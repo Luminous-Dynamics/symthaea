@@ -685,3 +685,12 @@ Compare point EIG, scenario-robust EIG, expected EVSI, worst-case/CVaR EVSI, EVS
 Measure realized held-out regret, wrong terminal decisions, EVSI prediction error, policy stability, target impact and total investigation cost. Proposed target: reduce 90th-percentile realized regret by at least 20% versus point EIG on a preregistered misspecification corpus, without increasing target impact or investigation cost beyond the declared tolerance. This is a research target, not a measured result.
 
 The machine-readable benchmark manifest now includes the decision-value/minimax-regret suite as a separate family.
+
+
+### Held-out distribution-shift evaluation
+
+Exact minimax over the supplied finite scenarios can still fail under an omitted true data-generating process. Therefore the benchmark now has a distinct hidden-DGP track tracked by [#10175](https://github.com/Luminous-Dynamics/symthaea/issues/10175).
+
+The hidden track withholds true likelihoods and tests prior shift, omitted latent variables, missing device/build/environment modes, correlated or non-stationary outcomes, optimistic in-ensemble models, utility perturbation, externalities and cost/impact estimation errors. It reports in-ensemble optimality separately from out-of-ensemble realized regret, wrong-action rates and regret CVaR.
+
+The planner is not given held-out scenarios; it cannot optimize directly for them. The benchmark freezes declared priors/scenarios/utilities before revealing the hidden DGP. Proposed target: at least 20% lower p90 realized regret than point EIG on the preregistered misspecification corpus, with no increase in wrong-action rate or target impact. This remains a research goal, not a measured claim.
