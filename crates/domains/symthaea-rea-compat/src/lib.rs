@@ -394,6 +394,16 @@ fn validate_relationship_coverage(value: &Value) -> Result<(), EvidenceError> {
     Ok(())
 }
 
+fn validate_nonnegative_safe_integer(value: &Value, context: &str) -> Result<(), EvidenceError> {
+    const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+    let integer = value.as_u64()
+        .ok_or_else(|| schema_error(format!("{context} must be a non-negative safe integer")))?;
+    if integer > MAX_SAFE_INTEGER {
+        return Err(schema_error(format!("{context} exceeds the JavaScript safe integer range")));
+    }
+    Ok(())
+}
+
 fn validate_location(value: &Value, index: usize) -> Result<(), EvidenceError> {
     let context = format!("locations[{index}]");
     let map = object(value, &context)?;
@@ -420,19 +430,17 @@ fn validate_location(value: &Value, index: usize) -> Result<(), EvidenceError> {
             nonempty_string(field(map, "end", &context)?, &format!("{context}.end"))?;
         }
         "file-offset" => {
-            if field(map, "offset", &context)?.as_u64().is_none() {
-                return Err(schema_error(format!(
-                    "{context}.offset must be a non-negative integer"
-                )));
-            }
+            validate_nonnegative_safe_integer(
+                field(map, "offset", &context)?,
+                &format!("{context}.offset"),
+            )?;
         }
         "file-offset-range" => {
             for key in ["start", "end"] {
-                if field(map, key, &context)?.as_u64().is_none() {
-                    return Err(schema_error(format!(
-                        "{context}.{key} must be a non-negative integer"
-                    )));
-                }
+                validate_nonnegative_safe_integer(
+                    field(map, key, &context)?,
+                    &format!("{context}.{key}"),
+                )?;
             }
         }
         _ => {}
@@ -868,6 +876,21 @@ mod tests {
         missing_profile.as_object_mut().unwrap().remove("analysis_profile");
         assert_eq!(
             validate_evidence_schema(&missing_profile).unwrap_err().kind,
+            EvidenceErrorKind::SchemaViolation
+        );
+    }
+
+    #[test]
+    fn file_offsets_match_zod_safe_integer_bounds() {
+        let mut evidence = golden();
+        evidence["locations"] = json!([{"kind": "file-offset", "offset": 9007199254740991}]);
+        let new_id = compute_evidence_id(&evidence).unwrap();
+        evidence["evidence_id"] = json!(new_id);
+        assert!(verify_evidence_value(&evidence).is_ok());
+
+        evidence["locations"][0]["offset"] = json!(9007199254740992u64);
+        assert_eq!(
+            validate_evidence_schema(&evidence).unwrap_err().kind,
             EvidenceErrorKind::SchemaViolation
         );
     }
