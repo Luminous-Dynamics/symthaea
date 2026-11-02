@@ -17,6 +17,7 @@ const PROTOCOL: &str = "CONNECTOME-STRUCTURAL-WORLD-UNIVERSE-V1";
 const RECEIPT_PROTOCOL: &str = "CONNECTOME-STRUCTURAL-WORLD-VERIFICATION-RECEIPT-V1";
 const POLICY: &str = "cartesian_product_all_combinations_v1";
 const MAX_WORLDS: usize = 100_000;
+const MAX_AXES: usize = 64;
 const TOLERANCE: f64 = 1.0e-12;
 
 fn sha256(bytes: &[u8]) -> String {
@@ -127,9 +128,16 @@ fn world_id(assignment: &Map<String, Value>) -> Result<String, String> {
 }
 
 #[derive(Clone, Debug)]
+struct Alternative {
+    id: String,
+    evidence_artifact_id: String,
+    evidence_sha256: String,
+}
+
+#[derive(Clone, Debug)]
 struct Axis {
     id: String,
-    alternatives: Vec<String>,
+    alternatives: Vec<Alternative>,
 }
 
 /// Generate all worlds in lexical axis/alternative order. The only admissibility
@@ -146,7 +154,7 @@ fn expand_world_ids(
     }
     let axis = &axes[index];
     for alternative in &axis.alternatives {
-        assignment.insert(axis.id.clone(), Value::String(alternative.clone()));
+        assignment.insert(axis.id.clone(), Value::String(alternative.id.clone()));
         expand_world_ids(axes, index + 1, assignment, output)?;
     }
     assignment.remove(&axis.id);
@@ -160,6 +168,10 @@ fn read_axes(manifest: &Value, errors: &mut Vec<String>) -> Vec<Axis> {
     };
     if items.is_empty() {
         errors.push("axes: expected a non-empty array".to_owned());
+        return Vec::new();
+    }
+    if items.len() > MAX_AXES {
+        errors.push(format!("axes: {} axes exceed the V1 safety cap of {MAX_AXES}", items.len()));
         return Vec::new();
     }
 
@@ -200,13 +212,25 @@ fn read_axes(manifest: &Value, errors: &mut Vec<String>) -> Vec<Axis> {
                     "axes[{axis_index}]: duplicate alternative_id {alternative_id}"
                 ));
             }
-            match alternative.get("evidence_sha256").and_then(Value::as_str) {
-                Some(digest) if is_sha256(digest) => {}
-                _ => errors.push(format!(
-                    "axes[{axis_index}].alternatives[{alternative_index}].evidence_sha256: invalid SHA-256"
-                )),
-            }
-            alternatives.push(alternative_id);
+            let artifact_id = match alternative.get("evidence_artifact_id").and_then(Value::as_str) {
+                Some(value) if !value.trim().is_empty() => value.to_owned(),
+                _ => {
+                    errors.push(format!(
+                        "axes[{axis_index}].alternatives[{alternative_index}].evidence_artifact_id: missing"
+                    ));
+                    continue;
+                }
+            };
+            let evidence_sha256 = match alternative.get("evidence_sha256").and_then(Value::as_str) {
+                Some(digest) if is_sha256(digest) => digest.to_owned(),
+                _ => {
+                    errors.push(format!(
+                        "axes[{axis_index}].alternatives[{alternative_index}].evidence_sha256: invalid SHA-256"
+                    ));
+                    continue;
+                }
+            };
+            alternatives.push(Alternative { id: alternative_id, evidence_artifact_id: artifact_id, evidence_sha256 });
         }
         alternatives.sort();
         axes.push(Axis { id, alternatives });
@@ -441,22 +465,18 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
     }
 
     let axes = read_axes(&manifest, &mut errors);
-    for (axis_index, item) in manifest
-        .get("axes")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .enumerate()
-    {
-        if let Some(alternatives) = item.get("alternatives").and_then(Value::as_array) {
-            for (alternative_index, alternative) in alternatives.iter().enumerate() {
-                if let Some(digest) = alternative.get("evidence_sha256").and_then(Value::as_str) {
-                    if !artifact_digests.values().any(|actual| actual == digest) {
-                        errors.push(format!(
-                            "axes[{axis_index}].alternatives[{alternative_index}].evidence_sha256: no matching verified artifact"
-                        ));
-                    }
-                }
+    for axis in &axes {
+        for alternative in &axis.alternatives {
+            match artifact_digests.get(&alternative.evidence_artifact_id) {
+                Some(actual) if actual == &alternative.evidence_sha256 => {}
+                Some(actual) => errors.push(format!(
+                    "axis {}/{}: evidence digest mismatch for artifact {}",
+                    axis.id, alternative.id, alternative.evidence_artifact_id
+                )),
+                None => errors.push(format!(
+                    "axis {}/{}: evidence artifact {} was not independently verified",
+                    axis.id, alternative.id, alternative.evidence_artifact_id
+                )),
             }
         }
     }
@@ -779,15 +799,15 @@ mod tests {
             {
                 "axis_id": "detector_state",
                 "alternatives": [
-                    {"alternative_id":"low","evidence_sha256":digest_for("a1_evidence")},
-                    {"alternative_id":"high","evidence_sha256":digest_for("a2_evidence")}
+                    {"alternative_id":"low","evidence_artifact_id":"a1_evidence","evidence_sha256":digest_for("a1_evidence")},
+                    {"alternative_id":"high","evidence_artifact_id":"a2_evidence","evidence_sha256":digest_for("a2_evidence")}
                 ]
             },
             {
                 "axis_id": "structural_hypothesis",
                 "alternatives": [
-                    {"alternative_id":"merge","evidence_sha256":digest_for("b1_evidence")},
-                    {"alternative_id":"separate","evidence_sha256":digest_for("b2_evidence")}
+                    {"alternative_id":"merge","evidence_artifact_id":"b1_evidence","evidence_sha256":digest_for("b1_evidence")},
+                    {"alternative_id":"separate","evidence_artifact_id":"b2_evidence","evidence_sha256":digest_for("b2_evidence")}
                 ]
             }
         ]);
@@ -930,4 +950,51 @@ mod tests {
         let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("stale digest");
         assert!(errors.iter().any(|error| error.contains("manifest_sha256")));
     }
+    #[test]
+    fn parent_traversal_in_artifact_path_is_rejected() {
+        let root = test_root();
+        let path = root.join("universe.json");
+        let mut manifest = fixture(&root);
+        manifest["artifact_files"][0]["relative_path"] = json!("../freeze.json");
+        manifest = seal_manifest(manifest);
+        fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
+        let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("path traversal");
+        assert!(errors.iter().any(|error| error.contains("cannot traverse directories")));
+    }
+
+    #[test]
+    fn alternative_must_bind_exact_evidence_artifact_id_and_digest() {
+        let root = test_root();
+        let path = root.join("universe.json");
+        let mut manifest = fixture(&root);
+        manifest["axes"][0]["alternatives"][0]["evidence_artifact_id"] = json!("base_graph_snapshot");
+        manifest = seal_manifest(manifest);
+        fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
+        let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("wrong evidence artifact");
+        assert!(errors.iter().any(|error| error.contains("evidence digest mismatch")));
+    }
+
+    #[test]
+    fn axis_count_is_bounded_before_recursive_enumeration() {
+        let root = test_root();
+        let path = root.join("universe.json");
+        let mut manifest = fixture(&root);
+        let mut axes = manifest["axes"].as_array().expect("axes").clone();
+        while axes.len() <= MAX_AXES {
+            axes.push(json!({
+                "axis_id": format!("extra-{}", axes.len()),
+                "alternatives": [{
+                    "alternative_id": "only",
+                    "evidence_artifact_id": "a1_evidence",
+                    "evidence_sha256": manifest["artifact_files"][5]["sha256"]
+                }]
+            }));
+        }
+        manifest["axes"] = Value::Array(axes);
+        manifest = seal_manifest(manifest);
+        fs::write(&path, serde_json::to_vec_pretty(&manifest).expect("serialize")).expect("write manifest");
+        let errors = verify_manifest(&path, &"c".repeat(64)).expect_err("axis cap");
+        assert!(errors.iter().any(|error| error.contains("exceed the V1 safety cap")));
+    }
+
 }
