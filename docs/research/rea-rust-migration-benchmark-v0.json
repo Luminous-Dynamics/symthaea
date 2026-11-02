@@ -547,7 +547,27 @@
           "UnCrackable_L1",
           "UnCrackable_L2"
         ],
-        "corpus_policy": "pin challenge bytes and versions; retain upstream license/provenance; add newly source-built variants as held-out cases"
+        "corpus_policy": "pin challenge bytes and versions; retain upstream license/provenance; add newly source-built variants as held-out cases",
+        "upstream_catalog_ids": {
+          "MASTG-APP-0002": "Android License Validator",
+          "MASTG-APP-0003": "Android UnCrackable L1",
+          "MASTG-APP-0004": "Android UnCrackable L2",
+          "MASTG-APP-0005": "Android UnCrackable L3",
+          "MASTG-APP-0015": "Android UnCrackable L4",
+          "MASTG-APP-0025": "iOS UnCrackable L1",
+          "MASTG-APP-0026": "iOS UnCrackable L2"
+        },
+        "reference_page": "https://mas.owasp.org/crackmes/",
+        "license": "CC-BY-4.0 for OWASP MAS Crackmes content; preserve source artifact licensing independently",
+        "extra_artifacts": [
+          {
+            "name": "Android UnCrackable DRM",
+            "artifact": "validate (ELF 32-bit)",
+            "platform": "Android",
+            "kind": "native_executable",
+            "note": "Treat as a distinct ELF target, not an APK."
+          }
+        ]
       },
       "baselines": [
         "MobSF_static",
