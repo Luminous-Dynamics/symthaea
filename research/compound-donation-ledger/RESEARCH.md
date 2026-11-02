@@ -353,6 +353,120 @@ not the FDR estimand. These results are exploratory and require frozen
 confirmatory seeds, heterogeneous and switching alternatives, positive and
 negative dependence, and family-size/alpha transfer tests.
 
+### Horizon-independent projective rank prior
+
+The fixed-family rank-geometric prior above allocates equal mass over ranks
+for one precommitted family-size envelope. It can be powerful, but recomputing
+it as the active family grows changes old candidate calibrators and violates
+projectivity. A different construction removes family size entirely.
+
+For candidate \(i\), fix its global summable weight \(\gamma_i>0\) and target
+level \(\alpha\). For every dyadic rank \(r_j=2^j\), \(j=0,1,\ldots\), allocate
+\[
+\pi_j=\frac{1}{(j+1)(j+2)},\qquad \sum_{j=0}^{\infty}\pi_j=1.
+\]
+Let \(S_{i,t}=\sup_{s\le t}E_{i,s}\) be the running supremum of its base
+e-process, and define
+\[
+K_{i,j}=
+\max\left\{1,\left\lceil
+\frac{1}{\alpha\gamma_i\,2^j\,\pi_j}
+\right\rceil\right\},
+\qquad
+V_{i,t}=\sum_{j=0}^{\infty}
+\pi_jK_{i,j}\mathbf1\{S_{i,t}\ge K_{i,j}\}.
+\]
+The clamp at one is valid because a running supremum starting at one is
+always at least one; when the un-clamped threshold is below one, replacing it
+by one only decreases the term's contribution relative to the intended
+threshold condition. More directly, if the e-BH boundary is below one, the
+baseline crossing already occurs at \(S=1\).
+
+By Ville's inequality,
+\[
+\mathbb E[V_{i,\infty}]
+\le\sum_j\pi_j\le1.
+\]
+It is adapted and pathwise nondecreasing, so it is a valid time-monotone
+e-process. Crucially, it depends on the candidate's fixed \(\gamma_i\) and
+\(\alpha\), but **not on the number of currently active hypotheses**.
+
+For any actual e-BH rejection rank \(k\), choose
+\(j=\lfloor\log_2 k\rfloor\), giving \(2^j\le k<2^{j+1}\). The single
+corresponding staircase term satisfies
+\[
+\pi_jK_{i,j}
+\ge\frac{1}{\alpha\gamma_i2^j}
+\ge\frac{1}{\alpha\gamma_i k}.
+\]
+Thus it reaches the candidate's weighted e-BH rank-k boundary. Conversely,
+because \(k<2^{j+1}\), its raw supremum threshold is bounded, up to fixed-
+point rounding and the lower clamp at one, by
+\[
+K_{i,j}
+\lesssim
+\max\left\{1,\,
+\frac{2(j+1)(j+2)}{\alpha\gamma_i k}
+\right\}.
+\]
+Since \(j=O(\log k)\), the rank overhead is \(O((\log k)^2)\), while a
+square-root adjuster requires raw supremum proportional to the square of
+the adjusted boundary. This is the price paid for covering every possible
+future rank with one precommitted prior.
+
+The finite Rust constructor stores j=0..63. The masses sum to 64/65, leaving
+the tail unspent, and cover every rejection rank representable in a u64
+finite family (maximum rank below 2^64). Each candidate's rational global
+weight must itself be precommitted and must not be renormalized when new
+hypotheses arrive. This makes the calibrator itself projective under
+initial-segment horizon extension.
+
+This is a direct construction from Ville's inequality plus a dyadic rank
+cover. The possible contribution is its use as a fixed, projective,
+decision-targeted adjuster for weighted SupFDR, along with a careful empirical
+comparison against horizon-specific calibration. It is not claimed as a new
+general e-process theorem.
+
+### Exploratory projective-rank experiment
+
+We extended the Bernoulli likelihood-ratio screen with the horizon-independent
+projective rank prior. Fixed seed 20261102; 3,000 independent streams per
+cell; m=100; T=100; alpha=0.05; null p0=0.5; alternative p1=0.75; per-round
+LR factors 1.5 and 0.5. Compared square-root, 25-point universal dyadic,
+fixed-family equal-prior rank-geometric, and projective dyadic-rank
+calibrators. SupFDR is the mean over streams of max_t FDP_t; power is the
+terminal fraction of alternatives rejected. Balanced negative dependence
+uses a random floor/ceiling count of null successes with a uniformly selected
+subset, preserving conditional marginal success probability 0.5 for every
+null coordinate.
+
+| Null dependence | Alternative fraction | Square-root power | Universal dyadic power | Fixed-family rank power | Projective rank power | Projective SupFDR |
+|---|---:|---:|---:|---:|---:|---:|
+| Independent | 5% | 58.73% | 70.42% | 90.44% | 88.84% | 0.573% |
+| Independent | 20% | 82.93% | 84.16% | 95.48% | 90.69% | 0.314% |
+| Independent | 50% | 91.52% | 89.23% | 96.62% | 92.38% | 0.121% |
+| Balanced negative | 5% | 58.42% | 70.25% | 90.48% | 89.12% | 0.453% |
+| Balanced negative | 20% | 82.54% | 83.81% | 95.55% | 90.48% | 0.306% |
+| Balanced negative | 50% | 91.63% | 89.35% | 96.65% | 92.49% | 0.115% |
+
+The projective rank prior gives up some power relative to the finite-family
+specialist, as expected, but remains materially ahead of square-root and
+universal dyadic in this one model while keeping the same candidate
+calibrator as the family grows. Its global-null SupFDR estimates were 1.667%
+(independent) and 1.767% (balanced negative); in mixed-alternative cells the
+largest projective SupFDR estimate was 0.573% (independent) and 0.453%
+(balanced negative). At n=3,000 the one-sided 95% Hoeffding half-width is
+0.02235. Thus the largest projective SupFDR point estimate has a conservative
+upper bound below 4.01% in these cells.
+
+This is an exploratory result, not a guarantee or SOTA claim. It is one
+family size, one alpha, one likelihood-ratio model, homogeneous signals and
+one negative-dependence design. The committed run manifest and script must
+be independently reproduced before confirmatory use. The next experiment
+must test family-size transfer with a fixed global weight sequence, multiple
+alpha values, heterogeneous and switching alternatives, time-varying
+dependence, delayed/predictable arrivals and 50,000+ frozen streams.
+
 ## 6. Prior art and software baselines
 
 The benchmark must keep guarantee classes separate.
