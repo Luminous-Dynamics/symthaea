@@ -289,7 +289,7 @@ impl DecisionFunctionalCalibrationRequest {
                 "request.null_rows",
             )?;
             validate_randomized_assignment(
-                self.alternative_rows.iter().map(|row| (&row.model_id, &row.policy_id, row.assignment_probability, &row.sampling_unit_ids)),
+                self.alternative_rows.iter().map(|row| (&row.model_id, &row.policy_id, row.assignment_probability, row.sampling_unit_ids.as_slice())),
                 "request.alternative_rows",
             )?;
         }
