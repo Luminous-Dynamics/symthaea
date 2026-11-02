@@ -493,9 +493,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("analyze-causal-study") => analyze_causal_study_cli(&args),
         Some("analyze-exposure-transfer") => analyze_exposure_transfer_cli(&args),
         Some("analyze-adjudication-attrition") => analyze_adjudication_attrition_cli(&args),
+        Some("score-codec-dataset") => score_codec_dataset_cli(&args),
+        Some("evaluate-codec-dataset-auc") => evaluate_codec_dataset_level_auc_cli(&args),
         Some("audit-adjudications") => audit_adjudications(&args),
         _ => Err(
-            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | analyze-adjudication-attrition | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
+            "commands: generate | score | evaluate | randomize-intervention | audit-intervention | audit-training-receipt | analyze-causal-study | analyze-exposure-transfer | analyze-adjudication-attrition | score-codec-dataset | evaluate-codec-dataset-auc | ftd-pvalues | ftd-fuse | audit-adjudications\nRun a command without the required arguments to see its usage."
                 .into(),
         ),
     }
