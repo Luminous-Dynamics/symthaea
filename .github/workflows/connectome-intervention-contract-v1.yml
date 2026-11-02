@@ -7,7 +7,6 @@ on:
       - "docs/neuroscience/CONNECTOME_INTERVENTION_BENCHMARK_*.json"
       - "docs/neuroscience/CONNECTOME_INTERVENTION_BENCHMARK_SCORECARD_V1.md"
       - "docs/neuroscience/CPG_*"
-      - "docs/neuroscience/CPG_*"
       - "tools/connectome-intervention-contract/**"
       - ".github/workflows/connectome-intervention-contract-v1.yml"
   pull_request:
@@ -31,6 +30,7 @@ concurrency:
 jobs:
   semantic-contract:
     name: Exact-source semantic contract tests
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
