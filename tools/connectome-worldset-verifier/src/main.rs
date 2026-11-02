@@ -663,6 +663,11 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
         "coverage": coverage,
         "expected_world_count": expected_world_ids.len(),
         "evaluated_world_count": evaluated_ids.len(),
+        "trust_boundary": {
+            "prequery_freeze_authentication": "NOT_PERFORMED_EXTERNAL_TRUST_REQUIRED",
+            "universe_selection_independence": "NOT_ASSESSED",
+            "alternative_biological_admissibility": "NOT_ASSESSED"
+        },
         "biological_exhaustiveness": false,
         "errors": []
     });
@@ -881,6 +886,14 @@ mod tests {
         assert!(receipt["coverage"]["closure_verified"].as_bool().expect("closure flag"));
         assert_eq!(receipt["expected_world_count"], 4);
         assert_eq!(receipt["evaluated_world_count"], 4);
+        assert_eq!(
+            receipt["trust_boundary"]["prequery_freeze_authentication"],
+            "NOT_PERFORMED_EXTERNAL_TRUST_REQUIRED"
+        );
+        assert_eq!(
+            receipt["trust_boundary"]["universe_selection_independence"],
+            "NOT_ASSESSED"
+        );
         assert_eq!(receipt["coverage"]["expected_world_ids"].as_array().expect("IDs").len(), 4);
         assert!(is_sha256(receipt["coverage"]["verification_receipt_sha256"].as_str().expect("receipt digest")));
     }
