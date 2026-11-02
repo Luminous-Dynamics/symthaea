@@ -109,6 +109,8 @@ MAX_SOURCE_TEXT_BYTES = 64 * 1024
 SOURCE_SNAPSHOT_ALLOWLIST = {
     "README.md",
     "abm/README.md",
+    "abm/abm.ipynb",
+    "abm/array_to_df.py",
     "abm/model.py",
     "algorithm/README.md",
     "algorithm/params/seed_0.yml",
@@ -118,17 +120,71 @@ SOURCE_SNAPSHOT_ALLOWLIST = {
     "algorithm/dqn/dqn_exp.py",
     "algorithm/dqn/dqn_agent.py",
     "algorithm/dqn/environment_vect.py",
+    "algorithm/dqn/logger.py",
+    "algorithm/dqn/memory.py",
+    "algorithm/dqn/nn.py",
+    "common/generate/generation.py",
     "analysis/README.md",
     "data/README.md",
     "statistics/README.md",
     ".gitattributes",
 }
+NOTEBOOK_SNAPSHOT_MAX_BYTES = 1_500_000
+
+def notebook_source_snapshot(raw: bytes, info: zipfile.ZipInfo) -> dict[str, Any]:
+    """Retain notebook markdown headings and code cells, never cell outputs."""
+    notebook = json.loads(raw.decode("utf-8"))
+    extracted_cells = []
+    for index, cell in enumerate(notebook.get("cells", [])):
+        cell_type = cell.get("cell_type")
+        source = cell.get("source", [])
+        source_text = "".join(source) if isinstance(source, list) else str(source)
+        if cell_type == "code":
+            extracted_cells.append({
+                "cell_index": index,
+                "cell_type": "code",
+                "execution_count": cell.get("execution_count"),
+                "source": source_text,
+            })
+        elif cell_type == "markdown":
+            headings = [
+                line.strip() for line in source_text.splitlines()
+                if line.lstrip().startswith("#")
+            ]
+            if headings:
+                extracted_cells.append({
+                    "cell_index": index,
+                    "cell_type": "markdown_headings",
+                    "headings": headings,
+                })
+    return {
+        "path": info.filename,
+        "size_bytes": info.file_size,
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "notebook_metadata": {
+            "nbformat": notebook.get("nbformat"),
+            "nbformat_minor": notebook.get("nbformat_minor"),
+            "kernelspec": notebook.get("metadata", {}).get("kernelspec"),
+        },
+        "extracted_cells": extracted_cells,
+        "outputs_included": False,
+    }
 
 def source_snapshot(archive: zipfile.ZipFile, info: zipfile.ZipInfo) -> dict[str, Any] | None:
     parts = PurePosixPath(info.filename).parts
     relative_path = "/".join(parts[1:])
     if relative_path not in SOURCE_SNAPSHOT_ALLOWLIST:
         return None
+    if relative_path.endswith(".ipynb"):
+        if info.file_size > NOTEBOOK_SNAPSHOT_MAX_BYTES:
+            return {"path": info.filename, "inspection": "notebook_skipped_size_limit", "size_bytes": info.file_size}
+        try:
+            raw = archive.read(info)
+            if raw.startswith(b"version https://git-lfs.github.com/spec/v1"):
+                return None
+            return notebook_source_snapshot(raw, info)
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            return {"path": info.filename, "inspection": "unreadable_notebook"}
     if info.file_size > MAX_SOURCE_TEXT_BYTES:
         return {"path": info.filename, "inspection": "skipped_size_limit", "size_bytes": info.file_size}
     try:
@@ -263,7 +319,7 @@ def main() -> int:
             "This report inventories archive structure and field names; it is not a reproduction of the paper's analysis.",
             "CSV headers and JSON keys are metadata only; no participant or move-level row values are exported.",
             "Git LFS pointer files are identified by OID and declared size but are not hydrated by this inventory step; underlying LFS data rows are not inspected.",
-            "Research source snapshots include only an explicit allowlist of README, ABM, DQN and configuration source files; no participant-level raw or processed data files are included.",
+            "Research source snapshots include only an explicit allowlist of README, ABM notebook code/markdown headings, ABM source, DQN source and configuration files; notebook cell outputs are excluded and no participant-level raw or processed data files are included.",
             "Network orientation, tie-breaking, path legality and hidden-level constraints still require source-code review.",
             "The archive license and per-file data-use terms must be preserved from the source metadata before any redistribution.",
         ],
