@@ -80,6 +80,8 @@ At minimum, reproduce compatible versions of:
 6. Vaze's simultaneous coverage-and-efficiency approach, once its exact method and assumptions are implemented.
 7. Fixed sliding-window quantile calibration with predeclared windows.
 8. PACE heterogeneous-horizon ensemble as an empirical heuristic baseline.
+
+**UP-OCP source pin:** The ICML 2026 paper is https://proceedings.mlr.press/v306/liu26y.html. Its public reference repository https://github.com/AdaMLLab/up-for-ocp is pinned at main commit 3575f1f94a14620e089422f52cf9e1a6766ec7b1 and declares MIT. Source inspection of core/methods.py finds a UniversalPortfolio class with Dirichlet/uniform mixture options, a finite-sample alpha correction (alpha -= 0.015), wealth/betting updates and quantile-radius calculation. Treat this as a reproduction target; verify paper configurations and tests rather than assuming the repository HEAD is a formal theorem artifact.
 9. Fixed-horizon interleaved delayed ACI as specified by El Halabi & Brandt (2026).
 10. Multi-step Adaptive Conformal Prediction (MACP).
 11. Autocorrelation-aware Multi-step Conformal Prediction (AcMCP).
