@@ -117,6 +117,8 @@ pub struct DosePlanCheckSummary {
 /// formulation viscosity/temperature envelope; a digest alone does not authenticate it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DoseDeliveryCalibration {
+    pub component_id: String,
+    pub dispenser_channel_id: String,
     pub calibration_id: String,
     pub calibration_evidence_sha256: String,
     /// Allowed under-delivery in basis points; must be below 10,000 (100%).
@@ -132,6 +134,8 @@ pub struct DoseDeliveryCalibration {
 #[derive(Debug, Clone, PartialEq)]
 pub struct DoseDeliveryMeasurement {
     pub event_id: String,
+    pub component_id: String,
+    pub dispenser_channel_id: String,
     pub calibration_id: String,
     pub actual_dose_mg: u64,
     pub actual_elapsed_s: u32,
@@ -161,6 +165,8 @@ pub enum ChemistryError {
     InvalidDeliveryEvidence,
     DeliveryCalibrationMismatch,
     DeliveryEventMismatch,
+    DeliveryComponentMismatch,
+    DeliveryChannelMismatch,
     ActualDoseOutsideTolerance,
     ActualDeliveryTimingOutsideTolerance,
     ComponentDoseOverflow {
@@ -461,13 +467,17 @@ pub fn check_reported_dose_delivery(
     {
         return Err(ChemistryError::DeliveryEventMismatch);
     }
-    if !canonical_non_empty(&calibration.calibration_id)
+    if !canonical_non_empty(&calibration.component_id)
+        || !canonical_non_empty(&calibration.dispenser_channel_id)
+        || !canonical_non_empty(&calibration.calibration_id)
         || calibration.maximum_underdelivery_bps >= 10_000
         || !valid_digest(&calibration.calibration_evidence_sha256)
     {
         return Err(ChemistryError::InvalidDeliveryCalibration);
     }
     if !canonical_non_empty(&measurement.event_id)
+        || !canonical_non_empty(&measurement.component_id)
+        || !canonical_non_empty(&measurement.dispenser_channel_id)
         || !valid_digest(&measurement.measurement_evidence_sha256)
         || !valid_digest(&measurement.calibration_bundle_sha256)
     {
@@ -475,6 +485,14 @@ pub fn check_reported_dose_delivery(
     }
     if measurement.event_id != commanded.event_id {
         return Err(ChemistryError::DeliveryEventMismatch);
+    }
+    if calibration.component_id != commanded.component_id
+        || measurement.component_id != commanded.component_id
+    {
+        return Err(ChemistryError::DeliveryComponentMismatch);
+    }
+    if measurement.dispenser_channel_id != calibration.dispenser_channel_id {
+        return Err(ChemistryError::DeliveryChannelMismatch);
     }
     if measurement.calibration_id != calibration.calibration_id {
         return Err(ChemistryError::DeliveryCalibrationMismatch);
@@ -702,6 +720,8 @@ mod tests {
 
     fn delivery_calibration() -> DoseDeliveryCalibration {
         DoseDeliveryCalibration {
+            component_id: "enzyme".to_owned(),
+            dispenser_channel_id: "channel-a".to_owned(),
             calibration_id: "dispenser-channel-a-v1".to_owned(),
             calibration_evidence_sha256: "d".repeat(64),
             maximum_underdelivery_bps: 500,
@@ -713,6 +733,8 @@ mod tests {
     fn delivery_measurement(event: &DoseEvent) -> DoseDeliveryMeasurement {
         DoseDeliveryMeasurement {
             event_id: event.event_id.clone(),
+            component_id: event.component_id.clone(),
+            dispenser_channel_id: "channel-a".to_owned(),
             calibration_id: "dispenser-channel-a-v1".to_owned(),
             actual_dose_mg: event.dose_mg + 10,
             actual_elapsed_s: event.elapsed_s + 1,
@@ -724,7 +746,7 @@ mod tests {
 
     #[test]
     fn accepts_reported_delivery_inside_calibrated_integer_mass_and_timing_tolerance() {
-        let event = request().events.remove(0);
+        let event = request().events.into_iter().next().unwrap();
         let summary = check_reported_dose_delivery(
             &event,
             &delivery_calibration(),
@@ -763,6 +785,33 @@ mod tests {
         assert!(matches!(
             check_reported_dose_delivery(&event, &delivery_calibration(), &measurement),
             Err(ChemistryError::ActualDeliveryTimingOutsideTolerance)
+        ));
+    }
+
+    #[test]
+    fn rejects_delivery_from_wrong_component_or_dispenser_channel() {
+        let event = request().events.into_iter().next().unwrap();
+
+        let mut wrong_component = delivery_measurement(&event);
+        wrong_component.component_id = "bleach".to_owned();
+        assert!(matches!(
+            check_reported_dose_delivery(
+                &event,
+                &delivery_calibration(),
+                &wrong_component
+            ),
+            Err(ChemistryError::DeliveryComponentMismatch)
+        ));
+
+        let mut wrong_channel = delivery_measurement(&event);
+        wrong_channel.dispenser_channel_id = "channel-b".to_owned();
+        assert!(matches!(
+            check_reported_dose_delivery(
+                &event,
+                &delivery_calibration(),
+                &wrong_channel
+            ),
+            Err(ChemistryError::DeliveryChannelMismatch)
         ));
     }
 
