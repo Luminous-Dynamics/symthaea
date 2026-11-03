@@ -27,3 +27,19 @@ All units are encoded in column names. Flow is litres/minute, pressure is pascal
 8. Mark missing values as empty, not zero. Zero is a valid measurement and must remain distinguishable from missing data.
 
 This schema does not itself implement IEC 60436 or a sanitization test.
+
+## Occupancy-curve constructor mapping
+
+The run-level Rust API in `symthaea-dishwasher-scheduler::resource_curve` consumes fields from a frozen experiment archive:
+
+- `PhysicalRunMeasurement.run_id` ← `run_id`
+- `cleaning_pass` / `rinse_pass` ← the corresponding independent ground-truth acceptance calls
+- `energy_kwh` ← `total_wall_real_energy_kwh` (include controls, pump, heater, drying and declared standby boundary)
+- `fresh_water_l` ← `fresh_water_l`
+- `duration_s` ← `cycle_duration_s`
+- `cleaning_evidence_ref` / `rinse_evidence_ref` ← immutable assay / coupon / residue record references
+- `calibration_bundle_sha256` ← digest of the calibration-certificate and meter-configuration bundle
+
+The curve scope must be built from the exact machine/programme, soil/surface, load-set, soil/detergent/water batch, soil age, water hardness, inlet temperature, ambient temperature and humidity, protocol ID and raw-data archive digest. Do not combine runs with different fixed conditions into one curve.
+
+The CSV header is a data contract only; it does not authenticate the evidence references or automatically compute the pass/fail fields. Preserve original meter exports and assay records. A run failing a cleaning/rinse endpoint stays in the raw archive and the failed occupancy must not be used as an eligible scheduler curve.
