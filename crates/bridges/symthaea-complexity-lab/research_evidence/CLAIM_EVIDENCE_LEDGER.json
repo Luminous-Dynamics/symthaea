@@ -1,0 +1,157 @@
+{
+  "schema": "symthaea.complexity-claim-evidence-ledger/v1",
+  "audit_date": "2026-11-03",
+  "policy": {
+    "formalized": "Only claims explicitly scoped by a linked formal theorem and its source scope note are marked lean_formalization_scope_documented. A paper's stronger statement is a separate manuscript-only claim unless a corresponding theorem is identified.",
+    "exactness": "Exact coefficient arithmetic does not imply deterministic solver correctness. Solver mode, proof/certificate model and output contract are separate fields.",
+    "independent_reproduction": "A repository theorem citation is not an assertion that this Symthaea environment independently rebuilt the Lean project.",
+    "peer_review": "Preprint, internal formalization, external review and peer-reviewed publication are separate evidence dimensions."
+  },
+  "sources": [
+    {
+      "source_id": "openai-math-revision",
+      "repository": "openai/math",
+      "revision": "4eaee87548250b2682affda7d05d947c05554bae",
+      "immutable_url": "https://github.com/openai/math/tree/4eaee87548250b2682affda7d05d947c05554bae",
+      "kind": "repository_revision"
+    },
+    {
+      "source_id": "openai-eth-lean-scope",
+      "source_id_kind": "git_blob_sha",
+      "blob_sha": "223bbe187394bffca8a2c7ba1656538bfba26e3b",
+      "immutable_url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/docs/378.md",
+      "kind": "lean_scope_note"
+    },
+    {
+      "source_id": "openai-eth-lean-final",
+      "source_id_kind": "git_blob_sha",
+      "blob_sha": "a69635a2492e06a26f2e33d4251edd1e21ba3332",
+      "immutable_url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/OAI/Algorithms/SubexponentialSAT/SqrtLogSpace/Final.lean",
+      "kind": "lean_source"
+    },
+    {
+      "source_id": "openai-eth-comparator",
+      "source_id_kind": "git_blob_sha",
+      "blob_sha": "d4cc9e7074e900c1aa6371151cfd234c121a0b82",
+      "immutable_url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/ComparatorChallenges/SubexponentialSAT.json",
+      "kind": "comparator_manifest"
+    },
+    {
+      "source_id": "openai-eth-paper-readme",
+      "source_id_kind": "git_blob_sha",
+      "blob_sha": "4fed045323c329be85bc53cf46dfaa6efbf3759f",
+      "immutable_url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/preprints/The-Exponential-Time-Hypothesis-is-False-October-25-2026/README.md",
+      "kind": "manuscript_metadata"
+    },
+    {
+      "source_id": "openai-eth-paper-pdf",
+      "source_id_kind": "git_blob_sha",
+      "blob_sha": "0503566e95bc587a4076573a45132d97531b8ba6",
+      "immutable_url": "https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/preprints/The-Exponential-Time-Hypothesis-is-False-October-25-2026/paper.pdf",
+      "kind": "manuscript_pdf"
+    },
+    {
+      "source_id": "weighted-counting-preprint",
+      "immutable_url": "https://hexagonmath.org/2610.00594v1",
+      "version": "v1",
+      "date": "2026-10-29",
+      "kind": "unrefereed_preprint",
+      "peer_review_status": "not_established_as_peer_reviewed",
+      "provenance_note": "The source describes mixed human/AI-generated text and names Claude/Claude Code/Python in its release metadata."
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "ETH-CLAIM-001",
+      "title": "Lean-formalized exact counting and SAT for fixed-width k-CNF",
+      "evidence_status": "lean_formalization_scope_documented",
+      "bound": "(L+1)^O_k(1) * 2^O_k(n*(log log n)^2/sqrt(log n))",
+      "input_family": "canonically encoded k-CNF over n variables, fixed k >= 2",
+      "input_encoding": "OpenAI math repository canonical CNF encoding; bit length L",
+      "output_contract": ["exact number of satisfying assignments", "SAT decision"],
+      "machine_model": "deterministic primitive machine as represented in the Lean development",
+      "space_claim": "at every execution prefix, visited tape cells are polynomial in L (for fixed k)",
+      "formal_theorem": "OAI.Algorithms.SubexponentialSAT.SqrtLogSpace.exact_count_and_sat",
+      "formal_source_ids": ["openai-eth-lean-final", "openai-eth-lean-scope"],
+      "comparator_manifest_source_ids": ["openai-eth-comparator"],
+      "permitted_axioms": ["propext", "Quot.sound", "Classical.choice"],
+      "source_scope_qualifier": "The Lean scope note explicitly describes this weaker squared-log-log exponent. The same file contains compiled_exact_count_and_sat and exact_count_eth declarations, but this ledger does not infer a stronger theorem from manuscript wording.",
+      "not_established_here": [
+        "Symthaea has not rebuilt the OpenAI Lean project in this environment.",
+        "The claim does not cover arbitrary SAT encodings, arbitrary output algebras, PMC/PWMC, or complex weighted counting.",
+        "This is a formalization-scope citation, not an independent external mathematical review."
+      ],
+      "reproduction_status": "not_independently_rebuilt_by_symthaea",
+      "external_review_status": "not_independently_adjudicated_here",
+      "last_audited": "2026-11-03"
+    },
+    {
+      "claim_id": "ETH-CLAIM-002",
+      "title": "Sharper general fixed-width k-CNF bound stated by the October 25 manuscript",
+      "evidence_status": "manuscript_only",
+      "bound": "(n+m)^O_k(1) * 2^O_k(n*log log n/sqrt(log n))",
+      "input_family": "fixed-width k-CNF with n variables and m clauses",
+      "input_encoding": "manuscript input model; details must be read from the paper before applying beyond stated scope",
+      "output_contract": ["exact SAT/counting as stated by manuscript"],
+      "machine_model": "as stated in manuscript; not promoted to Lean theorem by this ledger",
+      "formal_theorem": null,
+      "formal_source_ids": [],
+      "manuscript_source_ids": ["openai-eth-paper-readme", "openai-eth-paper-pdf"],
+      "relationship_to_formalized_scope": "sharper manuscript statement; the linked Lean scope note documents the squared-log-log exponent instead",
+      "not_established_here": [
+        "No corresponding exact theorem declaration is linked by the comparator manifest supplied here.",
+        "The formalized squared-log-log theorem does not, by itself, formalize this sharper exponent.",
+        "No Symthaea reproduction or external peer-review verdict is asserted."
+      ],
+      "reproduction_status": "not_reproduced_by_symthaea",
+      "external_review_status": "not_independently_adjudicated_here",
+      "last_audited": "2026-11-03"
+    },
+    {
+      "claim_id": "ETH-CLAIM-003",
+      "title": "Sparse fixed-width k-CNF corollary stated by the October 25 manuscript",
+      "evidence_status": "manuscript_only",
+      "bound": "if m <= D*n for fixed D: (n+m)^O_{k,D}(1) * 2^O_{k,D}(n/sqrt(log n))",
+      "input_family": "fixed-width k-CNF with an additional linear-clause promise m <= D*n",
+      "input_encoding": "manuscript input model",
+      "output_contract": ["exact SAT/counting as stated by manuscript"],
+      "machine_model": "as stated in manuscript; not promoted to Lean theorem by this ledger",
+      "formal_theorem": null,
+      "formal_source_ids": [],
+      "manuscript_source_ids": ["openai-eth-paper-readme", "openai-eth-paper-pdf"],
+      "relationship_to_formalized_scope": "sparse manuscript corollary; the linked Lean scope note does not list this sharper sparse exponent as the formalized theorem",
+      "not_established_here": [
+        "The linear-clause promise is an essential extra assumption.",
+        "No corresponding exact theorem declaration is linked by the comparator manifest supplied here.",
+        "No Symthaea reproduction or external peer-review verdict is asserted."
+      ],
+      "reproduction_status": "not_reproduced_by_symthaea",
+      "external_review_status": "not_independently_adjudicated_here",
+      "last_audited": "2026-11-03"
+    },
+    {
+      "claim_id": "ETH-CLAIM-004",
+      "title": "Subexponential weighted sparse counting and exact optimization over commutative Q-algebras",
+      "evidence_status": "manuscript_only",
+      "bound": "sparse weighted theorem reported with 2^O(n*(log log n)^2/sqrt(log n)) factor",
+      "input_family": "weighted sparse constraint/counting and optimization instances subject to the preprint's hypotheses",
+      "input_encoding": "preprint-specific; must be matched to its theorem hypotheses",
+      "output_contract": ["weighted distributions / exact optimization as specified by the preprint"],
+      "coefficient_domain": "commutative Q-algebra",
+      "machine_model": "as stated by preprint; no Lean machine theorem is linked here",
+      "formal_theorem": null,
+      "formal_source_ids": [],
+      "manuscript_source_ids": ["weighted-counting-preprint"],
+      "peer_review_status": "not_established_as_peer_reviewed",
+      "provenance": "The v1 preprint describes mixed human/AI-generated text and identifies Claude, Claude Code and Python in its release metadata.",
+      "not_established_here": [
+        "The weighted preprint is not the sharper dense OpenAI ETH construction.",
+        "No formalization in the OpenAI Lean artifact or Symthaea Lean project is linked.",
+        "Its theorem conditions and sparse structural assumptions must be checked before comparison."
+      ],
+      "reproduction_status": "not_reproduced_by_symthaea",
+      "external_review_status": "not_independently_adjudicated_here",
+      "last_audited": "2026-11-03"
+    }
+  ]
+}
