@@ -675,10 +675,10 @@ mod tests {
         let mut d=ModelDecisionObservation{
             decision_id:"decision-1".into(),scenario_id:"scenario-1".into(),failure_family_id:"crossing".into(),actor_policy_id:"ped-yield-v1".into(),split_id:"heldout".into(),shift_regime_id:"nominal".into(),
             initial_state_digest:h('a'),environment_digest:h('b'),dynamics_digest:h('c'),action_history_digest:h('d'),observation_availability_digest:h('e'),forecast_issued_at_ms:1000,
-            decision_context_digest:String::new(),action_set_digest:String::new(),utility_id:"progress-risk".into(),utility_unit_id:"utility".into(),tie_tolerance:1e-9,selected_action_id:"yield".into(),
+            decision_context_digest:String::new(),action_set_digest:String::new(),utility_id:"progress-risk".into(),utility_unit_id:"utility".into(),tie_tolerance:1e-9,selected_action_id:"continue".into(),
             candidate_set_complete:true,selection_commit_sequence:10,reference_outcome_reveal_sequence:11,selection_receipt_id:"select-1".into(),actions:vec![
-                DiscrepancyActionOutcome{action_id:"yield".into(),command_digest:h('f'),feasibility:DiscrepancyFeasibility::Feasible,reference_status:ReferenceOutcomeStatus::Observed,predicted_utility:10.0,realized_utility:Some(2.0),execution_receipt_id:Some("exec-y".into()),execution_digest:Some(h('1')),evaluator_receipt_id:Some("eval-y".into())},
-                DiscrepancyActionOutcome{action_id:"continue".into(),command_digest:h('0'),feasibility:DiscrepancyFeasibility::Feasible,reference_status:ReferenceOutcomeStatus::Observed,predicted_utility:7.0,realized_utility:Some(8.0),execution_receipt_id:Some("exec-c".into()),execution_digest:Some(h('2')),evaluator_receipt_id:Some("eval-c".into())}
+                DiscrepancyActionOutcome{action_id:"continue".into(),command_digest:h('f'),feasibility:DiscrepancyFeasibility::Feasible,reference_status:ReferenceOutcomeStatus::Observed,predicted_utility:10.0,realized_utility:Some(2.0),execution_receipt_id:Some("exec-c".into()),execution_digest:Some(h('1')),evaluator_receipt_id:Some("eval-c".into())},
+                DiscrepancyActionOutcome{action_id:"yield".into(),command_digest:h('0'),feasibility:DiscrepancyFeasibility::Feasible,reference_status:ReferenceOutcomeStatus::Observed,predicted_utility:7.0,realized_utility:Some(8.0),execution_receipt_id:Some("exec-y".into()),execution_digest:Some(h('2')),evaluator_receipt_id:Some("eval-y".into())}
             ]};
         d.actions.sort_by(|a,b|a.action_id.cmp(&b.action_id));
         d.action_set_digest=model_discrepancy_action_set_digest(&d.actions).unwrap();
@@ -864,7 +864,7 @@ mod tests {
             VehicleModelDiscrepancyError::MissingResidualOutcomeSlot
         );
     }
-    #[test] fn detects_planner_ranking_reversal_and_regret(){let r=summarize_vehicle_model_discrepancy(&input()).unwrap();let d=&r.decision_results[0];assert_eq!(d.predicted_best_action_id.as_deref(),Some("yield"));assert_eq!(d.realized_best_action_id.as_deref(),Some("continue"));assert_eq!(d.ranking_reversed,Some(true));assert_eq!(d.selected_action_regret,Some(6.0));assert_eq!(d.optimism_gap,Some(9.0));}
+    #[test] fn detects_planner_ranking_reversal_and_regret(){let r=summarize_vehicle_model_discrepancy(&input()).unwrap();let d=&r.decision_results[0];assert_eq!(d.selected_action_id,"continue");assert_eq!(d.predicted_best_action_id.as_deref(),Some("continue"));assert_eq!(d.realized_best_action_id.as_deref(),Some("yield"));assert_eq!(d.ranking_reversed,Some(true));assert_eq!(d.selected_action_regret,Some(6.0));assert_eq!(d.optimism_gap,Some(9.0));}
     #[test] fn rejects_outcome_leakage(){let mut x=input();x.decisions[0].reference_outcome_reveal_sequence=9;x.decisions[0].decision_context_digest=model_discrepancy_decision_context_digest(&x.decisions[0]).unwrap();assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::OutcomeLeakage);}
     #[test] fn unknown_feasibility_makes_decision_indeterminate(){let mut x=input();x.decisions[0].actions[0].feasibility=DiscrepancyFeasibility::Indeterminate;x.decisions[0].actions[0].realized_utility=None;let r=summarize_vehicle_model_discrepancy(&x).unwrap();assert_eq!(r.decision_results[0].status,DecisionAuditStatus::IndeterminateFeasibility);}
     #[test]
