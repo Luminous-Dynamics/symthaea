@@ -312,7 +312,6 @@ fn set_summary_field(summary: &Summary, key: &str, value: &Value) -> Result<(), 
         "query_flipping_reference_count" => summary.query_flipping_reference_count,
         "omitted_query_flipping_count" => summary.omitted_query_flipping_count,
         "false_invariance_count" => summary.false_invariance_count,
-        "not_estimable_count" => summary.not_estimable_count,
         "false_ambiguity_count" => summary.false_ambiguity_count,
         "candidate_duplicate_structure_group_count" => {
             summary.candidate_duplicate_structure_group_count
