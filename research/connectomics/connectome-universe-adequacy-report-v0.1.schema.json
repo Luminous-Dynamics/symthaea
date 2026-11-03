@@ -397,22 +397,15 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "evaluator_sha256",
+        "evaluator_protocol_sha256",
         "rules_sha256",
-        "report_sha256",
         "truth_separation_verified",
         "canonicalizer_sha256",
         "candidate_structure_manifest_sha256",
         "reference_structure_manifest_sha256"
       ],
       "properties": {
-        "evaluator_sha256": {
-          "$ref": "#/$defs/sha256"
-        },
         "rules_sha256": {
-          "$ref": "#/$defs/sha256"
-        },
-        "report_sha256": {
           "$ref": "#/$defs/sha256"
         },
         "truth_separation_verified": {
@@ -425,6 +418,9 @@
           "$ref": "#/$defs/sha256"
         },
         "reference_structure_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evaluator_protocol_sha256": {
           "$ref": "#/$defs/sha256"
         }
       }
