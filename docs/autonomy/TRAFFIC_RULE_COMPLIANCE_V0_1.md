@@ -20,7 +20,7 @@ The v0.1 evaluator supports three rule primitives:
 - **MandatoryDirection:** compare wrapped trajectory heading against a declared heading and angular tolerance.
 - **StopBeforeLine:** require low-speed samples before line crossing for a minimum dwell duration, with bounded sample gaps and plausible route-progress movement during the stationary sequence.
 
-Other rule families can be retained as `Unsupported` and yield `Indeterminate`. They must not be silently dropped or counted as compliant. Initial unsupported families include yield/right-of-way, crosswalk priority, signal phase, no-entry, prohibited turns and other route-direction signs.
+Other rule families can be retained as `Unsupported` and yield `Indeterminate`. An empty unsupported-family name is malformed and also remains indeterminate. They must not be silently dropped or counted as compliant. Initial unsupported families include yield/right-of-way, crosswalk priority, signal phase, no-entry, prohibited turns and other route-direction signs.
 
 ## Evidence input semantics
 
@@ -28,9 +28,11 @@ Every rule includes:
 - stable rule ID;
 - active route-progress interval;
 - typed rule parameters and units;
-- evidence ID and source ID;
-- source artifact digest;
+- evidence ID;
+- source ID and source artifact digest when the source is available or conflicted;
 - status: `Uncontradicted`, `Conflicted` or `Unavailable`.
+
+An `Unavailable` source does not require a fabricated source ID or digest; its unavailable state is explicit.
 
 **Uncontradicted does not mean authenticated or correct.** It only means the caller supplied one rule assertion without a declared conflict. The evaluator does not perform image perception, traffic-sign recognition, map matching, jurisdictional law interpretation, provenance authentication or source truth adjudication.
 
@@ -52,7 +54,7 @@ A stop is not inferred from one low-speed point or from widely separated samples
 - each consecutive low-speed sample gap no larger than the declared maximum;
 - route progress remains before the line within the declared tolerance;
 - sampled progress displacement remains compatible with the speed threshold and tolerance;
-- total observed sampled dwell reaches the required duration before line crossing.
+- total observed sampled dwell reaches the required duration before line crossing. The final low-speed-sample-to-crossing gap must be within the declared maximum but is not counted as stopped dwell.
 
 This is a discrete trajectory check, not proof of continuous physical standstill. The maximum sample gap and position tolerance are part of the rule profile and must be calibrated to the data source.
 
