@@ -14,7 +14,7 @@
 //! does not receive the intervention label. Exact input/output records are
 //! digested for deterministic replay.
 
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fmt::Write as FmtWrite;
 
@@ -235,14 +235,21 @@ pub fn validate_rmi_intervention_pair(
 /// paired arms. It is not told which arm is control/treatment or which feature
 /// was manipulated. Production Melothaea adapters can implement this trait
 /// later, after their observation/action boundaries are pinned.
-pub trait RmiPolicyV1 {
+pub trait RmiPolicyV1: Serialize + DeserializeOwned + Sized {
     fn policy_id(&self) -> &str;
     fn policy_version(&self) -> &str;
-    /// Implementations must behave as a pure function of the frozen history,
-    /// observation and seed. Stateful adaptation belongs in an explicit state
-    /// snapshot included in the history, never in hidden mutable policy state.
+    /// Stateful policy data must be fully represented by this serialization.
+    /// Implementations must not depend on shared process-global mutable state.
+    fn snapshot_state(&self) -> Result<Vec<u8>, String> {
+        serde_json::to_vec(self).map_err(|error| error.to_string())
+    }
+    /// Restore an independent policy instance from an exact pre-trial snapshot.
+    fn restore_from_snapshot(snapshot: &[u8]) -> Result<Self, String> {
+        serde_json::from_slice(snapshot).map_err(|error| error.to_string())
+    }
+    /// The evaluator passes an independently restored instance to each arm.
     fn respond(
-        &self,
+        &mut self,
         history: &[RmiHistoryEventV1],
         observation: &RmiPartnerObservationV1,
         seed: u64,
@@ -251,12 +258,20 @@ pub trait RmiPolicyV1 {
 
 /// Controlled partner policy for measuring agent-to-partner influence.
 /// It receives the same frozen history and the agent's current action.
-pub trait RmiPartnerPolicyV1 {
+pub trait RmiPartnerPolicyV1: Serialize + DeserializeOwned + Sized {
     fn policy_id(&self) -> &str;
     fn policy_version(&self) -> &str;
-    /// Must be a pure function of the frozen history, agent action and seed.
+    /// Stateful policy data must be fully represented by this serialization.
+    /// Implementations must not depend on shared process-global mutable state.
+    fn snapshot_state(&self) -> Result<Vec<u8>, String> {
+        serde_json::to_vec(self).map_err(|error| error.to_string())
+    }
+    /// Restore an independent partner instance from an exact pre-trial snapshot.
+    fn restore_from_snapshot(snapshot: &[u8]) -> Result<Self, String> {
+        serde_json::from_slice(snapshot).map_err(|error| error.to_string())
+    }
     fn respond(
-        &self,
+        &mut self,
         history: &[RmiHistoryEventV1],
         agent_action: &RmiAgentActionV1,
         seed: u64,
@@ -264,7 +279,7 @@ pub trait RmiPartnerPolicyV1 {
 }
 
 /// Fixed partner baseline: ignores the agent's current action.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FixedPartnerResponsePolicyV1 {
     pub id: String,
     pub version: String,
@@ -276,7 +291,7 @@ impl RmiPartnerPolicyV1 for FixedPartnerResponsePolicyV1 {
     fn policy_version(&self) -> &str { &self.version }
 
     fn respond(
-        &self,
+        &mut self,
         _history: &[RmiHistoryEventV1],
         _agent_action: &RmiAgentActionV1,
         _seed: u64,
@@ -287,7 +302,7 @@ impl RmiPartnerPolicyV1 for FixedPartnerResponsePolicyV1 {
 
 /// Synthetic partner positive control. Its one target-specific transformation
 /// exists only to qualify the directionality oracle, not to model human agency.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyntheticResponsivePartnerPolicyV1 {
     pub id: String,
     pub version: String,
@@ -299,7 +314,7 @@ impl RmiPartnerPolicyV1 for SyntheticResponsivePartnerPolicyV1 {
     fn policy_version(&self) -> &str { &self.version }
 
     fn respond(
-        &self,
+        &mut self,
         _history: &[RmiHistoryEventV1],
         agent_action: &RmiAgentActionV1,
         _seed: u64,
@@ -314,7 +329,7 @@ impl RmiPartnerPolicyV1 for SyntheticResponsivePartnerPolicyV1 {
 }
 
 /// Fixed response baseline: returns exactly the same action for every input.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FixedResponsePolicyV1 {
     pub id: String,
     pub version: String,
@@ -331,7 +346,7 @@ impl RmiPolicyV1 for FixedResponsePolicyV1 {
     }
 
     fn respond(
-        &self,
+        &mut self,
         _history: &[RmiHistoryEventV1],
         _observation: &RmiPartnerObservationV1,
         _seed: u64,
@@ -342,7 +357,7 @@ impl RmiPolicyV1 for FixedResponsePolicyV1 {
 
 /// One-way prompt baseline: represents a response selected from a frozen
 /// initial prompt/state, with no access to the current partner event.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OneWayPromptPolicyV1 {
     pub id: String,
     pub version: String,
@@ -359,7 +374,7 @@ impl RmiPolicyV1 for OneWayPromptPolicyV1 {
     }
 
     fn respond(
-        &self,
+        &mut self,
         _history: &[RmiHistoryEventV1],
         _observation: &RmiPartnerObservationV1,
         _seed: u64,
@@ -370,7 +385,7 @@ impl RmiPolicyV1 for OneWayPromptPolicyV1 {
 
 /// Yoked replay baseline: replays a response captured in a matched prior
 /// session. A single paired probe uses that same replay in both arms.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct YokedReplayPolicyV1 {
     pub id: String,
     pub version: String,
@@ -387,7 +402,7 @@ impl RmiPolicyV1 for YokedReplayPolicyV1 {
     }
 
     fn respond(
-        &self,
+        &mut self,
         _history: &[RmiHistoryEventV1],
         _observation: &RmiPartnerObservationV1,
         _seed: u64,
@@ -400,7 +415,7 @@ impl RmiPolicyV1 for YokedReplayPolicyV1 {
 ///
 /// This should be input-sensitive, but the benchmark does not infer musical
 /// complementarity, negotiation or co-creative value from copying.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImitationOnlyPolicyV1 {
     pub id: String,
     pub version: String,
@@ -416,7 +431,7 @@ impl RmiPolicyV1 for ImitationOnlyPolicyV1 {
     }
 
     fn respond(
-        &self,
+        &mut self,
         _history: &[RmiHistoryEventV1],
         observation: &RmiPartnerObservationV1,
         _seed: u64,
@@ -452,7 +467,7 @@ fn transform_target_feature(features: &mut RmiMusicalFeaturesV1, target: RmiTarg
 ///
 /// It applies a fixed, declared transformation to one configured feature of
 /// current input. It proves only that the oracle detects known contingency.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyntheticContingentPolicyV1 {
     pub id: String,
     pub version: String,
@@ -471,7 +486,7 @@ impl RmiPolicyV1 for SyntheticContingentPolicyV1 {
     }
 
     fn respond(
-        &self,
+        &mut self,
         _history: &[RmiHistoryEventV1],
         observation: &RmiPartnerObservationV1,
         _seed: u64,
@@ -549,6 +564,9 @@ pub struct RmiEvaluationPayloadV1 {
     pub intervention_pair_sha256: String,
     pub policy_id: String,
     pub policy_version: String,
+    pub policy_pre_state_sha256: String,
+    pub control_policy_post_state_sha256: String,
+    pub treatment_policy_post_state_sha256: String,
     pub target: RmiTargetFeatureV1,
     pub control_action: RmiAgentActionV1,
     pub treatment_action: RmiAgentActionV1,
@@ -576,6 +594,9 @@ pub struct RmiReciprocalEvaluationPayloadV1 {
     pub agent_evaluation_sha256: String,
     pub partner_policy_id: String,
     pub partner_policy_version: String,
+    pub partner_policy_pre_state_sha256: String,
+    pub control_partner_post_state_sha256: String,
+    pub treatment_partner_post_state_sha256: String,
     pub target: RmiTargetFeatureV1,
     /// Partner-to-agent input sensitivity from the first half of this pair.
     pub agent_targeted_sensitivity: bool,
@@ -602,11 +623,17 @@ pub enum RmiEvaluationErrorV1 {
     InvalidActionId { arm: String },
     InvalidActionFeatures { arm: String, issues: Vec<RmiValidationIssueV1> },
     NonDeterministicPolicyOutput { arm: String },
+    PolicyStateSnapshotFailure(String),
+    PolicyStateRestoreFailure { arm: String, reason: String },
+    PolicyStateMismatch { arm: String },
     EmptyPartnerPolicyId,
     EmptyPartnerPolicyVersion,
     InvalidPartnerResponseId { arm: String },
     InvalidPartnerResponseFeatures { arm: String, issues: Vec<RmiValidationIssueV1> },
     NonDeterministicPartnerOutput { arm: String },
+    PartnerStateSnapshotFailure(String),
+    PartnerStateRestoreFailure { arm: String, reason: String },
+    PartnerStateMismatch { arm: String },
     SerializationFailure(String),
 }
 
@@ -626,30 +653,102 @@ pub fn evaluate_rmi_pair<P: RmiPolicyV1>(
         return Err(RmiEvaluationErrorV1::EmptyPolicyVersion);
     }
 
-    let control_action = policy.respond(
+    // Snapshot once, then restore independent instances for both counterfactual
+    // arms and for deterministic replay. Never run control then treatment on
+    // the same mutable policy object.
+    let policy_snapshot = policy
+        .snapshot_state()
+        .map_err(RmiEvaluationErrorV1::PolicyStateSnapshotFailure)?;
+    let policy_pre_state_sha256 = sha256_hex(&policy_snapshot);
+
+    let mut control_policy = P::restore_from_snapshot(&policy_snapshot)
+        .map_err(|reason| RmiEvaluationErrorV1::PolicyStateRestoreFailure {
+            arm: "control".into(),
+            reason,
+        })?;
+    let mut control_replay = P::restore_from_snapshot(&policy_snapshot)
+        .map_err(|reason| RmiEvaluationErrorV1::PolicyStateRestoreFailure {
+            arm: "control_replay".into(),
+            reason,
+        })?;
+    let mut treatment_policy = P::restore_from_snapshot(&policy_snapshot)
+        .map_err(|reason| RmiEvaluationErrorV1::PolicyStateRestoreFailure {
+            arm: "treatment".into(),
+            reason,
+        })?;
+    let mut treatment_replay = P::restore_from_snapshot(&policy_snapshot)
+        .map_err(|reason| RmiEvaluationErrorV1::PolicyStateRestoreFailure {
+            arm: "treatment_replay".into(),
+            reason,
+        })?;
+
+    for (arm, restored) in [
+        ("control", &control_policy),
+        ("control_replay", &control_replay),
+        ("treatment", &treatment_policy),
+        ("treatment_replay", &treatment_replay),
+    ] {
+        let restored_bytes = restored
+            .snapshot_state()
+            .map_err(RmiEvaluationErrorV1::PolicyStateSnapshotFailure)?;
+        if restored_bytes != policy_snapshot {
+            return Err(RmiEvaluationErrorV1::PolicyStateMismatch {
+                arm: arm.to_owned(),
+            });
+        }
+    }
+
+    let control_action = control_policy.respond(
         &pair.pre_intervention_history,
         &pair.control_observation,
         pair.seed,
     );
-    if control_action != policy.respond(
+    let control_replay_action = control_replay.respond(
         &pair.pre_intervention_history,
         &pair.control_observation,
         pair.seed,
-    ) {
+    );
+    let control_policy_post_state_sha256 = sha256_hex(
+        &control_policy
+            .snapshot_state()
+            .map_err(RmiEvaluationErrorV1::PolicyStateSnapshotFailure)?,
+    );
+    let control_replay_post_state_sha256 = sha256_hex(
+        &control_replay
+            .snapshot_state()
+            .map_err(RmiEvaluationErrorV1::PolicyStateSnapshotFailure)?,
+    );
+    if control_action != control_replay_action
+        || control_policy_post_state_sha256 != control_replay_post_state_sha256
+    {
         return Err(RmiEvaluationErrorV1::NonDeterministicPolicyOutput {
             arm: "control".to_string(),
         });
     }
-    let treatment_action = policy.respond(
+
+    let treatment_action = treatment_policy.respond(
         &pair.pre_intervention_history,
         &pair.treatment_observation,
         pair.seed,
     );
-    if treatment_action != policy.respond(
+    let treatment_replay_action = treatment_replay.respond(
         &pair.pre_intervention_history,
         &pair.treatment_observation,
         pair.seed,
-    ) {
+    );
+    let treatment_policy_post_state_sha256 = sha256_hex(
+        &treatment_policy
+            .snapshot_state()
+            .map_err(RmiEvaluationErrorV1::PolicyStateSnapshotFailure)?,
+    );
+    let treatment_replay_post_state_sha256 = sha256_hex(
+        &treatment_replay
+            .snapshot_state()
+            .map_err(RmiEvaluationErrorV1::PolicyStateSnapshotFailure)?,
+    );
+    if treatment_action != treatment_replay_action
+        || treatment_policy_post_state_sha256 != treatment_replay_post_state_sha256
+    {
         return Err(RmiEvaluationErrorV1::NonDeterministicPolicyOutput {
             arm: "treatment".to_string(),
         });
@@ -690,6 +789,9 @@ pub fn evaluate_rmi_pair<P: RmiPolicyV1>(
         intervention_pair_sha256,
         policy_id: policy.policy_id().to_string(),
         policy_version: policy.policy_version().to_string(),
+        policy_pre_state_sha256,
+        control_policy_post_state_sha256,
+        treatment_policy_post_state_sha256,
         target: pair.target,
         control_action,
         treatment_action,
@@ -728,30 +830,101 @@ where
         return Err(RmiEvaluationErrorV1::EmptyPartnerPolicyVersion);
     }
 
-    let control_partner_response = partner_policy.respond(
+    // Independently fork partner policy state for control, treatment and
+    // repeatability checks, exactly as done for the agent policy above.
+    let partner_snapshot = partner_policy
+        .snapshot_state()
+        .map_err(RmiEvaluationErrorV1::PartnerStateSnapshotFailure)?;
+    let partner_policy_pre_state_sha256 = sha256_hex(&partner_snapshot);
+
+    let mut control_partner = H::restore_from_snapshot(&partner_snapshot)
+        .map_err(|reason| RmiEvaluationErrorV1::PartnerStateRestoreFailure {
+            arm: "control".into(),
+            reason,
+        })?;
+    let mut control_partner_replay = H::restore_from_snapshot(&partner_snapshot)
+        .map_err(|reason| RmiEvaluationErrorV1::PartnerStateRestoreFailure {
+            arm: "control_replay".into(),
+            reason,
+        })?;
+    let mut treatment_partner = H::restore_from_snapshot(&partner_snapshot)
+        .map_err(|reason| RmiEvaluationErrorV1::PartnerStateRestoreFailure {
+            arm: "treatment".into(),
+            reason,
+        })?;
+    let mut treatment_partner_replay = H::restore_from_snapshot(&partner_snapshot)
+        .map_err(|reason| RmiEvaluationErrorV1::PartnerStateRestoreFailure {
+            arm: "treatment_replay".into(),
+            reason,
+        })?;
+
+    for (arm, restored) in [
+        ("control", &control_partner),
+        ("control_replay", &control_partner_replay),
+        ("treatment", &treatment_partner),
+        ("treatment_replay", &treatment_partner_replay),
+    ] {
+        let restored_bytes = restored
+            .snapshot_state()
+            .map_err(RmiEvaluationErrorV1::PartnerStateSnapshotFailure)?;
+        if restored_bytes != partner_snapshot {
+            return Err(RmiEvaluationErrorV1::PartnerStateMismatch {
+                arm: arm.to_owned(),
+            });
+        }
+    }
+
+    let control_partner_response = control_partner.respond(
         &pair.pre_intervention_history,
         &agent.payload.control_action,
         pair.seed,
     );
-    if control_partner_response != partner_policy.respond(
+    let control_partner_replay_response = control_partner_replay.respond(
         &pair.pre_intervention_history,
         &agent.payload.control_action,
         pair.seed,
-    ) {
+    );
+    let control_partner_post_state_sha256 = sha256_hex(
+        &control_partner
+            .snapshot_state()
+            .map_err(RmiEvaluationErrorV1::PartnerStateSnapshotFailure)?,
+    );
+    let control_partner_replay_post_state_sha256 = sha256_hex(
+        &control_partner_replay
+            .snapshot_state()
+            .map_err(RmiEvaluationErrorV1::PartnerStateSnapshotFailure)?,
+    );
+    if control_partner_response != control_partner_replay_response
+        || control_partner_post_state_sha256 != control_partner_replay_post_state_sha256
+    {
         return Err(RmiEvaluationErrorV1::NonDeterministicPartnerOutput {
             arm: "control".to_string(),
         });
     }
-    let treatment_partner_response = partner_policy.respond(
+
+    let treatment_partner_response = treatment_partner.respond(
         &pair.pre_intervention_history,
         &agent.payload.treatment_action,
         pair.seed,
     );
-    if treatment_partner_response != partner_policy.respond(
+    let treatment_partner_replay_response = treatment_partner_replay.respond(
         &pair.pre_intervention_history,
         &agent.payload.treatment_action,
         pair.seed,
-    ) {
+    );
+    let treatment_partner_post_state_sha256 = sha256_hex(
+        &treatment_partner
+            .snapshot_state()
+            .map_err(RmiEvaluationErrorV1::PartnerStateSnapshotFailure)?,
+    );
+    let treatment_partner_replay_post_state_sha256 = sha256_hex(
+        &treatment_partner_replay
+            .snapshot_state()
+            .map_err(RmiEvaluationErrorV1::PartnerStateSnapshotFailure)?,
+    );
+    if treatment_partner_response != treatment_partner_replay_response
+        || treatment_partner_post_state_sha256 != treatment_partner_replay_post_state_sha256
+    {
         return Err(RmiEvaluationErrorV1::NonDeterministicPartnerOutput {
             arm: "treatment".to_string(),
         });
@@ -796,6 +969,9 @@ where
         agent_evaluation_sha256: agent.payload_sha256,
         partner_policy_id: partner_policy.policy_id().to_string(),
         partner_policy_version: partner_policy.policy_version().to_string(),
+        partner_policy_pre_state_sha256,
+        control_partner_post_state_sha256,
+        treatment_partner_post_state_sha256,
         target: pair.target,
         agent_targeted_sensitivity: agent.payload.targeted_input_sensitivity,
         control_partner_response,
