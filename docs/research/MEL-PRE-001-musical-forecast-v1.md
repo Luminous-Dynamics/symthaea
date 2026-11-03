@@ -22,19 +22,19 @@ Move from a black-box response to an **inspectable future commitment**:
 5. Delivery/display is logged separately from forecast generation. A display record does not prove the musician read, understood or acted on it.
 6. The collaborator can accept, steer, veto, branch, ignore or abstain. Departing from a preview is not disobedience or an agent failure.
 
-The V1 Rust module provides the symbolic event ledger and evaluator. Each ledger event is SHA-256 hash-linked to its predecessor; the evaluation receipt binds the ledger prefix at the realization tick, excluding later events. Publishing or signing that head outside the ledger is still required to anchor the history against a full rewrite. It does not yet wire the forecast object into the live Studio candidate/score path or a UI.
+The V1 Rust module provides the symbolic event ledger and evaluator. Each ledger event is SHA-256 hash-linked to its predecessor; the evaluation context records an exact event-sequence high-water mark at realization and the receipt binds that prefix hash. This disambiguates same-tick events and excludes later display/revision records. Publishing or signing that head outside the ledger is still required to anchor the history against a full rewrite. It does not yet wire the forecast object into the live Studio candidate/score path or a UI.
 
 ## V1 invariants
 
 - Schema version and forecast/turn/session IDs are mandatory.
-- Sequence IDs increase strictly; event ticks are monotonic inside one session/clock-domain ledger.
-- A commit cannot be backdated relative to the append-only ledger.
-- The execution window is non-empty; the forecast is committed before its end and remains valid through its expiry.
+- Sequence IDs increase strictly; event ticks are monotonic inside one session/clock-domain ledger. The realization receipt pins an exact sequence high-water mark in addition to the tick; same-tick events are resolved by sequence.
+- A commit cannot be backdated relative to the append-only ledger and must occur strictly before its target execution window begins.
+- The execution window is non-empty; the forecast is committed before its start and remains valid through its expiry.
 - Every predicted event has a unique stable slot ID and positive duration.
 - Every predicted field has an explicit probability or an explicit unavailable reason.
 - Probability values are integer parts-per-million in `[0, 1,000,000]`.
 - A new forecast can supersede only an active previous forecast in the same session, turn and clock domain.
-- A forecast is not eligible if created after realization, outside its target window, expired, superseded or invalidated.
+- A forecast is not eligible if created after realization, outside its target window, expired, superseded or invalidated. A display receipt cannot resurface an expired, superseded or invalidated preview as current.
 - Input-history and immutable-policy-identity mismatches fail closed; a yoked forecast cannot pass as contingent.
 - The evaluation receipt binds the exact realization artifact digest and the canonical digest of the symbolic event projection used by the scorer.
 - A single forecast's Brier contribution is not called calibration. Calibration requires a held-out population, stratified by field, forecast horizon, task and collaborator.
