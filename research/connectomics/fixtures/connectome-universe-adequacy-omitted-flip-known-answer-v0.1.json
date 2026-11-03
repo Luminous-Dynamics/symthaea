@@ -1,0 +1,121 @@
+{
+  "schema_version": "0.1.0",
+  "evaluation_id": "known-answer-omitted-query-flipping-world-v0.1",
+  "query": {
+    "query_id": "pathway-strength-over-registered-threshold",
+    "definition_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "decision_rule_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "metric": "directed_pathway_strength",
+    "unit": "normalized_synthetic_strength",
+    "baseline_decision": "BELOW_THRESHOLD"
+  },
+  "candidate_universe": {
+    "universe_id": "synthetic-universe-without-continuation-alternative",
+    "manifest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "generator_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "closure_disposition": "CLOSED_VERIFIED",
+    "world_ids": [
+      "world-merge-split-a",
+      "world-merge-split-b"
+    ]
+  },
+  "reference_challenge": {
+    "challenge_id": "synthetic-independent-reference-v0.1",
+    "manifest_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "generator_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "freeze_receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "oracle_boundary": "EVALUATOR_ONLY_VERIFIED"
+  },
+  "candidate_worlds": [
+    {
+      "world_id": "world-merge-split-a",
+      "query_state": "BELOW_THRESHOLD"
+    },
+    {
+      "world_id": "world-merge-split-b",
+      "query_state": "BELOW_THRESHOLD"
+    }
+  ],
+  "reference_worlds": [
+    {
+      "world_id": "world-merge-split-a",
+      "error_family": "merge_split",
+      "evidence_compatibility": "COMPATIBLE",
+      "query_state": "BELOW_THRESHOLD",
+      "material_to_query": false
+    },
+    {
+      "world_id": "world-merge-split-b",
+      "error_family": "merge_split",
+      "evidence_compatibility": "COMPATIBLE",
+      "query_state": "BELOW_THRESHOLD",
+      "material_to_query": false
+    },
+    {
+      "world_id": "world-continuation-loss-c",
+      "error_family": "continuation_loss",
+      "evidence_compatibility": "COMPATIBLE",
+      "query_state": "AT_OR_ABOVE_THRESHOLD",
+      "material_to_query": true
+    },
+    {
+      "world_id": "world-registration-unknown-d",
+      "error_family": "registration_uncertainty",
+      "evidence_compatibility": "INDETERMINATE",
+      "query_state": null,
+      "material_to_query": true
+    }
+  ],
+  "summary": {
+    "candidate_world_count": 2,
+    "reference_world_count": 4,
+    "compatible_reference_count": 3,
+    "incompatible_reference_count": 0,
+    "indeterminate_reference_count": 1,
+    "structurally_included_count": 2,
+    "query_state_covered_count": 2,
+    "query_flipping_reference_count": 1,
+    "omitted_query_flipping_count": 1,
+    "false_invariance_count": 1,
+    "not_estimable_count": 1
+  },
+  "family_summaries": [
+    {
+      "error_family": "merge_split",
+      "compatible_reference_count": 2,
+      "structurally_included_count": 2,
+      "query_flipping_reference_count": 0,
+      "omitted_query_flipping_count": 0,
+      "false_invariance_count": 0,
+      "not_estimable_count": 0
+    },
+    {
+      "error_family": "continuation_loss",
+      "compatible_reference_count": 1,
+      "structurally_included_count": 0,
+      "query_flipping_reference_count": 1,
+      "omitted_query_flipping_count": 1,
+      "false_invariance_count": 1,
+      "not_estimable_count": 0
+    },
+    {
+      "error_family": "registration_uncertainty",
+      "compatible_reference_count": 0,
+      "structurally_included_count": 0,
+      "query_flipping_reference_count": 0,
+      "omitted_query_flipping_count": 0,
+      "false_invariance_count": 0,
+      "not_estimable_count": 1
+    }
+  ],
+  "dispositions": {
+    "enumeration_closure": "CLOSED_VERIFIED",
+    "universe_adequacy": "ADEQUACY_FAILED"
+  },
+  "provenance": {
+    "evaluator_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+    "rules_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+    "report_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "truth_separation_verified": true
+  }
+}
