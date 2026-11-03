@@ -6,7 +6,7 @@
     "release_id": "release-2"
   },
   "target_manifest_sha256": "d2fdcdd223956d2d7882b7e89e12e3c566cf97a0d4e2bdea046d1e4360079299",
-  "correspondence_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "correspondence_receipt_sha256": "7a0ac82ae2c6fa062d1d9680c3d408e8b80e72fb4983e42008af62a240f0fe2f",
   "fates": [
     {
       "target_object_id": "segment-1",
@@ -85,6 +85,6 @@
   },
   "provenance": {
     "target_manifest_sha256": "d2fdcdd223956d2d7882b7e89e12e3c566cf97a0d4e2bdea046d1e4360079299",
-    "correspondence_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    "correspondence_receipt_sha256": "7a0ac82ae2c6fa062d1d9680c3d408e8b80e72fb4983e42008af62a240f0fe2f"
   }
 }
