@@ -859,6 +859,19 @@ fn run_self_tests() -> Result<(), String> {
     }
     println!("SELF_TEST_PASS documentation-only change refreshes retrieval without invalidating proofs");
 
+    let mut changed_edges = base_edges.clone();
+    let replacement_edge = changed_edges.iter_mut().find(|edge| edge.edge_id == "e-root-doc").unwrap();
+    replacement_edge.target_node_id = "helper".into();
+    replacement_edge.relation = "signature_reference".into();
+    let edge_change = snap("edge-change", &"d".repeat(64), base_nodes.clone(), changed_edges, true);
+    let report = analyze(&old_bytes, &serde_json::to_vec(&edge_change).map_err(|e| e.to_string())?)?;
+    if !report.impacts.iter().any(|x| x.node_id == "root" && x.action == "reprove")
+        || !report.changes.iter().any(|x| x.change_id == "e-root-doc" && x.change_kind == "edge_changed")
+    {
+        return Err("changed edge was not evaluated as both a removed and a replacement dependency".into());
+    }
+    println!("SELF_TEST_PASS changed edge accounts for both removed and replacement relation");
+
     let incomplete = snap("incomplete", &"d".repeat(64), base_nodes.clone(), base_edges.clone(), false);
     let report = analyze(&old_bytes, &serde_json::to_vec(&incomplete).map_err(|e| e.to_string())?)?;
     if report.impacts.iter().filter(|x| x.action == "unknown_conservative").count() != 4 {
