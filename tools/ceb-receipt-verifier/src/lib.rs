@@ -1329,7 +1329,7 @@ fn base_report(status: &str, reason: String) -> VerificationReport {
         trust_policy_sha256: None,
         schema_sha256: schema_digests(),
         reasons: vec![reason],
-        claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove runner isolation, independently adjudicate test semantics, recompute the resulting source tree, or authenticate the claimed model provider.",
+        claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove runner isolation, independently adjudicate test semantics, prove that the submitted patch produces the computed result snapshot, or authenticate the claimed model provider.",
     }
 }
 
@@ -1445,7 +1445,7 @@ fn verify_pair_inner(inputs: &PairInputs) -> Result<VerificationReport, Failure>
         trust_policy_sha256: Some(sha256_hex(&inputs.trust_policy)),
         schema_sha256: schema_digests(),
         reasons: Vec::new(),
-        claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove runner isolation, independently adjudicate test semantics, recompute the resulting source tree, or authenticate the claimed model provider.",
+        claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove runner isolation, independently adjudicate test semantics, prove that the submitted patch produces the computed result snapshot, or authenticate the claimed model provider.",
     })
 }
 
