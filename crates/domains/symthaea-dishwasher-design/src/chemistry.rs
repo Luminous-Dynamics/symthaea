@@ -165,6 +165,8 @@ pub enum ChemistryError {
     InvalidDeliveryEvidence,
     DeliveryCalibrationMismatch,
     DeliveryEventMismatch,
+    DeliveryStageMismatch,
+    ActualDeliveryOutsideStageWindow,
     DeliveryComponentMismatch,
     DeliveryChannelMismatch,
     ActualDoseOutsideTolerance,
@@ -458,6 +460,7 @@ fn validate_stage_windows(
 /// the sensor, calibration record or evidence, and does not establish cleaning.
 pub fn check_reported_dose_delivery(
     commanded: &DoseEvent,
+    stage_window: &StageWindow,
     calibration: &DoseDeliveryCalibration,
     measurement: &DoseDeliveryMeasurement,
 ) -> Result<DoseDeliveryCheckSummary, ChemistryError> {
@@ -466,6 +469,16 @@ pub fn check_reported_dose_delivery(
         || commanded.release_duration_s == 0
     {
         return Err(ChemistryError::DeliveryEventMismatch);
+    }
+    if stage_window.stage != commanded.stage || stage_window.start_s >= stage_window.end_s {
+        return Err(ChemistryError::DeliveryStageMismatch);
+    }
+    let commanded_end_s =
+        u64::from(commanded.elapsed_s) + u64::from(commanded.release_duration_s);
+    if commanded.elapsed_s < stage_window.start_s
+        || commanded_end_s > u64::from(stage_window.end_s)
+    {
+        return Err(ChemistryError::DeliveryStageMismatch);
     }
     if !canonical_non_empty(&calibration.component_id)
         || !canonical_non_empty(&calibration.dispenser_channel_id)
@@ -499,6 +512,13 @@ pub fn check_reported_dose_delivery(
     }
     if measurement.actual_duration_s == 0 {
         return Err(ChemistryError::ActualDeliveryTimingOutsideTolerance);
+    }
+    let actual_end_s =
+        u64::from(measurement.actual_elapsed_s) + u64::from(measurement.actual_duration_s);
+    if measurement.actual_elapsed_s < stage_window.start_s
+        || actual_end_s > u64::from(stage_window.end_s)
+    {
+        return Err(ChemistryError::ActualDeliveryOutsideStageWindow);
     }
 
     const BASIS_POINTS: u128 = 10_000;
@@ -718,6 +738,15 @@ pub fn validate_dose_plan(
 mod tests {
     use super::*;
 
+    fn prewash_window() -> StageWindow {
+        StageWindow {
+            stage: WashStage::Prewash,
+            start_s: 0,
+            end_s: 300,
+            water_temperature_c: Some(40.0),
+        }
+    }
+
     fn delivery_calibration() -> DoseDeliveryCalibration {
         DoseDeliveryCalibration {
             component_id: "enzyme".to_owned(),
@@ -749,6 +778,8 @@ mod tests {
         let event = request().events.into_iter().next().unwrap();
         let summary = check_reported_dose_delivery(
             &event,
+            &prewash_window(),
+&event,
             &delivery_calibration(),
             &delivery_measurement(&event),
         )
@@ -765,15 +796,34 @@ mod tests {
         let mut under = delivery_measurement(&event);
         under.actual_dose_mg = 474;
         assert!(matches!(
-            check_reported_dose_delivery(&event, &delivery_calibration(), &under),
+            check_reported_dose_delivery(&event, &prewash_window(), &delivery_calibration(), &under),
             Err(ChemistryError::ActualDoseOutsideTolerance)
         ));
 
         let mut over = delivery_measurement(&event);
         over.actual_dose_mg = 526;
         assert!(matches!(
-            check_reported_dose_delivery(&event, &delivery_calibration(), &over),
+            check_reported_dose_delivery(&event, &prewash_window(), &delivery_calibration(), &over),
             Err(ChemistryError::ActualDoseOutsideTolerance)
+        ));
+    }
+
+    #[test]
+    fn rejects_actual_delivery_that_spills_past_phase_boundary() {
+        let mut event = request().events.into_iter().next().unwrap();
+        event.elapsed_s = 295;
+        event.release_duration_s = 5;
+        let mut actual = delivery_measurement(&event);
+        actual.actual_elapsed_s = 296;
+        actual.actual_duration_s = 5;
+        assert!(matches!(
+            check_reported_dose_delivery(
+                &event,
+                &prewash_window(),
+                &delivery_calibration(),
+                &actual
+            ),
+            Err(ChemistryError::ActualDeliveryOutsideStageWindow)
         ));
     }
 
@@ -783,7 +833,7 @@ mod tests {
         let mut measurement = delivery_measurement(&event);
         measurement.actual_elapsed_s += 3;
         assert!(matches!(
-            check_reported_dose_delivery(&event, &delivery_calibration(), &measurement),
+            check_reported_dose_delivery(&event, &prewash_window(), &delivery_calibration(), &measurement),
             Err(ChemistryError::ActualDeliveryTimingOutsideTolerance)
         ));
     }
@@ -797,6 +847,8 @@ mod tests {
         assert!(matches!(
             check_reported_dose_delivery(
                 &event,
+                &prewash_window(),
+&event,
                 &delivery_calibration(),
                 &wrong_component
             ),
@@ -808,6 +860,8 @@ mod tests {
         assert!(matches!(
             check_reported_dose_delivery(
                 &event,
+                &prewash_window(),
+&event,
                 &delivery_calibration(),
                 &wrong_channel
             ),
@@ -821,21 +875,21 @@ mod tests {
         let mut wrong_event = delivery_measurement(&event);
         wrong_event.event_id = "another-event".to_owned();
         assert!(matches!(
-            check_reported_dose_delivery(&event, &delivery_calibration(), &wrong_event),
+            check_reported_dose_delivery(&event, &prewash_window(), &delivery_calibration(), &wrong_event),
             Err(ChemistryError::DeliveryEventMismatch)
         ));
 
         let mut wrong_calibration = delivery_measurement(&event);
         wrong_calibration.calibration_id = "other-channel".to_owned();
         assert!(matches!(
-            check_reported_dose_delivery(&event, &delivery_calibration(), &wrong_calibration),
+            check_reported_dose_delivery(&event, &prewash_window(), &delivery_calibration(), &wrong_calibration),
             Err(ChemistryError::DeliveryCalibrationMismatch)
         ));
 
         let mut bad_evidence = delivery_measurement(&event);
         bad_evidence.measurement_evidence_sha256 = "missing".to_owned();
         assert!(matches!(
-            check_reported_dose_delivery(&event, &delivery_calibration(), &bad_evidence),
+            check_reported_dose_delivery(&event, &prewash_window(), &delivery_calibration(), &bad_evidence),
             Err(ChemistryError::InvalidDeliveryEvidence)
         ));
     }
@@ -846,7 +900,7 @@ mod tests {
         let mut calibration = delivery_calibration();
         calibration.maximum_underdelivery_bps = 10_000;
         assert!(matches!(
-            check_reported_dose_delivery(&event, &calibration, &delivery_measurement(&event)),
+            check_reported_dose_delivery(&event, &prewash_window(), &calibration, &delivery_measurement(&event)),
             Err(ChemistryError::InvalidDeliveryCalibration)
         ));
     }
