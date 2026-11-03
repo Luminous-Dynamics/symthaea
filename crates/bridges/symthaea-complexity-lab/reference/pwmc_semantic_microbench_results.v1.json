@@ -4,8 +4,13 @@
   "exact_zero_nonempty_support": "passed",
   "format": "symthaea.pwmc-semantic-microbench-results",
   "hidden_witness_invariance": "passed",
-  "input_sha256": "sha256:3054fd702511af5c189d81030141c0643714db9b068bdb79db571703d3732b01",
-  "method": "exhaustive full-assignment enumeration and exact Fraction arithmetic",
+  "input_sha256": "sha256:c26471c634c9b956d7f229695f5fc3cceb4662501a6a73cba01d3916421d1707",
+  "method": "visible-first existential support compilation; independent full-assignment exact replay; Fraction arithmetic",
+  "projection_algorithms": {
+    "agreement": "exact",
+    "producer": "visible_assignment_then_existential_hidden_search_with_early_exit",
+    "verifier": "full_universe_assignment_enumeration_then_visible_projection"
+  },
   "results": [
     {
       "case_id": "single-hidden-witness-scope",
@@ -21,8 +26,8 @@
       }
     },
     {
-      "case_id": "twelve-hidden-free-witnesses",
-      "full_model_count": "4096",
+      "case_id": "twenty-hidden-free-witnesses",
+      "full_model_count": "1048576",
       "projected_support": [
         "1"
       ],
@@ -30,7 +35,7 @@
       "status": "exact_oracle_match",
       "support_cardinality": "1",
       "witness_counts": {
-        "1": "4096"
+        "1": "1048576"
       }
     },
     {
