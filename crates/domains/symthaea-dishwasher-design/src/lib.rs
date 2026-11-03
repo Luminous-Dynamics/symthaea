@@ -11,6 +11,7 @@
 pub mod chemistry;
 pub mod quality;
 pub mod service;
+pub mod system_window;
 pub mod validation;
 
 pub mod energy {
