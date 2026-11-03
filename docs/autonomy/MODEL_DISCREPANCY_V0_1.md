@@ -45,6 +45,8 @@ Each decision binds the same initial state, environment, dynamics, actor policy,
 
 Each candidate binds its action ID, command digest, feasibility, predicted utility, realized utility, execution receipt/digest and evaluator receipt.
 
+**Known v0.1 limitation:** the current input requires realized reference values and receipts for every supplied action outcome. It does not yet encode typed Missing/Censored/TimedOut/Unsupported outcomes in the decision-action matrix. Do not omit an action or horizon and then describe the remaining subset as a complete comparison. Keep the experiment externally marked incomplete and do not promote the result. This schema gap is tracked by [#10282](https://github.com/Luminous-Dynamics/symthaea/issues/10282) and must be resolved before decision-ranking results are used as confirmatory evidence.
+
 The evaluator:
 - recomputes the decision-context digest;
 - recomputes the action-set digest from sorted action ID / command digest pairs;
@@ -99,7 +101,7 @@ Required first fixtures:
 5. Missing horizon: no interpolation or synthetic pair is produced.
 6. Context mismatch: changed environment, action history, actor policy, state, forecast time, split or shift rejects a paired claim.
 7. Duplicate scenario/action-history/metric/horizon key is rejected.
-8. Missing reference result remains absent; it is never a zero residual.
+8. The evaluator must not receive an invented zero for a missing reference; v0.1 cannot yet retain typed missing/censored outcomes, so such runs must be marked incomplete outside this report until #10282 is resolved.
 9. Ranking reversal: planner-predicted best action loses under realized utility; the reversal and regret are exposed.
 10. Optimism attack: inject an optimistic selected-action utility and verify optimism gap rises.
 11. Outcome leakage: reveal sequence at or before selection commit is rejected.
