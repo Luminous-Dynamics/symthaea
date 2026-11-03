@@ -90,6 +90,19 @@ The official manifest exposes a useful **workload proxy**: the number of graded 
 
 Tasks with five or more graded declarations are 17.0% of the benchmark but account for 26/60 (43.3%) of the leading run's unresolved tasks. All tasks with two or more declarations comprise 111/341 (32.6%) of the benchmark but account for 38/60 (63.3%) of unresolved tasks and $4,388.04/$6,817.01 (64.4%) of unresolved-task spend.
 
+The same stratification across the four published model runs shows that this is a benchmark-wide hard-tail pattern, not a peculiarity of one system:
+
+| Published model run | 1 declaration | 2–4 declarations | 5+ declarations | Recorded spend per 5+ solved task* |
+|---|---:|---:|---:|---:|
+| GPT-6 Astra | 90.4% | 77.4% | 55.2% | $149.04 |
+| Opus 5 | 74.8% | 47.2% | 24.1% | $249.28 |
+| GPT-5.6 Sol | 70.9% | 45.3% | 24.1% | $242.51 |
+| DeepSeek V4.1 Flash | 64.3% | 39.6% | 19.0% | $85.55 |
+
+Every run has a lower solve rate as the graded-declaration count grows. Within each run, the recorded spend per verified completion in the 5+ stratum is about 4.3–5.4 times that in the one-declaration stratum. These are within-run cost ratios; absolute costs across models are not directly comparable because their prices, scaffolds, and resource policies differ.
+
+*Total recorded spend for the stratum, including unsuccessful attempts, divided by its number of solved tasks. This is not the marginal cost of a successful attempt.
+
 To reduce subject confounding, I repeated the five-plus versus under-five comparison **within source groups that contain both task-size strata**. Thirteen of 24 source groups have both. Within those groups:
 
 - Five-plus: 26/58 unresolved (44.8%).
