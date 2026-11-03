@@ -200,6 +200,27 @@ External leaderboard scores are reference points only. Reproduce the published p
 
 For Fail2Drive, retain the 100 matched ID/OOD route pairs (200 routes) and 17 reported shift scenario classes as the paper defines them. Do not call 200 routes 200 independent pairs.
 
+## 9.1 External benchmark reference snapshot (checked 2026-11-03)
+
+These are external reference points, not SAM results. Recheck the exact board, protocol, checkpoint, and date before making a leaderboard claim.
+
+| Benchmark | Surfaced reference snapshot | Comparison boundary |
+|---|---|---|
+| Argoverse 2 multi-agent motion forecasting test | SOTA2's surfaced test board lists QCNeXt2026.07 at 0.50 m average minADE (K=6), 1.02 m average minFDE (K=6), and 0.13 actor miss rate (K=6). | Third-party leaderboard aggregation; open-loop forecasting, not interactive closed-loop planning or calibrated set coverage. |
+| WOD-E2E planning | SOTA2 lists DriveMA-4B (2026.05) at RFS Overall 8.079, RFS Spotlight 7.169, ADE(5s) 2.67 m and ADE(3s) 1.166 m; that page reports it was updated five months ago. | A dated rater-preference / open-loop evaluation snapshot, not a November 2026 verified current leader or safety metric. |
+| Waymo Open Dataset challenges | Waymo states it is not hosting formal challenges in 2026; the public leaderboards remain active. Its 2025 challenge tracks included E2E driving, Sim Agents, Interaction Prediction and Scenario Generation. | Reproduce the published tracks and protocols; do not describe them as an active 2026 competition. |
+| Fail2Drive | The 2026 paper reports 200 routes across 17 new scenario classes; the project describes these as 100 matched ID/OOD route pairs. The evaluated methods showed a 22.8% average success-rate drop under shift. | The unit is 100 matched pairs (200 routes), not 200 independent pairs. It is a closed-loop generalization benchmark, not a physical crash-rate study. |
+| CARLA Leaderboard | Leaderboard 2.1 is the current official evaluation version. Its driving score is route completion multiplied by an infraction penalty; submissions may not use privileged simulator ground truth. Version 2.1 changed the infraction aggregation after early-stopping strategies exploited the previous scoring design. | Pin CARLA and Leaderboard 2.1 exactly. Scores from 2.0 and 2.1 should not be compared as if the evaluator were unchanged. |
+
+The CARLA early-stop episode is an important benchmark-design lesson: every aggregate score needs adversarial incentive tests. Include controls for stopping early, route truncation, slow driving, safe-but-useless immobilization, and trading away rare vulnerable-road-user performance to improve average completion.
+
+Sources:
+- [Argoverse 2 multi-agent motion forecasting test leaderboard — SOTA2](https://www.sota2.com/research/sota/multi-agent-motion-forecasting-on-argoverse-2-av2-test)
+- [WOD-E2E planning leaderboard — SOTA2](https://www.sota2.com/research/sota/autonomous-driving-planning-on-wod-e2e)
+- [Waymo Open Dataset challenge status](https://waymo.com/open/challenges/)
+- [Fail2Drive paper](https://arxiv.org/abs/2604.08535) and [project repository](https://github.com/autonomousvision/fail2drive)
+- [CARLA Leaderboard 2.1 evaluation criteria](https://leaderboard.carla.org/evaluation_v2_1/)
+
 ## 10. Prospective gates (targets, not results)
 
 These targets must be preregistered with exact baseline, dataset version, sample design and compute budget before execution:
