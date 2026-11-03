@@ -1,0 +1,82 @@
+name: PITB Typed Graph Evidence
+
+on:
+  pull_request:
+    paths:
+      - "tools/pitb-graph-evidence/**"
+      - ".github/workflows/pitb-typed-graph-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  graph-evidence-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Install JSON Schema validator
+        run: |
+          python3 -m venv "$RUNNER_TEMP/jsonschema-venv"
+          "$RUNNER_TEMP/jsonschema-venv/bin/pip" install "jsonschema==4.25.1"
+
+      - name: Validate formatting and compile/test Rust verifier
+        run: |
+          set -euo pipefail
+          cargo fmt --check --manifest-path tools/pitb-graph-evidence/Cargo.toml
+          cargo test --manifest-path tools/pitb-graph-evidence/Cargo.toml
+
+      - name: Validate schema and synthetic fixture
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("tools/pitb-graph-evidence/schema/proof-graph-evidence-v0.schema.json").read_text())
+          fixture = json.loads(Path("tools/pitb-graph-evidence/fixtures/graph-evidence.synthetic.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          errors = sorted(Draft202012Validator(schema).iter_errors(fixture), key=lambda e: list(e.path))
+          if errors:
+              raise SystemExit("\n".join(f"{list(e.path)}: {e.message}" for e in errors))
+          print("PITB_GRAPH_EVIDENCE_SCHEMA_PASS")
+          PY
+
+      - name: Run evidence-byte and adversarial self-tests
+        run: |
+          set -euo pipefail
+          cargo run --manifest-path tools/pitb-graph-evidence/Cargo.toml -- \
+            --self-test \
+            tools/pitb-graph-evidence/fixtures/graph-evidence.synthetic.json \
+            tools/pitb-graph-evidence/fixtures/evidence
+
+      - name: Emit canonical synthetic summary
+        run: |
+          set -euo pipefail
+          cargo run --manifest-path tools/pitb-graph-evidence/Cargo.toml -- \
+            --verify \
+            tools/pitb-graph-evidence/fixtures/graph-evidence.synthetic.json \
+            tools/pitb-graph-evidence/fixtures/evidence \
+            > "$RUNNER_TEMP/pitb-graph-evidence-summary.json"
+          cat "$RUNNER_TEMP/pitb-graph-evidence-summary.json"
+
+      - name: Retain synthetic graph summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-typed-graph-evidence-summary
+          path: ${{ runner.temp }}/pitb-graph-evidence-summary.json
+          if-no-files-found: warn
+          retention-days: 30
