@@ -296,6 +296,9 @@ pub mod rea_compat;
 /// Native Rust mobile tool-effect catalog and capability policy.
 #[cfg(feature = "rea-compat")]
 pub mod mobile_tool_policy;
+/// Caller/session/consent-bound mobile invocation authorization.
+#[cfg(feature = "rea-compat")]
+pub mod mobile_invocation_policy;
 
 // Unified error types for cross-subsystem error handling.
 pub mod errors;
