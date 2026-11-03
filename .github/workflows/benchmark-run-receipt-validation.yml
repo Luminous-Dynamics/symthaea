@@ -43,14 +43,14 @@ jobs:
 
       - name: Assert Rust toolchain
         run: |
-          test "$(rustc --version)" = "rustc 1.96.0 (ac68faa20 2025-05-23)"
+          test "$(rustc --version | cut -d ' ' -f 2)" = "1.96.0"
           cargo --version
 
       - name: Set up isolated Python schema-audit environment
         run: |
           python3 -m venv "$RUNNER_TEMP/receipt-schema-venv"
           "$RUNNER_TEMP/receipt-schema-venv/bin/python" -m pip install --disable-pip-version-check --no-deps -r tools/benchmark-run-receipt-harness/requirements-ci.txt
-          "$RUNNER_TEMP/receipt-schema-venv/bin/python" -c "import jsonschema, attrs, referencing, rpds; assert jsonschema.__version__ == '4.26.0'"
+          "$RUNNER_TEMP/receipt-schema-venv/bin/python" -c "from importlib.metadata import version; assert version('jsonschema') == '4.26.0'; assert version('attrs') == '26.1.0'; assert version('referencing') == '0.37.0'; assert version('rpds-py') == '2026.9.1'"
 
       - name: Validate Draft 2020-12 schema and synthetic fixture
         run: |
