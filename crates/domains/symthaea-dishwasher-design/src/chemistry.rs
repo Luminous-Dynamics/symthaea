@@ -83,6 +83,8 @@ pub struct ComponentInteraction {
     pub compatibility_evidence_sha256: String,
 }
 
+/// Caller-supplied calibration metadata. Digests are identifiers only; this
+/// structure is not cryptographically authenticated or independently validated.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FormulationCalibrationProfile {
     pub formulation_id: String,
@@ -103,7 +105,7 @@ pub struct DosePlanRequest {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ValidatedDoseSummary {
+pub struct DosePlanCheckSummary {
     pub event_count: usize,
     pub component_count: usize,
     pub total_dose_mg: u64,
@@ -402,7 +404,7 @@ fn validate_stage_windows(
 pub fn validate_dose_plan(
     formulation: &FormulationCalibrationProfile,
     request: &DosePlanRequest,
-) -> Result<ValidatedDoseSummary, ChemistryError> {
+) -> Result<DosePlanCheckSummary, ChemistryError> {
     validate_formulation(formulation)?;
 
     if !canonical_non_empty(&request.soil_class) {
@@ -567,7 +569,7 @@ pub fn validate_dose_plan(
         }
     }
 
-    Ok(ValidatedDoseSummary {
+    Ok(DosePlanCheckSummary {
         event_count: request.events.len(),
         component_count: component_totals.len(),
         total_dose_mg,
