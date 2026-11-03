@@ -212,7 +212,7 @@ mod tests {
             * SHORTCUT_PROBABILITIES.len()
             * ATTENTION_CAPACITIES.len()
             * POLICIES.len();
-        assert_eq!(conditions, 648);
+        assert_eq!(conditions, 324);
         assert_eq!(REPLICATES, 128);
     }
 
