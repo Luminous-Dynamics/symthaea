@@ -14,13 +14,14 @@ const REPLICATES: u64 = 128;
 const POPULATION_SIZES: [usize; 3] = [8, 16, 32];
 const ATTENTION_CAPACITIES: [usize; 3] = [1, 2, 4];
 const SHORTCUT_PROBABILITIES: [f64; 2] = [0.0, 0.2];
-const POLICIES: [TransmissionPolicy; 6] = [
+const POLICIES: [TransmissionPolicy; 7] = [
     TransmissionPolicy::NoSocial,
     TransmissionPolicy::FixedRing,
     TransmissionPolicy::FixedRingContentShuffled,
     TransmissionPolicy::RandomNetworkContent,
     TransmissionPolicy::StateAwareFrontier,
-    TransmissionPolicy::StateAwareContentShuffled,
+    TransmissionPolicy::StateAwareRandomContent,
+    TransmissionPolicy::StateAwareRecipientShuffled,
 ];
 
 #[derive(Default)]
@@ -212,13 +213,14 @@ mod tests {
             * SHORTCUT_PROBABILITIES.len()
             * ATTENTION_CAPACITIES.len()
             * POLICIES.len();
-        assert_eq!(conditions, 324);
+        assert_eq!(conditions, 378);
         assert_eq!(REPLICATES, 128);
     }
 
     #[test]
     fn state_shuffled_and_state_aware_policies_are_both_in_the_grid() {
         assert!(POLICIES.contains(&TransmissionPolicy::StateAwareFrontier));
-        assert!(POLICIES.contains(&TransmissionPolicy::StateAwareContentShuffled));
+        assert!(POLICIES.contains(&TransmissionPolicy::StateAwareRandomContent));
+        assert!(POLICIES.contains(&TransmissionPolicy::StateAwareRecipientShuffled));
     }
 }
