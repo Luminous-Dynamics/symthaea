@@ -151,7 +151,7 @@ def main():
             A=fac(r,a,"A",("x","y"),cards);B=fac(r,a,"B",("y","z"),cards)
             positive.append(cert(RULES[3],{"op":"mul","left":A,"right":B},a,cards));counts[RULES[3]]+=1
     for kind in ("ipoly","qpoly"):
-        a=Alg(kind);A=fac(r,a,"R",("z"),cards);positive.append(cert("cancel-additive-inverse",{"op":"add","left":{"op":"neg","body":A},"right":A},a,cards))
+        a=Alg(kind);A=fac(r,a,"R",("z",),cards);positive.append(cert("cancel-additive-inverse",{"op":"add","left":{"op":"neg","body":A},"right":A},a,cards))
     negatives=[]
     c=json.loads(json.dumps(positive[0]));c["target_sha256"]="0"*64;negatives.append(c)
     c=json.loads(json.dumps(positive[0]));c["rule_id"]="swap-finite-sums";negatives.append(c)
