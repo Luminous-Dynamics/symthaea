@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::controller::VehicleController;
 use crate::encoder::VehicleHdcEncoder;
-use crate::perturbations::PerturbationSchedule;
+use crate::perturbations::{PerturbationSchedule, VehiclePerturbation};
 use crate::road::Road;
 use crate::simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
 use crate::types::{
@@ -229,7 +229,7 @@ pub fn run_paired_lane_keep_rollout(
     if advanced_controller_digest.eq_ignore_ascii_case(&baseline_controller_digest) {
         return Err(VehiclePairedRolloutError::ControllerIdentityAliased);
     }
-    if !target_speed_mps.is_finite() || target_speed_mps < 0.0 {
+    if !target_speed_mps.is_finite() || !(0.0..=80.0).contains(&target_speed_mps) {
         return Err(VehiclePairedRolloutError::InvalidTargetSpeed);
     }
     if !timestep_s.is_finite() || timestep_s <= 0.0 || timestep_s > 0.1 {
@@ -238,10 +238,13 @@ pub fn run_paired_lane_keep_rollout(
     if steps == 0 || steps > MAX_PAIRED_ROLLOUT_STEPS {
         return Err(VehiclePairedRolloutError::InvalidStepBudget);
     }
-    if !state_is_finite(initial_simulator.state()) {
+    if !state_is_acceptable(initial_simulator.state()) {
         return Err(VehiclePairedRolloutError::InvalidInitialState);
     }
 
+    if !perturbation_schedule_is_valid(perturbations) {
+        return Err(VehiclePairedRolloutError::InvalidRolloutProfile);
+    }
     let initial_state_bytes = serde_json::to_vec(initial_simulator.state())
         .map_err(|_| VehiclePairedRolloutError::InvalidInitialState)?;
     let initial_state_digest = blake3::hash(&initial_state_bytes).to_hex().to_string();
@@ -338,8 +341,8 @@ pub fn run_paired_lane_keep_rollout(
         let baseline_time = baseline_simulator.state().timestamp;
         let advanced_time_tolerance = 1e-9 * expected_advanced_time.abs().max(1.0);
         let baseline_time_tolerance = 1e-9 * expected_baseline_time.abs().max(1.0);
-        if !state_is_finite(advanced_simulator.state())
-            || !state_is_finite(baseline_simulator.state())
+        if !state_is_acceptable(advanced_simulator.state())
+            || !state_is_acceptable(baseline_simulator.state())
             || (advanced_time - expected_advanced_time).abs() > advanced_time_tolerance
             || (baseline_time - expected_baseline_time).abs() > baseline_time_tolerance
         {
@@ -430,6 +433,47 @@ fn subtract_metrics(
 
 fn digest_is_valid(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn state_is_acceptable(state: &VehicleState) -> bool {
+    state.is_bounded() && state_is_finite(state)
+}
+
+fn perturbation_schedule_is_valid(schedule: &PerturbationSchedule) -> bool {
+    for (step, event) in &schedule.events {
+        if schedule.clear_step.is_some_and(|clear| *step >= clear) {
+            return false;
+        }
+        let valid = match event {
+            VehiclePerturbation::BlackIce { friction_scale } => {
+                friction_scale.is_finite() && (0.0..=2.0).contains(friction_scale)
+            }
+            VehiclePerturbation::SensorBlindness { affected_channels } => {
+                *affected_channels <= 14
+            }
+            VehiclePerturbation::Crosswind { force_n } => force_n.is_finite(),
+            VehiclePerturbation::TireBlowout {
+                tire,
+                grip_reduction,
+            } => {
+                matches!(
+                    tire.as_str(),
+                    "front_left" | "front_right" | "rear_left" | "rear_right"
+                ) && grip_reduction.is_finite()
+                    && (0.0..=1.0).contains(grip_reduction)
+            }
+            VehiclePerturbation::MeshSpoof { num_spoofed_peers } => {
+                *num_spoofed_peers <= 1024
+            }
+            VehiclePerturbation::RoadImpulse { decel_impulse } => {
+                decel_impulse.is_finite() && *decel_impulse >= 0.0
+            }
+        };
+        if !valid {
+            return false;
+        }
+    }
+    true
 }
 
 fn state_is_finite(state: &VehicleState) -> bool {
@@ -634,6 +678,34 @@ mod tests {
                 &sim,
                 &road,
                 &perturbations,
+                10.0,
+                0.005,
+                2,
+                &mut controller,
+                &mut encoder,
+            ).err(),
+            Some(VehiclePairedRolloutError::InvalidRolloutProfile)
+        );
+    }
+
+    #[test]
+    fn invalid_perturbation_parameters_are_rejected_before_stepping() {
+        let (sim, road, _, mut controller, mut encoder) = setup();
+        let invalid = PerturbationSchedule {
+            events: vec![(0, VehiclePerturbation::TireBlowout {
+                tire: "unknown-wheel".into(),
+                grip_reduction: 0.5,
+            })],
+            clear_step: Some(2),
+        };
+        assert_eq!(
+            run_paired_lane_keep_rollout(
+                "candidate",
+                "road",
+                "f".repeat(64),
+                &sim,
+                &road,
+                &invalid,
                 10.0,
                 0.005,
                 2,
