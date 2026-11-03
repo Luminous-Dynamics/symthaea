@@ -18,6 +18,9 @@ use crate::validation::{
     RunPartitionRecord, ValidationPartition,
 };
 
+const RELIABILITY_BIN_COUNT: usize = 10;
+const LOG_LOSS_EPSILON: f64 = 1.0e-15;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct EndpointPrediction {
     pub item_id: String,
@@ -133,6 +136,36 @@ pub struct ObserverThresholdMetrics {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct ReliabilityBinMetrics {
+    pub lower_probability: f64,
+    pub upper_probability: f64,
+    pub physical_run_count: usize,
+    pub mean_predicted_pass_probability: Option<f64>,
+    /// Mean observed item pass fraction, averaging physical runs equally.
+    pub observed_pass_fraction: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EndpointCalibrationMetrics {
+    pub endpoint: Endpoint,
+    /// Only runs with PASS/FAIL on every item for this endpoint are scored.
+    pub resolved_run_count: usize,
+    /// Runs with at least one INDETERMINATE item outcome for this endpoint.
+    pub unresolved_run_count: usize,
+    pub resolved_item_endpoint_pair_count: usize,
+    /// Mean of per-run Brier scores; each physical run has equal weight.
+    pub run_balanced_brier_score: Option<f64>,
+    /// Mean of per-run binary log loss; each physical run has equal weight.
+    pub run_balanced_log_loss: Option<f64>,
+    /// Mean of per-run mean item probabilities.
+    pub run_balanced_mean_predicted_probability: Option<f64>,
+    /// Mean of per-run observed item pass fractions.
+    pub run_balanced_observed_pass_fraction: Option<f64>,
+    /// Fixed-width bins over per-run average probabilities. Empty bins remain present.
+    pub reliability_bins: Vec<ReliabilityBinMetrics>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct ObserverBenchmarkReport {
     pub target_partition: ValidationPartition,
     pub target_run_count: usize,
@@ -143,6 +176,17 @@ pub struct ObserverBenchmarkReport {
     pub grouped_validation: GroupedValidationReport,
     /// Sorted thresholds, suitable for constructing a risk/coverage curve.
     pub points: Vec<ObserverThresholdMetrics>,
+    /// Run-balanced probabilistic scores and fixed-bin reliability summaries.
+    pub endpoint_calibration: Vec<EndpointCalibrationMetrics>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RunEndpointCalibration {
+    pair_count: usize,
+    mean_predicted_probability: f64,
+    observed_pass_fraction: f64,
+    brier_score: f64,
+    log_loss: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -150,6 +194,7 @@ struct PreparedRun {
     truth: RunTruth,
     minimum_endpoint_probability: f64,
     endpoint_truth: BTreeMap<Endpoint, RunTruth>,
+    endpoint_calibration: BTreeMap<Endpoint, Option<RunEndpointCalibration>>,
 }
 
 fn canonical_non_empty(value: &str) -> bool {
@@ -462,10 +507,70 @@ pub fn evaluate_observer_risk_coverage(
         } else {
             RunTruth::Conforming
         };
+
+        // Score each endpoint only when every item for that endpoint has an
+        // adjudicable PASS/FAIL label. Average within a physical run, then
+        // weight runs equally so larger loads do not dominate the score.
+        let mut endpoint_calibration = BTreeMap::new();
+        for endpoint in &required {
+            let mut probability_sum = 0.0;
+            let mut observed_pass_sum = 0.0;
+            let mut brier_sum = 0.0;
+            let mut log_loss_sum = 0.0;
+            let mut unresolved = false;
+            for item_id in &item_ids {
+                let decision = outcomes.get(&(item_id.to_string(), *endpoint))
+                    .copied()
+                    .ok_or_else(|| ObserverEvaluationError::MissingOutcome {
+                        run_id: run.run_id.clone(),
+                        item_id: (*item_id).to_owned(),
+                        endpoint: *endpoint,
+                    })?;
+                let probability = predictions.get(&(item_id.to_string(), *endpoint))
+                    .copied()
+                    .ok_or_else(|| ObserverEvaluationError::MissingPrediction {
+                        run_id: run.run_id.clone(),
+                        item_id: (*item_id).to_owned(),
+                        endpoint: *endpoint,
+                    })?;
+                let observed = match decision {
+                    Decision::Pass => 1.0,
+                    Decision::Fail => 0.0,
+                    Decision::Indeterminate => {
+                        unresolved = true;
+                        continue;
+                    }
+                };
+                probability_sum += probability;
+                observed_pass_sum += observed;
+                brier_sum += (probability - observed).powi(2);
+                let likelihood = if observed == 1.0 {
+                    probability.max(LOG_LOSS_EPSILON)
+                } else {
+                    (1.0 - probability).max(LOG_LOSS_EPSILON)
+                };
+                log_loss_sum -= likelihood.ln();
+            }
+            if unresolved {
+                endpoint_calibration.insert(*endpoint, None);
+            } else {
+                let pair_count = item_ids.len();
+                let divisor = pair_count as f64;
+                endpoint_calibration.insert(*endpoint, Some(RunEndpointCalibration {
+                    pair_count,
+                    mean_predicted_probability: probability_sum / divisor,
+                    observed_pass_fraction: observed_pass_sum / divisor,
+                    brier_score: brier_sum / divisor,
+                    log_loss: log_loss_sum / divisor,
+                }));
+            }
+        }
+
         prepared.push(PreparedRun {
             truth,
             minimum_endpoint_probability,
             endpoint_truth,
+            endpoint_calibration,
         });
     }
 
@@ -572,7 +677,72 @@ pub fn evaluate_observer_risk_coverage(
         calibration_bundle_sha256,
         grouped_validation,
         points,
+        endpoint_calibration: endpoint_calibration_metrics(&prepared, &required),
     })
+}
+
+fn endpoint_calibration_metrics(
+    runs: &[PreparedRun],
+    required: &BTreeSet<Endpoint>,
+) -> Vec<EndpointCalibrationMetrics> {
+    required.iter().map(|endpoint| {
+        let resolved: Vec<RunEndpointCalibration> = runs.iter()
+            .filter_map(|run| run.endpoint_calibration.get(endpoint).copied().flatten())
+            .collect();
+        let unresolved_run_count = runs.len().saturating_sub(resolved.len());
+        let resolved_run_count = resolved.len();
+        let resolved_item_endpoint_pair_count = resolved.iter()
+            .map(|score| score.pair_count)
+            .sum::<usize>();
+        let denominator = resolved_run_count as f64;
+
+        let run_balanced_brier_score = (resolved_run_count > 0).then(|| {
+            resolved.iter().map(|score| score.brier_score).sum::<f64>() / denominator
+        });
+        let run_balanced_log_loss = (resolved_run_count > 0).then(|| {
+            resolved.iter().map(|score| score.log_loss).sum::<f64>() / denominator
+        });
+        let run_balanced_mean_predicted_probability = (resolved_run_count > 0).then(|| {
+            resolved.iter().map(|score| score.mean_predicted_probability).sum::<f64>() / denominator
+        });
+        let run_balanced_observed_pass_fraction = (resolved_run_count > 0).then(|| {
+            resolved.iter().map(|score| score.observed_pass_fraction).sum::<f64>() / denominator
+        });
+
+        let mut bin_sums = vec![(0_usize, 0.0_f64, 0.0_f64); RELIABILITY_BIN_COUNT];
+        for score in &resolved {
+            let bin_index = ((score.mean_predicted_probability * RELIABILITY_BIN_COUNT as f64)
+                .floor() as usize)
+                .min(RELIABILITY_BIN_COUNT - 1);
+            let bin = &mut bin_sums[bin_index];
+            bin.0 += 1;
+            bin.1 += score.mean_predicted_probability;
+            bin.2 += score.observed_pass_fraction;
+        }
+        let reliability_bins = bin_sums.into_iter().enumerate().map(|(index, (count, predicted, observed))| {
+            let lower_probability = index as f64 / RELIABILITY_BIN_COUNT as f64;
+            let upper_probability = (index + 1) as f64 / RELIABILITY_BIN_COUNT as f64;
+            ReliabilityBinMetrics {
+                lower_probability,
+                upper_probability,
+                physical_run_count: count,
+                mean_predicted_pass_probability: (count > 0).then(|| predicted / count as f64),
+                observed_pass_fraction: (count > 0).then(|| observed / count as f64),
+            }
+        }).collect();
+
+        EndpointCalibrationMetrics {
+            endpoint: *endpoint,
+            resolved_run_count,
+            unresolved_run_count,
+            resolved_item_endpoint_pair_count,
+            run_balanced_brier_score,
+            run_balanced_log_loss,
+            run_balanced_mean_predicted_probability,
+            run_balanced_observed_pass_fraction,
+            reliability_bins,
+        }
+    }).collect()
 }
 
 fn endpoint_metrics(
