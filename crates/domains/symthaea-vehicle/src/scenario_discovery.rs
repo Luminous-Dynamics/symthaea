@@ -104,6 +104,7 @@ pub enum CounterexampleMinimizationError {
     EvaluationBudgetTooLarge,
     OriginalNotCounterexample,
     InvalidEvaluationReceipt,
+    InconsistentEvaluatorIdentity,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -178,6 +179,7 @@ impl IntersectionCounterexampleMinimization {
             || !self.evaluation_receipts[0].predicate_holds
             || !self.evaluation_receipts.iter().all(|receipt| {
                 !receipt.evaluator_id.trim().is_empty()
+                    && receipt.evaluator_id == self.evaluation_receipts[0].evaluator_id
                     && !receipt.execution_receipt_id.trim().is_empty()
                     && receipt.is_valid_for(&receipt.candidate, &self.predicate_id)
             })
@@ -320,10 +322,12 @@ where
     }
 
     let mut evaluation_receipts = Vec::with_capacity(maximum_evaluations as usize);
+    let mut evaluator_identity = None;
     let source_preserves = evaluate_and_record(
         source,
         &predicate_id,
         &mut evaluator,
+        &mut evaluator_identity,
         &mut evaluation_receipts,
     )?;
     let mut evaluations = 1_u32;
@@ -374,6 +378,7 @@ where
             &target_candidate,
             &predicate_id,
             &mut evaluator,
+            &mut evaluator_identity,
             &mut evaluation_receipts,
         )?;
         evaluations += 1;
@@ -400,6 +405,7 @@ where
                 &proposal,
                 &predicate_id,
                 &mut evaluator,
+                &mut evaluator_identity,
                 &mut evaluation_receipts,
             )?;
             evaluations += 1;
@@ -459,6 +465,7 @@ fn evaluate_and_record<F>(
     candidate: &IntersectionScenarioCandidate,
     predicate_id: &str,
     evaluator: &mut F,
+    evaluator_identity: &mut Option<String>,
     receipts: &mut Vec<CounterexampleEvaluationReceipt>,
 ) -> Result<bool, CounterexampleMinimizationError>
 where
@@ -467,6 +474,13 @@ where
     let receipt = evaluator(candidate);
     if !receipt.is_valid_for(candidate, predicate_id) {
         return Err(CounterexampleMinimizationError::InvalidEvaluationReceipt);
+    }
+    if let Some(expected) = evaluator_identity.as_ref() {
+        if expected != &receipt.evaluator_id {
+            return Err(CounterexampleMinimizationError::InconsistentEvaluatorIdentity);
+        }
+    } else {
+        *evaluator_identity = Some(receipt.evaluator_id.clone());
     }
     let predicate_holds = receipt.predicate_holds;
     receipts.push(receipt);
@@ -1038,6 +1052,33 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(error, CounterexampleMinimizationError::InvalidEvaluationReceipt);
+    }
+
+    #[test]
+    fn counterexample_minimizer_rejects_mixed_evaluator_builds() {
+        let source = candidate_from_factors(
+            5,
+            0,
+            1,
+            RANDOM_GENERATOR_POLICY_ID,
+            [20.0, 2.4, 0.8, 0.2, 0.2, 0.4, 0.3],
+        );
+        let mut calls = 0usize;
+        let error = minimize_intersection_counterexample(
+            &source,
+            "crossing-failure-v1",
+            32,
+            |candidate| {
+                calls += 1;
+                let mut receipt = mock_receipt(candidate, "crossing-failure-v1", true);
+                if calls > 1 {
+                    receipt.evaluator_id = "different-simulator-build".into();
+                }
+                receipt
+            },
+        )
+        .unwrap_err();
+        assert_eq!(error, CounterexampleMinimizationError::InconsistentEvaluatorIdentity);
     }
 
     #[test]
