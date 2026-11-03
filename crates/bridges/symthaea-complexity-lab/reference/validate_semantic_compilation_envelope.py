@@ -78,7 +78,15 @@ def semantic_errors(x):
     }
     for s in stages:
         by_kind = {}
-        for o in s["obligations"]: by_kind.setdefault(o["kind"], []).append(o)
+        for o in s["obligations"]:
+            for evidence_name in ("proof", "tests"):
+                evidence = o.get(evidence_name)
+                if evidence is not None and (
+                    evidence.get("input_representation_digest") != s["input"]["digest"]
+                    or evidence.get("output_representation_digest") != s["output"]["digest"]
+                ):
+                    errors.append(f"{evidence_name} evidence is not bound to stage {s['stage_id']} input/output")
+            by_kind.setdefault(o["kind"], []).append(o)
         k = required.get(s["relation"])
         if k and (k not in by_kind or any(o["status"] in {"unsupported", "failed"} for o in by_kind[k])):
             errors.append(f"stage {s['stage_id']} lacks an established {k} obligation")
@@ -137,9 +145,10 @@ def main():
     a=copy.deepcopy(fixture); a["problem"]["weight_map"]["entries"][0]["true_weight"]={"numerator":"4","denominator":"6"}; cases.append(("unreduced rational",a))
     a=copy.deepcopy(fixture); a["problem"]["contract"]="wmc"; a["problem"]["quantifier_semantics"]="all_assignments"; a["problem"]["weight_map"]["entries"].append({"variable":"h","false_weight":{"numerator":"1","denominator":"1"},"true_weight":{"numerator":"1","denominator":"1"}}); cases.append(("hidden variable in full WMC universe",a))
     a=copy.deepcopy(fixture); a["independent_replay"]["input_representation_digest"]="sha256:"+"f"*64; cases.append(("replay bound to wrong input",a))
-    a=copy.deepcopy(fixture); a["stages"][0]["relation"]="satisfiability_equivalence"; a["stages"][0]["obligations"]=[{"obligation_id":"sat-only","kind":"satisfiability_equivalence","status":"tested_only","tests":{"suite_id":"negative-control","artifact_digest":fixture["stages"][0]["obligations"][0]["tests"]["artifact_digest"],"case_count":1,"claim_ceiling":"finite_test_evidence"}}]; cases.append(("SAT-only proof used for projected count",a))
+    a=copy.deepcopy(fixture); a["stages"][0]["relation"]="satisfiability_equivalence"; a["stages"][0]["obligations"]=[{"obligation_id":"sat-only","kind":"satisfiability_equivalence","status":"tested_only","tests":{"suite_id":"negative-control","artifact_digest":fixture["stages"][0]["obligations"][0]["tests"]["artifact_digest"],"case_count":1,"claim_ceiling":"finite_test_evidence","input_representation_digest":a["stages"][0]["input"]["digest"],"output_representation_digest":a["stages"][0]["output"]["digest"]}}]; cases.append(("SAT-only proof used for projected count",a))
+    a=copy.deepcopy(fixture); a["stages"][0]["obligations"][0]["tests"]["output_representation_digest"]="sha256:"+"e"*64; cases.append(("evidence bound to wrong stage output",a))
     for name, case in cases: reject(name,case,schema)
-    print(f"PASS: 12 semantic-contract checks (2 positive cases, {len(cases)} negative controls)")
+    print(f"PASS: 13 semantic-contract checks (2 positive cases, {len(cases)} negative controls)")
     return 0
 
 if __name__ == "__main__": sys.exit(main())
