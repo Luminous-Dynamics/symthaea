@@ -208,6 +208,12 @@ impl VehicleRuntimeAssurance {
         &self.config.profile_id
     }
 
+    /// Integrity fingerprint for the frozen monitor configuration.
+    /// This is not a canonical cross-language encoding or signed identity.
+    pub fn profile_digest(&self) -> &str {
+        &self.profile_digest
+    }
+
     /// Reset temporal history into the conservative baseline state.
     /// Reset does not prove that the baseline is admissible.
     pub fn reset(&mut self) {
