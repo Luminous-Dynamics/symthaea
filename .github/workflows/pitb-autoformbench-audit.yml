@@ -72,18 +72,23 @@ jobs:
               raise SystemExit("leading-model unresolved cost share differs from registered audit")
           if leading["unresolved_end_reasons"] != {"budget_consumed": 21, "model_gave_up": 39}:
               raise SystemExit("leading-model failure-reason counts differ from registered audit")
-          complexity = report["gpt_6_astra_target_count_complexity_analysis"]
-          strata = {row["stratum"]: row for row in complexity["task_strata"]}
-          expected_strata = {
-              "one_declaration": (230, 208),
-              "two_to_four_declarations": (53, 41),
-              "five_or_more_declarations": (58, 32),
+          complexity = report["target_count_complexity_by_model"]
+          expected_by_model = {
+              "gpt-6-astra": ((230, 208), (53, 41), (58, 32)),
+              "opus-5": ((230, 172), (53, 25), (58, 14)),
+              "gpt-5.6-sol": ((230, 163), (53, 24), (58, 14)),
+              "deepseek-v4.1-flash": ((230, 148), (53, 21), (58, 11)),
           }
-          for name, expected in expected_strata.items():
-              row = strata[name]
-              if (row["tasks"], row["solved"]) != expected:
-                  raise SystemExit(f"target-count stratum changed: {name}: {row}")
-          contrast = complexity["five_plus_vs_under_five_within_source_groups"]
+          if set(complexity) != set(expected_by_model):
+              raise SystemExit("target-count audit must cover exactly the four registered model runs")
+          for model, expected_rows in expected_by_model.items():
+              strata = {row["stratum"]: row for row in complexity[model]["task_strata"]}
+              names = ("one_declaration", "two_to_four_declarations", "five_or_more_declarations")
+              for name, expected in zip(names, expected_rows):
+                  row = strata[name]
+                  if (row["tasks"], row["solved"]) != expected:
+                      raise SystemExit(f"{model} target-count stratum changed: {name}: {row}")
+          contrast = complexity["gpt-6-astra"]["five_plus_vs_under_five_within_source_groups"]
           if contrast["source_groups_with_both_strata"] != 13:
               raise SystemExit("within-source complexity comparison has the wrong source-group count")
           if (contrast["high"]["tasks"], contrast["high"]["unresolved"]) != (58, 26):
