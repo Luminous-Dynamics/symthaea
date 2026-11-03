@@ -119,8 +119,9 @@ impl OccupancyObservation {
                 occupancy: self.occupancy,
             });
         }
-        if self.cleaning_failures > self.replicate_count
-            || self.rinse_failures > self.replicate_count
+        let replicate_count = self.replicate_ids.len();
+        if self.cleaning_failures > replicate_count
+            || self.rinse_failures > replicate_count
         {
             return Err(CurveError::FailureCountExceedsReplicates {
                 occupancy: self.occupancy,
