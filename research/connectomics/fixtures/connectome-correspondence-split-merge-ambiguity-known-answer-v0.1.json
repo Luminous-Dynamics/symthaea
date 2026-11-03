@@ -85,7 +85,7 @@
         "seg-A-right"
       ],
       "cardinality": "ONE_TO_MANY",
-      "support_status": "VERIFIED",
+      "support_status": "CLAIMED_VERIFIED",
       "alternative_set_id": null,
       "evidence": [
         {
@@ -109,7 +109,7 @@
         "seg-BC"
       ],
       "cardinality": "MANY_TO_ONE",
-      "support_status": "VERIFIED",
+      "support_status": "CLAIMED_VERIFIED",
       "alternative_set_id": null,
       "evidence": [
         {
@@ -132,7 +132,7 @@
         "neuron-1-v2"
       ],
       "cardinality": "ONE_TO_ONE",
-      "support_status": "VERIFIED",
+      "support_status": "CLAIMED_VERIFIED",
       "alternative_set_id": null,
       "evidence": [
         {
@@ -245,7 +245,7 @@
         "segmentation-v2"
       ],
       "cardinality": "ONE_TO_ONE",
-      "support_status": "VERIFIED",
+      "support_status": "CLAIMED_VERIFIED",
       "alternative_set_id": null,
       "evidence": [
         {
@@ -287,7 +287,6 @@
   ],
   "summary": {
     "mapping_count": 8,
-    "verified_count": 4,
     "ambiguous_count": 2,
     "not_estimable_count": 2,
     "rejected_count": 0,
@@ -297,7 +296,8 @@
     "many_to_many_count": 0,
     "query_same_count": 1,
     "query_different_count": 1,
-    "query_not_estimable_count": 1
+    "query_not_estimable_count": 1,
+    "claimed_verified_count": 4
   },
   "disposition": "NOT_ESTIMABLE",
   "provenance": {
