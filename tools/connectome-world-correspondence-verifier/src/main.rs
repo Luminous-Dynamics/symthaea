@@ -592,6 +592,7 @@ fn verify_receipt(
     let mut mapping_ids = BTreeSet::new();
     let mut evidence_ids = BTreeSet::new();
     let mut source_coverage = BTreeSet::new();
+    let mut target_coverage = BTreeSet::new();
     let mut unmapped_sources = BTreeSet::new();
     let mut source_mapping_kinds = BTreeMap::<String, (String, Option<String>)>::new();
     let mut alternative_groups =
@@ -685,6 +686,9 @@ fn verify_receipt(
             }
         }
         for target_id in &target_ids {
+            if !target_coverage.insert(target_id.clone()) {
+                return Err(format!("{context}: target object {target_id} is claimed by more than one mapping row"));
+            }
             let object_type = target
                 .objects
                 .get(target_id)
@@ -760,7 +764,9 @@ fn verify_receipt(
         }
     }
 
-    if source_coverage != source.objects.keys().cloned().collect() {
+    let source_inventory_ids: BTreeSet<String> =
+        source.objects.keys().cloned().collect();
+    if source_coverage != source_inventory_ids {
         let missing: Vec<String> = source
             .objects
             .keys()
@@ -1089,6 +1095,15 @@ mod tests {
             Value::String("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned());
         receipt["query_comparisons"][2]["target_output_sha256"] =
             Value::String("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned());
+        let bytes = serde_json::to_string(&receipt).expect("serialize altered receipt");
+        assert!(verify(&bytes, SOURCE, TARGET).is_err());
+    }
+
+
+    #[test]
+    fn rejects_target_object_reused_across_mapping_rows() {
+        let mut receipt: Value = serde_json::from_str(RECEIPT).expect("fixture JSON");
+        receipt["mappings"][0]["target_object_ids"][1] = Value::String("seg-BC".to_owned());
         let bytes = serde_json::to_string(&receipt).expect("serialize altered receipt");
         assert!(verify(&bytes, SOURCE, TARGET).is_err());
     }
