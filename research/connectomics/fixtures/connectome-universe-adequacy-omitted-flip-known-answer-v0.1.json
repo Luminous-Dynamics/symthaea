@@ -136,12 +136,11 @@
     "universe_adequacy": "ADEQUACY_FAILED"
   },
   "provenance": {
-    "evaluator_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
-    "rules_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
-    "report_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "rules_sha256": "60c1b8a20a774908f239160c0c9a7b816c22e4c4a8a40b3ed45b9d7f87ea08a4",
     "truth_separation_verified": true,
-    "canonicalizer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "canonicalizer_sha256": "578a939bfdf68a11f279fcce606f97d2c11dfd90cd569fa1edd1fc7e8e8c6a70",
     "candidate_structure_manifest_sha256": "402324df481fb6743c3c5a07bd9c7a6707e626a7848bfa24bc43afae402deb4c",
-    "reference_structure_manifest_sha256": "4736c11291392f78514cda666cc47ab1bf448c04eaf73dd1c88093ec03529e8e"
+    "reference_structure_manifest_sha256": "4736c11291392f78514cda666cc47ab1bf448c04eaf73dd1c88093ec03529e8e",
+    "evaluator_protocol_sha256": "df83b9386deee6ed881e58b6aaa78919206233619571459c94c611dfccbb82e5"
   }
 }
