@@ -54,6 +54,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             - report.payload.summary.fixed_agent_zero_sensitivity
     );
     println!(
+        "One-way prompt false positives: {}",
+        report.payload.summary.trials
+            - report.payload.summary.one_way_prompt_zero_sensitivity
+    );
+    println!(
+        "Yoked replay false positives: {}",
+        report.payload.summary.trials
+            - report.payload.summary.yoked_replay_zero_sensitivity
+    );
+    println!(
         "Imitation sensitivity: {}/{}",
         report.payload.summary.imitation_agent_target_sensitive,
         report.payload.summary.trials
