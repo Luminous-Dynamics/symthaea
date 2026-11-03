@@ -285,6 +285,101 @@
           "if": {
             "properties": {
               "relation": {
+                "const": "documentation_reference"
+              }
+            },
+            "required": [
+              "relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_class": {
+                "const": "lean_doc_parser"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "relation": {
+                "const": "inheritance_reference"
+              }
+            },
+            "required": [
+              "relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_class": {
+                "const": "lean_elaborator"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "relation": {
+                "const": "structure_field_reference"
+              }
+            },
+            "required": [
+              "relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_class": {
+                "const": "lean_elaborator"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "relation": {
+                "const": "definition_body_reference"
+              }
+            },
+            "required": [
+              "relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_class": {
+                "const": "lean_elaborator"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "relation": {
+                "const": "signature_reference"
+              }
+            },
+            "required": [
+              "relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_class": {
+                "const": "lean_elaborator"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "relation": {
                 "const": "type_reference"
               }
             },
@@ -430,8 +525,13 @@
               "relation": {
                 "enum": [
                   "type_reference",
+                  "signature_reference",
                   "proof_term_reference",
+                  "definition_body_reference",
+                  "structure_field_reference",
+                  "inheritance_reference",
                   "instance_synthesis",
+                  "documentation_reference",
                   "module_environment_dependency"
                 ]
               },
