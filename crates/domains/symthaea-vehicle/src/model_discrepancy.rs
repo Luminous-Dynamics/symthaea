@@ -200,6 +200,36 @@ impl VehicleModelDiscrepancyReport {
     }
 }
 
+/// Compute the canonical digest of a finite action set from sorted action IDs and command digests.
+/// This binds the declared candidate payload identities; it does not authenticate the commands.
+pub fn model_discrepancy_action_set_digest(
+    actions: &[DiscrepancyActionOutcome],
+) -> Result<String, VehicleModelDiscrepancyError> {
+    if actions.len() < 2 {
+        return Err(VehicleModelDiscrepancyError::TooFewActions);
+    }
+    let mut pairs = actions
+        .iter()
+        .map(|action| (action.action_id.as_str(), action.command_digest.as_str()))
+        .collect::<Vec<_>>();
+    pairs.sort_by(|left, right| left.0.cmp(right.0));
+    if pairs.iter().any(|(id, digest)| id.trim().is_empty() || !valid_digest(digest)) {
+        return Err(VehicleModelDiscrepancyError::InvalidActionSetDigest);
+    }
+    if pairs.windows(2).any(|pair| pair[0].0 == pair[1].0) {
+        return Err(VehicleModelDiscrepancyError::DuplicateActionId);
+    }
+    hash_json(&pairs)
+}
+
+/// Compute the context digest required by a decision observation.
+/// Call this after setting the decision fields, including action_set_digest.
+pub fn model_discrepancy_decision_context_digest(
+    decision: &ModelDecisionObservation,
+) -> Result<String, VehicleModelDiscrepancyError> {
+    decision_context_digest(decision)
+}
+
 pub fn summarize_vehicle_model_discrepancy(
     input: &VehicleModelDiscrepancyInput,
 ) -> Result<VehicleModelDiscrepancyReport, VehicleModelDiscrepancyError> {
