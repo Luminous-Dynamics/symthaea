@@ -14,6 +14,8 @@ This module therefore separates three things:
 
 The system window uses one declared monotonic clock domain. Every request, release event and resource-meter interval must use that clock. The interval is `[start_at_s, end_at_s)`; events exactly at the end belong to the next window. Meter instrument IDs identify independently calibrated measurement streams, not a multi-channel data-acquisition chassis; distinct channels need distinct stream identities in this schema.
 
+Each scored window also freezes the machine-unit ID, whole-system configuration SHA-256 and utility-topology ID. Each request carries a compartment/cell ID and a compartment-configuration SHA-256. Reusing one cell ID for two configuration digests within one window is rejected; a configuration change is a different experimental condition and must not be pooled as if it were the same cell.
+
 ## Definitions
 
 - **Accepted request:** one stable service-request identity with one or more requested item IDs.
@@ -31,16 +33,18 @@ The system window uses one declared monotonic clock domain. Every request, relea
 - Request count, accepted/started/completed counts, carry-in requests, and unresolved requests at window end.
 - Requested and unresolved items for the accepted-in-window cohort.
 - Time to first independently verified release.
-- Request latency p50/p95 and queue-wait p50/p95, using nearest-rank percentiles over completed/started requests accepted during the window. Right-censored requests are reported separately and are not imputed into percentiles.
+- Request latency p50/p95 over completed requests accepted during the window, and queue-wait p50/p95 over requests accepted in-window that actually started (including requests still in service at window end). Both use nearest-rank percentiles. Right-censored request latency is reported separately and is not imputed into percentiles.
 - First-pass yield: first-attempt verified items divided by requested items in completed requests accepted during the window. The service ledger reports first-pass IDs; an item first qualified after a re-wash is not first-pass.
+- Physical attempt count, rewash-attempt count, requests with any rewash attempt, item-attempt visits and reattempted item visits.
 - Unqualified items reported by the service ledgers, active request seconds and maximum concurrency.
+- Per-compartment request counts, independently verified releases, active request seconds, peak within-cell concurrency and the configuration digest.
 - System-level resource totals by canonical unit, plus window resource totals per verified release when at least one item was released. The field is a window-intensity ratio, not the full lifecycle resource cost for one service request.
 
 A release count is event-based. An item qualified in a service report but not released in the scored window is not counted as a release in that window. A request accepted before the window can still contribute a release during it; this is why carry-in is surfaced.
 
 ## Resource boundary policy
 
-The system-window resource rows are authoritative for the window numerator. Do not add the request-ledger totals to them. Otherwise an appliance main-feed meter plus a per-request allocation of the same energy can be counted twice.
+The system-window resource rows are authoritative for the window numerator. Do not add the request-ledger totals to them. Otherwise an appliance main-feed meter plus a per-request allocation of the same energy can be counted twice. The report aggregates the underlying service reports separately: physical attempts, rewash attempts, item-attempt visits and item reattempt visits remain visible without adding their resource vectors again.
 
 Each row contains a stable `measurement_boundary_id`. Overlapping intervals from different instruments on the same declared boundary are rejected. A parent meter can declare that it covers downstream boundary IDs; overlapping parent and child rows are rejected. This catches explicit aggregate-plus-branch duplication, but a false boundary map can still evade the structural check. The physical wiring/plumbing map and every meter's placement must be independently audited.
 
@@ -64,7 +68,7 @@ For each condition:
 6. Score a fixed wall-clock window. Report carry-in, unresolved, queue, throughput, latency and all resources. Do not sum overlapping request durations to form the denominator.
 7. Repeat with one compartment active, two compartments simultaneous, all compartments active, injected isolation/valve/filter/sensor faults, and an external operator/site where feasible.
 
-Primary system-level results are verified items/hour, first-pass yield, rewash burden, time-to-first-release, p50/p95 request latency, maximum concurrency, resource totals per window and window resource totals per release. Also report per-request lifecycle resources from complete service ledgers; the two denominators answer different questions.
+Primary system-level results are verified items/hour, first-pass yield, physical rewash attempts, reattempted item visits, time-to-first-release, p50/p95 request latency, maximum concurrency, resource totals per window and window resource totals per verified release. Report per-compartment statistics and the exact machine/configuration/topology IDs. Also report per-request lifecycle resources from complete service ledgers; the two denominators answer different questions.
 
 ## Benchmark standards and scope separation
 
@@ -98,6 +102,6 @@ Sources:
 
 ## Acceptance tests
 
-Source-authored Rust tests cover concurrent versus sequential service, right-censored queued and started requests, independent-assay release qualification, duplicate releases, clock mismatch, cross-instrument boundary overlap, declared parent/branch duplication, parallel operator person-time, missing required resource dimensions, first-pass yield and inconsistent upstream service reports.
+Source-authored Rust tests cover concurrent versus sequential service, carry-in requests, right-censored queued and started requests, independent-assay release qualification, duplicate releases, clock mismatch, cross-instrument boundary overlap, declared parent/branch duplication, parallel operator person-time, missing required resource dimensions, first-pass yield, rewash aggregation, per-compartment statistics and configuration mismatch, and inconsistent upstream service reports.
 
 All tests, formatting and clippy must run on the exact pull-request head before any pass claim. The validator does not authenticate referenced evidence bytes, prove assay independence, establish the truth of boundary IDs, infer omitted requests, or establish physical cleaning/hygiene performance.
