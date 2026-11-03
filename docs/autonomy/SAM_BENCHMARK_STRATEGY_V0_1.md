@@ -312,3 +312,36 @@ Treat simulator outputs as observations from a named model. Cross-check selected
 6. Publish every failure, no-result, unsupported simulator feature and resource constraint. Treat confidence and calibration as first-class measurements.
 
 The immediate implementation now includes same-observation shadow comparison and a separate paired closed-loop lane-keeping runner. Neither yet integrates the RTA monitor or actor-capable intersection simulator.
+
+## 9. 2026 closed-loop generalization benchmarks to adopt
+
+### Fail2Drive — priority external generalization track
+
+Fail2Drive (IROS 2026) is especially relevant to SAM's evaluation design. The authors describe a CARLA v2 benchmark with 200 routes, 17 new scenario classes, and matched in-distribution reference routes for shifted routes. Their abstract reports an average 22.8% success-rate degradation under distribution shift across evaluated models. It highlights that training-scenario reuse can make closed-loop scores look stronger than true generalization.
+
+Adopt the *paired shift* methodology where compatible:
+- every shifted route has a matched in-distribution reference;
+- compute per-pair completion and constraint deltas, not only aggregate success;
+- slice by shift family (appearance, layout, behavior, robustness);
+- report degradation distribution, worst-family failures and confidence intervals;
+- preserve solvability checks and an independent expert/controller reference where available;
+- keep the shifted scenario family out of training, tuning and search-policy adaptation.
+
+Do not directly compare Fail2Drive's CARLA scores to the local bicycle-model lane-keeping metrics. It is an external closed-loop generalization track, not a metric conversion target.
+
+Reference: https://arxiv.org/abs/2604.08535 and https://github.com/autonomousvision/fail2drive.
+
+### Person2Drive — optional personalization / style track
+
+Person2Drive (ECCV 2026) studies closed-loop personalized end-to-end driving and quantitative driver-style similarity. It is relevant only if SAM introduces a declared personalization objective. Keep style similarity strictly separate from collision outcomes, legality, comfort constraints and competence. Personalization must not reward unsafe speed, shorter gaps or non-compliant maneuvers. The public repository indicates code, models and evaluation tools were still marked as coming soon at the time of the reviewed page; verify availability and dataset terms before planning a reproduction.
+
+References: https://arxiv.org/abs/2602.18757 and https://github.com/dongxr77/Person2Drive.
+
+### Implications for SAM's own paired benchmark
+
+Use two different kinds of pairing, never merge them into one score:
+
+1. **Controller pairing:** same initial state/dynamics/disturbance, independent post-action plant evolution. Our `paired_rollout` module implements the first limited lane-keeping slice.
+2. **Distribution-shift pairing:** matched nominal/shifted routes with the same route/task intent. Fail2Drive provides an external template for generalization-gap measurement.
+
+The first isolates controller effects under matched conditions. The second measures sensitivity to unseen shifts. Neither is a substitute for representative operational exposure or physical validation.
