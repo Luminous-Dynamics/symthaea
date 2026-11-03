@@ -25,7 +25,7 @@ relationships.
 No edge is labeled compiler-verified: a future independent Rust Analyzer /
 compiler pass must supply those receipts before such an authority can be assigned.
 The anchors establish source-text provenance only; they are not complete AST spans
-or compiler/LSP semantic locations.
+or compiler/LSP semantic locations. Static intake must also verify that the anchored declaration actually names the graph node; a line that exists and matches its text can still be assigned to the wrong symbol.
 
 `mutations.v0.json` defines deterministic edit scenarios and expected impact
 sets. They are scenario specifications, not pre-applied patches.
