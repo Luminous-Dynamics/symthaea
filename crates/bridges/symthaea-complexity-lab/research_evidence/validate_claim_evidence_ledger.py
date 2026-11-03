@@ -111,6 +111,18 @@ def validate_ledger(data: dict) -> dict:
             axioms = claim.get("permitted_axioms")
             require(isinstance(axioms, list) and axioms,
                     f"permitted axioms must be explicit: {claim_id}")
+            require(claim.get("bound") == claim.get("formalized_scope_bound"),
+                    f"formal bound differs from the pinned Lean scope bound: {claim_id}")
+            require(set(claim.get("output_contract", [])) ==
+                    set(claim.get("formalized_scope_output_contract", [])) ==
+                    {"exact number of satisfying assignments", "SAT decision"},
+                    f"formal output contract differs from the Lean scope: {claim_id}")
+            require(isinstance(claim.get("machine_model"), str) and claim["machine_model"],
+                    f"formal machine model missing: {claim_id}")
+            require(isinstance(claim.get("space_claim"), str) and claim["space_claim"],
+                    f"formal space claim missing: {claim_id}")
+            require(isinstance(claim.get("input_encoding"), str) and claim["input_encoding"],
+                    f"formal input encoding missing: {claim_id}")
             require(claim.get("reproduction_status") == "not_independently_rebuilt_by_symthaea"
                     or claim.get("reproduction_status") == "independently_rebuilt_by_symthaea",
                     f"formal claim must state local rebuild status: {claim_id}")
@@ -181,6 +193,14 @@ def mutation_tests(data: dict) -> dict:
     bad = copy.deepcopy(data)
     bad["claims"][2]["output_contract"] = []
     tests.append(("output contract omitted", bad))
+
+    bad = copy.deepcopy(data)
+    bad["claims"][0]["bound"] = "(n+m)^O_k(1) * 2^O_k(n*log log n/sqrt(log n))"
+    tests.append(("stronger manuscript exponent substituted into Lean claim", bad))
+
+    bad = copy.deepcopy(data)
+    bad["claims"][0]["output_contract"] = ["SAT decision"]
+    tests.append(("formal counting output dropped", bad))
 
     bad = copy.deepcopy(data)
     bad["claims"][3]["peer_review_status"] = None
