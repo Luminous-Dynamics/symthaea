@@ -311,7 +311,9 @@ fn derive_report(
 
     for row in &evaluation {
         let covered = row.nonconformity_score <= calibration_threshold;
-        overall_covered += usize::from(covered);
+        if covered {
+            overall_covered += 1;
+        }
         overall_measure_mean = online_mean(
             overall_measure_mean,
             row.prediction_set_measure,
