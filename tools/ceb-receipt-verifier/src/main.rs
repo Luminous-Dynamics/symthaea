@@ -4,10 +4,14 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use ceb_receipt_verifier::{hash_source_tree, verify_pair, PairInputs, TREE_DIGEST_ALGORITHM};
+use ceb_receipt_verifier::{PairInputs, TREE_DIGEST_ALGORITHM, hash_source_tree, verify_pair};
 
 #[derive(Debug, Parser)]
-#[command(name = "ceb-receipt-verifier", version, about = "Offline verifier for signed CEB primary/regrade receipt pairs")]
+#[command(
+    name = "ceb-receipt-verifier",
+    version,
+    about = "Offline verifier for signed CEB primary/regrade receipt pairs"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -60,16 +64,22 @@ fn read_limited(path: &Path, limit: u64) -> Result<Vec<u8>, String> {
         return Err(format!("{} is not a regular file", path.display()));
     }
     if metadata.len() > limit {
-        return Err(format!("{} exceeds the {limit}-byte input limit", path.display()));
+        return Err(format!(
+            "{} exceeds the {limit}-byte input limit",
+            path.display()
+        ));
     }
-    let file = File::open(path)
-        .map_err(|error| format!("cannot open {}: {error}", path.display()))?;
+    let file =
+        File::open(path).map_err(|error| format!("cannot open {}: {error}", path.display()))?;
     let mut bytes = Vec::with_capacity(metadata.len() as usize);
     file.take(limit + 1)
         .read_to_end(&mut bytes)
         .map_err(|error| format!("cannot read {}: {error}", path.display()))?;
     if bytes.len() as u64 > limit {
-        return Err(format!("{} exceeds the {limit}-byte input limit", path.display()));
+        return Err(format!(
+            "{} exceeds the {limit}-byte input limit",
+            path.display()
+        ));
     }
     Ok(bytes)
 }
@@ -160,7 +170,11 @@ fn main() -> ExitCode {
                 "reasons": [reason],
                 "claim_ceiling": "No acceptance claim; one or more verifier inputs could not be read safely."
             });
-            println!("{}", serde_json::to_string_pretty(&message).unwrap_or_else(|_| "{\"status\":\"protocol_violation\"}".to_owned()));
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&message)
+                    .unwrap_or_else(|_| "{\"status\":\"protocol_violation\"}".to_owned())
+            );
             return ExitCode::from(2);
         }
     };
