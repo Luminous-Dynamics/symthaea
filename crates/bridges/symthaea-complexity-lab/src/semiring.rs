@@ -426,6 +426,43 @@ fn validate_support_factor_alignment(
     Ok(())
 }
 
+
+/// Validate one row and return its total distinct assignment support.
+fn maxcount_backpointer_row_support(
+    row: &MaxCountBackpointerRow,
+    variable_cardinality: usize,
+) -> Result<u128, EliminationError> {
+    if row.maximizing_states.len() != row.branch_multiplicities.len()
+        || row.maximizing_states.len() != row.branch_assignment_counts.len()
+    {
+        return Err(EliminationError::InvalidEliminationOrder {
+            reason: "backpointer row parallel branch arrays are invalid",
+        });
+    }
+    let mut total_support = 0u128;
+    let mut previous_state = None;
+    for i in 0..row.maximizing_states.len() {
+        let state = row.maximizing_states[i];
+        let multiplicity = row.branch_multiplicities[i];
+        let support = row.branch_assignment_counts[i];
+        if state >= variable_cardinality
+            || multiplicity == 0
+            || support == 0
+            || previous_state.is_some_and(|previous| state <= previous)
+        {
+            return Err(EliminationError::InvalidEliminationOrder {
+                reason: "backpointer branch state/count is invalid",
+            });
+        }
+        total_support = total_support.checked_add(support)
+            .ok_or(SemiringError::CountOverflow {
+                operation: "sampler row support aggregation",
+            })?;
+        previous_state = Some(state);
+    }
+    Ok(total_support)
+}
+
 /// MaxCount-specialized elimination retaining every local maximizer.
 /// The reverse pass returns a canonical optimum witness without conditional
 /// re-solves. Backpointer multiplicities are distinct from assignment count:
@@ -723,45 +760,24 @@ impl ExactFactorGraph<MaxCountValue> {
                     reason: "backpointer row count does not match separator cardinality",
                 });
             }
-            for (row_index, row) in backpointer.rows.iter().enumerate() {
-                let mut decoded = vec![0usize; n];
-                decode_assignment(row_index, &backpointer.separator, &self.cardinalities, &mut decoded);
-                let expected_key: Vec<usize> = backpointer.separator.iter().map(|&v| decoded[v]).collect();
-                if row.separator_assignment != expected_key
-                    || row.maximizing_states.len() != row.branch_multiplicities.len()
-                    || row.maximizing_states.len() != row.branch_assignment_counts.len()
-                {
+            if backpointer.separator.is_empty() {
+                let root_row = backpointer.rows.get(0)
+                    .ok_or(EliminationError::InvalidEliminationOrder {
+                        reason: "root backpointer is missing its empty-separator row",
+                    })?;
+                if !root_row.separator_assignment.is_empty() {
                     return Err(EliminationError::InvalidEliminationOrder {
-                        reason: "backpointer row encoding or parallel branch arrays are invalid",
+                        reason: "root backpointer row has a nonempty separator key",
                     });
                 }
-                let mut previous_state = None;
-                let mut row_support = 0u128;
-                for i in 0..row.maximizing_states.len() {
-                    let state = row.maximizing_states[i];
-                    let multiplicity = row.branch_multiplicities[i];
-                    let support = row.branch_assignment_counts[i];
-                    if state >= self.cardinalities[backpointer.variable]
-                        || multiplicity == 0
-                        || support == 0
-                        || previous_state.is_some_and(|previous| state <= previous)
-                    {
-                        return Err(EliminationError::InvalidEliminationOrder {
-                            reason: "backpointer branch state/count is invalid",
-                        });
-                    }
-                    row_support = row_support.checked_add(support)
-                        .ok_or(SemiringError::CountOverflow {
-                            operation: "sampler row support aggregation",
-                        })?;
-                    previous_state = Some(state);
-                }
-                if backpointer.separator.is_empty() {
-                    root_support = root_support.checked_mul(row_support)
-                        .ok_or(SemiringError::CountOverflow {
-                            operation: "sampler root support product",
-                        })?;
-                }
+                let support = maxcount_backpointer_row_support(
+                    root_row,
+                    self.cardinalities[backpointer.variable],
+                )?;
+                root_support = root_support.checked_mul(support)
+                    .ok_or(SemiringError::CountOverflow {
+                        operation: "sampler root support product",
+                    })?;
             }
         }
         if root_support != result.distinct_optimal_assignments {
@@ -788,13 +804,10 @@ impl ExactFactorGraph<MaxCountValue> {
                     reason: "sampler backpointer row key mismatch",
                 });
             }
-            let mut total_support = 0u128;
-            for &support in &row.branch_assignment_counts {
-                total_support = total_support.checked_add(support)
-                    .ok_or(SemiringError::CountOverflow {
-                        operation: "sampler branch support total",
-                    })?;
-            }
+            let total_support = maxcount_backpointer_row_support(
+                row,
+                self.cardinalities[backpointer.variable],
+            )?;
             if total_support == 0 {
                 return Err(EliminationError::InvalidEliminationOrder {
                     reason: "reachable backpointer row has zero support",
