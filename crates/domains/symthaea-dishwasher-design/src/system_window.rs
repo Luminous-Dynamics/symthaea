@@ -130,7 +130,8 @@ pub struct SystemWindowReport {
     pub queue_wait_p95_seconds: Option<u64>,
     pub total_resource_measurement_count: usize,
     pub resource_totals: Vec<(SystemResourceKind, f64, &'static str)>,
-    pub resources_per_verified_item: Option<Vec<(SystemResourceKind, f64, &'static str)>>,
+    /// Window resource intensity per release; not a per-request lifecycle cost.
+    pub window_resources_per_verified_release: Option<Vec<(SystemResourceKind, f64, &'static str)>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -139,6 +140,7 @@ pub enum SystemWindowError {
     InvalidIdentity(&'static str),
     InvalidClockDomain { request_id: String },
     DuplicateRequestId(String),
+    EmptyRequestedItemSet(String),
     DuplicateRequestedItem { request_id: String, item_id: String },
     RequestOutsideWindow(String),
     RequestFinishBeforeStart(String),
@@ -317,6 +319,11 @@ fn validate_request(
         ));
     }
 
+    if request.requested_item_ids.is_empty() {
+        return Err(SystemWindowError::EmptyRequestedItemSet(
+            request.service_request_id.clone(),
+        ));
+    }
     let mut requested = HashSet::new();
     for item_id in &request.requested_item_ids {
         if !canonical_non_empty(item_id) {
@@ -786,7 +793,7 @@ pub fn account_system_window(
         queue_wait_p95_seconds: percentile_nearest_rank(&mut queue_wait_values, 0.95),
         total_resource_measurement_count: resources.len(),
         resource_totals,
-        resources_per_verified_item,
+        window_resources_per_verified_release: resources_per_verified_item,
     })
 }
 
@@ -812,6 +819,7 @@ mod tests {
         let first_pass_ids: Vec<String> = first_pass.iter().map(|id| (*id).to_owned()).collect();
         let unique_item_count = verified_ids.len() + unqualified_ids.len();
         let resources = AttemptResources::default();
+        let resources_per_verified_item = if verified_ids.is_empty() { None } else { Some(resources) };
         ServiceAccountingReport {
             service_request_id: request_id.to_owned(),
             attempt_count: 1,
@@ -825,7 +833,7 @@ mod tests {
             first_pass_verified_item_ids: first_pass_ids,
             unqualified_item_ids: unqualified_ids,
             total_resources: resources,
-            resources_per_verified_item: None,
+            resources_per_verified_item,
             service_makespan_s: 60,
         }
     }
@@ -1017,6 +1025,38 @@ mod tests {
     }
 
     #[test]
+    fn reports_carry_in_requests_separately_from_new_arrivals() {
+        let requests = [
+            request(
+                "carry-in",
+                0,
+                Some(0),
+                WindowRequestState::Completed { closed_at_s: 40 },
+                &["cup-old"],
+                Some(report("carry-in", &["cup-old"], &[], &["cup-old"])),
+            ),
+            request(
+                "new-arrival",
+                20,
+                Some(30),
+                WindowRequestState::Completed { closed_at_s: 80 },
+                &["cup-new"],
+                Some(report("new-arrival", &["cup-new"], &[], &["cup-new"])),
+            ),
+        ];
+        let result = account_system_window(
+            &spec(&REQUIRED),
+            &requests,
+            &[release("carry-in", "cup-old", 35), release("new-arrival", "cup-new", 70)],
+            &basic_resources(),
+        ).unwrap();
+        assert_eq!(result.carry_in_requests_at_window_start, 1);
+        assert_eq!(result.requests_accepted_in_window, 1);
+        assert_eq!(result.verified_item_release_count, 2);
+        assert_eq!(result.items_in_completed_cohort, 1);
+    }
+
+    #[test]
     fn queued_unresolved_request_is_right_censored_and_never_released() {
         let requests = [request(
             "service-queued",
@@ -1036,7 +1076,7 @@ mod tests {
         assert_eq!(result.unresolved_items_in_accepted_cohort, 1);
         assert_eq!(result.verified_item_release_count, 0);
         assert_eq!(result.verified_items_per_hour, 0.0);
-        assert!(result.resources_per_verified_item.is_none());
+        assert!(result.window_resources_per_verified_release.is_none());
         assert!(result.first_pass_yield.is_none());
     }
 
