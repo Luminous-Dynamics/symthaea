@@ -123,6 +123,7 @@ pub enum TemporalGroundingIssue {
     EmptyQueryText,
     EmptyAnnotationPolicyVersion,
     InvalidAnnotationDigest,
+    InvalidPredictionDigest,
     ZeroAnnotators,
     InvalidAudioDigest,
     InvalidAudioClock { field: String },
@@ -296,7 +297,7 @@ pub fn validate_temporal_grounding_prediction(
             reason,
         } => {
             if !is_lower_hex_digest(raw_output_sha256) {
-                issues.push(TemporalGroundingIssue::InvalidAnnotationDigest);
+                issues.push(TemporalGroundingIssue::InvalidPredictionDigest);
             }
             if reason.trim().is_empty() {
                 issues.push(TemporalGroundingIssue::MissingPredictionStatusReason);
@@ -926,7 +927,7 @@ pub fn aggregate_temporal_grounding_scores(
         positive_queries: positive.len(),
         negative_queries: negative.len(),
         abstained_queries: scored.iter().filter(|score| score.abstained).count(),
-        parse_failure_queries: scored.iter().filter(|score| score.parse_failure).count(),
+        parse_failure_queries: scores.iter().filter(|score| score.parse_failure).count(),
         micro_true_positives,
         micro_false_positives,
         micro_false_negatives,
@@ -1238,6 +1239,131 @@ mod tests {
         assert_eq!(score.ambiguous_candidate_count, 1);
         assert_eq!(score.predicted_occurrences, 0);
         assert_eq!(score.false_negatives, 1);
+    }
+
+
+    #[test]
+    fn unparseable_output_is_a_failure_not_an_abstention() {
+        let truth = truth(
+            GroundTruthStateV1::Present,
+            vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
+        );
+        let prediction = prediction(GroundingPredictionStateV1::Unparseable {
+            raw_output_sha256: sha256_hex(b"model output that did not parse"),
+            reason: "invalid timestamp JSON".into(),
+        });
+        let score = score_temporal_grounding(&truth, &prediction, &plan()).unwrap();
+        assert!(score.parse_failure);
+        assert!(!score.abstained);
+        assert_eq!(score.false_negatives, 1);
+        assert_eq!(score.prediction_kind, GroundingPredictionKindV1::Unparseable);
+    }
+
+    #[test]
+    fn dataset_aggregate_reports_count_absence_and_boundary_metrics() {
+        let positive_truth = truth(
+            GroundTruthStateV1::Present,
+            vec![
+                FrameIntervalV1 {
+                    start_frame: 100,
+                    end_frame: 200,
+                },
+                FrameIntervalV1 {
+                    start_frame: 500,
+                    end_frame: 600,
+                },
+            ],
+        );
+        let positive_prediction = prediction(GroundingPredictionStateV1::Occurrences {
+            intervals: vec![
+                FrameIntervalV1 {
+                    start_frame: 148,
+                    end_frame: 248,
+                },
+                FrameIntervalV1 {
+                    start_frame: 452,
+                    end_frame: 552,
+                },
+            ],
+        });
+        let positive_score =
+            score_temporal_grounding(&positive_truth, &positive_prediction, &plan()).unwrap();
+
+        let mut negative_truth = truth(GroundTruthStateV1::Absent, Vec::new());
+        negative_truth.query_id = "query-absent-02".into();
+        let mut negative_prediction = prediction(GroundingPredictionStateV1::QueryAbsent);
+        negative_prediction.query_id = "query-absent-02".into();
+        let negative_score =
+            score_temporal_grounding(&negative_truth, &negative_prediction, &plan()).unwrap();
+
+        let aggregate =
+            aggregate_temporal_grounding_scores(&[positive_score, negative_score]).unwrap();
+        assert_eq!(aggregate.total_queries, 2);
+        assert_eq!(aggregate.scored_queries, 2);
+        assert_eq!(aggregate.positive_queries, 1);
+        assert_eq!(aggregate.negative_queries, 1);
+        assert_eq!(aggregate.one_to_many_queries, 1);
+        assert_eq!(aggregate.one_to_many_exact_count, 1);
+        assert_eq!(aggregate.one_to_many_count_accuracy, Some(1.0));
+        assert_eq!(aggregate.negative_absence_accuracy, Some(1.0));
+        assert_eq!(aggregate.negative_absence_coverage, Some(1.0));
+        assert_eq!(aggregate.start_boundary_mae_ms, Some(1.0));
+        assert_eq!(aggregate.end_boundary_mae_ms, Some(1.0));
+    }
+
+    #[test]
+    fn dataset_aggregate_counts_parse_failures_separately_from_abstentions() {
+        let truth = truth(
+            GroundTruthStateV1::Present,
+            vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
+        );
+        let prediction = prediction(GroundingPredictionStateV1::Unparseable {
+            raw_output_sha256: sha256_hex(b"bad output"),
+            reason: "unparseable answer".into(),
+        });
+        let score = score_temporal_grounding(&truth, &prediction, &plan()).unwrap();
+        let aggregate = aggregate_temporal_grounding_scores(&[score]).unwrap();
+        assert_eq!(aggregate.parse_failure_queries, 1);
+        assert_eq!(aggregate.abstained_queries, 0);
+        assert_eq!(aggregate.micro_f1, Some(0.0));
+    }
+
+    #[test]
+    fn dataset_aggregate_rejects_mixed_evaluators_and_duplicate_queries() {
+        let truth = truth(
+            GroundTruthStateV1::Present,
+            vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
+        );
+        let prediction = prediction(GroundingPredictionStateV1::Occurrences {
+            intervals: vec![FrameIntervalV1 {
+                start_frame: 100,
+                end_frame: 200,
+            }],
+        });
+        let score = score_temporal_grounding(&truth, &prediction, &plan()).unwrap();
+        let mut second = score.clone();
+        second.evaluator_version = "different-evaluator".into();
+        let issues =
+            aggregate_temporal_grounding_scores(&[score.clone(), second]).unwrap_err();
+        assert!(issues.iter().any(|issue| matches!(
+            issue,
+            TemporalGroundingAggregateIssue::MixedEvaluatorVersions { .. }
+        )));
+
+        let issues = aggregate_temporal_grounding_scores(&[score.clone(), score]).unwrap_err();
+        assert!(issues.iter().any(|issue| matches!(
+            issue,
+            TemporalGroundingAggregateIssue::DuplicateQueryId { .. }
+        )));
     }
 
     #[test]
