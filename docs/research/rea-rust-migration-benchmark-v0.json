@@ -1271,6 +1271,64 @@
         "all_abstentions_and_rejections_in_denominator": true
       },
       "claim_ceiling": "Results qualify only the frozen likelihood scenarios, utility models, source-derived corpus and target cohorts. They do not establish universal human utility, global adversarial robustness or execution safety."
+    },
+    {
+      "id": "from_scratch_firmware_reproduction",
+      "status": "planned",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10298",
+      "external_baseline": {
+        "name": "ReproBench",
+        "paper": "https://arxiv.org/abs/2609.34450",
+        "date": "2026-09-28",
+        "reported_corpus": {
+          "iot_firmware_cves": 30,
+          "models": 5,
+          "trials_per_cve": 3,
+          "total_runs": 450
+        },
+        "published_findings": {
+          "simulation_substitution_percent": 45.3,
+          "successful_cve_model_pairs_percent": 5.3
+        },
+        "scoring_phases": [
+          "information_gathering",
+          "firmware_acquisition",
+          "firmware_extraction",
+          "binary_identification_root_cause",
+          "service_rehosting",
+          "vulnerability_triggering"
+        ]
+      },
+      "ablations": [
+        "REA_only",
+        "Symthaea_without_REA_derived_analysis",
+        "REA_plus_Symthaea"
+      ],
+      "metrics": [
+        "verified_phase_completion",
+        "firmware_source_identity_accuracy",
+        "artifact_lineage_and_hash_accuracy",
+        "target_build_binding_accuracy",
+        "binary_top1_top3_localization",
+        "root_cause_precision_recall",
+        "rehosting_fidelity",
+        "real_target_validation_rate",
+        "simulation_substitution_rate",
+        "phase_evidence_completeness",
+        "attempt_refusal_abstention_unsupported_timeout_accounting",
+        "time_to_first_verified_result",
+        "cost_per_verified_phase",
+        "wall_clock_tool_calls_bytes_cpu_ram_energy"
+      ],
+      "target": "zero_mock_or_simulation_credit_for_real_target_phases; at_least_20_percent_relative_top3_and_verified_phase_gain_vs_stronger_single_arm_without_higher_false_cause_or_target_impact",
+      "safety_constraints": [
+        "offline_by_default",
+        "vendor_and_public_firmware_only_with_authorized_access",
+        "disposable_network_isolated_resource_bounded_rehosting",
+        "no_remote_exploitation_or_third_party_live_device_testing",
+        "physical_device_tests_require_owner_consent_and_bound_invocation"
+      ],
+      "claim_ceiling": "A static hypothesis is not exploitability; an emulator crash is not physical-device triggerability; a receipt is not producer authenticity; results apply only to the named firmware/device scope."
     }
   ],
   "promotion_policy": {
@@ -1316,7 +1374,8 @@
     "https://github.com/Luminous-Dynamics/symthaea/issues/10175",
     "https://github.com/Luminous-Dynamics/symthaea/issues/10109",
     "https://github.com/Luminous-Dynamics/symthaea/issues/10207",
-    "https://github.com/Luminous-Dynamics/symthaea/issues/10208"
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10208",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10298"
   ],
   "claim_ceiling": {
     "rust_port_completed": false,
