@@ -14,6 +14,8 @@ pub mod resource_curve;
 
 use std::collections::HashSet;
 
+use symthaea_dishwasher_design::quality::{Endpoint, PilotEvidenceEnvelope};
+
 const ALL_SOILS_MASK: u8 = 0b0001_1111;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -29,6 +31,27 @@ pub enum SoilClass {
 impl SoilClass {
     pub const fn mask(self) -> u8 {
         1_u8 << (self as u8)
+    }
+
+    pub const fn as_label(self) -> &'static str {
+        match self {
+            SoilClass::Protein => "protein",
+            SoilClass::Starch => "starch",
+            SoilClass::Fat => "fat",
+            SoilClass::Beverage => "beverage",
+            SoilClass::Mixed => "mixed",
+        }
+    }
+
+    pub fn from_label(value: &str) -> Option<Self> {
+        match value {
+            "protein" => Some(SoilClass::Protein),
+            "starch" => Some(SoilClass::Starch),
+            "fat" => Some(SoilClass::Fat),
+            "beverage" => Some(SoilClass::Beverage),
+            "mixed" => Some(SoilClass::Mixed),
+            _ => None,
+        }
     }
 }
 
@@ -96,6 +119,171 @@ impl ModeProfile {
     fn water_for(&self, item_count: usize) -> f64 {
         self.base_fresh_water_l + self.fresh_water_per_item_l * item_count as f64
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EvidenceBoundModeError {
+    EmptyPilotEvidence,
+    InvalidCapacity,
+    SanitizationRequiresSeparateCertification,
+    InvalidBaseProfile(&'static str),
+    ProgrammeMismatch,
+    UnsupportedSoilClass(String),
+    MissingRequiredEndpoint(Endpoint),
+    InsufficientPilotRuns,
+    InconsistentPhysicalScope,
+    DuplicateSoilOccupancy {
+        soil: SoilClass,
+        occupancy: usize,
+    },
+    MissingSoilOccupancy {
+        soil: SoilClass,
+        occupancy: usize,
+    },
+}
+
+/// A process profile whose supported soil/occupancy grid is derived from
+/// independent pilot outcome evidence rather than the caller's boolean flag.
+///
+/// This does not certify the appliance, authenticate the evidence, provide
+/// sanitization approval or validate resource coefficients. Resource curves
+/// must be measured independently and the five-run pilot floor is not a
+/// confirmatory sample-size calculation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EvidenceBoundMode {
+    profile: ModeProfile,
+    pilot_evidence: Vec<PilotEvidenceEnvelope>,
+}
+
+impl EvidenceBoundMode {
+    /// Bind one exact mode/programme to a complete pilot-evidence ladder.
+    ///
+    /// For each supported soil class, evidence is required at every occupancy
+    /// from 1 through the mode capacity. All envelopes must use the same machine,
+    /// programme, surface, detergent/water batches and operating conditions.
+    /// The adapter does not accept sanitization claims; those require separate
+    /// certification evidence and a different API.
+    pub fn from_pilot_evidence(
+        mut profile: ModeProfile,
+        pilot_evidence: Vec<PilotEvidenceEnvelope>,
+    ) -> Result<Self, EvidenceBoundModeError> {
+        if pilot_evidence.is_empty() {
+            return Err(EvidenceBoundModeError::EmptyPilotEvidence);
+        }
+        if profile.capacity == 0 || profile.capacity > 64 {
+            return Err(EvidenceBoundModeError::InvalidCapacity);
+        }
+        if profile.supports_sanitization {
+            return Err(EvidenceBoundModeError::SanitizationRequiresSeparateCertification);
+        }
+
+        let first_scope = pilot_evidence[0].scope();
+        if profile.name != first_scope.programme {
+            return Err(EvidenceBoundModeError::ProgrammeMismatch);
+        }
+        let required = [
+            Endpoint::SoilRemovalResidual,
+            Endpoint::FinalRinseResidue,
+            Endpoint::CrossContamination,
+        ];
+        let mut supported_soils = 0_u8;
+        let mut soil_occupancies = HashSet::new();
+
+        for envelope in &pilot_evidence {
+            let scope = envelope.scope();
+            if scope.machine_model != first_scope.machine_model
+                || scope.programme != first_scope.programme
+                || scope.surface_material != first_scope.surface_material
+                || scope.detergent_batch_id != first_scope.detergent_batch_id
+                || scope.water_batch_id != first_scope.water_batch_id
+                || scope.water_hardness_ppm_as_caco3
+                    != first_scope.water_hardness_ppm_as_caco3
+                || scope.inlet_temperature_millic != first_scope.inlet_temperature_millic
+                || scope.ambient_temperature_millic != first_scope.ambient_temperature_millic
+                || scope.ambient_relative_humidity_permille
+                    != first_scope.ambient_relative_humidity_permille
+                || scope.protocol_id != first_scope.protocol_id
+            {
+                return Err(EvidenceBoundModeError::InconsistentPhysicalScope);
+            }
+            let soil = SoilClass::from_label(&scope.soil_class)
+                .ok_or_else(|| EvidenceBoundModeError::UnsupportedSoilClass(
+                    scope.soil_class.clone(),
+                ))?;
+            let occupancy = scope.item_ids.len();
+            if occupancy == 0 || occupancy > profile.capacity {
+                return Err(EvidenceBoundModeError::InvalidCapacity);
+            }
+            if envelope.minimum_independent_runs() < 5 {
+                return Err(EvidenceBoundModeError::InsufficientPilotRuns);
+            }
+            for endpoint in required {
+                if !envelope.required_endpoints().contains(&endpoint) {
+                    return Err(EvidenceBoundModeError::MissingRequiredEndpoint(endpoint));
+                }
+            }
+            if !soil_occupancies.insert((soil, occupancy)) {
+                return Err(EvidenceBoundModeError::DuplicateSoilOccupancy {
+                    soil,
+                    occupancy,
+                });
+            }
+            supported_soils |= soil.mask();
+        }
+
+        for soil in [
+            SoilClass::Protein,
+            SoilClass::Starch,
+            SoilClass::Fat,
+            SoilClass::Beverage,
+            SoilClass::Mixed,
+        ] {
+            if supported_soils & soil.mask() != 0 {
+                for occupancy in 1..=profile.capacity {
+                    if !soil_occupancies.contains(&(soil, occupancy)) {
+                        return Err(EvidenceBoundModeError::MissingSoilOccupancy {
+                            soil,
+                            occupancy,
+                        });
+                    }
+                }
+            }
+        }
+
+        profile.supported_soils_mask = supported_soils;
+        profile.cleaning_and_rinse_validated = true;
+        profile.supports_sanitization = false;
+        profile
+            .validate(None)
+            .map_err(EvidenceBoundModeError::InvalidBaseProfile)?;
+
+        Ok(Self {
+            profile,
+            pilot_evidence,
+        })
+    }
+
+    pub fn profile(&self) -> &ModeProfile {
+        &self.profile
+    }
+
+    pub fn pilot_evidence(&self) -> &[PilotEvidenceEnvelope] {
+        &self.pilot_evidence
+    }
+}
+
+/// Run the household scheduler using evidence-bound pilot mode profiles.
+///
+/// This is still a research simulator: the profile's energy/water coefficients
+/// are caller inputs and must be replaced with measured occupancy curves before
+/// resource-superiority claims. Sanitization-required jobs remain ineligible.
+pub fn simulate_with_pilot_evidence(
+    jobs: &[Job],
+    quick: &EvidenceBoundMode,
+    full: &EvidenceBoundMode,
+    policy: Policy,
+) -> Result<SimulationResult, &'static str> {
+    simulate(jobs, quick.profile(), full.profile(), policy)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
