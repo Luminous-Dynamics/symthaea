@@ -485,6 +485,25 @@ fn evaluate_requirement(
             }) {
                 return indeterminate(RuleComplianceReason::TrajectoryCoverageInsufficient);
             }
+            let approach_zone_end = *stop_line_progress_m + *progress_tolerance_m;
+            let approach_samples = trajectory[..=crossing_index]
+                .iter()
+                .filter(|sample| {
+                    sample.route_progress_m >= requirement.active_start_progress_m
+                        && sample.route_progress_m <= approach_zone_end
+                })
+                .count();
+            if approach_samples < 2 {
+                return indeterminate(RuleComplianceReason::TrajectoryCoverageInsufficient);
+            }
+            if rule_zone_has_sampling_gap(
+                &trajectory[..=crossing_index],
+                requirement.active_start_progress_m,
+                approach_zone_end,
+                *maximum_sample_gap_s,
+            ) {
+                return indeterminate(RuleComplianceReason::TrajectorySamplingGap);
+            }
             let crossing_sample = &trajectory[crossing_index];
             let mut stop_start: Option<usize> = None;
             let mut index = crossing_index;
@@ -1005,6 +1024,33 @@ mod tests {
         let report = evaluate_traffic_rules(&[rule], &noncompliant).unwrap();
         assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::Violation);
         assert_eq!(report.findings[0].first_violating_sample_index, Some(2));
+    }
+
+    #[test]
+    fn stop_line_zone_skipped_by_trajectory_is_indeterminate() {
+        let rule = TrafficRuleRequirement {
+            rule_id: "stop-line-skipped-zone".into(),
+            active_start_progress_m: 8.0,
+            active_end_progress_m: 20.0,
+            kind: TrafficRuleKind::StopBeforeLine {
+                stop_line_progress_m: 10.0,
+                stop_speed_threshold_mps: 0.1,
+                required_stationary_duration_s: 1.0,
+                maximum_sample_gap_s: 0.6,
+                progress_tolerance_m: 0.05,
+            },
+            evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
+        };
+        let trajectory = vec![
+            sample(0.0, 7.0, 2.0, 0.0),
+            sample(0.1, 11.0, 2.0, 0.0),
+        ];
+        let report = evaluate_traffic_rules(&[rule], &trajectory).unwrap();
+        assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::Indeterminate);
+        assert_eq!(
+            report.findings[0].reason,
+            RuleComplianceReason::TrajectoryCoverageInsufficient
+        );
     }
 
     #[test]
