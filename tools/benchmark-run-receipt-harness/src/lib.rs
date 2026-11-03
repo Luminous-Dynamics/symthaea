@@ -1788,7 +1788,7 @@ mod tests {
             "unavailable_usage":{},
             "official_score":{"metric_id":"benchmark-owner-official-score","formula_version":"not-applicable-synthetic","value":null,"unit":"fraction","numerator":null,"denominator":null,"is_official":false,"source_output_sha256":null,"unavailable_reason":"Synthetic fixture has no benchmark-owner official score."},
             "derived_metrics":[
-                {"metric_id":"eligible-task-yield","value":0.5,"unit":"fraction","formula":"passed/eligible","is_official":false,"unavailable_reason":null}
+                {"metric_id":"coverage-adjusted-task-yield","value":0.5,"unit":"fraction","formula":"passed / eligible","is_official":false,"unavailable_reason":null}
             ],
             "provenance":{"input_manifest_sha256":A,"output_manifest_sha256":B,"transcript_sha256":C}
         })
