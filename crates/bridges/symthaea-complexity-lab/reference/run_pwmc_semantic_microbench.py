@@ -95,6 +95,14 @@ def run_metamorphic_tests(corpus):
             variable = transformed["hidden"].pop()
             transformed["visible"].append(variable)
             transformed["weights"][variable] = {"false":"1/1", "true":"1/1"}
+        elif op == "add_unique_definitional_hidden":
+            # Add z <-> d: every old d assignment has exactly one z extension.
+            new_var = len(transformed["variables"]) + 1
+            transformed["variables"].append("z")
+            transformed["hidden"].append("z")
+            transformed["clauses"].extend([[-1, new_var], [1, -new_var]])
+        elif op == "substitute_visible_weight_map":
+            transformed["weights"] = reuse["weight_maps"][1]["weights"]
         else:
             raise AssertionError(f"unknown metamorphic operation: {op}")
         actual = evaluate(transformed)
@@ -113,6 +121,13 @@ def run_metamorphic_tests(corpus):
         elif op == "move_hidden_to_visible":
             assert actual["support_cardinality"] == expected["support_cardinality"]
             assert actual["pwmc"] == expected["pwmc"]
+        elif op == "add_unique_definitional_hidden":
+            for field in ("full_model_count", "projected_support", "pwmc"):
+                assert actual[field] == base[field], (test["id"], field, actual[field], base[field])
+        elif op == "substitute_visible_weight_map":
+            assert actual["projected_support"] == base["projected_support"]
+            assert actual["pwmc"] == expected["pwmc"]
+            assert actual["pwmc"] != base["pwmc"]
         output.append({"test_id":test["id"],"operation":op,"status":"exact_metamorphic_relation_passed",
                        "base_full_model_count":base["full_model_count"],"transformed_full_model_count":actual["full_model_count"],
                        "base_support_cardinality":base["support_cardinality"],"transformed_support_cardinality":actual["support_cardinality"],
