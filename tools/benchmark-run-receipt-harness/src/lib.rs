@@ -1064,7 +1064,7 @@ mod tests {
             "budget_caps":{"wall_time_ms":1000,"cpu_time_ms":1000,"peak_memory_bytes":1000000,"model_calls":10,"input_tokens":10000,"output_tokens":10000,"tool_calls":20},
             "actual_usage":{"wall_time_ms":100,"cpu_time_ms":50,"peak_memory_bytes":10000,"model_calls":1,"input_tokens":100,"output_tokens":50,"tool_calls":2},
             "unavailable_usage":{},
-            "official_score":{"metric_id":"pass-rate","formula_version":"1","value":1.0,"unit":"fraction","numerator":1,"denominator":1,"is_official":true,"source_output_sha256":C},
+            "official_score":{"metric_id":"pass-rate","formula_version":"1","value":1.0,"unit":"fraction","numerator":1,"denominator":1,"is_official":true,"source_output_sha256":C,"unavailable_reason":null},
             "derived_metrics":[
                 {"metric_id":"eligible-task-yield","value":0.5,"unit":"fraction","formula":"passed/eligible","is_official":false,"unavailable_reason":null}
             ],
@@ -1161,6 +1161,16 @@ mod tests {
         let mut receipt = base_receipt();
         receipt["actual_usage"]["cpu_time_ms"] = Value::Null;
         receipt["unavailable_usage"]["cpu_time_ms"] = json!("runner did not expose CPU accounting");
+        assert!(verify_receipt_value(&receipt).is_ok());
+    }
+
+    #[test]
+    fn permits_official_score_unavailable_without_fabricating_zero_percent() {
+        let mut receipt = base_receipt();
+        receipt["official_score"]["value"] = Value::Null;
+        receipt["official_score"]["numerator"] = Value::Null;
+        receipt["official_score"]["denominator"] = Value::Null;
+        receipt["official_score"]["unavailable_reason"] = json!("no tasks reached the benchmark grader");
         assert!(verify_receipt_value(&receipt).is_ok());
     }
 
