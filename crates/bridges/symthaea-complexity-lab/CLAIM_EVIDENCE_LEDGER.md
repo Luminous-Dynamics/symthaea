@@ -36,17 +36,19 @@ The current ledger contains 7 pinned sources and 4 claims:
 - 1 lean_formalization_scope_documented;
 - 3 manuscript_only.
 
-An independent JavaScript policy replay over the committed JSON checked the schema and evidence links. It accepted the valid ledger and rejected all 6 deliberately invalid mutations:
+An independent JavaScript policy replay over the committed JSON checked the schema and evidence links. It accepted the valid ledger and rejected all 8 deliberately invalid mutations:
 1. Promote the sharper manuscript exponent to Lean-formalized.
 2. Remove the Lean theorem declaration from the formal claim.
 3. Remove the permitted-axiom manifest.
 4. Replace formal Lean source references with the weighted preprint.
 5. Remove an output contract.
 6. Remove peer-review/external-review status from the preprint claim.
+7. Substitute the sharper manuscript exponent directly into the Lean-formalized claim while leaving its formal-scope pin unchanged.
+8. Drop the exact-count output while leaving only the SAT-decision output.
 
 Promotion controls also confirmed that the formal claim is allowed to be described as Lean-formalization-scope documented while the general, sparse and weighted manuscript claims are not.
 
-The committed Python validator implements the same required-field and evidence-status policy, but its CLI was not executed in this environment. The independent JavaScript replay is recorded to avoid falsely claiming the Python file passed a run.
+The formal record now pins the exact Lean-scope bound and exact output contract; the Python validator rejects any mismatch. The committed Python validator implements the same required-field and evidence-status policy, but its CLI was not executed in this environment. The independent JavaScript replay is recorded to avoid falsely claiming the Python file passed a run.
 
 ## 5. Source revision and drift policy
 
