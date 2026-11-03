@@ -19,6 +19,19 @@ def reject_external_refs(value, path="$"):
             reject_external_refs(child, f"{path}[{index}]")
 
 
+def unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key: {key}")
+        result[key] = value
+    return result
+
+
+def load_json(path):
+    return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_object)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--schema", required=True)
@@ -27,8 +40,8 @@ def main():
 
     schema_path = Path(args.schema)
     instance_path = Path(args.instance)
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
-    instance = json.loads(instance_path.read_text(encoding="utf-8"))
+    schema = load_json(schema_path)
+    instance = load_json(instance_path)
 
     if schema.get("$schema") != "https://json-schema.org/draft/2020-12/schema":
         raise ValueError("schema must declare JSON Schema Draft 2020-12")
