@@ -622,6 +622,7 @@ impl QuantityKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum ScalarDomain {
+    #[default]
     Unknown,
     Integer,
     Rational,
