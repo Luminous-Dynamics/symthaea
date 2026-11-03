@@ -120,17 +120,29 @@ Required controls:
 These are proposed gates, not results:
 
 1. Reproduction gate: reproduce the public task set and checker with 100% task-manifest agreement, 100% clean-room environment reconstruction, and zero target/axiom policy drift.
-2. Initial utility gate: on the same 341 tasks and matched budgets, reach at least 291/341 (85.3%) with a paired, source-group-clustered 95% interval above the matched F0 baseline.
-3. Efficiency gate: reduce recorded cost per verified task by at least 20% versus matched F0 while remaining non-inferior in solve rate (non-inferiority margin no worse than 1 percentage point).
-4. Stretch gate: reach at least 307/341 (90.0%) without relaxing the integrity, source, budget, or checker conditions.
+2. Pilot signal gate: reach at least 291/341 (85.3%) on the same 341 tasks and matched budgets, with a paired, source-group-clustered 95% interval above matched F0. This is only an early signal (+2.9 percentage points over 281/341), not a five-point SOTA-beating claim.
+3. Competitive gate: reach at least 299/341 (87.7%), which clears a +5 percentage-point absolute improvement over 281/341, with the paired 95% interval lower bound above zero.
+4. Efficiency gate: reduce recorded cost per verified task by at least 20% versus matched F0 while remaining non-inferior in solve rate (non-inferiority margin no worse than 1 percentage point).
+5. Stretch gate: reach at least 316/341 (92.7%), clearing +10 percentage points over the published baseline, without relaxing integrity, source, budget, or checker conditions.
 5. Reliability gate: 100% of counted successes survive exact-target comparator checks and independent clean-room replay; zero accepted target mutations or unapproved axiom additions.
 6. Generalization gate: replicate the direction of gain on held-out source groups or a later independent advanced-mathematics formalization cohort.
 
-A 5-point improvement over 281/341 would require roughly 298 solved tasks; a 10-point improvement is a stretch beyond 315 solved tasks. The exact integer threshold must be computed and registered before evaluation. Do not describe 291/341 as a five-point improvement: it is approximately 85.3%, or +2.9 percentage points.
+With a fixed 341-task denominator, 298/341 is still fractionally below +5.0 percentage points; the first integer threshold clearing +5 points is 299/341. Likewise, 315/341 is fractionally below +10 points; the first integer threshold is 316/341. These exact thresholds should be pre-registered. Do not describe 291/341 as a five-point improvement: it is approximately 85.3%, or +2.9 percentage points.
+
+## Reproducible audit utility
+
+The research-only auditor is at `scripts/research/pitb_autoformbench_audit_v0.py`. It reads only the pinned release commit's manifest and public task-level leaderboard CSVs; it does not open Lean workspaces, textbook material, accepted solutions, submissions, or traces.
+
+```sh
+python3 scripts/research/pitb_autoformbench_audit_v0.py --self-test
+python3 scripts/research/pitb_autoformbench_audit_v0.py --repo /path/to/autoformbench
+```
+
+The repository clone must contain the pinned release commit. The auditor verifies the five Git blob identities, manifest cardinalities, declaration totals, exact task-set equality, source-group joins, numeric fields, official model solve counts, and then recomputes cost/residual/paired tables. The synthetic self-test was run locally on the analysis implementation; the current GitHub branch version has not yet been executed in a runner or against a local checkout of the pinned external repository. The report's statistics above were independently computed from the fetched public CSV rows.
 
 ## Immediate work items
 
-1. Add an offline audit command that checks the pinned release commit, Git blob IDs, 341 unique task IDs, exact manifest/CSV task-set equality, target-count reconciliation, and all model outcome fields before reporting the residual frontier.
+1. Execute the checked-in offline audit against a local clone of the pinned AutoformBench release and compare its JSON output byte-for-byte (after canonical JSON normalization) with the registered summary tables.
 2. Add a source-group dashboard for solve rate, cost per verified task, unresolved-cost share, and budget-exhaustion reason. Preserve the raw denominators.
 3. Reproduce one modest, pre-registered development subset under Lean v4.32.2 / Mathlib `905b958...` using the official Harbor adapter. This is a pipeline smoke, not a benchmark result.
 4. Implement dependency-aware declaration planning and type-directed search before expanding agent fan-out. Track whether a branch discovers a missing definition, proves a helper, finds an existing library route, detects a type mismatch, or abstains.
