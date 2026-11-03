@@ -266,6 +266,15 @@ pub struct MaxCountBackpointer {
     pub rows: Vec<MaxCountBackpointerRow>,
 }
 
+/// Measure used when sampling among optimal assignments.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MaxCountSamplingMeasure {
+    /// Every distinct variable assignment has equal probability.
+    DistinctAssignments,
+    /// Assignment probability is proportional to its MaxCount multiplicity.
+    WeightedMultiplicity,
+}
+
 /// Exact optimum, semiring multiplicity, one canonical witness, and the
 /// complete local argmax tables needed to represent the optimal-assignment DAG.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -460,6 +469,26 @@ fn maxcount_backpointer_row_support(
         previous_state = Some(state);
     }
     Ok(total_support)
+}
+
+/// Return a row's sampling mass under the requested measure after validating
+/// its aligned state, multiplicity, and support arrays.
+fn maxcount_backpointer_row_weight(
+    row: &MaxCountBackpointerRow,
+    variable_cardinality: usize,
+    measure: MaxCountSamplingMeasure,
+) -> Result<u128, EliminationError> {
+    let support_total = maxcount_backpointer_row_support(row, variable_cardinality)?;
+    match measure {
+        MaxCountSamplingMeasure::DistinctAssignments => Ok(support_total),
+        MaxCountSamplingMeasure::WeightedMultiplicity => {
+            row.branch_multiplicities.iter().try_fold(0u128, |total, &count| {
+                total.checked_add(count).ok_or(SemiringError::CountOverflow {
+                    operation: "sampler row multiplicity aggregation",
+                }.into())
+            })
+        }
+    }
 }
 
 /// MaxCount-specialized elimination retaining every local maximizer.
@@ -689,17 +718,46 @@ impl ExactFactorGraph<MaxCountValue> {
     ///
     /// The callback must return an unbiased integer in [0, upper_bound).
     /// It is called once per backpointer row visited in reverse elimination
-    /// order. For each row, branch probability is proportional to the number
-    /// of distinct partial assignments represented by that branch. Products
-    /// of branch supports correspond to disjoint earlier-eliminated blocks,
-    /// so the conditional probabilities telescope to 1 / total support.
-    ///
-    /// The result must come from evaluate_with_witness on this graph or have
-    /// been independently certificate-checked. The structural checks below
-    /// do not replay every local argmax against the source factor tables.
+    /// order. Branch probability is proportional to the number of distinct
+    /// partial assignments represented by that branch.
     pub fn sample_optimal_assignment<F>(
         &self,
         result: &MaxCountWitnessResult,
+        uniform_below: F,
+    ) -> Result<Option<Vec<usize>>, EliminationError>
+    where
+        F: FnMut(u128) -> u128,
+    {
+        self.sample_optimal_assignment_by_measure(
+            result,
+            MaxCountSamplingMeasure::DistinctAssignments,
+            uniform_below,
+        )
+    }
+
+    /// Draw an optimum assignment with probability proportional to its
+    /// MaxCount multiplicity. This is intentionally different from uniform
+    /// sampling over distinct assignments.
+    pub fn sample_optimal_assignment_by_multiplicity<F>(
+        &self,
+        result: &MaxCountWitnessResult,
+        uniform_below: F,
+    ) -> Result<Option<Vec<usize>>, EliminationError>
+    where
+        F: FnMut(u128) -> u128,
+    {
+        self.sample_optimal_assignment_by_measure(
+            result,
+            MaxCountSamplingMeasure::WeightedMultiplicity,
+            uniform_below,
+        )
+    }
+
+    /// Shared exact backpointer sampler for both measures.
+    pub fn sample_optimal_assignment_by_measure<F>(
+        &self,
+        result: &MaxCountWitnessResult,
+        measure: MaxCountSamplingMeasure,
         mut uniform_below: F,
     ) -> Result<Option<Vec<usize>>, EliminationError>
     where
@@ -716,9 +774,13 @@ impl ExactFactorGraph<MaxCountValue> {
             }
             Some(term) => term,
         };
-        if result.distinct_optimal_assignments == 0 {
+        let expected_total = match measure {
+            MaxCountSamplingMeasure::DistinctAssignments => result.distinct_optimal_assignments,
+            MaxCountSamplingMeasure::WeightedMultiplicity => optimum.count,
+        };
+        if expected_total == 0 {
             return Err(EliminationError::InvalidEliminationOrder {
-                reason: "feasible optimum has zero distinct support",
+                reason: "feasible optimum has zero sampling mass",
             });
         }
         let n = self.cardinalities.len();
@@ -739,7 +801,7 @@ impl ExactFactorGraph<MaxCountValue> {
             position[variable] = i;
         }
 
-        let mut root_support = 1u128;
+        let mut root_mass = 1u128;
         for (step, backpointer) in result.backpointers.iter().enumerate() {
             if backpointer.separator.windows(2).any(|pair| pair[0] >= pair[1])
                 || backpointer.separator.iter().any(|&v| {
@@ -770,19 +832,20 @@ impl ExactFactorGraph<MaxCountValue> {
                         reason: "root backpointer row has a nonempty separator key",
                     });
                 }
-                let support = maxcount_backpointer_row_support(
+                let mass = maxcount_backpointer_row_weight(
                     root_row,
                     self.cardinalities[backpointer.variable],
+                    measure,
                 )?;
-                root_support = root_support.checked_mul(support)
+                root_mass = root_mass.checked_mul(mass)
                     .ok_or(SemiringError::CountOverflow {
-                        operation: "sampler root support product",
+                        operation: "sampler root mass product",
                     })?;
             }
         }
-        if root_support != result.distinct_optimal_assignments {
+        if root_mass != expected_total {
             return Err(EliminationError::InvalidEliminationOrder {
-                reason: "backpointer root supports disagree with reported distinct optimum count",
+                reason: "backpointer root mass disagrees with requested sampling total",
             });
         }
 
@@ -804,36 +867,39 @@ impl ExactFactorGraph<MaxCountValue> {
                     reason: "sampler backpointer row key mismatch",
                 });
             }
-            let total_support = maxcount_backpointer_row_support(
+            let total_mass = maxcount_backpointer_row_weight(
                 row,
                 self.cardinalities[backpointer.variable],
+                measure,
             )?;
-            if total_support == 0 {
+            if total_mass == 0 {
                 return Err(EliminationError::InvalidEliminationOrder {
-                    reason: "reachable backpointer row has zero support",
+                    reason: "reachable backpointer row has zero sampling mass",
                 });
             }
-            let draw = uniform_below(total_support);
-            if draw >= total_support {
+            let draw = uniform_below(total_mass);
+            if draw >= total_mass {
                 return Err(EliminationError::InvalidRandomDraw {
-                    upper_bound: total_support,
+                    upper_bound: total_mass,
                     draw,
                 });
             }
+            let weights = match measure {
+                MaxCountSamplingMeasure::DistinctAssignments => &row.branch_assignment_counts,
+                MaxCountSamplingMeasure::WeightedMultiplicity => &row.branch_multiplicities,
+            };
             let mut offset = draw;
             let mut selected_state = None;
-            for (state, &support) in row.maximizing_states.iter()
-                .zip(row.branch_assignment_counts.iter())
-            {
-                if offset < support {
+            for (state, &weight) in row.maximizing_states.iter().zip(weights.iter()) {
+                if offset < weight {
                     selected_state = Some(*state);
                     break;
                 }
-                offset -= support;
+                offset -= weight;
             }
             chosen[backpointer.variable] = Some(selected_state.ok_or(
                 EliminationError::InvalidEliminationOrder {
-                    reason: "sampler failed to select a support interval",
+                    reason: "sampler failed to select a weighted branch interval",
                 }
             )?);
         }
@@ -855,7 +921,6 @@ impl ExactFactorGraph<MaxCountValue> {
             }),
         }
     }
-
 }
 
 fn decode_assignment(mut index: usize, scope: &[usize], cards: &[usize], assignment: &mut [usize]) {
@@ -1183,6 +1248,37 @@ mod tests {
         let mut inconsistent = result.clone();
         inconsistent.distinct_optimal_assignments += 1;
         assert!(graph.sample_optimal_assignment(&inconsistent, |_| 0).is_err());
+    }
+
+    #[test]
+    fn multiplicity_weighted_sampler_uses_a_different_distribution_than_uniform_support() {
+        let mut graph = ExactFactorGraph::new(vec![2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        graph.add_factor(vec![0], vec![
+            MaxCountValue::candidate(5, 4),
+            MaxCountValue::candidate(5, 2),
+        ]).unwrap();
+        let result = graph.evaluate_with_witness(&[0]).unwrap();
+        assert_eq!(result.distinct_optimal_assignments, 2);
+        assert_eq!(result.value.optimum().unwrap().count, 6);
+
+        // Distinct-uniform sampling assigns one half of the integer interval
+        // to each state, while multiplicity-weighted sampling uses 4:2.
+        assert_eq!(
+            graph.sample_optimal_assignment(&result, |_| 0).unwrap(),
+            Some(vec![0])
+        );
+        assert_eq!(
+            graph.sample_optimal_assignment(&result, |_| 1).unwrap(),
+            Some(vec![1])
+        );
+        assert_eq!(
+            graph.sample_optimal_assignment_by_multiplicity(&result, |_| 3).unwrap(),
+            Some(vec![0])
+        );
+        assert_eq!(
+            graph.sample_optimal_assignment_by_multiplicity(&result, |_| 4).unwrap(),
+            Some(vec![1])
+        );
     }
 
     #[test]
