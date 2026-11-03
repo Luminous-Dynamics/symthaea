@@ -1,26 +1,15 @@
 {
-  "all_passed": true,
-  "certificate_contract": "Input and output factors are content-addressed. Intermediate tables are not stored in the trace; the checker recomputes exact joins and sums.",
-  "claim_ceiling": "Finite exact Q(i) direct-enumeration comparison and deterministic replay certificate checks. Not Rust, Lean, production parser, formal proof, bounded-memory streaming, or performance advantage.",
-  "direct_vs_variable_elimination_checks": 480,
-  "negative_controls": [
-    "stale input digest",
-    "forged intermediate output digest",
-    "forged bucket membership",
-    "tampered exact result",
-    "unbound variable in elimination order",
-    "missing final scalar binding",
-    "forged joined scope",
-    "reserved generated-factor ID collision"
-  ],
-  "orders_per_network": 4,
-  "random_networks": 120,
-  "seed": "0xE7022",
-  "separate_process_checker": {
-    "accepted_positive": 481,
-    "negative_total": 8,
-    "positive_total": 481,
-    "rejected_negative": 8
+  "suite": "ETH-022 reference prototype status",
+  "execution_status": "not_executed_in_this_session",
+  "source_status": "committed_research_prototype_unqualified",
+  "planned_test_design": {
+    "random_networks": 120,
+    "orders_per_network": 4,
+    "planned_direct_vs_ve_checks": 480,
+    "planned_positive_certificates": 481,
+    "negative_controls": 8
   },
-  "suite": "ETH-022 deterministic Q(i) elimination replay certificates"
+  "actual_results": null,
+  "all_passed": null,
+  "claim_ceiling": "Test counts are planned corpus parameters only. The associated Python source was not executed in this session; no pass/reject/semantic-equivalence result is established."
 }
