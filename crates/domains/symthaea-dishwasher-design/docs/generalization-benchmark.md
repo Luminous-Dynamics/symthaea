@@ -82,7 +82,7 @@ A single split cannot prove every type of generalization. Run distinct, pre-regi
 - Freeze model weights, feature definitions, sensor calibration IDs, software commit, runtime policy, endpoint criteria and decision threshold before confirmation.
 - Report all tried model families and threshold-selection steps. Do not present the best of many unreported tests as a confirmatory result.
 - Keep the locked confirmation archive inaccessible to model developers until the frozen evaluation is run.
-- Preserve rejected, failed, rew ash, aborted and missing-data runs in the denominator and raw archive. Exclusion is permitted only for a predeclared protocol deviation with a documented reason and independent adjudication; publish sensitivity analysis with all runs retained.
+- Preserve rejected, failed, rewash, aborted and missing-data runs in the denominator and raw archive. Exclusion is permitted only for a predeclared protocol deviation with a documented reason and independent adjudication; publish sensitivity analysis with all runs retained.
 
 ## 4. Experimental design
 
