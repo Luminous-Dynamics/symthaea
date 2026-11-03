@@ -29,6 +29,8 @@ pub struct EndpointPrediction {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EndpointOutcome {
+    /// Physical run that produced the assay result; must match its containing run.
+    pub source_run_id: String,
     pub item_id: String,
     pub endpoint: Endpoint,
     /// Adjudicated outcome from the independent endpoint assay.
@@ -81,6 +83,7 @@ pub enum ObserverEvaluationError {
     UnexpectedEndpoint { run_id: String, endpoint: Endpoint },
     DuplicatePrediction { run_id: String, item_id: String, endpoint: Endpoint },
     DuplicateOutcome { run_id: String, item_id: String, endpoint: Endpoint },
+    OutcomeRunMismatch { run_id: String, observed_run_id: String },
     MissingPrediction { run_id: String, item_id: String, endpoint: Endpoint },
     MissingOutcome { run_id: String, item_id: String, endpoint: Endpoint },
     InvalidProbability { run_id: String, item_id: String, endpoint: Endpoint },
@@ -363,6 +366,15 @@ pub fn evaluate_observer_risk_coverage(
 
         let mut outcomes = BTreeMap::new();
         for outcome in &run.outcomes {
+            if !canonical_non_empty(&outcome.source_run_id) {
+                return Err(ObserverEvaluationError::InvalidIdentity("outcome.source_run_id"));
+            }
+            if outcome.source_run_id != run.run_id {
+                return Err(ObserverEvaluationError::OutcomeRunMismatch {
+                    run_id: run.run_id.clone(),
+                    observed_run_id: outcome.source_run_id.clone(),
+                });
+            }
             if !canonical_non_empty(&outcome.assay_record_id) {
                 return Err(ObserverEvaluationError::InvalidIdentity("assay_record_id"));
             }
@@ -641,6 +653,7 @@ mod tests {
                 pass_probability: probability,
             }).collect(),
             outcomes: REQUIRED.iter().map(|endpoint| EndpointOutcome {
+                source_run_id: run_id.to_owned(),
                 item_id: item_id.clone(),
                 endpoint: *endpoint,
                 decision,
@@ -750,6 +763,7 @@ mod tests {
                 pass_probability: 0.97,
             });
             run.outcomes.push(EndpointOutcome {
+                source_run_id: "multi-item-run".to_owned(),
                 item_id: "plate-2".to_owned(),
                 endpoint,
                 decision: Decision::Pass,
@@ -911,6 +925,31 @@ mod tests {
         assert_eq!(point.verified_released_run_count, 0);
         assert_eq!(point.false_release_rate_among_verified_releases, None);
         assert_eq!(point.iid_zero_event_challenge_upper_bound, None);
+    }
+
+    #[test]
+    fn rejects_assay_record_attributed_to_the_wrong_physical_run() {
+        let manifest = manifest_for_target(
+            ValidationPartition::LockedConfirmation,
+            &["run-1"],
+        );
+        let mut run = scores("run-1", Decision::Pass, 0.99);
+        run.outcomes[0].source_run_id = "different-run".to_owned();
+        assert!(matches!(
+            evaluate_observer_risk_coverage(
+                &manifest,
+                &[run],
+                &[HoldoutAxis::MachineUnit],
+                ValidationPartition::LockedConfirmation,
+                &REQUIRED,
+                &[0.9],
+                0.05,
+            ),
+            Err(ObserverEvaluationError::OutcomeRunMismatch {
+                run_id,
+                observed_run_id,
+            }) if run_id == "run-1" && observed_run_id == "different-run"
+        ));
     }
 
     #[test]
