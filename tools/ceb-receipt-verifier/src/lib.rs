@@ -44,6 +44,9 @@ pub struct VerificationReport {
     pub regrade_run_id: Option<String>,
     pub primary_signer_domains: Vec<String>,
     pub regrade_signer_domains: Vec<String>,
+    pub primary_artifact_evidence_sha256: Vec<String>,
+    pub regrade_artifact_evidence_sha256: Vec<String>,
+    pub trust_policy_sha256: Option<String>,
     pub schema_sha256: SchemaDigests,
     pub reasons: Vec<String>,
     pub claim_ceiling: &'static str,
@@ -411,7 +414,6 @@ fn dsse_pae(payload_type: &str, payload: &[u8]) -> Vec<u8> {
 
 #[derive(Clone, Debug)]
 struct VerifiedReceipt {
-    statement: Value,
     predicate: Value,
     envelope_sha256: String,
     run_id: String,
@@ -421,6 +423,7 @@ struct VerifiedReceipt {
     signer_ids: BTreeSet<String>,
     signer_domains: BTreeSet<String>,
     check_evidence: BTreeSet<String>,
+    artifact_evidence: BTreeSet<String>,
 }
 
 fn verify_signatures(
@@ -546,18 +549,28 @@ fn hash_artifact(root: &Path, relative: &str, expected_size: u64, expected_diges
     Ok(())
 }
 
-fn validate_artifacts(predicate: &Value, root: &Path) -> Result<(), Failure> {
+fn validate_artifacts(
+    predicate: &Value,
+    root: &Path,
+    expected_patch_sha256: &str,
+) -> Result<BTreeSet<String>, Failure> {
     let artifacts = field(predicate, "artifacts", "predicate")?
         .as_array()
         .ok_or_else(|| Failure::protocol("predicate.artifacts must be an array"))?;
-    if artifacts.is_empty() || artifacts.len() > MAX_ARTIFACTS {
-        return Err(Failure::unresolved(format!("receipt must reference 1..={MAX_ARTIFACTS} retained artifacts")));
+    if artifacts.len() < 2 || artifacts.len() > MAX_ARTIFACTS {
+        return Err(Failure::unresolved(format!(
+            "receipt must reference a patch plus at least one retained execution artifact (maximum {MAX_ARTIFACTS})"
+        )));
     }
     let mut ids = HashSet::new();
     let mut paths = HashSet::new();
+    let mut patch_count = 0usize;
+    let mut execution_digests = BTreeSet::new();
+    let mut all_digests = BTreeSet::new();
     for artifact in artifacts {
         let id = string_field(artifact, "artifact_id", "artifact")?;
         let path = string_field(artifact, "path", "artifact")?;
+        let role = string_field(artifact, "role", "artifact")?;
         let digest = string_field(artifact, "sha256", "artifact")?;
         let size = u64_field(artifact, "size_bytes", "artifact")?;
         if id.trim().is_empty() || id.contains("..") || id.contains('/') || id.contains('\\') || id.contains('\0') {
@@ -566,14 +579,27 @@ fn validate_artifacts(predicate: &Value, root: &Path) -> Result<(), Failure> {
         if !ids.insert(id.clone()) || !paths.insert(path.clone()) {
             return Err(Failure::protocol("duplicate artifact_id or artifact path"));
         }
-        if !is_sha256(&digest) {
-            return Err(Failure::protocol(format!("artifact {id} has malformed SHA-256")));
+        if !is_sha256(&digest) || !all_digests.insert(digest.clone()) {
+            return Err(Failure::protocol(format!("artifact {id} has malformed or duplicate SHA-256")));
         }
         hash_artifact(root, &path, size, &digest)?;
+        if role == "patch" {
+            patch_count += 1;
+            if digest != expected_patch_sha256 {
+                return Err(Failure::protocol("retained patch artifact digest differs from the candidate patch"));
+            }
+        } else {
+            execution_digests.insert(digest);
+        }
     }
-    Ok(())
+    if patch_count != 1 {
+        return Err(Failure::protocol("each receipt must contain exactly one patch artifact"));
+    }
+    if execution_digests.is_empty() {
+        return Err(Failure::unresolved("receipt contains no retained execution evidence artifact"));
+    }
+    Ok(execution_digests)
 }
-
 fn validate_changed_paths(candidate: &Value) -> Result<(), Failure> {
     let paths = field(candidate, "changed_paths", "candidate")?
         .as_array()
@@ -843,7 +869,10 @@ fn verify_one_receipt(
     }
 
     let check_evidence = validate_check_aggregates(predicate)?;
-    validate_artifacts(predicate, artifact_root)?;
+    let artifact_evidence = validate_artifacts(predicate, artifact_root, patch_sha256)?;
+    if !check_evidence.is_subset(&artifact_evidence) {
+        return Err(Failure::protocol("one or more check evidence digests are not present in the retained artifacts"));
+    }
     check_budget(task, predicate)?;
 
     let verdict = string_field(field(predicate, "result", "predicate")?, "verdict", "result")?;
@@ -860,7 +889,6 @@ fn verify_one_receipt(
     }
     let envelope_sha256 = sha256_hex(envelope_bytes);
     Ok(VerifiedReceipt {
-        statement,
         predicate: predicate.clone(),
         envelope_sha256,
         run_id,
@@ -870,6 +898,7 @@ fn verify_one_receipt(
         signer_ids,
         signer_domains,
         check_evidence,
+        artifact_evidence,
     })
 }
 
@@ -910,10 +939,17 @@ fn check_pair_consistency(primary: &VerifiedReceipt, regrade: &VerifiedReceipt) 
     {
         return Err(Failure::protocol("primary and regrade signer identities/trust domains are not independent"));
     }
-    if primary.check_evidence.is_empty() || regrade.check_evidence.is_empty()
-        || primary.check_evidence == regrade.check_evidence
+    if primary.check_evidence.is_empty()
+        || regrade.check_evidence.is_empty()
+        || !primary.check_evidence.is_disjoint(&regrade.check_evidence)
     {
-        return Err(Failure::protocol("primary and regrade do not carry distinct check-evidence digest sets"));
+        return Err(Failure::protocol("primary and regrade check-evidence digests are not independent"));
+    }
+    if primary.artifact_evidence.is_empty()
+        || regrade.artifact_evidence.is_empty()
+        || !primary.artifact_evidence.is_disjoint(&regrade.artifact_evidence)
+    {
+        return Err(Failure::protocol("primary and regrade execution artifact digests are not independent"));
     }
     Ok(())
 }
@@ -934,6 +970,9 @@ fn base_report(status: &str, reason: String) -> VerificationReport {
         regrade_run_id: None,
         primary_signer_domains: Vec::new(),
         regrade_signer_domains: Vec::new(),
+        primary_artifact_evidence_sha256: Vec::new(),
+        regrade_artifact_evidence_sha256: Vec::new(),
+        trust_policy_sha256: None,
         schema_sha256: schema_digests(),
         reasons: vec![reason],
         claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove the runner's isolation or the claimed model provider's identity.",
@@ -1029,6 +1068,9 @@ fn verify_pair_inner(inputs: &PairInputs) -> Result<VerificationReport, Failure>
         regrade_run_id: Some(regrade.run_id),
         primary_signer_domains: primary.signer_domains.into_iter().collect(),
         regrade_signer_domains: regrade.signer_domains.into_iter().collect(),
+        primary_artifact_evidence_sha256: primary.artifact_evidence.into_iter().collect(),
+        regrade_artifact_evidence_sha256: regrade.artifact_evidence.into_iter().collect(),
+        trust_policy_sha256: Some(sha256_hex(&inputs.trust_policy)),
         schema_sha256: schema_digests(),
         reasons: Vec::new(),
         claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove the runner's isolation or the claimed model provider's identity.",
