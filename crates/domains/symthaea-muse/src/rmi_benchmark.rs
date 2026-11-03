@@ -1109,6 +1109,11 @@ fn sha256_hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::Cell;
+
+    thread_local! {
+        static UNTRACKED_PROCESS_CALLS: Cell<u32> = Cell::new(0);
+    }
 
     fn base_features() -> RmiMusicalFeaturesV1 {
         RmiMusicalFeaturesV1 {
@@ -1266,6 +1271,52 @@ mod tests {
             "both arms start from the same state and take one corresponding transition"
         );
         assert_eq!(result.payload.policy_pre_state_sha256.len(), 64);
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct ProcessGlobalCounterPolicy;
+
+    impl RmiPolicyV1 for ProcessGlobalCounterPolicy {
+        fn policy_id(&self) -> &str { "process-global-counter" }
+        fn policy_version(&self) -> &str { "1" }
+
+        fn respond(
+            &mut self,
+            _history: &[RmiHistoryEventV1],
+            _observation: &RmiPartnerObservationV1,
+            _seed: u64,
+        ) -> RmiAgentActionV1 {
+            // This state is intentionally absent from Serialize. Calls 0-1
+            // return A and calls 2-3 return B: the old evaluator's control,
+            // control-repeat, treatment, treatment-repeat sequence therefore
+            // passed its within-arm duplicate checks while fabricating an
+            // apparent treatment effect. The reversed-order replay must catch it.
+            let call = UNTRACKED_PROCESS_CALLS.with(|counter| {
+                let call = counter.get();
+                counter.set(call + 1);
+                call
+            });
+            let mut features = base_features();
+            if call % 4 >= 2 {
+                features.role = RmiRoleV1::Accompaniment;
+            }
+            RmiAgentActionV1 {
+                action_id: if call % 4 >= 2 { "global-B".into() } else { "global-A".into() },
+                features,
+            }
+        }
+    }
+
+    #[test]
+    fn arm_order_swap_rejects_untracked_process_global_state() {
+        UNTRACKED_PROCESS_CALLS.with(|counter| counter.set(0));
+        let policy = ProcessGlobalCounterPolicy;
+        let result = evaluate_rmi_pair(&policy, &pair_for(RmiTargetFeatureV1::Role));
+        assert!(matches!(
+            result,
+            Err(RmiEvaluationErrorV1::NonDeterministicPolicyOutput { arm })
+                if arm == "order_swap_treatment"
+        ));
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
