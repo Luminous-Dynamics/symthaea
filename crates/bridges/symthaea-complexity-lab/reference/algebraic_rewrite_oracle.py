@@ -131,10 +131,10 @@ def apply(rule,s,a):
         raise ValueError("inverse-pair")
     raise ValueError("unknown-rule")
 def canon(v):return json.dumps(v,sort_keys=True,separators=(",",":"),ensure_ascii=True)
-def sha(v):return hashlib.sha256(canon(v)).encode()).hexdigest()
+def sha(v):return hashlib.sha256(canon(v).encode()).hexdigest()
 def cert(rule,src,a,cards):
     dst=apply(rule,src,a)
-    return {"format":FME,"algebra":a.kind,"domains":dict(sorted(cards.items())),"rule_id":rule,"source":src,"target":dst,"source_sha256":sha(src),"target_sha256":sha(dst)}
+    return {"format":FMT,"algebra":a.kind,"domains":dict(sorted(cards.items())),"rule_id":rule,"source":src,"target":dst,"source_sha256":sha(src),"target_sha256":sha(dst)}
 def main():
     r=random.Random(0xE7018);cards={"x":2,"y":3,"z":2};positive=[];counts={x:0 for x in RULES}
     for kind in KINDS:
@@ -166,7 +166,7 @@ def main():
         a=Alg(c["algebra"]);d=c["domains"];src=c["source"];dst=c["target"]
         vars_=sorted(free(src)|free(dst))
         for vals in product(*(range(d[v]) for v in vars_)):
-            env=dict(zip(vars_,vals));assert ev(src,a,d,env)==ev(dst<a,d,env)
+            env=dict(zip(vars_,vals));assert ev(src,a,d,env)==ev(dst,a,d,env)
     out={"suite":"domain-qualified algebraic rewrite reference","seed":"0xE7018","algebras":list(KINDS),"trials_per_algebra_and_rule":24,"positive_rule_checks":counts,"positive_rule_checks_total":len(positive)-2,"ring_cancellation_checks":2,"separate_process_checker":{"accepted_positive":response["accepted_count"],"positive_total":len(positive),"rejected_negative":response["rejected_count"],"negative_total":len(negatives)},"negative_controls_rejected":response["rejected_count"],"all_passed":True,"claim_ceiling":"Finite exhaustive semantic checks on small table factors plus local certificate replay. Not a Lean proof, cross-language verifier, e-graph search, production Rust implementation, or performance result."}
     Path(__file__).with_name("algebraic_rewrite_results.json").write_text(json.dumps(out,indent=2,sort_keys=True)+"\n")
     print(json.dumps(out,indent=2,sort_keys=True))
