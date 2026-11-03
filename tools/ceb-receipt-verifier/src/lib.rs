@@ -386,6 +386,109 @@ fn collect_tree_entries(
     Ok(())
 }
 
+
+fn tree_entry_digest(entry: &TreeEntry) -> Result<String, Failure> {
+    let mut hasher = Sha256::new();
+    match &entry.content {
+        TreeEntryContent::File(path) => {
+            hasher.update([b'F']);
+            hasher.update([u8::from(entry.executable)]);
+            hasher.update(entry.size.to_be_bytes());
+            let mut file = File::open(path)
+                .map_err(|error| Failure::protocol(format!("cannot open source-tree file {}: {error}", path.display())))?;
+            let mut content = Sha256::new();
+            let mut total = 0u64;
+            let mut buffer = [0u8; 64 * 1024];
+            loop {
+                let read = file.read(&mut buffer)
+                    .map_err(|error| Failure::protocol(format!("cannot read source-tree file {}: {error}", path.display())))?;
+                if read == 0 { break; }
+                total = total.checked_add(read as u64)
+                    .ok_or_else(|| Failure::protocol("source-tree file length overflow"))?;
+                if total > entry.size {
+                    return Err(Failure::protocol(format!("source-tree file changed while hashing: {}", path.display())));
+                }
+                content.update(&buffer[..read]);
+            }
+            if total != entry.size {
+                return Err(Failure::protocol(format!("source-tree file size changed while hashing: {}", path.display())));
+            }
+            hasher.update(content.finalize());
+        }
+        TreeEntryContent::Symlink(target) => {
+            hasher.update([b'L']);
+            hasher.update([0]);
+            hasher.update((target.len() as u64).to_be_bytes());
+            hasher.update(Sha256::digest(target));
+        }
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn tree_manifest(root: &Path) -> Result<BTreeMap<String, String>, Failure> {
+    let canonical_root = root.canonicalize()
+        .map_err(|error| Failure::protocol(format!("cannot resolve tree root {}: {error}", root.display())))?;
+    if !canonical_root.is_dir() {
+        return Err(Failure::protocol("tree root is not a directory"));
+    }
+    let mut entries = Vec::new();
+    let mut total_bytes = 0u64;
+    let mut visited_entries = 0usize;
+    collect_tree_entries(&canonical_root, "", &mut entries, &mut total_bytes, &mut visited_entries, 0)?;
+    let mut manifest = BTreeMap::new();
+    for entry in &entries {
+        let digest = tree_entry_digest(entry)?;
+        if manifest.insert(entry.relative_path.clone(), digest).is_some() {
+            return Err(Failure::protocol("source tree contains duplicate normalized paths"));
+        }
+    }
+    Ok(manifest)
+}
+
+/// Return paths whose content, type or executable bit differs between source and result.
+fn changed_tree_paths(source: &Path, result: &Path) -> Result<Vec<String>, Failure> {
+    let before = tree_manifest(source)?;
+    let after = tree_manifest(result)?;
+    let all_paths: BTreeSet<String> = before.keys().chain(after.keys()).cloned().collect();
+    let mut changed = Vec::new();
+    for path in all_paths {
+        if before.get(&path) != after.get(&path) {
+            changed.push(path);
+        }
+    }
+    Ok(changed)
+}
+
+/// Parse path pairs from Git's unquoted diff --git a/path b/path headers.
+/// Quoted/ambiguous paths are deliberately rejected in CEB V0.
+fn git_patch_paths(patch: &[u8]) -> Result<Vec<String>, Failure> {
+    let text = std::str::from_utf8(patch)
+        .map_err(|_| Failure::unresolved("CEB V0 patch path audit requires UTF-8 Git diff headers"))?;
+    let mut paths = BTreeSet::new();
+    for line in text.lines() {
+        let Some(header) = line.strip_prefix("diff --git ") else { continue; };
+        let (old_path, new_path) = header.split_once(' ')
+            .ok_or_else(|| Failure::protocol("malformed Git diff header"))?;
+        if old_path.starts_with('"') || new_path.starts_with('"') || new_path.contains(' ') {
+            return Err(Failure::unresolved("quoted or whitespace-containing Git diff paths are not supported in CEB V0"));
+        }
+        let old_path = old_path.strip_prefix("a/")
+            .ok_or_else(|| Failure::protocol("Git diff header must contain an a/ source path"))?;
+        let new_path = new_path.strip_prefix("b/")
+            .ok_or_else(|| Failure::protocol("Git diff header must contain a b/ destination path"))?;
+        for path in [old_path, new_path] {
+            if !safe_tree_relative_path(path) {
+                return Err(Failure::protocol(format!("Git patch contains unsafe path: {path}")));
+            }
+            paths.insert(path.to_owned());
+        }
+    }
+    if paths.is_empty() {
+        return Err(Failure::rejected("candidate patch contains no auditable diff --git file headers"));
+    }
+    Ok(paths.into_iter().collect())
+}
+
 /// Compute the versioned CEB filesystem-tree digest without executing or invoking Git.
 ///
 /// The digest covers sorted UTF-8 relative paths, regular-file executable bits,
@@ -842,7 +945,7 @@ fn validate_artifacts(
         execution_digests,
     })
 }
-fn validate_changed_paths(candidate: &Value) -> Result<(), Failure> {
+fn validate_changed_paths(candidate: &Value, expected_paths: &[String]) -> Result<(), Failure> {
     let paths = field(candidate, "changed_paths", "candidate")?
         .as_array()
         .ok_or_else(|| Failure::protocol("candidate.changed_paths must be an array"))?;
@@ -858,6 +961,11 @@ fn validate_changed_paths(candidate: &Value) -> Result<(), Failure> {
         if !seen.insert(path) {
             return Err(Failure::protocol(format!("duplicate changed path: {path}")));
         }
+    }
+    let declared: BTreeSet<String> = seen.into_iter().map(str::to_owned).collect();
+    let expected: BTreeSet<String> = expected_paths.iter().cloned().collect();
+    if declared != expected {
+        return Err(Failure::protocol("receipt changed_paths do not equal the independently computed source/result tree path diff"));
     }
     Ok(())
 }
@@ -1088,6 +1196,7 @@ fn verify_one_receipt(
     task: &Value,
     source_tree_sha256: &str,
     result_tree_sha256: &str,
+    expected_changed_paths: &[String],
     patch_sha256: &str,
     requested_task_id: &str,
 ) -> Result<VerifiedReceipt, Failure> {
@@ -1149,7 +1258,7 @@ fn verify_one_receipt(
     {
         return Err(Failure::protocol("candidate base-tree, result-tree or patch digest mismatch"));
     }
-    validate_changed_paths(candidate)?;
+    validate_changed_paths(candidate, expected_changed_paths)?;
 
     let subjects = field(&statement, "subject", "statement")?
         .as_array()
@@ -1385,6 +1494,11 @@ fn verify_pair_inner(inputs: &PairInputs) -> Result<VerificationReport, Failure>
     let patch_sha256 = sha256_hex(&inputs.patch);
     let source_tree_sha256 = hash_source_tree_inner(&inputs.source_tree_dir)?;
     let result_tree_sha256 = hash_source_tree_inner(&inputs.result_tree_dir)?;
+    let expected_changed_paths = changed_tree_paths(&inputs.source_tree_dir, &inputs.result_tree_dir)?;
+    let patch_paths = git_patch_paths(&inputs.patch)?;
+    if patch_paths != expected_changed_paths {
+        return Err(Failure::protocol("Git patch file paths do not exactly match independently changed source/result tree paths"));
+    }
     if task_source_tree.as_deref() != Some(source_tree_sha256.as_str()) {
         return Err(Failure::protocol("recomputed source-tree digest does not match the task contract"));
     }
@@ -1400,6 +1514,7 @@ fn verify_pair_inner(inputs: &PairInputs) -> Result<VerificationReport, Failure>
         &task,
         &source_tree_sha256,
         &result_tree_sha256,
+        &expected_changed_paths,
         &patch_sha256,
         &inputs.task_id,
     )?;
@@ -1414,6 +1529,7 @@ fn verify_pair_inner(inputs: &PairInputs) -> Result<VerificationReport, Failure>
         &task,
         &source_tree_sha256,
         &result_tree_sha256,
+        &expected_changed_paths,
         &patch_sha256,
         &inputs.task_id,
     )?;
