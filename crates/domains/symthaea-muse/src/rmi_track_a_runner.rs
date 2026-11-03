@@ -22,7 +22,7 @@ use sha2::{Digest, Sha256};
 use std::fmt::Write as FmtWrite;
 
 pub const RMI_TRACK_A_RUNNER_VERSION_V1: &str = "rmi-track-a-offline-runner-v1";
-pub const RMI_TRACK_A_MAX_TRIALS_PER_TARGET_V1: usize = 10_000;
+pub const RMI_TRACK_A_MAX_TRIALS_PER_TARGET_V1: usize = 1_024;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RmiTrackAManifestV1 {
@@ -147,15 +147,20 @@ pub fn make_rmi_track_a_fixture_v1(
     trial_index: usize,
     seed_root: u64,
 ) -> Result<RmiInterventionPairV1, String> {
-    let target_seed = target_index_v1(target)
-        .checked_mul(0x9E37_79B9)
-        .ok_or_else(|| "target seed overflow".to_owned())?;
-    let trial_seed = (trial_index as u64)
-        .checked_mul(0xD1B5_4A32)
-        .ok_or_else(|| "trial seed overflow".to_owned())?;
-    let seed = seed_root
-        .wrapping_add(target_seed)
-        .wrapping_add(trial_seed);
+    if trial_index >= RMI_TRACK_A_MAX_TRIALS_PER_TARGET_V1 {
+        return Err(format!(
+            "trial_index must be below {RMI_TRACK_A_MAX_TRIALS_PER_TARGET_V1}"
+        ));
+    }
+    // A disjoint ordinal block per target guarantees unique trial seeds within
+    // a suite and avoids relying on OS or process randomness.
+    let target_offset = target_index_v1(target)
+        .checked_mul(RMI_TRACK_A_MAX_TRIALS_PER_TARGET_V1 as u64)
+        .ok_or_else(|| "target seed offset overflow".to_owned())?;
+    let seed_offset = target_offset
+        .checked_add(trial_index as u64)
+        .ok_or_else(|| "trial seed offset overflow".to_owned())?;
+    let seed = seed_root.wrapping_add(seed_offset);
 
     let mut control = RmiMusicalFeaturesV1 {
         motif_intervals: [2, -1, 3, 0],
@@ -195,11 +200,11 @@ pub fn make_rmi_track_a_fixture_v1(
         pre_intervention_state_sha256: pre_state_sha256,
         target,
         control_observation: RmiPartnerObservationV1 {
-            source_event_id: format!("partner-event-{target_seed}-{trial_seed}"),
+            source_event_id: format!("partner-event-{}-{trial_index:06}", target_name_v1(target)),
             features: control,
         },
         treatment_observation: RmiPartnerObservationV1 {
-            source_event_id: format!("partner-event-{target_seed}-{trial_seed}"),
+            source_event_id: format!("partner-event-{}-{trial_index:06}", target_name_v1(target)),
             features: treatment,
         },
     };
