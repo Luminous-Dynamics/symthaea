@@ -713,7 +713,7 @@ mod tests {
         assert_eq!(result.value.optimum(), Some(MaxCountTerm { score: 2, count: 6 }));
         let witness = result.witness.unwrap();
         let score: i128 = [(0,1),(1,2),(0,2)].iter()
-            .map(|&(u,v)| i128::from(witness[u] != witness[v])).sum();
+            .map(|&(u,v)| if witness[u] != witness[v] { 1i128 } else { 0i128 }).sum();
         assert_eq!(score, 2);
         assert_eq!(result.backpointers.len(), 3);
         assert!(result.backpointers.iter().any(|bp| bp.rows.iter().any(|row| row.maximizing_states.len() > 1)));
