@@ -1,0 +1,86 @@
+name: PITB AutoformBench Frozen Audit
+
+on:
+  pull_request:
+    paths:
+      - "scripts/research/pitb_autoformbench_audit_v0.py"
+      - "docs/research/pitb-autoformbench-residual-frontier-2026-11-03.md"
+      - ".github/workflows/pitb-autoformbench-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frozen-public-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact PITB pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Check out pinned AutoformBench public evaluation release
+        uses: actions/checkout@v4
+        with:
+          repository: facebookresearch/autoformbench
+          ref: af1aa38fd44e019e566bce0b5a168609a886d8e6
+          path: _pitb-autoformbench
+          persist-credentials: false
+
+      - name: Run auditor syntax and synthetic controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          script="$GITHUB_WORKSPACE/scripts/research/pitb_autoformbench_audit_v0.py"
+          python3 -m py_compile "$script"
+          python3 "$script" --self-test
+
+      - name: Recompute the pinned manifest and public leaderboard audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/research/pitb_autoformbench_audit_v0.py \
+            --repo "$GITHUB_WORKSPACE/_pitb-autoformbench" \
+            > "$RUNNER_TEMP/pitb-autoformbench-audit.json"
+          python3 - "$RUNNER_TEMP/pitb-autoformbench-audit.json" <<'PY'
+          import json
+          import math
+          import sys
+          from pathlib import Path
+
+          report = json.loads(Path(sys.argv[1]).read_text())
+          if report["source"]["commit"] != "af1aa38fd44e019e566bce0b5a168609a886d8e6":
+              raise SystemExit("audit source commit drifted")
+          if report["manifest"] != {"tasks": 341, "source_groups": 24, "graded_declarations": 1155}:
+              raise SystemExit(f"manifest totals differ: {report['manifest']}")
+          models = report["models"]
+          expected = {
+              "gpt-6-astra": (281, 60),
+              "opus-5": (211, 130),
+              "gpt-5.6-sol": (201, 140),
+              "deepseek-v4.1-flash": (180, 161),
+          }
+          for name, (solved, unresolved) in expected.items():
+              row = models[name]
+              if (row["solved"], row["unresolved"]) != (solved, unresolved):
+                  raise SystemExit(f"{name}: official task totals changed: {row}")
+          leading = models["gpt-6-astra"]
+          if not math.isclose(leading["unresolved_cost_share"], 0.46175583093831973, rel_tol=0, abs_tol=1e-10):
+              raise SystemExit("leading-model unresolved cost share differs from registered audit")
+          if leading["unresolved_end_reasons"] != {"budget_consumed": 21, "model_gave_up": 39}:
+              raise SystemExit("leading-model failure-reason counts differ from registered audit")
+          print("PITB_AUTOFORMBENCH_FROZEN_AUDIT_PASS: pinned commit, 341 tasks, 24 source groups, 1,155 declarations, four model CSVs")
+          print(f"GPT-6 Astra unresolved spend share: {leading['unresolved_cost_share']:.6%}")
+          PY
+
+      - name: Retain machine-readable audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-autoformbench-frozen-audit
+          path: ${{ runner.temp }}/pitb-autoformbench-audit.json
+          if-no-files-found: warn
+          retention-days: 30
