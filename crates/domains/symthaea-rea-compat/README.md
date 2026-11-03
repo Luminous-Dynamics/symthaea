@@ -112,3 +112,14 @@ The portable receipt contains the **hash** of the ephemeral session nonce, not t
 ### Important claim ceiling
 
 This is a policy and integrity contract. It does not execute ADB, authenticate the provider executable, validate a consent signature, prove that a human clicked a consent dialog, attest the device, or prove ADB output truth. A gateway must supply an actually verified consent result, selected live session snapshot, fresh clock and provider report before it calls this API. The receipt's self-hash is not a signature. HARDSEC or another independently trusted verifier is required for authenticity claims.
+
+
+## Caller/session-bound mobile invocation v1
+
+The optional `mobile_invocation` module adds a one-use authorization lease that binds caller identity, a gateway-selected opaque device-session alias/generation/nonce, a consent receipt digest and verifier label, exact tool/argument digest, provider capability/executable metadata, effect catalog/policy digests and a short expiry. The portable receipt hashes the ephemeral session nonce and does not export it.
+
+The process-local replay guard has an expiry-aware bounded cache (65,536 active IDs/nonces) and explicit capacity rejection. It is only a testable in-process primitive: production must use a durable transactional replay store shared by every adapter and process.
+
+Consent revocation is represented as a gateway-supplied revocation timestamp. A trusted consent provider must authenticate the signed grant and supply a current revocation result before this module is called. A caller-supplied timestamp is not itself proof of revocation status.
+
+The implementation is an authorization contract only. No ADB operation is run, no user-consent UI is implemented, no provider executable digest is independently authenticated, and no hardware attestation or device-output truth is claimed.
