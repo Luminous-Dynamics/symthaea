@@ -1,33 +1,37 @@
 {
-  "suite": "Exact MaxCount witness/backpointer dual-count reference",
-  "seed": 20261103,
-  "randomized_instances": 240,
-  "randomized_certificates_checked": 240,
-  "distinct_support_matches": 240,
+  "claim_boundary": "Python exact reference only; v2 dual-count backpointer trace, distinct-uniform and multiplicity-weighted exact samplers, and separate checker are not Rust, Lean, or performance-qualified. Every original table cell is one local assignment; the support channel counts distinct assignments separately from weighted multiplicity.",
+  "disconnected_components": {"distinct_assignments": 6, "multiplicity": 50, "optimum": 0},
+  "dual_count_checks": 240,
+  "exact_multiplicity_probability_checks": 1389,
+  "exact_uniform_probability_checks": 1389,
+  "multiplicity_weighted_sampling_probability_verified": true,
+  "negative_controls": {
+    "cases": [
+      {"name":"false_argmax_state_rehashed","rejected":true},
+      {"name":"missing_tied_argmax_rehashed","rejected":true},
+      {"name":"wrong_witness_state_rehashed","rejected":true},
+      {"name":"wrong_optimum_rehashed","rejected":true},
+      {"name":"altered_instance_digest_rehashed","rejected":true},
+      {"name":"duplicate_elimination_variable_rehashed","rejected":true},
+      {"name":"wrong_separator_rehashed","rejected":true},
+      {"name":"false_output_cell_rehashed","rejected":true},
+      {"name":"false_distinct_support_rehashed","rejected":true},
+      {"name":"false_branch_support_rehashed","rejected":true},
+      {"name":"false_intermediate_support_table_rehashed","rejected":true}
+    ],
+    "rejected": 11,
+    "total": 11
+  },
   "optimal_solution_dag_support_matches": 240,
   "positive_handcrafted_cases": 4,
-  "exact_uniform_probability_checks": 1389,
+  "randomized_certificates_checked": 240,
+  "randomized_instances": 240,
+  "seed": 20261103,
+  "suite": "Exact MaxCount witness/backpointer reference",
+  "triangle_maxcut": {"distinct_assignments": 6, "multiplicity": 6, "optimum": 2, "witness": [1,0,0]},
   "uniform_sampling_probability_verified": true,
-  "triangle_maxcut": {"optimum": 2, "multiplicity": 6, "distinct_optimal_assignments": 6, "witness": [1,0,0], "each_optimum_probability": "1/6"},
-  "disconnected_components": {"optimum": 0, "multiplicity": 50, "distinct_optimal_assignments": 6, "each_optimum_probability": "1/6"},
-  "weighted_unique_assignment": {"optimum": 6, "multiplicity": 4, "distinct_optimal_assignments": 1},
-  "weighted_tie_case": {"optimum": 5, "multiplicity": 6, "distinct_optimal_assignments": 2, "branches": [[0,4,1],[1,2,1]]},
-  "negative_controls": {
-    "rejected": 11,
-    "total": 11,
-    "cases": [
-      "false_argmax_state_rehashed",
-      "missing_tied_argmax_rehashed",
-      "wrong_witness_state_rehashed",
-      "wrong_optimum_rehashed",
-      "altered_instance_digest_rehashed",
-      "duplicate_elimination_variable_rehashed",
-      "wrong_separator_rehashed",
-      "false_output_cell_rehashed",
-      "false_distinct_support_rehashed",
-      "false_branch_support_rehashed",
-      "false_intermediate_support_table_rehashed"
-    ]
-  },
-  "claim_boundary": "Python exact reference only; v2 dual-count backpointer trace, support-proportional exact sampler and separate checker are not Rust, Lean, or performance-qualified. Every original factor-table cell is one local assignment; an unbiased bounded-integer source is required for exact uniform sampling."
+  "weighted_case_result": {"distinct_assignments": 1, "result": [6,4]},
+  "weighted_tie_case": {"branches": [[0,4,1],[1,2,1]], "distinct_assignments": 2, "result": [5,6]},
+  "weighted_tie_distinct_uniform_probability": "1/2 each",
+  "weighted_tie_multiplicity_probability": {"state_0":"2/3","state_1":"1/3"}
 }
