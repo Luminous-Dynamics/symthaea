@@ -301,6 +301,7 @@ fn safe_tree_relative_path(path: &str) -> bool {
         && !path.starts_with('/')
         && !path.contains('\\')
         && !path.contains('\0')
+        && !path.contains(':')
         && !path.starts_with('~')
         && path.split('/').all(|part| !part.is_empty() && part != "." && part != "..")
 }
@@ -2495,22 +2496,30 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).unwrap();
         fs::write(root.join("target.txt"), b"target").unwrap();
+        fs::write(root.join("other.txt"), b"target").unwrap();
         symlink("target.txt", root.join("link.txt")).unwrap();
         let digest = hash_source_tree_inner(&root).unwrap();
-        fs::write(root.join("target.txt"), b"changed target").unwrap();
+        fs::remove_file(root.join("link.txt")).unwrap();
+        symlink("other.txt", root.join("link.txt")).unwrap();
         assert_ne!(digest, hash_source_tree_inner(&root).unwrap());
         fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
     fn git_patch_paths_are_safe_unique_and_match_tree_change_set() {
-        let patch = b"diff --git a/src/lib.rs b/src/lib.rs\\nindex 123..456 100644\\n--- a/src/lib.rs\\n+++ b/src/lib.rs\\n@@ -1 +1 @@\\n-false\\n+true\\n";
+        let patch = b"diff --git a/src/lib.rs b/src/lib.rs\nindex 123..456 100644\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1 +1 @@\n-false\n+true\n";
         assert_eq!(git_patch_paths(patch).unwrap(), vec!["src/lib.rs".to_string()]);
-        let unsafe_patch = b"diff --git a/../escape b/../escape\\n";
+        let addition = b"diff --git a/src/new.rs b/src/new.rs\nnew file mode 100644\n--- /dev/null\n+++ b/src/new.rs\n";
+        assert_eq!(git_patch_paths(addition).unwrap(), vec!["src/new.rs".to_string()]);
+        let deletion = b"diff --git a/src/old.rs b/src/old.rs\ndeleted file mode 100644\n--- a/src/old.rs\n+++ /dev/null\n";
+        assert_eq!(git_patch_paths(deletion).unwrap(), vec!["src/old.rs".to_string()]);
+        let mismatch = b"diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/other.rs\n+++ b/src/lib.rs\n";
+        assert!(git_patch_paths(mismatch).is_err());
+        let unsafe_patch = b"diff --git a/../escape b/../escape\n";
         assert!(git_patch_paths(unsafe_patch).is_err());
         let empty = b"no file diff headers";
         assert!(git_patch_paths(empty).is_err());
-        let ambiguous = b"diff --git \"a/file name\" \"b/file name\"\\n";
+        let ambiguous = b"diff --git \"a/file name\" \"b/file name\"\n";
         assert!(git_patch_paths(ambiguous).is_err());
     }
 
