@@ -12,4 +12,8 @@ symthaea-statistics = { path = "../../crates/domains/symthaea-statistics" }
 name = "run_sweep"
 path = "src/bin/run_sweep.rs"
 
+[[bin]]
+name = "run_dose_sweep"
+path = "src/bin/run_dose_sweep.rs"
+
 [workspace]
