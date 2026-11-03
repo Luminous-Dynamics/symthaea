@@ -390,7 +390,7 @@ TrafficSignBench (arXiv:2609.38463, code released 28 Sep 2026) is now a priority
 
 This benchmark demonstrates that destination and collision metrics do not imply rule compliance. SAM therefore adds a separate rule-evidence/trajectory layer in `symthaea_vehicle::rule_compliance`. The initial offline evaluator implements speed limit, mandatory direction and stop-before-line checks; unsupported rule families (yield, crosswalk, signals, no-entry, turn prohibitions) are explicit `Indeterminate` outcomes, not silently ignored.
 
-The evaluator retains raw typed rule evidence and trajectory samples, replays all per-rule findings, distinguishes NotEncountered from Pending stop-zone episodes and rejects non-finite inputs. It does not perform perception, map matching, legal interpretation or simulator execution. Symtropy #3387 remains the future execution/receipt owner.
+The evaluator retains raw typed rule evidence and trajectory samples, replays all per-rule findings, distinguishes NotEncountered from Pending stop-zone episodes, permits genuinely unavailable sources without fabricated digests, and rejects non-finite inputs. Stop dwell excludes the final post-stop acceleration/crossing gap and requires plausible stationary route progress. It does not perform perception, map matching, legal interpretation or simulator execution. Symtropy #3387 remains the future execution/receipt owner.
 
 Benchmark sequence:
 1. Reproduce the TrafficSignBench published baselines and manifests.
@@ -410,10 +410,10 @@ NIST's 2026 Measurement Science for Automated Vehicles programme separates four 
 
 The new `symthaea_vehicle::counterfactual_decision` module begins a bounded Tier-3 interface. It evaluates one selected action against a caller-declared finite set of alternative vehicle commands, using a single named metric and a common evaluator identity. It reports whether a better feasible alternative was found, model-relative infeasibility, absence of feasible actions or indeterminate evidence.
 
-Every action includes the exact command payload digest plus execution receipt/digest. A caller completeness flag is required; incomplete candidate sets cannot produce a "no better action found" result. The report validator re-computes the finding from the retained action set.
+Every action includes the exact command payload digest, a shared-context fingerprint and execution receipt/digest. The shared context binds the scenario artifact, initial state, environment, dynamics, execution protocol, evaluator artifact/build and metric definition. A caller completeness flag is required; incomplete candidate sets cannot produce a "no better action found" result. The report validator re-computes the finding from the retained action set. Equal-score alternatives use stable action-ID tie-breaking.
 
 This is not a simulator or an optimal-control solver. It does not prove that the action set is exhaustive, that the independent evaluator is actually independent or that the declared model is physically correct. Symtropy #3387 remains responsible for exact action-conditioned execution/replay. Symthaea owns action-set design, criteria, family statistics and interpretation.
 
-Run separate reports for safety margin, rule compliance, progress, comfort and energy; avoid a hidden weighted composite. For each scenario family, report counterfactual regret distributions and the fraction of decisions where a better feasible alternative was found. A positive regret is evidence of an opportunity within the evaluated set/model, not proof that the deployed controller could have safely executed that alternative in reality.
+Run separate reports for safety margin, rule compliance, progress, comfort and energy; avoid a hidden weighted composite. For each scenario family, report counterfactual regret distributions and the fraction of decisions where a better feasible alternative was found. The selected action being infeasible can still retain the best feasible alternative for diagnosis, but regret remains undefined. A positive regret is evidence of an opportunity within the evaluated set/model, not proof that the deployed controller could have safely executed that alternative in reality.
 
 Protocol: [COUNTERFACTUAL_DECISION_QUALITY_V0_1.md](./COUNTERFACTUAL_DECISION_QUALITY_V0_1.md).
