@@ -99,7 +99,7 @@ Here w0+w1 denotes the two literal weights for the added variable in the appropr
 
 ## 4. Executable v1 coverage
 
-The current PWMC micro-suite executes six laws:
+The current PWMC micro-suite executes eight laws:
 
 1. L3 free-hidden addition: full models double while support and PWMC are unchanged.
 2. L2 variable-order permutation with literal-index remapping.
@@ -107,8 +107,10 @@ The current PWMC micro-suite executes six laws:
 4. L6 redundant/subsumed clause addition.
 5. L4 free-visible extension with predicted exact PWMC multiplication.
 6. L5 projection-boundary change with a predicted support/value change.
+7. A unique hidden definitional extension z <-> d, preserving the projected support and PWMC on the fixed fixture.
+8. L11 visible weight-map substitution, preserving support while changing the exact scalar (-2/5 to 17/24).
 
-L7–L12 are specified but not yet fully generated as independent fixtures. L9/L10 require circuit-level structural witnesses; they should not be faked by CNF-only tests.
+The unique-definitional-extension test covers projected support/PWMC only; it does not establish general full WMC preservation or prove arbitrary auxiliary-weight transport. L8, L9, L10 and L12 are not all fully generated as independent fixtures. L9/L10 require circuit-level structural witnesses; they should not be faked by CNF-only tests.
 
 ## 5. Research significance
 
