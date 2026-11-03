@@ -82,6 +82,7 @@ pub mod encoder;
 pub mod fep_agent;
 pub mod perturbations;
 pub mod paired_rollout;
+pub mod paired_statistics;
 pub mod plugin;
 pub mod reward;
 pub mod road;
@@ -110,6 +111,12 @@ pub use paired_rollout::{
     VehiclePairedRolloutError, VehiclePairedRolloutFrame, VehiclePairedRolloutResult,
     VehicleTrajectoryMetrics, run_paired_lane_keep_rollout,
     run_paired_lane_keep_rollout_with_baseline,
+};
+pub use paired_statistics::{
+    MAX_PAIRED_BOOTSTRAP_REPLICATES, MIN_PAIRED_BOOTSTRAP_REPLICATES,
+    PAIRED_STATISTICS_SCHEMA, PairedFamilyEffect, PairedMetricDirection,
+    PairedMetricObservation, PairedMetricSummary, PairedStatisticsError,
+    summarize_paired_metric,
 };
 pub use reward::{episode_reward, follow_distance_reward, safety_reward, speed_reward};
 pub use road::{Road, RoadSegment};
