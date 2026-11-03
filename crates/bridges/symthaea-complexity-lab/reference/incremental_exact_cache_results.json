@@ -5,7 +5,12 @@
     "id": "symthaea.same-scope-pointwise-product-and-unit-elision/v1",
     "same_scope_factor_split_merge_cache_hits": 2,
     "multiplicative_identity_factor_elision_cache_hits": 2,
-    "incorrect_normalized_factor_rejected": true
+    "incorrect_normalized_factor_rejected": true,
+    "maxcount_same_scope_factor_split_merge_cache_hits": 2,
+    "same_scope_factor_split_merge_tested_under": [
+      "natural-count",
+      "MaxCount"
+    ]
   },
   "algebras": [
     "natural-count/unbounded-int/v1",
