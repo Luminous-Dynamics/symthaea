@@ -90,7 +90,8 @@
           "target_triple",
           "enabled_features",
           "expected_active_nodes",
-          "expected_inactive_nodes"
+          "expected_inactive_nodes",
+          "default_features_enabled"
         ],
         "properties": {
           "id": {
@@ -132,6 +133,9 @@
               "type": "string",
               "minLength": 1
             }
+          },
+          "default_features_enabled": {
+            "type": "boolean"
           }
         }
       }
