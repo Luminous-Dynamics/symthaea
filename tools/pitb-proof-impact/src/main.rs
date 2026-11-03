@@ -4,7 +4,6 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     env, fs,
-    path::Path,
     process::ExitCode,
 };
 
@@ -125,6 +124,7 @@ enum Propagation {
     TransparentBody,
     ProofEvidence,
     Environment,
+    Retrieval,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -279,7 +279,7 @@ fn relation_endpoint_kinds_valid(edge: &Edge, source: &Node, target: &Node) -> b
             is_formal(source) && is_formal(target)
         }
         "module_environment_dependency" => {
-            is_formal(source) || source.kind == "module"
+            (is_formal(source) || source.kind == "module")
                 && matches!(target.kind.as_str(), "module" | "environment_artifact")
         }
         "documentation_reference" => is_formal(source) && target.kind == "document",
@@ -340,6 +340,25 @@ fn action_for_propagation(relation: &str, target: &Node, propagation: Propagatio
             | "inheritance_reference" | "instance_synthesis" => Some(Action::Rebuild),
             _ => None,
         },
+        Propagation::Retrieval => match relation {
+            "documentation_reference" | "blueprint_dependency"
+            | "informal_candidate_dependency" | "cross_formality_match" => {
+                Some(Action::RetrievalRefresh)
+            }
+            _ => None,
+        },
+    }
+}
+
+fn enqueue(
+    queue: &mut VecDeque<(String, Propagation)>,
+    queued: &mut BTreeSet<(String, Propagation)>,
+    node_id: &str,
+    propagation: Propagation,
+) {
+    let key = (node_id.to_owned(), propagation);
+    if queued.insert(key.clone()) {
+        queue.push_back(key);
     }
 }
 
@@ -410,7 +429,13 @@ fn node_change(old: &Node, new: &Node) -> Vec<NodeChange> {
             Action::SourceRevalidate
         };
         changes.push(NodeChange {
-            propagation: if action == Action::Rebuild { Propagation::Environment } else { Propagation::ProofEvidence },
+            propagation: if action == Action::Rebuild {
+                Propagation::Environment
+            } else if action == Action::RetrievalRefresh {
+                Propagation::Retrieval
+            } else {
+                Propagation::ProofEvidence
+            },
             action,
             code: "source_bytes_changed_without_semantic_digest_change",
         });
@@ -464,12 +489,6 @@ fn analyze(old_bytes: &[u8], new_bytes: &[u8]) -> Result<Report, String> {
     let mut queue = VecDeque::<(String, Propagation)>::new();
     let mut queued = BTreeSet::<(String, Propagation)>::new();
 
-    let mut schedule = |node_id: &str, propagation: Propagation| {
-        if queued.insert((node_id.to_owned(), propagation)) {
-            queue.push_back((node_id.to_owned(), propagation));
-        }
-    };
-
     for (id, old_node) in &old_nodes {
         match new_nodes.get(id) {
             None => {
@@ -482,7 +501,7 @@ fn analyze(old_bytes: &[u8], new_bytes: &[u8]) -> Result<Report, String> {
                 );
                 if is_formal(old_node) {
                     // Removed declaration's dependents are discovered through old edges below.
-                    schedule(id, Propagation::Signature);
+                    enqueue(&mut queue, &mut queued, id, Propagation::Signature);
                 }
             }
             Some(new_node) => {
@@ -511,7 +530,7 @@ fn analyze(old_bytes: &[u8], new_bytes: &[u8]) -> Result<Report, String> {
                             change.code.to_owned(),
                         );
                     }
-                    schedule(id, change.propagation);
+                    enqueue(&mut queue, &mut queued, id, change.propagation);
                 }
             }
         }
@@ -536,7 +555,7 @@ fn analyze(old_bytes: &[u8], new_bytes: &[u8]) -> Result<Report, String> {
         for node in &new.nodes {
             if is_formal(node) {
                 add_reason(&mut actions, &mut reasons, &node.node_id, Action::Rebuild, "global_lean_environment_changed".into());
-                schedule(&node.node_id, Propagation::Environment);
+                enqueue(&mut queue, &mut queued, &node.node_id, Propagation::Environment);
             }
         }
     }
@@ -557,7 +576,7 @@ fn analyze(old_bytes: &[u8], new_bytes: &[u8]) -> Result<Report, String> {
                 format!("dependency_edge_removed_or_changed:{}", old_edge.relation),
             );
             if action == Action::Reprove || action == Action::Revalidate {
-                schedule(&old_edge.source_node_id, Propagation::ProofEvidence);
+                enqueue(&mut queue, &mut queued, &old_edge.source_node_id, Propagation::ProofEvidence);
             }
         }
     }
@@ -574,7 +593,7 @@ fn analyze(old_bytes: &[u8], new_bytes: &[u8]) -> Result<Report, String> {
                 format!("dependency_edge_added:{}", new_edge.relation),
             );
             if action == Action::Reprove || action == Action::Revalidate {
-                schedule(&new_edge.source_node_id, Propagation::ProofEvidence);
+                enqueue(&mut queue, &mut queued, &new_edge.source_node_id, Propagation::ProofEvidence);
             }
         }
     }
@@ -627,11 +646,13 @@ fn analyze(old_bytes: &[u8], new_bytes: &[u8]) -> Result<Report, String> {
                 format!("transitive_impact:{} via {}", changed_dependency_id, edge.relation),
             );
             if action == Action::Rebuild {
-                schedule(&edge.source_node_id, Propagation::Environment);
+                enqueue(&mut queue, &mut queued, &edge.source_node_id, Propagation::Environment);
+            } else if action == Action::RetrievalRefresh {
+                enqueue(&mut queue, &mut queued, &edge.source_node_id, Propagation::Retrieval);
             } else if action == Action::Reprove || action == Action::Revalidate {
-                schedule(&edge.source_node_id, Propagation::ProofEvidence);
+                enqueue(&mut queue, &mut queued, &edge.source_node_id, Propagation::ProofEvidence);
                 if source.declaration_kind == "definition" && source.reducibility == "transparent" {
-                    schedule(&edge.source_node_id, Propagation::TransparentBody);
+                    enqueue(&mut queue, &mut queued, &edge.source_node_id, Propagation::TransparentBody);
                 }
             }
         }
