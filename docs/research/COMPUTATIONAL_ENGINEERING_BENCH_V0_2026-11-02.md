@@ -246,3 +246,30 @@ For each frozen task family, run (1) a foundation model with a minimal harness, 
 Do not claim Symthaea caused a gain unless the same underlying model/scaffold without Symthaea is a matched control. Do not compare Symthaea's native path to a larger hosted model and attribute the entire difference to architecture. Report the architecture's incremental contribution separately.
 
 **Current claim ceiling:** schemas, fixture files, verifier source and authored tests are research artifacts. The Rust tests and schema workflow have not been run, no runner has been qualified, the ten catalog tasks remain design_only, and no performance result exists.
+
+
+## 18. Repository-intelligence industry baselines (2026-11-03)
+
+CEB-REPO-001 should compare against adjacent production-grade code-intelligence systems, not only against a hand-written gold graph:
+
+- **rust-analyzer** is a direct semantic baseline for Rust. Its architecture models the project as source inputs plus a crate graph containing dependencies and cfg flags, then derives a resolved semantic model with references and types. It supports small incremental input deltas and immutable Analysis snapshots. Pin the rust-analyzer binary/revision, Cargo metadata, toolchain, target and feature configuration used for every gold capture.
+- **SCIP 0.10.0** is a language-agnostic indexing protocol for symbol definitions/references/implementations, with a Protobuf schema, Rust bindings and Rust indexer ecosystem. CEB should import/export SCIP and report per-relation coverage and provenance rather than inventing an incompatible symbol interchange format.
+- **CodeQL** is a separate security/data-flow baseline. GitHub documents Rust support; CodeQL 2.27.2 (2026-10-09) added Rust extractor and data-flow improvements. Use its alert/data-flow results for security-relevant relations, but do not mistake CodeQL's security graph for a complete semantic repository twin.
+- **Cargo metadata** is a manifest/dependency baseline; syntax-only parsers such as Tree-sitter provide a syntax extraction baseline.
+
+A competitive repository twin must combine these sources without merging their authority. Every fact should retain an exact source revision, path/span, cfg/feature/target world, indexer/compiler version and evidence artifact. Suggested authority levels are syntax-declared, manifest-declared, rust-analyzer-resolved, rustc-confirmed, runtime-observed and human-adjudicated. No fact may be promoted to a stronger authority simply because multiple weaker sources agree.
+
+**Paradigm shift:** make the graph temporal and evidence-carrying. Every repository edit produces a graph delta and an invalidation closure. The benchmark compares the incremental graph against a full rebuild after every mutation, including a fresh semantic re-index. This directly measures stale knowledge, invalidation underreach/overreach and computational cost, not just one-shot graph extraction.
+
+Add these metrics to CEB-REPO-001:
+
+- Relation-specific node/edge P/R against pinned rust-analyzer and SCIP outputs.
+- cfg/feature/target-world coverage and false activation of mutually exclusive features.
+- Change-impact P/R across symbols, tests, public re-exports, dependencies, features and target gates.
+- Stale-fact rate and stale-fact lifetime after rename, move, trait-bound, feature or target mutations.
+- Incremental invalidation cost as a fraction of a full graph rebuild, plus exact post-update equivalence.
+- Provenance coverage and authority-calibration error: every resolved/compiler claim must point to exact toolchain and source inputs.
+
+Prospective targets remain syntax P/R ≥0.95, supported semantic relation P/R ≥0.90, impact recall ≥0.95 with precision ≥0.80, zero stale facts after completed invalidation, and zero authority inflation. These are internal targets, not current results or industry standards.
+
+The current fixture remains design-only. Issue #10064 must qualify the compiler/LSP execution environment before any build script, compiler or language server is launched on untrusted fixture content.
