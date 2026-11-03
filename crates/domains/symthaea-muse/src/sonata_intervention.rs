@@ -149,7 +149,7 @@ impl SonataActionQualificationV1 {
     pub fn is_executable(&self) -> bool {
         self.validate().is_ok()
             && self.requested_mode == SonataActionExecutionModeV1::Execute
-            && matches!(self.status, SonataActionQualificationStatusV1::Supported { .. })
+            && matches!(&self.status, SonataActionQualificationStatusV1::Supported { .. })
     }
 
     pub fn digest_sha256(&self) -> Result<String, String> {
@@ -165,6 +165,20 @@ impl SonataActionQualificationV1 {
 }
 
 pub const SONATA_RETURN_REALIZER_ID_V1: &str = "sonata-thematic-return-v1";
+
+/// Conservative serde default for historical return batches created before
+/// action-qualification receipts existed. The legacy object may be inspected,
+/// but it does not carry current execution authority.
+fn legacy_sonata_action_qualification_v1() -> SonataActionQualificationV1 {
+    SonataActionQualificationV1 {
+        schema_version: 1,
+        action: SymbolicAction::ReturnOpeningMaterial,
+        requested_mode: SonataActionExecutionModeV1::ShadowOnly,
+        status: SonataActionQualificationStatusV1::ShadowOnly {
+            reason: "legacy batch predates action qualification; execution authority is not reconstructed".into(),
+        },
+    }
+}
 
 fn sonata_return_evidence_v1() -> Vec<SonataActionEvidenceV1> {
     vec![
@@ -238,6 +252,7 @@ impl SonataInterventionCandidate {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SonataInterventionBatch {
     /// Exact action-to-realizer receipt used to authorize this batch.
+    #[serde(default = "legacy_sonata_action_qualification_v1")]
     pub action_qualification: SonataActionQualificationV1,
     pub source_section: SonataSectionKind,
     pub target_section: SonataSectionKind,
@@ -880,14 +895,14 @@ mod tests {
                 SymbolicAction::ReturnOpeningMaterial => {
                     assert!(qualification.is_executable());
                     assert!(matches!(
-                        qualification.status,
+                        &qualification.status,
                         SonataActionQualificationStatusV1::Supported { .. }
                     ));
                 }
                 _ => {
                     assert!(!qualification.is_executable());
                     assert!(matches!(
-                        qualification.status,
+                        &qualification.status,
                         SonataActionQualificationStatusV1::Unsupported { .. }
                     ));
                 }
@@ -916,7 +931,7 @@ mod tests {
             qualification.validate().unwrap();
             assert!(!qualification.is_executable());
             assert!(matches!(
-                qualification.status,
+                &qualification.status,
                 SonataActionQualificationStatusV1::ShadowOnly { .. }
             ));
         }
@@ -935,7 +950,7 @@ mod tests {
         };
         assert_eq!(qualification.action, SymbolicAction::IncreaseDensity);
         assert!(matches!(
-            qualification.status,
+            &qualification.status,
             SonataActionQualificationStatusV1::Unsupported { .. }
         ));
     }
