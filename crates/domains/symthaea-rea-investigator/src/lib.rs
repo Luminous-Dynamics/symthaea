@@ -1363,3 +1363,6 @@ mod tests {
 
 /// Robust expected / worst-case / lower-tail EIG planning over likelihood scenarios.
 pub mod robust;
+
+/// Held-out likelihood calibration, reliability and unsigned receipt evaluation.
+pub mod calibration;

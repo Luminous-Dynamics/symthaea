@@ -1,8 +1,30 @@
 //! Native, fail-closed planning over caller-supplied REA Evidence provenance.
 //!
-//! The planner selects and ranks proposed experiments but never executes them.
-//! Provenance classes and likelihood models are caller-supplied and are not
-//! authenticated or calibrated by this module.
+//! The planner ranks proposed experiments and downstream decisions, and evaluates
+//! held-out likelihood calibration. It never executes experiments or terminal
+//! actions. Evidence provenance, likelihood models, source labels and utility
+//! values remain caller-supplied inputs until separately qualified.
+
+pub use symthaea_rea_investigator::calibration::{
+    CALIBRATION_BOOTSTRAP_UNIT,
+    CALIBRATION_EVALUATOR_VERSION,
+    CalibrationClaimCeiling,
+    CalibrationConfig,
+    CalibrationEligibility,
+    CalibrationError,
+    CalibrationErrorKind,
+    CalibrationInterval,
+    CalibrationMetrics,
+    CalibrationModelIdentity,
+    CalibrationObservation,
+    CalibrationReceipt,
+    CalibrationScope,
+    CalibrationThresholds,
+    ClassProbability,
+    ReliabilityBin,
+    evaluate_likelihood_calibration,
+    verify_calibration_receipt_against_observations,
+};
 
 pub use symthaea_rea_investigator::robust::{
     LikelihoodModelScenario,
