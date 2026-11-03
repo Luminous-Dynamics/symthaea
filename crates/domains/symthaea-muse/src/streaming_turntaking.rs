@@ -119,8 +119,10 @@ pub struct MusicalTurnPredictionChunkV1 {
     pub input_interval: MusicalFrameIntervalV1,
     /// Last input frame available to the agent. Must equal chunk end.
     pub observed_through_frame: u64,
-    /// Clock frame at which the action decision was committed.
-    pub decision_frame: u64,
+    /// Monotonic runner-clock time when the complete input chunk was received.
+    pub chunk_received_at_ns: u64,
+    /// Monotonic runner-clock time when the action decision was committed.
+    pub decision_at_ns: u64,
     pub disposition: MusicalTurnDispositionV1,
 }
 
@@ -159,10 +161,12 @@ pub enum MusicalTurnTakingIssue {
     SessionMismatch,
     ArtifactMismatch { field: String },
     ObservedThroughMismatch { position: usize },
-    DecisionBeforeChunkEnd { position: usize },
-    DecisionPastArtifact { position: usize },
+    DecisionBeforeChunkReceipt { position: usize },
+    NonMonotonicChunkReceiptTime { position: usize },
+    NonMonotonicDecisionTime { position: usize },
+    EffectFrameBeforeObservedInput { position: usize },
     EffectBeforeDecision { position: usize },
-    EffectPastArtifact { position: usize },
+    EffectTimestampPairMismatch { position: usize },
     UntimedActionHasEffect { position: usize },
     TimedActionParseDigestInvalid { position: usize },
     MissingParseFailureReason { position: usize },
@@ -217,6 +221,10 @@ pub struct MusicalTurnTakingScoreV1 {
     pub decision_latency_p95_ms: Option<f64>,
     pub decision_latency_p99_ms: Option<f64>,
     pub decision_latencies_ms: Vec<f64>,
+    pub effect_latency_p50_ms: Option<f64>,
+    pub effect_latency_p95_ms: Option<f64>,
+    pub effect_latency_p99_ms: Option<f64>,
+    pub effect_latencies_ms: Vec<f64>,
     pub signed_effect_errors_ms: Vec<f64>,
 }
 
@@ -297,29 +305,54 @@ pub fn validate_musical_turn_prediction(
         &mut issues,
     );
 
+    let mut previous_received_at = None;
+    let mut previous_decision_at = None;
     for (position, chunk) in prediction.chunks.iter().enumerate() {
         if chunk.observed_through_frame != chunk.input_interval.end_frame {
             issues.push(MusicalTurnTakingIssue::ObservedThroughMismatch { position });
         }
-        if chunk.decision_frame < chunk.input_interval.end_frame {
-            issues.push(MusicalTurnTakingIssue::DecisionBeforeChunkEnd { position });
+        if chunk.decision_at_ns < chunk.chunk_received_at_ns {
+            issues.push(MusicalTurnTakingIssue::DecisionBeforeChunkReceipt { position });
         }
-        if chunk.decision_frame > prediction.artifact.total_frames {
-            issues.push(MusicalTurnTakingIssue::DecisionPastArtifact { position });
+        if let Some(previous) = previous_received_at {
+            if chunk.chunk_received_at_ns < previous {
+                issues.push(MusicalTurnTakingIssue::NonMonotonicChunkReceiptTime { position });
+            }
         }
+        if let Some(previous) = previous_decision_at {
+            if chunk.decision_at_ns < previous {
+                issues.push(MusicalTurnTakingIssue::NonMonotonicDecisionTime { position });
+            }
+        }
+        previous_received_at = Some(chunk.chunk_received_at_ns);
+        previous_decision_at = Some(chunk.decision_at_ns);
 
         match &chunk.disposition {
-            MusicalTurnDispositionV1::Action { action, effect_frame } => {
+            MusicalTurnDispositionV1::Action {
+                action,
+                effect_frame,
+                effect_at_ns,
+            } => {
                 if action.requires_effect_time() {
+                    if effect_frame.is_some() != effect_at_ns.is_some() {
+                        issues.push(MusicalTurnTakingIssue::EffectTimestampPairMismatch { position });
+                    }
                     if let Some(frame) = effect_frame {
-                        if *frame < chunk.decision_frame {
-                            issues.push(MusicalTurnTakingIssue::EffectBeforeDecision { position });
+                        if *frame < chunk.observed_through_frame {
+                            issues.push(
+                                MusicalTurnTakingIssue::EffectFrameBeforeObservedInput { position },
+                            );
                         }
                         if *frame >= prediction.artifact.total_frames {
                             issues.push(MusicalTurnTakingIssue::EffectPastArtifact { position });
                         }
                     }
-                } else if effect_frame.is_some() {
+                    if let Some(effect_time) = effect_at_ns {
+                        if *effect_time < chunk.decision_at_ns {
+                            issues.push(MusicalTurnTakingIssue::EffectBeforeDecision { position });
+                        }
+                    }
+                } else if effect_frame.is_some() || effect_at_ns.is_some() {
                     issues.push(MusicalTurnTakingIssue::UntimedActionHasEffect { position });
                 }
             }
@@ -373,6 +406,7 @@ pub fn score_musical_turn_taking(
     let mut parse_failures = 0usize;
     let mut correct_actions = 0usize;
     let mut decision_latencies_ms = Vec::with_capacity(truth.chunks.len());
+    let mut effect_latencies_ms = Vec::new();
     let mut signed_effect_errors_ms = Vec::new();
     let mut timed_action_count = 0usize;
     let mut timed_action_success_count = 0usize;
@@ -399,10 +433,18 @@ pub fn score_musical_turn_taking(
             }
         }
 
-        let latency_frames = actual.decision_frame.saturating_sub(actual.input_interval.end_frame);
-        decision_latencies_ms.push(
-            latency_frames as f64 * 1000.0 / truth.artifact.sample_rate_hz as f64,
-        );
+        let decision_latency_ns = actual
+            .decision_at_ns
+            .saturating_sub(actual.chunk_received_at_ns);
+        decision_latencies_ms.push(decision_latency_ns as f64 / 1_000_000.0);
+        if let MusicalTurnDispositionV1::Action {
+            effect_at_ns: Some(effect_time),
+            ..
+        } = &actual.disposition
+        {
+            let effect_latency_ns = effect_time.saturating_sub(actual.decision_at_ns);
+            effect_latencies_ms.push(effect_latency_ns as f64 / 1_000_000.0);
+        }
 
         if expected.expected_action.requires_effect_time() {
             timed_action_count += 1;
@@ -540,6 +582,10 @@ pub fn score_musical_turn_taking(
         decision_latency_p95_ms: percentile(&decision_latencies_ms, 0.95),
         decision_latency_p99_ms: percentile(&decision_latencies_ms, 0.99),
         decision_latencies_ms,
+        effect_latency_p50_ms: percentile(&effect_latencies_ms, 0.50),
+        effect_latency_p95_ms: percentile(&effect_latencies_ms, 0.95),
+        effect_latency_p99_ms: percentile(&effect_latencies_ms, 0.99),
+        effect_latencies_ms,
         signed_effect_errors_ms,
     })
 }
@@ -776,27 +822,32 @@ mod tests {
                     chunk_index: 0,
                     input_interval: MusicalFrameIntervalV1 { start_frame: 0, end_frame: 100 },
                     observed_through_frame: 100,
-                    decision_frame: 100,
+                    chunk_received_at_ns: 10_000_000,
+                    decision_at_ns: 10_000_000,
                     disposition: MusicalTurnDispositionV1::Action {
                         action: MusicalTurnActionV1::Wait,
                         effect_frame: None,
+                        effect_at_ns: None,
                     },
                 },
                 MusicalTurnPredictionChunkV1 {
                     chunk_index: 1,
                     input_interval: MusicalFrameIntervalV1 { start_frame: 100, end_frame: 200 },
                     observed_through_frame: 200,
-                    decision_frame: 200,
+                    chunk_received_at_ns: 20_000_000,
+                    decision_at_ns: 20_000_000,
                     disposition: MusicalTurnDispositionV1::Action {
                         action: MusicalTurnActionV1::Respond,
                         effect_frame: Some(220),
+                        effect_at_ns: Some(22_000_000),
                     },
                 },
                 MusicalTurnPredictionChunkV1 {
                     chunk_index: 2,
                     input_interval: MusicalFrameIntervalV1 { start_frame: 200, end_frame: 300 },
                     observed_through_frame: 300,
-                    decision_frame: 300,
+                    chunk_received_at_ns: 30_000_000,
+                    decision_at_ns: 30_000_000,
                     disposition: MusicalTurnDispositionV1::Action {
                         action: MusicalTurnActionV1::Continue,
                         effect_frame: None,
@@ -806,17 +857,20 @@ mod tests {
                     chunk_index: 3,
                     input_interval: MusicalFrameIntervalV1 { start_frame: 300, end_frame: 400 },
                     observed_through_frame: 400,
-                    decision_frame: 400,
+                    chunk_received_at_ns: 40_000_000,
+                    decision_at_ns: 40_000_000,
                     disposition: MusicalTurnDispositionV1::Action {
                         action: MusicalTurnActionV1::Yield,
                         effect_frame: Some(420),
+                        effect_at_ns: Some(42_000_000),
                     },
                 },
                 MusicalTurnPredictionChunkV1 {
                     chunk_index: 4,
                     input_interval: MusicalFrameIntervalV1 { start_frame: 400, end_frame: 500 },
                     observed_through_frame: 500,
-                    decision_frame: 500,
+                    chunk_received_at_ns: 50_000_000,
+                    decision_at_ns: 50_000_000,
                     disposition: MusicalTurnDispositionV1::Action {
                         action: MusicalTurnActionV1::Wait,
                         effect_frame: None,
@@ -826,7 +880,8 @@ mod tests {
                     chunk_index: 5,
                     input_interval: MusicalFrameIntervalV1 { start_frame: 500, end_frame: 600 },
                     observed_through_frame: 600,
-                    decision_frame: 600,
+                    chunk_received_at_ns: 60_000_000,
+                    decision_at_ns: 60_000_000,
                     disposition: MusicalTurnDispositionV1::Action {
                         action: MusicalTurnActionV1::Wait,
                         effect_frame: None,
@@ -889,19 +944,20 @@ mod tests {
     #[test]
     fn backdated_decision_is_rejected() {
         let mut predicted = prediction();
-        predicted.chunks[1].decision_frame = 199;
+        predicted.chunks[1].decision_at_ns = 19_000_000;
         assert!(score_musical_turn_taking(&truth(), &predicted)
             .unwrap_err()
-            .contains(&MusicalTurnTakingIssue::DecisionBeforeChunkEnd { position: 1 }));
+            .contains(&MusicalTurnTakingIssue::DecisionBeforeChunkReceipt { position: 1 }));
     }
 
     #[test]
     fn response_effect_cannot_precede_decision() {
         let mut predicted = prediction();
-        predicted.chunks[1].decision_frame = 210;
+        predicted.chunks[1].decision_at_ns = 21_000_000;
         predicted.chunks[1].disposition = MusicalTurnDispositionV1::Action {
             action: MusicalTurnActionV1::Respond,
-            effect_frame: Some(209),
+            effect_frame: Some(220),
+            effect_at_ns: Some(20_900_000),
         };
         assert!(score_musical_turn_taking(&truth(), &predicted)
             .unwrap_err()
@@ -962,6 +1018,7 @@ mod tests {
         predicted.chunks[4].disposition = MusicalTurnDispositionV1::Action {
             action: MusicalTurnActionV1::Respond,
             effect_frame: Some(510),
+            effect_at_ns: Some(51_000_000),
         };
         let score = score_musical_turn_taking(&annotations, &predicted).unwrap();
         assert_eq!(score.post_yield_leakage_count, 1);
