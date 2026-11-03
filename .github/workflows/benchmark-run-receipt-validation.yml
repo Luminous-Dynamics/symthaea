@@ -50,7 +50,7 @@ jobs:
         run: |
           python3 -m venv "$RUNNER_TEMP/receipt-schema-venv"
           "$RUNNER_TEMP/receipt-schema-venv/bin/python" -m pip install --disable-pip-version-check --no-deps -r tools/benchmark-run-receipt-harness/requirements-ci.txt
-          "$RUNNER_TEMP/receipt-schema-venv/bin/python" -c "from importlib.metadata import version; assert version('jsonschema') == '4.26.0'; assert version('attrs') == '26.1.0'; assert version('referencing') == '0.37.0'; assert version('rpds-py') == '2026.9.1'"
+          "$RUNNER_TEMP/receipt-schema-venv/bin/python" -c "from importlib.metadata import version; assert version('jsonschema') == '4.26.0'; assert version('attrs') == '26.1.0'; assert version('referencing') == '0.37.0'; assert version('rpds-py') == '2026.9.1'; assert version('typing-extensions') == '4.16.0'"
 
       - name: Validate Draft 2020-12 schema and synthetic fixture
         run: |
