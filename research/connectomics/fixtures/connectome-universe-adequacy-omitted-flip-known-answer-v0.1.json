@@ -142,11 +142,13 @@
     "universe_adequacy": "ADEQUACY_FAILED"
   },
   "provenance": {
-    "rules_sha256": "60c1b8a20a774908f239160c0c9a7b816c22e4c4a8a40b3ed45b9d7f87ea08a4",
+    "rules_sha256": "ee9caeef8c104c10a170de7eb33aba058c8d33c443d7140b9ebac028aa818b11",
     "truth_separation_verified": true,
-    "canonicalizer_sha256": "578a939bfdf68a11f279fcce606f97d2c11dfd90cd569fa1edd1fc7e8e8c6a70",
+    "canonicalizer_sha256": "604a03409b21c5c7af1ec41c0bf8466d6b999103f95a429c5d9add6083e3e05c",
     "candidate_structure_manifest_sha256": "402324df481fb6743c3c5a07bd9c7a6707e626a7848bfa24bc43afae402deb4c",
     "reference_structure_manifest_sha256": "4736c11291392f78514cda666cc47ab1bf448c04eaf73dd1c88093ec03529e8e",
-    "evaluator_protocol_sha256": "df83b9386deee6ed881e58b6aaa78919206233619571459c94c611dfccbb82e5"
+    "evaluator_protocol_sha256": "eb780dac0d14b867ef8b0b42773c911e8e01890cca3ec4709b870e0989f8b085",
+    "report_schema_sha256": "7640424b4afff287f9d11d1d4a6a8474f533b1b1a90face915c56bd972f1afbc",
+    "structure_schema_sha256": "16f2b9eac1f4a0145289d6100f8c902e5b470ece45a623d032e874ce5bd50476"
   }
 }
