@@ -230,13 +230,27 @@
           "$ref": "#/$defs/sha256"
         },
         "correspondence_engine_sha256": {
-          "$ref": "#/$defs/sha256"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "verifier_protocol_sha256": {
           "$ref": "#/$defs/sha256"
         },
         "verifier_sha256": {
-          "$ref": "#/$defs/sha256"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "report_schema_sha256": {
           "$ref": "#/$defs/sha256"
@@ -450,7 +464,8 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/evidence"
-          }
+          },
+          "minItems": 1
         },
         "rationale_code": {
           "type": "string",
@@ -509,5 +524,6 @@
         }
       }
     }
-  }
+  },
+  "$comment": "undefined In specification-only receipts, correspondence_engine_sha256 and verifier_sha256 may be null. A null implementation digest cannot support a CORRESPONDENCE_VERIFIED disposition."
 }
