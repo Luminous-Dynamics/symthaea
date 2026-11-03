@@ -207,6 +207,7 @@ These are external reference points, not SAM results. Recheck the exact board, p
 | Benchmark | Surfaced reference snapshot | Comparison boundary |
 |---|---|---|
 | Argoverse 2 multi-agent motion forecasting test | SOTA2's surfaced test board lists QCNeXt2026.07 at 0.50 m average minADE (K=6), 1.02 m average minFDE (K=6), and 0.13 actor miss rate (K=6). | Third-party leaderboard aggregation; open-loop forecasting, not interactive closed-loop planning or calibrated set coverage. |
+| Waymo Open Sim Agents Challenge (WOSAC) | The surfaced 2025 board lists SMART-R1 at realism score 78.58, kinematics 49.44, interactivity 81.10, map adherence 92.01 and minADE 1.2885; the board was updated about eight months before this check. | A simulator-agent realism benchmark; its dimensions should remain separate, and this dated third-party board is not a November 2026 verified current leader. |
 | WOD-E2E planning | SOTA2 lists DriveMA-4B (2026.05) at RFS Overall 8.079, RFS Spotlight 7.169, ADE(5s) 2.67 m and ADE(3s) 1.166 m; that page reports it was updated five months ago. | A dated rater-preference / open-loop evaluation snapshot, not a November 2026 verified current leader or safety metric. |
 | Waymo Open Dataset challenges | Waymo states it is not hosting formal challenges in 2026; the public leaderboards remain active. Its 2025 challenge tracks included E2E driving, Sim Agents, Interaction Prediction and Scenario Generation. | Reproduce the published tracks and protocols; do not describe them as an active 2026 competition. |
 | Fail2Drive | The 2026 paper reports 200 routes across 17 new scenario classes; the project describes these as 100 matched ID/OOD route pairs. The evaluated methods showed a 22.8% average success-rate drop under shift. | The unit is 100 matched pairs (200 routes), not 200 independent pairs. It is a closed-loop generalization benchmark, not a physical crash-rate study. |
@@ -216,6 +217,7 @@ The CARLA early-stop episode is an important benchmark-design lesson: every aggr
 
 Sources:
 - [Argoverse 2 multi-agent motion forecasting test leaderboard — SOTA2](https://www.sota2.com/research/sota/multi-agent-motion-forecasting-on-argoverse-2-av2-test)
+- [Waymo Open Sim Agents Challenge methodology](https://waymo.com/research/the-waymo-open-sim-agents-challenge/) and [surfaced 2025 leaderboard snapshot](https://www.sota2.com/research/sota/motion-simulation-on-waymo-open-sim-agents-challenge-2025)
 - [WOD-E2E planning leaderboard — SOTA2](https://www.sota2.com/research/sota/autonomous-driving-planning-on-wod-e2e)
 - [Waymo Open Dataset challenge status](https://waymo.com/open/challenges/)
 - [Fail2Drive paper](https://arxiv.org/abs/2604.08535) and [project repository](https://github.com/autonomousvision/fail2drive)
