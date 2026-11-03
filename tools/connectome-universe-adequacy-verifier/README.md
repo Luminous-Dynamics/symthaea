@@ -35,7 +35,9 @@ The output is deterministic JSON with `status=COUNTERS_RECOMPUTED`, `source_repo
 - Candidate/reference structural inclusion using recomputed graph hashes, not world-ID string equality.
 - Query-state consistency for structurally equivalent worlds under the same frozen query.
 - Candidate and reference duplicate-structure group counts.
-- Reference compatibility, query-state coverage, decision flips, omitted query-flipping worlds, false invariance, false ambiguity and NOT_ESTIMABLE counts.
+- Evidence compatibility (compatible / incompatible / indeterminate) separately from query estimability within compatible worlds;
+- Structural inclusion across all evidence-compatible references, and query-state coverage / decision flips only across query-estimable compatible references;
+- Omitted query-flipping worlds, false invariance, false ambiguity, candidate abstention and per-family denominator reconciliation.
 - Per-error-family counters, required-family coverage and aggregate denominator reconciliation.
 - The reported adequacy disposition against independently recomputed counters.
 
@@ -56,4 +58,4 @@ The graph canonicalizer V1 is a synthetic directed-graph identity representation
 
 ## Validation status
 
-Seven Rust unit tests are authored, including the omitted-query-flip and false-ambiguity controls, sidecar byte mutation, structural digest mutation, array-order invariance, and inconsistent query-state rejection. They have **not** been compiled or executed in this authoring environment because `cargo`, `rustc` and `rustfmt` are unavailable. No Rust test, formatting, Clippy or CI pass is claimed.
+Eight Rust unit tests are authored, including the omitted-query-flip and false-ambiguity controls, sidecar byte mutation, structural digest mutation, array-order invariance, and inconsistent query-state rejection, plus an independent compatibility-versus-query-estimability fixture. They have **not** been compiled or executed in this authoring environment because `cargo`, `rustc` and `rustfmt` are unavailable. No Rust test, formatting, Clippy or CI pass is claimed.
