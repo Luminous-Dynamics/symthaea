@@ -384,7 +384,6 @@ pub fn verify_mobile_invocation_receipt(
         || receipt.prepared_at_unix_ms >= receipt.expires_at_unix_ms
         || receipt.issued_at_unix_ms
             > receipt.prepared_at_unix_ms.saturating_add(MOBILE_INVOCATION_MAX_CLOCK_SKEW_MS)
-        || receipt.prepared_at_unix_ms < receipt.issued_at_unix_ms
     {
         return Err(MobileInvocationError::InvalidTimestamp("receipt time bounds"));
     }
