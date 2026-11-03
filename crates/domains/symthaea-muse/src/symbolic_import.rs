@@ -25,9 +25,12 @@ struct RawNote {
 }
 
 fn part_id_for_track(track: usize) -> Result<PartId, String> {
-    u16::try_from(track)
-        .map(PartId)
-        .map_err(|_| format!("MIDI track index {track} exceeds the supported PartId range"))
+    // PartId::UNASSIGNED reserves u16::MAX; never turn a real MIDI track
+    // into the sentinel used for missing part identity.
+    if track >= usize::from(u16::MAX) {
+        return Err(format!("MIDI track index {track} exceeds the supported PartId range"));
+    }
+    Ok(PartId(track as u16))
 }
 
 fn duration_from_ticks(ticks: u64, ticks_per_beat: u64) -> Result<Duration, String> {
@@ -464,8 +467,8 @@ mod tests {
 
     #[test]
     fn track_identity_overflow_rejects_instead_of_colliding_with_unassigned() {
-        assert!(part_id_for_track(usize::from(u16::MAX)).is_ok());
-        assert!(part_id_for_track(usize::from(u16::MAX) + 1).is_err());
+        assert!(part_id_for_track(usize::from(u16::MAX) - 1).is_ok());
+        assert!(part_id_for_track(usize::from(u16::MAX)).is_err());
     }
 
     #[test]
