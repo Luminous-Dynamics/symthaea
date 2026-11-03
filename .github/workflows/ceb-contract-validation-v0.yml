@@ -255,8 +255,8 @@ jobs:
                   subject["name"]: subject["digest"]["sha256"]
                   for subject in subjects
               }
-              if set(subject_digests) != {"ceb/candidate.patch", "ceb/source.tree"}:
-                  raise ValueError("statement must bind exactly the candidate patch and source tree subjects")
+              if set(subject_digests) != {"ceb/candidate.patch", "ceb/source.tree", "ceb/result.tree"}:
+                  raise ValueError("statement must bind exactly candidate patch, source tree and result tree subjects")
               candidate = predicate["candidate"]
               task = predicate["task"]
               if candidate["base_tree_sha256"] != task["source_tree_sha256"]:
@@ -265,6 +265,8 @@ jobs:
                   raise ValueError("in-toto candidate subject does not match predicate patch digest")
               if subject_digests["ceb/source.tree"] != task["source_tree_sha256"]:
                   raise ValueError("in-toto source subject does not match predicate source tree digest")
+              if subject_digests["ceb/result.tree"] != candidate["result_tree_sha256"]:
+                  raise ValueError("in-toto result subject does not match predicate result tree digest")
               for changed_path in candidate["changed_paths"]:
                   relative = PurePosixPath(changed_path)
                   if relative.is_absolute() or not relative.parts or ".." in relative.parts or "." in relative.parts:
