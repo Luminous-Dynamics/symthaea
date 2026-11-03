@@ -11,7 +11,7 @@ The adapter implements two empirical routes described in Miyoshi, Rahnev & Lau (
 1. **Confidence route:** use at least three ordered confidence levels, recorded separately after the binary decision. High-confidence "no" is least signal-like; low-confidence "no" is closer to the decision boundary; low-confidence "yes" is more signal-like; high-confidence "yes" is most signal-like.
 2. **RT route:** within each participant, rank observed decision latencies into predeclared quantile bins. Faster responses are treated as stronger evidence for the chosen response. The type-1 ROC then includes "yes" bins from fastest to slowest, followed by "no" bins from slowest to fastest.
 
-Both routes use the shared ROC/AUC implementation, including exact tie grouping. The crate reports descriptive type-1 curves only. It does not estimate unequal-variance SDT parameters mu, sigma or d_a. Those estimates require a separately qualified model fitter and an external comparator.
+Both routes use the shared ROC/AUC implementation, including exact tie grouping. The adapter also exposes raw ordered category-by-truth counts for each route; these preserve the sufficient frequency table needed by a downstream likelihood fitter without making this crate own the estimator. It reports descriptive type-1 curves only. It does not estimate unequal-variance SDT parameters mu, sigma or d_a. Those estimates require a separately qualified model fitter and an external comparator.
 
 ## Record contract
 
