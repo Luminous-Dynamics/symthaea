@@ -43,15 +43,18 @@ A row key is scenario × actor-policy × action-history × metric × horizon. Du
 
 Each decision binds the same initial state, environment, dynamics, actor policy, action history, observation availability, forecast time, utility, selection receipt, candidate-set digest and selection/reveal sequence.
 
-Each candidate binds its action ID, command digest, feasibility, predicted utility, realized utility, execution receipt/digest and evaluator receipt.
+Each candidate binds its action ID, command digest, feasibility, predicted utility, typed reference-outcome status, optional realized utility, and optional execution/evaluator receipts.
 
-**Known v0.1 limitation:** the current input requires realized reference values and receipts for every supplied action outcome. It does not yet encode typed Missing/Censored/TimedOut/Unsupported outcomes in the decision-action matrix. Do not omit an action or horizon and then describe the remaining subset as a complete comparison. Keep the experiment externally marked incomplete and do not promote the result. This schema gap is tracked by [#10282](https://github.com/Luminous-Dynamics/symthaea/issues/10282) and must be resolved before decision-ranking results are used as confirmatory evidence.
+Reference-outcome status is one of Observed, Missing, Censored, TimedOut or Unsupported. An Observed feasible action requires a finite realized utility and execution/evaluator receipts. An Observed infeasible or indeterminate action may retain its feasibility evidence without inventing a utility. A non-observed outcome must have no realized utility or fabricated receipt and must remain feasibility-indeterminate. If any candidate reference outcome is non-observed, the decision becomes IncompleteReference and no ranking reversal or regret is emitted.
+
+**Known v0.1 limitation:** residual rows currently represent observed prediction/reference pairs only; the residual series does not yet retain typed missing/censored/timed-out/unsupported rows or expected-horizon denominators. Do not omit a missing residual horizon and then describe the remaining residual series as complete. Such experiments must be externally marked incomplete until [#10282](https://github.com/Luminous-Dynamics/symthaea/issues/10282) adds denominator-preserving residual outcome rows.
 
 The evaluator:
-- recomputes the decision-context digest;
+- recomputes the decision-context digest and exposes public digest-building helpers for callers;
 - recomputes the action-set digest from sorted action ID / command digest pairs;
 - rejects duplicate action and receipt identities;
 - requires the selection commit sequence to precede the reference-outcome reveal sequence;
+- treats missing/censored/timed-out/unsupported reference outcomes as IncompleteReference;
 - treats unknown candidate feasibility as indeterminate;
 - compares only the supplied finite candidate set;
 - reports selected-action regret, predicted-vs-realized ranking reversal and optimism gap when comparison is determinate.
@@ -101,7 +104,7 @@ Required first fixtures:
 5. Missing horizon: no interpolation or synthetic pair is produced.
 6. Context mismatch: changed environment, action history, actor policy, state, forecast time, split or shift rejects a paired claim.
 7. Duplicate scenario/action-history/metric/horizon key is rejected.
-8. The evaluator must not receive an invented zero for a missing reference; v0.1 cannot yet retain typed missing/censored outcomes, so such runs must be marked incomplete outside this report until #10282 is resolved.
+8. Missing, censored, timed-out and unsupported candidate reference outcomes produce IncompleteReference; no ranking/regret is emitted. Residual-horizon missingness remains a known limitation tracked by #10282.
 9. Ranking reversal: planner-predicted best action loses under realized utility; the reversal and regret are exposed.
 10. Optimism attack: inject an optimistic selected-action utility and verify optimism gap rises.
 11. Outcome leakage: reveal sequence at or before selection commit is rejected.
