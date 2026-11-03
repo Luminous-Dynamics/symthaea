@@ -7,25 +7,33 @@
 //! engineering alongside `symthaea-structural` (which covers mechanical
 //! statics). The workspace had no electrical/circuit analysis.
 //!
-//! Pure `std`, zero dependencies, no `symthaea-core` link. All results are
-//! closed-form and checked against textbook values.
+//! Pure `std`, zero dependencies, no `symthaea-core` link. Closed-form
+//! references are checked against textbook/analytical known answers.
 //!
 //! ## Scope
 //!
 //! - DC: Ohm's law, power, series/parallel resistance, voltage divider.
 //! - Transients: RC/RL time constants, charging/discharging curves.
 //! - AC: capacitive/inductive reactance, LC resonance, series-RLC impedance.
+//! - Resonance: validated series-RLC metrics and coupled-inductor natural modes.
 //!
 //! ## Example
 //!
 //! ```
-//! use symthaea_circuits::{dc, ac};
-//! assert!((dc::current(12.0, 4.0) - 3.0).abs() < 1e-12);          // 3 A
-//! assert!((ac::resonant_frequency(1e-3, 1e-6) - 5032.92).abs() < 0.1); // Hz
+//! use symthaea_circuits::{dc, ac, resonance::SeriesRlc};
+//! assert!((dc::current(12.0, 4.0) - 3.0).abs() < 1e-12);
+//! assert!((ac::resonant_frequency(1e-3, 1e-6) - 5032.92).abs() < 0.1);
+//! let resonator = SeriesRlc::new(50.0, 1e-3, 1e-6).unwrap();
+//! assert!((resonator.metrics().resonant_frequency_hz - 5032.92).abs() < 0.1);
 //! ```
+//!
+//! The resonance module is an analytical reference model, not a circuit
+//! simulator or evidence of physical performance. It assumes linear,
+//! lumped, passive components and states its validity limits.
 
 pub mod ac;
 pub mod dc;
+pub mod resonance;
 pub mod transient;
 
 #[cfg(test)]
