@@ -784,7 +784,9 @@ mod tests {
         for a in 0..2 {
             for b in 0..2 {
                 for c in 0..2 {
-                    let cut = i32::from(a != b) + i32::from(b != c) + i32::from(a != c);
+                    let cut = (if a != b { 1 } else { 0 })
+                        + (if b != c { 1 } else { 0 })
+                        + (if a != c { 1 } else { 0 });
                     if cut == 2 { expected.push(vec![a,b,c]); }
                 }
             }
