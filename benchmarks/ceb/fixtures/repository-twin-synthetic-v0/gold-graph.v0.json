@@ -87,9 +87,9 @@
       "path": "crates/domain/src/lib.rs",
       "name": "User",
       "source_anchor": {
-        "line": 4,
+        "line": 7,
         "kind": "declaration_anchor",
-        "text": "pub struct UserId(pub u64);",
+        "text": "pub struct User {",
         "authority": "source_text_anchor"
       }
     },
