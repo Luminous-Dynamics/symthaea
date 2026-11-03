@@ -828,12 +828,13 @@ mod tests {
     fn stop_line_not_encountered_is_not_misreported_as_compliant() {
         let rule = TrafficRuleRequirement {
             rule_id: "stop-line-002".into(),
-            active_start_progress_m: 0.0,
+            active_start_progress_m: 7.0,
             active_end_progress_m: 20.0,
             kind: TrafficRuleKind::StopBeforeLine {
                 stop_line_progress_m: 10.0,
                 stop_speed_threshold_mps: 0.1,
                 required_stationary_duration_s: 1.0,
+                maximum_sample_gap_s: 0.6,
                 progress_tolerance_m: 0.05,
             },
             evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
