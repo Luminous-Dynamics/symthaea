@@ -18,6 +18,7 @@ This is a local/model-relative counterfactual comparison, not a proof of global 
 
 A `CounterfactualDecisionInput` includes:
 - decision, scenario and failure-family IDs;
+- scenario artifact digest, initial-state digest, environment profile digest, dynamics profile digest and execution-protocol digest;
 - frozen controller artifact digest;
 - separate evaluator artifact digest and evaluator ID;
 - non-empty external independence-evidence reference;
@@ -26,7 +27,7 @@ A `CounterfactualDecisionInput` includes:
 - caller assertion that the candidate set is complete;
 - candidate actions with exact steering/throttle/brake command, action digest, model-relative feasibility, objective value, evaluator ID and execution receipt/digest.
 
-All candidate receipts must use the same evaluator ID. Controller and evaluator artifact digests must be distinct. Every action digest is recomputed from the exact command payload. Execution receipt IDs must be unique and execution digests must be 64-hex strings.
+All candidate receipts must use the same evaluator ID. Controller and evaluator artifact digests must be distinct. Every action digest is recomputed from the exact command payload. Every action also carries a recomputable execution-context digest over the shared scenario, initial state, environment, dynamics, protocol, evaluator artifact/build and metric definition. The validator rejects any action whose context digest differs. Execution receipt IDs must be unique and execution digests must be 64-hex strings.
 
 These are structural checks, not cryptographic authentication. The independence evidence reference is not dereferenced or verified. Distinct artifact digests do not prove architectural or common-cause independence.
 
@@ -55,13 +56,7 @@ Different objectives may disagree. Retain separate reports and Pareto comparison
 
 The report retains the entire input, all candidate command payloads and action/evaluation receipts. Its validator recomputes the finding and checks the BLAKE3 output digest. The digest is an integrity fingerprint, not a signature or a verified simulator attestation.
 
-The caller must ensure each action was evaluated:
-- from the same decision-time state and scenario;
-- under the same frozen dynamics, environment and evaluator build;
-- with the same sensor/map information policy;
-- using declared, comparable horizon and termination criteria.
-
-The module cannot establish those experiment conditions from the action record alone.
+The record binds each action to the same declared decision-time state, scenario, environment, dynamics, execution protocol and evaluator build via the shared context digest. The caller must still ensure that the execution backend actually used those values, that sensor/map information policies matched, and that horizon/termination criteria are comparable. Structural digests do not authenticate the backend or prove these experimental conditions.
 
 ## Relation to NIST's four-tier measurement programme
 
@@ -77,7 +72,7 @@ Reference: https://www.nist.gov/programs-projects/measurement-science-automated-
 
 ## Controls
 
-Ten unit tests are authored for:
+Thirteen unit tests are authored for:
 - better feasible action and positive regret;
 - no better action / zero regret;
 - correct direction for higher-is-better metrics;
@@ -86,6 +81,8 @@ Ten unit tests are authored for:
 - infeasible selected action;
 - no feasible action;
 - duplicate IDs, mixed evaluators and controller/evaluator digest aliasing;
+- malformed shared context digests and mismatched per-action context receipts;
+- deterministic tie-breaking independent of candidate insertion order;
 - action payload mutation rejection;
 - report tamper rejection even after digest recomputation.
 
