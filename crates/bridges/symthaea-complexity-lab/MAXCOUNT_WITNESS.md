@@ -1,6 +1,6 @@
 # ETH-018 — exact MaxCount witness and optimal-solution DAG
 
-**Status:** Python exact reference prototype passes. Rust integration, Lean proofs and hardware benchmarks remain open.
+**Status:** Rust witness/backpointer and two-measure sampling APIs are committed on draft PR #10215. Python exact references pass. Rust compilation, Lean proofs and hardware benchmarks remain open.
 
 ## Why this is the next extension
 
@@ -89,6 +89,32 @@ For a reached backpointer row r, let B_r(a) be the distinct support count of the
 Each B_r(a) is a product of support totals for the disjoint child factors in that bucket. When the algorithm later samples each child block, its conditional path probability contributes the reciprocal of that child's support total. Those child denominators cancel the corresponding factors in B_r(a). Repeating this over the elimination forest leaves one denominator per empty-separator root row. Distinct components have disjoint variable sets, so their root supports multiply to the global distinct optimum count N. Thus every complete optimal assignment has probability exactly 1/N.
 
 The proof depends on the disjoint hidden-variable-block invariant from the dual-count section. It is invalid for pre-aggregated factors with overlapping hidden assignment provenance. It is also conditional on the bounded-integer callback being unbiased; modulo-biased or adversarial draws do not give exact uniformity.
+
+## Two exact optimal-assignment sampling measures
+
+The same tie-aware backpointer rows support two different measures:
+
+1. **Distinct-uniform:** every distinct optimal assignment has probability exactly (1/N), where (N) is `distinct_optimal_assignments`.
+2. **Multiplicity-weighted:** an optimal assignment (a) has probability (M(a)/\sum_b M(b)), where (M(a)) is the product of its local MaxCount multiplicities.
+
+At each reverse step, select a maximizing state in proportion to its `branch_assignment_count` for distinct-uniform sampling, or its `branch_multiplicity` for multiplicity-weighted sampling. The products of conditional probabilities telescope along the elimination forest.
+
+**Constant scalar factors must cancel.** A zero-scope factor multiplies the multiplicity of every variable assignment equally. It changes the reported global MaxCount multiplicity but not the probability distribution over assignments. The Rust weighted sampler computes the scalar-factor multiplicity product and removes it from the global normalization before checking the product of empty-separator root masses.
+
+For a one-variable equal-score tie with local multiplicities `[4, 2]`, distinct-uniform probabilities are `[1/2, 1/2]`, whereas multiplicity-weighted probabilities are `[2/3, 1/3]`. These are intentionally different APIs: sampling configurations uniformly is not the same as sampling weighted derivations/microstates.
+
+Rust APIs:
+- `sample_optimal_assignment`: distinct-uniform over feasible optimal assignments;
+- `sample_optimal_assignment_by_multiplicity`: assignment probability proportional to its MaxCount multiplicity;
+- `sample_optimal_assignment_by_measure`: shared implementation selected by `MaxCountSamplingMeasure`.
+
+Both require a caller-supplied unbiased `uniform_below(bound)` callback. Modulo-biased or adversarial draws do not produce exact sampling. The sampler checks the backpointer structure, root normalization, callback range and final optimum score. As documented above, external result objects must be independently certificate-checked first; the sampling helper is not a substitute for replaying all argmax contents against the original factors.
+
+## Sampling research and prior art
+
+Projected enumeration/counting proof logging has advanced in 2026: McCreesh, Nordström, Oertel & Tan, *Proof Logging for Projected Enumeration (and Counting?) Problems in VeriPB*, CP 2026, develops formally verified enumerations and discusses extending the system toward counting. This reinforces the claim boundary: proof-logged enumeration is not novel. The narrower question here is exact sampling from a checked factor-elimination optimum support, with distinct-uniform and multiplicity-weighted measures made explicit. https://doi.org/10.4230/LIPIcs.CP.2026.43
+
+The extended Python reference checks exact rational path probabilities with `fractions.Fraction`: 1,389 assignment paths for distinct-uniform sampling and the same 1,389 for multiplicity-weighted sampling. The one-variable weighted-tie control confirms the `[2/3, 1/3]` multiplicity split; disconnected components and scalar factors are covered. These are exact finite probability checks, not a runtime benchmark.
 
 ## Benchmarks and qualification targets
 
