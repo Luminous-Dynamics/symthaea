@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/research/eth-026-typed-circuit-proof-adapters/crates/bridges/symthaea-complexity-lab/reference/typed_circuit_ir_schema.json",
+  "title": "Symthaea typed tractable-circuit IR",
+  "version": "symthaea.typed-tractable-circuit/v1",
+  "description": "Typed finite pseudo-Boolean function DAG. This draft schema describes the reference subset, not an external proof format.",
+  "domains": {
+    "bool": {"zero": false, "one": true, "addition": "OR", "multiplication": "AND"},
+    "q": {"wire_coefficient": "[numerator, denominator]", "encoding": "reduced exact rational with positive denominator"},
+    "qi": {"wire_coefficient": {"re": "[numerator, denominator]", "im": "[numerator, denominator]"}, "encoding": "Q(i), exact Gaussian rational"}
+  },
+  "contracts": {
+    "#sat": {"root_domain": "bool", "output": "number of satisfying assignments"},
+    "pmc": {"root_domain": "bool", "output": "number of distinct assignments to visible variables with Boolean support"},
+    "pwmc": {"root_domain": "bool", "output": "exact sum of visible-assignment weights over distinct supported projections"},
+    "wmc": {"root_domain": "q", "output": "exact sum of root function values over full assignments"},
+    "amc-complex": {"root_domain": "qi", "output": "exact sum of Q(i) root function values over full assignments"}
+  },
+  "circuit": {
+    "required_header": ["schema", "contract", "variables", "visible", "domain", "nodes", "root"],
+    "optional_header": ["visible_weights"],
+    "node_kinds": {
+      "indicator": {"fields": ["id", "kind", "variable", "value"], "scope": "singleton variable"},
+      "constant": {"fields": ["id", "kind", "value"], "scope": "empty"},
+      "product": {"fields": ["id", "kind", "children"], "invariant": "child scopes pairwise disjoint"},
+      "sum": {"fields": ["id", "kind", "terms", "deterministic?"], "term": {"child": "node_id", "weight": "domain coefficient"}, "optional_invariant": "when deterministic=true, terms have disjoint nonzero support"}
+    },
+    "topology": "Nodes are listed in topological order. All references point to earlier nodes. The root may have a scope smaller than the declared variable universe; omitted variables are free and are enumerated by the reference evaluator.",
+    "projection": "visible is a subset of variables and is only valid for pmc/pwmc. Hidden-variable support is existentially collapsed by collecting distinct visible tuples, not by adding witness counts.",
+    "pwmc_weights": "visible_weights maps visible variable IDs to [false_weight, true_weight], each an exact rational pair. The default pair is [1,1] for both polarities."
+  },
+  "qualification": {
+    "status": "research_reference_subset",
+    "formal_proof": false,
+    "proof_format_adapters": [],
+    "external_interoperability": false
+  }
+}
