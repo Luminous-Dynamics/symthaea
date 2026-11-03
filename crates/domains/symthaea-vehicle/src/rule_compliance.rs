@@ -97,7 +97,6 @@ pub enum RuleComplianceReason {
     MandatoryDirectionNotFollowed,
     StopLinePassedWithoutRequiredStop,
     RequirementSatisfied,
-    RequirementSatisfied,
     RuleKindUnsupported,
     RequiredStopObserved,
     RequirementNotEncountered,
@@ -308,6 +307,9 @@ fn evaluate_requirement(
             if !trajectory_range_overlaps_rule(trajectory, requirement) {
                 return not_encountered(requirement);
             }
+            if !trajectory_covers_rule(trajectory, requirement) {
+                return indeterminate(RuleComplianceReason::TrajectoryCoverageInsufficient);
+            }
             if applicable.len() < 2 {
                 return indeterminate(RuleComplianceReason::TrajectoryCoverageInsufficient);
             }
@@ -443,6 +445,15 @@ fn evaluate_requirement(
                 sample.route_progress_m > *stop_line_progress_m + *progress_tolerance_m
             });
             let Some(crossing_index) = crossing_index else {
+                let active_zone_end = *stop_line_progress_m + *progress_tolerance_m;
+                let overlaps_control_zone = trajectory.last().is_some_and(|last| {
+                    last.route_progress_m >= requirement.active_start_progress_m
+                }) && trajectory.first().is_some_and(|first| {
+                    first.route_progress_m <= active_zone_end
+                });
+                if !overlaps_control_zone {
+                    return not_encountered(requirement);
+                }
                 let active_sample_count = trajectory
                     .iter()
                     .filter(|sample| {
@@ -451,7 +462,7 @@ fn evaluate_requirement(
                     })
                     .count();
                 if active_sample_count == 0 {
-                    return not_encountered(requirement);
+                    return indeterminate(RuleComplianceReason::TrajectoryCoverageInsufficient);
                 }
                 return finding(
                     requirement,
@@ -463,6 +474,11 @@ fn evaluate_requirement(
                     None,
                 );
             };
+            if trajectory.first().is_some_and(|first| {
+                first.route_progress_m > *stop_line_progress_m + *progress_tolerance_m
+            }) {
+                return indeterminate(RuleComplianceReason::TrajectoryCoverageInsufficient);
+            }
             let crossing_sample = &trajectory[crossing_index];
             let mut stop_start: Option<usize> = None;
             let mut index = crossing_index;
@@ -618,6 +634,20 @@ fn trajectory_range_overlaps_rule(
     };
     last.route_progress_m >= requirement.active_start_progress_m
         && first.route_progress_m <= requirement.active_end_progress_m
+}
+
+fn trajectory_covers_rule(
+    trajectory: &[RuleTrajectorySample],
+    requirement: &TrafficRuleRequirement,
+) -> bool {
+    let Some(first) = trajectory.first() else {
+        return false;
+    };
+    let Some(last) = trajectory.last() else {
+        return false;
+    };
+    first.route_progress_m <= requirement.active_start_progress_m
+        && last.route_progress_m >= requirement.active_end_progress_m
 }
 
 fn rule_zone_has_sampling_gap(
