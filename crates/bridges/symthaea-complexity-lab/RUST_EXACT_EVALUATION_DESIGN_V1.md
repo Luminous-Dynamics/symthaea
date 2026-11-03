@@ -106,3 +106,10 @@ The source-to-projected-support claim remains delegated to the checked SCPOG cer
 5. The complete receipt chain identifies exact source, parser, representation, certificate, checker binary, domain, weight map and result digests.
 
 This v1 design intentionally avoids a premature Rust implementation because the current execution environment has no Rust compiler/Cargo available for local validation. The next code change should be made only where the pinned compiler and dependencies can be run; CI skipped is not a substitute.
+
+
+## 9. Explicit aggregation operators
+
+The semantic envelope's aggregation_plan is executable input, not an annotation. The Rust type should model the two dimensions separately, for example ProjectionAggregation::{None, Exists} and FinalAggregation::{Count, WeightedSum}. Contract validation accepts only the declared v1 pairs: #SAT=(None,Count), WMC=(None,WeightedSum), PMC=(Exists,Count), PWMC=(Exists,WeightedSum), complex AMC=(None,WeightedSum).
+
+Do not implement existential elimination by summing hidden witness values. The projected-support path must first produce the Boolean support relation; the scalar evaluator then counts or applies visible weights over that support. In contrast, full WMC/AMC retains additive contributions over the full assignment universe. Include this plan in structural and arithmetic cache keys.
