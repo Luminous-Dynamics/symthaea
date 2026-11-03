@@ -169,7 +169,9 @@ pub struct DecisionOutcomeResult {
     pub outcome_probability: f64,
     pub posterior: Vec<Probability>,
     pub scenario_optimal_decision_id: Option<String>,
+    pub scenario_optimal_decision_impact: Option<DecisionImpact>,
     pub shared_policy_decision_id: String,
+    pub shared_policy_decision_impact: DecisionImpact,
     pub scenario_best_expected_utility: f64,
     pub shared_policy_expected_utility: f64,
     pub expected_regret: f64,
@@ -193,6 +195,7 @@ pub struct DecisionScenarioResult {
 pub struct OutcomeDecision {
     pub outcome: String,
     pub decision_id: String,
+    pub impact: DecisionImpact,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -710,6 +713,7 @@ fn candidate_metrics(
     policy: &[usize],
     decision_ids: &[String],
     utilities: &BTreeMap<String, BTreeMap<String, f64>>,
+    decision_impacts: &BTreeMap<String, DecisionImpact>,
     priors: &BTreeMap<&str, f64>,
 ) -> CandidateMetrics {
     let hypothesis_ids: Vec<&str> = priors.keys().copied().collect();
@@ -790,7 +794,11 @@ fn candidate_metrics(
                         scenario_optimal_decision_id: outcome
                             .optimal_decision_index
                             .map(|best| decision_ids[best].clone()),
+                        scenario_optimal_decision_impact: outcome
+                            .optimal_decision_index
+                            .map(|best| decision_impacts[&decision_ids[best]]),
                         shared_policy_decision_id: selected_id.clone(),
+                        shared_policy_decision_impact: decision_impacts[selected_id],
                         scenario_best_expected_utility: outcome.best_expected_utility,
                         shared_policy_expected_utility: selected_value,
                         expected_regret: (outcome.best_expected_utility - selected_value).max(0.0),
@@ -885,6 +893,10 @@ pub fn plan_next_experiment_decision_aware(
     let hypothesis_ids: Vec<&str> = priors.keys().copied().collect();
     let utilities = validate_decisions(decisions, &hypothesis_ids)?;
     let decision_ids: Vec<String> = utilities.keys().cloned().collect();
+    let decision_impacts: BTreeMap<String, DecisionImpact> = decisions
+        .iter()
+        .map(|decision| (decision.id.clone(), decision.impact))
+        .collect();
     let prior_distribution: Vec<f64> = hypothesis_ids.iter().map(|id| priors[id]).collect();
     let (baseline_index, baseline_expected_utility) =
         best_decision(&utilities, &hypothesis_ids, &prior_distribution);
@@ -1029,6 +1041,7 @@ pub fn plan_next_experiment_decision_aware(
             &policy,
             &decision_ids,
             &utilities,
+            &decision_impacts,
             &priors,
         );
 
@@ -1080,6 +1093,7 @@ pub fn plan_next_experiment_decision_aware(
             .map(|(outcome, decision_index)| OutcomeDecision {
                 outcome: outcome.clone(),
                 decision_id: decision_ids[*decision_index].clone(),
+                impact: decision_impacts[&decision_ids[*decision_index]],
             })
             .collect();
 
@@ -1291,7 +1305,7 @@ mod tests {
         .unwrap();
 
         assert!(plan.selected.is_none());
-        assert_eq!(plan.baseline_decision_id, "keep");
+        assert_eq!(plan.baseline_decision_id.as_deref(), Some("keep"));
         assert_eq!(
             plan.rejected_experiments[0].reasons,
             vec![DecisionRejectionReason::NoDecisionValue]
