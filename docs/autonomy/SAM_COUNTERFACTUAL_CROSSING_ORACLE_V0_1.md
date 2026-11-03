@@ -184,6 +184,8 @@ The actor adapter should output a bounded kinematic target applied by the existi
 
 This oracle is not a substitute for public benchmarks. It is the analytic gate before larger benchmark execution.
 
+**Leaderboard comparability cautions:** the surfaced AV2, WOSAC, Waymo E2E and Bench2Drive rows above are third-party leaderboard snapshots, not all official live challenge results. The Bench2Drive community leaderboard explicitly says its v0.0.3 results are self-reported from publications, mix different data/training/inference budgets and include privileged ground-truth-perception methods in a separate section. For Waymo, its official site says 2026 formal challenges are not being hosted, while public leaderboards remain active. Pin exact task, dataset, evaluator, sensor privilege, compute budget and submission protocol before any comparison.
+
 | Benchmark | Current external reference | What SAM should measure beyond headline score |
 |---|---|---|
 | Argoverse 2 multi-agent motion forecasting test | SOTA2 surfaced IMR 0.92 minADE K=1 and QCNeXt 0.50 minADE K=6 (board updated about 3 months ago) | minADE/minFDE, miss rate, Brier score, calibration and downstream action regret |
