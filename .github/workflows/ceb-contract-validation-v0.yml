@@ -53,9 +53,11 @@ jobs:
           task_schema = load_schema("task.schema.json")
           receipt_schema = load_schema("run-receipt.schema.json")
           envelope_schema = load_schema("dsse-envelope.schema.json")
+          worlds_schema = load_schema("repository-worlds.schema.json")
           task_validator = Draft202012Validator(task_schema, format_checker=format_checker)
           receipt_validator = Draft202012Validator(receipt_schema, format_checker=format_checker)
           envelope_validator = Draft202012Validator(envelope_schema, format_checker=format_checker)
+          worlds_validator = Draft202012Validator(worlds_schema, format_checker=format_checker)
 
           def expect_reject(validator, value, label):
               if not list(validator.iter_errors(value)):
@@ -165,6 +167,85 @@ jobs:
           repo_node_count, repo_edge_count, repo_mutation_count = validate_repository_fixture(graph, mutations)
           if repo_node_count != 32 or repo_edge_count != 37 or repo_mutation_count != 7:
               raise SystemExit("repository-twin synthetic fixture changed without an explicit benchmark revision")
+
+          worlds = json.loads((fixture_root / "worlds.v0.json").read_text())
+
+          def validate_repository_worlds(worlds_value, graph_value):
+              worlds_validator.validate(worlds_value)
+              if worlds_value["fixture_id"] != graph_value["fixture_id"]:
+                  raise ValueError("configuration-world matrix refers to a different repository fixture")
+              facts = worlds_value["conditional_facts"]
+              fact_ids = [fact["node_id"] for fact in facts]
+              if len(fact_ids) != len(set(fact_ids)):
+                  raise ValueError("duplicate conditional fact node ID")
+              conditional_nodes = {
+                  node["id"] for node in graph_value["nodes"]
+                  if node["kind"] in {"feature", "target", "external_dependency"} or "conditional" in node
+              }
+              if set(fact_ids) != conditional_nodes:
+                  raise ValueError("conditional fact inventory must exactly cover all feature/target-gated graph nodes")
+              vocabulary = set(worlds_value["feature_vocabulary"])
+              if len(vocabulary) != len(worlds_value["feature_vocabulary"]):
+                  raise ValueError("duplicate feature name in configuration-world vocabulary")
+              world_ids = [world["id"] for world in worlds_value["worlds"]]
+              if len(world_ids) != len(set(world_ids)):
+                  raise ValueError("duplicate configuration-world ID")
+              if len(world_ids) != 8:
+                  raise ValueError("V0 requires the complete 2x2x2 target/feature world matrix")
+              all_fact_ids = set(fact_ids)
+              for world in worlds_value["worlds"]:
+                  target_os = world["target_os"]
+                  triple = world["target_triple"]
+                  if target_os == "windows" and "windows" not in triple:
+                      raise ValueError(f"Windows world has non-Windows target triple: {world['id']}")
+                  if target_os == "linux" and "linux" not in triple:
+                      raise ValueError(f"Linux world has non-Linux target triple: {world['id']}")
+                  enabled = set(world["enabled_features"])
+                  if not enabled <= vocabulary:
+                      raise ValueError(f"world enables an undeclared Cargo feature: {world['id']}")
+                  computed_active = set()
+                  for fact in facts:
+                      activation = fact["activation"]
+                      feature_ok = "feature" not in activation or activation["feature"] in enabled
+                      target_ok = "target_os" not in activation or activation["target_os"] == target_os
+                      if feature_ok and target_ok:
+                          computed_active.add(fact["node_id"])
+                  declared_active = set(world["expected_active_nodes"])
+                  declared_inactive = set(world["expected_inactive_nodes"])
+                  if declared_active & declared_inactive:
+                      raise ValueError(f"world marks a conditional fact both active and inactive: {world['id']}")
+                  if declared_active | declared_inactive != all_fact_ids:
+                      raise ValueError(f"world does not account for every conditional fact exactly once: {world['id']}")
+                  if declared_active != computed_active or declared_inactive != all_fact_ids - computed_active:
+                      raise ValueError(f"conditional activation mismatch for configuration world: {world['id']}")
+              return len(world_ids), len(facts)
+
+          world_count, conditional_fact_count = validate_repository_worlds(worlds, graph)
+          if world_count != 8 or conditional_fact_count != 7:
+              raise SystemExit("repository target/feature world matrix changed without an explicit benchmark revision")
+
+          def expect_world_reject(worlds_value, graph_value, label):
+              try:
+                  validate_repository_worlds(worlds_value, graph_value)
+              except (ValidationError, ValueError, KeyError):
+                  return
+              raise SystemExit(f"repository configuration-world negative control unexpectedly passed: {label}")
+
+          mutant_worlds = copy.deepcopy(worlds)
+          linux_native = next(world for world in mutant_worlds["worlds"] if world["id"] == "linux-windows-native")
+          linux_native["expected_active_nodes"].append("sym.windows.os_version")
+          linux_native["expected_inactive_nodes"].remove("sym.windows.os_version")
+          expect_world_reject(mutant_worlds, graph, "Windows-only symbol activated on Linux")
+
+          mutant_worlds = copy.deepcopy(worlds)
+          windows_audit = next(world for world in mutant_worlds["worlds"] if world["id"] == "windows-audit")
+          windows_audit["expected_active_nodes"].remove("sym.audit.record_access")
+          windows_audit["expected_inactive_nodes"].append("sym.audit.record_access")
+          expect_world_reject(mutant_worlds, graph, "enabled audit feature symbol incorrectly inactive")
+
+          mutant_worlds = copy.deepcopy(worlds)
+          mutant_worlds["worlds"][1]["id"] = mutant_worlds["worlds"][0]["id"]
+          expect_world_reject(mutant_worlds, graph, "duplicate configuration-world ID")
 
           def expect_repo_reject(graph_value, mutations_value, label):
               try:
@@ -420,7 +501,7 @@ jobs:
           print(
               "CEB_CONTRACT_SCHEMA_PASS: "
               f"tasks={len(task_ids)} unique_tasks={len(set(task_ids))} "
-              "schemas=3 negative_controls=31"
+              "schemas=4 negative_controls=34"
           )
           print("CEB_CLAIM_BOUNDARY: schema validation is not DSSE signature verification or runner qualification")
           PY
