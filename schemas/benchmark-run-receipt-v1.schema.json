@@ -677,7 +677,9 @@
         "input_sha256",
         "attempted",
         "disposition",
-        "graded"
+        "graded",
+        "grader_result",
+        "terminal_reason"
       ],
       "properties": {
         "task_id": {
@@ -981,6 +983,44 @@
             "properties": {
               "access_class": {
                 "const": "synthetic"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "integrity": {
+            "properties": {
+              "signature_status": {
+                "const": "independently_verified"
+              }
+            },
+            "required": [
+              "signature_status"
+            ]
+          }
+        },
+        "required": [
+          "integrity"
+        ]
+      },
+      "then": {
+        "properties": {
+          "integrity": {
+            "required": [
+              "signature_artifact_sha256",
+              "signer_id"
+            ],
+            "properties": {
+              "signature_artifact_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "signer_id": {
+                "type": "string",
+                "minLength": 1
               }
             }
           }
