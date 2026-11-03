@@ -22,6 +22,24 @@ pub struct PhysicalDimension {
     pub luminous: i8,
 }
 
+impl std::ops::Add for PhysicalDimension {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        self.checked_add(rhs)
+            .expect("physical dimension exponent overflow")
+    }
+}
+
+impl std::ops::Sub for PhysicalDimension {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        self.checked_sub(rhs)
+            .expect("physical dimension exponent overflow")
+    }
+}
+
 impl PhysicalDimension {
     pub const DIMENSIONLESS: Self = Self {
         mass: 0, length: 0, time: 0, current: 0,
@@ -110,7 +128,7 @@ impl RationalScale {
     pub const ONE: Self = Self { numerator: 1, denominator: 1 };
 
     pub const fn new(numerator: i64, denominator: i64) -> Option<Self> {
-        if denominator == 0 || denominator < 0 {
+        if denominator <= 0 {
             None
         } else {
             Some(Self { numerator, denominator })
