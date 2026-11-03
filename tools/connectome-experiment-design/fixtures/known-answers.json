@@ -199,5 +199,56 @@
     "expected_rank_by_eig": "within_group_identity",
     "expected_rank_by_evsi": "decision_relevant_group",
     "expected_evsi_regret_if_within_group_selected": 0.3
+  },
+  "parameter_identification_case": {
+    "evidence_class": "synthetic_known_answer",
+    "claim_ceiling": "SYNTHETIC_ONLY",
+    "units": {
+      "d_optimal_gain": "nats",
+      "a_optimal_variance_reduction": "parameter-variance units"
+    },
+    "prior_precision": [
+      [
+        100,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "candidates": [
+      {
+        "id": "refine_already_known_parameter",
+        "sensitivities_by_observation": [
+          [
+            17.320508075688775,
+            0
+          ]
+        ],
+        "observation_variances": [
+          1
+        ],
+        "expected_d_optimal_gain_nats": 0.6931471805599453,
+        "expected_a_optimal_variance_reduction": 0.0075
+      },
+      {
+        "id": "resolve_uncertain_parameter",
+        "sensitivities_by_observation": [
+          [
+            0,
+            1
+          ]
+        ],
+        "observation_variances": [
+          1
+        ],
+        "expected_d_optimal_gain_nats": 0.34657359027997264,
+        "expected_a_optimal_variance_reduction": 0.5
+      }
+    ],
+    "expected_rank_by_d_optimal": "refine_already_known_parameter",
+    "expected_rank_by_a_optimal": "resolve_uncertain_parameter",
+    "interpretation": "D-optimal design prefers greater joint parameter-volume shrinkage, while A-optimal design prefers the reduction in total marginal variance. A single scalar leaderboard would hide this declared objective trade-off."
   }
 }
