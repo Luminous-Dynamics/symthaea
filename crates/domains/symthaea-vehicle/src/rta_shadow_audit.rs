@@ -228,6 +228,16 @@ impl VehicleRtaShadowReport {
             return false;
         }
 
+        if self.reason_counts.iter().map(|(reason, _)| *reason).collect::<Vec<_>>()
+            != all_reason_variants()
+            || self.frames.iter().any(|frame| {
+                frame.schema_version != VEHICLE_RTA_SHADOW_AUDIT_SCHEMA
+                    || frame.monitor_profile_digest != self.monitor_profile_digest
+            })
+        {
+            return false;
+        }
+
         let mode_count = |mode| self.frames.iter().filter(|frame| frame.mode == mode).count();
         if self.advanced_frames != mode_count(VehicleRtaMode::Advanced)
             || self.baseline_frames != mode_count(VehicleRtaMode::Baseline)
