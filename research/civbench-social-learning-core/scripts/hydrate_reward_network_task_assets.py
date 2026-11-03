@@ -9,6 +9,8 @@ aggregate network/solution diagnostics and per-object integrity receipts.
 from __future__ import annotations
 
 import argparse
+import base64
+import os
 import hashlib
 import json
 import re
@@ -89,14 +91,27 @@ def lfs_batch_url(archive: zipfile.ZipFile, cli_url: str | None) -> str:
 
 def post_json(url: str, payload: dict[str, Any]) -> dict[str, Any]:
     body = json.dumps(payload).encode("utf-8")
+    headers = {
+        "Accept": "application/vnd.git-lfs+json",
+        "Content-Type": "application/vnd.git-lfs+json",
+        "User-Agent": "CivBench-TaskNetwork-Audit/0.1",
+    }
+
+    # Git LFS uses HTTP Basic auth for its batch API. GitHub Actions supplies
+    # a short-lived, read-only GITHUB_TOKEN through the workflow environment.
+    # Never log or persist this credential; signed download URLs/headers returned
+    # by the batch response are used for the actual object requests.
+    token = os.environ.get("GITHUB_TOKEN")
+    if token:
+        credential = base64.b64encode(
+            f"x-access-token:{token}".encode("utf-8")
+        ).decode("ascii")
+        headers["Authorization"] = f"Basic {credential}"
+
     request = urllib.request.Request(
         url,
         data=body,
-        headers={
-            "Accept": "application/vnd.git-lfs+json",
-            "Content-Type": "application/vnd.git-lfs+json",
-            "User-Agent": "CivBench-TaskNetwork-Audit/0.1",
-        },
+        headers=headers,
         method="POST",
     )
     try:
