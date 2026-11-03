@@ -1,0 +1,28 @@
+{
+  "suite": "ETH-018 reference prototype status",
+  "execution_status": "not_executed_in_this_session",
+  "source_status": "committed_research_prototype_unqualified",
+  "planned_test_design": {
+    "semiring_cases": 576,
+    "ring_cancellation_cases": 2,
+    "expected_positive_certificates": 578,
+    "negative_controls": 9,
+    "algebras": [
+      "bool",
+      "nat",
+      "maxcount",
+      "pareto",
+      "ipoly",
+      "qpoly"
+    ],
+    "rule_families": [
+      "factor-independent-summand",
+      "swap-finite-sums",
+      "split-independent-components",
+      "swap-multiplicands"
+    ]
+  },
+  "actual_results": null,
+  "all_passed": null,
+  "claim_ceiling": "Test counts are planned corpus parameters only. The associated Python source was not executed in this session; no pass/reject/semantic-equivalence result is established."
+}
