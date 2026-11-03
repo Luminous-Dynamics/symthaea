@@ -141,6 +141,7 @@ class Cache:
         scope=list(message.scope)
         values=list(message.vals)
         removed=0
+        comparisons=0
         changed=True
         while changed:
             changed=False
@@ -160,9 +161,12 @@ class Cache:
                         cell=0
                         for v in scope:cell=cell*self.cards[v]+assignment[v]
                         observed.append(values[cell])
-                    if any(self.A.enc(x)!=self.A.enc(observed[0]) for x in observed[1:]):
-                        independent=False
-                        break
+                    for value in observed[1:]:
+                        comparisons+=1
+                        if self.A.enc(value)!=self.A.enc(observed[0]):
+                            independent=False
+                            break
+                    if not independent:break
                     reduced.append(observed[0])
                 if independent:
                     scope=list(next_scope)
@@ -170,7 +174,7 @@ class Cache:
                     removed+=1
                     changed=True
                     break
-        return F(tuple(scope),tuple(values)),removed
+        return F(tuple(scope),tuple(values)),removed,comparisons
 
     def check(self,v,bucket,candidate):
         # Separate replay path. Candidate may omit raw-bucket separator axes
@@ -220,7 +224,7 @@ class Cache:
     def evaluate(self,factors,order):
         order=tuple(order)
         if len(order)!=len(self.cards) or set(order)!=set(range(len(self.cards))):raise ValueError("bad order")
-        work=list(factors); stats={"hits":0,"misses":0,"rejected":0,"adds":0,"muls":0,"invalidated":0,"scope_axes_elided":0}
+        work=list(factors); stats={"hits":0,"misses":0,"rejected":0,"adds":0,"muls":0,"invalidated":0,"scope_axes_elided":0,"scope_value_comparisons":0}
         keys={}
         for v in order:
             bucket=[f for f in work if v in f.scope]
@@ -231,7 +235,9 @@ class Cache:
             if msg is None:
                 stats["misses"]+=1; stats["rejected"]+=int(bad)
                 msg,a,m=self.produce(v,normalized); stats["adds"]+=a; stats["muls"]+=m
-                msg,elided=self.minimize_message_scope(msg); stats["scope_axes_elided"]+=elided
+                msg,elided,comparisons=self.minimize_message_scope(msg)
+                stats["scope_axes_elided"]+=elided
+                stats["scope_value_comparisons"]+=comparisons
                 self.store(k,msg,v,bucket)
             else: stats["hits"]+=1
             if v in self.last and self.last[v]!=k:stats["invalidated"]+=1
@@ -342,9 +348,11 @@ def main():
       "same_scope_split_merge_hits":smerged["hits"],"unit_factor_elision_hits":smerged["hits"],
       "normalization_mutant_rejected":True,"maxcount_same_scope_split_merge_hits":mps["hits"],
       "message_scope_axes_elided_natural_count":original_stats["scope_axes_elided"],
+      "message_scope_value_comparisons_natural_count":original_stats["scope_value_comparisons"],
       "same_result_upstream_change_natural_count_hits":variant_stats["hits"],
       "same_result_upstream_change_natural_count_misses":variant_stats["misses"],
       "message_scope_axes_elided_maxcount":mscope_stats["scope_axes_elided"],
+      "message_scope_value_comparisons_maxcount":mscope_stats["scope_value_comparisons"],
       "same_result_upstream_change_maxcount_hits":mvariant_stats["hits"],
       "same_result_upstream_change_maxcount_misses":mvariant_stats["misses"],
       "scope_edit_exact":True,
