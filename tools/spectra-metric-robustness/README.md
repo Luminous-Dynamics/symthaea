@@ -97,10 +97,16 @@ From this directory:
     cargo run --release --bin run_sweep -- 256 > metric-robustness.csv
 
 The optional argument is the number of independent campaign seeds per world.
-CSV is written to stdout. The generator uses deterministic SplitMix64 streams
-and Box-Muller normals for replay only; it is not cryptographically
-unpredictable. Floating-point transcendental functions mean bitwise replay is
-specified only within the declared implementation/runtime.
+Seed-level CSV is written to stdout. A second per-world campaign summary is
+written to stderr and reports both per-diagnostic trigger counts/rates and the
+aggregate any-flag rate. This is essential: nine diagnostics each having a low
+individual false-flag rate does not imply the complete battery has the same
+familywise false-alert rate. The summary reports raw counts and descriptive
+rates only; it does not manufacture confidence intervals or p-values. The
+generator uses deterministic SplitMix64 streams and Box-Muller normals for
+replay only; it is not cryptographically unpredictable. Floating-point
+transcendental functions mean bitwise replay is specified only within the
+declared implementation/runtime.
 
 ## Benchmarks to claim improvement
 
@@ -115,9 +121,10 @@ At equal trial counts and compute budgets, compare:
    unit;
 5. a hierarchical observer/session model as a separately validated comparator.
 
-Report, by world and across independent seeds: false-flag rate in the Gaussian
-reference; detection rate for each injected violation; confusion matrix between
-world family and diagnostic flags; uncertainty over campaign-level rates;
+Report, by world and across independent seeds: per-diagnostic false-flag rates
+and the aggregate any-flag false-alert rate in the Gaussian reference;
+detection rate for each injected violation; confusion matrix between world
+family and diagnostic flags; uncertainty over campaign-level rates;
 d-prime/criterion bias only where the target is meaningful; AUC/AP recovery;
 missingness-mechanism detection and MCAR false-flag rate;
 abstention and false-abstention rates; runtime and memory at equal data budgets.
@@ -126,8 +133,10 @@ Do not select thresholds on the same seeds used for the reported score.
 Proposed qualification targets (not achieved):
 
 - deterministic replay for identical code, design and seed;
-- reference false-flag rate no greater than 5% per configured diagnostic in a
-  sufficiently large independent seed campaign, with intervals reported;
+- familywise false-alert rate no greater than 5% across the complete diagnostic
+  battery in held-out Gaussian-reference campaigns, with intervals reported;
+- per-diagnostic false-flag rates reported separately, not substituted for the
+  familywise target;
 - at least 90% detection for each deliberately injected, sufficiently strong
   violation family at its declared benchmark severity;
 - no silent re-use of equal-variance d-prime interpretation under declared
