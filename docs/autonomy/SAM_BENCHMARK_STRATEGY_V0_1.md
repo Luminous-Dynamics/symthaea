@@ -373,3 +373,13 @@ The minimizer tests the original candidate, shrinks factors toward declared nomi
 This is deliberately a local minimizer, not a global minimality proof. Bisection assumes useful local monotonicity along one factor; non-monotonic/disconnected failure regions may be missed. The final candidate is only as trustworthy as the caller's exact execution/predicate evaluator. No simulator is run inside Symthaea.
 
 Protocol: [COUNTEREXAMPLE_MINIMIZATION_V0_1.md](./COUNTEREXAMPLE_MINIMIZATION_V0_1.md).
+
+## 12. Family-clustered paired statistics
+
+The new `symthaea_vehicle::paired_statistics` module adds a deterministic paired bootstrap for controller metric comparisons. It first aggregates scenario variants within each declared failure family, then resamples family means—not individual sibling scenarios—with replacement. It reports a macro-average improvement, median family improvement, family win fraction, worst-family improvement and a seeded 95% percentile interval.
+
+Positive improvement is normalized to favor the advanced controller for both lower-is-better and higher-is-better metrics. The summary retains the exact paired observations and validates that family means, aggregate statistics and the bootstrap interval can be reconstructed from them.
+
+This does not prove the scenario families are independent or representative. The confidence interval is conditional on the declared family corpus and its sampling assumptions, not an operational fleet-risk interval. Use the proposed minimum of ten disjoint failure families and 10,000 executed holdout scenarios before broad robustness summaries, while still showing every family separately.
+
+Protocol: [PAIRED_FAMILY_STATISTICS_V0_1.md](./PAIRED_FAMILY_STATISTICS_V0_1.md).
