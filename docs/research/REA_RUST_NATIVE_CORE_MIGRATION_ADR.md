@@ -787,3 +787,16 @@ References:
 - MASTG v2.0.0 release: https://github.com/OWASP/mastg/releases/tag/v2.0.0
 - MASWE v1.0.0 announcement: https://mas.owasp.org/news/archive/2026/
 - MASWE catalogue: https://mas.owasp.org/MASWE/
+
+
+## 14. From-scratch firmware reproduction
+
+The public reverse-engineering benchmark suite should include a pre-environment task cohort, tracked by [REA-RUST-016 / #10298](https://github.com/Luminous-Dynamics/symthaea/issues/10298).
+
+ReproBench (published 28 September 2026) identifies a meaningful gap: most security benchmarks start with a prepared source tree, binary or environment. Its study starts from a CVE identifier and evaluates six sequential phases: information gathering, firmware acquisition, extraction, binary/root-cause identification, service rehosting and vulnerability triggering. On its 30-IoT-firmware-CVE, 450-run study, it reports 45.3% simulation substitution and only 5.3% successful real-world reproductions among CVE–model pairs. These are results from that study, not Luminous measurements.
+
+The paradigm shift is **from binary comprehension to verified reconstruction of the target environment**. REA should preserve source provenance and artifact lineage across every phase. Symthaea should reason over the graph, identify where uncertainty blocks progress and choose the next discriminating experiment. Independent phase oracles must decide whether each step really happened.
+
+Do not credit a mock service, host-native substitute or static-only hypothesis as a real firmware reproduction. Start with authorized public/vendor firmware and safe local validation: deterministic crash/marker evidence or patched-vs-unpatched differential tests inside a disposable, network-isolated environment. No third-party live-device test or remote exploitation is part of this initial benchmark.
+
+The six-phase evidence, A/B/C ablation and scorecards are defined in #10298 and the machine-readable benchmark manifest. Keep this separate from SRE-Bench, AgentRE-Bench and Decompile-Bench; they have different task starts and scoring contracts.
