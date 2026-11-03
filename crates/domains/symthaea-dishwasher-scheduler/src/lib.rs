@@ -1486,6 +1486,20 @@ mod evidence_bound_mode_tests {
                 soil: SoilClass::Starch
             })
         );
+
+        let result = EvidenceBoundMode::from_pilot_evidence(
+            mode_profile("full-load-v1", 2, false),
+            vec![
+                make(1, "starch-batch-a", 21_600),
+                make(2, "starch-batch-a", 43_200),
+            ],
+        );
+        assert_eq!(
+            result,
+            Err(EvidenceBoundModeError::InconsistentSoilPreparation {
+                soil: SoilClass::Starch
+            })
+        );
     }
 
     #[test]
