@@ -72,7 +72,7 @@ The evaluator must distinguish:
 - **query-state coverage:** the reference world's query decision state is represented somewhere in the candidate universe, even when its exact structure is not included;
 - **evidence compatibility:** whether the reference world is compatible with the observations available to the candidate.
 
-An evidence-incompatible reference world is counted and disclosed but does not count as a missed admissible world. An indeterminate reference world is not silently counted as compatible or incompatible; it contributes to NOT_ESTIMABLE / abstention reporting. Structural inclusion is determined using the common canonical structural digest. Query-state coverage is a weaker, distinct result: a structurally omitted reference world may still have its decision state represented by a different candidate world.
+An evidence-incompatible reference world is counted and disclosed but does not count as a missed admissible world. Evidence compatibility and query evaluability are independent axes: count COMPATIBLE / INCOMPATIBLE / INDETERMINATE first, then split COMPATIBLE worlds into query-estimable and query-NOT_ESTIMABLE. A COMPATIBLE world whose query cannot be evaluated remains COMPATIBLE and increments the compatible-query-NOT_ESTIMABLE count; it must not be relabelled evidence-INDETERMINATE. An evidence-INDETERMINATE world remains in its own compatibility category regardless of whether a provisional query output happens to exist. Structural inclusion is determined using the common canonical structural digest. Query-state coverage is a weaker, distinct result: a structurally omitted reference world may still have its decision state represented by a different candidate world.
 
 The initial protocol must not assign probabilities to worlds. Challenge-set frequencies are not population prevalence.
 
@@ -82,15 +82,17 @@ For every frozen query, report counts and denominators before percentages:
 
 - candidate world count;
 - reference challenge world count;
-- compatible / incompatible / indeterminate reference counts;
-- exact structural inclusion among compatible reference worlds;
-- query-state coverage among compatible, estimable reference worlds;
+- evidence-compatibility partition: compatible / incompatible / indeterminate reference counts (these three categories sum to all reference worlds);
+- query-estimability partition within compatible reference worlds: estimable / NOT_ESTIMABLE counts (these two categories sum to compatible reference worlds);
+- exact structural inclusion among all evidence-compatible reference worlds, independent of query evaluability;
+- query-state coverage among compatible, query-estimable reference worlds;
 - reference worlds that flip the baseline query decision;
 - omitted query-flipping worlds;
 - false-invariance events (all candidate worlds are estimable and have one decision state, while a compatible reference world has another);
 - false-ambiguity events (candidate permits a decision state unsupported by compatible reference worlds);
-- reference NOT_ESTIMABLE / indeterminate counts;
-- candidate-world NOT_ESTIMABLE / abstention counts;
+- evidence-indeterminate reference count;
+- evidence-compatible but query-NOT_ESTIMABLE reference count;
+- candidate-world NOT_ESTIMABLE / abstention count;
 - candidate and reference duplicate canonical-structure groups (different world IDs that canonicalize to the same structure).
 
 Report the same quantities per error family and per source cluster. The reference challenge manifest must predeclare `required_error_families`; the report must contain exactly one family summary for every required family, including families with zero support. Missing family summaries are invalid; a required family with zero estimable compatible support forces ADEQUACY_NOT_ESTIMABLE. A pooled average must not conceal an entire omitted family. Where challenge generation is not probability sampled, use the name **challenge-set coverage**, never population recall.
@@ -169,13 +171,16 @@ JSON Schema checks structural shape only. A Rust semantic validator must additio
 - candidate and reference sidecar raw-byte hashes match the report's structure-manifest digests;
 - the pinned evaluator canonicalizer recomputes each world structural digest from sidecar graph bytes; duplicate canonical structures with distinct world IDs are counted separately for candidate and reference worlds;
 - query evaluation is deterministic for a canonical structure: structurally equivalent worlds with different query states under the same query/code digest invalidate the report;
-- `candidate_not_estimable_count` is recomputed separately from reference indeterminacy;
+- `compatible_reference_count + incompatible_reference_count + indeterminate_reference_count = reference_world_count`;
+- `compatible_estimable_reference_count + compatible_query_not_estimable_reference_count = compatible_reference_count`;
+- `candidate_not_estimable_count` is recomputed separately from both reference partitions;
 - `false_ambiguity_count` is recomputed as estimable candidate worlds whose query state is absent from the compatible, estimable reference query-state set;
 - `false_invariance_count` is recomputed only when every candidate world is estimable and all candidate worlds share one decision state, then counts compatible reference worlds with a different state;
 - family totals reconcile without duplicate family keys, and every predeclared required family has exactly one summary row;
 - required families with zero support force ADEQUACY_NOT_ESTIMABLE;
 - false-invariance, false-ambiguity and omitted-flipping counts are independently recomputed;
-- query-state coverage is calculated only over estimable, evidence-compatible reference worlds;
+- query-state coverage is calculated only over query-estimable, evidence-compatible reference worlds;
+- structural inclusion is computed over all evidence-compatible reference worlds, including those whose query output is NOT_ESTIMABLE;
 - ADEQUACY_SUPPORTED_WITHIN_TESTED_CHALLENGES is impossible when oracle separation is unverified, a material compatible world is omitted, or any required challenge family is absent;
 - closure and adequacy dispositions remain independent.
 
