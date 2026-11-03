@@ -24,7 +24,7 @@ A process with an unvalidated cleaning/rinse flag is never selected. Soil or san
 
 ## Evidence-qualified measured occupancy curves
 
-The `resource_curve` module accepts physical resource observations scoped to one exact machine, programme, soil class, surface material, protocol and raw-data SHA-256 digest. It requires at least two measured occupancies, at least five independent runs per occupancy, and zero cleaning/rinse failures at every occupancy point before constructing an eligible curve.
+The `resource_curve` module accepts physical resource observations scoped to one exact machine, programme, soil class, surface material, fixed load set, detergent batch, water hardness, inlet temperature, protocol and raw-data SHA-256 digest. It requires at least two measured occupancies, at least five distinct nonblank run IDs per occupancy, and zero cleaning/rinse failures at every occupancy point before constructing an eligible curve. Distinct IDs are provenance evidence, not proof of independent experiments.
 
 - Exact measured occupancy returns the stored observation.
 - Intermediate occupancy uses piecewise-linear interpolation, explicitly marked as an estimate.
