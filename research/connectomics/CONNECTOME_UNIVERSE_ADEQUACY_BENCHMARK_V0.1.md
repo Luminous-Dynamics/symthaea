@@ -83,9 +83,11 @@ For every frozen query, report counts and denominators before percentages:
 - false-ambiguity events (candidate permits a decision state unsupported by compatible reference worlds);
 - NOT_ESTIMABLE / abstention counts.
 
-Report the same quantities per error family and per source cluster. A pooled average must not conceal an entire omitted family. Where challenge generation is not probability sampled, use the name **challenge-set coverage**, never population recall.
+Report the same quantities per error family and per source cluster. The reference challenge manifest must predeclare `required_error_families`; the report must contain exactly one family summary for every required family, including families with zero support. Missing family summaries are invalid; a required family with zero estimable compatible support forces ADEQUACY_NOT_ESTIMABLE. A pooled average must not conceal an entire omitted family. Where challenge generation is not probability sampled, use the name **challenge-set coverage**, never population recall.
 
-Do not reduce structural inclusion, query-state coverage and false-invariance risk to one scalar.
+Also report **false ambiguity**: candidate worlds whose query decision state is not represented by any evidence-compatible, estimable reference world. A candidate universe that invents unsupported query outcomes should not appear safer merely because it contains more worlds. Count affected candidate worlds and report the metric per error family where candidate provenance permits attribution.
+
+Do not reduce structural inclusion, query-state coverage, false-invariance, false-ambiguity and reference-support into one scalar.
 
 ## 6. Required synthetic challenge families
 
@@ -150,8 +152,11 @@ JSON Schema checks structural shape only. A Rust semantic validator must additio
 - exact count reconciliation between world arrays and `summary`;
 - compatible + incompatible + indeterminate = reference count;
 - all count numerators are bounded by the appropriate denominators;
-- family totals reconcile without duplicate family keys;
-- false-invariance and omitted-flipping counts are independently recomputed;
+- candidate and reference structural digests are recomputed by the pinned evaluator canonicalizer; duplicate canonical structures with distinct world IDs are disclosed;
+- `false_ambiguity_count` is recomputed as candidate worlds whose query state is absent from the compatible, estimable reference query-state set;
+- family totals reconcile without duplicate family keys, and every predeclared required family has exactly one summary row;
+- required families with zero support force ADEQUACY_NOT_ESTIMABLE;
+- false-invariance, false-ambiguity and omitted-flipping counts are independently recomputed;
 - query-state coverage is calculated only over estimable, evidence-compatible reference worlds;
 - ADEQUACY_SUPPORTED_WITHIN_TESTED_CHALLENGES is impossible when oracle separation is unverified, a material compatible world is omitted, or any required challenge family is absent;
 - closure and adequacy dispositions remain independent.
