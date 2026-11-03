@@ -568,7 +568,7 @@ fn validate_artifacts(
     root: &Path,
     expected_patch_sha256: &str,
     expected_stage: &str,
- ) -> Result<ArtifactSets, Failure> {
+) -> Result<ArtifactSets, Failure> {
     let artifacts = field(predicate, "artifacts", "predicate")?
         .as_array()
         .ok_or_else(|| Failure::protocol("predicate.artifacts must be an array"))?;
@@ -1460,7 +1460,16 @@ mod tests {
             ]
         });
         let evidence = validate_artifacts(&predicate, &root, &sha256_hex(patch), "primary").unwrap();
-        assert!(evidence.contains(&sha256_hex(log)));
+        assert!(evidence.evidence_digests.contains(&sha256_hex(log)));
+        assert!(evidence.execution_digests.contains(&sha256_hex(log)));
+
+        let report_only = serde_json::json!({
+            "artifacts": [
+                {"artifact_id":"patch","path":"candidate.patch","role":"patch","sha256":sha256_hex(patch),"size_bytes":patch.len()},
+                {"artifact_id":"primary-report","path":"primary-report.json","role":"primary_report","sha256":sha256_hex(report),"size_bytes":report.len()}
+            ]
+        });
+        assert!(validate_artifacts(&report_only, &root, &sha256_hex(patch), "primary").is_err());
 
         let wrong_patch_digest = "a".repeat(64);
         assert!(validate_artifacts(&predicate, &root, &wrong_patch_digest, "primary").is_err());
