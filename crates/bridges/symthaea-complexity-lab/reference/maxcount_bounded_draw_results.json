@@ -1,0 +1,11 @@
+{
+  "all_bounded_draws_uniform": true,
+  "bound_one_consumes_no_randomness": true,
+  "bounds_exhaustively_checked": 64,
+  "claim_boundary": "Exact finite reference only. Removes modulo bias assuming ideal uniform raw words; does not prove entropy quality, compile Rust, or benchmark performance.",
+  "exact_two_word_path_checks": 149797,
+  "negative_controls_rejected": 3,
+  "suite": "MaxCount unbiased bounded-draw transcript oracle",
+  "transcript_replay": true,
+  "u128_ceiling_rejection": true
+}
