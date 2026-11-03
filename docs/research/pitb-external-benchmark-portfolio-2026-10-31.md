@@ -15,6 +15,8 @@ The current proof-engineering landscape measures several different capabilities.
 | Semantic theorem correctness | T² | Check generated theorem statements through dependent successor theorems | 2,206 problems across 5 repositories, ~41 successors per problem; best reported testing accuracy 38.9% despite stronger compilation performance |
 | Repair efficiency and trajectory quality | BlueprintTrace / BlueprintRepair | Typed local repair actions vs exact source patches vs whole-module rewrites | 142 controlled failure states; similar coverage, with typed repair cheapest per solved state in reported runs |
 | Premise retrieval | Legendre / MathlibQR and MathlibMPR | Relevant-declaration recall and complete multi-premise route coverage | Lean Finder v2: 97.3% Recall@100 on 894 resolved queries; LeanGraphSearch: 94.7% on a different 810-query subset and 42.8% Covered@20 on MathlibMPR |
+| Dependency-aware premise selection | DAPS | Typed graph neighborhoods, two-hop bidirectional dependency context, group-level contrastive premise bundles, and Blueprint adaptation | Recall@32: 89.25 on Mathlib4-Heldout (+11.41pp vs LeanHammer), 23.53 on DAPS-Collection (+20.34pp), 50.08 on DAPS-Blueprint (+9.66pp); premise conditioning raises Goedel-Prover-V2-8B miniF2F Pass@4 from 49.90 to 54.03. Different cohorts; DAPS-Blueprint is node-heldout, not project-heldout |
+| Formal/informal theorem graph | TheoremGraph / LeanGraph | Large-scale typed Lean declaration graph bridged to candidate informal theorem dependencies | 388,105 formal nodes and 11.3M typed edges across 25 projects; 11.7M informal statements and 18.3M extractor-proposed edges; name/signature plus graph expansion Recall@10 0.775 vs LeanSearch v2 reranked 0.780. Informal edges and LLM-affirmed cross-formality matches remain candidate evidence |
 | Graduate-level theorem proving | ProofBench v1.1 | Natural-language problems paired with reviewed Lean statements | Private 100-problem split with an agentic 40-turn tool budget; current scores must be read with model/harness/cost settings |
 | Open, evolving Lean formalization | LeanEval v1 | Hard mathematical problems with reviewed statements and automatic comparator verification | Small, actively updated public leaderboard; useful as an external challenge set, not a stable fixed-snapshot comparison |
 | Advanced mathematics formalization | AutoformBench | Formalize proof developments with missing definitions, intermediate lemmas and supporting infrastructure | 341 audited tasks from 24 sources; current source-present leaderboard shows GPT-6 Astra 281/341 (82.4%) and Opus 5 211/341 (61.9%); separate from fill-in-the-sorry |
@@ -48,7 +50,9 @@ Do not assume this result transfers automatically to SorryDB source holes: Bluep
 
 ### 4. Retrieval should recover routes, not just nearest declarations
 
-A 97.3% Recall@100 result is strong retrieval evidence but not a 97.3% proof completion rate. Multi-premise route coverage is a more demanding retrieval measure, and downstream proof completion/cost must remain the final utility endpoint. PITB should combine intent-aware query rewriting, semantic seed retrieval, dependency graph traversal, instance-aware support projection and a Lean feedback loop.
+A 97.3% Recall@100 result is strong retrieval evidence but not a 97.3% proof completion rate. DAPS materially raises the dependency-aware retrieval frontier: its 89.25 Recall@32 on file-heldout Mathlib queries and +4.13pp miniF2F Pass@4 change the baseline PITB should compare against. TheoremGraph offers a much larger typed formal dependency resource, while its informal edges and LLM-affirmed cross-formality links must remain lower-trust candidates. LeanGraphSearch remains a distinct two-hop graph retrieval comparator. None of these headline metrics are interchangeable: task collections, K, model, query formalizer, train/test splits and checkers differ.
+
+PITB should compare these systems on the same fixed target/query set and K=16/32 budgets, then measure downstream exact-target proof success and cost. Include group-level premise-set utility, complete route coverage, precision, recall, macro-F1, type/instance compatibility, source-group/project holdout, and frequency/recency bias. DAPS-Blueprint's test split is node-level among 53 projects, not unseen-project generalization; PITB needs project-disjoint and temporal holdouts. Cross-formality candidate matches should carry provenance, confidence and independent-review status. The differentiator is not merely another graph index: it is joining these heterogeneous sources into an evidence-qualified AND/OR support planner that recognizes when an existing lemma bundle is sufficient and when missing infrastructure must be constructed.
 
 ### 5. Use compute as a controlled decision variable
 
@@ -106,6 +110,8 @@ The task-level residual and cost analysis is maintained separately at [PITB Auto
 - T² / Benchmarking Testing in Automated Theorem Proving: https://aclanthology.org/2026.acl-industry.150/ and https://github.com/ldilab/T2
 - BlueprintRepair / BlueprintTrace: https://aclanthology.org/2026.mathnlp-main.3/ and https://github.com/Karifannaa/BlueprintRepair
 - Legendre Mathlib retrieval board: https://www.legendre-leaderboard.com/
+- DAPS (NeurIPS 2026 project; submitted 30 October 2026): https://arxiv.org/abs/2610.41536; https://daps-eth.github.io/; code: https://github.com/DAPS-ETH/DAPS (Apache-2.0).
+- TheoremGraph / LeanGraph: https://arxiv.org/abs/2606.25363; TheoremSearch: https://theoremsearch.com/.
 - LeanGraphSearch: https://pluslabnlp.github.io/LeanGraphSearch/
 - ProofBench v1.1: https://www.vals.ai/benchmarks/proof_bench
 - LeanEval: https://lean-lang.org/eval/
