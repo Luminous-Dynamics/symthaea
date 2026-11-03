@@ -85,6 +85,7 @@ pub mod paired_rollout;
 pub mod paired_statistics;
 pub mod plugin;
 pub mod reward;
+pub mod rule_compliance;
 pub mod road;
 pub mod runtime_assurance;
 pub mod rta_shadow_audit;
@@ -101,6 +102,12 @@ pub mod types;
 pub use classical_baselines::{
     PURE_PURSUIT_ROAD_BASELINE_POLICY_ID, STANLEY_ROAD_BASELINE_POLICY_ID,
     PurePursuitRoadConfig, StanleyRoadConfig, VehicleClassicalBaseline,
+};
+pub use rule_compliance::{
+    RuleComplianceFinding, RuleComplianceOutcome, RuleComplianceReason, RuleEvaluationError,
+    RuleTrajectorySample, TRAFFIC_RULE_COMPLIANCE_SCHEMA, TrafficRuleComplianceReport,
+    TrafficRuleEvidence, TrafficRuleEvidenceStatus, TrafficRuleKind, TrafficRuleRequirement,
+    evaluate_traffic_rules,
 };
 pub use controller::VehicleController;
 pub use encoder::VehicleHdcEncoder;
