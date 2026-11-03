@@ -75,6 +75,24 @@
       ]
     },
     {
+      "id": "linux-no-features",
+      "target_os": "linux",
+      "target_triple": "x86_64-unknown-linux-gnu",
+      "default_features_enabled": false,
+      "explicit_features": [],
+      "effective_features": [],
+      "expected_active_nodes": [],
+      "expected_inactive_nodes": [
+        "dep.windows-sys",
+        "feature.api.audit",
+        "feature.api.windows_native",
+        "sym.audit.AccessRecord",
+        "sym.audit.record_access",
+        "sym.windows.os_version",
+        "target.api.windows"
+      ]
+    },
+    {
       "id": "linux-windows-native",
       "target_os": "linux",
       "target_triple": "x86_64-unknown-linux-gnu",
@@ -164,6 +182,25 @@
       "explicit_features": [],
       "effective_features": [
         "audit"
+      ]
+    },
+    {
+      "id": "windows-no-features",
+      "target_os": "windows",
+      "target_triple": "x86_64-pc-windows-msvc",
+      "default_features_enabled": false,
+      "explicit_features": [],
+      "effective_features": [],
+      "expected_active_nodes": [
+        "target.api.windows"
+      ],
+      "expected_inactive_nodes": [
+        "dep.windows-sys",
+        "feature.api.audit",
+        "feature.api.windows_native",
+        "sym.audit.AccessRecord",
+        "sym.audit.record_access",
+        "sym.windows.os_version"
       ]
     },
     {
