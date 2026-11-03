@@ -384,8 +384,8 @@ pub fn score_musical_turn_taking(
     let mut awaiting_partner_after_yield = false;
 
     for (expected, actual) in truth.chunks.iter().zip(prediction.chunks.iter()) {
-        let predicted_action = match actual.disposition {
-            MusicalTurnDispositionV1::Action { action, .. } => Some(action),
+        let predicted_action = match &actual.disposition {
+            MusicalTurnDispositionV1::Action { action, .. } => Some(*action),
             MusicalTurnDispositionV1::Unparseable { .. } => {
                 parse_failures += 1;
                 None
@@ -651,7 +651,7 @@ fn parse_failures_for_action(
         .filter(|(expected, actual)| {
             expected.expected_action == action
                 && matches!(
-                    actual.disposition,
+                    &actual.disposition,
                     MusicalTurnDispositionV1::Unparseable { .. }
                 )
         })
@@ -674,7 +674,11 @@ fn is_lower_hex_digest(value: &str) -> bool {
 }
 
 fn ratio(numerator: usize, denominator: usize) -> Option<f64> {
-    (denominator > 0).then_some(numerator as f64 / denominator as f64)
+    if denominator == 0 {
+        None
+    } else {
+        Some(numerator as f64 / denominator as f64)
+    }
 }
 
 fn mean(values: &[f64]) -> Option<f64> {
@@ -704,7 +708,7 @@ mod tests {
             audio_sha256: format!("{:x}", Sha256::digest(b"test stream bytes")),
             sample_rate_hz: 10_000,
             channels: 2,
-            total_frames: 400,
+            total_frames: 600,
         }
     }
 
@@ -741,8 +745,22 @@ mod tests {
                     chunk_index: 3,
                     input_interval: MusicalFrameIntervalV1 { start_frame: 300, end_frame: 400 },
                     expected_action: MusicalTurnActionV1::Yield,
-                    effect_target_frame: Some(350),
-                    effect_window: Some(MusicalFrameIntervalV1 { start_frame: 320, end_frame: 380 }),
+                    effect_target_frame: Some(420),
+                    effect_window: Some(MusicalFrameIntervalV1 { start_frame: 410, end_frame: 450 }),
+                },
+                MusicalTurnTruthChunkV1 {
+                    chunk_index: 4,
+                    input_interval: MusicalFrameIntervalV1 { start_frame: 400, end_frame: 500 },
+                    expected_action: MusicalTurnActionV1::Wait,
+                    effect_target_frame: None,
+                    effect_window: None,
+                },
+                MusicalTurnTruthChunkV1 {
+                    chunk_index: 5,
+                    input_interval: MusicalFrameIntervalV1 { start_frame: 500, end_frame: 600 },
+                    expected_action: MusicalTurnActionV1::Wait,
+                    effect_target_frame: None,
+                    effect_window: None,
                 },
             ],
         }
@@ -791,6 +809,26 @@ mod tests {
                     decision_frame: 400,
                     disposition: MusicalTurnDispositionV1::Action {
                         action: MusicalTurnActionV1::Yield,
+                        effect_frame: Some(420),
+                    },
+                },
+                MusicalTurnPredictionChunkV1 {
+                    chunk_index: 4,
+                    input_interval: MusicalFrameIntervalV1 { start_frame: 400, end_frame: 500 },
+                    observed_through_frame: 500,
+                    decision_frame: 500,
+                    disposition: MusicalTurnDispositionV1::Action {
+                        action: MusicalTurnActionV1::Wait,
+                        effect_frame: None,
+                    },
+                },
+                MusicalTurnPredictionChunkV1 {
+                    chunk_index: 5,
+                    input_interval: MusicalFrameIntervalV1 { start_frame: 500, end_frame: 600 },
+                    observed_through_frame: 600,
+                    decision_frame: 600,
+                    disposition: MusicalTurnDispositionV1::Action {
+                        action: MusicalTurnActionV1::Wait,
                         effect_frame: None,
                     },
                 },
@@ -801,13 +839,13 @@ mod tests {
     #[test]
     fn exact_four_action_trace_scores_perfectly() {
         let score = score_musical_turn_taking(&truth(), &prediction()).unwrap();
-        assert_eq!(score.total_chunks, 4);
-        assert_eq!(score.parsed_chunks, 4);
-        assert_eq!(score.correct_actions, 4);
+        assert_eq!(score.total_chunks, 6);
+        assert_eq!(score.parsed_chunks, 6);
+        assert_eq!(score.correct_actions, 6);
         assert_eq!(score.action_accuracy, Some(1.0));
         assert_eq!(score.timed_action_count, 2);
-        assert_eq!(score.timed_action_success_count, 1);
-        assert_eq!(score.timed_action_window_accuracy, Some(0.5));
+        assert_eq!(score.timed_action_success_count, 2);
+        assert_eq!(score.timed_action_window_accuracy, Some(1.0));
         assert_eq!(score.wait_false_activation_count, 0);
         assert_eq!(score.premature_yield_count, 0);
     }
@@ -919,29 +957,12 @@ mod tests {
 
     #[test]
     fn post_yield_non_wait_decisions_are_reported_separately() {
-        let mut annotations = truth();
-        annotations.chunks[3].expected_action = MusicalTurnActionV1::Yield;
-        annotations.chunks.push(MusicalTurnTruthChunkV1 {
-            chunk_index: 4,
-            input_interval: MusicalFrameIntervalV1 { start_frame: 400, end_frame: 500 },
-            expected_action: MusicalTurnActionV1::Wait,
-            effect_target_frame: None,
-            effect_window: None,
-        });
-        annotations.artifact.total_frames = 500;
-
+        let annotations = truth();
         let mut predicted = prediction();
-        predicted.artifact.total_frames = 500;
-        predicted.chunks.push(MusicalTurnPredictionChunkV1 {
-            chunk_index: 4,
-            input_interval: MusicalFrameIntervalV1 { start_frame: 400, end_frame: 500 },
-            observed_through_frame: 500,
-            decision_frame: 500,
-            disposition: MusicalTurnDispositionV1::Action {
-                action: MusicalTurnActionV1::Respond,
-                effect_frame: Some(510),
-            },
-        });
+        predicted.chunks[4].disposition = MusicalTurnDispositionV1::Action {
+            action: MusicalTurnActionV1::Respond,
+            effect_frame: Some(510),
+        };
         let score = score_musical_turn_taking(&annotations, &predicted).unwrap();
         assert_eq!(score.post_yield_leakage_count, 1);
     }
