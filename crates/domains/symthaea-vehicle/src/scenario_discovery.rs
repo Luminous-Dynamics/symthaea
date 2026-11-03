@@ -738,6 +738,26 @@ mod tests {
     use super::*;
     use std::collections::BTreeSet;
 
+    fn mock_receipt(
+        candidate: &IntersectionScenarioCandidate,
+        predicate_id: &str,
+        predicate_holds: bool,
+    ) -> CounterexampleEvaluationReceipt {
+        let mut hasher = Hasher::new();
+        hasher.update(b"sam-synthetic-test-evaluator-v1");
+        hasher.update(candidate.candidate_id.as_bytes());
+        hasher.update(predicate_id.as_bytes());
+        hasher.update(&[u8::from(predicate_holds)]);
+        CounterexampleEvaluationReceipt {
+            candidate_id: candidate.candidate_id.clone(),
+            predicate_id: predicate_id.into(),
+            evaluator_id: "unit-test-synthetic-evaluator-v1".into(),
+            execution_receipt_id: format!("test-execution-{}", candidate.candidate_id),
+            execution_digest: hasher.finalize().to_hex().to_string(),
+            predicate_holds,
+        }
+    }
+
     #[test]
     fn same_seed_and_budget_reproduce_exact_candidate_ids() {
         let first = generate_stratified_intersection_candidates(42, 128).unwrap();
@@ -914,9 +934,13 @@ mod tests {
             "synthetic-crossing-conflict-predicate-v1",
             128,
             |candidate| {
-                candidate.ego_initial_speed_mps >= 16.0
-                    && candidate.occlusion_fraction >= 0.6
-                    && candidate.sensor_delay_s >= 0.1
+                mock_receipt(
+                    candidate,
+                    "synthetic-crossing-conflict-predicate-v1",
+                    candidate.ego_initial_speed_mps >= 16.0
+                        && candidate.occlusion_fraction >= 0.6
+                        && candidate.sensor_delay_s >= 0.1,
+                )
             },
         )
         .unwrap();
@@ -929,6 +953,11 @@ mod tests {
         assert!(report.minimized_candidate.identity_is_valid());
         assert!(report.failure_preserved);
         assert!(report.evaluations <= 128);
+        assert_eq!(report.evaluation_receipts.len(), report.evaluations as usize);
+        assert!(report.evaluation_receipts.iter().all(|receipt| {
+            receipt.predicate_id == "synthetic-crossing-conflict-predicate-v1"
+                && !receipt.execution_receipt_id.is_empty()
+        }));
         assert!(report.minimized_candidate.ego_initial_speed_mps >= 16.0);
         assert!(report.minimized_candidate.ego_initial_speed_mps - 16.0 < 0.01);
         assert!(report.minimized_candidate.occlusion_fraction >= 0.6);
@@ -943,14 +972,18 @@ mod tests {
     fn counterexample_minimizer_rejects_invalid_source_and_non_failure() {
         let source = generate_stratified_intersection_candidates(4, 1).unwrap().remove(0);
         assert_eq!(
-            minimize_intersection_counterexample(&source, "predicate-v1", 64, |_| false)
+            minimize_intersection_counterexample(&source, "predicate-v1", 64, |candidate| {
+                mock_receipt(candidate, "predicate-v1", false)
+            })
                 .unwrap_err(),
             CounterexampleMinimizationError::OriginalNotCounterexample
         );
         let mut invalid = source;
         invalid.candidate_id.push_str("-tampered");
         assert_eq!(
-            minimize_intersection_counterexample(&invalid, "predicate-v1", 64, |_| true)
+            minimize_intersection_counterexample(&invalid, "predicate-v1", 64, |candidate| {
+                mock_receipt(candidate, "predicate-v1", true)
+            })
                 .unwrap_err(),
             CounterexampleMinimizationError::InvalidSourceCandidate
         );
@@ -960,7 +993,9 @@ mod tests {
     fn counterexample_minimizer_fails_closed_on_invalid_budgets_and_predicate_ids() {
         let source = generate_stratified_intersection_candidates(5, 1).unwrap().remove(0);
         assert_eq!(
-            minimize_intersection_counterexample(&source, "predicate-v1", 0, |_| true)
+            minimize_intersection_counterexample(&source, "predicate-v1", 0, |candidate| {
+                mock_receipt(candidate, "predicate-v1", true)
+            })
                 .unwrap_err(),
             CounterexampleMinimizationError::ZeroEvaluationBudget
         );
@@ -969,15 +1004,34 @@ mod tests {
                 &source,
                 "predicate-v1",
                 MAX_COUNTEREXAMPLE_MINIMIZATION_EVALUATIONS + 1,
-                |_| true
+                |candidate| mock_receipt(candidate, "predicate-v1", true)
             )
             .unwrap_err(),
             CounterexampleMinimizationError::EvaluationBudgetTooLarge
         );
         assert_eq!(
-            minimize_intersection_counterexample(&source, " ", 64, |_| true).unwrap_err(),
+            minimize_intersection_counterexample(&source, " ", 64, |candidate| {
+                mock_receipt(candidate, " ", true)
+            }).unwrap_err(),
             CounterexampleMinimizationError::EmptyPredicateId
         );
+    }
+
+    #[test]
+    fn counterexample_minimizer_rejects_unbound_execution_receipts() {
+        let source = generate_stratified_intersection_candidates(11, 1).unwrap().remove(0);
+        let error = minimize_intersection_counterexample(
+            &source,
+            "crossing-failure-v1",
+            32,
+            |candidate| {
+                let mut receipt = mock_receipt(candidate, "crossing-failure-v1", true);
+                receipt.candidate_id.push_str("-unbound");
+                receipt
+            },
+        )
+        .unwrap_err();
+        assert_eq!(error, CounterexampleMinimizationError::InvalidEvaluationReceipt);
     }
 
     #[test]
@@ -993,7 +1047,11 @@ mod tests {
             &source,
             "crossing-conflict-v1",
             64,
-            |candidate| candidate.ego_initial_speed_mps >= 16.0,
+            |candidate| mock_receipt(
+                candidate,
+                "crossing-conflict-v1",
+                candidate.ego_initial_speed_mps >= 16.0,
+            ),
         )
         .unwrap();
         report.evaluations += 1;
