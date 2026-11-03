@@ -275,6 +275,89 @@ pub enum MaxCountSamplingMeasure {
     WeightedMultiplicity,
 }
 
+/// One bounded-integer draw, including every rejected raw word. The raw
+/// words are replayable; their statistical quality remains a property of the
+/// caller's random-word source.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BoundedRandomDraw {
+    pub upper_bound: u128,
+    pub random_words: Vec<u128>,
+    pub accepted_draw: u128,
+}
+
+/// Reproducible sampling receipt. This records how the bounded choices were
+/// derived, not proof that the original random-word source had enough entropy.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MaxCountSamplingTranscript {
+    pub measure: MaxCountSamplingMeasure,
+    pub draws: Vec<BoundedRandomDraw>,
+    pub assignment: Option<Vec<usize>>,
+}
+
+/// Convert uniform raw 128-bit words into an unbiased integer in [0, bound)
+/// using bit-mask rejection, avoiding modulo bias. Returns None only for an
+/// invalid zero bound (which a valid backpointer sampler never requests).
+fn draw_below_from_words<F>(
+    bound: u128,
+    next_word: &mut F,
+    consumed_words: &mut Vec<u128>,
+) -> Option<u128>
+where
+    F: FnMut() -> u128,
+{
+    let largest = bound.checked_sub(1)?;
+    let bits = 128usize - largest.leading_zeros() as usize;
+    if bits == 0 {
+        return Some(0);
+    }
+    let mask = if bits == 128 { u128::MAX } else { (1u128 << bits) - 1 };
+    loop {
+        let word = next_word();
+        consumed_words.push(word);
+        let candidate = word & mask;
+        if candidate < bound {
+            return Some(candidate);
+        }
+    }
+}
+
+/// Replay and validate one rejection-sampled bounded draw.
+fn replay_bounded_draw(
+    record: &BoundedRandomDraw,
+    expected_bound: u128,
+) -> Result<u128, EliminationError> {
+    if record.upper_bound != expected_bound || expected_bound == 0 {
+        return Err(EliminationError::InvalidEliminationOrder {
+            reason: "sampling transcript has a wrong or zero upper bound",
+        });
+    }
+    let largest = expected_bound - 1;
+    let bits = 128usize - largest.leading_zeros() as usize;
+    if bits == 0 {
+        if !record.random_words.is_empty() || record.accepted_draw != 0 {
+            return Err(EliminationError::InvalidEliminationOrder {
+                reason: "bound-one sampling transcript must consume no words and accept zero",
+            });
+        }
+        return Ok(0);
+    }
+    let mask = if bits == 128 { u128::MAX } else { (1u128 << bits) - 1 };
+    for (index, &word) in record.random_words.iter().enumerate() {
+        let candidate = word & mask;
+        if candidate < expected_bound {
+            if index + 1 != record.random_words.len() || candidate != record.accepted_draw {
+                return Err(EliminationError::InvalidEliminationOrder {
+                    reason: "sampling transcript accepted draw or trailing words are invalid",
+                });
+            }
+            return Ok(candidate);
+        }
+    }
+    Err(EliminationError::InvalidEliminationOrder {
+        reason: "sampling transcript contains no accepted random word",
+    })
+}
+
 /// Exact optimum, semiring multiplicity, one canonical witness, and the
 /// complete local argmax tables needed to represent the optimal-assignment DAG.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -754,6 +837,102 @@ impl ExactFactorGraph<MaxCountValue> {
     }
 
     /// Shared exact backpointer sampler for both measures.
+    /// Sample through a raw 128-bit word source using rejection to produce
+    /// unbiased bounded integers. Every rejected word is preserved in the
+    /// returned transcript for deterministic replay.
+    ///
+    /// The caller must still provide an appropriately uniform random-word
+    /// source. The transcript proves how words map to branches, not that the
+    /// entropy source is unbiased or unpredictable.
+    pub fn sample_optimal_assignment_with_words<F>(
+        &self,
+        result: &MaxCountWitnessResult,
+        measure: MaxCountSamplingMeasure,
+        mut next_word: F,
+    ) -> Result<MaxCountSamplingTranscript, EliminationError>
+    where
+        F: FnMut() -> u128,
+    {
+        let mut draws = Vec::new();
+        let mut invalid_bound = false;
+        let assignment = self.sample_optimal_assignment_by_measure(
+            result,
+            measure,
+            |bound| {
+                let mut words = Vec::new();
+                match draw_below_from_words(bound, &mut next_word, &mut words) {
+                    Some(accepted_draw) => {
+                        draws.push(BoundedRandomDraw {
+                            upper_bound: bound,
+                            random_words: words,
+                            accepted_draw,
+                        });
+                        accepted_draw
+                    }
+                    None => {
+                        invalid_bound = true;
+                        0
+                    }
+                }
+            },
+        )?;
+        if invalid_bound {
+            return Err(EliminationError::InvalidEliminationOrder {
+                reason: "sampling requested a zero bounded-integer range",
+            });
+        }
+        Ok(MaxCountSamplingTranscript { measure, draws, assignment })
+    }
+
+    /// Independently replay a sampling transcript against the same checked
+    /// backpointer result and factor graph. This validates the bounded draws
+    /// and selected assignment but does not certify the original entropy.
+    pub fn verify_sampling_transcript(
+        &self,
+        result: &MaxCountWitnessResult,
+        transcript: &MaxCountSamplingTranscript,
+    ) -> Result<bool, EliminationError> {
+        let mut draw_index = 0usize;
+        let mut transcript_error = None;
+        let assignment = self.sample_optimal_assignment_by_measure(
+            result,
+            transcript.measure,
+            |bound| {
+                let record = match transcript.draws.get(draw_index) {
+                    Some(record) => record,
+                    None => {
+                        transcript_error = Some(EliminationError::InvalidEliminationOrder {
+                            reason: "sampling transcript is missing a bounded draw",
+                        });
+                        return 0;
+                    }
+                };
+                draw_index += 1;
+                match replay_bounded_draw(record, bound) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        transcript_error = Some(error);
+                        0
+                    }
+                }
+            },
+        )?;
+        if let Some(error) = transcript_error {
+            return Err(error);
+        }
+        if draw_index != transcript.draws.len() {
+            return Err(EliminationError::InvalidEliminationOrder {
+                reason: "sampling transcript contains unused bounded draws",
+            });
+        }
+        if assignment != transcript.assignment {
+            return Err(EliminationError::InvalidEliminationOrder {
+                reason: "sampling transcript assignment does not match replay",
+            });
+        }
+        Ok(true)
+    }
+
     pub fn sample_optimal_assignment_by_measure<F>(
         &self,
         result: &MaxCountWitnessResult,
@@ -1272,6 +1451,54 @@ mod tests {
         let mut inconsistent = result.clone();
         inconsistent.distinct_optimal_assignments += 1;
         assert!(graph.sample_optimal_assignment(&inconsistent, |_| 0).is_err());
+    }
+
+    #[test]
+    fn rejection_sampler_records_rejected_words_and_replays_without_modulo_bias() {
+        let mut source = vec![3u128, 2u128].into_iter();
+        let mut consumed = Vec::new();
+        let draw = draw_below_from_words(3, &mut || source.next().unwrap(), &mut consumed).unwrap();
+        assert_eq!(draw, 2);
+        assert_eq!(consumed, vec![3, 2]);
+        assert_eq!(replay_bounded_draw(
+            &BoundedRandomDraw {
+                upper_bound: 3,
+                random_words: consumed,
+                accepted_draw: 2,
+            },
+            3,
+        ).unwrap(), 2);
+        let mut untouched = Vec::new();
+        assert_eq!(draw_below_from_words(1, &mut || panic!("bound one consumes no entropy"), &mut untouched), Some(0));
+        assert!(untouched.is_empty());
+    }
+
+    #[test]
+    fn sampling_transcript_replays_and_rejects_mutated_random_words() {
+        let mut graph = ExactFactorGraph::new(vec![3], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        graph.add_factor(vec![0], vec![
+            MaxCountValue::candidate(7, 1),
+            MaxCountValue::candidate(7, 1),
+            MaxCountValue::candidate(7, 1),
+        ]).unwrap();
+        let result = graph.evaluate_with_witness(&[0]).unwrap();
+        let mut words = vec![3u128, 2u128].into_iter();
+        let transcript = graph.sample_optimal_assignment_with_words(
+            &result,
+            MaxCountSamplingMeasure::DistinctAssignments,
+            || words.next().unwrap(),
+        ).unwrap();
+        assert_eq!(transcript.assignment, Some(vec![2]));
+        assert_eq!(transcript.draws[0].upper_bound, 3);
+        assert_eq!(transcript.draws[0].random_words, vec![3, 2]);
+        assert!(graph.verify_sampling_transcript(&result, &transcript).unwrap());
+
+        let mut mutated = transcript.clone();
+        mutated.draws[0].random_words[0] = 0;
+        assert!(graph.verify_sampling_transcript(&result, &mutated).is_err());
+        let mut missing = transcript.clone();
+        missing.draws.clear();
+        assert!(graph.verify_sampling_transcript(&result, &missing).is_err());
     }
 
     #[test]
