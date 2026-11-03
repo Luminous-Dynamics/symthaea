@@ -44,7 +44,8 @@ Tests are authored for:
 - seeded state-envelope violation selecting the baseline mode;
 - baseline control-path fault producing no admissible fallback;
 - monitor epoch reset while preserving previous audit frames;
-- aggregate-count inconsistency rejection even after the report digest is recomputed.
+- aggregate-count inconsistency rejection even after the report digest is recomputed;
+- missing reason-vocabulary rejection even after the report digest is recomputed.
 
 These controls test the adapter and named RTA behavior only. They have not been compiled or executed in this session.
 
