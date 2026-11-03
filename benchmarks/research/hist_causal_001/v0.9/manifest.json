@@ -1,0 +1,22 @@
+{
+  "benchmark": "HIST-CAUSAL-001",
+  "version": "0.9",
+  "issue": 10180,
+  "status": "finite_sample_composite_null_model_adequacy",
+  "method": "candidate-specific Monte Carlo lower-tail p-values plus intersection-union rejection",
+  "statistic": "maximum over one candidate model of joint log likelihood summed across all six probes",
+  "decision": "model_misspecified iff all candidate-specific p-values <= alpha",
+  "alpha": 0.05,
+  "calibration_replicates_per_candidate_per_recipe": 5000,
+  "evaluation_replicates_per_truth_per_recipe": 2000,
+  "development_recipes": 24,
+  "samples_per_probe": [1,2,5,10,20],
+  "probes_per_case": 6,
+  "known_to_detector": ["candidate catalogue","point nuisance parameters per recipe"],
+  "hidden_from_detector": ["OOD mixture likelihood","latent component identity"],
+  "ood_detection_rate": {"1":0.06977083333333334,"2":0.24285416666666668,"5":0.540625,"10":0.8508541666666666,"20":0.9847708333333335},
+  "worst_candidate_false_ood": {"1":0.0305,"2":0.044729166666666674,"5":0.04975,"10":0.0495625,"20":0.0508125},
+  "finite_sample_argument": "Under correct known point parameters and independent exchangeable units, the true candidate's own rank p-value is super-uniform. Model misspecified requires all candidate p-values <= alpha, so false rejection is <= alpha for each in-family candidate. Ties are conservative.",
+  "limitations": ["unknown nuisance parameters","persistent/correlated confounders","only one OOD mixture","public development recipes, not sealed holdouts"],
+  "claim_ceiling": "conditional finite-sample composite-null test; no physical or SOTA claim"
+}
