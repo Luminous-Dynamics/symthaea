@@ -34,7 +34,7 @@ Positive improvement always favors the advanced controller.
 5. Bootstrap family means with replacement, drawing the same number of families per replicate.
 6. Report the 2.5th and 97.5th percentiles of the deterministic bootstrap distribution.
 
-The PRNG is a local SplitMix64 implementation with rejection sampling for unbiased bounded indices. The seed and bootstrap replicate count are included in the summary.
+The PRNG is a local SplitMix64 implementation with rejection sampling for unbiased bounded indices. Means divide each value before summation to avoid overflow for otherwise finite metrics; unrepresentable differences are rejected. The seed and bootstrap replicate count are included in the summary.
 
 ## Artifact integrity
 
@@ -58,12 +58,13 @@ For broad robustness statements, SAM's proposed evaluation target remains at lea
 
 ## Controls
 
-Seven unit tests are authored for:
+Nine unit tests are authored for:
 - sibling aggregation before bootstrap;
 - positive-improvement sign convention in both metric directions;
 - deterministic replay for a frozen seed, independent of input row order;
 - duplicate scenario rejection;
 - insufficient-family and non-finite-value rejection;
+- robustness to extreme but finite inputs and rejection of an unrepresentable paired difference;
 - inconsistent aggregate rejection even after the summary digest is recomputed.
 
 Tests have not been compiled or executed in this session.
