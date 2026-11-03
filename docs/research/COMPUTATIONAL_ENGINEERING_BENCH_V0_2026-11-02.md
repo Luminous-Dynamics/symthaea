@@ -209,7 +209,11 @@ Two repository-repair audit design documents currently describe Rust binaries un
 
 ## 15. Receipt-verifier implementation
 
-CEB task and run statements are now machine-readable in an in-toto Statement v1 + DSSE envelope. `.github/workflows/ceb-contract-validation-v0.yml` validates the Draft 2020-12 schemas, catalog and cross-field receipt invariants with pinned `jsonschema` and negative controls. The workflow has been authored but not run in this conversation. Cryptographic signature verification, trust-root policy and primary/regrade-pair adjudication remain implementation work under [issue #10167](https://github.com/Luminous-Dynamics/symthaea/issues/10167). A schema-valid statement is not proof of an authentic execution.
+CEB task and run statements are machine-readable in an in-toto Statement v1 + DSSE envelope. Each receipt binds exactly three subjects: candidate patch, source tree and result tree. The CEB contract workflow validates Draft 2020-12 schema structure, catalog invariants and cross-field controls with pinned jsonschema; it has not been run in this work session.
+
+A first standalone Rust verifier is now authored in draft PR [#10212](https://github.com/Luminous-Dynamics/symthaea/pull/10212), tracked by [issue #10167](https://github.com/Luminous-Dynamics/symthaea/issues/10167). It includes DSSE Ed25519 verification against an out-of-band pinned trust policy, task-contract hash pinning, check/budget/runtime binding, CEB-TREE-V1 source/result hashing, changed-path and patch-header reconciliation, artifact re-hashing, and primary/regrade independence controls.
+
+The implementation has 18 authored Rust tests and a dedicated Rust build/format/Clippy workflow. They have **not** been run, the Rust toolchain is unavailable in this execution environment, and no Cargo.lock has been generated. The relevant GitHub workflows are queued rather than passed. The verifier cannot establish runner isolation, test semantic correctness, or that the submitted patch transforms the base tree into the result tree. It is not qualified for scored benchmark use. All ten catalog tasks remain design_only.
 
 
 ## 16. Repository fixture and gold-label CI checks
