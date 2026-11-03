@@ -501,7 +501,7 @@ jobs:
           print(
               "CEB_CONTRACT_SCHEMA_PASS: "
               f"tasks={len(task_ids)} unique_tasks={len(set(task_ids))} "
-              "schemas=4 negative_controls=34"
+              f"schemas=4 negative_controls=34 worlds={world_count} conditional_facts={conditional_fact_count}"
           )
           print("CEB_CLAIM_BOUNDARY: schema validation is not DSSE signature verification or runner qualification")
           PY
