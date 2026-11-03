@@ -97,6 +97,10 @@ fn canonical_non_empty(value: &str) -> bool {
     !value.trim().is_empty() && value.trim() == value
 }
 
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 impl HoldoutAxis {
     fn group_id<'a>(self, record: &'a RunPartitionRecord) -> &'a str {
         match self {
@@ -176,12 +180,14 @@ pub fn audit_grouped_holdout(
             ("test_site_id", record.test_site_id.as_str()),
             ("service_request_id", record.service_request_id.as_str()),
             ("compartment_id", record.compartment_id.as_str()),
-            ("compartment_configuration_sha256", record.compartment_configuration_sha256.as_str()),
             ("utility_topology_id", record.utility_topology_id.as_str()),
         ] {
             if !canonical_non_empty(value) {
                 return Err(GroupedValidationError::InvalidIdentity(field));
             }
+        }
+        if !valid_sha256(&record.compartment_configuration_sha256) {
+            return Err(GroupedValidationError::InvalidIdentity("compartment_configuration_sha256"));
         }
         if !run_ids.insert(record.run_id.as_str()) {
             return Err(GroupedValidationError::DuplicateRunId(
@@ -445,6 +451,26 @@ mod tests {
                 ],
             ),
             Err(GroupedValidationError::DuplicateRunId("same-run".to_owned()))
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_compartment_configuration_digest() {
+        let mut item = record(
+            "run-a",
+            ValidationPartition::Development,
+            "unit-a",
+            "day-a",
+            "soil-a",
+        );
+        item.compartment_configuration_sha256 = "not-a-sha256".to_owned();
+        assert_eq!(
+            audit_grouped_holdout(
+                &[item],
+                &[HoldoutAxis::CompartmentConfiguration],
+                &[ValidationPartition::Development],
+            ),
+            Err(GroupedValidationError::InvalidIdentity("compartment_configuration_sha256"))
         );
     }
 
