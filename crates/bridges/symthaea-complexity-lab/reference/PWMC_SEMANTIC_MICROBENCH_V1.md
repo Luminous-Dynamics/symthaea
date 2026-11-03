@@ -71,4 +71,6 @@ The first four are invariance checks. The last two are exact predicted-delta che
 - The result is a semantic regression suite, not a runtime/SOTA comparison.
 - The 32 maps are a reuse correctness test, not evidence of a 32x speedup.
 
+The runner also executes eight metamorphic laws: free-hidden addition, variable-order permutation, clause/literal idempotence, a subsumed-clause addition, free-visible expansion, a projection-boundary change, a unique hidden definitional extension z <-> d, and visible weight-map substitution. The last law keeps support fixed while changing exact PWMC from -2/5 to 17/24. These are finite exact relations, not universal proof certificates.
+
 Next steps: add generator provenance and structural families; import the public 2024 projected benchmark fixtures; run the SCPOG artifact; then add Rust producer/replay implementations and differential checks.
