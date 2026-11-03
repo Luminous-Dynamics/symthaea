@@ -658,23 +658,46 @@ mod tests {
         d.action_set_digest=model_discrepancy_action_set_digest(&d.actions).unwrap();
         d.decision_context_digest=model_discrepancy_decision_context_digest(&d).unwrap();d
     }
-    fn input()->VehicleModelDiscrepancyInput{VehicleModelDiscrepancyInput{
-        predictor_model_id:"predictor-v0".into(),predictor_artifact_digest:h('3'),reference_model_id:"reference-v0".into(),reference_model_artifact_digest:h('4'),
-        evaluator_id:"evaluator-v0".into(),evaluator_artifact_digest:h('5'),planner_id:"planner-v0".into(),planner_artifact_digest:h('6'),sampling_profile_digest:h('7'),
-        protocol_id:"SAM-MODEL-RESIDUAL-001".into(),protocol_digest:h('8'),residual_observations:vec![residual(1000,1.0,0.0),residual(2000,4.0,0.0)],decisions:vec![decision()]}}
+    fn expected_slot(row: &ModelResidualObservation) -> ExpectedResidualSlot {
+        ExpectedResidualSlot {
+            scenario_id:row.scenario_id.clone(),
+            failure_family_id:row.failure_family_id.clone(),
+            actor_policy_id:row.actor_policy_id.clone(),
+            split_id:row.split_id.clone(),
+            shift_regime_id:row.shift_regime_id.clone(),
+            initial_state_digest:row.initial_state_digest.clone(),
+            environment_digest:row.environment_digest.clone(),
+            dynamics_digest:row.dynamics_digest.clone(),
+            action_history_digest:row.action_history_digest.clone(),
+            observation_availability_digest:row.observation_availability_digest.clone(),
+            forecast_issued_at_ms:row.forecast_issued_at_ms,
+            horizon_ms:row.horizon_ms,
+            metric_id:row.metric_id.clone(),
+            metric_unit_id:row.metric_unit_id.clone(),
+        }
+    }
+    fn set_residual_schedule(sample: &mut VehicleModelDiscrepancyInput, rows: Vec<ModelResidualObservation>) {
+        sample.expected_residual_slots = rows.iter().map(expected_slot).collect();
+        sample.residual_observations = rows;
+    }
+    fn input()->VehicleModelDiscrepancyInput {
+        let residual_observations=vec![residual(1000,1.0,0.0),residual(2000,4.0,0.0)];
+        let expected_residual_slots=residual_observations.iter().map(expected_slot).collect();
+        VehicleModelDiscrepancyInput{
+            predictor_model_id:"predictor-v0".into(),predictor_artifact_digest:h('3'),reference_model_id:"reference-v0".into(),reference_model_artifact_digest:h('4'),
+            evaluator_id:"evaluator-v0".into(),evaluator_artifact_digest:h('5'),planner_id:"planner-v0".into(),planner_artifact_digest:h('6'),sampling_profile_digest:h('7'),
+            protocol_id:"SAM-MODEL-RESIDUAL-001".into(),protocol_digest:h('8'),expected_residual_slots,residual_observations,decisions:vec![decision()]
+        }
+    }
     #[test]
     fn analytic_linear_motion_fixture_has_known_horizon_growth() {
         let mut sample = input();
         let speed_prediction = 5.0_f64;
         let speed_reference = 5.2_f64;
-        sample.residual_observations = [1_000_u64, 2_000_u64].into_iter().map(|horizon_ms| {
+        set_residual_schedule(&mut sample, [1_000_u64, 2_000_u64].into_iter().map(|horizon_ms| {
             let seconds = horizon_ms as f64 / 1_000.0;
-            residual(
-                horizon_ms,
-                speed_prediction * seconds,
-                speed_reference * seconds,
-            )
-        }).collect();
+            residual(horizon_ms, speed_prediction * seconds, speed_reference * seconds)
+        }).collect());
         let report = summarize_vehicle_model_discrepancy(&sample).unwrap();
         assert!((report.paired_horizon_growth[0].absolute_residual_growth - 0.2).abs() < 1e-12);
     }
@@ -682,7 +705,7 @@ mod tests {
     #[test]
     fn perfect_model_fixture_has_zero_residual_at_every_horizon() {
         let mut sample = input();
-        sample.residual_observations = vec![residual(1_000, 5.0, 5.0), residual(2_000, 10.0, 10.0)];
+        set_residual_schedule(&mut sample, vec![residual(1_000, 5.0, 5.0), residual(2_000, 10.0, 10.0)]);
         let report = summarize_vehicle_model_discrepancy(&sample).unwrap();
         assert_eq!(report.horizon_summaries[0].p95_absolute_residual, Some(0.0));
         assert_eq!(report.horizon_summaries[1].p95_absolute_residual, Some(0.0));
@@ -692,7 +715,7 @@ mod tests {
     #[test]
     fn preserves_signed_bias_direction() {
         let mut sample = input();
-        sample.residual_observations = vec![residual(1_000, 3.0, 4.0)];
+        set_residual_schedule(&mut sample, vec![residual(1_000, 3.0, 4.0)]);
         let report = summarize_vehicle_model_discrepancy(&sample).unwrap();
         assert_eq!(report.horizon_summaries[0].mean_signed_residual, Some(-1.0));
     }
@@ -722,13 +745,13 @@ mod tests {
     #[test]
     fn horizon_denominators_retain_each_incomplete_outcome_status() {
         let mut sample = input();
-        sample.residual_observations = vec![
+        set_residual_schedule(&mut sample, vec![
             residual(1_000, 2.0, 1.0),
             incomplete_residual(2_000, ReferenceOutcomeStatus::Missing),
             incomplete_residual(3_000, ReferenceOutcomeStatus::Censored),
             incomplete_residual(4_000, ReferenceOutcomeStatus::TimedOut),
             incomplete_residual(5_000, ReferenceOutcomeStatus::Unsupported),
-        ];
+        ]);
         let report = summarize_vehicle_model_discrepancy(&sample).unwrap();
         assert_eq!(report.horizon_summaries.len(), 5);
         assert_eq!(report.horizon_summaries[0].outcome_count, 1);
@@ -743,11 +766,11 @@ mod tests {
     #[test]
     fn missing_intermediate_horizon_does_not_bridge_paired_growth() {
         let mut sample = input();
-        sample.residual_observations = vec![
+        set_residual_schedule(&mut sample, vec![
             residual(1_000, 1.0, 0.0),
             incomplete_residual(2_000, ReferenceOutcomeStatus::Missing),
             residual(3_000, 5.0, 0.0),
-        ];
+        ]);
         let report = summarize_vehicle_model_discrepancy(&sample).unwrap();
         assert!(report.paired_horizon_growth.is_empty());
         assert_eq!(report.horizon_summaries[1].outcome_count, 1);
@@ -758,7 +781,15 @@ mod tests {
     #[test] fn reports_paired_horizon_error_growth(){let r=summarize_vehicle_model_discrepancy(&input()).unwrap();assert_eq!(r.paired_horizon_growth.len(),1);assert_eq!(r.paired_horizon_growth[0].absolute_residual_growth,3.0);}
     #[test] fn rejects_mismatched_context_pair(){let mut x=input();x.residual_observations[1].environment_digest=h('9');assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::MismatchedResidualContext);}
     #[test] fn rejects_duplicate_scenario_actor_action_horizon(){let mut x=input();x.residual_observations.push(residual(1000,2.0,0.0));assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::DuplicateResidualKey);}
-    #[test] fn missing_horizons_are_not_imputed(){let mut x=input();x.residual_observations.truncate(1);assert!(summarize_vehicle_model_discrepancy(&x).unwrap().paired_horizon_growth.is_empty());}
+    #[test]
+    fn omitted_expected_horizon_slot_is_rejected() {
+        let mut sample = input();
+        sample.residual_observations.truncate(1);
+        assert_eq!(
+            summarize_vehicle_model_discrepancy(&sample).unwrap_err(),
+            VehicleModelDiscrepancyError::MissingResidualOutcomeSlot
+        );
+    }
     #[test] fn detects_planner_ranking_reversal_and_regret(){let r=summarize_vehicle_model_discrepancy(&input()).unwrap();let d=&r.decision_results[0];assert_eq!(d.predicted_best_action_id.as_deref(),Some("yield"));assert_eq!(d.realized_best_action_id.as_deref(),Some("continue"));assert_eq!(d.ranking_reversed,Some(true));assert_eq!(d.selected_action_regret,Some(6.0));assert_eq!(d.optimism_gap,Some(9.0));}
     #[test] fn rejects_outcome_leakage(){let mut x=input();x.decisions[0].reference_outcome_reveal_sequence=9;x.decisions[0].decision_context_digest=model_discrepancy_decision_context_digest(&x.decisions[0]).unwrap();assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::OutcomeLeakage);}
     #[test] fn unknown_feasibility_makes_decision_indeterminate(){let mut x=input();x.decisions[0].actions[0].feasibility=DiscrepancyFeasibility::Indeterminate;x.decisions[0].actions[0].realized_utility=None;let r=summarize_vehicle_model_discrepancy(&x).unwrap();assert_eq!(r.decision_results[0].status,DecisionAuditStatus::IndeterminateFeasibility);}
