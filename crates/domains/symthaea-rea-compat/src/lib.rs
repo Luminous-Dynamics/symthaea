@@ -11,6 +11,7 @@
 //! duplicate keys before REA's object-level schema sees the object.
 
 pub mod mobile_tool_effects;
+pub mod mobile_invocation;
 
 // Compile the same root-level re-export consumed by Symthaea callers. This
 // isolated harness check does not compile the entire monorepo root crate.
