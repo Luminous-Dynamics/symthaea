@@ -123,7 +123,7 @@ impl PairedMetricSummary {
                 || (previous_family == current_family
                     && previous_scenario >= current_scenario)
         }) || self.family_effects.windows(2).any(|pair| {
-            pair[0].failure_family_id >= pair[1].failure_family_id
+            pair[0].failure_family_id.as_str() >= pair[1].failure_family_id.as_str()
         }) {
             return false;
         }
