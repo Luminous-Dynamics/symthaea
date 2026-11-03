@@ -567,6 +567,9 @@ pub struct RmiEvaluationPayloadV1 {
     pub policy_pre_state_sha256: String,
     pub control_policy_post_state_sha256: String,
     pub treatment_policy_post_state_sha256: String,
+    /// True only if a second evaluation with reversed arm order reproduced
+    /// both arm-specific actions and post-state digests.
+    pub arm_order_swap_verified: bool,
     pub target: RmiTargetFeatureV1,
     pub control_action: RmiAgentActionV1,
     pub treatment_action: RmiAgentActionV1,
@@ -597,6 +600,9 @@ pub struct RmiReciprocalEvaluationPayloadV1 {
     pub partner_policy_pre_state_sha256: String,
     pub control_partner_post_state_sha256: String,
     pub treatment_partner_post_state_sha256: String,
+    /// True only if a reversed partner-arm order reproduced both responses
+    /// and post-state digests.
+    pub partner_arm_order_swap_verified: bool,
     pub target: RmiTargetFeatureV1,
     /// Partner-to-agent input sensitivity from the first half of this pair.
     pub agent_targeted_sensitivity: bool,
@@ -754,6 +760,53 @@ pub fn evaluate_rmi_pair<P: RmiPolicyV1>(
         });
     }
 
+    // Repeat the pair in reverse order. This catches order-coupled shared
+    // process state that is not captured by the policy's serialized snapshot.
+    let mut treatment_order_probe = P::restore_from_snapshot(&policy_snapshot)
+        .map_err(|reason| RmiEvaluationErrorV1::PolicyStateRestoreFailure {
+            arm: "order_swap_treatment".into(),
+            reason,
+        })?;
+    let mut control_order_probe = P::restore_from_snapshot(&policy_snapshot)
+        .map_err(|reason| RmiEvaluationErrorV1::PolicyStateRestoreFailure {
+            arm: "order_swap_control".into(),
+            reason,
+        })?;
+    let reverse_treatment_action = treatment_order_probe.respond(
+        &pair.pre_intervention_history,
+        &pair.treatment_observation,
+        pair.seed,
+    );
+    let reverse_treatment_post_state_sha256 = sha256_hex(
+        &treatment_order_probe
+            .snapshot_state()
+            .map_err(RmiEvaluationErrorV1::PolicyStateSnapshotFailure)?,
+    );
+    let reverse_control_action = control_order_probe.respond(
+        &pair.pre_intervention_history,
+        &pair.control_observation,
+        pair.seed,
+    );
+    let reverse_control_post_state_sha256 = sha256_hex(
+        &control_order_probe
+            .snapshot_state()
+            .map_err(RmiEvaluationErrorV1::PolicyStateSnapshotFailure)?,
+    );
+    if reverse_treatment_action != treatment_action
+        || reverse_treatment_post_state_sha256 != treatment_policy_post_state_sha256
+    {
+        return Err(RmiEvaluationErrorV1::NonDeterministicPolicyOutput {
+            arm: "order_swap_treatment".to_string(),
+        });
+    }
+    if reverse_control_action != control_action
+        || reverse_control_post_state_sha256 != control_policy_post_state_sha256
+    {
+        return Err(RmiEvaluationErrorV1::NonDeterministicPolicyOutput {
+            arm: "order_swap_control".to_string(),
+        });
+    }
+
     for (arm, action) in [
         ("control", &control_action),
         ("treatment", &treatment_action),
@@ -792,6 +845,7 @@ pub fn evaluate_rmi_pair<P: RmiPolicyV1>(
         policy_pre_state_sha256,
         control_policy_post_state_sha256,
         treatment_policy_post_state_sha256,
+        arm_order_swap_verified: true,
         target: pair.target,
         control_action,
         treatment_action,
@@ -929,6 +983,52 @@ where
             arm: "treatment".to_string(),
         });
     }
+
+    let mut treatment_partner_order_probe = H::restore_from_snapshot(&partner_snapshot)
+        .map_err(|reason| RmiEvaluationErrorV1::PartnerStateRestoreFailure {
+            arm: "order_swap_treatment".into(),
+            reason,
+        })?;
+    let mut control_partner_order_probe = H::restore_from_snapshot(&partner_snapshot)
+        .map_err(|reason| RmiEvaluationErrorV1::PartnerStateRestoreFailure {
+            arm: "order_swap_control".into(),
+            reason,
+        })?;
+    let reverse_treatment_partner_response = treatment_partner_order_probe.respond(
+        &pair.pre_intervention_history,
+        &agent.payload.treatment_action,
+        pair.seed,
+    );
+    let reverse_treatment_partner_post_state_sha256 = sha256_hex(
+        &treatment_partner_order_probe
+            .snapshot_state()
+            .map_err(RmiEvaluationErrorV1::PartnerStateSnapshotFailure)?,
+    );
+    let reverse_control_partner_response = control_partner_order_probe.respond(
+        &pair.pre_intervention_history,
+        &agent.payload.control_action,
+        pair.seed,
+    );
+    let reverse_control_partner_post_state_sha256 = sha256_hex(
+        &control_partner_order_probe
+            .snapshot_state()
+            .map_err(RmiEvaluationErrorV1::PartnerStateSnapshotFailure)?,
+    );
+    if reverse_treatment_partner_response != treatment_partner_response
+        || reverse_treatment_partner_post_state_sha256 != treatment_partner_post_state_sha256
+    {
+        return Err(RmiEvaluationErrorV1::NonDeterministicPartnerOutput {
+            arm: "order_swap_treatment".to_string(),
+        });
+    }
+    if reverse_control_partner_response != control_partner_response
+        || reverse_control_partner_post_state_sha256 != control_partner_post_state_sha256
+    {
+        return Err(RmiEvaluationErrorV1::NonDeterministicPartnerOutput {
+            arm: "order_swap_control".to_string(),
+        });
+    }
+
     for (arm, response) in [
         ("control", &control_partner_response),
         ("treatment", &treatment_partner_response),
@@ -972,6 +1072,7 @@ where
         partner_policy_pre_state_sha256,
         control_partner_post_state_sha256,
         treatment_partner_post_state_sha256,
+        partner_arm_order_swap_verified: true,
         target: pair.target,
         agent_targeted_sensitivity: agent.payload.targeted_input_sensitivity,
         control_partner_response,
