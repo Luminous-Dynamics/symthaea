@@ -55,6 +55,8 @@ pub struct CounterfactualActionEvaluation {
     pub command: VehicleCommand,
     /// BLAKE3 over the exact serialized command payload.
     pub action_digest: String,
+    /// Fingerprint of the shared scenario/state/environment/dynamics/protocol context.
+    pub execution_context_digest: String,
     pub feasibility: CounterfactualFeasibility,
     /// One named scalar objective only; no implicit weighted composite.
     pub objective_value: f64,
@@ -250,6 +252,9 @@ fn derive_finding(
         if action.action_digest != command_digest(&action.command) {
             return Err(CounterfactualDecisionError::InvalidActionDigest);
         }
+        if action.execution_context_digest != execution_context_digest(input) {
+            return Err(CounterfactualDecisionError::InvalidExecutionReceipt);
+        }
         if !action.objective_value.is_finite() {
             return Err(CounterfactualDecisionError::InvalidObjectiveValue);
         }
@@ -372,6 +377,25 @@ fn derive_finding(
     })
 }
 
+fn execution_context_digest(input: &CounterfactualDecisionInput) -> String {
+    let context = (
+        &input.decision_id,
+        &input.scenario_id,
+        &input.scenario_artifact_digest,
+        &input.initial_state_digest,
+        &input.environment_profile_digest,
+        &input.dynamics_profile_digest,
+        &input.execution_protocol_digest,
+        &input.evaluator_artifact_digest,
+        &input.evaluator_id,
+        &input.criterion_id,
+        input.direction,
+        input.tie_tolerance.to_bits(),
+    );
+    let bytes = serde_json::to_vec(&context).unwrap_or_default();
+    blake3::hash(&bytes).to_hex().to_string()
+}
+
 fn command_digest(command: &VehicleCommand) -> String {
     let bytes = serde_json::to_vec(command).unwrap_or_default();
     blake3::hash(&bytes).to_hex().to_string()
@@ -402,6 +426,7 @@ mod tests {
         CounterfactualActionEvaluation {
             action_id: id.into(),
             action_digest: command_digest(&command),
+            execution_context_digest: String::new(),
             command,
             feasibility,
             objective_value: objective,
@@ -412,7 +437,7 @@ mod tests {
     }
 
     fn input() -> CounterfactualDecisionInput {
-        CounterfactualDecisionInput {
+        let mut input = CounterfactualDecisionInput {
             decision_id: "decision-001".into(),
             scenario_id: "scenario-001".into(),
             scenario_artifact_digest: "1".repeat(64),
@@ -435,7 +460,12 @@ mod tests {
                 action("alternative", 0.2, CounterfactualFeasibility::Feasible, 1.0),
                 action("infeasible", 0.8, CounterfactualFeasibility::Infeasible, 0.1),
             ],
+        };
+        let context_digest = execution_context_digest(&input);
+        for action in &mut input.actions {
+            action.execution_context_digest = context_digest.clone();
         }
+        input
     }
 
     #[test]
@@ -606,6 +636,16 @@ mod tests {
         assert_eq!(
             evaluate_counterfactual_decision(aliased).unwrap_err(),
             CounterfactualDecisionError::ControllerEvaluatorIdentityAliased
+        );
+    }
+
+    #[test]
+    fn rejects_action_receipt_from_a_different_shared_execution_context() {
+        let mut sample = input();
+        sample.actions[0].execution_context_digest = "f".repeat(64);
+        assert_eq!(
+            evaluate_counterfactual_decision(sample).unwrap_err(),
+            CounterfactualDecisionError::InvalidExecutionReceipt
         );
     }
 
