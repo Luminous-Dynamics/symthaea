@@ -92,4 +92,7 @@ Mutation tests must change one field at a time and assert deterministic rejectio
 ## 8. Claim ceiling
 
 A valid V0.1 fate inventory demonstrates only exhaustive structural accounting against one pinned target manifest. It does not demonstrate that the mapped objects are biologically identical, that target-only objects are biologically new, or that evidence authorities are authentic. Biological claims require separate evidence authentication and independent adjudication.
-\n## 9. Current implementation status\n\nThe Rust CLI verifier and nineteen mutation/known-answer unit tests are authored under `tools/connectome-target-fate-verifier/`. They have not been compiled or executed in the current authoring environment because Rust toolchain binaries are unavailable. The exact raw-byte fixture pins are recorded in the known-answer fixture. Do not interpret authored tests as passing tests; exact-head CI remains the required execution evidence.\n
+
+## 9. Current implementation status
+
+The Rust CLI verifier and nineteen mutation/known-answer unit tests are authored under `tools/connectome-target-fate-verifier/`. They have not been compiled or executed in the current authoring environment because Rust toolchain binaries are unavailable. The exact raw-byte fixture pins are recorded in the known-answer fixture. Do not interpret authored tests as passing tests; exact-head CI remains the required execution evidence.
