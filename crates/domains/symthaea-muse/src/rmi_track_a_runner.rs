@@ -487,7 +487,7 @@ pub fn run_rmi_track_a_suite_v1(
         && summary.fixed_partner_did_not_respond == summary.trials
         && summary.reciprocal_positive_control_both_directions == summary.trials
         && summary.reciprocal_positive_control_zero_collateral == summary.trials
-        && summary.agent_order_swap_verified == summary.trials * 3
+        && summary.agent_order_swap_verified == summary.trials * 5
         && summary.partner_order_swap_verified == summary.trials * 3;
 
     let payload = RmiTrackAReportPayloadV1 {
