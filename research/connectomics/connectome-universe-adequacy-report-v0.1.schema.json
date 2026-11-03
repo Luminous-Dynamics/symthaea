@@ -108,7 +108,8 @@
         "manifest_sha256",
         "generator_sha256",
         "freeze_receipt_sha256",
-        "oracle_boundary"
+        "oracle_boundary",
+        "required_error_families"
       ],
       "properties": {
         "challenge_id": {
@@ -137,6 +138,16 @@
             "NOT_VERIFIED",
             "NOT_AUDITABLE"
           ]
+        },
+        "required_error_families": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Predeclared challenge families whose support is required for the adequacy disposition."
         }
       }
     },
@@ -148,7 +159,8 @@
         "additionalProperties": false,
         "required": [
           "world_id",
-          "query_state"
+          "query_state",
+          "canonical_structural_sha256"
         ],
         "properties": {
           "world_id": {
@@ -157,6 +169,9 @@
           },
           "query_state": {
             "$ref": "#/$defs/decision"
+          },
+          "canonical_structural_sha256": {
+            "$ref": "#/$defs/sha256"
           }
         }
       }
@@ -172,7 +187,8 @@
           "error_family",
           "evidence_compatibility",
           "query_state",
-          "material_to_query"
+          "material_to_query",
+          "canonical_structural_sha256"
         ],
         "properties": {
           "world_id": {
@@ -202,6 +218,9 @@
           },
           "material_to_query": {
             "type": "boolean"
+          },
+          "canonical_structural_sha256": {
+            "$ref": "#/$defs/sha256"
           }
         }
       }
@@ -220,7 +239,8 @@
         "query_flipping_reference_count",
         "omitted_query_flipping_count",
         "false_invariance_count",
-        "not_estimable_count"
+        "not_estimable_count",
+        "false_ambiguity_count"
       ],
       "properties": {
         "candidate_world_count": {
@@ -266,6 +286,10 @@
         "not_estimable_count": {
           "type": "integer",
           "minimum": 0
+        },
+        "false_ambiguity_count": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
@@ -281,7 +305,8 @@
           "query_flipping_reference_count",
           "omitted_query_flipping_count",
           "false_invariance_count",
-          "not_estimable_count"
+          "not_estimable_count",
+          "false_ambiguity_count"
         ],
         "properties": {
           "error_family": {
@@ -309,6 +334,10 @@
             "minimum": 0
           },
           "not_estimable_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "false_ambiguity_count": {
             "type": "integer",
             "minimum": 0
           }
