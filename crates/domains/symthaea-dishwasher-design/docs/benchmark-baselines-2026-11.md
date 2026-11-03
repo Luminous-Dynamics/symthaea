@@ -77,6 +77,31 @@ Sources:
 
 Important: the table mixes manufacturer/EPREL product declarations and independent product-selection data. It is a competitive screening set, not a laboratory head-to-head.
 
+## Fast-cycle and rapid-turnaround incumbents
+
+Fast cycles need soil class and service context; published minutes are not interchangeable:
+
+| Product / programme | Published time | Stated use case | Important boundary |
+|---|---:|---|---|
+| Miele QuickPowerWash (South Africa range) | 58 min | Normally soiled crockery; Miele markets best cleaning results in under one hour | Product-family programme statement; exact model, load, energy and IEC test report required for head-to-head |
+| V-ZUG Sprint | 20 min | Lightly soiled pre-dinner glasses | Not suitable for normally or heavily soiled plates/pans; manufacturer guidance |
+| V-ZUG Party | 11 min | Repeated rapid turnaround between courses | 20-minute heating phase before repeated loading; five consecutive cycles described by manufacturer. Count preheat, refill, water and total event energy, not only the 11-minute interval |
+| Fisher & Paykel DishDrawer Quick modifier | Published as faster wash while maintaining performance | Faster wash modifier on an independently operated drawer | Exact duration, soil rating, consumption and model-specific test evidence must be obtained; do not invent a duration |
+
+Sources:
+- Miele South Africa QuickPowerWash: https://www.miele.co.za/domestic/range-of-dishwashers-2498.htm
+- V-ZUG Sprint / Party and soil suitability: https://www.vzug.com/be/en/service/device/v-zug-know-how-faq?query=%3Arelevance-desc%3AtabItemType%3AFaq%3AproductCategoryCode%3Adishwasher
+- Fisher & Paykel Series 7 Double DishDrawer guide, 17 April 2026: https://assets.fisherpaykel.com/product/2883_f16c0631-b9fe-4395-812f-cb2c5c6ee4bc
+
+### Implication for QuickCell target definition
+
+The previous blanket target of <=4 minutes for a "single cup/plate wash-and-rinse" is too broad to be defensible without a soil qualification. Replace it with two separately benchmarked service classes:
+
+1. **Rapid reuse / lightly soiled glassware**: <=4 minutes ready-state is an aspirational target to test against V-ZUG's 20-minute Sprint and 11-minute Party interval, but compare equal soil severity, temperature, loading and finish. Report cold-start and party/preheat overhead separately. This target is not for normally or heavily soiled plates.
+2. **Normally soiled single item**: do not pre-commit to a sub-4-minute claim. First target a matched endpoint materially faster than the 58-minute Miele QuickPowerWash incumbent; measure energy, water and rinse residue. A <=15-minute ready-state target may be used as a stretch hypothesis for the one-item cell, but only if it preserves the defined normal-soil residual threshold.
+
+For party / multi-course use, benchmark an **event service level** rather than only cycle time: time to first released item, median inter-batch refill-to-release time, total items released in 60 / 120 minutes, total energy and fresh water including preheat, plus the fraction meeting the required soil endpoint. V-ZUG's Party sequence shows why an 11-minute run time alone can understate the total service boundary.
+
 ## Recent research relevant to the engineering plan
 
 1. **Hydraulic network modelling (Simulation Modelling Practice and Theory, Volume 152, November 2026, Article 103329).** A modular lumped-parameter hydraulic model was compared with numerical and test-bench evidence. The authors report up to 14% deviation in key results, transient pump-ramp deviations below 9.1%, motor-current estimate deviations below 10.7%, and a design modification that raised spray-arm flow by 12% without raising pump power/current. The authors say the data will be made available on request. This supports a measured-pump-curve + branch-loss model as our first digital-twin layer; target better accuracy on an open, reproducible test rig rather than claiming superiority from equations alone.
@@ -114,10 +139,11 @@ Do not compare the QuickCell to eco labels. Define a separate, pre-registered pe
 
 | Metric | First engineering gate | Competitive target |
 |---|---:|---:|
-| Single cup/plate wash-and-rinse | <=6 min ready-state | <=4 min ready-state |
+| Rapid reuse: lightly soiled glassware | <=6 min ready-state | <=4 min ready-state; aspirational vs incumbent 11–20 min rapid programmes |
+| Normally soiled single item | Establish matched baseline | <=15 min ready-state stretch hypothesis; no achieved claim |
 | Fresh water | <=1.0 L/item | <=0.7 L/item |
 | Electricity | <=0.07 kWh/item | <=0.05 kWh/item |
-| Cleaning | meet fixed residual-soil threshold | match conventional reference with >=10% lower resource per successful clean |
+| Cleaning | Meet fixed residual-soil threshold for each declared soil class | Match conventional reference with >=10% lower resource per successful clean |
 | Rinse carryover | below assay limit defined by protocol | no worse than reference |
 | Cross-contamination | no detectable transfer under negative-control design | no detectable transfer across validated worst case |
 
