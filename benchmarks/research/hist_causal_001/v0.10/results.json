@@ -1,0 +1,21 @@
+{
+  "benchmark": "HIST-CAUSAL-001",
+  "version": "0.10",
+  "method": "independent-pilot Berger-Boos adjustment; exact finite nuisance grid",
+  "n_pilot": 20,
+  "n_evaluation": 20,
+  "theta_grid": ["1/4","1/2","3/4"],
+  "alpha": "1/20",
+  "beta": "1/100",
+  "alternative_theta": "1/8",
+  "null_checks": [
+    {"theta":"1/4","confidence_coverage":"1091690412777/1099511627776","false_rejection_probability":"32124391475074967987325/1208925819614629174706176","coverage_decimal":0.9928866463969825,"false_rejection_decimal":0.02657267381824577},
+    {"theta":"1/2","confidence_coverage":"522937/524288","false_rejection_probability":"10188579365/1099511627776","coverage_decimal":0.9974231719970703,"false_rejection_decimal":0.009266458951060486},
+    {"theta":"3/4","confidence_coverage":"1091690412777/1099511627776","false_rejection_probability":"3724207153253802419325/1208925819614629174706176","coverage_decimal":0.9928866463969825,"false_rejection_decimal":0.003080591954302848}
+  ],
+  "minimum_null_coverage_decimal": 0.9928866463969825,
+  "maximum_null_rejection_decimal": 0.02657267381824577,
+  "alternative_power_decimal": 0.24847753514317353,
+  "tests_passed": 6,
+  "claim_ceiling": "exact validity on declared finite theta grid only; not continuous nuisance coverage or full catalogue model"
+}
