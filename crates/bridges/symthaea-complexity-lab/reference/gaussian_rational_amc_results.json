@@ -1,0 +1,14 @@
+{
+  "all_passed": true,
+  "claim_ceiling": "Finite exact Q(i) reference arithmetic and small factor-network VE comparisons. Not the full MC2026 field track, algebraic-number fields, projected counting, Rust/Lean proof, or performance result.",
+  "coefficient_domain": "Q(i), exact pair of reduced rational numbers",
+  "elimination_orders": {"degree_like":180,"forward":180,"random":180,"reverse":180},
+  "exact_cancellation_controls": 2,
+  "exact_direct_vs_variable_elimination_checks": 720,
+  "malformed_coefficient_encodings_rejected": 5,
+  "random_factor_networks": 180,
+  "ring_law_checks": 10800,
+  "ring_trials": 1200,
+  "seed": "0xE7020",
+  "suite": "ETH-020 Gaussian-rational algebraic model counting reference"
+}
