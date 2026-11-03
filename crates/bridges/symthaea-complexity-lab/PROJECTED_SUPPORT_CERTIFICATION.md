@@ -231,8 +231,9 @@ A small local reference prototype now tests nested deterministic/decomposable de
 - Signed rational WMC cancellation: exact zero with support cardinality 2.
 - Complex Q(i) cancellation: exact zero with support cardinality 2.
 - Invalid controls rejected: overlapping product scopes, false OR determinism, and binary floating-point weights in exact mode.
+- Mutation controls killed three semantic bugs: omitting non-smooth-scope completion changes 19/28 to 17/14; omitting root free-variable completion changes 864 to 3; summing over two hidden witnesses instead of existentially projecting changes PWMC 2/3 to 4/3.
 
-The exact locally executed source has Git blob SHA `e3b14fe2f544999c62ac297329f0d03807832e1c`; fetching the committed file back from GitHub returned the same blob SHA. The result manifest binds this source SHA.
+The exact locally executed source has Git blob SHA `4f35cc8e20f82a070fd4444687e2f3e317b2d69b`; fetching the committed file back from GitHub returned the same blob SHA. The result manifest binds this source SHA.
 
 ### Interpretation and limitations
 
