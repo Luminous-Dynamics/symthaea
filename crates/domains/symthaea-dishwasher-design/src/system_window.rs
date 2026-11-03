@@ -56,6 +56,8 @@ pub struct ServiceWindowRequest {
     pub service_report: Option<ServiceAccountingReport>,
     /// Item identities are scoped to this service request.
     pub requested_item_ids: Vec<String>,
+    pub compartment_id: String,
+    pub compartment_configuration_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -100,13 +102,38 @@ pub struct SystemWindowSpec {
     pub start_at_s: u64,
     pub end_at_s: u64,
     pub required_resources: Vec<SystemResourceKind>,
+    pub machine_unit_id: String,
+    pub system_configuration_sha256: String,
+    pub utility_topology_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompartmentWindowStats {
+    pub compartment_id: String,
+    pub compartment_configuration_sha256: String,
+    pub request_record_count: usize,
+    pub requests_accepted_in_window: usize,
+    pub requests_started_in_window: usize,
+    pub requests_completed_in_window: usize,
+    pub unresolved_requests_at_window_end: usize,
+    pub verified_item_release_count: usize,
+    pub active_request_seconds: u64,
+    pub maximum_concurrent_requests: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SystemWindowReport {
     pub window_id: String,
+    pub machine_unit_id: String,
+    pub system_configuration_sha256: String,
+    pub utility_topology_id: String,
     pub elapsed_wall_seconds: u64,
     pub request_record_count: usize,
+    pub physical_attempt_count_total: usize,
+    pub rewash_attempt_count_total: usize,
+    pub requests_with_rewash_attempts_total: usize,
+    pub item_attempt_visits_total: usize,
+    pub reattempted_item_visits_total: usize,
     pub carry_in_requests_at_window_start: usize,
     pub requests_accepted_in_window: usize,
     pub requests_started_in_window: usize,
@@ -133,12 +160,15 @@ pub struct SystemWindowReport {
     pub resource_totals: Vec<(SystemResourceKind, f64, &'static str)>,
     /// Window resource intensity per release; not a per-request lifecycle cost.
     pub window_resources_per_verified_release: Option<Vec<(SystemResourceKind, f64, &'static str)>>,
+    pub compartment_stats: Vec<CompartmentWindowStats>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SystemWindowError {
     InvalidWindow,
     InvalidIdentity(&'static str),
+    InvalidSystemIdentity(&'static str),
+    CompartmentConfigurationMismatch { compartment_id: String },
     InvalidClockDomain { request_id: String },
     InvalidResourceClockDomain { measurement_id: String },
     EmptyRequests,
@@ -283,6 +313,14 @@ fn validate_service_report(
             field: "attempt_count/physical_run_count",
         });
     }
+    if report.rewash_attempt_count > report.attempt_count
+        || (report.rewash_attempt_count == 0) != (report.reattempted_item_visits == 0)
+    {
+        return Err(SystemWindowError::InconsistentServiceReport {
+            request_id: request.service_request_id.clone(),
+            field: "rewash_attempt_count",
+        });
+    }
     if report.item_attempt_visits < report.unique_item_count
         || report.reattempted_item_visits != report.item_attempt_visits - report.unique_item_count
     {
@@ -314,6 +352,12 @@ fn validate_request(
 ) -> Result<(), SystemWindowError> {
     if !canonical_non_empty(&request.service_request_id) {
         return Err(SystemWindowError::InvalidIdentity("service_request_id"));
+    }
+    if !canonical_non_empty(&request.compartment_id) {
+        return Err(SystemWindowError::InvalidIdentity("compartment_id"));
+    }
+    if !valid_digest(&request.compartment_configuration_sha256) {
+        return Err(SystemWindowError::InvalidEvidenceDigest("compartment_configuration_sha256"));
     }
     if !canonical_non_empty(&request.clock_domain_id)
         || request.clock_domain_id != spec.clock_domain_id
@@ -417,6 +461,15 @@ pub fn account_system_window(
         || spec.end_at_s <= spec.start_at_s
     {
         return Err(SystemWindowError::InvalidWindow);
+    }
+    if !canonical_non_empty(&spec.machine_unit_id) {
+        return Err(SystemWindowError::InvalidSystemIdentity("machine_unit_id"));
+    }
+    if !valid_digest(&spec.system_configuration_sha256) {
+        return Err(SystemWindowError::InvalidSystemIdentity("system_configuration_sha256"));
+    }
+    if !canonical_non_empty(&spec.utility_topology_id) {
+        return Err(SystemWindowError::InvalidSystemIdentity("utility_topology_id"));
     }
     if requests.is_empty() {
         return Err(SystemWindowError::EmptyRequests);
