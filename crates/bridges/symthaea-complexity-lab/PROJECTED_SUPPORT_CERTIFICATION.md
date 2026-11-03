@@ -215,3 +215,25 @@ The primary competitive score should be **verified exact instances solved** unde
 ## 10. Claim boundary
 
 ETH-027 is a research integration design and reproduction plan. The SAT 2025 SCPOG implementation is established prior art. The current ETH-026 v1 Python prototype is a finite exhaustive reference evaluator, not a scalable bottom-up circuit engine. No new Symthaea SCPOG adapter, Rust build, Lean/HOL4 verification, solver differential, or SOTA advantage is claimed by this document.
+
+
+## 11. Executed ETH-027 bottom-up reference prototype
+
+A small local reference prototype now tests nested deterministic/decomposable decision circuits and bottom-up exact evaluation:
+- Source: `reference/projected_support_bottom_up.py`
+- Manifest: `reference/projected_support_bottom_up_results.json`
+- Executed environment: Python 3.13.5, seed `0xe7027`
+- Exact direct truth-table oracle comparisons: 5,000/5,000, 1,000 per contract (#SAT, WMC, PMC, PWMC, complex AMC over Q(i)).
+- Hidden-witness invariance cases: 500/500.
+- Circuit structure traversed: 159,097 nodes, including 12,693 non-smooth OR nodes and 11,727 nodes referenced by multiple parents.
+- Non-smooth OR scope completion: exact result 19/28, matching the independent oracle; support cardinality 3.
+- Free-variable completion: root scope {x}, exact result 864, matching oracle; support cardinality 4.
+- Signed rational WMC cancellation: exact zero with support cardinality 2.
+- Complex Q(i) cancellation: exact zero with support cardinality 2.
+- Invalid controls rejected: overlapping product scopes, false OR determinism, and binary floating-point weights in exact mode.
+
+The exact locally executed source has Git blob SHA `e3b14fe2f544999c62ac297329f0d03807832e1c`; fetching the committed file back from GitHub returned the same blob SHA. The result manifest binds this source SHA.
+
+### Interpretation and limitations
+
+This is evidence for the bottom-up arithmetic rule on small finite nested deterministic/decomposable DAGs, including non-smooth scope completion and shared subgraphs. The arithmetic evaluator traverses the DAG bottom-up and memoizes no subtree in the result representation; the reference compiler and determinism validation still use exhaustive truth tables. Shannon decomposition here is not a general source-CNF compiler. The experiment does not invoke or verify the SAT 2025 SCPOG artifact, does not implement a proof adapter, and is not a Rust/Lean/HOL4 build, solver-binary differential, large-scale benchmark, or SOTA result.
