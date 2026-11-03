@@ -744,7 +744,9 @@ mod tests {
         let selected = plan.selected.unwrap();
         assert!((selected.expected_information_gain_bits - 0.2800269059780251).abs() < 1.0e-12);
         assert!((selected.worst_case_information_gain_bits - 0.02904940554533142).abs() < 1.0e-12);
-        assert!((selected.lower_tail_cvar_information_gain_bits - 0.02904940554533142).abs() < 1.0e-12);
+        assert!(
+            (selected.lower_tail_cvar_information_gain_bits - 0.02904940554533142).abs() < 1.0e-12
+        );
         assert!(selected.information_gain_variance_bits_squared > 0.0);
         assert_eq!(selected.scenario_results.len(), 2);
     }
