@@ -29,6 +29,7 @@ A single pair of worlds can be query-equivalent while their segmentation graphs 
 
 Each world manifest pins:
 - world, dataset, source-volume and release identifiers;
+- a complete object inventory for the object classes in scope: SEGMENT, NEURON, SYNAPSE and ARTIFACT;
 - exact segmentation SHA-256 and optional mesh / skeleton / synapse annotation SHA-256;
 - coordinate-frame identifier and voxel spacing in physical nanometres;
 - object inventory with object type, object ID, optional lineage ID and optional stable anchor ID.
@@ -51,11 +52,13 @@ Cardinality rules:
 - `ONE_TO_MANY`: exactly 1 source and at least 2 targets.
 - `MANY_TO_ONE`: at least 2 sources and exactly 1 target.
 - `MANY_TO_MANY`: at least 2 sources and at least 2 targets.
-- `UNMAPPED`: one or more sources and zero targets.
+- `UNMAPPED`: one or more sources and exactly zero targets.
+
+The cardinality label must be recomputed from source/target array lengths and must match exactly. The schema and semantic verifier both reject mismatches. For V0.1, every source object in the source manifest inventory must occur in at least one mapping; objects with no target correspondence must be declared by an explicit UNMAPPED row. Multiple mapping rows may reference the same source only when they represent distinct typed relations or explicit unresolved alternatives; the verifier does not infer identity by picking one.
 
 Do not force split / merge lineage into bijections. A partial mapping can leave objects unresolved; every unmapped or unresolved source object is counted. Do not silently discard ambiguous alternatives.
 
-Every source and target object ID must exist in the corresponding pinned world manifest. A `NEURON_CORRESPONDENCE` mapping must reference neuron objects; a `SYNAPSE_CORRESPONDENCE` mapping must reference synapse objects; `SEGMENT_LINEAGE` must reference segment objects.
+Every source and target object ID must exist in the corresponding pinned world manifest. A `NEURON_CORRESPONDENCE` mapping must reference neuron objects; a `SYNAPSE_CORRESPONDENCE` mapping must reference synapse objects; `SEGMENT_LINEAGE` must reference segment objects; `ARTIFACT_IDENTITY` must reference artifact objects. A source/target relation with mismatched object types is rejected.
 
 A `SEGMENT_LINEAGE` relation does not itself assert neuron identity. A neuron correspondence needs independent identity evidence (for example a stable source anchor or expert adjudication) under the declared evidence policy.
 
@@ -72,14 +75,14 @@ The V0.1 schema does not authenticate evidence. Until that verifier exists, synt
 
 ## 6. Physical registration
 
-Coordinate transforms are explicit and directional. The source-to-target transform, coordinate-frame policy, physical voxel spacing, maximum observed residual and uncertainty bound must be present.
+Coordinate transforms are explicit and directional. V0.1 fixes column-vector convention, nanometre coordinates, and source-to-target multiplication: `p_target = T_source_to_target * p_source`. The 4×4 matrix is affine, and its final row must be `[0, 0, 0, 1]` within `1e-9`; its upper-left 3×3 determinant must be finite and have absolute value greater than `1e-12`. The source-to-target transform, coordinate-frame policy, physical voxel spacing, maximum observed residual and uncertainty bound must be present when status is VERIFIED.
 
 - Use physical units (nm / µm), never voxel-index distances without anisotropy conversion.
 - A transform with unknown or unacceptable uncertainty cannot support identity.
 - Registration similarity is supporting evidence, not proof of identity.
 - Reflections, axis swaps and anisotropic scale changes must be explicitly allowed or rejected by the pinned coordinate-frame policy.
 
-V0.1 carries a 4×4 transform in the receipt schema. A later implementation must specify transform convention (row/column vector, handedness, units, multiplication order), validate rigid/affine constraints under policy, and recompute residuals from actual anchor coordinates. It must not trust a caller's `max_residual_nm` value alone.
+V0.1 carries a 4×4 transform in the receipt schema and the above convention is normative. The future semantic verifier must check the matrix, recompute physical residuals from actual anchor coordinates and the pinned coordinate-frame policy, and authenticate the evidence artifacts. It must not trust a caller's `max_residual_nm` value alone. The V0.1 schema/fixture validator only checks matrix form; it does not authenticate the transform or certify registration.
 
 ## 7. Query equivalence
 
@@ -133,3 +136,13 @@ Proposed targets are qualification goals, not results:
 ## 10. Claim ceiling
 
 A V0.1 receipt schema and synthetic fixtures demonstrate only that the contract can represent typed partial correspondence and prevent category errors. They do not validate source evidence, authenticate edit lineage, establish neuron identity, or prove anatomical equivalence. Biological correspondence results require a later independent verifier and adjudicated real-world evaluation.
+
+## 11. V0.1 executable contract and claim ceiling
+
+The schema is structural. A semantic verifier must independently check sidecar raw-byte hashes, embedded world identity, object inventories, mapping IDs, evidence IDs, object membership, relation/object-type compatibility, cardinality, explicit source coverage, summary counters and query-output relationships.
+
+The expected output of the first verifier is `COUNTERS_RECOMPUTED` with `trusted_promotion=false`. It must not treat `support_status=VERIFIED`, `authority=INDEPENDENTLY_VERIFIED`, `registration.status=VERIFIED`, or `disposition=CORRESPONDENCE_VERIFIED` as authenticated truth. It has no evidence-artifact adapter, signer trust-root, source edit-history verifier or physical-anchor residual verifier. It therefore reports claimed statuses separately and keeps the actual receipt disposition NOT_ESTIMABLE unless a hard structural contradiction requires REJECTED or an explicitly preserved ambiguous alternative is present.
+
+A mapping row count is not a population metric. Mapping precision/recall targets require an independently adjudicated object-pair reference set, clustered by source volume / neuron / acquisition lineage. A source object repeated in alternative mappings must not inflate the denominator.
+
+The V0.1 schema includes an explicit ARTIFACT object type so artifact identity is not falsely represented as neuron or segment identity.
