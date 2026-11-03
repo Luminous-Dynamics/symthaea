@@ -27,7 +27,8 @@ use symthaea_music_theory::motif_family::{
     ProvenanceSource, ReviewStatus,
 };
 use symthaea_music_theory::{
-    Emphasis, Key, Motif, MotifNote, ObligationKind, PartId, Pitch, ReturnTransformation,
+    Emphasis, Key, Motif, MotifDevelopmentTransformation, MotifNote, ObligationKind,
+    PartId, Pitch, ReturnTransformation,
     Score, ScoreNote, ScoreValidationConfig, SonataObligationEvidence, SonataPlan,
     SonataRealization, SonataSectionKind, TheoryValidationReport, VoiceRole,
     validate_score, verify_sonata_obligations,
@@ -42,7 +43,7 @@ pub const SONATA_MOTIF_DEVELOPMENT_SCHEMA_VERSION_V1: u32 = 1;
 #[serde(rename_all = "snake_case")]
 pub enum SonataMotifDevelopmentStrategyV1 {
     IdentityBaseline,
-    TransposedUpOneDiatonicDegree,
+    DiatonicTransposition,
     InvertedAroundFirstDegree,
 }
 
@@ -62,7 +63,7 @@ pub enum SonataMotifDevelopmentErrorV1 {
     SourcePitchOutsideDiatonicScale { source_note_index: usize },
     TargetPitchOutsideDiatonicScale { target_note_index: usize },
     InvalidCapability(String),
-    UnsupportedTransformation { transformation: ReturnTransformation },
+    UnsupportedTransformation { transformation: MotifDevelopmentTransformation },
     GeneratedPitchOutsideRepresentableRange { note_index: usize },
     SerializationFailure(String),
 }
@@ -71,7 +72,7 @@ pub enum SonataMotifDevelopmentErrorV1 {
 pub struct SonataMotifDevelopmentCandidateV1 {
     pub candidate_id: String,
     pub strategy: SonataMotifDevelopmentStrategyV1,
-    pub transformation: Option<ReturnTransformation>,
+    pub transformation: Option<MotifDevelopmentTransformation>,
     pub score: Score,
     pub score_sha256: String,
     pub event_projection_sha256: String,
@@ -89,7 +90,7 @@ pub struct SonataMotifDevelopmentBatchV1 {
     pub capability_sha256: String,
     pub source_motif_id: String,
     pub source_motif_family_id: String,
-    pub requested_transformation: ReturnTransformation,
+    pub requested_transformation: MotifDevelopmentTransformation,
     pub source_section: SonataSectionKind,
     pub target_section: SonataSectionKind,
     pub source_key: Key,
@@ -153,10 +154,7 @@ pub fn generate_sonata_motif_development_v1(
         }
         _ => return Err(SonataMotifDevelopmentErrorV1::DrivingObligationIsNotNamedMotif),
     };
-    if !matches!(
-        requested_transformation,
-        ReturnTransformation::Transposed | ReturnTransformation::Inverted
-    ) {
+    if development_family_transform(requested_transformation).is_err() {
         return Err(SonataMotifDevelopmentErrorV1::UnsupportedTransformation {
             transformation: requested_transformation,
         });
@@ -255,7 +253,7 @@ pub fn generate_sonata_motif_development_v1(
         source_motif.clone(),
         PhraseRole::Transition,
         vec![MotifInvariant::EventCount(source_note_indices.len())],
-        vec![requested_transformation],
+        vec![development_family_transform(requested_transformation)?],
         // The Sonata style does not yet have a Style enum value. An empty
         // compatibility list is more honest than asserting Classical fit.
         Vec::new(),
@@ -301,12 +299,19 @@ pub fn generate_sonata_motif_development_v1(
     )?);
 
     let (strategy, candidate_id, transformed_motif) = match requested_transformation {
-        ReturnTransformation::Transposed => (
-            SonataMotifDevelopmentStrategyV1::TransposedUpOneDiatonicDegree,
-            "transposed-up-one-diatonic-degree",
-            source_motif.transpose(1),
-        ),
-        ReturnTransformation::Inverted => {
+        MotifDevelopmentTransformation::DiatonicTransposition { degree_shift } => {
+            if degree_shift == 0 || !(-7..=7).contains(&degree_shift) {
+                return Err(SonataMotifDevelopmentErrorV1::UnsupportedTransformation {
+                    transformation: requested_transformation,
+                });
+            }
+            (
+                SonataMotifDevelopmentStrategyV1::DiatonicTransposition,
+                format!("diatonic-shift-{degree_shift}"),
+                source_motif.transpose(degree_shift),
+            )
+        }
+        MotifDevelopmentTransformation::InversionAroundFirstNote => {
             let pivot = source_motif
                 .notes
                 .first()
@@ -316,14 +321,9 @@ pub fn generate_sonata_motif_development_v1(
                 })?;
             (
                 SonataMotifDevelopmentStrategyV1::InvertedAroundFirstDegree,
-                "inversion-about-first-source-degree",
+                "inversion-about-first-source-degree".to_owned(),
                 source_motif.invert(pivot),
             )
-        }
-        unsupported => {
-            return Err(SonataMotifDevelopmentErrorV1::UnsupportedTransformation {
-                transformation: unsupported,
-            });
         }
     };
     let transformed_score = apply_pitch_motif(
@@ -341,7 +341,7 @@ pub fn generate_sonata_motif_development_v1(
             },
         )?;
     candidates.push(build_candidate(
-        candidate_id,
+        &candidate_id,
         strategy,
         Some(requested_transformation),
         transformed_score,
@@ -431,12 +431,31 @@ fn build_candidate(
     })
 }
 
+fn development_family_transform(
+    transformation: MotifDevelopmentTransformation,
+) -> Result<ReturnTransformation, SonataMotifDevelopmentErrorV1> {
+    match transformation {
+        MotifDevelopmentTransformation::DiatonicTransposition { degree_shift }
+            if degree_shift != 0 && (-7..=7).contains(&degree_shift) =>
+        {
+            Ok(ReturnTransformation::Transposed)
+        }
+        MotifDevelopmentTransformation::InversionAroundFirstNote => {
+            Ok(ReturnTransformation::Inverted)
+        }
+        unsupported => Err(SonataMotifDevelopmentErrorV1::UnsupportedTransformation {
+            transformation: unsupported,
+        }),
+    }
+}
+
 fn validate_transformation_allowed(
     family: &MotifFamily,
-    transformation: Option<ReturnTransformation>,
+    transformation: Option<MotifDevelopmentTransformation>,
 ) -> Result<(), SonataMotifDevelopmentErrorV1> {
     if let Some(transformation) = transformation {
-        if !family.permitted_transforms.contains(&transformation) {
+        let family_transform = development_family_transform(transformation)?;
+        if !family.permitted_transforms.contains(&family_transform) {
             return Err(SonataMotifDevelopmentErrorV1::UnsupportedTransformation {
                 transformation,
             });
@@ -667,14 +686,21 @@ mod tests {
             motif_from_score_indices(&score, &[0, 1, 2], score.key).unwrap(),
         );
         assert_eq!(
-            validate_transformation_allowed(&family, Some(ReturnTransformation::Fragmented)),
+            validate_transformation_allowed(
+                &family,
+                Some(MotifDevelopmentTransformation::DiatonicTransposition {
+                    degree_shift: 0,
+                }),
+            ),
             Err(SonataMotifDevelopmentErrorV1::UnsupportedTransformation {
-                transformation: ReturnTransformation::Fragmented,
+                transformation: MotifDevelopmentTransformation::DiatonicTransposition {
+                    degree_shift: 0,
+                },
             })
         );
         assert!(validate_transformation_allowed(
             &family,
-            Some(ReturnTransformation::Transposed),
+            Some(MotifDevelopmentTransformation::DiatonicTransposition { degree_shift: 1 }),
         ).is_ok());
     }
 
