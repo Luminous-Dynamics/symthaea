@@ -762,7 +762,7 @@ mod tests {
             LikelihoodModelScenario {
                 scenario_id: "shifted".to_owned(),
                 scenario_probability: 0.5,
-                experiments: vec![matrix("fragile", 0.5, 0.5), matrix("steady", 0.75, 0.25)],
+                experiments: vec![matrix("fragile", 0.55, 0.45), matrix("steady", 0.75, 0.25)],
             },
         ];
         let plan = plan_next_experiment_robust(
@@ -782,6 +782,8 @@ mod tests {
             .iter()
             .find(|item| item.experiment_id == "fragile")
             .unwrap();
+        assert!(fragile.lower_tail_cvar_information_gain_bits > 1.0e-6);
+        assert!((fragile.top1_rank_stability - 0.5).abs() < 1.0e-12);
         assert!(fragile.top1_rank_stability < 1.0);
     }
 
