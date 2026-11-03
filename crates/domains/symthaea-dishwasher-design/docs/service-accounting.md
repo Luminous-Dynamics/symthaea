@@ -38,12 +38,14 @@ Attempt timestamps use one monotonic clock. The service makespan is maximum fini
 
 ## Data and evidence requirements
 
-- One physical run ID per attempt; rewashes require new run IDs.
+- One physical run ID per attempt; rewashes require new run IDs. Every item/endpoint decision must carry the same run ID as its attempt.
+- Each attempt carries separate resource and outcome archive references plus SHA-256 digests. Each outcome carries its item, endpoint, criterion, method, protocol and source-record reference.
+- These references/digests support traceability only: they do not authenticate the file, prove the contents or establish that an assay is independent/valid. Verify the archive and endpoint record through the upstream evidence pipeline before building the ledger.
 - Sequence numbers are strictly increasing in the order supplied to the accounting function.
 - Item IDs identify one requested service, not a reusable item category such as glass or plate.
 - Every outcome record carries a `run_id` that must exactly match the containing attempt, plus an item and endpoint identity. Criterion, method, protocol and evidence-reference binding must be validated upstream against the qualified outcome-evidence record.
 - Only IndependentOutcomeAssay is accepted. Turbidity, conductivity, camera confidence, temperature, commanded dosing and model predictions must not be submitted as outcome decisions.
-- The module checks that a required endpoint has a PASS record; it does not authenticate the assay, validate its uncertainty, prove physical independence or verify the scientific quality of the evidence. Perform the existing outcome qualification and run/derived-record lineage audits before constructing an accepted ledger.
+- The module checks that a required endpoint has a PASS record, that its run ID matches the attempt, and that criterion/method/protocol/evidence references are nonblank. It does not verify their contents, authenticate the assay, validate its uncertainty, prove physical independence or verify scientific quality. Perform the existing outcome qualification and run/derived-record lineage audits before constructing an accepted ledger.
 - An interrupted run never releases an item, even where partial observations look favourable.
 
 ## Illustrative arithmetic (not measured performance)
@@ -65,6 +67,6 @@ This is the intended accounting behaviour; the numbers are explanatory fixtures,
 
 ## Tests authored
 
-The module includes tests for complete endpoint qualification, failed-attempt rewash accounting, missing/indeterminate endpoint rejection, per-item outcomes within a multi-item run, interrupted-attempt resource inclusion, proxy-evidence rejection, duplicate outcomes/run IDs, invalid resource and sequence values, and reattempt after qualification.
+The module includes tests for complete endpoint qualification, failed-attempt rewash accounting, missing/indeterminate endpoint rejection, per-item outcomes within a multi-item run, interrupted-attempt resource inclusion, proxy-evidence rejection, run-ID mismatch, archive reference/digest validation, evidence-reference validation, duplicate outcomes/run IDs, invalid resource and sequence values, and reattempt after qualification.
 
 They are source-authored tests only until Cargo runs them on the exact commit.
