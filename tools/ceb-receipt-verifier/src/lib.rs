@@ -952,6 +952,27 @@ fn verify_one_receipt(
         return Err(Failure::unresolved("runner profile, image digest, or network policy is not qualified"));
     }
 
+    // The receipts must implement the immutable environment contract, not merely
+    // agree with one another about a potentially incorrect runtime configuration.
+    let task_environment = field(task, "environment", "task contract")?;
+    let expected_profile = string_field(task_environment, "runner_profile", "environment")?;
+    let expected_network = string_field(task_environment, "network_policy", "environment")?;
+    let expected_runner_policy = string_field(task_environment, "runner_policy_sha256", "environment")?;
+    let expected_toolchain = string_field(task_environment, "toolchain_lock_sha256", "environment")?;
+    let expected_image = string_field(task_environment, "image", "environment")?;
+    let expected_image_digest = expected_image
+        .rsplit_once("@sha256:")
+        .map(|(_, digest)| format!("sha256:{digest}"))
+        .ok_or_else(|| Failure::unresolved("task environment image is not pinned by an OCI SHA-256 digest"))?;
+    if runner_profile != expected_profile
+        || network_policy != expected_network
+        || image_digest.as_deref() != Some(expected_image_digest.as_str())
+        || string_field(execution, "runner_policy_sha256", "execution")? != expected_runner_policy
+        || string_field(execution, "toolchain_lock_sha256", "execution")? != expected_toolchain
+    {
+        return Err(Failure::protocol("receipt runtime environment differs from the immutable task contract"));
+    }
+
     let grader = field(predicate, "grader", "predicate")?;
     if !matches!(string_field(grader, "trust_domain", "grader")?.as_str(), "separate_host_control_plane" | "separate_vm")
         || string_field(grader, "candidate_access", "grader")? != "read_only"
@@ -1020,7 +1041,7 @@ fn check_pair_consistency(primary: &VerifiedReceipt, regrade: &VerifiedReceipt) 
     }
     let primary_execution = field(primary_predicate, "execution", "primary predicate")?;
     let regrade_execution = field(regrade_predicate, "execution", "regrade predicate")?;
-    for key in ["runner_profile", "image_digest", "runner_policy_sha256", "network_policy"] {
+    for key in ["runner_profile", "image_digest", "runner_policy_sha256", "toolchain_lock_sha256", "network_policy"] {
         if field(primary_execution, key, "primary execution")?
             != field(regrade_execution, key, "regrade execution")?
         {
