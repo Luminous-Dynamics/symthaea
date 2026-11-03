@@ -6,7 +6,7 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chrono::{DateTime, FixedOffset};
 use ed25519_dalek::{Signature, VerifyingKey};
-use serde::de::{Deserialize, Deserializer, Error as DeError, MapAccess, SeqAccess, Visitor};
+use serde::de::{Deserializer, Error as DeError, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Number, Value};
 use sha2::{Digest, Sha256};
@@ -978,12 +978,12 @@ fn verify_pair_inner(inputs: &PairInputs) -> Result<VerificationReport, Failure>
     }
     let source_snapshot = field(&task, "source_snapshot", "task contract")?;
     let task_source_tree = optional_string_field(source_snapshot, "tree_sha256", "source_snapshot")?;
-    if task_source_tree.as_deref() != Some(inputs.source_tree_sha256.as_str()) {
-        return Err(Failure::protocol("source-tree pin does not match the task contract"));
-    }
     let execution_status = string_field(&task, "execution_status", "task contract")?;
     if execution_status != "qualified" {
         return Err(Failure::unresolved("task contract is not qualified; design-only and fixture-ready tasks cannot be scored"));
+    }
+    if task_source_tree.as_deref() != Some(inputs.source_tree_sha256.as_str()) {
+        return Err(Failure::protocol("source-tree pin does not match the task contract"));
     }
 
     let primary = verify_one_receipt(
