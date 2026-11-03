@@ -48,6 +48,8 @@ pub struct DoseEvent {
     pub stage: WashStage,
     /// Elapsed seconds from the beginning of the complete cycle.
     pub elapsed_s: u32,
+    /// Duration of physical release; interactions are measured after delivery ends.
+    pub release_duration_s: u32,
     /// Commanded component mass in integer milligrams. Volumetric ingredients
     /// must be converted using a measured batch density and archived in the protocol.
     pub dose_mg: u64,
@@ -133,7 +135,11 @@ pub enum ChemistryError {
     OverlappingStageWindows,
     StageOrderViolation,
     EmptyDosePlan,
+    InvalidEventId,
     DuplicateEventId(String),
+    InvalidEventDuration {
+        event_id: String,
+    },
     UnknownComponent(String),
     UnsupportedSoil {
         component_id: String,
@@ -393,8 +399,16 @@ pub fn validate_dose_plan(
     let mut total_dose_mg = 0_u64;
 
     for event in &request.events {
-        if !non_empty(&event.event_id) || !event_ids.insert(event.event_id.clone()) {
+        if !non_empty(&event.event_id) || event.event_id.trim() != event.event_id {
+            return Err(ChemistryError::InvalidEventId);
+        }
+        if !event_ids.insert(event.event_id.clone()) {
             return Err(ChemistryError::DuplicateEventId(event.event_id.clone()));
+        }
+        if event.release_duration_s == 0 {
+            return Err(ChemistryError::InvalidEventDuration {
+                event_id: event.event_id.clone(),
+            });
         }
         let calibration = calibration_by_id
             .get(&event.component_id)
@@ -441,7 +455,9 @@ pub fn validate_dose_plan(
             .ok_or(ChemistryError::EventOutsideStageWindow {
                 event_id: event.event_id.clone(),
             })?;
-        if event.elapsed_s < window.start_s || event.elapsed_s >= window.end_s {
+        let release_end_s =
+            u64::from(event.elapsed_s) + u64::from(event.release_duration_s);
+        if event.elapsed_s < window.start_s || release_end_s > u64::from(window.end_s) {
             return Err(ChemistryError::EventOutsideStageWindow {
                 event_id: event.event_id.clone(),
             });
@@ -501,7 +517,18 @@ pub fn validate_dose_plan(
 
         for left in &first {
             for right in &second {
-                if left.elapsed_s.abs_diff(right.elapsed_s) < interaction.minimum_separation_s {
+                let left_start = u64::from(left.elapsed_s);
+                let left_end = left_start + u64::from(left.release_duration_s);
+                let right_start = u64::from(right.elapsed_s);
+                let right_end = right_start + u64::from(right.release_duration_s);
+                let separation_s = if left_end <= right_start {
+                    right_start - left_end
+                } else if right_end <= left_start {
+                    left_start - right_end
+                } else {
+                    0
+                };
+                if separation_s < u64::from(interaction.minimum_separation_s) {
                     return Err(ChemistryError::IncompatibleReleaseTiming {
                         first_event_id: left.event_id.clone(),
                         second_event_id: right.event_id.clone(),
@@ -604,6 +631,7 @@ mod tests {
                     component_id: "enzyme".to_owned(),
                     stage: WashStage::Prewash,
                     elapsed_s: 120,
+                    release_duration_s: 5,
                     dose_mg: 500,
                 },
                 DoseEvent {
@@ -611,6 +639,7 @@ mod tests {
                     component_id: "bleach".to_owned(),
                     stage: WashStage::MainWash,
                     elapsed_s: 600,
+                    release_duration_s: 5,
                     dose_mg: 400,
                 },
                 DoseEvent {
@@ -618,6 +647,7 @@ mod tests {
                     component_id: "rinse-aid".to_owned(),
                     stage: WashStage::FinalRinse,
                     elapsed_s: 1_350,
+                    release_duration_s: 5,
                     dose_mg: 200,
                 },
             ],
@@ -733,6 +763,7 @@ mod tests {
             component_id: "enzyme".to_owned(),
             stage: WashStage::Prewash,
             elapsed_s: 240,
+            release_duration_s: 5,
             dose_mg: 1_000,
         });
         input.events[1].elapsed_s = 700;
@@ -755,6 +786,7 @@ mod tests {
                 component_id: "enzyme".to_owned(),
                 stage: WashStage::Prewash,
                 elapsed_s: 10,
+                release_duration_s: 1,
                 dose_mg: u64::MAX,
             },
             DoseEvent {
@@ -762,6 +794,7 @@ mod tests {
                 component_id: "enzyme".to_owned(),
                 stage: WashStage::Prewash,
                 elapsed_s: 20,
+                release_duration_s: 1,
                 dose_mg: 1,
             },
         ];
@@ -769,6 +802,41 @@ mod tests {
             validate_dose_plan(&profile, &input),
             Err(ChemistryError::ComponentDoseOverflow { .. })
                 | Err(ChemistryError::TotalDoseOverflow)
+        ));
+    }
+
+    #[test]
+    fn rejects_release_that_starts_inside_but_finishes_after_phase() {
+        let mut input = request();
+        input.events[0].elapsed_s = 299;
+        input.events[0].release_duration_s = 2;
+        assert!(matches!(
+            validate_dose_plan(&formulation(), &input),
+            Err(ChemistryError::EventOutsideStageWindow { .. })
+        ));
+    }
+
+    #[test]
+    fn interaction_separation_is_measured_after_release_completion() {
+        let mut input = request();
+        input.events[0].stage = WashStage::MainWash;
+        input.events[0].elapsed_s = 400;
+        input.events[0].release_duration_s = 100;
+        input.events[1].elapsed_s = 600;
+        input.events[1].release_duration_s = 5;
+        assert!(matches!(
+            validate_dose_plan(&formulation(), &input),
+            Err(ChemistryError::IncompatibleReleaseTiming { .. })
+        ));
+    }
+
+    #[test]
+    fn invalid_zero_duration_release_is_rejected() {
+        let mut input = request();
+        input.events[0].release_duration_s = 0;
+        assert!(matches!(
+            validate_dose_plan(&formulation(), &input),
+            Err(ChemistryError::InvalidEventDuration { .. })
         ));
     }
 
