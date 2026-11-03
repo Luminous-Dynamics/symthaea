@@ -902,8 +902,7 @@ pub fn decision_selection_regret(
     })
 }
 
-
-fn cholesky(matrix: &[Vec<f64>]) -> Result<Vec<Vec<f64>>, DesignError> {
+fn cholesky(matrix: &[Vec<f64>] -> Result<Vec<Vec<f64>>, DesignError> {
     let n = matrix.len();
     let mut lower = vec![vec![0.0; n]; n];
     for i in 0..n {
