@@ -1055,9 +1055,35 @@ pub fn plan_next_experiment_decision_aware(
             });
             continue;
         }
-        if metrics.expected_shared_policy_evsi
-            <= config.minimum_shared_policy_evsi + OBJECTIVE_TOLERANCE
-        {
+        let normalized_cost = normalized_cost(proposal, config.base).max(1.0e-12);
+        let (selected_objective, utility, satisfies_decision_value_floor) =
+            match config.ranking_policy {
+                DecisionRankingPolicy::ExpectedEvsi => (
+                    metrics.expected_shared_policy_evsi,
+                    metrics.expected_shared_policy_evsi / normalized_cost,
+                    metrics.expected_shared_policy_evsi
+                        > config.minimum_shared_policy_evsi + OBJECTIVE_TOLERANCE,
+                ),
+                DecisionRankingPolicy::WorstCaseEvsi => (
+                    metrics.worst_case_shared_policy_evsi,
+                    metrics.worst_case_shared_policy_evsi / normalized_cost,
+                    metrics.worst_case_shared_policy_evsi
+                        > config.minimum_shared_policy_evsi + OBJECTIVE_TOLERANCE,
+                ),
+                DecisionRankingPolicy::LowerTailCvarEvsi => (
+                    metrics.lower_tail_shared_policy_cvar_evsi,
+                    metrics.lower_tail_shared_policy_cvar_evsi / normalized_cost,
+                    metrics.lower_tail_shared_policy_cvar_evsi
+                        > config.minimum_shared_policy_evsi + OBJECTIVE_TOLERANCE,
+                ),
+                DecisionRankingPolicy::MinimaxRegret => (
+                    -metrics.worst_case_regret,
+                    -metrics.worst_case_regret / normalized_cost,
+                    metrics.expected_shared_policy_evsi
+                        > config.minimum_shared_policy_evsi + OBJECTIVE_TOLERANCE,
+                ),
+            };
+        if !satisfies_decision_value_floor {
             rejected_experiments.push(DecisionRejectedExperiment {
                 experiment_id: proposal.id.clone(),
                 reasons: vec![DecisionRejectionReason::NoDecisionValue],
@@ -1065,26 +1091,6 @@ pub fn plan_next_experiment_decision_aware(
             continue;
         }
         saw_decision_value = true;
-
-        let normalized_cost = normalized_cost(proposal, config.base).max(1.0e-12);
-        let (selected_objective, utility) = match config.ranking_policy {
-            DecisionRankingPolicy::ExpectedEvsi => (
-                metrics.expected_shared_policy_evsi,
-                metrics.expected_shared_policy_evsi / normalized_cost,
-            ),
-            DecisionRankingPolicy::WorstCaseEvsi => (
-                metrics.worst_case_shared_policy_evsi,
-                metrics.worst_case_shared_policy_evsi / normalized_cost,
-            ),
-            DecisionRankingPolicy::LowerTailCvarEvsi => (
-                metrics.lower_tail_shared_policy_cvar_evsi,
-                metrics.lower_tail_shared_policy_cvar_evsi / normalized_cost,
-            ),
-            DecisionRankingPolicy::MinimaxRegret => (
-                metrics.worst_case_regret,
-                -metrics.worst_case_regret / normalized_cost,
-            ),
-        };
 
         let shared_policy = proposal
             .outcomes
@@ -1468,6 +1474,46 @@ mod tests {
         assert_eq!(
             selected.scenario_results[0].outcomes[0].shared_policy_decision_impact,
             DecisionImpact::ServiceDisruption
+        );
+    }
+
+    #[test]
+    fn worst_case_evsi_does_not_select_a_probe_that_is_useless_in_a_plausible_scenario() {
+        let hypotheses = hypotheses(&[0.5, 0.5]);
+        let decisions = decisions(&[("repair-a", &[10.0, 0.0]), ("repair-b", &[0.0, 10.0])]);
+        let proposals = vec![proposal("probe", &["yes", "no"])];
+        let scenarios = vec![
+            scenario(
+                "informative",
+                0.9,
+                vec![matrix("probe", &[("h0", &[0.99, 0.01]), ("h1", &[0.01, 0.99])])],
+            ),
+            scenario(
+                "uninformative",
+                0.1,
+                vec![matrix("probe", &[("h0", &[0.5, 0.5]), ("h1", &[0.5, 0.5])])],
+            ),
+        ];
+        let result = plan(
+            &hypotheses,
+            &proposals,
+            &scenarios,
+            &decisions,
+            DecisionPlannerConfig {
+                ranking_policy: DecisionRankingPolicy::WorstCaseEvsi,
+                ..DecisionPlannerConfig::default()
+            },
+        )
+        .unwrap();
+
+        assert!(result.selected.is_none());
+        assert_eq!(
+            result.rejected_experiments[0].reasons,
+            vec![DecisionRejectionReason::NoDecisionValue]
+        );
+        assert_eq!(
+            result.abstention,
+            Some(DecisionAbstentionReason::NoDecisionValue)
         );
     }
 
