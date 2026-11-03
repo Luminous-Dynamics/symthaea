@@ -83,6 +83,7 @@ impl StressWorld {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RobustnessError {
     InvalidDesign,
+    InvalidSeverity,
     CountOverflow,
     MisalignedRecords,
     PartialObservation,
@@ -95,6 +96,7 @@ impl fmt::Display for RobustnessError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
             Self::InvalidDesign => "design needs >=4 participants, >=2 sessions, and >=8 even trials per session",
+            Self::InvalidSeverity => "severity must be finite and within [0, 1]",
             Self::CountOverflow => "design exceeds supported count or identifier range",
             Self::MisalignedRecords => "candidate records and evaluator truth are not aligned",
             Self::PartialObservation => "score and response must both be present or both be absent",
@@ -174,6 +176,7 @@ pub struct EvaluatorTruth {
     missing: Vec<bool>,
     injected_d_prime: Vec<f64>,
     world: StressWorld,
+    severity: f64,
     seed: u64,
 }
 
@@ -249,6 +252,7 @@ impl MetricDisposition {
 #[derive(Debug, Clone, PartialEq)]
 pub struct RobustnessReport {
     pub world: StressWorld,
+    pub severity: f64,
     pub seed: u64,
     pub total_trials: usize,
     pub observed_trials: usize,
@@ -284,6 +288,22 @@ pub fn simulate(
     world: StressWorld,
     design: SimulationDesign,
 ) -> Result<SyntheticBundle, RobustnessError> {
+    simulate_with_severity(world, design, 1.0)
+}
+
+/// Generate one campaign at a declared misspecification severity.
+///
+/// A severity of 0.0 removes the corresponding injected departure; 1.0
+/// reproduces the original v0 stress world. Intermediate values define the
+/// benchmark's dose-response path and are not universal effect-size scales.
+pub fn simulate_with_severity(
+    world: StressWorld,
+    design: SimulationDesign,
+    severity: f64,
+) -> Result<SyntheticBundle, RobustnessError> {
+    if !severity.is_finite() || !(0.0..=1.0).contains(&severity) {
+        return Err(RobustnessError::InvalidSeverity);
+    }
     let design = design.validate()?;
     let total = design.total_trials()?;
 
@@ -311,39 +331,54 @@ pub fn simulate(
                     session as f64 / (design.sessions_per_participant - 1) as f64;
 
                 let sensitivity = match world {
-                    StressWorld::SensitivityDrift => 0.20 + 1.60 * session_fraction,
+                    StressWorld::SensitivityDrift => {
+                        1.0 + severity * (-0.80 + 1.60 * session_fraction)
+                    }
                     StressWorld::ParticipantHeterogeneity => {
-                        0.15 + 1.70 * participant as f64 / (design.participants - 1) as f64
+                        1.0 + severity
+                            * (-0.85
+                                + 1.70 * participant as f64 / (design.participants - 1) as f64)
                     }
                     StressWorld::CovariateLeakage => 0.0,
                     _ => 1.0,
                 };
 
                 let criterion = match world {
-                    StressWorld::CriterionDrift => -1.0 + 2.0 * session_fraction,
+                    StressWorld::CriterionDrift => severity * (-1.0 + 2.0 * session_fraction),
                     _ => 0.0,
                 };
 
                 let mut residual = match world {
-                    StressWorld::HeavyTailed => evidence_rng.standardized_student_t3(),
+                    StressWorld::HeavyTailed => {
+                        if severity >= 1.0 {
+                            evidence_rng.standardized_student_t3()
+                        } else if severity <= 0.0 {
+                            evidence_rng.standard_normal()
+                        } else if evidence_rng.uniform() < severity {
+                            evidence_rng.standardized_student_t3()
+                        } else {
+                            evidence_rng.standard_normal()
+                        }
+                    }
                     StressWorld::ContaminatedMixture => {
-                        if evidence_rng.uniform() < 0.08 {
-                            evidence_rng.standard_normal() * 5.0
+                        if evidence_rng.uniform() < 0.08 * severity {
+                            evidence_rng.standard_normal() * (1.0 + 4.0 * severity)
                         } else {
                             evidence_rng.standard_normal()
                         }
                     }
                     StressWorld::SerialDependence => {
                         let innovation = evidence_rng.standard_normal();
-                        ar_state = 0.80 * ar_state
-                            + (1.0_f64 - 0.80_f64.powi(2)).sqrt() * innovation;
+                        let rho = 0.80 * severity;
+                        ar_state = rho * ar_state
+                            + (1.0_f64 - rho.powi(2)).sqrt() * innovation;
                         ar_state
                     }
                     _ => evidence_rng.standard_normal(),
                 };
 
                 let class_scale = if world == StressWorld::UnequalVariance && is_signal {
-                    1.80
+                    1.0 + 0.80 * severity
                 } else {
                     1.0
                 };
@@ -359,7 +394,7 @@ pub fn simulate(
 
                 let response = evidence_score >= criterion;
                 let auxiliary_score = if world == StressWorld::CovariateLeakage {
-                    (if is_signal { 1.5 } else { -1.5 })
+                    (if is_signal { 1.5 * severity } else { -1.5 * severity })
                         + auxiliary_rng.standard_normal() * 0.80
                 } else {
                     auxiliary_rng.standard_normal()
@@ -367,9 +402,9 @@ pub fn simulate(
 
                 let missing_probability = match world {
                     StressWorld::MissingCompletelyAtRandom => 0.15,
-                    StressWorld::MissingAtRandomBySession => 0.05 + 0.45 * session_fraction,
+                    StressWorld::MissingAtRandomBySession => 0.05 + 0.45 * severity * session_fraction,
                     StressWorld::OutcomeDependentMissingness => {
-                        if is_signal && response { 1.0 } else { 0.05 }
+                        if is_signal && response { 0.05 + 0.95 * severity } else { 0.05 }
                     }
                     _ => 0.0,
                 };
@@ -411,6 +446,7 @@ pub fn simulate(
             missing,
             injected_d_prime,
             world,
+            severity,
             seed: design.seed,
         },
     })
@@ -598,6 +634,7 @@ pub fn evaluate(
 
     Ok(RobustnessReport {
         world: truth.world,
+        severity: truth.severity,
         seed: truth.seed,
         total_trials: n,
         observed_trials,
@@ -968,6 +1005,7 @@ mod tests {
             missing: vec![false, true, false, false],
             injected_d_prime: vec![1.0; 4],
             world: StressWorld::SerialDependence,
+            severity: 1.0,
             seed: 7,
         };
 
