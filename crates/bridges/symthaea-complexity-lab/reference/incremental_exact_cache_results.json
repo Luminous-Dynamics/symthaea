@@ -1,12 +1,16 @@
 {
-  "suite": "ETH-019 content-normalized incremental exact cache",
+  "suite": "ETH-019 compact content-normalized incremental cache reproducer",
   "seed": 20261103,
   "normalizer": {
     "id": "symthaea.same-scope-pointwise-product-and-unit-elision/v1",
-    "operations": ["pointwise multiply same-scope factors", "remove exact multiplicative-identity factors"],
-    "independently_checked": true,
-    "normalization_mutant_rejected": true
+    "same_scope_factor_split_merge_cache_hits": 2,
+    "multiplicative_identity_factor_elision_cache_hits": 2,
+    "incorrect_normalized_factor_rejected": true
   },
+  "algebras": [
+    "natural-count/unbounded-int/v1",
+    "maxcount/multiplicity-distinct-support/v2"
+  ],
   "cache_identity_binds": [
     "schema",
     "normalizer_id",
@@ -16,15 +20,9 @@
     "multiset_of_normalized_input_factor_content_digests",
     "checker_id"
   ],
-  "algebras": [
-    "natural-count/unbounded-int/v1",
-    "maxcount/multiplicity-distinct-support/v2"
-  ],
-  "single_edit_disconnected_hits": 3,
-  "single_edit_disconnected_misses": 3,
+  "single_factor_edit_disconnected_hits": 3,
+  "single_factor_edit_disconnected_misses": 3,
   "factor_permutation_hits": 6,
-  "same_scope_split_merge_hits": 2,
-  "unit_factor_elision_hits": 2,
   "scope_edit_exact": true,
   "tampered_rehashed_payload_rejected": 1,
   "wrong_authentication_key_rejected": 6,
@@ -41,5 +39,5 @@
   "incremental_producer_multiplications": 3804,
   "producer_addition_reduction_fraction": 0.723302338686954,
   "producer_multiplication_reduction_fraction": 0.7104141291108405,
-  "claim_boundary": "Python finite reference only. Producer operations exclude checker replay, normalization, HMAC, JSON serialization, cache memory and wall-time costs. No Rust compile, Lean proof, public benchmark or measured runtime speedup."
+  "claim_boundary": "Python finite reference only. Producer operation reductions exclude checker replay, HMAC, JSON serialization, cache memory and wall-time costs. No Rust compile, Lean proof, public benchmark or measured runtime speedup."
 }
