@@ -58,7 +58,7 @@ The current Rust benchmark includes six policies:
 5. StateAwareFrontier — select messages using recipient prerequisite coverage, immediate executability, novelty to collective knowledge and downstream recipe unlock potential.
 6. StateAwareContentShuffled — first compute the state-aware sender/receiver schedule and each sender's selected recipe payload multiset, then shuffle those payloads only among that sender's scheduled recipients. This preserves who communicates with whom, when, how many messages are sent, which sender-owned recipes are sent, and each sender's selected content multiset.
 
-The final control is deliberately modeled on the paper's content-shuffling ablation. It preserves the exact ordered sender/receiver schedule and each sender's selected content multiset while permuting the mapping between that sender's selected recipes and the scheduled recipients. It is the most important causal control in this first mechanism slice: if state-aware routing wins only because of a different topology, message count, or sender's content selection—not recipient-state matching—the content-shuffled control should expose that.
+The two controls ask different causal questions. StateAwareRandomContent is the closer analogue of the paper's ablation: preserve who shares with whom, timing and message count, but randomize which sender-held memories are selected. StateAwareRecipientShuffled is stricter: also preserve each sender's selected payload multiset, changing only which scheduled recipient receives which selected payload. The first tests state-dependent content selection; the second tests recipient-specific matching conditional on a sender's selected content.
 
 The heuristic score is transparent and deterministic:
 - high priority when the recipient has all prerequisites and can execute the rule immediately;
@@ -75,7 +75,7 @@ The adaptive-transmission-sweep binary runs a predeclared grid:
 - population: 8, 16, 32;
 - graph shortcut probability: 0.0, 0.2 (ring baseline plus optional undirected shortcuts);
 - attention capacity per recipient per step: 1, 2, 4;
-- six policies above;
+- seven policies above;
 - 128 seeds per condition;
 - 12 steps;
 - one seed agent with three initial rules;
@@ -84,7 +84,7 @@ The adaptive-transmission-sweep binary runs a predeclared grid:
 - per-step transmission budget equal to the population size;
 - successful acquisition probability 0.9.
 
-This is 324 conditions and 41,472 total simulation runs. All policies in a given task/population/topology/attention condition use the same seed IDs and configuration. The current single-PRNG design makes this a matched-seed design, not a guarantee of perfectly aligned random draws after policy-dependent control flow; a separate-stream common-random-number implementation is a later hardening step.
+This is 378 conditions and 48,384 total simulation runs. All policies in a given task/population/topology/attention condition use the same seed IDs and configuration. The current single-PRNG design makes this a matched-seed design, not a guarantee of perfectly aligned random draws after policy-dependent control flow; a separate-stream common-random-number implementation is a later hardening step.
 
 Outputs include:
 - final collective result coverage and a 95% normal-approximation interval over simulation seeds;
