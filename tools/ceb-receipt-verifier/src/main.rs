@@ -76,8 +76,7 @@ fn read_limited(path: &Path, limit: u64) -> Result<Vec<u8>, String> {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    let command = cli.command;
-    let Command::VerifyPair {
+    let (
         task_contract,
         task_id,
         expected_task_contract_sha256,
@@ -90,21 +89,47 @@ fn main() -> ExitCode {
         regrade_artifacts_dir,
         trust_policy,
         expected_trust_policy_sha256,
-    } = command else {
-        let Command::HashTree { directory } = command else {
-            unreachable!("clap command variant was already matched");
-        };
-        return match hash_source_tree(&directory) {
-            Ok(sha256) => {
-                println!("algorithm={TREE_DIGEST_ALGORITHM}");
-                println!("sha256={sha256}");
-                ExitCode::SUCCESS
-            }
-            Err(reason) => {
-                eprintln!("tree hashing unresolved: {reason}");
-                ExitCode::from(2)
-            }
-        };
+    ) = match cli.command {
+        Command::HashTree { directory } => {
+            return match hash_source_tree(&directory) {
+                Ok(sha256) => {
+                    println!("algorithm={TREE_DIGEST_ALGORITHM}");
+                    println!("sha256={sha256}");
+                    ExitCode::SUCCESS
+                }
+                Err(reason) => {
+                    eprintln!("tree hashing unresolved: {reason}");
+                    ExitCode::from(2)
+                }
+            };
+        }
+        Command::VerifyPair {
+            task_contract,
+            task_id,
+            expected_task_contract_sha256,
+            source_tree_dir,
+            result_tree_dir,
+            patch,
+            primary,
+            primary_artifacts_dir,
+            regrade,
+            regrade_artifacts_dir,
+            trust_policy,
+            expected_trust_policy_sha256,
+        } => (
+            task_contract,
+            task_id,
+            expected_task_contract_sha256,
+            source_tree_dir,
+            result_tree_dir,
+            patch,
+            primary,
+            primary_artifacts_dir,
+            regrade,
+            regrade_artifacts_dir,
+            trust_policy,
+            expected_trust_policy_sha256,
+        ),
     };
 
     let loaded = (|| -> Result<PairInputs, String> {
