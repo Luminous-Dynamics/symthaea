@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ceb-repository-worlds-v0.schema.json",
+  "title": "CEB Repository Twin Evaluation Worlds V0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_id",
+    "status",
+    "feature_vocabulary",
+    "conditional_facts",
+    "worlds"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 0
+    },
+    "fixture_id": {
+      "const": "CEB-REPO-001-SYNTHETIC-V0"
+    },
+    "status": {
+      "const": "design_only_world_matrix"
+    },
+    "feature_vocabulary": {
+      "const": [
+        "audit",
+        "windows-native"
+      ]
+    },
+    "conditional_facts": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "node_id",
+          "activation"
+        ],
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "activation": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "feature": {
+                "enum": [
+                  "audit",
+                  "windows-native"
+                ]
+              },
+              "target_os": {
+                "enum": [
+                  "linux",
+                  "windows"
+                ]
+              }
+            },
+            "anyOf": [
+              {
+                "required": [
+                  "feature"
+                ]
+              },
+              {
+                "required": [
+                  "target_os"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "worlds": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "target_os",
+          "target_triple",
+          "enabled_features",
+          "expected_active_nodes",
+          "expected_inactive_nodes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^(linux|windows)-[a-z]+(-[a-z-]+)?$"
+          },
+          "target_os": {
+            "enum": [
+              "linux",
+              "windows"
+            ]
+          },
+          "target_triple": {
+            "type": "string",
+            "minLength": 1
+          },
+          "enabled_features": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "audit",
+                "windows-native"
+              ]
+            }
+          },
+          "expected_active_nodes": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "expected_inactive_nodes": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}
