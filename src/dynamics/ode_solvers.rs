@@ -227,8 +227,6 @@ pub struct OdeSolveFailure {
     pub last_error_estimate: Option<f64>,
     pub partial_result: Option<OdeResult>,
 }
-
-
 // ---------------------------------------------------------------------------
 // Solver engine
 // ---------------------------------------------------------------------------
