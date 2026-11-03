@@ -388,6 +388,143 @@ fn collect_tree_entries(
 }
 
 
+
+fn collect_snapshot_entries(root: &Path) -> Result<Vec<TreeEntry>, Failure> {
+    if !cfg!(unix) {
+        return Err(Failure::unresolved("CEB-TREE-V1 requires Unix executable-bit semantics"));
+    }
+    let canonical_root = root.canonicalize()
+        .map_err(|error| Failure::protocol(format!("cannot resolve snapshot {}: {error}", root.display())))?;
+    if !canonical_root.is_dir() {
+        return Err(Failure::protocol("snapshot root is not a directory"));
+    }
+    let mut entries = Vec::new();
+    let mut total_bytes = 0u64;
+    let mut visited_entries = 0usize;
+    collect_tree_entries(
+        &canonical_root,
+        "",
+        &mut entries,
+        &mut total_bytes,
+        &mut visited_entries,
+        0,
+    )?;
+    if entries.is_empty() {
+        return Err(Failure::unresolved("empty snapshots cannot qualify as engineering evidence"));
+    }
+    entries.sort_by(|left, right| left.relative_path.as_bytes().cmp(right.relative_path.as_bytes()));
+    Ok(entries)
+}
+
+fn build_git_tree_from_entries(
+    repository: &git2::Repository,
+    entries: &[TreeEntry],
+    prefix: &str,
+) -> Result<git2::Oid, Failure> {
+    let mut children: BTreeMap<String, Option<&TreeEntry>> = BTreeMap::new();
+    for entry in entries {
+        let remainder = entry.relative_path.strip_prefix(prefix)
+            .ok_or_else(|| Failure::protocol("snapshot path is not beneath tree builder prefix"))?;
+        if let Some((name, rest)) = remainder.split_once('/') {
+            if name.is_empty() || rest.is_empty() {
+                return Err(Failure::protocol("snapshot contains an empty Git tree path component"));
+            }
+            match children.get(name) {
+                Some(Some(_)) => return Err(Failure::protocol(format!("snapshot file/directory collision at {name}"))),
+                Some(None) => {}
+                None => { children.insert(name.to_owned(), None); }
+            }
+        } else {
+            if name_is_empty(remainder) {
+                return Err(Failure::protocol("snapshot contains an empty Git tree entry name"));
+            }
+            if children.insert(remainder.to_owned(), Some(entry)).is_some() {
+                return Err(Failure::protocol(format!("snapshot has duplicate or colliding Git tree entry: {remainder}")));
+            }
+        }
+    }
+
+    let mut builder = repository.treebuilder(None)
+        .map_err(|error| Failure::unresolved(format!("cannot create isolated Git tree builder: {error}")))?;
+    for (name, entry) in children {
+        let (oid, mode) = match entry {
+            Some(entry) => match &entry.content {
+                TreeEntryContent::File(path) => {
+                    let metadata = fs::symlink_metadata(path)
+                        .map_err(|error| Failure::protocol(format!("cannot re-stat snapshot file {}: {error}", path.display())))?;
+                    if !metadata.file_type().is_file() || metadata.len() != entry.size {
+                        return Err(Failure::unresolved(format!("snapshot file changed or is no longer regular: {}", path.display())));
+                    }
+                    let oid = repository.blob_path(path)
+                        .map_err(|error| Failure::unresolved(format!("cannot store snapshot blob {}: {error}", path.display())))?;
+                    (oid, if entry.executable { 0o100755 } else { 0o100644 })
+                }
+                TreeEntryContent::Symlink(target) => {
+                    let oid = repository.blob(target)
+                        .map_err(|error| Failure::unresolved(format!("cannot store symlink target blob: {error}")))?;
+                    (oid, 0o120000)
+                }
+            },
+            None => {
+                let child_prefix = format!("{prefix}{name}/");
+                let oid = build_git_tree_from_entries(repository, entries, &child_prefix)?;
+                (oid, 0o040000)
+            }
+        };
+        builder.insert(&name, oid, mode)
+            .map_err(|error| Failure::protocol(format!("cannot insert Git tree entry {name}: {error}")))?;
+    }
+    builder.write()
+        .map_err(|error| Failure::unresolved(format!("cannot write isolated Git tree object: {error}")))
+}
+
+/// Independently apply the submitted Git patch to a tree stored in a private,
+/// temporary bare libgit2 repository. No worktree is created and no candidate
+/// code/build/test command is executed. The result is accepted only when the
+/// applied Git tree is byte/mode-identical to the supplied result snapshot.
+fn verify_patch_reconstructs_result(
+    source_root: &Path,
+    result_root: &Path,
+    patch: &[u8],
+) -> Result<(), Failure> {
+    if patch.is_empty() || patch.len() > MAX_PATCH_BYTES {
+        return Err(Failure::rejected("patch reconstruction requires a non-empty patch within the V0 size limit"));
+    }
+    if git_patch_paths(patch).is_err() {
+        return Err(Failure::rejected("patch reconstruction requires safe, auditable Git diff paths"));
+    }
+
+    let source_entries = collect_snapshot_entries(source_root)?;
+    let result_entries = collect_snapshot_entries(result_root)?;
+    let temporary_repository = tempfile::Builder::new()
+        .prefix("ceb-patch-reconstruction-")
+        .tempdir()
+        .map_err(|error| Failure::unresolved(format!("cannot create temporary patch object database: {error}")))?;
+    let repository = git2::Repository::init_bare(temporary_repository.path())
+        .map_err(|error| Failure::unresolved(format!("cannot initialize temporary bare object database: {error}")))?;
+
+    let source_tree_id = build_git_tree_from_entries(&repository, &source_entries, "")?;
+    let source_tree = repository.find_tree(source_tree_id)
+        .map_err(|error| Failure::unresolved(format!("cannot reopen pinned source tree: {error}")))?;
+    let diff = git2::Diff::from_buffer(patch)
+        .map_err(|error| Failure::rejected(format!("candidate patch is not a supported Git diff: {error}")))?;
+    let mut applied_index = repository.apply_to_tree(&source_tree, &diff, None)
+        .map_err(|error| Failure::rejected(format!("candidate patch does not apply cleanly to the pinned source tree: {error}")))?;
+    let applied_tree_id = applied_index.write_tree_to(&repository)
+        .map_err(|error| Failure::unresolved(format!("cannot write reconstructed patch tree: {error}")))?;
+    let expected_result_tree_id = build_git_tree_from_entries(&repository, &result_entries, "")?;
+    if applied_tree_id != expected_result_tree_id {
+        return Err(Failure::rejected(
+            "independently applied candidate patch does not produce the supplied result snapshot",
+        ));
+    }
+    Ok(())
+}
+
+fn name_is_empty(value: &str) -> bool {
+    value.is_empty() || value == "." || value == ".."
+}
+
 fn tree_entry_digest(entry: &TreeEntry) -> Result<String, Failure> {
     let mut hasher = Sha256::new();
     match &entry.content {
@@ -1567,6 +1704,11 @@ fn verify_pair_inner(inputs: &PairInputs) -> Result<VerificationReport, Failure>
     if patch_paths != expected_changed_paths {
         return Err(Failure::protocol("Git patch file paths do not exactly match independently changed source/result tree paths"));
     }
+    verify_patch_reconstructs_result(
+        &inputs.source_tree_dir,
+        &inputs.result_tree_dir,
+        &inputs.patch,
+    )?;
     if task_source_tree.as_deref() != Some(source_tree_sha256.as_str()) {
         return Err(Failure::protocol("recomputed source-tree digest does not match the task contract"));
     }
