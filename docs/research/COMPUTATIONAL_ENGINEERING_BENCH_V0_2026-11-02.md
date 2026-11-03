@@ -290,34 +290,44 @@ The current fixture remains design-only. Issue #10064 must qualify the compiler/
 
 ### Cargo feature/target configuration-world benchmark
 
-The synthetic repository-twin fixture includes `worlds.v0.json`: a complete
-2×2×2 matrix over Linux/Windows targets and the effective `audit`/`windows-native`
-Cargo features. The matrix explicitly records three separate values:
-`default_features_enabled`, `explicit_features` and `effective_features`.
-This matters because the API crate declares `default = ["audit"]`: an empty
-explicit feature list with defaults enabled still activates the audit feature.
-The matrix also contains a no-default-features world with `audit` explicitly
-selected, allowing the indexing path to be checked independently of Cargo's
-default-feature expansion.
+The synthetic repository-twin fixture includes `worlds.v0.json`: ten
+design-only configurations over two target operating systems and five Cargo
+feature-selection modes per target:
 
-The key target distinction remains: on Linux, enabling `windows-native` activates
-the Cargo feature node but must not activate the Windows module or target-specific
-`windows-sys` dependency. Seven conditional facts are enumerated: two feature
-nodes, one Windows target node, two audit-gated symbols, one Windows-gated symbol
-and one target/feature-gated dependency. Each world supplies explicit and effective
-features plus exact active/inactive fact sets. The validator recomputes effective
-features from Cargo defaults and explicit flags, verifies the exact target triple,
+1. Default features enabled, no explicit features (effective `audit`).
+2. `--no-default-features`, no explicit features (effective empty set).
+3. `--no-default-features`, explicit `audit`.
+4. `--no-default-features`, explicit `windows-native`.
+5. `--no-default-features`, both features explicitly enabled.
+
+This gives all four effective feature combinations (none, audit, windows-native,
+both), while retaining separate provenance for default-enabled `audit` and
+no-defaults plus explicit `audit`. Each row records
+`default_features_enabled`, `explicit_features` and `effective_features`.
+The API crate declares `default = ["audit"]`, so an empty explicit feature list
+with defaults enabled still activates audit. An explicit no-default/no-feature
+world now verifies that optional audit facts really disappear when every
+optional feature is disabled.
+
+Seven conditional facts are enumerated: two feature nodes, one Windows target
+node, two audit-gated symbols, one Windows-gated symbol and one
+target/feature-gated dependency. The matrix also preserves the key target
+distinction: on Linux, enabling `windows-native` activates its Cargo feature
+node but must not activate the Windows module or `windows-sys` dependency.
+Each world supplies effective features and exact active/inactive fact sets. The
+validator recomputes features from Cargo defaults and explicit flags, requires
+the exact target triple, verifies all ten distinct configuration combinations,
 and derives every active/inactive fact set.
 
-Seven new world controls cover false Windows activation on Linux, missed default
-audit activation, missed explicitly selected audit activation, inconsistent
+Seven world-specific negative controls cover false Windows activation on Linux,
+missed default audit activation, missed explicit audit activation, inconsistent
 effective-feature declarations, target-triple mismatch, duplicated feature
 configuration hiding a missing world, and duplicate world IDs. Together with
 the 32 existing controls, this brings the contract workflow to 39 authored
-negative controls across four Draft 2020-12 schemas. Static matrix
-consistency checks passed in this repository review, but these CI controls have
-not yet passed a successful exact-head workflow. All eight worlds remain
-design-only expectations, not compiler-confirmed results.
+negative controls across four Draft 2020-12 schemas. Static matrix consistency
+checks passed in this repository review, but these CI controls have not yet
+passed a successful exact-head workflow. All ten worlds remain design-only
+expectations, not compiler-confirmed results.
 
 Next qualification: obtain Cargo metadata and rust-analyzer/SCIP output inside
 the isolated pinned runner for each feature/target world, then compare observed
