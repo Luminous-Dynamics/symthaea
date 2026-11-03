@@ -1041,4 +1041,57 @@ mod tests {
         let bytes = serde_json::to_string(&receipt).expect("serialize altered receipt");
         assert!(verify(&bytes, SOURCE, TARGET).is_err());
     }
+    #[test]
+    fn rejects_repeated_source_object_without_explicit_alternative_set() {
+        let mut receipt: Value = serde_json::from_str(RECEIPT).expect("fixture JSON");
+        let mut duplicate = receipt["mappings"][3].clone();
+        duplicate["mapping_id"] = Value::String("map-neuron-2-without-alt-set".to_owned());
+        duplicate["target_object_ids"] = json!(["neuron-2-candidate-b"]);
+        duplicate["alternative_set_id"] = Value::Null;
+        duplicate["support_status"] = Value::String("NOT_ESTIMABLE".to_owned());
+        receipt["mappings"].as_array_mut().expect("mappings").push(duplicate);
+        receipt["summary"]["mapping_count"] = Value::from(9);
+        receipt["summary"]["not_estimable_count"] = Value::from(3);
+        let bytes = serde_json::to_string(&receipt).expect("serialize altered receipt");
+        assert!(verify(&bytes, SOURCE, TARGET).is_err());
+    }
+
+    #[test]
+    fn rejects_alternative_set_with_overlapping_target_objects() {
+        let mut receipt: Value = serde_json::from_str(RECEIPT).expect("fixture JSON");
+        receipt["mappings"][4]["target_object_ids"] =
+            json!(["neuron-2-candidate-a"]);
+        let bytes = serde_json::to_string(&receipt).expect("serialize altered receipt");
+        assert!(verify(&bytes, SOURCE, TARGET).is_err());
+    }
+
+    #[test]
+    fn rejects_singular_registration_transform() {
+        let mut receipt: Value = serde_json::from_str(RECEIPT).expect("fixture JSON");
+        receipt["registration"]["transform_source_to_target_4x4"] =
+            json!([[1,0,0,20],[0,0,0,-10],[0,0,1,5],[0,0,0,1]]);
+        let bytes = serde_json::to_string(&receipt).expect("serialize altered receipt");
+        assert!(verify(&bytes, SOURCE, TARGET).is_err());
+    }
+
+    #[test]
+    fn rejects_relation_object_type_mismatch() {
+        let mut receipt: Value = serde_json::from_str(RECEIPT).expect("fixture JSON");
+        receipt["mappings"][2]["source_object_ids"] = json!(["seg-A"]);
+        let bytes = serde_json::to_string(&receipt).expect("serialize altered receipt");
+        assert!(verify(&bytes, SOURCE, TARGET).is_err());
+    }
+
+    #[test]
+    fn rejects_not_estimable_query_with_two_output_digests() {
+        let mut receipt: Value = serde_json::from_str(RECEIPT).expect("fixture JSON");
+        receipt["query_comparisons"][2]["source_output_sha256"] =
+            Value::String("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned());
+        receipt["query_comparisons"][2]["target_output_sha256"] =
+            Value::String("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned());
+        let bytes = serde_json::to_string(&receipt).expect("serialize altered receipt");
+        assert!(verify(&bytes, SOURCE, TARGET).is_err());
+    }
+
+
 }
