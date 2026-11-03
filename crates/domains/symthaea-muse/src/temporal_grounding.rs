@@ -1269,11 +1269,11 @@ mod tests {
             vec![
                 FrameIntervalV1 {
                     start_frame: 100,
-                    end_frame: 200,
+                    end_frame: 300,
                 },
                 FrameIntervalV1 {
                     start_frame: 500,
-                    end_frame: 600,
+                    end_frame: 700,
                 },
             ],
         );
@@ -1281,11 +1281,11 @@ mod tests {
             intervals: vec![
                 FrameIntervalV1 {
                     start_frame: 148,
-                    end_frame: 248,
+                    end_frame: 348,
                 },
                 FrameIntervalV1 {
                     start_frame: 452,
-                    end_frame: 552,
+                    end_frame: 652,
                 },
             ],
         });
