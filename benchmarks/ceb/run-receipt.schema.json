@@ -475,7 +475,8 @@
               "artifact_id",
               "role",
               "sha256",
-              "size_bytes"
+              "size_bytes",
+              "path"
             ],
             "properties": {
               "artifact_id": {
@@ -503,6 +504,10 @@
               "size_bytes": {
                 "type": "integer",
                 "minimum": 0
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
               }
             }
           }
