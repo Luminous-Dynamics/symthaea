@@ -51,6 +51,8 @@ pub enum TrafficRuleKind {
         maximum_sample_gap_s: f64,
         progress_tolerance_m: f64,
     },
+    /// A declared family for which this verifier has no executable semantics.
+    Unsupported { rule_family: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -91,6 +93,7 @@ pub enum RuleComplianceReason {
     StopLinePassedWithoutRequiredStop,
     RequirementSatisfied,
     RequirementSatisfied,
+    RuleKindUnsupported,
     RequiredStopObserved,
     RequirementNotEncountered,
 }
@@ -371,6 +374,9 @@ fn evaluate_requirement(
                 ),
             }
         }
+        TrafficRuleKind::Unsupported { .. } => {
+            indeterminate(RuleComplianceReason::RuleKindUnsupported)
+        }
         TrafficRuleKind::StopBeforeLine {
             stop_line_progress_m,
             stop_speed_threshold_mps,
@@ -509,6 +515,7 @@ fn requirement_numeric_fields_are_finite(requirement: &TrafficRuleRequirement) -
             required_heading_rad,
             maximum_heading_error_rad,
         } => required_heading_rad.is_finite() && maximum_heading_error_rad.is_finite(),
+        TrafficRuleKind::Unsupported { .. } => true,
         TrafficRuleKind::StopBeforeLine {
             stop_line_progress_m,
             stop_speed_threshold_mps,
@@ -904,6 +911,30 @@ mod tests {
             .unwrap_err(),
             RuleEvaluationError::EmptyRuleId
         );
+    }
+
+    #[test]
+    fn unsupported_rule_families_are_retained_as_indeterminate() {
+        let rule = TrafficRuleRequirement {
+            rule_id: "yield-unknown-semantics".into(),
+            active_start_progress_m: 0.0,
+            active_end_progress_m: 30.0,
+            kind: TrafficRuleKind::Unsupported {
+                rule_family: "yield-right-of-way".into(),
+            },
+            evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
+        };
+        let report = evaluate_traffic_rules(
+            &[rule],
+            &[sample(0.0, 1.0, 8.0, 0.0), sample(0.1, 2.0, 8.0, 0.0)],
+        )
+        .unwrap();
+        assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::Indeterminate);
+        assert_eq!(
+            report.findings[0].reason,
+            RuleComplianceReason::RuleKindUnsupported
+        );
+        assert!(report.identity_is_valid());
     }
 
     #[test]
