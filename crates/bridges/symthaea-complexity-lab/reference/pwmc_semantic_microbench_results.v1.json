@@ -1,0 +1,279 @@
+{
+  "case_count": 7,
+  "claim_ceiling": "finite_reference_oracle_not_solver_performance",
+  "exact_zero_nonempty_support": "passed",
+  "format": "symthaea.pwmc-semantic-microbench-results",
+  "hidden_witness_invariance": "passed",
+  "input_sha256": "sha256:3054fd702511af5c189d81030141c0643714db9b068bdb79db571703d3732b01",
+  "method": "exhaustive full-assignment enumeration and exact Fraction arithmetic",
+  "results": [
+    {
+      "case_id": "single-hidden-witness-scope",
+      "full_model_count": "2",
+      "projected_support": [
+        "1"
+      ],
+      "pwmc": "2/3",
+      "status": "exact_oracle_match",
+      "support_cardinality": "1",
+      "witness_counts": {
+        "1": "2"
+      }
+    },
+    {
+      "case_id": "twelve-hidden-free-witnesses",
+      "full_model_count": "4096",
+      "projected_support": [
+        "1"
+      ],
+      "pwmc": "2/3",
+      "status": "exact_oracle_match",
+      "support_cardinality": "1",
+      "witness_counts": {
+        "1": "4096"
+      }
+    },
+    {
+      "case_id": "asymmetric-hidden-witness-multiplicity",
+      "full_model_count": "3",
+      "projected_support": [
+        "0",
+        "1"
+      ],
+      "pwmc": "1/1",
+      "status": "exact_oracle_match",
+      "support_cardinality": "2",
+      "witness_counts": {
+        "0": "1",
+        "1": "2"
+      }
+    },
+    {
+      "case_id": "free-visible-scope-completion",
+      "full_model_count": "4",
+      "projected_support": [
+        "10",
+        "11"
+      ],
+      "pwmc": "2/3",
+      "status": "exact_oracle_match",
+      "support_cardinality": "2",
+      "witness_counts": {
+        "10": "2",
+        "11": "2"
+      }
+    },
+    {
+      "case_id": "nonempty-support-exact-cancellation",
+      "full_model_count": "4",
+      "projected_support": [
+        "0",
+        "1"
+      ],
+      "pwmc": "0/1",
+      "status": "exact_oracle_match",
+      "support_cardinality": "2",
+      "witness_counts": {
+        "0": "2",
+        "1": "2"
+      }
+    },
+    {
+      "case_id": "signed-fractional-weights",
+      "full_model_count": "2",
+      "projected_support": [
+        "0",
+        "1"
+      ],
+      "pwmc": "1/6",
+      "status": "exact_oracle_match",
+      "support_cardinality": "2",
+      "witness_counts": {
+        "0": "1",
+        "1": "1"
+      }
+    },
+    {
+      "case_id": "empty-projected-support",
+      "full_model_count": "0",
+      "projected_support": [],
+      "pwmc": "0/1",
+      "status": "exact_oracle_match",
+      "support_cardinality": "0",
+      "witness_counts": {}
+    }
+  ],
+  "reusable_projection": {
+    "independent_exhaustive_replays": 32,
+    "results": [
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "-2/5",
+        "weight_map_id": "map-00"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "17/24",
+        "weight_map_id": "map-01"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "-22/35",
+        "weight_map_id": "map-02"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "37/48",
+        "weight_map_id": "map-03"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "-46/63",
+        "weight_map_id": "map-04"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "13/16",
+        "weight_map_id": "map-05"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "-26/33",
+        "weight_map_id": "map-06"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "101/120",
+        "weight_map_id": "map-07"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "-118/143",
+        "weight_map_id": "map-08"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "145/168",
+        "weight_map_id": "map-09"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "-166/195",
+        "weight_map_id": "map-10"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "197/224",
+        "weight_map_id": "map-11"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "-74/85",
+        "weight_map_id": "map-12"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "257/288",
+        "weight_map_id": "map-13"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "-286/323",
+        "weight_map_id": "map-14"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "65/72",
+        "weight_map_id": "map-15"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "-358/399",
+        "weight_map_id": "map-16"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "401/440",
+        "weight_map_id": "map-17"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "-146/161",
+        "weight_map_id": "map-18"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "485/528",
+        "weight_map_id": "map-19"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "-526/575",
+        "weight_map_id": "map-20"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "577/624",
+        "weight_map_id": "map-21"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "-622/675",
+        "weight_map_id": "map-22"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "677/728",
+        "weight_map_id": "map-23"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "-242/261",
+        "weight_map_id": "map-24"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "157/168",
+        "weight_map_id": "map-25"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "-838/899",
+        "weight_map_id": "map-26"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "901/960",
+        "weight_map_id": "map-27"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "-958/1023",
+        "weight_map_id": "map-28"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "1025/1088",
+        "weight_map_id": "map-29"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "-362/385",
+        "weight_map_id": "map-30"
+      },
+      {
+        "independent_projection_replay": "matched",
+        "pwmc": "1157/1224",
+        "weight_map_id": "map-31"
+      }
+    ],
+    "retained_support": [
+      "01",
+      "10",
+      "11"
+    ],
+    "support_compilations_in_reuse_path": 1,
+    "weight_map_evaluations": 32
+  },
+  "version": 1
+}
