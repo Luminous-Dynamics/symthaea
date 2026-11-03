@@ -567,7 +567,8 @@ impl OdeSolverEngine {
         // Fail closed if any stage or embedded solution became non-finite.
         // A NaN comparison in the max-norm loop below would otherwise be false
         // and could leave `err == 0`, incorrectly accepting a corrupted step.
-        if k1.iter()
+        if k1
+            .iter()
             .chain(k2.iter())
             .chain(k3.iter())
             .chain(k4.iter())
@@ -839,11 +840,7 @@ impl OdeSolverEngine {
                     ));
                 }
 
-                let next_t = if h >= t_span.1 - t {
-                    t_span.1
-                } else {
-                    t + h
-                };
+                let next_t = if h >= t_span.1 - t { t_span.1 } else { t + h };
                 if !next_t.is_finite() || next_t <= t {
                     return Err(fail(
                         OdeSolveFailureKind::TimeDidNotAdvance,
@@ -1565,7 +1562,13 @@ mod tests {
             )
             .expect("smooth oscillator should complete");
         assert!((result.times.last().copied().unwrap_or_default() - 2.0).abs() < 1e-12);
-        assert!(result.states.iter().flatten().all(|value| value.is_finite()));
+        assert!(
+            result
+                .states
+                .iter()
+                .flatten()
+                .all(|value| value.is_finite())
+        );
         let expected = [2.0_f64.cos(), -2.0_f64.sin()];
         let final_state = result.states.last().expect("final state");
         assert!((final_state[0] - expected[0]).abs() < 1e-7);
@@ -1658,7 +1661,14 @@ mod tests {
             failure.kind,
             OdeSolveFailureKind::MaximumAcceptedStepsExceeded
         );
-        assert_eq!(failure.partial_result.expect("accepted prefix").step_sizes.len(), 1);
+        assert_eq!(
+            failure
+                .partial_result
+                .expect("accepted prefix")
+                .step_sizes
+                .len(),
+            1
+        );
     }
 
     #[test]
