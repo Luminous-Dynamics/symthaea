@@ -56,9 +56,9 @@ The current Rust benchmark includes six policies:
 3. FixedRingContentShuffled — preserve that ring's sender/receiver schedule but select a random available rule.
 4. RandomNetworkContent — randomize sender/receiver pairs over the same generated graph and choose random sender-held rules.
 5. StateAwareFrontier — select messages using recipient prerequisite coverage, immediate executability, novelty to collective knowledge and downstream recipe unlock potential.
-6. StateAwareContentShuffled — first compute the state-aware sender/receiver schedule, then shuffle content among each sender's available rules, preserving who communicates with whom and when.
+6. StateAwareContentShuffled — first compute the state-aware sender/receiver schedule and each sender's selected recipe payload multiset, then shuffle those payloads only among that sender's scheduled recipients. This preserves who communicates with whom, when, how many messages are sent, which sender-owned recipes are sent, and each sender's selected content multiset.
 
-The final control is deliberately modeled on the paper's content-shuffling ablation. It is the most important causal control in this first mechanism slice: if state-aware routing wins only because of a different topology or more transmissions, the content-shuffled control should expose that.
+The final control is deliberately modeled on the paper's content-shuffling ablation. It preserves the exact ordered sender/receiver schedule and each sender's selected content multiset while permuting the mapping between that sender's selected recipes and the scheduled recipients. It is the most important causal control in this first mechanism slice: if state-aware routing wins only because of a different topology, message count, or sender's content selection—not recipient-state matching—the content-shuffled control should expose that.
 
 The heuristic score is transparent and deterministic:
 - high priority when the recipient has all prerequisites and can execute the rule immediately;
