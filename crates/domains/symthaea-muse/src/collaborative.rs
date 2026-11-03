@@ -42,7 +42,12 @@ pub struct HarmonyContribution {
 pub enum BlendStrategy {
     /// Simple average of all contributions.
     Mean,
-    /// Weighted by each participant's Phi (more conscious = more influence).
+    /// Experimental weighting by each participant's Phi proxy.
+    ///
+    /// Phi is not a validated measure of contribution, competence, preference,
+    /// ownership, consent, or decision authority. Do not use this strategy for
+    /// governance, attribution, permissions, or prioritizing creative intent.
+    /// It is retained only for explicit experiments and ablations.
     PhiWeighted,
     /// Maximum activation per harmony (union of all experiences).
     Maximum,
@@ -52,11 +57,16 @@ pub enum BlendStrategy {
 
 impl Default for BlendStrategy {
     fn default() -> Self {
-        Self::PhiWeighted
+        // Equal influence is the neutral baseline. Internal Phi proxies must
+        // never silently determine whose creative contribution carries weight.
+        Self::Mean
     }
 }
 
 /// Collaborative composition orchestrator.
+///
+/// `Default` uses equal participant influence. Non-neutral strategies require
+/// explicit selection so that no internal proxy silently grants authority.
 pub struct CollaborativeComposer {
     contributions: Vec<HarmonyContribution>,
     strategy: BlendStrategy,
@@ -66,7 +76,17 @@ pub struct CollaborativeComposer {
     ema_alpha: f32,
 }
 
+impl Default for CollaborativeComposer {
+    fn default() -> Self {
+        Self::new(BlendStrategy::default())
+    }
+}
+
 impl CollaborativeComposer {
+    /// Create a composer with an explicitly selected blending policy.
+    ///
+    /// Prefer `Default`/`BlendStrategy::Mean` unless an experiment explicitly
+    /// requires a different numerical aggregation policy.
     pub fn new(strategy: BlendStrategy) -> Self {
         Self {
             contributions: Vec::with_capacity(MAX_PARTICIPANTS),
@@ -234,7 +254,7 @@ mod tests {
     }
 
     #[test]
-    fn phi_weighted_favors_high_phi() {
+    fn explicit_phi_weighting_remains_available_for_ablations() {
         let mut composer = CollaborativeComposer::new(BlendStrategy::PhiWeighted);
         // High-phi participant with high harmonies
         composer.contribute(make_contribution(1, 0.9, [0.8; 8]));
@@ -247,6 +267,24 @@ mod tests {
         assert!(
             state.harmony_activations[0] > 0.3,
             "phi-weighted should favor high-phi: {}",
+            state.harmony_activations[0]
+        );
+    }
+
+    #[test]
+    fn default_blend_uses_equal_influence_not_phi_weighting() {
+        assert_eq!(BlendStrategy::default(), BlendStrategy::Mean);
+
+        let mut composer = CollaborativeComposer::default();
+        composer.contribute(make_contribution(1, 0.99, [0.2; 8]));
+        composer.contribute(make_contribution(2, 0.01, [0.8; 8]));
+        let state = composer.blend();
+
+        // The equal-weight target is 0.5. After one EMA update from 0.3 at
+        // alpha 0.15, the result is 0.33, regardless of either Phi proxy.
+        assert!(
+            (state.harmony_activations[0] - 0.33).abs() < 1e-6,
+            "default blend must not privilege the higher-Phi contributor: {}",
             state.harmony_activations[0]
         );
     }
