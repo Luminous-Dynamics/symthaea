@@ -1308,6 +1308,40 @@ mod tests {
     }
 
     #[test]
+    fn rejects_task_grade_with_wrong_pinned_grader_version() {
+        let mut receipt = base_receipt();
+        receipt["task_results"][0]["grade"]["grader_version"] = json!("different-grader");
+        assert_eq!(
+            verify_receipt_value(&receipt).unwrap_err().kind,
+            ReceiptErrorKind::NonComparable
+        );
+    }
+
+    #[test]
+    fn rejects_run_level_tool_usage_below_task_level_sum() {
+        let mut receipt = base_receipt();
+        receipt["actual_usage"]["tool_calls"] = json!(1);
+        assert_eq!(
+            verify_receipt_value(&receipt).unwrap_err().kind,
+            ReceiptErrorKind::AccountingMismatch
+        );
+    }
+
+    #[test]
+    fn rejects_matched_arms_with_same_ids_but_different_input_bytes() {
+        let first = verify_receipt_value(&base_receipt()).unwrap();
+        let mut second_value = base_receipt();
+        second_value["run_id"] = json!("synthetic-run-003");
+        second_value["system"]["arm"] = json!("REA_only");
+        second_value["task_results"][0]["input_sha256"] = json!(C);
+        let second = verify_receipt_value(&second_value).unwrap();
+        assert_eq!(
+            validate_comparable_arms(&[first, second]).unwrap_err().kind,
+            ReceiptErrorKind::NonComparable
+        );
+    }
+
+    #[test]
     fn rejects_excluded_task_without_reason() {
         let mut receipt = base_receipt();
         receipt["task_universe"][2]["exclusion"]["reason"] = Value::Null;
