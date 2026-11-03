@@ -652,8 +652,8 @@ fn verify_receipt(
             _ => return Err(format!("{context}.support_status invalid")),
         }
         let alternative_set_id = optional_string_field(mapping, "alternative_set_id", &context)?;
-        if support_status == "AMBIGUOUS" && alternative_set_id.is_none() {
-            return Err(format!("{context}: ambiguous mapping requires alternative_set_id"));
+        if support_status == "AMBIGUOUS" && (alternative_set_id.is_none() || target_ids.is_empty()) {
+            return Err(format!("{context}: ambiguous mapping requires a non-empty target and alternative_set_id"));
         }
         if support_status != "AMBIGUOUS" && alternative_set_id.is_some() {
             return Err(format!("{context}: alternative_set_id only applies to AMBIGUOUS mappings"));
@@ -946,7 +946,7 @@ mod tests {
         let output = verify(RECEIPT, SOURCE, TARGET).expect("valid synthetic receipt");
         let counts = &output["recomputed_summary"];
         assert_eq!(counts["mapping_count"], 8);
-        assert_eq!(counts["verified_count"], 4);
+        assert_eq!(output["support_status_claim_counts"]["claimed_verified_mapping_count"], 4);
         assert_eq!(counts["ambiguous_count"], 2);
         assert_eq!(counts["not_estimable_count"], 2);
         assert_eq!(counts["unmapped_source_object_count"], 1);
@@ -1009,7 +1009,8 @@ mod tests {
     #[test]
     fn rejects_duplicate_mapping_ids() {
         let mut receipt: Value = serde_json::from_str(RECEIPT).expect("fixture JSON");
-        receipt["mappings"][1]["mapping_id"] = receipt["mappings"][0]["mapping_id"].clone();
+        let first_mapping_id = receipt["mappings"][0]["mapping_id"].clone();
+        receipt["mappings"][1]["mapping_id"] = first_mapping_id;
         let bytes = serde_json::to_string(&receipt).expect("serialize altered receipt");
         assert!(verify(&bytes, SOURCE, TARGET).is_err());
     }
