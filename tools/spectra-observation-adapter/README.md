@@ -17,7 +17,7 @@ Both routes use the shared ROC/AUC implementation, including exact tie grouping.
 
 Each candidate-visible row preserves participant/session/trial identity, stimulus-onset timestamp, binary decision and its timestamp, optional ordinal confidence and its separate timestamp, clock resolution, stimulus-onset uncertainty, and independently calibrated input-latency uncertainty.
 
-Ground-truth event labels are kept in a separate evaluator sidecar. This software type split is not cryptographic custody. Decision timestamps must be strictly after stimulus onset; confidence timestamps must be strictly after the binary decision. Missing choices, confidence ratings and RT are counted separately; rows are not silently dropped.
+Ground-truth event labels are kept in a separate evaluator sidecar. This software type split is not cryptographic custody. Decision timestamps must be strictly after stimulus onset; confidence timestamps must be strictly after the binary decision. A recorded binary choice with a missing RT timestamp remains in the binary counts, but cannot contribute to the RT curve; a confidence rating requires a verifiable decision timestamp. Missing choices, confidence ratings and RT are counted separately; rows are not silently dropped.
 
 RT observations are excluded from the RT curve when observed latency is no greater than the declared combined timing-uncertainty bound:
 
