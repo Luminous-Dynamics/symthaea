@@ -1548,4 +1548,365 @@ mod tests {
         assert!(validate_execution_environment(&mutable_image, &execution).is_err());
     }
 
+    fn write_test_artifact(root: &std::path::Path, path: &str, bytes: &[u8]) -> Value {
+        let target = root.join(path);
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent).unwrap();
+        }
+        std::fs::write(&target, bytes).unwrap();
+        serde_json::json!({
+            "artifact_id": path.replace('/', "-"),
+            "role": if path == "candidate.patch" { "patch" } else if path == "primary-report.json" { "primary_report" } else if path == "regrade-report.json" { "regrade_report" } else { "test_log" },
+            "sha256": sha256_hex(bytes),
+            "size_bytes": bytes.len(),
+            "path": path
+        })
+    }
+
+    fn signed_test_envelope(
+        statement: &Value,
+        payload_type: &str,
+        key_id: &str,
+        signing_key: &SigningKey,
+    ) -> Vec<u8> {
+        let payload = serde_json::to_vec(statement).unwrap();
+        let pae = dsse_pae(payload_type, &payload);
+        let signature = signing_key.sign(&pae);
+        serde_json::to_vec(&serde_json::json!({
+            "payloadType": payload_type,
+            "payload": STANDARD.encode(payload),
+            "signatures": [{
+                "keyid": key_id,
+                "sig": STANDARD.encode(signature.to_bytes())
+            }]
+        })).unwrap()
+    }
+
+    fn build_test_receipt(
+        stage: &str,
+        run_id: &str,
+        receipt_id: &str,
+        started_at: &str,
+        finished_at: &str,
+        parent_envelope_sha256: Option<&str>,
+        task_contract_sha256: &str,
+        source_tree_sha256: &str,
+        patch_sha256: &str,
+        artifact_root: &std::path::Path,
+    ) -> Value {
+        let patch_bytes = b"diff --git a/src/lib.rs b/src/lib.rs\\n+pub fn verified() -> bool { true }\\n";
+        let log_bytes = format!("independent {stage} test evidence").into_bytes();
+        let report_bytes = format!("signed {stage} run report").into_bytes();
+        let patch_artifact = write_test_artifact(artifact_root, "candidate.patch", patch_bytes);
+        let log_artifact = write_test_artifact(artifact_root, "logs/test.log", &log_bytes);
+        let report_name = if stage == "primary" { "primary-report.json" } else { "regrade-report.json" };
+        let report_artifact = write_test_artifact(artifact_root, report_name, &report_bytes);
+        let check_digest = sha256_hex(&log_bytes);
+        serde_json::json!({
+            "_type": STATEMENT_TYPE,
+            "subject": [
+                {"name":"ceb/candidate.patch","digest":{"sha256":patch_sha256}},
+                {"name":"ceb/source.tree","digest":{"sha256":source_tree_sha256}}
+            ],
+            "predicateType": PREDICATE_TYPE,
+            "predicate": {
+                "schema_version": 0,
+                "receipt_kind": "ceb_run_receipt",
+                "receipt_id": receipt_id,
+                "task": {
+                    "task_id": "CEB-RUST-001",
+                    "task_contract_sha256": task_contract_sha256,
+                    "source_tree_sha256": source_tree_sha256,
+                    "fixture_revision": "synthetic-rust-fixture-v1"
+                },
+                "candidate": {
+                    "base_tree_sha256": source_tree_sha256,
+                    "patch_sha256": patch_sha256,
+                    "result_tree_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                    "changed_paths": ["src/lib.rs"]
+                },
+                "agent": {
+                    "agent_id": "unit-test-agent",
+                    "model_id": "unit-test-model",
+                    "harness_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                    "prompt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                    "configuration_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                    "secrets_exposed": false
+                },
+                "execution": {
+                    "run_id": run_id,
+                    "stage": stage,
+                    "runner_profile": "isolated_microvm",
+                    "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "runner_policy_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                    "toolchain_lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                    "network_policy": "disabled",
+                    "started_at_utc": started_at,
+                    "finished_at_utc": finished_at,
+                    "regrade_of_receipt_sha256": parent_envelope_sha256
+                },
+                "grader": {
+                    "grader_id": "unit-independent-grader",
+                    "grader_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                    "trust_domain": "separate_host_control_plane",
+                    "candidate_access": "read_only",
+                    "hidden_tests_visible_to_agent": false,
+                    "grader_writable_by_agent": false
+                },
+                "checks": [{
+                    "check_id": "tests.correctness",
+                    "kind": "hidden_test",
+                    "required": true,
+                    "authority": "independent_grader",
+                    "status": "pass",
+                    "evidence_sha256": check_digest
+                }],
+                "result": {
+                    "verdict": "pass",
+                    "required_check_count": 1,
+                    "required_pass_count": 1,
+                    "required_fail_count": 0,
+                    "required_error_count": 0,
+                    "required_skipped_count": 0,
+                    "safety_violation": false,
+                    "protocol_violation": false
+                },
+                "resources": {
+                    "wall_clock_ms": 5000,
+                    "cpu_time_ms": 4000,
+                    "peak_memory_bytes": 1048576,
+                    "peak_disk_bytes": 2097152,
+                    "output_bytes": 1024,
+                    "input_tokens": 100,
+                    "output_tokens": 50,
+                    "turns": 3,
+                    "tool_calls": 4,
+                    "cost_usd": 0.01
+                },
+                "artifacts": [patch_artifact, log_artifact, report_artifact]
+            }
+        })
+    }
+
+    fn build_test_task() -> Value {
+        serde_json::json!({
+            "schema_version": 0,
+            "benchmark_id": "CEB",
+            "task_id": "CEB-RUST-001",
+            "execution_status": "qualified",
+            "lane": "rust_engineering",
+            "title": "Qualify a small Rust API change",
+            "objective": "Implement a deterministic API behavior and verify all required contracts.",
+            "agent_prompt": "Implement the described API change without modifying the grader or hidden tests.",
+            "source_snapshot": {
+                "kind": "synthetic_fixture",
+                "uri": "fixture://ceb-e2e/rust",
+                "revision": "synthetic-rust-fixture-v1",
+                "tree_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+            },
+            "environment": {
+                "image": "oci://registry.example/ceb@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "toolchain_lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "runner_profile": "isolated_microvm",
+                "network_policy": "disabled",
+                "runner_policy_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            },
+            "agent_policy": {
+                "writable_paths": ["src"],
+                "read_only_paths": ["/grader", "/hidden-tests"],
+                "secrets_exposed": false,
+                "grader_visible": false,
+                "human_approval_required": []
+            },
+            "acceptance": {
+                "reference_patch_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+                "empty_patch_must_fail": true,
+                "independent_grader": "unit-independent-grader",
+                "grader_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "checks": [{
+                    "check_id": "tests.correctness",
+                    "kind": "hidden_test",
+                    "authority": "independent_grader",
+                    "required": true,
+                    "description": "The hidden behavioral contract must pass in the isolated grader."
+                }]
+            },
+            "budget": {
+                "wall_clock_seconds": 10,
+                "max_turns": 10,
+                "max_tool_calls": 10,
+                "input_token_budget": 1000,
+                "output_token_budget": 500,
+                "cost_budget_usd": 0.25
+            },
+            "split": {
+                "partition": "private_holdout",
+                "sealed": true,
+                "leakage_groups": ["synthetic-rust-api"],
+                "freshness_policy": "Never expose this task or its reference patch during training."
+            }
+        })
+    }
+
+    fn build_test_trust_policy(
+        primary: &SigningKey,
+        regrade: &SigningKey,
+    ) -> Vec<u8> {
+        serde_json::to_vec(&serde_json::json!({
+            "schema_version": 0,
+            "policy_id": "ceb-e2e-unit-test-policy-v1",
+            "minimum_signers": 1,
+            "keys": [
+                {
+                    "key_id": "primary-test-key",
+                    "algorithm": "ed25519",
+                    "public_key_base64": STANDARD.encode(primary.verifying_key().to_bytes()),
+                    "role": "primary_runner",
+                    "trust_domain": "primary-control-plane",
+                    "status": "active"
+                },
+                {
+                    "key_id": "regrade-test-key",
+                    "algorithm": "ed25519",
+                    "public_key_base64": STANDARD.encode(regrade.verifying_key().to_bytes()),
+                    "role": "regrade_runner",
+                    "trust_domain": "regrade-control-plane",
+                    "status": "active"
+                }
+            ]
+        })).unwrap()
+    }
+
+    #[test]
+    fn complete_independently_signed_primary_regrade_pair_is_accepted() {
+        use std::fs;
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT: AtomicU64 = AtomicU64::new(1);
+        let root = std::env::temp_dir().join(format!(
+            "ceb-e2e-pair-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        let primary_root = root.join("primary");
+        let regrade_root = root.join("regrade");
+        fs::create_dir_all(&primary_root).unwrap();
+        fs::create_dir_all(&regrade_root).unwrap();
+
+        let primary_key = signing_key(31);
+        let regrade_key = signing_key(32);
+        let policy_bytes = build_test_trust_policy(&primary_key, &regrade_key);
+        let policy_digest = sha256_hex(&policy_bytes);
+        let task_bytes = serde_json::to_vec(&build_test_task()).unwrap();
+        let task_digest = sha256_hex(&task_bytes);
+        let source_digest = "3333333333333333333333333333333333333333333333333333333333333333".to_string();
+        let patch = b"diff --git a/src/lib.rs b/src/lib.rs\n+pub fn verified() -> bool { true }\n".to_vec();
+        let patch_digest = sha256_hex(&patch);
+
+        let primary_statement = build_test_receipt(
+            "primary",
+            "primary-run-0001",
+            "primary-receipt-0001",
+            "2026-11-03T00:00:00Z",
+            "2026-11-03T00:00:05Z",
+            None,
+            &task_digest,
+            &source_digest,
+            &patch_digest,
+            &primary_root
+        );
+        let primary_envelope = signed_test_envelope(
+            &primary_statement,
+            PAYLOAD_TYPE,
+            "primary-test-key",
+            &primary_key
+        );
+        let primary_digest = sha256_hex(&primary_envelope);
+
+        let regrade_statement = build_test_receipt(
+            "pristine_regrade",
+            "regrade-run-0002",
+            "regrade-receipt-0002",
+            "2026-11-03T00:00:06Z",
+            "2026-11-03T00:00:11Z",
+            Some(&primary_digest),
+            &task_digest,
+            &source_digest,
+            &patch_digest,
+            &regrade_root
+        );
+        let regrade_envelope = signed_test_envelope(
+            &regrade_statement,
+            PAYLOAD_TYPE,
+            "regrade-test-key",
+            &regrade_key
+        );
+
+        let report = verify_pair(PairInputs {
+            task_contract: task_bytes.clone(),
+            task_id: "CEB-RUST-001".to_string(),
+            source_tree_sha256: source_digest,
+            patch,
+            primary_envelope: primary_envelope.clone(),
+            primary_artifacts_dir: primary_root.clone(),
+            regrade_envelope: regrade_envelope.clone(),
+            regrade_artifacts_dir: regrade_root.clone(),
+            trust_policy: policy_bytes,
+            expected_trust_policy_sha256: policy_digest,
+        });
+        assert!(report.accepted, "unexpected verifier rejection: {:?}", report.reasons);
+        assert_eq!(report.status, "accepted");
+        assert_eq!(report.primary_run_id.as_deref(), Some("primary-run-0001"));
+        assert_eq!(report.regrade_run_id.as_deref(), Some("regrade-run-0002"));
+        assert_ne!(report.primary_envelope_sha256, report.regrade_envelope_sha256);
+        assert_ne!(report.primary_artifact_evidence_sha256, report.regrade_artifact_evidence_sha256);
+
+        // Re-signing a regrade that does not link the exact primary envelope must fail.
+        let mut detached = regrade_statement.clone();
+        detached["predicate"]["execution"]["regrade_of_receipt_sha256"] =
+            serde_json::json!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        let detached_envelope = signed_test_envelope(
+            &detached, PAYLOAD_TYPE, "regrade-test-key", &regrade_key
+        );
+        let detached_report = verify_pair(PairInputs {
+            task_contract: task_bytes.clone(),
+            task_id: "CEB-RUST-001".to_string(),
+            source_tree_sha256: "3333333333333333333333333333333333333333333333333333333333333333".to_string(),
+            patch: b"diff --git a/src/lib.rs b/src/lib.rs\n+pub fn verified() -> bool { true }\n".to_vec(),
+            primary_envelope: primary_envelope.clone(),
+            primary_artifacts_dir: primary_root.clone(),
+            regrade_envelope: detached_envelope,
+            regrade_artifacts_dir: regrade_root.clone(),
+            trust_policy: build_test_trust_policy(&primary_key, &regrade_key),
+            expected_trust_policy_sha256: policy_digest.clone(),
+        });
+        assert!(!detached_report.accepted);
+        assert_eq!(detached_report.status, "protocol_violation");
+
+        // A second run cannot reuse primary execution evidence.
+        let mut reused = regrade_statement;
+        reused["predicate"]["checks"][0]["evidence_sha256"] =
+            serde_json::json!(primary_statement["predicate"]["checks"][0]["evidence_sha256"].clone());
+        reused["predicate"]["artifacts"][1]["sha256"] =
+            primary_statement["predicate"]["artifacts"][1]["sha256"].clone();
+        let reused_envelope = signed_test_envelope(
+            &reused, PAYLOAD_TYPE, "regrade-test-key", &regrade_key
+        );
+        let reused_report = verify_pair(PairInputs {
+            task_contract: task_bytes,
+            task_id: "CEB-RUST-001".to_string(),
+            source_tree_sha256: "3333333333333333333333333333333333333333333333333333333333333333".to_string(),
+            patch: b"diff --git a/src/lib.rs b/src/lib.rs\n+pub fn verified() -> bool { true }\n".to_vec(),
+            primary_envelope,
+            primary_artifacts_dir: primary_root,
+            regrade_envelope: reused_envelope,
+            regrade_artifacts_dir: regrade_root,
+            trust_policy: build_test_trust_policy(&primary_key, &regrade_key),
+            expected_trust_policy_sha256: policy_digest,
+        });
+        assert!(!reused_report.accepted);
+        assert!(matches!(reused_report.status.as_str(), "protocol_violation" | "rejected"));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
 }
