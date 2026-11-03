@@ -91,6 +91,13 @@ pub struct ResourceMeasurement {
 pub struct PhysicalRunEvidenceBundle {
     pub schema_version: u16,
     pub run: RunPartitionRecord,
+    /// Stable service-request ID shared by retries/rewashes for one requested service.
+    pub service_request_id: String,
+    /// Use an explicit cell ID even for a single-compartment reference machine.
+    pub compartment_id: String,
+    pub compartment_configuration_sha256: String,
+    /// Identifies the shared/isolated utility topology used during this run.
+    pub utility_topology_id: String,
     pub machine_model_id: String,
     pub programme_id: String,
     pub firmware_sha256: String,
@@ -243,6 +250,9 @@ pub fn validate_physical_run_bundle(
         ("operator_id", bundle.run.operator_id.as_str()),
         ("assay_lab_id", bundle.run.assay_lab_id.as_str()),
         ("test_site_id", bundle.run.test_site_id.as_str()),
+        ("service_request_id", bundle.service_request_id.as_str()),
+        ("compartment_id", bundle.compartment_id.as_str()),
+        ("utility_topology_id", bundle.utility_topology_id.as_str()),
         ("machine_model_id", bundle.machine_model_id.as_str()),
         ("programme_id", bundle.programme_id.as_str()),
         ("protocol_id", bundle.protocol_id.as_str()),
@@ -256,6 +266,9 @@ pub fn validate_physical_run_bundle(
     }
     if !valid_digest(&bundle.firmware_sha256) {
         return Err(EvidenceBundleError::InvalidDigest("firmware_sha256"));
+    }
+    if !valid_digest(&bundle.compartment_configuration_sha256) {
+        return Err(EvidenceBundleError::InvalidDigest("compartment_configuration_sha256"));
     }
     if !valid_digest(&bundle.archive_sha256) {
         return Err(EvidenceBundleError::InvalidDigest("bundle_archive_sha256"));
@@ -582,6 +595,10 @@ mod tests {
         PhysicalRunEvidenceBundle {
             schema_version: EVIDENCE_BUNDLE_SCHEMA_VERSION,
             run: run_record(),
+            service_request_id: "service-request-001".to_owned(),
+            compartment_id: "cell-01".to_owned(),
+            compartment_configuration_sha256: digest('7'),
+            utility_topology_id: "isolated-wet-loop-shared-thermal-bus-v1".to_owned(),
             machine_model_id: "prototype-v1".to_owned(),
             programme_id: "quickcell-v1".to_owned(),
             firmware_sha256: digest('f'),
