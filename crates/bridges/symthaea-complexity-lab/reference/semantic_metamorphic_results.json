@@ -1,0 +1,34 @@
+{
+  "all_passed": true,
+  "base_instances_with_exact_zero": 201,
+  "checks_by_transform": {
+    "forced_true_scaling": 500,
+    "free_variable_scaling": 500,
+    "syntax_normalization": 500,
+    "unsatisfiable_extension_zero": 500,
+    "variable_complement": 500,
+    "variable_permutation": 500
+  },
+  "claim_ceiling": "Executed finite exact direct-oracle/metamorphic relations on small instances. Not a differential run of Ganak or Symthaea binaries, official-format parser qualification, Rust/Lean verification, or a performance result.",
+  "elapsed_seconds": 0.351369,
+  "failure_count": 0,
+  "failures": [],
+  "hidden_witness_invariance_checks": 200,
+  "instances_per_mode": 100,
+  "metamorphic_checks": 3000,
+  "modes": ["mc", "wmc", "pmc", "pwmc", "amc-complex"],
+  "python_version": "3.13.5",
+  "seed": "0xe7025",
+  "suite": "ETH-025 exact semantics metamorphic benchmark",
+  "targeted_semantic_controls": {
+    "all_passed": true,
+    "exact_zero": {"AMC_Qi": "0", "WMC": "0"},
+    "multiple_hidden_witnesses": {
+      "#SAT": "2",
+      "PMC": "1",
+      "PWMC": "2/3",
+      "incorrect_hidden_witness_weight": "4/3"
+    },
+    "wrong_hidden_witness_doubling_detected": true
+  }
+}
