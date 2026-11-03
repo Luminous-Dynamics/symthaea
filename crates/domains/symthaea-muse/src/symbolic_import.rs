@@ -7,7 +7,7 @@
 //! any shared Foundry or learning corpus.
 
 use midly::{MetaMessage, MidiMessage, Smf, TrackEventKind};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, VecDeque};
 use symthaea_muse_protocol::{
     ImportedMotifSummary, ImportedSectionSummary, ImportedWorkAnalysis, SymbolicImportFormat,
 };
@@ -36,7 +36,13 @@ pub fn parse_symbolic(bytes: &[u8], format: SymbolicImportFormat) -> Result<Scor
 pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
     let smf = Smf::parse(bytes).map_err(|error| format!("MIDI parse error: {error}"))?;
     let ticks_per_beat = match smf.header.timing {
-        midly::Timing::Metrical(value) => u64::from(value.as_int()),
+        midly::Timing::Metrical(value) => {
+            let ticks = u64::from(value.as_int());
+            if ticks == 0 {
+                return Err("MIDI metrical division must have non-zero ticks per beat".into());
+            }
+            ticks
+        },
         midly::Timing::Timecode(_, _) => {
             return Err("SMPTE-time MIDI is not supported in the first symbolic importer".into());
         }
@@ -49,12 +55,16 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
 
     for (track_index, track) in smf.tracks.iter().enumerate() {
         let mut tick = 0_u64;
-        let mut pending: HashMap<(u8, u8), (u64, u8)> = HashMap::new();
+        let mut pending: HashMap<(u8, u8), VecDeque<(u64, u8)>> = HashMap::new();
         for event in track {
             tick = tick.saturating_add(u64::from(event.delta.as_int()));
             match event.kind {
                 TrackEventKind::Meta(MetaMessage::Tempo(value)) => {
-                    tempo_bpm = 60_000_000.0 / value.as_int() as f32;
+                    let micros_per_beat = value.as_int();
+                    if micros_per_beat == 0 {
+                        return Err("MIDI tempo meta-event must have non-zero microseconds per beat".into());
+                    }
+                    tempo_bpm = 60_000_000.0 / micros_per_beat as f32;
                 }
                 TrackEventKind::Meta(MetaMessage::TimeSignature(numerator, _, _, _)) => {
                     meter = numerator.max(1);
@@ -67,11 +77,15 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                     let channel = channel.as_int();
                     match message {
                         MidiMessage::NoteOn { key, vel } if vel.as_int() > 0 => {
-                            pending.insert((channel, key.as_int()), (tick, vel.as_int()));
+                            pending
+                                .entry((channel, key.as_int()))
+                                .or_default()
+                                .push_back((tick, vel.as_int()));
                         }
                         MidiMessage::NoteOn { key, .. } | MidiMessage::NoteOff { key, .. } => {
+                            let note_key = (channel, key.as_int());
                             if let Some((onset, velocity)) =
-                                pending.remove(&(channel, key.as_int()))
+                                pending.get_mut(&note_key).and_then(VecDeque::pop_front)
                             {
                                 notes.push(RawNote {
                                     track: track_index,
@@ -81,6 +95,9 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                                     velocity,
                                 });
                             }
+                            if pending.get(&note_key).is_some_and(VecDeque::is_empty) {
+                                pending.remove(&note_key);
+                            }
                         }
                         _ => {}
                     }
@@ -88,14 +105,16 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
                 _ => {}
             }
         }
-        for ((_, pitch), (onset, velocity)) in pending {
-            notes.push(RawNote {
-                track: track_index,
-                pitch,
-                onset,
-                duration: tick.saturating_sub(onset).max(1),
-                velocity,
-            });
+        for ((_, pitch), active_notes) in pending {
+            for (onset, velocity) in active_notes {
+                notes.push(RawNote {
+                    track: track_index,
+                    pitch,
+                    onset,
+                    duration: tick.saturating_sub(onset).max(1),
+                    velocity,
+                });
+            }
         }
     }
     if notes.is_empty() {
@@ -393,6 +412,61 @@ pub fn analyze(score: &Score) -> ImportedWorkAnalysis {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn midi_fixture(ppq: u16, events: &[u8]) -> Vec<u8> {
+        let mut track = Vec::from(events);
+        track.extend_from_slice(&[0x00, 0xFF, 0x2F, 0x00]);
+
+        let mut bytes = b"MThd".to_vec();
+        bytes.extend_from_slice(&6_u32.to_be_bytes());
+        bytes.extend_from_slice(&0_u16.to_be_bytes());
+        bytes.extend_from_slice(&1_u16.to_be_bytes());
+        bytes.extend_from_slice(&ppq.to_be_bytes());
+        bytes.extend_from_slice(b"MTrk");
+        bytes.extend_from_slice(&(track.len() as u32).to_be_bytes());
+        bytes.extend_from_slice(&track);
+        bytes
+    }
+
+    #[test]
+    fn repeated_same_pitch_notes_are_fifo_paired_without_overwriting() {
+        let events = [
+            0x00, 0xFF, 0x51, 0x03, 0x07, 0xA1, 0x20, // 120 BPM
+            0x00, 0x90, 0x3C, 0x64, // C4 on, velocity 100
+            0x30, 0x90, 0x3C, 0x50, // same pitch on again at tick 48
+            0x30, 0x80, 0x3C, 0x00, // FIFO closes first note at tick 96
+            0x30, 0x80, 0x3C, 0x00, // closes second note at tick 144
+        ];
+        let score = parse_midi(&midi_fixture(96, &events)).expect("valid overlapping MIDI notes");
+        assert_eq!(score.notes.len(), 2);
+        assert!((score.notes[0].velocity - 100.0 / 127.0).abs() < 1.0e-6);
+        assert!((score.notes[1].velocity - 80.0 / 127.0).abs() < 1.0e-6);
+        assert!((score.notes[0].onset.beats() - 0.0).abs() < 1.0e-6);
+        assert!((score.notes[1].onset.beats() - 0.5).abs() < 1.0e-6);
+        assert!((score.notes[0].duration.beats() - 1.0).abs() < 1.0e-6);
+        assert!((score.notes[1].duration.beats() - 1.0).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn zero_ppq_is_rejected_before_duration_construction() {
+        let events = [
+            0x00, 0x90, 0x3C, 0x64,
+            0x60, 0x80, 0x3C, 0x00,
+        ];
+        let error = parse_midi(&midi_fixture(0, &events)).expect_err("zero PPQ must reject");
+        assert!(error.contains("non-zero ticks per beat"));
+    }
+
+    #[test]
+    fn zero_tempo_meta_event_is_rejected() {
+        let events = [
+            0x00, 0xFF, 0x51, 0x03, 0x00, 0x00, 0x00,
+            0x00, 0x90, 0x3C, 0x64,
+            0x60, 0x80, 0x3C, 0x00,
+        ];
+        let error = parse_midi(&midi_fixture(96, &events)).expect_err("zero tempo must reject");
+        assert!(error.contains("non-zero microseconds per beat"));
+    }
 
     #[test]
     fn parses_minimal_musicxml_without_forcing_a_territory() {
