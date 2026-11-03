@@ -359,7 +359,7 @@ fn build_rt_observations(
             for (index, _) in &observations[start..end] {
                 let decision_yes = candidate.trials[*index]
                     .decision_yes
-                    .ok_or(ObservationError::PartialDecision)?;
+                    .ok_or(ObservationError::DecisionTimestampWithoutDecision)?;
                 scores_by_index[*index] = Some(if decision_yes { magnitude } else { -magnitude });
             }
             start = end;
