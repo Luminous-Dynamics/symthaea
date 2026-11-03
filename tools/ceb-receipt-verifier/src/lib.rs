@@ -10,7 +10,7 @@ use serde::de::{Deserializer, Error as DeError, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Number, Value};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -691,6 +691,73 @@ fn validate_check_aggregates(predicate: &Value) -> Result<BTreeSet<String>, Fail
     Ok(evidence)
 }
 
+fn validate_task_check_binding(task: &Value, predicate: &Value) -> Result<(), Failure> {
+    let declared = field(field(task, "acceptance", "task")?, "checks", "acceptance")?
+        .as_array()
+        .ok_or_else(|| Failure::protocol("task acceptance checks must be an array"))?;
+    let actual = field(predicate, "checks", "predicate")?
+        .as_array()
+        .ok_or_else(|| Failure::protocol("receipt checks must be an array"))?;
+    if declared.is_empty() {
+        return Err(Failure::unresolved("qualified task contract declares no acceptance checks"));
+    }
+    if declared.len() != actual.len() {
+        return Err(Failure::protocol("receipt check set does not exactly match task acceptance check set"));
+    }
+    let mut declared_by_id = BTreeMap::new();
+    for check in declared {
+        let id = string_field(check, "check_id", "task acceptance check")?;
+        if declared_by_id.insert(id.clone(), check).is_some() {
+            return Err(Failure::protocol(format!("duplicate task acceptance check_id: {id}")));
+        }
+    }
+    let mut seen = HashSet::new();
+    for check in actual {
+        let id = string_field(check, "check_id", "receipt check")?;
+        if !seen.insert(id.clone()) {
+            return Err(Failure::protocol(format!("duplicate receipt check_id: {id}")));
+        }
+        let expected = declared_by_id.get(&id)
+            .ok_or_else(|| Failure::protocol(format!("receipt contains undeclared acceptance check: {id}")))?;
+        if string_field(check, "kind", "receipt check")?
+            != string_field(expected, "kind", "task acceptance check")?
+            || bool_field(check, "required", "receipt check")?
+                != bool_field(expected, "required", "task acceptance check")?
+        {
+            return Err(Failure::protocol(format!("receipt check definition differs from task contract: {id}")));
+        }
+        let declared_authority = string_field(expected, "authority", "task acceptance check")?;
+        let receipt_authority = string_field(check, "authority", "receipt check")?;
+        if declared_authority != "task_spec" && declared_authority != receipt_authority {
+            return Err(Failure::protocol(format!("receipt check authority differs from task contract: {id}")));
+        }
+    }
+    if seen.len() != declared_by_id.len() {
+        return Err(Failure::protocol("receipt omits one or more task acceptance checks"));
+    }
+    Ok(())
+}
+
+fn check_definitions(predicate: &Value) -> Result<BTreeMap<String, (String, bool, String, String)>, Failure> {
+    let checks = field(predicate, "checks", "predicate")?
+        .as_array()
+        .ok_or_else(|| Failure::protocol("predicate.checks must be an array"))?;
+    let mut output = BTreeMap::new();
+    for check in checks {
+        let id = string_field(check, "check_id", "check")?;
+        let definition = (
+            string_field(check, "kind", "check")?,
+            bool_field(check, "required", "check")?,
+            string_field(check, "authority", "check")?,
+            string_field(check, "status", "check")?,
+        );
+        if output.insert(id.clone(), definition).is_some() {
+            return Err(Failure::protocol(format!("duplicate check_id: {id}")));
+        }
+    }
+    Ok(output)
+}
+
 fn check_budget(task: &Value, predicate: &Value) -> Result<(), Failure> {
     let budget = field(task, "budget", "task")?;
     let resources = field(predicate, "resources", "predicate")?;
@@ -868,6 +935,7 @@ fn verify_one_receipt(
         return Err(Failure::unresolved("grader is not isolated from candidate writes or hidden-test disclosure"));
     }
 
+    validate_task_check_binding(task, predicate)?;
     let check_evidence = validate_check_aggregates(predicate)?;
     let artifact_evidence = validate_artifacts(predicate, artifact_root, patch_sha256)?;
     if !check_evidence.is_subset(&artifact_evidence) {
@@ -914,6 +982,9 @@ fn check_pair_consistency(primary: &VerifiedReceipt, regrade: &VerifiedReceipt) 
     }
     let primary_predicate = &primary.predicate;
     let regrade_predicate = &regrade.predicate;
+    if check_definitions(primary_predicate)? != check_definitions(regrade_predicate)? {
+        return Err(Failure::protocol("primary and regrade check definitions or verdicts differ"));
+    }
     for key in ["task", "candidate", "agent", "grader"] {
         if field(primary_predicate, key, "primary predicate")?
             != field(regrade_predicate, key, "regrade predicate")?
