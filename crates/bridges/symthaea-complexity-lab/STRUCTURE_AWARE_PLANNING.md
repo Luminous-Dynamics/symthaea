@@ -1,6 +1,6 @@
 # ETH-019: structure-aware exact computation planning
 
-**Status:** Research specification created. This branch extends ETH-018. No structural portfolio implementation or performance result is claimed yet.
+**Status:** Research specification plus a finite Python component-decomposition reference prototype. The broader structural portfolio and all performance claims remain open.
 
 ## 1. Research objective
 
@@ -113,6 +113,27 @@ No comparison of a contraction FLOP estimate against an exact solver's wall-cloc
 7. Connect all candidate plans to ETH-015 output algebras, ETH-016 certificates, ETH-017 cost-aware ordering and ETH-018 rewrite proofs.
 8. Benchmark on frozen held-out instances against compatible external tools.
 
-## 9. Claim ceiling
+## 9. Executed finite component-witness reference
+
+Prototype files:
+- `reference/component_decomposition.py`
+- `reference/component_decomposition_checker.py`
+- `reference/component_decomposition_results.json`
+
+The producer builds canonical connected components using union-find over the primal variable graph. The independent checker reconstructs the expected components using BFS, not union-find, then validates canonical ordering, exact variable/factor coverage, factor-scope containment, table dimensions, instance digest and the closed algebra tag.
+
+Deterministic seed `0xE7019` results:
+- 1,000 random structural factor-graph instances.
+- 240 additional random instances checked semantically.
+- 720 direct-enumeration versus component-product comparisons: 240 each for Boolean feasibility, natural-number weighted count and MaxCount (optimum plus multiplicity).
+- 9 special semantic controls covering empty instances, isolated variables, disconnected factors and zero-scope scalar factors.
+- Independent subprocess checker accepted 1,729/1,729 positive witnesses and rejected 6/6 malformed witnesses.
+- Up to 11 components appeared in the structural random corpus.
+
+The component product is computed exactly as the product of component-local finite sums. This uses the commutative-semiring decomposition identity; the prototype's executable evaluator covers only bool/nat/MaxCount. The closed witness tag catalogue also lists Pareto and polynomial algebras, but those are not included in this ETH-019 semantic experiment.
+
+This is finite reference evidence, not a generalized/fractional hypertree-width result, tensor-contraction planner, slicing optimizer, symmetry reduction, Rust qualification, Lean proof or performance benchmark. The reference tests use small domains and direct enumeration; no runtime advantage is claimed.
+
+## 10. Claim ceiling
 
 This document defines the research question and test programme. It contains no structural planner implementation, proof of an FPT result, measured speedup, or SOTA result.
