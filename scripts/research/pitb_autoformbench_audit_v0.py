@@ -45,6 +45,12 @@ def read_git_file(repo: Path, path: str) -> bytes:
         raise AuditError(f"cannot read pinned object {path}; fetch the release commit first") from exc
 
 
+def git_blob_sha1(raw: bytes) -> str:
+    """Return Git's canonical SHA-1 for a blob, including its object header."""
+    header = f"blob {len(raw)}\\0".encode("ascii")
+    return hashlib.sha1(header + raw).hexdigest()
+
+
 def parse_csv(data: bytes, label: str) -> list[dict[str, str]]:
     try:
         reader = csv.DictReader(io.StringIO(data.decode("utf-8"), newline=""))
@@ -231,7 +237,7 @@ def self_test():
     ]
     for row in sample:
         row["textbook"] = "one" if row["id"] != "c" else "two"
-    result = summarize({r["id"]: r for r in sample})
+    assert git_blob_sha1(b"abc") == "f2ba8f84ab5c1bce84a7b441cb1959cfc7093b7f"\n    assert median([1.0, 3.0]) == 2.0 and median([1.0, 2.0, 3.0]) == 2.0\n    result = summarize({r["id"]: r for r in sample})
     assert result["solved"] == 1 and result["unresolved"] == 2
     assert math.isclose(result["unresolved_cost_share"], 60 / 70)
     assert math.isclose(result["unresolved_to_solved_mean_cost_ratio"], 3)
