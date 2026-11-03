@@ -1375,7 +1375,8 @@
     "https://github.com/Luminous-Dynamics/symthaea/issues/10109",
     "https://github.com/Luminous-Dynamics/symthaea/issues/10207",
     "https://github.com/Luminous-Dynamics/symthaea/issues/10208",
-    "https://github.com/Luminous-Dynamics/symthaea/issues/10298"
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10298",
+    "https://github.com/Luminous-Dynamics/symthaea/pull/10304"
   ],
   "claim_ceiling": {
     "rust_port_completed": false,
@@ -1536,5 +1537,25 @@
       "note": "Pre-environment CVE-only benchmark; not comparable to binary-first benchmarks."
     }
   ],
-  "external_baseline_document": "docs/research/REA_BENCHMARK_EXTERNAL_BASELINES_2026Q4.md"
+  "external_baseline_document": "docs/research/REA_BENCHMARK_EXTERNAL_BASELINES_2026Q4.md",
+  "run_receipt_contract": {
+    "schema": "luminous.benchmark-run-receipt.v1",
+    "schema_file": "schemas/benchmark-run-receipt-v1.schema.json",
+    "semantic_validator_harness": "tools/benchmark-receipt-harness",
+    "cli": "benchmark_receipt_validate",
+    "synthetic_example": "examples/benchmark-run-receipt-v1.synthetic.json",
+    "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10029",
+    "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10304",
+    "validation_layers": [
+      "json_schema_draft_2020_12",
+      "strict_duplicate_key_json_import",
+      "task_denominator_disposition_equations",
+      "official_grader_score_provenance",
+      "derived_metric_recalculation",
+      "resource_budget_enforcement",
+      "matched_arm_taskset_budget_cohort_scoring_binding",
+      "canonical_receipt_integrity_hash"
+    ],
+    "claim_ceiling": "receipt self-hash is not signature, grader trust or answer correctness; authenticity_verified remains false"
+  }
 }
