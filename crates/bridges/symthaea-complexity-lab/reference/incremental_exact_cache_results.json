@@ -1,0 +1,74 @@
+{
+  "algebras": [
+    "natural-count/unbounded-int/v1",
+    "maxcount/multiplicity-distinct-support/v2"
+  ],
+  "cache_authentication": {
+    "attestation": "HMAC-SHA256 reference prototype",
+    "tampered_rehashed_payload_without_valid_mac_rejected": true,
+    "wrong_authentication_key_entries_rejected": 6,
+    "trust_boundary": "HMAC authenticates stored bytes but does not prove checker soundness or key quality. No production key management."
+  },
+  "cache_identity_binds": [
+    "schema",
+    "algebra",
+    "cardinalities",
+    "eliminated_variable",
+    "multiset_of_input_factor_content_digests",
+    "checker_id"
+  ],
+  "claim_boundary": "Python reference only; no Rust compile, Lean theorem, public benchmark or measured runtime speedup. Checker is a separate function path in the same file, not a separately built verifier.",
+  "edit_sequence": [
+    {"edit": 0, "hits": 6, "misses": 0},
+    {"edit": 1, "hits": 4, "misses": 2},
+    {"edit": 2, "hits": 3, "misses": 3},
+    {"edit": 3, "hits": 3, "misses": 3},
+    {"edit": 4, "hits": 6, "misses": 0},
+    {"edit": 5, "hits": 3, "misses": 3},
+    {"edit": 6, "hits": 4, "misses": 2},
+    {"edit": 7, "hits": 5, "misses": 1}
+  ],
+  "primary_cases": [
+    {
+      "case": "single_factor_edit_disconnected_components",
+      "cold_misses": 6,
+      "warm_hits": 6,
+      "incremental_hits": 3,
+      "incremental_misses": 3,
+      "invalidated_variable_steps": {"0": 1, "1": 1, "2": 1},
+      "cold_changed_producer_additions": 28,
+      "cold_changed_producer_multiplications": 52,
+      "incremental_producer_additions": 14,
+      "incremental_producer_multiplications": 26,
+      "incremental_equals_cold_and_direct": true
+    },
+    {"case": "input_factor_permutation", "cache_hits": 6, "all_reused": true},
+    {"case": "factor_scope_edit", "incremental_hits": 0, "incremental_misses": 6, "exact_match": true},
+    {"case": "tampered_cache_payload_rehashed_without_mac", "rejected": 1, "recomputed_exactly": true},
+    {"case": "cache_authentication_key_mismatch", "rejected": 6, "recomputed_exactly": true},
+    {"case": "algebra_namespace_isolation", "cross_algebra_hits": 0, "isolated": true},
+    {
+      "case": "randomized_single_factor_edits",
+      "graphs": 64,
+      "algebras": 2,
+      "incremental_vs_cold_vs_direct_matches": 128,
+      "cache_hits": 515,
+      "cache_misses": 253,
+      "invalidated_steps": 253,
+      "cold_producer_additions": 7168,
+      "cold_producer_multiplications": 16384,
+      "incremental_producer_additions": 2170,
+      "incremental_producer_multiplications": 4858
+    }
+  ],
+  "producer_operation_reduction": {
+    "addition_reduction_fraction": 0.697265625,
+    "multiplication_reduction_fraction": 0.7034912109375,
+    "definition": "producer semiring operation counts only; excludes checker, HMAC, serialization, cache memory and wall time"
+  },
+  "randomized_edits": 128,
+  "randomized_exact_matches": 128,
+  "seed": 20261103,
+  "suite": "Content-addressed incremental exact factor elimination",
+  "tamper_controls_rejected": 2
+}
