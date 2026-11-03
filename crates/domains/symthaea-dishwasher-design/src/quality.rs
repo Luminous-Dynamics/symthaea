@@ -76,6 +76,8 @@ pub struct OutcomeObservation {
     pub run_id: String,
     pub item_id: String,
     pub endpoint: Endpoint,
+    pub criterion_id: String,
+    pub metric_id: String,
     pub evidence_kind: EvidenceKind,
     pub method_id: String,
     pub protocol_id: String,
@@ -111,6 +113,8 @@ pub enum QualityError {
     MissingCriterion(Endpoint),
     ProcessProxyCannotQualify { run_id: String, item_id: String, endpoint: Endpoint },
     UnitMismatch(Endpoint),
+    CriterionMismatch(Endpoint),
+    MetricMismatch(Endpoint),
     MethodMismatch(Endpoint),
     DuplicateObservation { run_id: String, item_id: String, endpoint: Endpoint },
     InsufficientIndependentRuns { item_id: String, endpoint: Endpoint, observed: usize, required: usize },
@@ -290,6 +294,8 @@ pub fn qualify_pilot_evidence(
     for observation in &observations {
         if !canonical_non_empty(&observation.run_id)
             || !canonical_non_empty(&observation.item_id)
+            || !canonical_non_empty(&observation.criterion_id)
+            || !canonical_non_empty(&observation.metric_id)
             || !canonical_non_empty(&observation.method_id)
             || !canonical_non_empty(&observation.protocol_id)
             || !canonical_non_empty(&observation.unit)
@@ -332,6 +338,12 @@ pub fn qualify_pilot_evidence(
             .get(&observation.endpoint)
             .copied()
             .ok_or(QualityError::MissingCriterion(observation.endpoint))?;
+        if observation.criterion_id != criterion.criterion_id {
+            return Err(QualityError::CriterionMismatch(observation.endpoint));
+        }
+        if observation.metric_id != criterion.metric_id {
+            return Err(QualityError::MetricMismatch(observation.endpoint));
+        }
         if observation.unit != criterion.unit {
             return Err(QualityError::UnitMismatch(observation.endpoint));
         }
@@ -503,6 +515,16 @@ mod tests {
                         run_id: format!("run-{run:02}"),
                         item_id: item.clone(),
                         endpoint: *endpoint,
+                        criterion_id: criteria(policy)
+                            .into_iter()
+                            .find(|criterion| criterion.endpoint == *endpoint)
+                            .unwrap()
+                            .criterion_id,
+                        metric_id: criteria(policy)
+                            .into_iter()
+                            .find(|criterion| criterion.endpoint == *endpoint)
+                            .unwrap()
+                            .metric_id,
                         evidence_kind: EvidenceKind::IndependentOutcomeAssay,
                         method_id: method.to_owned(),
                         protocol_id: "independent-assay-v1".to_owned(),
@@ -613,6 +635,24 @@ mod tests {
             Endpoint::CrossContamination,
             Endpoint::RelativeMicrobialReduction,
         ]);
+    }
+
+    #[test]
+    fn rejects_measurement_bound_to_wrong_criterion_or_metric() {
+        let policy = policy();
+        let mut readings = observations(policy);
+        readings[0].criterion_id = "different-acceptance-rule".to_owned();
+        assert!(matches!(
+            qualify_pilot_evidence(scope(), policy, criteria(policy), readings),
+            Err(QualityError::CriterionMismatch(Endpoint::SoilRemovalResidual))
+        ));
+
+        let mut readings = observations(policy);
+        readings[0].metric_id = "rinse_conductivity".to_owned();
+        assert!(matches!(
+            qualify_pilot_evidence(scope(), policy, criteria(policy), readings),
+            Err(QualityError::MetricMismatch(Endpoint::SoilRemovalResidual))
+        ));
     }
 
     #[test]
