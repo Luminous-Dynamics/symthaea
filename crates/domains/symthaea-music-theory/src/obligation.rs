@@ -26,6 +26,16 @@ pub enum ReturnTransformation {
     Restored,
 }
 
+/// Typed scale-relative transformation requested for a new motif
+/// development. Unlike ReturnTransformation::Transposed (a return-identity
+/// relation), a diatonic shift is measured in the target section's scale.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "kind")]
+pub enum MotifDevelopmentTransformation {
+    DiatonicTransposition { degree_shift: i32 },
+    InversionAroundFirstNote,
+}
+
 /// A long-range musical promise.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ObligationKind {
@@ -39,7 +49,7 @@ pub enum ObligationKind {
     /// choose DevelopMotif rather than ReturnOpeningMaterial.
     DevelopMotif {
         motif_id: String,
-        transformation: ReturnTransformation,
+        transformation: MotifDevelopmentTransformation,
     },
     /// Establish a destination key or tonal center.
     ReachKey { key: Key },
@@ -304,7 +314,9 @@ mod tests {
             0.8,
             ObligationKind::DevelopMotif {
                 motif_id: "sonata.primary".into(),
-                transformation: ReturnTransformation::Transposed,
+                transformation: MotifDevelopmentTransformation::DiatonicTransposition {
+                    degree_shift: 1,
+                },
             },
         );
         let bytes = serde_json::to_vec(&obligation).unwrap();
