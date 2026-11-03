@@ -382,7 +382,7 @@ fn residual_context_digest(r:&ModelResidualObservation)->Result<String,VehicleMo
 fn decision_context_digest(d:&ModelDecisionObservation)->Result<String,VehicleModelDiscrepancyError> {
     hash_json(&(d.decision_id.as_str(),d.scenario_id.as_str(),d.failure_family_id.as_str(),d.actor_policy_id.as_str(),d.split_id.as_str(),d.shift_regime_id.as_str(),
         d.initial_state_digest.as_str(),d.environment_digest.as_str(),d.dynamics_digest.as_str(),d.action_history_digest.as_str(),d.observation_availability_digest.as_str(),
-        d.forecast_issued_at_ms,d.utility_id.as_str(),d.utility_unit_id.as_str(),d.tie_tolerance,d.selected_action_id.as_str(),d.selection_commit_sequence,d.reference_outcome_reveal_sequence,d.selection_receipt_id.as_str()))
+        d.forecast_issued_at_ms,d.utility_id.as_str(),d.utility_unit_id.as_str(),d.tie_tolerance,d.selected_action_id.as_str(),d.selection_commit_sequence,d.reference_outcome_reveal_sequence,d.selection_receipt_id.as_str(),d.action_set_digest.as_str(),d.candidate_set_complete))
 }
 fn hash_json<T:Serialize>(value:&T)->Result<String,VehicleModelDiscrepancyError> {
     let bytes=serde_json::to_vec(value).map_err(|_|VehicleModelDiscrepancyError::InvalidDecisionContextDigest)?;
@@ -426,6 +426,63 @@ mod tests {
         predictor_model_id:"predictor-v0".into(),predictor_artifact_digest:h('3'),reference_model_id:"reference-v0".into(),reference_model_artifact_digest:h('4'),
         evaluator_id:"evaluator-v0".into(),evaluator_artifact_digest:h('5'),planner_id:"planner-v0".into(),planner_artifact_digest:h('6'),sampling_profile_digest:h('7'),
         protocol_id:"SAM-MODEL-RESIDUAL-001".into(),protocol_digest:h('8'),residual_observations:vec![residual(1000,1.0,0.0),residual(2000,4.0,0.0)],decisions:vec![decision()]}}
+    #[test]
+    fn analytic_linear_motion_fixture_has_known_horizon_growth() {
+        let mut sample = input();
+        let speed_prediction = 5.0_f64;
+        let speed_reference = 5.2_f64;
+        sample.residual_observations = [1_000_u64, 2_000_u64].into_iter().map(|horizon_ms| {
+            let seconds = horizon_ms as f64 / 1_000.0;
+            residual(
+                horizon_ms,
+                speed_prediction * seconds,
+                speed_reference * seconds,
+            )
+        }).collect();
+        let report = summarize_vehicle_model_discrepancy(&sample).unwrap();
+        assert!((report.paired_horizon_growth[0].absolute_residual_growth - 0.2).abs() < 1e-12);
+    }
+
+    #[test]
+    fn perfect_model_fixture_has_zero_residual_at_every_horizon() {
+        let mut sample = input();
+        sample.residual_observations = vec![residual(1_000, 5.0, 5.0), residual(2_000, 10.0, 10.0)];
+        let report = summarize_vehicle_model_discrepancy(&sample).unwrap();
+        assert_eq!(report.horizon_summaries[0].p95_absolute_residual, 0.0);
+        assert_eq!(report.horizon_summaries[1].p95_absolute_residual, 0.0);
+        assert_eq!(report.paired_horizon_growth[0].absolute_residual_growth, 0.0);
+    }
+
+    #[test]
+    fn preserves_signed_bias_direction() {
+        let mut sample = input();
+        sample.residual_observations = vec![residual(1_000, 3.0, 4.0)];
+        let report = summarize_vehicle_model_discrepancy(&sample).unwrap();
+        assert_eq!(report.horizon_summaries[0].mean_signed_residual, -1.0);
+    }
+
+    #[test]
+    fn rejects_overflowing_signed_residual() {
+        let mut sample = input();
+        sample.residual_observations[0].predicted_value = f64::MAX;
+        sample.residual_observations[0].realized_value = -f64::MAX;
+        assert_eq!(
+            summarize_vehicle_model_discrepancy(&sample).unwrap_err(),
+            VehicleModelDiscrepancyError::InvalidResidual
+        );
+    }
+
+    #[test]
+    fn rejects_overflowing_utility_range() {
+        let mut sample = input();
+        sample.decisions[0].actions[0].predicted_utility = f64::MAX;
+        sample.decisions[0].actions[1].predicted_utility = -f64::MAX;
+        assert_eq!(
+            summarize_vehicle_model_discrepancy(&sample).unwrap_err(),
+            VehicleModelDiscrepancyError::InvalidUtility
+        );
+    }
+
     #[test] fn reports_paired_horizon_error_growth(){let r=summarize_vehicle_model_discrepancy(&input()).unwrap();assert_eq!(r.paired_horizon_growth.len(),1);assert_eq!(r.paired_horizon_growth[0].absolute_residual_growth,3.0);}
     #[test] fn rejects_mismatched_context_pair(){let mut x=input();x.residual_observations[1].environment_digest=h('9');assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::MismatchedResidualContext);}
     #[test] fn rejects_duplicate_scenario_actor_action_horizon(){let mut x=input();x.residual_observations.push(residual(1000,2.0,0.0));assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::DuplicateResidualKey);}
@@ -433,7 +490,7 @@ mod tests {
     #[test] fn detects_planner_ranking_reversal_and_regret(){let r=summarize_vehicle_model_discrepancy(&input()).unwrap();let d=&r.decision_results[0];assert_eq!(d.predicted_best_action_id.as_deref(),Some("yield"));assert_eq!(d.realized_best_action_id.as_deref(),Some("continue"));assert_eq!(d.ranking_reversed,Some(true));assert_eq!(d.selected_action_regret,Some(6.0));assert_eq!(d.optimism_gap,Some(9.0));}
     #[test] fn rejects_outcome_leakage(){let mut x=input();x.decisions[0].reference_outcome_reveal_sequence=9;x.decisions[0].decision_context_digest=decision_context_digest(&x.decisions[0]).unwrap();assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::OutcomeLeakage);}
     #[test] fn unknown_feasibility_makes_decision_indeterminate(){let mut x=input();x.decisions[0].actions[0].feasibility=DiscrepancyFeasibility::Indeterminate;x.decisions[0].action_set_digest=hash_json(&x.decisions[0].actions.iter().map(|a|(a.action_id.as_str(),a.command_digest.as_str())).collect::<Vec<_>>()).unwrap();let r=summarize_vehicle_model_discrepancy(&x).unwrap();assert_eq!(r.decision_results[0].status,DecisionAuditStatus::IndeterminateFeasibility);}
-    #[test] fn rejects_action_set_digest_mismatch(){let mut x=input();x.decisions[0].action_set_digest=h('9');assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::InvalidActionSetDigest);}
+    #[test] fn rejects_action_set_digest_mismatch(){let mut x=input();x.decisions[0].action_set_digest=h('9');x.decisions[0].decision_context_digest=decision_context_digest(&x.decisions[0]).unwrap();assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::InvalidActionSetDigest);}
     #[test] fn canonicalizes_row_and_action_order(){let x=input();let a=summarize_vehicle_model_discrepancy(&x).unwrap();let mut y=x;y.residual_observations.reverse();y.decisions[0].actions.reverse();let b=summarize_vehicle_model_discrepancy(&y).unwrap();assert_eq!(a.report_digest,b.report_digest);}
     #[test] fn report_digest_detects_tampering(){let mut r=summarize_vehicle_model_discrepancy(&input()).unwrap();assert!(r.identity_is_valid());r.horizon_summaries[0].p95_absolute_residual+=1.0;assert!(!r.identity_is_valid());}
 }
