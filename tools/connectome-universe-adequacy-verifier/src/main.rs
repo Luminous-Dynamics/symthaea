@@ -1029,6 +1029,17 @@ mod tests {
         "../../../research/connectomics/fixtures/connectome-universe-adequacy-false-ambiguity-reference-structures-v0.1.json"
     );
 
+
+    const STATUS_AXIS_REPORT: &str = include_str!(
+        "../../../research/connectomics/fixtures/connectome-universe-adequacy-status-axis-known-answer-v0.1.json"
+    );
+    const STATUS_AXIS_CANDIDATE: &str = include_str!(
+        "../../../research/connectomics/fixtures/connectome-universe-adequacy-status-axis-candidate-structures-v0.1.json"
+    );
+    const STATUS_AXIS_REFERENCE: &str = include_str!(
+        "../../../research/connectomics/fixtures/connectome-universe-adequacy-status-axis-reference-structures-v0.1.json"
+    );
+
     fn evaluate(report: &str, candidate: &str, reference: &str) -> Result<Value, String> {
         validate_report(report.as_bytes(), candidate.as_bytes(), reference.as_bytes())
     }
@@ -1151,6 +1162,23 @@ mod tests {
             OMITTED_REFERENCE.as_bytes()
         )
         .is_err());
+    }
+
+    #[test]
+    fn keeps_evidence_compatibility_separate_from_query_estimability() {
+        let result = evaluate(STATUS_AXIS_REPORT, STATUS_AXIS_CANDIDATE, STATUS_AXIS_REFERENCE)
+            .expect("status-axis fixture should be internally consistent");
+        let counts = &result["recomputed_summary"];
+        assert_eq!(counts["compatible_reference_count"], 1);
+        assert_eq!(counts["incompatible_reference_count"], 1);
+        assert_eq!(counts["indeterminate_reference_count"], 1);
+        assert_eq!(counts["compatible_estimable_reference_count"], 0);
+        assert_eq!(counts["compatible_query_not_estimable_reference_count"], 1);
+        assert_eq!(counts["structurally_included_count"], 1);
+        assert_eq!(
+            result["dispositions"]["universe_adequacy_against_supplied_challenge"],
+            "ADEQUACY_NOT_ESTIMABLE"
+        );
     }
 
 }
