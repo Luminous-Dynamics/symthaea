@@ -1017,6 +1017,52 @@ mod tests {
     }
 
     #[test]
+    fn scale_relative_identity_recognizes_major_to_relative_minor_development() {
+        let source_key = Key::major(PitchClass::C);
+        let target_key = Key::minor(PitchClass::E);
+        let mut score = Score::new(source_key, 120.0, 4);
+        let source = [60, 64, 67]; // C-E-G: scale degrees 1-3-5 in C major
+        let target = [64, 67, 71]; // E-G-B: scale degrees 1-3-5 in E minor
+        for (index, midi) in source.into_iter().enumerate() {
+            score.push(ScoreNote {
+                part: crate::score::PartId::UNASSIGNED,
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new(index as i64, 1),
+                duration: Duration::quarter(),
+                velocity: 0.7,
+                role: VoiceRole::Melody,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        for (index, midi) in target.into_iter().enumerate() {
+            score.push(ScoreNote {
+                part: crate::score::PartId::UNASSIGNED,
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new((index + 4) as i64, 1),
+                duration: Duration::quarter(),
+                velocity: 0.7,
+                role: VoiceRole::Melody,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        let evidence = compare_motif_development_regions(
+            &score,
+            Duration::zero(),
+            Duration::new(3, 1),
+            source_key,
+            Duration::new(4, 1),
+            Duration::new(7, 1),
+            target_key,
+        );
+        assert_eq!(evidence.scale_degree_similarity, 1.0);
+        assert_eq!(evidence.duration_similarity, 1.0);
+        assert_eq!(evidence.onset_interval_similarity, 1.0);
+        assert!(evidence.meets_threshold(0.999));
+    }
+
+    #[test]
     fn sonata_development_obligation_has_separate_score_side_evidence() {
         let home = Key::major(PitchClass::C);
         let realized = realize_sonata_with_plan(home, 100.0, 4.0, &theme(), 31, &intent());
