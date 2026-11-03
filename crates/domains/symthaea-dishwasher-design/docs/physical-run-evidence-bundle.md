@@ -18,7 +18,7 @@ A version-1 bundle comprises:
 3. Instrument calibrations: instrument ID, calibration ID, calibration validity interval, certificate URI/digest and calibration-bundle digest.
 4. Sensor traces: instrument/channel/metric/unit, sample count/rate, start/end, calibration reference, source run ID and immutable raw archive reference/digest.
 5. Independent assay records: one required item × endpoint record, with criterion/metric/method/protocol, measured value, expanded uncertainty, unit, instrument/calibration, assay timestamp, source run and archive reference/digest.
-6. Resource measurements: wall electricity, upstream hot-water energy, fresh water, detergent, rinse aid and active operator time, each with unit, interval, measurement method, provenance and calibration where instrumented.
+6. Resource measurements: wall electricity, upstream hot-water energy, fresh water, detergent, rinse aid and active operator time, each with an explicit source run ID, unit, interval increment, measurement method, provenance and calibration where instrumented.
 
 The tables are normalized: all child tables repeat the physical `run_id`. Never encode lists of item IDs or endpoints in a comma-delimited cell.
 
@@ -27,7 +27,7 @@ The tables are normalized: all child tables repeat the physical `run_id`. Never 
 - A run ID uniquely identifies one complete physical wash cycle. Do not reuse it for retries or rewashes; each attempt gets its own run ID and is linked at the service-request layer.
 - Each run also records soil age at wash start, inlet-water hardness, inlet temperature, ambient temperature and relative humidity. The ambient relative-humidity value is expressed in permille and must be no greater than 1,000. All timestamps are Unix UTC seconds in this schema version. Capture systems should retain higher-resolution raw timestamps in trace payloads when available.
 - Run end must be strictly later than run start.
-- Sensor-trace and resource-measurement intervals must be contained within the physical run interval.
+- Sensor-trace and resource-measurement intervals must be contained within the physical run interval. Every resource increment carries its source run ID, which must match the containing physical run.
 - Assay measurements may occur after the wash ends, but must retain the exact source run ID and the assay timestamp.
 - Machine unit, session, soil lot, detergent lot, water batch, operator, laboratory and site IDs are opaque grouping keys. Their meaning and uniqueness must be governed by the acquisition protocol. Include service request, compartment, compartment configuration and utility topology among possible dataset holdout axes. IDs alone do not prove independence.
 
