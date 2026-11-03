@@ -11,15 +11,13 @@
 
 use serde::{Deserialize, Serialize};
 
-use symthaea_core::genesis::GenesisSeed;
-
 use crate::controller::VehicleController;
 use crate::encoder::VehicleHdcEncoder;
 use crate::perturbations::PerturbationSchedule;
 use crate::road::Road;
 use crate::simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
 use crate::types::{
-    VehicleCommand, VehicleConfig, VehicleState, pd_cruise_baseline_with_road,
+    VehicleCommand, VehicleState, pd_cruise_baseline_with_road,
 };
 use crate::shadow_evaluation::pd_road_baseline_digest;
 
@@ -222,7 +220,7 @@ pub fn run_paired_lane_keep_rollout(
     let road_geometry_digest = road
         .profile_digest()
         .ok_or(VehiclePairedRolloutError::InvalidRoadProfile)?;
-    if !simulator_params_are_usable(initial_simulator) {
+    if !initial_simulator.dynamics_profile_is_valid() {
         return Err(VehiclePairedRolloutError::InvalidRolloutProfile);
     }
     if !digest_is_valid(&advanced_controller_digest) {
@@ -334,8 +332,16 @@ pub fn run_paired_lane_keep_rollout(
 
         advanced_simulator.step(&advanced_command, timestep_s);
         baseline_simulator.step(&baseline_command, timestep_s);
+        let expected_advanced_time = advanced_plant_before.timestamp + timestep_s;
+        let expected_baseline_time = baseline_plant_before.timestamp + timestep_s;
+        let advanced_time = advanced_simulator.state().timestamp;
+        let baseline_time = baseline_simulator.state().timestamp;
+        let advanced_time_tolerance = 1e-9 * expected_advanced_time.abs().max(1.0);
+        let baseline_time_tolerance = 1e-9 * expected_baseline_time.abs().max(1.0);
         if !state_is_finite(advanced_simulator.state())
             || !state_is_finite(baseline_simulator.state())
+            || (advanced_time - expected_advanced_time).abs() > advanced_time_tolerance
+            || (baseline_time - expected_baseline_time).abs() > baseline_time_tolerance
         {
             return Err(VehiclePairedRolloutError::InvalidStateDuringRollout);
         }
@@ -422,42 +428,6 @@ fn subtract_metrics(
     }
 }
 
-fn simulator_params_are_usable(simulator: &BicycleModelSimulator) -> bool {
-    let params = simulator.params();
-    let values = [
-        params.mass,
-        params.yaw_inertia,
-        params.front_axle_dist,
-        params.rear_axle_dist,
-        params.cg_height,
-        params.front_cornering_stiffness,
-        params.rear_cornering_stiffness,
-        params.max_steering_angle,
-        params.steering_rate_limit,
-        params.max_engine_force,
-        params.max_power,
-        params.max_brake_force,
-        params.drag_coeff,
-        params.rolling_resistance,
-        params.air_density,
-        params.wheelbase,
-    ];
-    values.iter().all(|value| value.is_finite())
-        && params.mass > 0.0
-        && params.yaw_inertia > 0.0
-        && params.front_axle_dist > 0.0
-        && params.rear_axle_dist > 0.0
-        && params.front_cornering_stiffness > 0.0
-        && params.rear_cornering_stiffness > 0.0
-        && params.max_steering_angle > 0.0
-        && params.steering_rate_limit > 0.0
-        && params.max_engine_force > 0.0
-        && params.max_power > 0.0
-        && params.max_brake_force > 0.0
-        && params.air_density > 0.0
-        && (params.wheelbase - params.front_axle_dist - params.rear_axle_dist).abs() < 1e-9
-}
-
 fn digest_is_valid(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
@@ -512,6 +482,8 @@ fn wrap_angle(mut angle: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_core::genesis::GenesisSeed;
+    use crate::types::VehicleConfig;
     use symthaea_core::genesis::GenesisSeed;
 
     fn setup() -> (BicycleModelSimulator, Road, PerturbationSchedule, VehicleController, VehicleHdcEncoder) {
@@ -588,6 +560,27 @@ mod tests {
         .unwrap();
         assert_eq!(result.frames[0].advanced_plant_state_before.position_y,
                    result.frames[0].baseline_plant_state_before.position_y);
+    }
+
+    #[test]
+    fn output_digest_and_profile_digest_detect_tampering() {
+        let (sim, road, perturbations, mut controller, mut encoder) = setup();
+        let mut result = run_paired_lane_keep_rollout(
+            "lane-keep-profile-digest",
+            "straight-road-v1",
+            "e".repeat(64),
+            &sim,
+            &road,
+            &perturbations,
+            10.0,
+            0.005,
+            2,
+            &mut controller,
+            &mut encoder,
+        ).unwrap();
+        assert!(result.profile.identity_is_valid());
+        result.profile.road_profile_id.push_str("-tampered");
+        assert!(!result.output_identity_is_valid());
     }
 
     #[test]
