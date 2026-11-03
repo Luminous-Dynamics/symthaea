@@ -510,8 +510,11 @@ pub fn evaluate_observer_risk_coverage(
             }
         }
 
+        // Any unresolved assay in the target set prevents a zero-event
+        // confidence claim: unresolved outcomes could conceal a false accept.
         let iid_zero_event_challenge_upper_bound = if false_accept_run_count == 0
             && nonconforming_run_count > 0
+            && unresolved_run_count == 0
         {
             Some(1.0 - alpha.powf(1.0 / nonconforming_run_count as f64))
         } else {
@@ -704,7 +707,94 @@ mod tests {
         assert_eq!(report.points[1].released_run_count, 1);
         assert_eq!(report.points[1].false_accept_run_count, 0);
         assert_eq!(report.points[1].unverifiable_release_run_count, 1);
-        assert!((report.points[1].iid_zero_event_challenge_upper_bound.unwrap() - 0.95).abs() < 1e-12);
+        assert_eq!(report.points[1].iid_zero_event_challenge_upper_bound, None);
+    }
+
+    #[test]
+    fn unresolved_assay_blocks_zero_event_confidence_claim() {
+        let target_ids = ["fail-run", "unknown-run"];
+        let manifest = manifest_for_target(
+            ValidationPartition::LockedConfirmation,
+            &target_ids,
+        );
+        let runs = vec![
+            scores("fail-run", Decision::Fail, 0.20),
+            scores("unknown-run", Decision::Indeterminate, 0.20),
+        ];
+        let report = evaluate_observer_risk_coverage(
+            &manifest,
+            &runs,
+            &[HoldoutAxis::MachineUnit],
+            ValidationPartition::LockedConfirmation,
+            &REQUIRED,
+            &[0.9],
+            0.05,
+        ).unwrap();
+        assert_eq!(report.points[0].false_accept_run_count, 0);
+        assert_eq!(report.points[0].unresolved_run_count, 1);
+        assert_eq!(report.points[0].iid_zero_event_challenge_upper_bound, None);
+    }
+
+    #[test]
+    fn one_physical_run_with_multiple_items_counts_as_one_trial() {
+        let manifest = manifest_for_target(
+            ValidationPartition::LockedConfirmation,
+            &["multi-item-run"],
+        );
+        let mut run = scores("multi-item-run", Decision::Pass, 0.99);
+        run.item_ids.push("plate-2".to_owned());
+        for endpoint in REQUIRED {
+            run.predictions.push(EndpointPrediction {
+                item_id: "plate-2".to_owned(),
+                endpoint,
+                pass_probability: 0.97,
+            });
+            run.outcomes.push(EndpointOutcome {
+                item_id: "plate-2".to_owned(),
+                endpoint,
+                decision: Decision::Pass,
+                assay_record_id: format!("assay-multi-item-run-plate-2-{endpoint:?}"),
+            });
+        }
+        let report = evaluate_observer_risk_coverage(
+            &manifest,
+            &[run],
+            &[HoldoutAxis::MachineUnit],
+            ValidationPartition::LockedConfirmation,
+            &REQUIRED,
+            &[0.9],
+            0.05,
+        ).unwrap();
+        assert_eq!(report.target_run_count, 1);
+        assert_eq!(report.points[0].physical_run_count, 1);
+        assert_eq!(report.points[0].released_run_count, 1);
+    }
+
+    #[test]
+    fn exact_zero_event_bound_is_reported_only_for_fully_adjudicated_runs() {
+        let target_ids = ["pass-1", "fail-1", "pass-2"];
+        let manifest = manifest_for_target(
+            ValidationPartition::LockedConfirmation,
+            &target_ids,
+        );
+        let runs = vec![
+            scores("pass-1", Decision::Pass, 0.99),
+            scores("fail-1", Decision::Fail, 0.20),
+            scores("pass-2", Decision::Pass, 0.99),
+        ];
+        let report = evaluate_observer_risk_coverage(
+            &manifest,
+            &runs,
+            &[HoldoutAxis::MachineUnit],
+            ValidationPartition::LockedConfirmation,
+            &REQUIRED,
+            &[0.9],
+            0.05,
+        ).unwrap();
+        let expected = 1.0 - 0.05_f64.powf(1.0);
+        assert_eq!(report.points[0].false_accept_run_count, 0);
+        assert_eq!(report.points[0].unresolved_run_count, 0);
+        assert!((report.points[0].iid_zero_event_challenge_upper_bound.unwrap() - expected).abs() < 1e-12);
     }
 
     #[test]
