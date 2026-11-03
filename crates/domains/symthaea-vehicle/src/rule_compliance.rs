@@ -79,6 +79,7 @@ pub enum RuleComplianceOutcome {
     Violation,
     Indeterminate,
     NotEncountered,
+    Pending,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -96,6 +97,7 @@ pub enum RuleComplianceReason {
     RuleKindUnsupported,
     RequiredStopObserved,
     RequirementNotEncountered,
+    RequirementPending,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -128,6 +130,7 @@ pub struct TrafficRuleComplianceReport {
     pub violation_count: usize,
     pub indeterminate_count: usize,
     pub not_encountered_count: usize,
+    pub pending_count: usize,
     /// BLAKE3 over exact inputs, findings and aggregates with this field empty.
     pub report_digest: String,
 }
@@ -166,6 +169,7 @@ impl TrafficRuleComplianceReport {
             || self.violation_count != counts.1
             || self.indeterminate_count != counts.2
             || self.not_encountered_count != counts.3
+            || self.pending_count != counts.4
         {
             return false;
         }
@@ -227,6 +231,7 @@ pub fn evaluate_traffic_rules(
         violation_count: counts.1,
         indeterminate_count: counts.2,
         not_encountered_count: counts.3,
+        pending_count: counts.4,
         report_digest: String::new(),
     };
     let bytes = serde_json::to_vec(&report).map_err(|_| RuleEvaluationError::EmptyTrajectory)?;
@@ -402,7 +407,25 @@ fn evaluate_requirement(
                 sample.route_progress_m > *stop_line_progress_m + *progress_tolerance_m
             });
             let Some(crossing_index) = crossing_index else {
-                return not_encountered(requirement);
+                let active_sample_count = trajectory
+                    .iter()
+                    .filter(|sample| {
+                        sample.route_progress_m >= requirement.active_start_progress_m
+                            && sample.route_progress_m <= *stop_line_progress_m + *progress_tolerance_m
+                    })
+                    .count();
+                if active_sample_count == 0 {
+                    return not_encountered(requirement);
+                }
+                return finding(
+                    requirement,
+                    RuleComplianceOutcome::Pending,
+                    RuleComplianceReason::RequirementPending,
+                    active_sample_count,
+                    None,
+                    None,
+                    None,
+                );
             };
             let crossing_sample = &trajectory[crossing_index];
             let mut stop_start: Option<usize> = None;
@@ -560,20 +583,22 @@ fn trajectory_is_valid(trajectory: &[RuleTrajectorySample]) -> bool {
     })
 }
 
-fn outcome_counts(findings: &[RuleComplianceFinding]) -> (usize, usize, usize, usize) {
+fn outcome_counts(findings: &[RuleComplianceFinding]) -> (usize, usize, usize, usize, usize) {
     let mut compliant = 0;
     let mut violation = 0;
     let mut indeterminate = 0;
     let mut not_encountered = 0;
+    let mut pending = 0;
     for finding in findings {
         match finding.outcome {
             RuleComplianceOutcome::Compliant => compliant += 1,
             RuleComplianceOutcome::Violation => violation += 1,
             RuleComplianceOutcome::Indeterminate => indeterminate += 1,
             RuleComplianceOutcome::NotEncountered => not_encountered += 1,
+            RuleComplianceOutcome::Pending => pending += 1,
         }
     }
-    (compliant, violation, indeterminate, not_encountered)
+    (compliant, violation, indeterminate, not_encountered, pending)
 }
 
 fn wrap_angle(angle: f64) -> f64 {
@@ -819,6 +844,31 @@ mod tests {
         )
         .unwrap();
         assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::NotEncountered);
+    }
+
+    #[test]
+    fn stop_line_episode_ending_inside_control_zone_is_pending() {
+        let rule = TrafficRuleRequirement {
+            rule_id: "stop-line-pending".into(),
+            active_start_progress_m: 0.0,
+            active_end_progress_m: 20.0,
+            kind: TrafficRuleKind::StopBeforeLine {
+                stop_line_progress_m: 10.0,
+                stop_speed_threshold_mps: 0.1,
+                required_stationary_duration_s: 1.0,
+                maximum_sample_gap_s: 0.6,
+                progress_tolerance_m: 0.05,
+            },
+            evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
+        };
+        let report = evaluate_traffic_rules(
+            &[rule],
+            &[sample(0.0, 8.0, 2.0, 0.0), sample(0.5, 9.0, 0.0, 0.0)],
+        )
+        .unwrap();
+        assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::Pending);
+        assert_eq!(report.pending_count, 1);
+        assert!(report.identity_is_valid());
     }
 
     #[test]
