@@ -2420,8 +2420,8 @@ mod tests {
         fs::create_dir_all(result_root.join("src")).unwrap();
         fs::create_dir_all(&primary_root).unwrap();
         fs::create_dir_all(&regrade_root).unwrap();
-        fs::write(source_root.join("src/lib.rs"), b"pub fn verified() -> bool { false }").unwrap();
-        fs::write(result_root.join("src/lib.rs"), b"pub fn verified() -> bool { true }").unwrap();
+        fs::write(source_root.join("src/lib.rs"), b"pub fn verified() -> bool { false }\n").unwrap();
+        fs::write(result_root.join("src/lib.rs"), b"pub fn verified() -> bool { true }\n").unwrap();
         let source_digest = hash_source_tree_inner(&source_root).unwrap();
         let result_digest = hash_source_tree_inner(&result_root).unwrap();
 
