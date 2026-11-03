@@ -3,7 +3,9 @@
 This is a standalone Rust CLI for checking a CEB primary receipt and its pristine
 regrade. It is intentionally outside the root Cargo workspace. At runtime the
 verifier does not shell out, open network connections, invoke candidate builds or
-tests, or execute candidate code. Compiling the tool with Cargo may run dependency
+tests, or execute candidate code. It does create a private temporary bare libgit2
+object database to reconstruct the patch result; the temporary directory is cleaned
+up automatically. Compiling the tool with Cargo may run dependency
 build scripts; its focused CI job has read-only repository permissions and no secrets.
 
 The three Draft 2020-12 schemas are embedded at compile time from
@@ -102,6 +104,7 @@ field, so the same immutable inputs produce byte-stable JSON.
   must each equal the corresponding value pinned by the task contract.
 - The task contract hash and trust-policy hash are pinned out of band by the host control plane. The source snapshot must match the contract's tree digest; the result snapshot is hashed independently by the verifier. The custom tree algorithm sorts UTF-8 relative paths and commits each entry type, byte length, executable bit and content digest; symlink target bytes are hashed without following links. Empty directories are ignored; .git metadata, non-UTF-8 names and special files are rejected.
 - The verifier computes the exact set of paths changed between source and result snapshots. The signed receipt's changed_paths and the Git patch's file headers must equal that set; quoted/space-containing patch paths are deliberately unsupported in V0.
+- The verifier creates Git trees from both snapshots in a private temporary bare repository, parses the submitted patch with libgit2, applies it with `Repository::apply_to_tree`, and compares the resulting Git tree object with the expected result tree. The submitted patch must actually transform the source snapshot into the result snapshot. Binary patch reconstruction is unresolved in V0.
 - The regrade links the SHA-256 of the exact primary envelope bytes; run IDs,
   receipt IDs, signer trust domains and check-evidence sets must be distinct.
 - Receipt check IDs, kinds, required flags and explicit authorities are bound to the exact acceptance-check set in the task contract. Required-check aggregates are recomputed from rows, not trusted from totals.
@@ -127,12 +130,12 @@ build script, test, or agent-generated program.
 
 The code is a first implementation slice. It must still pass Rust compilation,
 the included unit tests, Clippy, formatting, schema conformance tests and the
-external negative-control corpus before it can be qualified for scored benchmark use. Direct dependency versions are exact-pinned, but no Cargo.lock has been generated yet; transitive dependency resolution is therefore not locked.
+external negative-control corpus before it can be qualified for scored benchmark use. Patch reconstruction is currently limited to UTF-8 textual Git diffs, and the source/result snapshots must remain immutable during hashing and reconstruction. Direct dependency versions are exact-pinned, but no Cargo.lock has been generated yet; transitive dependency resolution is therefore not locked.
 
 
 ## Current implementation status (2026-11-03)
 
-The verifier source and focused CI workflow are in draft PR [#10212](https://github.com/Luminous-Dynamics/symthaea/pull/10212), stacked on CEB schema PR #10115. The source currently contains 18 authored unit tests covering duplicate JSON members, DSSE PAE/signatures, trust roles, exact task-check parity, forged counters, required-check skips, budget enforcement, artifact digest/path validation, traversal/symlink rejection, runtime-environment parity, deterministic source/result tree hashing, patch-path parity and a complete signed primary/regrade pair with detached-link and evidence-reuse negative controls. These tests are authored but have **not** been run; no build, rustfmt, Clippy, schema-conformance, tree-digest interoperability or end-to-end receipt-pair result is claimed. No Cargo.lock has yet been generated in this environment.
+The verifier source and focused CI workflow are in draft PR [#10212](https://github.com/Luminous-Dynamics/symthaea/pull/10212), stacked on CEB schema PR #10115. The source currently contains 19 authored unit tests covering duplicate JSON members, DSSE PAE/signatures, trust roles, exact task-check parity, forged counters, required-check skips, budget enforcement, artifact digest/path validation, traversal/symlink rejection, runtime-environment parity, deterministic source/result tree hashing, patch-path parity patch-result reconstruction (correct and wrong-patch controls), and a complete signed primary/regrade pair with detached-link and evidence-reuse negative controls. These tests are authored but have **not** been run; no build, rustfmt, Clippy, schema-conformance, tree-digest interoperability or end-to-end receipt-pair result is claimed. No Cargo.lock has yet been generated in this environment.
 
 The implementation intentionally returns unresolved for all current CEB catalog tasks because they remain `design_only`. Before any task can be scored, issue #10064 must qualify OS-level isolation, the task contract must be promoted with a frozen source and sealed split, and a real trusted signer policy must be provisioned outside the verifier inputs.
 
