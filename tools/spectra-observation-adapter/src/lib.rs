@@ -706,6 +706,22 @@ mod tests {
     }
 
     #[test]
+    fn evaluator_truth_constructor_rejects_empty_misaligned_and_duplicate_inputs() {
+        assert_eq!(
+            EvaluatorTruth::new(Vec::new(), Vec::new()),
+            Err(ObservationError::EmptyCampaign)
+        );
+        assert_eq!(
+            EvaluatorTruth::new(vec![0, 1], vec![true]),
+            Err(ObservationError::MisalignedTruth)
+        );
+        assert_eq!(
+            EvaluatorTruth::new(vec![4, 4], vec![true, false]),
+            Err(ObservationError::DuplicateTrialId)
+        );
+    }
+
+    #[test]
     fn duplicate_or_misaligned_trial_ids_are_rejected() {
         let (mut candidate, truth) = perfect_fixture();
         candidate.trials[1].trial_id = candidate.trials[0].trial_id;
