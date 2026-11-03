@@ -18,6 +18,7 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "src/lib.rs"
+      - "src/mobile_invocation_policy.rs"
       - "src/rea_compat.rs"
       - "scripts/rea/**"
       - "crates/domains/symthaea-rea-compat/**"
