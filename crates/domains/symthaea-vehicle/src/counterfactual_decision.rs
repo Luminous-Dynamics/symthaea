@@ -292,7 +292,8 @@ fn derive_finding(
                     CounterfactualMetricDirection::HigherIsBetter => {
                         candidate.objective_value > best.objective_value
                     }
-                };
+                } || (candidate.objective_value == best.objective_value
+                    && candidate.action_id < best.action_id);
                 if candidate_is_better {
                     candidate
                 } else {
@@ -452,6 +453,29 @@ mod tests {
         assert_eq!(
             report.finding.outcome,
             CounterfactualDecisionOutcome::BetterFeasibleActionFound
+        );
+    }
+
+    #[test]
+    fn tied_best_actions_use_stable_action_id_tiebreaker() {
+        let mut sample = input();
+        sample.actions[1].objective_value = 1.0;
+        sample.actions.push(action(
+            "aaa-alternative",
+            -0.2,
+            CounterfactualFeasibility::Feasible,
+            1.0,
+        ));
+        let first = evaluate_counterfactual_decision(sample.clone()).unwrap();
+        sample.actions.reverse();
+        let second = evaluate_counterfactual_decision(sample).unwrap();
+        assert_eq!(
+            first.finding.best_feasible_action_id,
+            Some("aaa-alternative".into())
+        );
+        assert_eq!(
+            first.finding.best_feasible_action_id,
+            second.finding.best_feasible_action_id
         );
     }
 
