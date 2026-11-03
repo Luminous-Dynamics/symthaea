@@ -527,6 +527,7 @@ fn action_for_obligation(kind: &ObligationKind) -> Option<SymbolicAction> {
         ObligationKind::ReturnMotif { .. } | ObligationKind::RestoreIdentity { .. } => {
             Some(SymbolicAction::ReturnOpeningMaterial)
         }
+        ObligationKind::DevelopMotif { .. } => Some(SymbolicAction::DevelopMotif),
         ObligationKind::ReachKey { .. } => Some(SymbolicAction::ModulateToRelatedKey),
         ObligationKind::Cadence { .. } | ObligationKind::ResolveAlteredDegree { .. } => {
             Some(SymbolicAction::StrengthenCadence)
@@ -786,6 +787,26 @@ mod tests {
             obligation_demands: Vec::new(),
             obligation_pressure: 0.0,
         }
+    }
+
+    #[test]
+    fn motif_development_obligation_selects_develop_action_not_return_action() {
+        let development = ObligationKind::DevelopMotif {
+            motif_id: "sonata.primary".into(),
+            transformation: symthaea_music_theory::MotifDevelopmentTransformation::DiatonicTransposition { degree_shift: 1 },
+        };
+        let returned = ObligationKind::ReturnMotif {
+            motif_id: "sonata.primary".into(),
+            transformation: symthaea_music_theory::ReturnTransformation::Literal,
+        };
+        assert_eq!(
+            action_for_obligation(&development),
+            Some(SymbolicAction::DevelopMotif)
+        );
+        assert_eq!(
+            action_for_obligation(&returned),
+            Some(SymbolicAction::ReturnOpeningMaterial)
+        );
     }
 
     #[test]

@@ -29,6 +29,7 @@ pub enum InterventionStrategy {
 pub enum ObligationClass {
     None,
     ReturnMotif,
+    MotifDevelopment,
     ReachKey,
     RestoreIdentity,
     ResolveAlteredDegree,

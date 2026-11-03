@@ -118,8 +118,8 @@ pub use motif_return::{
     compare_melodic_sequences, melodic_notes_in_region,
 };
 pub use obligation::{
-    CompositionalObligation, ObligationKind, ObligationLedger, ObligationPressure,
-    ObligationStatus, ReturnTransformation,
+    CompositionalObligation, MotifDevelopmentTransformation, ObligationKind, ObligationLedger,
+    ObligationPressure, ObligationStatus, ReturnTransformation,
 };
 pub use phrase::{Period, Phrase};
 pub use pitch::{Interval, IntervalQuality, Pitch, PitchClass};

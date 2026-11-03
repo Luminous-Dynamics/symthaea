@@ -149,6 +149,15 @@ pub enum ProvenanceSource {
     ProceduralGeneration { grammar_family: String, seed: u64 },
     CorpusExtraction { corpus: String, license: String },
     UserImport { owner: String },
+    /// A motif family derived from an exact region of a serialized symbolic
+    /// score. The score and ordered note-index projection are independently
+    /// content-addressed; this is not an inferred identity from approximate
+    /// audio similarity.
+    ScoreRegionExtraction {
+        source_score_sha256: String,
+        section_id: String,
+        note_indices_sha256: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -444,6 +453,18 @@ mod tests {
                 review_status: ReviewStatus::Unreviewed,
             },
         )
+    }
+
+    #[test]
+    fn score_region_extraction_provenance_round_trips_exact_source_identity() {
+        let source = ProvenanceSource::ScoreRegionExtraction {
+            source_score_sha256: "a".repeat(64),
+            section_id: "exposition_primary".into(),
+            note_indices_sha256: "b".repeat(64),
+        };
+        let bytes = serde_json::to_vec(&source).unwrap();
+        let restored: ProvenanceSource = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(restored, source);
     }
 
     #[test]
