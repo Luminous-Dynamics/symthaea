@@ -1,0 +1,396 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/connectomics/connectome-target-fate-inventory-v0.1.schema.json",
+  "title": "Bidirectional connectome target inventory fate receipt v0.1",
+  "description": "A typed, exhaustive fate classification for every object in a pinned target-world manifest. Fate classification is accounting, not biological identity authentication.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fate_inventory_id",
+    "target_world",
+    "target_manifest_sha256",
+    "correspondence_receipt_sha256",
+    "fates",
+    "summary",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "fate_inventory_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "release_id"
+      ],
+      "properties": {
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "release_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "target_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "correspondence_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "fates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/fate"
+      }
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_manifest_sha256",
+        "correspondence_receipt_sha256"
+      ],
+      "properties": {
+        "target_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "correspondence_receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "fate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_object_id",
+        "object_type",
+        "status",
+        "mapping_id",
+        "alternative_set_id",
+        "scope_policy_sha256",
+        "reason_code",
+        "evidence_ids"
+      ],
+      "properties": {
+        "target_object_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "object_type": {
+          "enum": [
+            "SEGMENT",
+            "NEURON",
+            "SYNAPSE",
+            "ARTIFACT"
+          ]
+        },
+        "status": {
+          "enum": [
+            "MAPPED",
+            "ALTERNATIVE_CANDIDATE",
+            "TARGET_ONLY_UNRESOLVED",
+            "OUT_OF_SCOPE",
+            "REJECTED"
+          ]
+        },
+        "mapping_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "alternative_set_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scope_policy_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason_code": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "MAPPED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "mapping_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "alternative_set_id": {
+                "type": "null"
+              },
+              "scope_policy_sha256": {
+                "type": "null"
+              },
+              "reason_code": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "ALTERNATIVE_CANDIDATE"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "mapping_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "alternative_set_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scope_policy_sha256": {
+                "type": "null"
+              },
+              "reason_code": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "TARGET_ONLY_UNRESOLVED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "mapping_id": {
+                "type": "null"
+              },
+              "alternative_set_id": {
+                "type": "null"
+              },
+              "scope_policy_sha256": {
+                "type": "null"
+              },
+              "reason_code": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "OUT_OF_SCOPE"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "mapping_id": {
+                "type": "null"
+              },
+              "alternative_set_id": {
+                "type": "null"
+              },
+              "scope_policy_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "reason_code": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "REJECTED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "mapping_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "alternative_set_id": {
+                "type": "null"
+              },
+              "scope_policy_sha256": {
+                "type": "null"
+              },
+              "reason_code": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "SEGMENT",
+        "NEURON",
+        "SYNAPSE",
+        "ARTIFACT"
+      ],
+      "properties": {
+        "SEGMENT": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "NEURON": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "SYNAPSE": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ARTIFACT": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_object_count",
+        "mapped_object_count",
+        "alternative_candidate_object_count",
+        "target_only_unresolved_object_count",
+        "out_of_scope_object_count",
+        "rejected_object_count",
+        "object_type_counts"
+      ],
+      "properties": {
+        "target_object_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mapped_object_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "alternative_candidate_object_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "target_only_unresolved_object_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "out_of_scope_object_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rejected_object_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "object_type_counts": {
+          "$ref": "#/$defs/counts"
+        }
+      }
+    }
+  },
+  "$comment": "JSON Schema validates each fate record's shape. A semantic verifier must independently load the exact target manifest and correspondence receipt, enforce exact target inventory coverage and uniqueness, cross-check mapping_id / alternative_set_id membership and recompute summary counters. This receipt never asserts biological novelty or authenticates evidence."
+}
