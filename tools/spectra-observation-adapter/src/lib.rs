@@ -120,6 +120,15 @@ impl fmt::Display for ObservationError {
 
 impl std::error::Error for ObservationError {}
 
+/// Raw frequency in one ordered response category, stratified by event truth.
+/// Category order is an integer rank, not an interval-valued score.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Type1CategoryCount {
+    pub evidence_order: i16,
+    pub signal_trials: u64,
+    pub noise_trials: u64,
+}
+
 /// Descriptive adapter result. A missing curve means its route did not
 /// contain both event classes with usable observations; it is not a zero AUC.
 #[derive(Debug, Clone, PartialEq)]
@@ -137,6 +146,10 @@ pub struct ObservationReport {
     pub distinct_rt_categories: usize,
     pub decision_counts: SignalDetectionCounts,
     pub binary_signal_detection: Option<SignalDetectionMetrics>,
+    /// Confidence response-category counts for future likelihood fitting.
+    pub confidence_category_counts: Vec<Type1CategoryCount>,
+    /// RT response-category counts for future likelihood fitting.
+    pub rt_category_counts: Vec<Type1CategoryCount>,
     pub confidence_type1_roc: Option<RocCurve>,
     pub rt_type1_roc: Option<RocCurve>,
     pub confidence_roc_auc: Option<f64>,
@@ -221,6 +234,8 @@ pub fn evaluate(
         .map(|observation| observation.score.to_bits())
         .collect();
 
+    let confidence_category_counts = category_counts(&confidence_observations);
+    let rt_category_counts = category_counts(&rt_observations);
     let confidence_curve = optional_roc(&confidence_observations)?;
     let rt_curve = optional_roc(&rt_observations)?;
     let binary_signal_detection = decision_counts.metrics();
@@ -239,6 +254,8 @@ pub fn evaluate(
         distinct_rt_categories: rt_categories.len(),
         decision_counts,
         binary_signal_detection,
+        confidence_category_counts,
+        rt_category_counts,
         confidence_roc_auc: confidence_curve.as_ref().map(|curve| curve.auc),
         rt_roc_auc: rt_curve.as_ref().map(|curve| curve.auc),
         confidence_type1_roc: confidence_curve,
@@ -378,6 +395,28 @@ fn build_rt_observations(
     Ok((result, rt_usable_trials, rt_resolution_limited_trials))
 }
 
+fn category_counts(observations: &[RocObservation]) -> Vec<Type1CategoryCount> {
+    let mut counts = BTreeMap::<i16, (u64, u64)>::new();
+    for observation in observations {
+        // Both routes emit finite integral ordinal ranks by construction.
+        let category = observation.score as i16;
+        let entry = counts.entry(category).or_default();
+        if observation.is_signal {
+            entry.0 += 1;
+        } else {
+            entry.1 += 1;
+        }
+    }
+    counts
+        .into_iter()
+        .map(|(evidence_order, (signal_trials, noise_trials))| Type1CategoryCount {
+            evidence_order,
+            signal_trials,
+            noise_trials,
+        })
+        .collect()
+}
+
 fn optional_roc(
     observations: &[RocObservation],
 ) -> Result<Option<RocCurve>, ObservationError> {
@@ -424,6 +463,31 @@ mod tests {
         assert_eq!(report.rt_roc_auc, Some(1.0));
         assert_eq!(report.decision_counts.hits, 3);
         assert_eq!(report.decision_counts.correct_rejections, 3);
+    }
+
+    #[test]
+    fn raw_category_counts_reconstruct_route_totals() {
+        let (candidate, truth) = perfect_fixture();
+        let report = evaluate(&candidate, &truth).unwrap();
+        assert_eq!(
+            report.confidence_category_counts.iter().map(|row| row.signal_trials).sum::<u64>(),
+            3
+        );
+        assert_eq!(
+            report.confidence_category_counts.iter().map(|row| row.noise_trials).sum::<u64>(),
+            3
+        );
+        assert_eq!(
+            report.rt_category_counts.iter().map(|row| row.signal_trials).sum::<u64>(),
+            3
+        );
+        assert_eq!(
+            report.rt_category_counts.iter().map(|row| row.noise_trials).sum::<u64>(),
+            3
+        );
+        assert!(report.confidence_category_counts.windows(2).all(|pair|
+            pair[0].evidence_order < pair[1].evidence_order
+        ));
     }
 
     #[test]
