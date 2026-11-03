@@ -78,6 +78,28 @@ The 60 unresolved tasks cost $6,817.01 in total. Their mean recorded input-token
 
 The manifest contains 1,155 graded declarations across 341 workspaces (3.39 declarations per workspace on average). Multi-declaration tasks can require substantial supporting formalization, so a final theorem-only retrieval metric will miss much of the engineering burden.
 
+## Graded-declaration workload and the hard tail
+
+The official manifest exposes a useful **workload proxy**: the number of graded declarations attached to each task. It is not a complete count of all required helper lemmas or dependencies, but it offers an independently available measure of how much formalization surface the task requires.
+
+| Graded declarations per task | Tasks | Solved | Solve rate | Mean recorded cost |
+|---|---:|---:|---:|---:|
+| 1 | 230 | 208 | 90.4% | $28.87 |
+| 2–4 | 53 | 41 | 77.4% | $63.29 |
+| 5+ | 58 | 32 | 55.2% | $82.23 |
+
+Tasks with five or more graded declarations are 17.0% of the benchmark but account for 26/60 (43.3%) of the leading run's unresolved tasks. All tasks with two or more declarations comprise 111/341 (32.6%) of the benchmark but account for 38/60 (63.3%) of unresolved tasks and $4,388.04/$6,817.01 (64.4%) of unresolved-task spend.
+
+To reduce subject confounding, I repeated the five-plus versus under-five comparison **within source groups that contain both task-size strata**. Thirteen of 24 source groups have both. Within those groups:
+
+- Five-plus: 26/58 unresolved (44.8%).
+- Under-five: 29/191 unresolved (15.2%).
+- Pooled within-source risk difference: +29.6 percentage points.
+- Pooled within-source risk ratio: 2.95.
+- A deterministic 50,000-replicate bootstrap resampling source groups (seed `8badf00d`) gives a 95% interval of +13.6 to +48.3 percentage points for the risk difference, and 1.75 to 5.74 for the risk ratio.
+
+This is exploratory, not causal. Only 13 source groups contribute to the within-group contrast, several cells are very small, the task-size proxy is imperfect, and the public model run is a single published configuration. It does, however, support a focused next experiment: test whether planning and verifying the declaration dependency DAG reduces the disproportionate failure and resource cost on multi-declaration tasks. Compare it with an equally budgeted direct-formalization baseline; do not infer that decomposition alone is the cause.
+
 ## Interpretation: what the benchmark is measuring
 
 AutoformBench is not simply “find a tactic for a known proposition.” The agent receives an informal proof and must produce the Lean-side mathematical infrastructure around it. The relevant capability stack is:
