@@ -370,19 +370,24 @@ fn evaluate_decision(d:&ModelDecisionObservation)->DecisionAuditResult {
         decision_id:d.decision_id.clone(),scenario_id:d.scenario_id.clone(),failure_family_id:d.failure_family_id.clone(),selected_action_id:d.selected_action_id.clone(),
         status,candidate_set_complete:d.candidate_set_complete,predicted_best_action_id:predicted_best,realized_best_action_id:realized_best,ranking_reversed:reversed,selected_action_regret:regret,optimism_gap:optimism
     };
+    if d.actions.iter().any(|a|a.reference_status!=ReferenceOutcomeStatus::Observed) {
+        return base(DecisionAuditStatus::IncompleteReference,None,None,None,None,None);
+    }
     if d.actions.iter().any(|a|a.feasibility==DiscrepancyFeasibility::Indeterminate) { return base(DecisionAuditStatus::IndeterminateFeasibility,None,None,None,None,None); }
     let feasible=d.actions.iter().filter(|a|a.feasibility==DiscrepancyFeasibility::Feasible).collect::<Vec<_>>();
     if feasible.is_empty() { return base(DecisionAuditStatus::NoFeasibleAction,None,None,None,None,None); }
     let p=best_action(&feasible,|a|a.predicted_utility,d.tie_tolerance);
-    let r=best_action(&feasible,|a|a.realized_utility,d.tie_tolerance);
+    let r=best_action(&feasible,|a|a.realized_utility.expect("feasible observed action has a realized utility"),d.tie_tolerance);
     if selected.feasibility!=DiscrepancyFeasibility::Feasible { return base(DecisionAuditStatus::SelectedActionInfeasible,Some(p.action_id.clone()),Some(r.action_id.clone()),Some(p.action_id!=r.action_id),None,None); }
-    let regret=(r.realized_utility-selected.realized_utility).max(0.0);
+    let selected_realized=selected.realized_utility.expect("feasible observed selected action has a realized utility");
+    let realized_best=r.realized_utility.expect("feasible observed best action has a realized utility");
+    let regret=(realized_best-selected_realized).max(0.0);
     let alternatives=feasible.iter().copied().filter(|a|a.action_id!=selected.action_id).collect::<Vec<_>>();
     let optimism=if alternatives.is_empty(){None}else{
         let predicted_alternative=best_action(&alternatives,|a|a.predicted_utility,d.tie_tolerance);
-        let realized_alternative=best_action(&alternatives,|a|a.realized_utility,d.tie_tolerance);
+        let realized_alternative=best_action(&alternatives,|a|a.realized_utility.expect("feasible observed alternative has a realized utility"),d.tie_tolerance);
         let predicted_advantage=selected.predicted_utility-predicted_alternative.predicted_utility;
-        let realized_advantage=selected.realized_utility-realized_alternative.realized_utility;
+        let realized_advantage=selected_realized-realized_alternative.realized_utility.expect("feasible observed alternative has a realized utility");
         Some(predicted_advantage-realized_advantage)
     };
     base(DecisionAuditStatus::Comparable,Some(p.action_id.clone()),Some(r.action_id.clone()),Some(p.action_id!=r.action_id),Some(regret),optimism)
@@ -404,6 +409,7 @@ fn summarize_decisions(rows:&[DecisionAuditResult])->DecisionAuditSummary {
     let reversals=comparable.iter().filter(|r|r.ranking_reversed==Some(true)).count();
     DecisionAuditSummary {
         decision_count:rows.len(),comparable_decision_count:comparable.len(),
+        incomplete_reference_decision_count:rows.iter().filter(|r|r.status==DecisionAuditStatus::IncompleteReference).count(),
         indeterminate_decision_count:rows.iter().filter(|r|r.status==DecisionAuditStatus::IndeterminateFeasibility).count(),
         selected_action_infeasible_count:rows.iter().filter(|r|r.status==DecisionAuditStatus::SelectedActionInfeasible).count(),
         no_feasible_action_count:rows.iter().filter(|r|r.status==DecisionAuditStatus::NoFeasibleAction).count(),
