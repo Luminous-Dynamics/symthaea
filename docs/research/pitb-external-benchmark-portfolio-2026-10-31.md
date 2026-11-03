@@ -92,6 +92,12 @@ These targets are deliberately separated. A high Pass@1 with theorem edits is a 
 
 The key paradigm shift is not a larger prover. It is a proof-engineering controller whose every intervention has explicit preconditions, typed effects, a measured budget and an independent verifier. PITB wins only when this architecture creates more verified value per unit cost without altering the proposition being proved.
 
+
+
+## AutoformBench residual-frontier audit (3 November 2026)
+
+The task-level residual and cost analysis is maintained separately at [PITB AutoformBench residual frontier](pitb-autoformbench-residual-frontier-2026-11-03.md). It pins the public release commit and five Git blob identities, reconciles all 341 tasks and 1,155 graded declarations, and separates descriptive cross-model outcomes from matched experiments. The corresponding research-only offline auditor is `scripts/research/pitb_autoformbench_audit_v0.py`. The report identifies an expensive residual tail and proposes a distinct formalization-infrastructure synthesis endpoint; it does not claim a PITB solve-rate improvement.
+
 ## Sources
 
 - SorryDB: https://sorrydb.org/ and https://proceedings.mlr.press/v306/letson26a.html
