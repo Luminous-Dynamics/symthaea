@@ -192,7 +192,6 @@
           "error_family",
           "evidence_compatibility",
           "query_state",
-          "material_to_query",
           "canonical_structural_sha256"
         ],
         "properties": {
@@ -220,9 +219,6 @@
                 "type": "null"
               }
             ]
-          },
-          "material_to_query": {
-            "type": "boolean"
           },
           "canonical_structural_sha256": {
             "$ref": "#/$defs/sha256"
