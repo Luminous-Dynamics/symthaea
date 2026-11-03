@@ -67,12 +67,16 @@ The controller should fail closed to fresh rinse or drain when quality sensors a
 
 Use measured effective heated mass and thermal losses rather than assuming the whole cabinet/load reaches target temperature simultaneously.
 
-Investigate:
+Investigate and compare before choosing hardware:
 - Low-volume local heating for QuickCell.
-- Shared thermal storage only when measured use patterns justify standby losses.
-- Heat recovery from hot discharge streams.
-- Heat-pump or passive drying alternatives.
-- Insulation and selective heating of fluid paths.
+- Resistance heating, heat-pump heating/drying, zeolite/desiccant drying, AutoOpen/passive airflow and variable hot-air drying.
+- Thermoelectric heating/cooling integrated with sensible or phase-change thermal storage, using the June 2026 TEHC-DW paper as a replication lead rather than assumed SOTA.
+- Pre-wetting / pre-soak during delayed start (e.g. V-ZUG OptiStart) to soften soil and lower subsequent wash temperature, only within validated soil-specific limits.
+- Shared thermal storage only when measured duty-cycle and standby losses justify it.
+- Heat recovery from hot discharge streams, condensation and selective heating/cooling of fluid paths.
+- Insulation and thermal isolation between concurrent QuickCell and FullLoad operations.
+
+Compare total wall energy, internal water-heating energy, peak power, storage standby loss, drying energy/time at equal residual moisture, material dryness (especially plastics/recessed items), mass/volume, service burden and reliability. See [thermal-storage-benchmark.md](thermal-storage-benchmark.md) for the physical comparison protocol.
 
 Report cold-start and warm-start results separately. Include heater, pump, controls, standby, drying and water-preheat energy in the system boundary.
 
@@ -129,6 +133,7 @@ May:
 - Propose a validated recipe for a known soil/material class.
 - Estimate resource use and uncertainty.
 - Select among programmes inside their validated envelopes.
+- Use camera-based load/item recognition as a *prior* for geometry and item type, fused with process sensors and user constraints.
 - Request extra sensing or a conservative fallback.
 - Learn from physical test data.
 
@@ -136,9 +141,12 @@ Must not:
 - Invent a sanitization guarantee.
 - Extrapolate a kinetic model outside its calibration envelope.
 - Override interlocks or hard temperature/pressure/time constraints.
-- Treat a visual classifier or turbidity sensor as proof of cleanliness.
+- Treat camera recognition, a visual classifier or turbidity/conductivity sensor as proof of cleanliness.
+- Assume the new system's camera-based load recognition is novel: Miele announced the G8 Diamond AutoVision camera-AI system on 2026-09-02 for load/type recognition, wash adaptation, bottle interior cleaning and plastic drying. G8 DACH launch is announced for 2027-04; matched test data are not yet published.
 
-Every control action should be logged with model version, recipe version, input sensor quality, uncertainty and fallback reason.
+The observer benchmark must compare manual selection, existing turbidity/auto sensing, camera-only load recognition (including the announced Miele incumbent when testable), and camera + turbidity + conductivity + hydraulic/thermal fusion. Camera use must have explicit privacy settings, a no-camera operating path and a retention policy; these are InstantClean design requirements, not statements about another manufacturer's implementation.
+
+Every control action should be logged with model version, camera/model version where enabled, recipe version, sensor quality, uncertainty, scope validity and fallback reason.
 
 ## Simulation division
 
