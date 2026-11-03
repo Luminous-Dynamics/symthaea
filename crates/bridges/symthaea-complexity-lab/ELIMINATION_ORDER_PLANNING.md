@@ -60,15 +60,15 @@ These numbers compare heuristics to exhaustive best on the same tiny synthetic c
 
 ## Six-variable extension (3 Nov 2026)
 
-A bounded larger-state pilot used one six-variable binary graph with scopes `[[0,1],[1,2],[2,3],[3,4],[4,5],[0,5],[0,3],[1,4],[2,5]]`. All 720 elimination orders were executed under MaxCount, two-objective ParetoCount and a bounded polynomial profile: **2,160 exact order/algebra executions**. All orders preserved the exact result in each algebra, the direct assignment oracle agreed in 3/3 cases, and 8 selected certificates passed the independent checker.
+A bounded larger-state pilot used one six-variable binary graph with scopes `[[0,1],[1,2],[2,3],[3,4],[4,5],[0,5],[0,3],[1,4],[2,5]]`. All 720 elimination orders were executed under MaxCount, two-objective ParetoCount and a bounded polynomial profile: **2,160 exact order/algebra executions**. All orders preserved the exact result in each algebra, the direct assignment oracle agreed in 3/3 cases, and 11 selected certificates passed the independent checker.
 
-| Algebra | Exhaustive-best order | Min-fill regret | Best of 32 stochastic min-fill regret | Cost-frontier size |
-|---|---|---:|---:|---:|
-| MaxCount | `[1,5,0,2,3,4]` | 21.45% | 0.00% | 16 |
-| ParetoCount | `[5,1,4,2,0,3]` | 35.69% | 5.12% | 1 |
-| Polynomial profile | `[1,3,5,0,4,2]` | 21.73% | 10.87% | 12 |
+| Algebra | Exhaustive-best order | Min-fill regret | 32-start static-score regret | Oracle-best-of-32 regret (hindsight) | Cost-frontier size |
+|---|---|---:|---:|---:|---:|
+| MaxCount | `[1,5,0,2,3,4]` | 21.45% | 20.95% | 0.00% | 16 |
+| ParetoCount | `[5,1,4,2,0,3]` | 35.69% | 33.98% | 5.12% | 1 |
+| Polynomial profile | `[1,3,5,0,4,2]` | 21.73% | 21.05% | 10.87% | 12 |
 
-On this one six-variable graph, all three algebras selected different exhaustive-best work-proxy orders. Min-fill and min-bucket-work happened to return the same candidate on this graph. The stochastic pool found the MaxCount exhaustive best, but still missed the Pareto and polynomial best. This is proxy regret versus exhaustive enumeration on one small synthetic graph—not measured runtime and not a general heuristic guarantee.
+On this one six-variable graph, all three algebras selected different exhaustive-best work-proxy orders. Min-fill and min-bucket-work happened to return the same candidate on this graph. The cheap structural selector marginally improves the min-fill order on this graph, but the oracle-best-of-32 column uses exhaustive exact proxy scores and is hindsight only. This is proxy regret versus exhaustive enumeration on one small synthetic graph—not measured runtime and not a general heuristic guarantee.
 
 An exploratory four-graph mixed-cardinality six-variable exhaustive run (8,640 intended order/algebra cases) exceeded a 300-second execution limit before completion. It is an incomplete attempt and is **not** included as successful evidence. The completed binary run is recorded in `src/elimination_order_scale6_binary.py` and `src/elimination_order_scale6_binary_results.json`.
 
