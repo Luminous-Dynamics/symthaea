@@ -81,6 +81,21 @@ Official source: https://www.miele.de/en/m/world-premiere-for-the-g8-diamond-845
 
 **Competitive boundary.** The combination of turbidity sensing, adaptive detergent quantity, one-hour wash/dry, multi-angle spray, steam and moisture-absorbing drying now appears in announced or launched products. InstantClean cannot claim these features as novel in isolation. Its evidence-based opportunity is to quantify delivered component mass at each phase, fuse formulation-specific calibration with independent soil/rinse endpoints, and demonstrate lower total resources per verified successful clean at matched loading and soil. Do not compare LG's announced one-hour programme with an Eco-label cycle unless the same endpoint and measurement boundary are matched.
 
+## Independent outcome qualification and stop-rule sensing
+
+A May 2026 Food Research International study reports a 365-nm LED fluorescence method for detecting oat-porridge residue on rice bowls. After surface-area correction it reports 86.7% cleaning-score classification accuracy; some intermediate classes were 65% and 70%. This is a promising one-soil laboratory assay lead, not a general in-appliance clean detector. It requires replication across protein/fat/beverage soils, glass/stainless/polymer substrates, recesses and held-out machines.
+- DOI: https://doi.org/10.1016/j.foodres.2026.118853
+- PubMed: https://pubmed.ncbi.nlm.nih.gov/41895937/
+
+Distinguish microbiological efficacy from sanitization. IEC TS 63331:2024 provides relative microbial-reduction methods and explicitly does not address sanitization/disinfection/sterilization; NSF/ANSI 184-2024 is a separate residential sanitization certification path. Do not infer sanitization from a relative microbial result or from final-rinse temperature alone.
+- IEC: https://webstore.iec.ch/en/publication/66647
+- NSF: https://www.nsf.org/consumer-resources/articles/dishwasher-certification
+- NSF/ANSI 184-2024 listing: https://webstore.ansi.org/standards/nsf/NSFANSI1842024
+
+The new quality module only builds a narrow pilot evidence envelope for the exact SKU/programme/soil/material/item set/batches/protocol. It requires independent per-item soil residual, final-rinse residue and cross-transfer measurements across at least five physical runs. Optional drying and relative microbiology remain distinct. It derives pass/fail/indeterminate from measured values and expanded uncertainty; a threshold-overlapping interval is indeterminate, and process proxies cannot qualify a pilot outcome. The module does not authenticate evidence, perform statistical power calculations, certify sanitation or authorize production release.
+
+Protocol: [outcome-evidence-and-stop-rule.md](outcome-evidence-and-stop-rule.md); issue: https://github.com/Luminous-Dynamics/symthaea/issues/10225.
+
 ## Manual dishwashing as the one-item / micro-batch competitor
 
 QuickCell must be compared with manual washing for one cup, glass or plate, not only with another dishwasher's full Eco programme.
