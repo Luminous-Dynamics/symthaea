@@ -200,7 +200,7 @@ pub fn account_service(
                     item_id: item_id.clone(),
                 });
             }
-            if qualified_items.contains(item_id) {
+            if qualified_items.contains(item_id.as_str()) {
                 return Err(ServiceAccountingError::ItemRepeatedAfterQualification {
                     item_id: item_id.clone(),
                     attempt_id: attempt.attempt_id.clone(),
@@ -216,7 +216,7 @@ pub fn account_service(
             if !canonical_non_empty(&outcome.run_id) {
                 return Err(ServiceAccountingError::InvalidIdentity("outcome.run_id"));
             }
-            if outcome.run_id != attempt.run_id {
+            if outcome.run_id.as_str() != attempt.run_id.as_str() {
                 return Err(ServiceAccountingError::OutcomeRunMismatch {
                     attempt_id: attempt.attempt_id.clone(),
                     expected_run_id: attempt.run_id.clone(),
