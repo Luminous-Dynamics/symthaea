@@ -134,10 +134,12 @@ tree hash. It is a CEB-specific snapshot commitment:
 1. Recursively enumerate regular files and symlinks; reject non-UTF-8 paths,
    special files and any .git path component. Empty directories are omitted.
 2. Sort entries by UTF-8 relative-path bytes.
-3. Begin SHA-256 with the domain separator `CEB-TREE-V1\\0` and the entry count.
+3. Begin SHA-256 with the domain separator `CEB-TREE-V1\0` and the entry count.
 4. For every entry, hash path length and bytes, target/file byte length, entry
    type, executable bit, and SHA-256 of file contents or symlink target bytes.
 5. Do not follow symlinks.
+
+The V0 digest uses Unix executable-bit semantics and therefore requires the verifier to run on a Linux/Unix host compatible with the task's OCI environment.
 
 Snapshots must be mounted read-only and immutable for the entire verification
 operation. The standard-library path walk is not a defense against a concurrent
