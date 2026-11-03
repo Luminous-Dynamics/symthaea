@@ -41,3 +41,10 @@ Malformed JSON, file errors and INVALID reports exit nonzero. INCOMPLETE exits z
 ## HMAC limitation
 
 The secret HMAC key is never written to the manifest. This verifier checks token shape, set membership and digest consistency but cannot independently prove that the tokens were generated from the claimed raw identities using the committed secret. That requires a controlled tokenization authority or separate signed attestation. Raw identities must not be published in the manifest.
+
+
+## Ordered and state-conditioned protocols
+
+The V1 manifest can declare protocol_semantics = ordered_steps with at least two protocol_steps. The verifier checks contiguous zero-based indices, unique non-empty targets per step, finite non-negative inter-step intervals, and equality between the parent intervention target set and the union of step target sets. State context at the intervention or step level requires a state-measurement manifest SHA-256 receipt. These checks validate declaration consistency, not biological efficacy or whether the physical assay can deliver the protocol.
+
+The schema exposes distinct metric identifiers for expected value of sample information and Fisher D-/A-optimal gains. They must remain separately labelled and use their declared units; they are not interchangeable with EIG bits.
