@@ -8,7 +8,7 @@ This is a ledger calculation, not an assay, controller, cleaning model, certific
 
 ## Release denominator
 
-For a service-item ID i, run r, and caller-declared required endpoint set E, define:
+For one stable service-request ID, service-item ID i, run r, and caller-declared required endpoint set E, define:
 
 Q(i,r) = AND over e in E of [D(i,e,r) = PASS]
 
@@ -30,6 +30,7 @@ Each attempt records the following independently:
 - upstream hot-water energy (kWh);
 - fresh water (L);
 - actual detergent delivered (g);
+- actual rinse-aid delivered (g);
 - active operator time (s).
 
 Do not add upstream hot-water energy to appliance wall energy if the wall meter already includes the water heater. Include preheat, purge and standby overhead in the appropriate attempt/service window. If overhead allocation across attempts is used, document the allocation rule and keep a service-window total as the controlling result.
@@ -42,7 +43,8 @@ Attempt timestamps use one monotonic clock. The service makespan is maximum fini
 - Each attempt carries separate resource and outcome archive references plus SHA-256 digests. Each outcome carries its item, endpoint, criterion, method, protocol and source-record reference.
 - These references/digests support traceability only: they do not authenticate the file, prove the contents or establish that an assay is independent/valid. Verify the archive and endpoint record through the upstream evidence pipeline before building the ledger.
 - Sequence numbers are strictly increasing in the order supplied to the accounting function.
-- Item IDs identify one requested service, not a reusable item category such as glass or plate.
+- Every attempt in one accounting call must carry the same nonblank `service_request_id`; mixed request IDs are rejected. Use one accounting call per requested service.
+- Item IDs identify individual items within that service request, not a reusable item category such as glass or plate.
 - Every outcome record carries a `run_id` that must exactly match the containing attempt, plus an item and endpoint identity. Criterion, method, protocol and evidence-reference binding must be validated upstream against the qualified outcome-evidence record.
 - Only IndependentOutcomeAssay is accepted. Turbidity, conductivity, camera confidence, temperature, commanded dosing and model predictions must not be submitted as outcome decisions.
 - The module checks that a required endpoint has a PASS record, that its run ID matches the attempt, and that criterion/method/protocol/evidence references are nonblank. It does not verify their contents, authenticate the assay, validate its uncertainty, prove physical independence or verify scientific quality. Perform the existing outcome qualification and run/derived-record lineage audits before constructing an accepted ledger.
@@ -50,9 +52,9 @@ Attempt timestamps use one monotonic clock. The service makespan is maximum fini
 
 ## Illustrative arithmetic (not measured performance)
 
-Suppose one cup is attempted twice. The first attempt fails soil removal and consumes 0.04 kWh appliance electricity and 0.8 L fresh water. The second attempt passes all required endpoints and consumes 0.05 kWh and 0.7 L.
+Suppose one cup is attempted twice under one service-request ID. The first attempt fails soil removal and consumes 0.04 kWh appliance electricity, 0.8 L fresh water and 0.5 g rinse aid. The second attempt passes all required endpoints and consumes 0.05 kWh, 0.7 L and another 0.5 g rinse aid.
 
-The service report therefore has one unique requested item, one verified successful item, two physical runs, one reattempted item visit, 0.09 kWh appliance electricity and 1.5 L fresh water per verified successful item. Upstream hot-water energy, detergent and active operator time remain separately reported.
+The service report therefore has one service-request ID, one unique requested item, one verified successful item, two physical runs, one reattempted item visit, 0.09 kWh appliance electricity, 1.5 L fresh water and 1.0 g rinse aid per verified successful item. Upstream hot-water energy, detergent and active operator time remain separately reported.
 
 This is the intended accounting behaviour; the numbers are explanatory fixtures, not an InstantClean result.
 
@@ -67,6 +69,6 @@ This is the intended accounting behaviour; the numbers are explanatory fixtures,
 
 ## Tests authored
 
-The module includes tests for complete endpoint qualification, failed-attempt rewash accounting, missing/indeterminate endpoint rejection, per-item outcomes within a multi-item run, interrupted-attempt resource inclusion, proxy-evidence rejection, run-ID mismatch, archive reference/digest validation, evidence-reference validation, duplicate outcomes/run IDs, invalid resource and sequence values, and reattempt after qualification.
+The module includes 14 source-authored tests for service-request isolation, rinse-aid accounting, complete endpoint qualification, failed-attempt rewash accounting, missing/indeterminate endpoint rejection, per-item outcomes within a multi-item run, interrupted-attempt resource inclusion, proxy-evidence rejection, run-ID mismatch, archive reference/digest validation, evidence-reference validation, duplicate outcomes/run IDs, invalid resource and sequence values, and reattempt after qualification.
 
 They are source-authored tests only until Cargo runs them on the exact commit.

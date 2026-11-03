@@ -15,6 +15,7 @@ pub struct AttemptResources {
     pub upstream_hot_water_energy_kwh: f64,
     pub fresh_water_l: f64,
     pub detergent_g: f64,
+    pub rinse_aid_g: f64,
     pub active_operator_seconds: f64,
 }
 
@@ -25,6 +26,7 @@ impl AttemptResources {
             ("upstream_hot_water_energy_kwh", self.upstream_hot_water_energy_kwh),
             ("fresh_water_l", self.fresh_water_l),
             ("detergent_g", self.detergent_g),
+            ("rinse_aid_g", self.rinse_aid_g),
             ("active_operator_seconds", self.active_operator_seconds),
         ] {
             if !value.is_finite() || value < 0.0 {
@@ -40,6 +42,7 @@ impl AttemptResources {
             upstream_hot_water_energy_kwh: self.upstream_hot_water_energy_kwh + other.upstream_hot_water_energy_kwh,
             fresh_water_l: self.fresh_water_l + other.fresh_water_l,
             detergent_g: self.detergent_g + other.detergent_g,
+            rinse_aid_g: self.rinse_aid_g + other.rinse_aid_g,
             active_operator_seconds: self.active_operator_seconds + other.active_operator_seconds,
         };
         total.validate()?;
@@ -53,6 +56,7 @@ impl AttemptResources {
             upstream_hot_water_energy_kwh: self.upstream_hot_water_energy_kwh / d,
             fresh_water_l: self.fresh_water_l / d,
             detergent_g: self.detergent_g / d,
+            rinse_aid_g: self.rinse_aid_g / d,
             active_operator_seconds: self.active_operator_seconds / d,
         }
     }
@@ -77,6 +81,8 @@ pub struct ItemEndpointOutcome {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ServiceAttempt {
+    /// Stable identifier for one requested cleaning service across attempts/rewashes.
+    pub service_request_id: String,
     /// Strictly increasing sequence in this service ledger.
     pub sequence: u64,
     pub attempt_id: String,
@@ -84,7 +90,7 @@ pub struct ServiceAttempt {
     pub run_id: String,
     pub started_at_s: u64,
     pub finished_at_s: u64,
-    /// Stable IDs for individual service requests, not dish type labels.
+    /// Stable IDs for each requested item in this service request, not dish type labels.
     pub item_ids: Vec<String>,
     /// Include allocated preheat/standby/purge overhead in this resource vector.
     pub resources: AttemptResources,
@@ -106,6 +112,7 @@ pub enum ServiceAccountingError {
     InvalidIdentity(&'static str),
     DuplicateAttemptId(String),
     DuplicateRunId(String),
+    ServiceRequestMismatch { expected: String, observed: String },
     NonIncreasingSequence { previous: u64, observed: u64 },
     FinishBeforeStart { attempt_id: String },
     InvalidResource(&'static str),
@@ -121,6 +128,7 @@ pub enum ServiceAccountingError {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ServiceAccountingReport {
+    pub service_request_id: String,
     pub attempt_count: usize,
     pub physical_run_count: usize,
     pub unique_item_count: usize,
@@ -139,8 +147,10 @@ pub struct ServiceAccountingReport {
 
 /// Account all resources against unique items that pass every required endpoint.
 ///
-/// Attempts must be in strictly increasing sequence order. An item can be
-/// reattempted after a failed, interrupted, indeterminate or incomplete run.
+/// All attempts passed to this function must belong to one service request;
+/// account separate requests with separate calls. Attempts must be in strictly
+/// increasing sequence order. An item can be reattempted after a failed,
+/// interrupted, indeterminate or incomplete run.
 /// All previous resource consumption remains in the numerator. Reattempting
 /// an already-qualified service item is rejected; assign a new service-item ID
 /// for a new use request. Outcome records must already be bound to the exact
@@ -161,6 +171,7 @@ pub fn account_service(
 
     let mut attempt_ids = HashSet::new();
     let mut run_ids = HashSet::new();
+    let mut service_request_id: Option<&str> = None;
     let mut seen_items = BTreeSet::new();
     let mut qualified_items = BTreeSet::new();
     let mut item_attempt_visits = 0_usize;
@@ -175,6 +186,19 @@ pub fn account_service(
         }
         if !canonical_non_empty(&attempt.run_id) {
             return Err(ServiceAccountingError::InvalidIdentity("run_id"));
+        }
+        if !canonical_non_empty(&attempt.service_request_id) {
+            return Err(ServiceAccountingError::InvalidIdentity("service_request_id"));
+        }
+        match service_request_id {
+            Some(expected) if expected != attempt.service_request_id => {
+                return Err(ServiceAccountingError::ServiceRequestMismatch {
+                    expected: expected.to_owned(),
+                    observed: attempt.service_request_id.clone(),
+                });
+            }
+            None => service_request_id = Some(attempt.service_request_id.as_str()),
+            _ => {}
         }
         if !attempt_ids.insert(attempt.attempt_id.as_str()) {
             return Err(ServiceAccountingError::DuplicateAttemptId(attempt.attempt_id.clone()));
@@ -303,6 +327,9 @@ pub fn account_service(
         .then(|| total_resources.divided_by(verified_successful_item_count));
 
     Ok(ServiceAccountingReport {
+        service_request_id: service_request_id
+            .ok_or(ServiceAccountingError::InvalidIdentity("service_request_id"))?
+            .to_owned(),
         attempt_count: attempts.len(),
         physical_run_count: run_ids.len(),
         unique_item_count,
@@ -354,6 +381,7 @@ mod tests {
         item_ids: &[&str], resources: AttemptResources, outcomes: Vec<ItemEndpointOutcome>,
     ) -> ServiceAttempt {
         ServiceAttempt {
+            service_request_id: "service-request-1".to_owned(),
             sequence,
             attempt_id: attempt_id.to_owned(),
             run_id: run_id.to_owned(),
@@ -376,8 +404,36 @@ mod tests {
             upstream_hot_water_energy_kwh: 0.1,
             fresh_water_l: water,
             detergent_g: 2.0,
+            rinse_aid_g: 0.5,
             active_operator_seconds: 15.0,
         }
+    }
+
+    #[test]
+    fn rejects_attempts_from_mixed_service_requests() {
+        let first = attempt(
+            1, "attempt-1", "run-1", 0, 60, &["cup-1"], resources(0.05, 0.7),
+            outcomes("run-1", "cup-1", Decision::Fail),
+        );
+        let mut second = attempt(
+            2, "attempt-2", "run-2", 70, 130, &["cup-1"], resources(0.05, 0.7),
+            outcomes("run-2", "cup-1", Decision::Pass),
+        );
+        second.service_request_id = "different-service-request".to_owned();
+        assert!(matches!(
+            account_service(&[first, second], &REQUIRED),
+            Err(ServiceAccountingError::ServiceRequestMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn includes_rinse_aid_in_total_and_per_verified_item_resources() {
+        let report = account_service(&[attempt(
+            1, "attempt-1", "run-1", 0, 60, &["cup-1"], resources(0.05, 0.7),
+            outcomes("run-1", "cup-1", Decision::Pass),
+        )], &REQUIRED).unwrap();
+        assert!((report.total_resources.rinse_aid_g - 0.5).abs() < 1e-12);
+        assert!((report.resources_per_verified_item.unwrap().rinse_aid_g - 0.5).abs() < 1e-12);
     }
 
     #[test]
