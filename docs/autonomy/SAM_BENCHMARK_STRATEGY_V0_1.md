@@ -345,3 +345,21 @@ Use two different kinds of pairing, never merge them into one score:
 2. **Distribution-shift pairing:** matched nominal/shifted routes with the same route/task intent. Fail2Drive provides an external template for generalization-gap measurement.
 
 The first isolates controller effects under matched conditions. The second measures sensitivity to unseen shifts. Neither is a substitute for representative operational exposure or physical validation.
+
+
+## 10. Runtime-assurance shadow evaluation
+
+A shadow-only adapter is now implemented in `symthaea_vehicle::rta_shadow_audit`. It records RTA mode, reason codes, recovery/transition counts, command-proposal presence, and monitor/observation/decision fingerprints. It deliberately discards the monitor's selected command and has no simulator or actuator reference.
+
+Use it to measure:
+- seeded fault detection by reason and failure family;
+- monitor mode transitions and recovery dwell;
+- fallback availability / no-admissible-fallback events;
+- command-proposal and disagreement-trigger rates;
+- monitor p50/p95/p99 runtime and deadline misses on named hardware.
+
+The adapter does not manufacture margins or health evidence. Every `VehicleRtaObservation` field concerning baseline admissibility, estimator/actuator/runtime health, model applicability, envelope and controllability margin remains a caller assertion. An external evidence source is needed before treating these fields as valid measurement inputs.
+
+The adapter is not yet integrated into the paired closed-loop runner. When integrating, record its decisions alongside each controller trajectory but do not let a shadow decision modify either branch's command. Evaluate monitor quality against preregistered seeded controls, with explicit false-safe and false-intervention definitions.
+
+Reference protocol: [RTA_SHADOW_AUDIT_V0_1.md](./RTA_SHADOW_AUDIT_V0_1.md).
