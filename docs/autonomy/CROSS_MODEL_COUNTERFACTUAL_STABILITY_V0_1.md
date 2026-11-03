@@ -72,7 +72,7 @@ Do not average outcomes from incompatible model/metric scales. If profiles are n
 
 ## Controls
 
-Nine unit tests are authored for:
+Ten unit tests are authored for:
 - best-action reversal across model profiles;
 - selected action remaining best across all profiles;
 - incomplete action/model set indeterminacy;
