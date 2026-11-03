@@ -268,6 +268,7 @@ const MAX_TREE_FILES: usize = 200_000;
 const MAX_TREE_ENTRIES: usize = 250_000;
 const MAX_TREE_DEPTH: usize = 128;
 const MAX_TREE_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+const MAX_PATCH_RECONSTRUCTION_BYTES: u64 = 512 * 1024 * 1024;
 
 #[derive(Clone, Debug)]
 enum TreeEntryContent {
@@ -423,8 +424,9 @@ fn build_git_tree_from_entries(
 ) -> Result<git2::Oid, Failure> {
     let mut children: BTreeMap<String, Option<&TreeEntry>> = BTreeMap::new();
     for entry in entries {
-        let remainder = entry.relative_path.strip_prefix(prefix)
-            .ok_or_else(|| Failure::protocol("snapshot path is not beneath tree builder prefix"))?;
+        let Some(remainder) = entry.relative_path.strip_prefix(prefix) else {
+            continue;
+        };
         if let Some((name, rest)) = remainder.split_once('/') {
             if name.is_empty() || rest.is_empty() {
                 return Err(Failure::protocol("snapshot contains an empty Git tree path component"));
@@ -490,12 +492,24 @@ fn verify_patch_reconstructs_result(
     if patch.is_empty() || patch.len() > MAX_PATCH_BYTES {
         return Err(Failure::rejected("patch reconstruction requires a non-empty patch within the V0 size limit"));
     }
-    if git_patch_paths(patch).is_err() {
-        return Err(Failure::rejected("patch reconstruction requires safe, auditable Git diff paths"));
+    let patch_paths = git_patch_paths(patch)?;
+    let patch_text = std::str::from_utf8(patch)
+        .map_err(|_| Failure::rejected("patch reconstruction requires UTF-8 text Git diffs"))?;
+    if patch_text.contains("GIT binary patch") || patch_text.contains("Binary files ") {
+        return Err(Failure::unresolved("binary patch reconstruction is not supported by CEB V0"));
+    }
+    if patch_paths.is_empty() {
+        return Err(Failure::rejected("patch reconstruction found no changed paths"));
     }
 
     let source_entries = collect_snapshot_entries(source_root)?;
     let result_entries = collect_snapshot_entries(result_root)?;
+    let total_snapshot_bytes = source_entries.iter().chain(result_entries.iter())
+        .try_fold(0u64, |total, entry| total.checked_add(entry.size))
+        .ok_or_else(|| Failure::protocol("patch reconstruction snapshot byte count overflow"))?;
+    if total_snapshot_bytes > MAX_PATCH_RECONSTRUCTION_BYTES {
+        return Err(Failure::unresolved("patch reconstruction exceeds the 512 MiB aggregate snapshot limit"));
+    }
     let temporary_repository = tempfile::Builder::new()
         .prefix("ceb-patch-reconstruction-")
         .tempdir()
@@ -2731,6 +2745,25 @@ mod tests {
                 "src/deleted.rs".to_string()
             ]
         );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn libgit2_patch_reconstruction_proves_base_to_result_transform() {
+        use std::fs;
+        let root = std::env::temp_dir().join(format!("ceb-patch-reconstruct-{}", std::process::id()));
+        let source = root.join("source");
+        let result = root.join("result");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(source.join("src")).unwrap();
+        fs::create_dir_all(result.join("src")).unwrap();
+        fs::write(source.join("src/lib.rs"), b"pub fn value() -> bool { false }\\n").unwrap();
+        fs::write(result.join("src/lib.rs"), b"pub fn value() -> bool { true }\\n").unwrap();
+        let valid_patch = b"diff --git a/src/lib.rs b/src/lib.rs\\n--- a/src/lib.rs\\n+++ b/src/lib.rs\\n@@ -1 +1 @@\\n-pub fn value() -> bool { false }\\n+pub fn value() -> bool { true }\\n";
+        assert!(verify_patch_reconstructs_result(&source, &result, valid_patch).is_ok());
+
+        let wrong_patch = b"diff --git a/src/lib.rs b/src/lib.rs\\n--- a/src/lib.rs\\n+++ b/src/lib.rs\\n@@ -1 +1 @@\\n-pub fn value() -> bool { false }\\n+pub fn value() -> bool { 2 }\\n";
+        assert!(verify_patch_reconstructs_result(&source, &result, wrong_patch).is_err());
         fs::remove_dir_all(root).unwrap();
     }
 
