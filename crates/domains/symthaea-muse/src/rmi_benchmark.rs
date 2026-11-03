@@ -1427,6 +1427,53 @@ mod tests {
 
     thread_local! {
         static UNTRACKED_PROCESS_CALLS: Cell<u32> = Cell::new(0);
+        static IDENTITY_RESTORE_CALLS: Cell<u32> = Cell::new(0);
+    }
+
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    struct IdentityDriftingPolicy {
+        identity_variant: u8,
+    }
+
+    impl RmiPolicyV1 for IdentityDriftingPolicy {
+        type Snapshot = Self;
+
+        fn policy_id(&self) -> &str { "identity-drifting-policy" }
+        fn policy_version(&self) -> &str { "1" }
+        fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> {
+            synthetic_policy_identity_v1(
+                self.policy_id(),
+                self.policy_version(),
+                std::any::type_name::<Self>(),
+                &self.identity_variant,
+            )
+        }
+        fn snapshot_state(&self) -> Result<Self::Snapshot, String> { Ok(self.clone()) }
+        fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> {
+            let restore_index = IDENTITY_RESTORE_CALLS.with(|counter| {
+                let index = counter.get();
+                counter.set(index + 1);
+                index
+            });
+            let mut restored = snapshot.clone();
+            // The third restore is the treatment instance. It deliberately
+            // reports a different immutable identity under identical labels.
+            if restore_index == 2 {
+                restored.identity_variant = restored.identity_variant.wrapping_add(1);
+            }
+            Ok(restored)
+        }
+        fn respond(
+            &mut self,
+            _history: &[RmiHistoryEventV1],
+            observation: &RmiPartnerObservationV1,
+            _seed: u64,
+        ) -> RmiAgentActionV1 {
+            RmiAgentActionV1 {
+                action_id: "identity-drift-response".into(),
+                features: observation.features.clone(),
+            }
+        }
     }
 
     fn base_features() -> RmiMusicalFeaturesV1 {
@@ -1475,6 +1522,98 @@ mod tests {
             action_id: "fixed-action".into(),
             features: base_features(),
         }
+    }
+
+    #[test]
+    fn immutable_identity_digest_distinguishes_same_label_different_artifacts() {
+        let mut first = synthetic_policy_identity_v1(
+            "same-policy",
+            "1",
+            "fixture::SamePolicy",
+            &"configuration-a",
+        ).unwrap();
+        let first_digest = first.digest_sha256().unwrap();
+
+        let artifact_digest = "a".repeat(64);
+        first.components.insert(1, RmiPolicyIdentityComponentV1 {
+            kind: RmiIdentityComponentKindV1::ModelArtifact,
+            sha256: artifact_digest.clone(),
+            digest_basis: RmiIdentityDigestBasisV1::ArtifactBytes,
+            source_ref: format!("sha256:{artifact_digest}"),
+            evidence_ref: format!("sha256:{artifact_digest}"),
+            evidence_sha256: artifact_digest.clone(),
+        });
+        let second_digest = first.digest_sha256().unwrap();
+        assert_ne!(first_digest, second_digest);
+        assert!(!first.all_components_content_addressed(),
+            "declaration-only implementation/runtime must not be labelled artifact-backed");
+
+        let mut other = first.clone();
+        let other_artifact_digest = "b".repeat(64);
+        let artifact = other.components.iter_mut()
+            .find(|component| component.kind == RmiIdentityComponentKindV1::ModelArtifact)
+            .unwrap();
+        artifact.sha256 = other_artifact_digest.clone();
+        artifact.source_ref = format!("sha256:{other_artifact_digest}");
+        artifact.evidence_ref = format!("sha256:{other_artifact_digest}");
+        artifact.evidence_sha256 = other_artifact_digest;
+        assert_ne!(second_digest, other.digest_sha256().unwrap());
+        assert_eq!(other.policy_id, "same-policy");
+        assert_eq!(other.policy_version, "1");
+    }
+
+    #[test]
+    fn immutable_identity_rejects_duplicate_or_unordered_components() {
+        let mut identity = synthetic_policy_identity_v1(
+            "ordered-policy",
+            "1",
+            "fixture::OrderedPolicy",
+            &(),
+        ).unwrap();
+        identity.components.push(identity.components[0].clone());
+        assert!(identity.validate_for("ordered-policy", "1").is_err());
+    }
+
+    #[test]
+    fn synthetic_identity_declarations_are_not_claimed_as_resolvable_artifacts() {
+        let identity = synthetic_policy_identity_v1(
+            "declared-policy",
+            "1",
+            "fixture::DeclaredPolicy",
+            &(),
+        ).unwrap();
+        assert!(!identity.all_components_content_addressed());
+        assert!(identity.digest_sha256().is_ok());
+    }
+
+    #[test]
+    fn restored_treatment_with_changed_immutable_identity_fails_before_action() {
+        IDENTITY_RESTORE_CALLS.with(|counter| counter.set(0));
+        let policy = IdentityDriftingPolicy { identity_variant: 0 };
+        let result = evaluate_rmi_pair(&policy, &pair_for(RmiTargetFeatureV1::Motif));
+        assert!(matches!(
+            result,
+            Err(RmiEvaluationErrorV1::PolicyImmutableIdentityMismatch { ref arm })
+                if arm == "treatment"
+        ));
+    }
+
+    #[test]
+    fn evaluation_payload_binds_immutable_identity_and_digest() {
+        let policy = SyntheticContingentPolicyV1 {
+            id: "identity-payload-control".into(),
+            version: "1".into(),
+            target: RmiTargetFeatureV1::Motif,
+        };
+        let result = evaluate_rmi_pair(&policy, &pair_for(RmiTargetFeatureV1::Motif)).unwrap();
+        assert_eq!(
+            result.payload.immutable_policy_identity_sha256,
+            result.payload.immutable_policy_identity.digest_sha256().unwrap()
+        );
+        assert_eq!(
+            result.payload.immutable_policy_identity.policy_id,
+            result.payload.policy_id
+        );
     }
 
     #[test]
