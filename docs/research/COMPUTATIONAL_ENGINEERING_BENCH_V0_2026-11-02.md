@@ -222,7 +222,7 @@ The CEB contract workflow now audits the static repository-twin fixture without 
 
 Negative controls inject a dangling edge, duplicate edge, invalid source line, anchor-text mismatch, unsafe path, semantic-authority inflation, forged edge count, unknown mutation impact and duplicate mutation ID. These controls are CI-authored and have not yet been run. They are checks on the gold artifact itself, not evidence that an agent has constructed the graph correctly.
 
-The workflow contains 30 authored negative controls, including result-tree subject digest tampering, and runs only JSON/schema/static-file validation. It does not compile the synthetic workspace, execute tests/build scripts, or qualify the runner. The task remains design-only.
+The workflow contains 31 authored negative controls, including result-tree subject digest tampering and a valid-line/wrong-symbol source-anchor attack. It now checks not only that each line exists and matches its anchor text, but also that the anchor text declares the symbol named by the graph node. These checks are authored and have not run. It does not compile the synthetic workspace, execute tests/build scripts, or qualify the runner. The task remains design-only.
 
 
 ## 17. 2026-11-03 verifier and benchmark direction update
