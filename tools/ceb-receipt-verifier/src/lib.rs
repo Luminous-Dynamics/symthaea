@@ -473,7 +473,7 @@ fn build_git_tree_from_entries(
                 (oid, 0o040000)
             }
         };
-        builder.insert(&name, oid, mode)
+        builder.insert(name.as_str(), oid, mode)
             .map_err(|error| Failure::protocol(format!("cannot insert Git tree entry {name}: {error}")))?;
     }
     builder.write()
