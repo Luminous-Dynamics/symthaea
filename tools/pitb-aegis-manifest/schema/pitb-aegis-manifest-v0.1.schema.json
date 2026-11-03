@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb-aegis-manifest-v0.1.json",
+  "title": "PITB Aegis frozen task manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark",
+    "dataset",
+    "task",
+    "toolchains",
+    "artifacts",
+    "classification"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb-aegis-manifest/0.1"
+    },
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "release",
+        "cohort_id"
+      ],
+      "properties": {
+        "name": {
+          "const": "Aegis"
+        },
+        "release": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cohort_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_uri",
+        "license",
+        "archive_sha256",
+        "program_pair_count",
+        "candidate_specification_count"
+      ],
+      "properties": {
+        "artifact_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "license": {
+          "type": "string",
+          "minLength": 1
+        },
+        "archive_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "program_pair_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "candidate_specification_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "evaluation_task_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "extraction_manifest_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "program_pair_id",
+        "specification_id",
+        "stratum",
+        "categories",
+        "split"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "program_pair_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "specification_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stratum": {
+          "enum": [
+            "edge_case",
+            "explicit_contract",
+            "other",
+            "unknown"
+          ]
+        },
+        "categories": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "fixed_width_arithmetic",
+              "overflow",
+              "explicit_failure",
+              "loops",
+              "casts",
+              "mutation",
+              "mixed",
+              "other"
+            ]
+          }
+        },
+        "split": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "toolchains": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rustc",
+        "aeneas",
+        "lean",
+        "lake_manifest_sha256"
+      ],
+      "properties": {
+        "rustc": {
+          "type": "string",
+          "minLength": 1
+        },
+        "aeneas": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lean": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lake_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "translator_config_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_rust",
+        "translated_lean",
+        "statement"
+      ],
+      "properties": {
+        "source_rust": {
+          "$ref": "#/$defs/artifact"
+        },
+        "translated_lean": {
+          "$ref": "#/$defs/artifact"
+        },
+        "statement": {
+          "$ref": "#/$defs/artifact"
+        },
+        "lake_manifest": {
+          "$ref": "#/$defs/artifact"
+        }
+      }
+    },
+    "classification": {
+      "enum": [
+        "proved",
+        "refuted",
+        "unresolved",
+        "invalid_task",
+        "translation_disagreement",
+        "specification_disagreement",
+        "execution_error"
+      ]
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}
