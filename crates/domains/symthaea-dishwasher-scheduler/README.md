@@ -22,6 +22,19 @@ Both hybrid policies retain the no-weighted-score Pareto rule for timed-out part
 
 A process with an unvalidated cleaning/rinse flag is never selected. Soil or sanitation incompatibility is not traded away for speed or resource use. Unprocessable jobs are reported rather than forced into a mode.
 
+## Evidence-qualified measured occupancy curves
+
+The `resource_curve` module accepts physical resource observations scoped to one exact machine, programme, soil class, surface material, protocol and raw-data SHA-256 digest. It requires at least two measured occupancies, at least five independent runs per occupancy, and zero cleaning/rinse failures at every occupancy point before constructing an eligible curve.
+
+- Exact measured occupancy returns the stored observation.
+- Intermediate occupancy uses piecewise-linear interpolation, explicitly marked as an estimate.
+- Occupancy outside the measured range is rejected; no extrapolation is permitted.
+- Min/mean/max values are descriptive observed ranges, not confidence intervals.
+- Interpolated values are diagnostic only until the chosen interpolation model is validated on held-out physical occupancy points.
+- Failed cleaning or rinse observations disqualify the curve; resource savings cannot compensate for endpoint failure.
+
+This API is separate from the illustrative linear `ModeProfile` coefficients. It does not silently change scheduler defaults. Issue #10136 remains the physical measurement programme required to supply real curves.
+
 ## Critical evidence boundary
 
 The included `illustrative_profiles()` values are hypothetical design inputs only:
