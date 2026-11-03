@@ -83,3 +83,17 @@ See [illustrative-crossover.md](docs/illustrative-crossover.md) for the arithmet
 ## Interpreting output
 
 Compare energy, fresh water, p95 end-to-end latency, deadline misses, unprocessed jobs and cycle counts together. Do not reduce the comparison to one weighted score. Keep eco-label tests separate from per-item QuickCell experiments.
+
+## Pilot evidence-bound scheduling
+
+The original `simulate` entry point remains appropriate for synthetic/offline dispatch experiments. Its ModeProfile cleaning/rinse boolean is a caller-supplied assumption and is not evidence.
+
+For a research simulation that should be gated by physical outcome data, construct `EvidenceBoundMode::from_pilot_evidence` and call `simulate_with_pilot_evidence`. The adapter:
+- derives the supported-soil mask from PilotEvidenceEnvelope objects; it does not trust the profile's requested soil mask;
+- requires independent soil-residual, final-rinse-residue and cross-contamination evidence;
+- requires the same exact machine, programme, material, detergent/water batches, hardness and ambient/inlet conditions;
+- requires a complete occupancy ladder from 1 item through the declared mode capacity for every soil class advertised;
+- rejects inconsistent scopes and duplicate soil/occupancy evidence;
+- never converts pilot outcome evidence into a sanitization capability.
+
+The ModeProfile resource coefficients remain explicit inputs. They must be replaced by measured occupancy resource curves before resource-superiority claims; this adapter does not infer or certify energy/water performance. Five independent runs remain a pilot floor, not a powered product qualification.
