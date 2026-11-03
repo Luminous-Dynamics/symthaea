@@ -246,7 +246,18 @@ pub struct MusicalForecastLedgerV1 {
 pub struct MusicalForecastLedgerEventV1 {
     pub sequence: u64,
     pub event_tick: u64,
+    pub previous_event_sha256: String,
     pub event: MusicalForecastLedgerEventKindV1,
+    pub event_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct MusicalForecastLedgerEventCommitmentV1 {
+    schema_version: u32,
+    sequence: u64,
+    event_tick: u64,
+    previous_event_sha256: String,
+    event: MusicalForecastLedgerEventKindV1,
 }
 
 impl MusicalForecastLedgerV1 {
@@ -286,14 +297,11 @@ impl MusicalForecastLedgerV1 {
         }
         let sequence = forecast.event_sequence;
         let event_tick = forecast.created_at_tick;
-        self.events.push(MusicalForecastLedgerEventV1 {
+        self.append_event(
             sequence,
             event_tick,
-            event: MusicalForecastLedgerEventKindV1::Committed { forecast },
-        });
-        self.last_sequence = sequence;
-        self.last_event_tick = event_tick;
-        Ok(())
+            MusicalForecastLedgerEventKindV1::Committed { forecast },
+        )
     }
 
     pub fn append_display_receipt(
@@ -315,14 +323,11 @@ impl MusicalForecastLedgerV1 {
             return Err("display cannot precede forecast commitment".into());
         }
         self.validate_next_event(sequence, receipt.displayed_at_tick)?;
-        self.events.push(MusicalForecastLedgerEventV1 {
+        self.append_event(
             sequence,
-            event_tick: receipt.displayed_at_tick,
-            event: MusicalForecastLedgerEventKindV1::Displayed { receipt },
-        });
-        self.last_sequence = sequence;
-        self.last_event_tick = self.events.last().map_or(0, |item| item.event_tick);
-        Ok(())
+            receipt.displayed_at_tick,
+            MusicalForecastLedgerEventKindV1::Displayed { receipt },
+        )
     }
 
     pub fn append_invalidation(
@@ -341,14 +346,11 @@ impl MusicalForecastLedgerV1 {
             return Err("only an active forecast can be invalidated".into());
         }
         self.validate_next_event(sequence, event_tick)?;
-        self.events.push(MusicalForecastLedgerEventV1 {
+        self.append_event(
             sequence,
             event_tick,
-            event: MusicalForecastLedgerEventKindV1::Invalidated { invalidation },
-        });
-        self.last_sequence = sequence;
-        self.last_event_tick = event_tick;
-        Ok(())
+            MusicalForecastLedgerEventKindV1::Invalidated { invalidation },
+        )
     }
 
     /// Replays the complete log and checks the serialized tail metadata. This
@@ -376,8 +378,11 @@ impl MusicalForecastLedgerV1 {
                 }
             }
         }
-        if replay.last_sequence != self.last_sequence || replay.last_event_tick != self.last_event_tick {
-            return Err("ledger tail metadata does not match replayed append-only events".into());
+        if replay.events != self.events
+            || replay.last_sequence != self.last_sequence
+            || replay.last_event_tick != self.last_event_tick
+        {
+            return Err("ledger event chain or tail metadata does not match replayed append-only events".into());
         }
         Ok(())
     }
@@ -427,6 +432,55 @@ impl MusicalForecastLedgerV1 {
                 MusicalForecastLedgerEventKindV1::Displayed { .. } => false,
             }
         })
+    }
+
+    fn append_event(
+        &mut self,
+        sequence: u64,
+        event_tick: u64,
+        event: MusicalForecastLedgerEventKindV1,
+    ) -> Result<(), String> {
+        self.validate_next_event(sequence, event_tick)?;
+        let previous_event_sha256 = self.ledger_head_sha256();
+        let commitment = MusicalForecastLedgerEventCommitmentV1 {
+            schema_version: 1,
+            sequence,
+            event_tick,
+            previous_event_sha256: previous_event_sha256.clone(),
+            event: event.clone(),
+        };
+        let bytes = serde_json::to_vec(&commitment).map_err(|error| error.to_string())?;
+        let event_sha256 = sha256_hex(&bytes);
+        self.events.push(MusicalForecastLedgerEventV1 {
+            sequence,
+            event_tick,
+            previous_event_sha256,
+            event,
+            event_sha256,
+        });
+        self.last_sequence = sequence;
+        self.last_event_tick = event_tick;
+        Ok(())
+    }
+
+    /// Returns the current chain head. Publish or sign this value outside the
+    /// ledger to anchor the history against a full rewrite.
+    pub fn ledger_head_sha256(&self) -> String {
+        self.events
+            .last()
+            .map(|event| event.event_sha256.clone())
+            .unwrap_or_else(ledger_genesis_sha256_v1)
+    }
+
+    /// Returns the last hash-linked event at or before a realization tick,
+    /// excluding later forecast revisions and unrelated future log entries.
+    pub fn ledger_head_sha256_at(&self, event_tick: u64) -> String {
+        self.events
+            .iter()
+            .rev()
+            .find(|event| event.event_tick <= event_tick)
+            .map(|event| event.event_sha256.clone())
+            .unwrap_or_else(ledger_genesis_sha256_v1)
     }
 
     fn validate_next_event(&self, sequence: u64, event_tick: u64) -> Result<(), String> {
@@ -497,6 +551,8 @@ pub struct ForecastFieldOutcomeV1 {
 pub struct ForecastEvaluationV1 {
     pub forecast_id: String,
     pub forecast_sha256: String,
+    /// Hash-linked ledger prefix observed at realization time.
+    pub ledger_head_sha256: String,
     pub realization_artifact_ref: String,
     pub realization_artifact_sha256: String,
     pub event_projection_id: String,
@@ -670,6 +726,7 @@ pub fn evaluate_musical_forecast_v1(
     Ok(ForecastEvaluationV1 {
         forecast_id: forecast_id.to_owned(),
         forecast_sha256,
+        ledger_head_sha256: ledger.ledger_head_sha256_at(context.realization_tick),
         realization_artifact_ref: context.realization_artifact_ref.clone(),
         realization_artifact_sha256: context.realization_artifact_sha256.clone(),
         event_projection_id: context.event_projection_id.clone(),
@@ -687,6 +744,10 @@ pub fn evaluate_musical_forecast_v1(
         mean_brier_score_millionths,
         field_outcomes: outcomes,
     })
+}
+
+fn ledger_genesis_sha256_v1() -> String {
+    sha256_hex(b"luminous-dynamics-musical-forecast-ledger-genesis-v1")
 }
 
 fn is_sha256(value: &str) -> bool {
@@ -988,6 +1049,65 @@ mod tests {
             ForecastScoringPolicyV1::default(),
         );
         assert!(result.unwrap_err().contains("clock domains"));
+    }
+
+    #[test]
+    fn ledger_hash_chain_detects_event_body_and_link_mutation() {
+        let mut ledger = MusicalForecastLedgerV1::default();
+        ledger.append_forecast(forecast(1, 5, None)).unwrap();
+        ledger
+            .append_display_receipt(
+                2,
+                ForecastDisplayReceiptV1 {
+                    forecast_id: "forecast-1".into(),
+                    recipient_id: "musician-1".into(),
+                    display_surface_id: "score-preview-panel".into(),
+                    displayed_at_tick: 6,
+                    display_evidence_ref: "fixture://display-chain".into(),
+                    display_evidence_sha256: digest("display-chain"),
+                },
+            )
+            .unwrap();
+        ledger.validate().unwrap();
+
+        let mut changed_event = ledger.clone();
+        if let MusicalForecastLedgerEventKindV1::Displayed { receipt } =
+            &mut changed_event.events[1].event
+        {
+            receipt.recipient_id = "substituted-recipient".into();
+        }
+        assert!(changed_event.validate().is_err());
+
+        let mut changed_link = ledger.clone();
+        changed_link.events[1].previous_event_sha256 = digest("wrong-parent");
+        assert!(changed_link.validate().is_err());
+    }
+
+    #[test]
+    fn evaluation_binds_ledger_prefix_at_realization_not_future_events() {
+        let mut ledger = MusicalForecastLedgerV1::default();
+        ledger.append_forecast(forecast(1, 5, None)).unwrap();
+        let before = ledger.ledger_head_sha256_at(12);
+        let first_score = evaluate_musical_forecast_v1(
+            &ledger,
+            "forecast-1",
+            &context(12),
+            ForecastScoringPolicyV1::default(),
+        ).unwrap();
+        ledger.append_display_receipt(
+            2,
+            ForecastDisplayReceiptV1 {
+                forecast_id: "forecast-1".into(),
+                recipient_id: "musician-1".into(),
+                display_surface_id: "score-preview-panel".into(),
+                displayed_at_tick: 20,
+                display_evidence_ref: "fixture://later-display".into(),
+                display_evidence_sha256: digest("later-display"),
+            },
+        ).unwrap();
+        assert_eq!(ledger.ledger_head_sha256_at(12), before);
+        assert_eq!(first_score.ledger_head_sha256, before);
+        assert_ne!(ledger.ledger_head_sha256(), before);
     }
 
     #[test]
