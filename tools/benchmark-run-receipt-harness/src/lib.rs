@@ -1037,7 +1037,10 @@ fn validate_official_and_derived(
                 false,
             )?;
         } else {
-            if score_value.as_f64().is_none_or(|number| !number.is_finite()) {
+            if score_value
+                .as_f64()
+                .is_none_or(|number| !number.is_finite())
+            {
                 return Err(error(
                     ReceiptErrorKind::SchemaViolation,
                     "official_score.value must be finite or null",
@@ -1053,11 +1056,7 @@ fn validate_official_and_derived(
                     "official_score.denominator must be positive and finite for a reported score",
                 ));
             }
-            if !numerator.is_null()
-                && numerator
-                    .as_f64()
-                    .is_none_or(|number| !number.is_finite())
-            {
+            if !numerator.is_null() && numerator.as_f64().is_none_or(|number| !number.is_finite()) {
                 return Err(error(
                     ReceiptErrorKind::SchemaViolation,
                     "official_score.numerator must be finite or null",
@@ -1140,7 +1139,10 @@ fn validate_official_and_derived(
         if metric_value.is_null() {
             string(reason, &format!("{context}.unavailable_reason"), false)?;
         } else {
-            if metric_value.as_f64().is_none_or(|number| !number.is_finite()) {
+            if metric_value
+                .as_f64()
+                .is_none_or(|number| !number.is_finite())
+            {
                 return Err(error(
                     ReceiptErrorKind::SchemaViolation,
                     format!("{context}.value must be finite or null"),
@@ -1157,7 +1159,9 @@ fn validate_official_and_derived(
         // Recompute common coverage/yield metrics from the validated denominator.
         // Caller-supplied formulas and values are not accepted as their own oracle.
         let known = match metric_id {
-            "eligible-coverage" => Some((counts.attempted, counts.eligible, "attempted / eligible")),
+            "eligible-coverage" => {
+                Some((counts.attempted, counts.eligible, "attempted / eligible"))
+            }
             "graded-coverage" => Some((counts.graded, counts.eligible, "graded / eligible")),
             "coverage-adjusted-task-yield" => {
                 Some((counts.passed, counts.eligible, "passed / eligible"))
@@ -1176,7 +1180,9 @@ fn validate_official_and_derived(
                 if !metric_value.is_null() || reason.is_null() {
                     return Err(error(
                         ReceiptErrorKind::AccountingMismatch,
-                        format!("{context} must be null with a reason when its denominator is zero"),
+                        format!(
+                            "{context} must be null with a reason when its denominator is zero"
+                        ),
                     ));
                 }
             } else {
