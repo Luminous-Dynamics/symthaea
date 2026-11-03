@@ -2,7 +2,7 @@
 
 **Status:** simulator-only implementation; no controller performance results reported  
 **Implementation:** `symthaea_vehicle::paired_rollout`  
-**Baseline options:** existing `pd_cruise_baseline_with_road` or the new versioned Stanley-style road tracker  
+**Baseline options:** existing PD road teacher, versioned Stanley-style road tracker, or versioned Pure Pursuit road tracker  
 **Advanced subject:** frozen HDC-LTC weights with evolving recurrent state
 
 ## Experiment design
@@ -17,6 +17,7 @@ The HDC-LTC controller is reset at the start and its recurrent state evolves as 
 
 The profile digest binds:
 - caller-supplied candidate and road-profile labels;
+- selected classical policy ID and parameter digest (PD, Stanley or Pure Pursuit);
 - selected classical baseline policy ID and its policy-parameter digest;
 - digest of actual resolved road segment geometry, projection look-ahead and closed-loop flag;
 - caller-supplied advanced controller digest;
@@ -57,12 +58,12 @@ The model itself is a simplified bicycle model with a simplified tire-force law.
 
 ## Verification status
 
-Nine Rust test declarations cover cloned initial conditions, identical disturbance application to both branches, deterministic replay receipts, PD/Stanley policy identity binding, road/profile identity tampering, output-trace tampering and invalid-profile rejection. The classical-baseline module adds five unit tests for steering direction, centered behavior, feed-forward response, parameter identity and invalid configuration. One additional perturbation-scheduler regression test checks that clearing tire blowout restores per-axle grip. One additional perturbation-scheduler regression test checks that clearing tire blowout restores per-axle grip. They have not been compiled or executed in this session. The environment has no Rust toolchain; current CI workflows on this branch were reported as `skipped`, not passed.
+Ten Rust test declarations cover cloned initial conditions, identical disturbance application to both branches, deterministic replay receipts, PD/Stanley/Pure Pursuit policy identity binding, road/profile identity tampering, output-trace tampering and invalid-profile rejection. The classical-baseline module adds nine unit tests for Stanley/Pure Pursuit steering direction, centered behavior, curvature/feed-forward response, parameter identity and invalid configuration. One additional perturbation-scheduler regression test checks that clearing tire blowout restores per-axle grip. One additional perturbation-scheduler regression test checks that clearing tire blowout restores per-axle grip. They have not been compiled or executed in this session. The environment has no Rust toolchain; current CI workflows on this branch were reported as `skipped`, not passed.
 
 ## Next progression
 
 1. Run exact-head focused unit tests, formatting and Clippy on a Rust-capable host.
-2. Add constrained MPC with frozen horizon, constraints, solver and infeasibility semantics; retain both PD and Stanley as classical references.
+2. Add constrained MPC with frozen horizon, constraints, solver and infeasibility semantics; retain PD, Stanley and Pure Pursuit as distinct classical references.
 3. Add RTA in shadow mode and compare intervention/fallback proposals without giving the monitor real actuator authority.
 4. Bind controller identities to measured build artifacts and record hardware/runtime budgets.
 5. Move pedestrian/intersection execution to Symtropy; add explicit simulator capability and semantic-loss records.
