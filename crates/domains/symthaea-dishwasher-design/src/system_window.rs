@@ -49,6 +49,8 @@ pub enum WindowRequestState {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ServiceWindowRequest {
     pub service_request_id: String,
+    pub service_class_id: String,
+    pub protocol_id: String,
     pub clock_domain_id: String,
     pub accepted_at_s: u64,
     /// None means the request is still queued and has not started.
@@ -99,6 +101,8 @@ pub struct SystemWindowResourceMeasurement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SystemWindowSpec {
     pub window_id: String,
+    pub service_class_id: String,
+    pub protocol_id: String,
     pub clock_domain_id: String,
     /// Observation interval is half-open: [start_at_s, end_at_s).
     pub start_at_s: u64,
@@ -127,6 +131,8 @@ pub struct CompartmentWindowStats {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SystemWindowReport {
     pub window_id: String,
+    pub service_class_id: String,
+    pub protocol_id: String,
     pub machine_unit_id: String,
     pub system_configuration_sha256: String,
     pub utility_topology_id: String,
@@ -174,6 +180,8 @@ pub enum SystemWindowError {
     InvalidIdentity(&'static str),
     InvalidSystemIdentity(&'static str),
     CompartmentConfigurationMismatch { compartment_id: String },
+    ServiceClassMismatch { request_id: String },
+    ProtocolMismatch { request_id: String },
     InvalidClockDomain { request_id: String },
     InvalidResourceClockDomain { measurement_id: String },
     EmptyRequests,
@@ -497,6 +505,22 @@ fn validate_request(
     if !canonical_non_empty(&request.compartment_id) {
         return Err(SystemWindowError::InvalidIdentity("compartment_id"));
     }
+    if !canonical_non_empty(&request.service_class_id) {
+        return Err(SystemWindowError::InvalidIdentity("service_class_id"));
+    }
+    if request.service_class_id != spec.service_class_id {
+        return Err(SystemWindowError::ServiceClassMismatch {
+            request_id: request.service_request_id.clone(),
+        });
+    }
+    if !canonical_non_empty(&request.protocol_id) {
+        return Err(SystemWindowError::InvalidIdentity("protocol_id"));
+    }
+    if request.protocol_id != spec.protocol_id {
+        return Err(SystemWindowError::ProtocolMismatch {
+            request_id: request.service_request_id.clone(),
+        });
+    }
     if !valid_digest(&request.compartment_configuration_sha256) {
         return Err(SystemWindowError::InvalidEvidenceDigest("compartment_configuration_sha256"));
     }
@@ -618,6 +642,8 @@ pub fn account_system_window(
     resources: &[SystemWindowResourceMeasurement],
 ) -> Result<SystemWindowReport, SystemWindowError> {
     if !canonical_non_empty(&spec.window_id)
+        || !canonical_non_empty(&spec.service_class_id)
+        || !canonical_non_empty(&spec.protocol_id)
         || !canonical_non_empty(&spec.clock_domain_id)
         || spec.end_at_s <= spec.start_at_s
     {
@@ -1073,6 +1099,8 @@ pub fn account_system_window(
 
     Ok(SystemWindowReport {
         window_id: spec.window_id.clone(),
+        service_class_id: spec.service_class_id.clone(),
+        protocol_id: spec.protocol_id.clone(),
         machine_unit_id: spec.machine_unit_id.clone(),
         system_configuration_sha256: spec.system_configuration_sha256.clone(),
         utility_topology_id: spec.utility_topology_id.clone(),
@@ -1165,6 +1193,8 @@ mod tests {
     ) -> ServiceWindowRequest {
         ServiceWindowRequest {
             service_request_id: id.to_owned(),
+            service_class_id: "quickcell-lightly-soiled-glassware".to_owned(),
+            protocol_id: "independent-outcome-protocol-v1".to_owned(),
             clock_domain_id: CLOCK.to_owned(),
             accepted_at_s: accepted,
             started_at_s: started,
@@ -1218,6 +1248,8 @@ mod tests {
     fn spec(required: &[SystemResourceKind]) -> SystemWindowSpec {
         SystemWindowSpec {
             window_id: "window-01".to_owned(),
+            service_class_id: "quickcell-lightly-soiled-glassware".to_owned(),
+            protocol_id: "independent-outcome-protocol-v1".to_owned(),
             clock_domain_id: CLOCK.to_owned(),
             start_at_s: 0,
             end_at_s: 100,
@@ -1741,6 +1773,37 @@ mod tests {
         assert_eq!(result.items_in_completed_cohort, 2);
         assert_eq!(result.first_pass_yield, Some(0.5));
         assert_eq!(result.unresolved_requests_at_window_end, 1);
+    }
+
+    #[test]
+    fn rejects_mixed_service_class_or_outcome_protocol_in_one_window() {
+        let mut mixed_class = request(
+            "service-other-class",
+            0,
+            Some(0),
+            WindowRequestState::Completed { closed_at_s: 60 },
+            &["cup-other"],
+            Some(report("service-other-class", &["cup-other"], &[], &["cup-other"])),
+        );
+        mixed_class.service_class_id = "quickcell-normal-soil-plate".to_owned();
+        assert!(matches!(
+            account_system_window(&spec(&REQUIRED), &[mixed_class], &[], &basic_resources()),
+            Err(SystemWindowError::ServiceClassMismatch { .. })
+        ));
+
+        let mut mixed_protocol = request(
+            "service-other-protocol",
+            0,
+            Some(0),
+            WindowRequestState::Completed { closed_at_s: 60 },
+            &["cup-other"],
+            Some(report("service-other-protocol", &["cup-other"], &[], &["cup-other"])),
+        );
+        mixed_protocol.protocol_id = "other-assay-protocol".to_owned();
+        assert!(matches!(
+            account_system_window(&spec(&REQUIRED), &[mixed_protocol], &[], &basic_resources()),
+            Err(SystemWindowError::ProtocolMismatch { .. })
+        ));
     }
 
     #[test]
