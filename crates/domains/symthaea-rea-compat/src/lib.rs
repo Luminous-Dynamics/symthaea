@@ -10,6 +10,7 @@
 //! is deliberately stricter than JavaScript JSON.parse, which resolves
 //! duplicate keys before REA's object-level schema sees the object.
 
+pub mod mobile_invocation;
 pub mod mobile_tool_effects;
 
 // Compile the same root-level re-export consumed by Symthaea callers. This
@@ -19,6 +20,10 @@ extern crate self as symthaea_rea_compat;
 #[cfg(test)]
 #[path = "../../../../src/mobile_tool_policy.rs"]
 mod root_mobile_tool_policy_facade;
+
+#[cfg(test)]
+#[path = "../../../../src/mobile_invocation_policy.rs"]
+mod root_mobile_invocation_policy_facade;
 
 use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::ser::{SerializeMap, SerializeSeq};

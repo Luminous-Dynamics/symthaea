@@ -96,3 +96,37 @@ The distinction matters: \`pull_adb_file\` writes a host-side copy but does not 
 MCP annotations are derived from effects exactly as in upstream REA. They are not the policy authority. Unknown or unaudited names fail closed. Authorization results bind a JCS digest of the effect row and a JCS digest of the policy ceiling. The dedicated upstream CI generator also compares all 30 effect rows, annotations and target-content trust flags with the pinned TypeScript source.
 
 This is a policy evaluator and typed catalog, not yet proof that every MCP/CLI/provider execution path calls it. Adapter wiring and exact tool-catalog parity remain acceptance requirements in issue #9909.
+
+
+## Session-bound mobile invocation authorization
+
+The optional `mobile_invocation` module prepares a narrowly scoped one-use authorization lease. It binds:
+- an opaque selected-device alias, generation and ephemeral session nonce;
+- caller ID and a caller-consent receipt digest/verifier label;
+- exact tool name and canonical argument digest;
+- the provider capability report, executable metadata, effect-catalog and policy digests;
+- an invocation ID/nonce and a bounded issue/expiry time window.
+
+The portable receipt contains the **hash** of the ephemeral session nonce, not the raw nonce or a stable device identifier. The prepared authorization retains the arguments only in-process for a narrow executor. A process-local replay guard rejects duplicate invocation IDs and nonces; production gateways must persist those claims transactionally across restarts and share the replay store across direct API/CLI/MCP adapters.
+
+### Important claim ceiling
+
+This is a policy and integrity contract. It does not execute ADB, authenticate the provider executable, validate a consent signature, prove that a human clicked a consent dialog, attest the device, or prove ADB output truth. A gateway must supply an actually verified consent result, selected live session snapshot, fresh clock and provider report before it calls this API. The receipt's self-hash is not a signature. HARDSEC or another independently trusted verifier is required for authenticity claims.
+
+
+## Caller/session-bound mobile invocation v1
+
+The optional `mobile_invocation` module adds a one-use authorization lease that binds caller identity, a gateway-selected opaque device-session alias/generation/nonce, a consent receipt digest and verifier label, exact tool/argument digest, provider capability/executable metadata, effect catalog/policy digests and a short expiry. The portable receipt hashes the ephemeral session nonce and does not export it.
+
+The process-local replay guard has an expiry-aware bounded cache (65,536 active IDs/nonces) and explicit capacity rejection. It is only a testable in-process primitive: production must use a durable transactional replay store shared by every adapter and process.
+
+Consent revocation is represented as a gateway-supplied revocation timestamp. A trusted consent provider must authenticate the signed grant and supply a current revocation result before this module is called. A caller-supplied timestamp is not itself proof of revocation status.
+
+The implementation is an authorization contract only. No ADB operation is run, no user-consent UI is implemented, no provider executable digest is independently authenticated, and no hardware attestation or device-output truth is claimed.
+
+
+### Read-only policy and log-safety hardening
+
+Invocation preparation accepts only the exact `mobile-device-read-only-v1` policy and `EffectCeiling::MOBILE_DEVICE_READ_ONLY`; broader effect ceilings are rejected. Receipt verification recomputes the pinned mobile tool-effect catalog digest and the selected tool's read-only policy/effect digests, so changing a tool/effect and recomputing only the receipt self-hash does not pass.
+
+Custom `Debug` implementations redact the raw session nonce, invocation nonce, caller ID and request argument payload. The mobile invocation unit suite now has 12 tests. These are authored tests; exact-head CI remains the validation authority.
