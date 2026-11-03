@@ -369,6 +369,28 @@ def run_nested_suite(seed=0xE7027, cases_per_contract=1000):
 
 def run_controls():
     results={}
+    def weighted_without_completion(circuit, weights):
+        by, scopes = circuit._maps_scopes()
+        vals = {}
+        for node in circuit.nodes:
+            node_id, kind = node["id"], node["kind"]
+            if kind == "const":
+                vals[node_id] = one("q") if node["value"] else z("q")
+            elif kind == "lit":
+                pair = weights.get(node["var"], (one("q"), one("q")))
+                vals[node_id] = pair[1 if node["value"] else 0]
+            elif kind == "and":
+                acc = one("q")
+                for child in node["children"]:
+                    acc = mulv("q", acc, vals[child])
+                vals[node_id] = acc
+            else:
+                acc = z("q")
+                for child in node["children"]:
+                    acc = addv("q", acc, vals[child])
+                vals[node_id] = acc
+        return vals[circuit.root]
+
     # Non-smooth OR: x OR y. The x=true branch omits y from its scope.
     variables=("x","y")
     table={(x,y):(x or y) for x,y in product((False,True),repeat=2)}
@@ -381,6 +403,14 @@ def run_controls():
         "has_non_smooth_sum":any(n["kind"]=="or" and any(scopes[ch]!=scopes[n["id"]] for ch in n["children"]) for n in circuit.nodes)
     }
     assert actual==expected and results["non_smooth_scope_completion"]["has_non_smooth_sum"]
+
+    nonsmooth_mutant = weighted_without_completion(circuit, weights)
+    results["non_smooth_completion_mutant_detected"] = {
+        "correct": str(actual),
+        "mutant_without_scope_completion": str(nonsmooth_mutant),
+        "detected": nonsmooth_mutant != expected
+    }
+    assert nonsmooth_mutant != expected
 
     # Root omits free variables; their literal-weight sums must be included.
     variables=("x","free1","free2")
@@ -408,6 +438,36 @@ def run_controls():
     results["signed_q_cancellation"]={"exact_output":str(q_value),"support":q_support}
     results["complex_qi_cancellation"]={"exact_output":fmtv("qi",qi_value),"support":qi_support}
     assert q_value==0 and qi_value==z("qi") and q_support==2 and qi_support==2
+
+
+    # Mutation control: omitting root free-variable completion must be detected.
+    omitted_completion = weighted_without_completion(circuit, weights)
+    results["free_variable_completion_mutant_detected"] = {
+        "correct": str(actual), "mutant_without_completion": str(omitted_completion),
+        "detected": omitted_completion != expected
+    }
+    assert omitted_completion != expected
+
+    # Mutation control: adding over hidden witnesses is not existential projection.
+    full_vars = ("d", "h")
+    full_table = {
+        (False, False): False, (False, True): False,
+        (True, False): True, (True, True): True
+    }
+    projected_table = {(False,): False, (True,): True}
+    projected_circuit = compile_truth_table(("d",), projected_table)
+    visible_weights = {"d": (F(1, 3), F(2, 3))}
+    correct_pw, _, _ = projected_circuit.weighted(visible_weights, "q")
+    naive_hidden_sum, _ = eval_oracle(
+        full_vars, full_table,
+        {"d": (F(1, 3), F(2, 3)), "h": (F(1), F(1))}, "q"
+    )
+    results["hidden_witness_multiplier_mutant_detected"] = {
+        "correct_pwmc": str(correct_pw),
+        "wrong_hidden_witness_sum": str(naive_hidden_sum),
+        "detected": correct_pw != naive_hidden_sum
+    }
+    assert correct_pw == F(2, 3) and naive_hidden_sum == F(4, 3)
 
     # Malformed product with overlapping scope.
     bad_product=Circuit(("x",),[
