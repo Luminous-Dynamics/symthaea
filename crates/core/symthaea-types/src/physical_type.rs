@@ -98,16 +98,6 @@ impl PhysicalDimension {
         Some(Self::from_array(out))
     }
 
-    /// Convenience arithmetic for already-bounded exponents.
-    /// New fail-closed inference code should prefer checked_add/checked_sub.
-    pub fn add(self, rhs: Self) -> Self {
-        self.checked_add(rhs).expect("physical dimension exponent overflow")
-    }
-
-    pub fn sub(self, rhs: Self) -> Self {
-        self.checked_sub(rhs).expect("physical dimension exponent overflow")
-    }
-
     pub fn scale(self, factor: i8) -> Option<Self> {
         let mut out = [0i8; 7];
         for (i, exponent) in self.as_array().into_iter().enumerate() {
