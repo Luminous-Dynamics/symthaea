@@ -196,8 +196,12 @@ impl OccupancyObservation {
                     metric: "duration_s",
                 });
             }
-            cleaning_failures += usize::from(!run.cleaning_pass);
-            rinse_failures += usize::from(!run.rinse_pass);
+            if !run.cleaning_pass {
+                cleaning_failures += 1;
+            }
+            if !run.rinse_pass {
+                rinse_failures += 1;
+            }
         }
 
         if cleaning_failures != 0 || rinse_failures != 0 {
