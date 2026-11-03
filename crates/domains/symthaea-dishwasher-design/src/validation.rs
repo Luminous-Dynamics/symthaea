@@ -28,6 +28,10 @@ pub enum HoldoutAxis {
     Operator,
     AssayLab,
     TestSite,
+    ServiceRequest,
+    Compartment,
+    CompartmentConfiguration,
+    UtilityTopology,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,6 +47,14 @@ pub struct RunPartitionRecord {
     pub operator_id: String,
     pub assay_lab_id: String,
     pub test_site_id: String,
+    /// Shared by initial attempt, interruption recovery and rewash for one requested service.
+    pub service_request_id: String,
+    /// Explicit cell identity; a single-compartment baseline also has one cell ID.
+    pub compartment_id: String,
+    /// Digest identifying the cell/rack/nozzle/door configuration.
+    pub compartment_configuration_sha256: String,
+    /// Identifier for shared or isolated hydraulic/thermal utility topology.
+    pub utility_topology_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -96,6 +108,10 @@ impl HoldoutAxis {
             HoldoutAxis::Operator => &record.operator_id,
             HoldoutAxis::AssayLab => &record.assay_lab_id,
             HoldoutAxis::TestSite => &record.test_site_id,
+            HoldoutAxis::ServiceRequest => &record.service_request_id,
+            HoldoutAxis::Compartment => &record.compartment_id,
+            HoldoutAxis::CompartmentConfiguration => &record.compartment_configuration_sha256,
+            HoldoutAxis::UtilityTopology => &record.utility_topology_id,
         }
     }
 }
@@ -158,6 +174,10 @@ pub fn audit_grouped_holdout(
             ("operator_id", record.operator_id.as_str()),
             ("assay_lab_id", record.assay_lab_id.as_str()),
             ("test_site_id", record.test_site_id.as_str()),
+            ("service_request_id", record.service_request_id.as_str()),
+            ("compartment_id", record.compartment_id.as_str()),
+            ("compartment_configuration_sha256", record.compartment_configuration_sha256.as_str()),
+            ("utility_topology_id", record.utility_topology_id.as_str()),
         ] {
             if !canonical_non_empty(value) {
                 return Err(GroupedValidationError::InvalidIdentity(field));
@@ -339,6 +359,10 @@ mod tests {
             operator_id: format!("operator-{session}"),
             assay_lab_id: format!("lab-{session}"),
             test_site_id: format!("site-{session}"),
+            service_request_id: format!("service-{run_id}"),
+            compartment_id: format!("cell-{session}"),
+            compartment_configuration_sha256: format!("{:064x}", session.len()),
+            utility_topology_id: format!("utility-{session}"),
         }
     }
 
@@ -526,6 +550,10 @@ mod tests {
                 HoldoutAxis::Operator,
                 HoldoutAxis::AssayLab,
                 HoldoutAxis::TestSite,
+                HoldoutAxis::ServiceRequest,
+                HoldoutAxis::Compartment,
+                HoldoutAxis::CompartmentConfiguration,
+                HoldoutAxis::UtilityTopology,
             ],
             &[
                 ValidationPartition::Development,
@@ -533,6 +561,40 @@ mod tests {
             ],
         )
         .is_ok());
+    }
+
+    #[test]
+    fn rejects_shared_compartment_configuration_across_declared_holdout_partitions() {
+        let mut development = record(
+            "run-dev",
+            ValidationPartition::Development,
+            "unit-a",
+            "day-a",
+            "soil-a",
+        );
+        let mut confirmation = record(
+            "run-confirm",
+            ValidationPartition::LockedConfirmation,
+            "unit-b",
+            "day-b",
+            "soil-b",
+        );
+        confirmation.compartment_configuration_sha256 =
+            development.compartment_configuration_sha256.clone();
+        assert!(matches!(
+            audit_grouped_holdout(
+                &[development, confirmation],
+                &[HoldoutAxis::CompartmentConfiguration],
+                &[
+                    ValidationPartition::Development,
+                    ValidationPartition::LockedConfirmation,
+                ],
+            ),
+            Err(GroupedValidationError::GroupLeaksAcrossPartitions {
+                axis: HoldoutAxis::CompartmentConfiguration,
+                ..
+            })
+        ));
     }
 
     #[test]
