@@ -410,7 +410,9 @@
             "output_bytes",
             "input_tokens",
             "output_tokens",
-            "cost_usd"
+            "cost_usd",
+            "turns",
+            "tool_calls"
           ],
           "properties": {
             "wall_clock_ms": {
@@ -452,6 +454,14 @@
                 "number",
                 "null"
               ],
+              "minimum": 0
+            },
+            "turns": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tool_calls": {
+              "type": "integer",
               "minimum": 0
             }
           }
