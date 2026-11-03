@@ -1,0 +1,18 @@
+{
+  "suite": "ETH-023 reference parser test plan status",
+  "execution_status": "not_executed_in_this_session",
+  "source_status": "committed_research_prototype_unqualified",
+  "planned_test_design": {
+    "deterministic_fixtures": 34,
+    "malformed_input_fuzz_cases": 2000,
+    "profiles": [
+      "strict",
+      "mccomp_v1_2",
+      "ganak_2026_compat"
+    ],
+    "effective_contract_cases": 5
+  },
+  "actual_results": null,
+  "all_passed": null,
+  "claim_ceiling": "The fixture and fuzz counts are intended test-plan parameters, not executed observations. The Python parser was not executed in this session. A separate JavaScript policy check only exercised expected effective-contract mappings, not the Python parser."
+}
