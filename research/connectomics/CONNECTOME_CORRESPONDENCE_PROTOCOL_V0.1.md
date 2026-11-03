@@ -66,7 +66,7 @@ A `SEGMENT_LINEAGE` relation does not itself assert neuron identity. A neuron co
 
 Evidence kinds are typed and each points to an immutable artifact digest and locator. Authority is recorded but not trusted merely because a field says SOURCE_DERIVED or INDEPENDENTLY_VERIFIED.
 
-- `VERIFIED`: only available to the future semantic verifier after the referenced artifacts and authority chain have been authenticated, all mapping constraints hold, and the policy's required independent evidence is satisfied.
+- `CLAIMED_VERIFIED`: a producer's declared status only. It is not an authenticated verification result. A future verifier may promote a mapping only after the referenced artifacts and authority chain have been authenticated, all mapping constraints hold, and the policy's required independent evidence is satisfied.
 - `AMBIGUOUS`: multiple correspondences survive the admissible evidence; preserve the alternatives and do not choose a best match silently.
 - `NOT_ESTIMABLE`: required source artifacts, registration support or independent anchors are absent or insufficient.
 - `REJECTED`: evidence contradicts the mapping or a hard constraint fails.
@@ -141,7 +141,7 @@ A V0.1 receipt schema and synthetic fixtures demonstrate only that the contract 
 
 The schema is structural. A semantic verifier must independently check sidecar raw-byte hashes, embedded world identity, object inventories, mapping IDs, evidence IDs, object membership, relation/object-type compatibility, cardinality, explicit source coverage, summary counters and query-output relationships.
 
-The expected output of the first verifier is `COUNTERS_RECOMPUTED` with `trusted_promotion=false`. It must not treat `support_status=VERIFIED`, `authority=INDEPENDENTLY_VERIFIED`, `registration.status=VERIFIED`, or `disposition=CORRESPONDENCE_VERIFIED` as authenticated truth. It has no evidence-artifact adapter, signer trust-root, source edit-history verifier or physical-anchor residual verifier. It therefore reports claimed statuses separately and keeps the actual receipt disposition NOT_ESTIMABLE unless a hard structural contradiction requires REJECTED or an explicitly preserved ambiguous alternative is present.
+The mapping status enum uses `CLAIMED_VERIFIED` rather than `VERIFIED` to make its untrusted nature explicit. The expected output of the first verifier is `COUNTERS_RECOMPUTED` with `trusted_promotion=false`; it reports support-status labels under `support_status_claim_counts`. It must not treat `support_status=VERIFIED`, `authority=INDEPENDENTLY_VERIFIED`, `registration.status=VERIFIED`, or `disposition=CORRESPONDENCE_VERIFIED` as authenticated truth. It has no evidence-artifact adapter, signer trust-root, source edit-history verifier or physical-anchor residual verifier. It therefore reports claimed statuses separately and keeps the actual receipt disposition NOT_ESTIMABLE unless a hard structural contradiction requires REJECTED or an explicitly preserved ambiguous alternative is present.
 
 A mapping row count is not a population metric. Mapping precision/recall targets require an independently adjudicated object-pair reference set, clustered by source volume / neuron / acquisition lineage. A source object repeated in alternative mappings must not inflate the denominator.
 
