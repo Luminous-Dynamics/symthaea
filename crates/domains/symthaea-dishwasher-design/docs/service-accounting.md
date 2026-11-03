@@ -22,6 +22,8 @@ R_per_verified_item = sum(resources for all attempts) / number of unique items t
 
 The report also identifies `first_pass_verified_item_ids` and `first_pass_verified_item_count`: an item is first-pass only if it passes every required endpoint on its first physical attempt. Passing after a failure, interruption or incomplete first attempt remains a verified success but is not a first-pass success. This distinction feeds system-window first-pass yield.
 
+In the worked example, the second physical attempt contains the item from the first attempt, so the service report has one `rewash_attempt_count` and one `reattempted_item_visit`. In a multi-item rewash, one rewash attempt may account for several reattempted item visits.
+
 The report also includes `rewash_attempt_count`: the number of physical attempts containing at least one item that has appeared in an earlier attempt within the same service request. This differs from `reattempted_item_visits`, which counts each item-level revisit. One rewash attempt can include several reattempted items; several rewash attempts can revisit one item repeatedly.
 
 If no item qualifies, the per-item ratio is absent rather than zero or infinity. Report total resources and unqualified IDs separately.
