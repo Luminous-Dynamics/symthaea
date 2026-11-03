@@ -188,12 +188,12 @@ fn valid_digest(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
-fn non_empty(value: &str) -> bool {
-    !value.trim().is_empty()
+fn canonical_non_empty(value: &str) -> bool {
+    !value.trim().is_empty() && value.trim() == value
 }
 
 fn validate_formulation(formulation: &FormulationCalibrationProfile) -> Result<(), ChemistryError> {
-    if !non_empty(&formulation.formulation_id) {
+    if !canonical_non_empty(&formulation.formulation_id) {
         return Err(ChemistryError::InvalidFormulationId);
     }
     if !valid_digest(&formulation.formulation_evidence_sha256) {
@@ -209,7 +209,7 @@ fn validate_formulation(formulation: &FormulationCalibrationProfile) -> Result<(
     let mut component_ids: HashSet<String> =
         HashSet::with_capacity(formulation.components.len());
     for component in &formulation.components {
-        if !non_empty(&component.component_id) {
+        if !canonical_non_empty(&component.component_id) {
             return Err(ChemistryError::InvalidComponentCalibration {
                 component_id: component.component_id.clone(),
                 field: "component_id",
@@ -220,7 +220,7 @@ fn validate_formulation(formulation: &FormulationCalibrationProfile) -> Result<(
                 component.component_id.clone(),
             ));
         }
-        if !non_empty(&component.calibration_id) {
+        if !canonical_non_empty(&component.calibration_id) {
             return Err(ChemistryError::InvalidComponentCalibration {
                 component_id: component.component_id.clone(),
                 field: "calibration_id",
@@ -229,18 +229,36 @@ fn validate_formulation(formulation: &FormulationCalibrationProfile) -> Result<(
         if !valid_digest(&component.calibration_evidence_sha256) {
             return Err(ChemistryError::InvalidEvidenceDigest("component calibration"));
         }
+        let unique_stages: HashSet<WashStage> =
+            component.allowed_stages.iter().copied().collect();
+        let unique_soils: HashSet<&str> = component
+            .supported_soil_classes
+            .iter()
+            .map(String::as_str)
+            .collect();
+        let unique_surfaces: HashSet<&str> = component
+            .supported_surface_materials
+            .iter()
+            .map(String::as_str)
+            .collect();
         if component.allowed_stages.is_empty()
+            || unique_stages.len() != component.allowed_stages.len()
             || component.supported_soil_classes.is_empty()
+            || unique_soils.len() != component.supported_soil_classes.len()
+            || component
+                .supported_soil_classes
+                .iter()
+                .any(|value| !canonical_non_empty(value))
             || component.supported_surface_materials.is_empty()
-            || component.supported_soil_classes.iter().any(|value| !non_empty(value))
+            || unique_surfaces.len() != component.supported_surface_materials.len()
             || component
                 .supported_surface_materials
                 .iter()
-                .any(|value| !non_empty(value))
+                .any(|value| !canonical_non_empty(value))
         {
             return Err(ChemistryError::InvalidComponentCalibration {
                 component_id: component.component_id.clone(),
-                field: "empty supported scope",
+                field: "empty, non-canonical or duplicate supported scope",
             });
         }
         if !component.minimum_temperature_c.is_finite()
@@ -274,6 +292,16 @@ fn validate_formulation(formulation: &FormulationCalibrationProfile) -> Result<(
 
     let mut interaction_keys: HashSet<(String, String)> = HashSet::new();
     for interaction in &formulation.interactions {
+        if !canonical_non_empty(&interaction.first_component_id) {
+            return Err(ChemistryError::UnknownInteractionComponent(
+                interaction.first_component_id.clone(),
+            ));
+        }
+        if !canonical_non_empty(&interaction.second_component_id) {
+            return Err(ChemistryError::UnknownInteractionComponent(
+                interaction.second_component_id.clone(),
+            ));
+        }
         if !component_ids.contains(&interaction.first_component_id) {
             return Err(ChemistryError::UnknownInteractionComponent(
                 interaction.first_component_id.clone(),
@@ -377,10 +405,10 @@ pub fn validate_dose_plan(
 ) -> Result<ValidatedDoseSummary, ChemistryError> {
     validate_formulation(formulation)?;
 
-    if !non_empty(&request.soil_class) {
+    if !canonical_non_empty(&request.soil_class) {
         return Err(ChemistryError::InvalidRequestScope("soil_class"));
     }
-    if !non_empty(&request.surface_material) {
+    if !canonical_non_empty(&request.surface_material) {
         return Err(ChemistryError::InvalidRequestScope("surface_material"));
     }
     if request.events.is_empty() {
@@ -399,7 +427,7 @@ pub fn validate_dose_plan(
     let mut total_dose_mg = 0_u64;
 
     for event in &request.events {
-        if !non_empty(&event.event_id) || event.event_id.trim() != event.event_id {
+        if !canonical_non_empty(&event.event_id) {
             return Err(ChemistryError::InvalidEventId);
         }
         if !event_ids.insert(event.event_id.clone()) {
@@ -485,7 +513,7 @@ pub fn validate_dose_plan(
         let component_total = component_totals
             .entry(calibration.component_id.clone())
             .or_insert(0_u64);
-        *component_total = component_total
+        *component_total = (*component_total)
             .checked_add(event.dose_mg)
             .ok_or_else(|| ChemistryError::ComponentDoseOverflow {
                 component_id: calibration.component_id.clone(),
@@ -801,7 +829,39 @@ mod tests {
         assert!(matches!(
             validate_dose_plan(&profile, &input),
             Err(ChemistryError::ComponentDoseOverflow { .. })
-                | Err(ChemistryError::TotalDoseOverflow)
+        ));
+    }
+
+    #[test]
+    fn rejects_total_dose_accumulator_overflow_across_components() {
+        let mut profile = formulation();
+        profile.maximum_total_dose_mg = u64::MAX;
+        profile.components[0].maximum_release_mg = u64::MAX;
+        profile.components[0].maximum_cycle_mg = u64::MAX;
+        profile.components[1].maximum_release_mg = u64::MAX;
+        profile.components[1].maximum_cycle_mg = u64::MAX;
+        let mut input = request();
+        input.events = vec![
+            DoseEvent {
+                event_id: "max-enzyme".to_owned(),
+                component_id: "enzyme".to_owned(),
+                stage: WashStage::Prewash,
+                elapsed_s: 10,
+                release_duration_s: 1,
+                dose_mg: u64::MAX,
+            },
+            DoseEvent {
+                event_id: "one-mg-bleach".to_owned(),
+                component_id: "bleach".to_owned(),
+                stage: WashStage::MainWash,
+                elapsed_s: 600,
+                release_duration_s: 1,
+                dose_mg: 1,
+            },
+        ];
+        assert!(matches!(
+            validate_dose_plan(&profile, &input),
+            Err(ChemistryError::TotalDoseOverflow)
         ));
     }
 
@@ -858,6 +918,34 @@ mod tests {
         assert!(matches!(
             validate_dose_plan(&profile, &request()),
             Err(ChemistryError::TotalDoseLimitExceeded)
+        ));
+    }
+
+    #[test]
+    fn rejects_duplicate_or_noncanonical_calibration_scope_entries() {
+        let mut profile = formulation();
+        profile.components[0]
+            .supported_soil_classes
+            .push("starch".to_owned());
+        assert!(matches!(
+            validate_dose_plan(&profile, &request()),
+            Err(ChemistryError::InvalidComponentCalibration { .. })
+        ));
+
+        let mut profile = formulation();
+        profile.components[0]
+            .allowed_stages
+            .push(WashStage::Prewash);
+        assert!(matches!(
+            validate_dose_plan(&profile, &request()),
+            Err(ChemistryError::InvalidComponentCalibration { .. })
+        ));
+
+        let mut profile = formulation();
+        profile.components[0].component_id = " enzyme".to_owned();
+        assert!(matches!(
+            validate_dose_plan(&profile, &request()),
+            Err(ChemistryError::InvalidComponentCalibration { .. })
         ));
     }
 
