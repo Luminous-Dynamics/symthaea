@@ -48,6 +48,27 @@ pub struct ModelResidualObservation {
     pub reference_status: ReferenceOutcomeStatus,
 }
 
+/// A frozen schedule slot that is expected to produce exactly one residual outcome row.
+/// The schedule is supplied by the benchmark harness before reference execution and is
+/// retained independently of the observed/missing outcome data.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExpectedResidualSlot {
+    pub scenario_id: String,
+    pub failure_family_id: String,
+    pub actor_policy_id: String,
+    pub split_id: String,
+    pub shift_regime_id: String,
+    pub initial_state_digest: String,
+    pub environment_digest: String,
+    pub dynamics_digest: String,
+    pub action_history_digest: String,
+    pub observation_availability_digest: String,
+    pub forecast_issued_at_ms: u64,
+    pub horizon_ms: u64,
+    pub metric_id: String,
+    pub metric_unit_id: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DiscrepancyActionOutcome {
     pub action_id: String,
@@ -102,6 +123,8 @@ pub struct VehicleModelDiscrepancyInput {
     pub sampling_profile_digest: String,
     pub protocol_id: String,
     pub protocol_digest: String,
+    /// Frozen expected slots; each must have exactly one typed outcome row below.
+    pub expected_residual_slots: Vec<ExpectedResidualSlot>,
     pub residual_observations: Vec<ModelResidualObservation>,
     pub decisions: Vec<ModelDecisionObservation>,
 }
@@ -110,6 +133,8 @@ pub struct VehicleModelDiscrepancyInput {
 pub enum VehicleModelDiscrepancyError {
     EmptyIdentity, InvalidDigest, EmptyResidualSet, InvalidHorizon, InvalidMetric,
     InvalidResidual, DuplicateResidualKey, MismatchedResidualContext,
+    EmptyResidualSchedule, DuplicateExpectedResidualSlot, MissingResidualOutcomeSlot,
+    UnexpectedResidualOutcomeSlot,
     InvalidDecisionIdentity, InvalidDecisionContextDigest, InvalidActionSetDigest,
     InvalidTieTolerance, TooFewActions, DuplicateDecisionId, DuplicateActionId,
     DuplicateReceiptId, MissingSelectedAction, OutcomeLeakage, InvalidUtility,
