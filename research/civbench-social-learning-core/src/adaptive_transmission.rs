@@ -933,11 +933,21 @@ fn program_schedule(
 
                     let ready = matched == recipe.ingredients.len();
                     let weights = program.weights;
+                    let immediate_score = if ready {
+                        u64::from(weights.immediate_executability)
+                    } else {
+                        0
+                    };
+                    let novelty_score = if group_novelty {
+                        u64::from(weights.collective_novelty)
+                    } else {
+                        0
+                    };
                     let score =
-                        u64::from(ready) * u64::from(weights.immediate_executability)
+                        immediate_score
                         + (matched as u64 * u64::from(weights.prerequisite_match)
                             / recipe.ingredients.len() as u64)
-                        + u64::from(group_novelty) * u64::from(weights.collective_novelty)
+                        + novelty_score
                         + task.descendant_count(recipe.output_element) as u64
                             * u64::from(weights.downstream_unlocks)
                         + agents[sender].known_recipes.len() as u64
@@ -1507,13 +1517,21 @@ mod tests {
         let mut program = TransmissionProgram::frontier_v1(config);
         program.program_id = "one-message-per-sender".to_owned();
         program.max_messages_per_sender = 1;
-        let run = simulate_with_program(&task, config, 819, &program).unwrap();
 
-        // At most one outbound message per sender per step; the total schedule
-        // is also bounded by the run-level transmission budget.
-        for step in 1..run.history.len() {
-            assert!(run.history[step].transmissions_scheduled <= config.transmission_budget_per_step);
+        let mut graph_rng = Rng::new(818);
+        let graph = SocialGraph::generate(
+            config.population_size,
+            config.network_shortcut_probability,
+            &mut graph_rng,
+        );
+        let agents = simulate(&task, Config { steps: 1, ..config }, 819).unwrap().agents;
+        let actions = program_schedule(&task, &graph, &agents, config, &program);
+        let mut sender_loads = vec![0usize; config.population_size];
+        for action in &actions {
+            sender_loads[action.sender] += 1;
         }
+        assert!(sender_loads.iter().all(|count| *count <= 1));
+        assert!(actions.len() <= config.transmission_budget_per_step);
     }
 
     #[test]
