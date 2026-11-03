@@ -14,11 +14,12 @@ use crate::mobile_tool_effects::{
 use crate::{canonical_jcs_bytes, sha256_hex};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 pub const MOBILE_INVOCATION_MAX_TTL_MS: u64 = 60_000;
 pub const MOBILE_INVOCATION_MAX_CLOCK_SKEW_MS: u64 = 5_000;
+pub const MOBILE_INVOCATION_MAX_LOCAL_REPLAY_ENTRIES: usize = 65_536;
 
 /// Explicitly selected, ephemeral device session. The serial-to-alias mapping
 /// remains local to the gateway and is never included in the portable receipt.
@@ -47,6 +48,8 @@ pub struct MobileConsentGrant {
     pub allowed_tools: Vec<MobileTool>,
     pub issued_at_unix_ms: u64,
     pub expires_at_unix_ms: u64,
+    /// Populated only by the gateway's consent/revocation verifier.
+    pub revoked_at_unix_ms: Option<u64>,
 }
 
 /// Exact, one-use request presented to the gateway.
@@ -123,6 +126,8 @@ pub enum MobileInvocationError {
     InvalidDigest(&'static str),
     InvalidTimestamp(&'static str),
     ConsentExpired,
+    ConsentRevoked,
+    ReplayCapacityExceeded,
     ConsentScopeMismatch(&'static str),
     SessionMismatch(&'static str),
     InvocationExpired,
@@ -141,6 +146,8 @@ impl fmt::Display for MobileInvocationError {
             Self::InvalidDigest(field) => write!(f, "{field} is not a lowercase SHA-256 digest"),
             Self::InvalidTimestamp(field) => write!(f, "{field} is invalid"),
             Self::ConsentExpired => write!(f, "caller consent is expired or not yet valid"),
+            Self::ConsentRevoked => write!(f, "caller consent has been revoked"),
+            Self::ReplayCapacityExceeded => write!(f, "process-local replay guard reached its bounded capacity"),
             Self::ConsentScopeMismatch(field) => write!(f, "consent does not authorize {field}"),
             Self::SessionMismatch(field) => write!(f, "selected device session does not match {field}"),
             Self::InvocationExpired => write!(f, "invocation authorization has expired"),
@@ -197,6 +204,14 @@ pub fn prepare_mobile_invocation(
         || consent.expires_at_unix_ms <= consent.issued_at_unix_ms
     {
         return Err(MobileInvocationError::ConsentExpired);
+    }
+    if let Some(revoked_at) = consent.revoked_at_unix_ms {
+        if revoked_at < consent.issued_at_unix_ms {
+            return Err(MobileInvocationError::InvalidTimestamp("revoked_at_unix_ms"));
+        }
+        if revoked_at <= now_unix_ms {
+            return Err(MobileInvocationError::ConsentRevoked);
+        }
     }
     if session.generation == 0 {
         return Err(MobileInvocationError::SessionMismatch("zero session generation"));
@@ -347,6 +362,17 @@ pub fn verify_mobile_invocation_receipt(
     validate_sha256(&receipt.policy_sha256, "policy_sha256")?;
     validate_sha256(&receipt.effect_sha256, "effect_sha256")?;
     validate_sha256(&receipt.receipt_sha256, "receipt_sha256")?;
+    if receipt.caller_id.trim().is_empty()
+        || receipt.consent_verifier_id.trim().is_empty()
+        || receipt.provider_id.trim().is_empty()
+        || receipt.provider_revision.trim().is_empty()
+        || receipt.policy_id.trim().is_empty()
+    {
+        return Err(MobileInvocationError::InvalidIdentifier("receipt principal/provider/policy"));
+    }
+    if let Some(executable_digest) = &receipt.provider_executable_sha256 {
+        validate_sha256(executable_digest, "provider_executable_sha256")?;
+    }
     if let Some(target_digest) = &receipt.target_scope_sha256 {
         validate_sha256(target_digest, "target_scope_sha256")?;
     }
@@ -356,6 +382,9 @@ pub fn verify_mobile_invocation_receipt(
     if receipt.expires_at_unix_ms <= receipt.issued_at_unix_ms
         || receipt.expires_at_unix_ms - receipt.issued_at_unix_ms > MOBILE_INVOCATION_MAX_TTL_MS
         || receipt.prepared_at_unix_ms >= receipt.expires_at_unix_ms
+        || receipt.issued_at_unix_ms
+            > receipt.prepared_at_unix_ms.saturating_add(MOBILE_INVOCATION_MAX_CLOCK_SKEW_MS)
+        || receipt.prepared_at_unix_ms < receipt.issued_at_unix_ms
     {
         return Err(MobileInvocationError::InvalidTimestamp("receipt time bounds"));
     }
@@ -371,13 +400,20 @@ pub fn verify_mobile_invocation_receipt(
 /// claims transactionally across restarts and share the store across adapters.
 #[derive(Debug, Default)]
 pub struct MobileInvocationReplayGuard {
-    invocation_ids: HashSet<String>,
-    nonce_digests: HashSet<String>,
+    invocation_ids: HashMap<String, u64>,
+    nonce_digests: HashMap<String, u64>,
 }
 
 impl MobileInvocationReplayGuard {
-    /// Validate first, then atomically claim both the invocation ID and nonce
-    /// in this process. A failed validation does not consume either value.
+    fn discard_expired(&mut self, now_unix_ms: u64) {
+        self.invocation_ids.retain(|_, expires_at| *expires_at > now_unix_ms);
+        self.nonce_digests.retain(|_, expires_at| *expires_at > now_unix_ms);
+    }
+
+    /// Validate first, then claim both the invocation ID and nonce in this
+    /// process. The in-memory guard is bounded and expiry-aware, but it is not
+    /// crash-safe or shared across processes. Production gateways must replace
+    /// it with a durable transactional replay store.
     pub fn prepare_once(
         &mut self,
         request: &MobileInvocationRequest,
@@ -391,15 +427,24 @@ impl MobileInvocationReplayGuard {
         let prepared = prepare_mobile_invocation(
             request, consent, session, provider, policy_id, ceiling, now_unix_ms,
         )?;
+        self.discard_expired(now_unix_ms);
         let nonce_digest = sha256_hex(request.invocation_nonce.as_bytes());
-        if self.invocation_ids.contains(&request.invocation_id) {
+        if self.invocation_ids.contains_key(&request.invocation_id) {
             return Err(MobileInvocationError::Replay("invocation_id"));
         }
-        if self.nonce_digests.contains(&nonce_digest) {
+        if self.nonce_digests.contains_key(&nonce_digest) {
             return Err(MobileInvocationError::Replay("invocation_nonce"));
         }
-        self.invocation_ids.insert(request.invocation_id.clone());
-        self.nonce_digests.insert(nonce_digest);
+        if self.invocation_ids.len() >= MOBILE_INVOCATION_MAX_LOCAL_REPLAY_ENTRIES
+            || self.nonce_digests.len() >= MOBILE_INVOCATION_MAX_LOCAL_REPLAY_ENTRIES
+        {
+            return Err(MobileInvocationError::ReplayCapacityExceeded);
+        }
+        self.invocation_ids.insert(
+            request.invocation_id.clone(),
+            request.expires_at_unix_ms,
+        );
+        self.nonce_digests.insert(nonce_digest, request.expires_at_unix_ms);
         Ok(prepared)
     }
 
@@ -491,6 +536,7 @@ mod tests {
             allowed_tools: vec![MobileTool::InspectAdbDevice],
             issued_at_unix_ms: NOW - 10_000,
             expires_at_unix_ms: NOW + 120_000,
+            revoked_at_unix_ms: None,
         };
         (session, consent)
     }
@@ -591,6 +637,60 @@ mod tests {
                 MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW),
             Err(MobileInvocationError::ConsentExpired)
         ));
+    }
+
+    #[test]
+    fn rejects_revoked_consent_before_provider_authorization() {
+        let (session, mut consent) = aliases();
+        consent.revoked_at_unix_ms = Some(NOW - 1);
+        let error = prepare_mobile_invocation(
+            &build_request(&session, &consent), &consent, &session, &report(),
+            MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW,
+        ).unwrap_err();
+        assert_eq!(error, MobileInvocationError::ConsentRevoked);
+    }
+
+    #[test]
+    fn rejects_provider_operation_reported_unavailable() {
+        let (session, consent) = aliases();
+        let mut provider = report();
+        provider.availability = ProviderAvailability::PartiallyAvailable;
+        let operation = provider.operations.iter_mut()
+            .find(|entry| entry.tool == MobileTool::InspectAdbDevice)
+            .unwrap();
+        operation.available = false;
+        operation.reason = Some("adb transport disconnected".to_owned());
+
+        let error = prepare_mobile_invocation(
+            &build_request(&session, &consent), &consent, &session, &provider,
+            MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW,
+        ).unwrap_err();
+        assert!(matches!(error, MobileInvocationError::Provider(
+            ToolAuthorizationError::ProviderOperationUnavailable { tool: MobileTool::InspectAdbDevice, .. }
+        )));
+    }
+
+    #[test]
+    fn replay_guard_discards_expired_process_local_claims() {
+        let (session, consent) = aliases();
+        let mut guard = MobileInvocationReplayGuard::default();
+        let first = build_request(&session, &consent);
+        guard.prepare_once(
+            &first, &consent, &session, &report(),
+            MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW,
+        ).unwrap();
+        assert_eq!(guard.claimed_invocation_count(), 1);
+
+        let mut second = build_request(&session, &consent);
+        second.invocation_id = format!("inv_{}", "7".repeat(64));
+        second.invocation_nonce = format!("nonce_{}", "8".repeat(64));
+        second.issued_at_unix_ms = NOW + 6_000;
+        second.expires_at_unix_ms = NOW + 11_000;
+        guard.prepare_once(
+            &second, &consent, &session, &report(),
+            MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW + 6_000,
+        ).unwrap();
+        assert_eq!(guard.claimed_invocation_count(), 1);
     }
 
     #[test]
