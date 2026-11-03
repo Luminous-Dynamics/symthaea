@@ -61,6 +61,7 @@ The outcome qualification constructor also requires balanced physical run covera
 
 Use `outcome-evidence-template.csv` for one item × endpoint × physical run measurement. Every observation binds to:
 - exact run and item ID;
+- soil preparation batch and ageing time;
 - endpoint, criterion ID and metric ID;
 - independent assay method and protocol;
 - measured value, expanded uncertainty and unit;
