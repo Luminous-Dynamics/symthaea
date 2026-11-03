@@ -198,11 +198,16 @@ fn validate_formulation(formulation: &ValidatedFormulation) -> Result<(), Chemis
         return Err(ChemistryError::NoCalibratedComponents);
     }
 
-    let mut component_ids = HashSet::with_capacity(formulation.components.len());
+    let mut component_ids: HashSet<String> =
+        HashSet::with_capacity(formulation.components.len());
     for component in &formulation.components {
-        if !non_empty(&component.component_id)
-            || !component_ids.insert(component.component_id.as_str())
-        {
+        if !non_empty(&component.component_id) {
+            return Err(ChemistryError::InvalidComponentCalibration {
+                component_id: component.component_id.clone(),
+                field: "component_id",
+            });
+        }
+        if !component_ids.insert(component.component_id.clone()) {
             return Err(ChemistryError::DuplicateComponentId(
                 component.component_id.clone(),
             ));
@@ -262,14 +267,14 @@ fn validate_formulation(formulation: &ValidatedFormulation) -> Result<(), Chemis
         }
     }
 
-    let mut interaction_keys = HashSet::new();
+    let mut interaction_keys: HashSet<(String, String)> = HashSet::new();
     for interaction in &formulation.interactions {
-        if !component_ids.contains(interaction.first_component_id.as_str()) {
+        if !component_ids.contains(&interaction.first_component_id) {
             return Err(ChemistryError::UnknownInteractionComponent(
                 interaction.first_component_id.clone(),
             ));
         }
-        if !component_ids.contains(interaction.second_component_id.as_str()) {
+        if !component_ids.contains(&interaction.second_component_id) {
             return Err(ChemistryError::UnknownInteractionComponent(
                 interaction.second_component_id.clone(),
             ));
@@ -290,20 +295,17 @@ fn validate_formulation(formulation: &ValidatedFormulation) -> Result<(), Chemis
             <= interaction.second_component_id
         {
             (
-                interaction.first_component_id.as_str(),
-                interaction.second_component_id.as_str(),
+                interaction.first_component_id.clone(),
+                interaction.second_component_id.clone(),
             )
         } else {
             (
-                interaction.second_component_id.as_str(),
-                interaction.first_component_id.as_str(),
+                interaction.second_component_id.clone(),
+                interaction.first_component_id.clone(),
             )
         };
-        if !interaction_keys.insert((left, right)) {
-            return Err(ChemistryError::DuplicateInteraction(
-                left.to_owned(),
-                right.to_owned(),
-            ));
+        if !interaction_keys.insert((left.clone(), right.clone())) {
+            return Err(ChemistryError::DuplicateInteraction(left, right));
         }
     }
 
@@ -381,22 +383,22 @@ request temp check    if request.events.is_empty() {
     }
 
     let stage_windows = validate_stage_windows(&request.stage_windows, request.cycle_duration_s)?;
-    let calibration_by_id: HashMap<&str, &ComponentCalibration> = formulation
+    let calibration_by_id: HashMap<String, &ComponentCalibration> = formulation
         .components
         .iter()
-        .map(|component| (component.component_id.as_str(), component))
+        .map(|component| (component.component_id.clone(), component))
         .collect();
 
-    let mut event_ids = HashSet::with_capacity(request.events.len());
-    let mut component_totals: HashMap<&str, f64> = HashMap::new();
+    let mut event_ids: HashSet<String> = HashSet::with_capacity(request.events.len());
+    let mut component_totals: HashMap<String, f64> = HashMap::new();
     let mut total_dose_g = 0.0_f64;
 
     for event in &request.events {
-        if !non_empty(&event.event_id) || !event_ids.insert(event.event_id.as_str()) {
+        if !non_empty(&event.event_id) || !event_ids.insert(event.event_id.clone()) {
             return Err(ChemistryError::DuplicateEventId(event.event_id.clone()));
         }
         let calibration = calibration_by_id
-            .get(event.component_id.as_str())
+            .get(&event.component_id)
             .copied()
             .ok_or_else(|| ChemistryError::UnknownComponent(event.component_id.clone()))?;
 
@@ -467,7 +469,7 @@ request temp check    if request.events.is_empty() {
         }
 
         let component_total = component_totals
-            .entry(calibration.component_id.as_str())
+            .entry(calibration.component_id.clone())
             .or_insert(0.0);
         *component_total += event.dose_g;
         total_dose_g += event.dose_g;
