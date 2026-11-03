@@ -542,3 +542,55 @@ Required falsification controls:
 This is a behaviour layer over existing stepping and road dynamics, not a new physics engine or a human behaviour model. Human fidelity requires an independent, rights-cleared observational dataset and separate evaluation. Synthetic actors must remain synthetic labels.
 
 The decision-quality chain becomes: forecast set -> interactive actor response -> exact execution -> counterfactual comparison -> planner action. This exposes model exploitation and planner regret that open-loop trajectory replay can conceal.
+
+
+## 21. Horizon-conditioned model discrepancy and planner exploitation
+
+New tracking work: [SAM-MODEL-RESIDUAL-001 #10257](https://github.com/Luminous-Dynamics/symthaea/issues/10257).
+
+The next diagnostic after cross-model action ranking (#10252) and prediction-set coverage (#10256) is to measure **how forecast error grows across rollout horizons and whether the planner selects actions that exploit optimistic model error**. A model can have acceptable average one-step error while diverging at 2–5 seconds or more precisely in the states where an action looks attractive.
+
+The proposed evaluator consumes paired, caller-produced predicted/realized values at multiple horizons under the same scenario, actor policy, action history, initial state and exogenous stream. It reports signed optimism/pessimism, absolute residual quantiles, residual growth only for genuinely paired horizons, predicted-vs-realized action ranking reversals and selected-action regret. Missing reference execution remains missing/indeterminate; it is not a zero residual. It composes with #10252 model variant comparisons, #10256 trajectory set coverage, #10237 counterfactual decision quality and Symtropy #3387/#3471 execution receipts.
+
+A planner-exploitation test must commit the policy-selected action before evaluator-only outcomes are exposed. The reference runner then evaluates the same finite action set from matched states. The key question is not just “does the model predict accurately?” but “does optimizing against this model produce systematically worse outcomes than its own predicted utility suggests?”
+
+No discrepancy implementation or result is claimed by this strategy entry. The proposed P0 controls are exact analytic horizon fixtures, a deliberately optimistic model attack, missing-reference rejection, future-outcome leakage prevention and cross-model action-ranking reversals.
+
+## 22. External comparison: what current public benchmarks actually measure
+
+The following are **reference points, not directly comparable SAM results**:
+
+- **Argoverse 2 multi-agent motion forecasting test leaderboard:** the current surfaced table lists IMR2026.07 at average minADE 0.92 (K=1), minFDE 2.29 (K=1), actor miss rate 0.15 (K=6), average minADE 0.51 (K=6), and average minFDE 1.08 (K=6). QCNeXt2026.07 is listed at 0.50 average minADE (K=6), 1.02 minFDE (K=6), and 0.13 actor miss rate. These metrics do not measure interactive closed-loop decision quality or conformal set coverage. Recheck the leaderboard at submission time and pin the exact model/checkpoint. Reference: https://www.sota2.com/research/sota/multi-agent-motion-forecasting-on-argoverse-2-av2-test.
+- **WOD-E2E:** the CVPR 2026 dataset contains 4,021 long-tail segments (about 12 hours) and introduces rater-preference RFS for open-loop trajectory evaluation. The surfaced leaderboard entries are timestamped 2026.05 (e.g. DriveMA-4B RFS 8.079); they are not a verified November 2026 current SOTA. RFS is not a collision-safety or interactive closed-loop metric. Reference: https://openaccess.thecvf.com/content/CVPR2026/html/Xu_WOD-E2E_Waymo_Open_Dataset_for_End-to-End_Driving_in_Challenging_Long-tail_CVPR_2026_paper.html.
+- **Fail2Drive:** the 2026 paper describes 200 paired routes and 17 new scenario classes; it reports an average success-rate drop of 22.8% across evaluated models under distribution shift. It is an appropriate paired generalization track, not a real-world crash-rate study. Reference: https://arxiv.org/abs/2604.08535.
+
+The industry comparison should therefore use multiple scorecards, not one composite:
+1. Open-loop forecasting: official minADE/minFDE/miss rate/Brier metrics.
+2. Forecast-set validity: marginal coverage, family/worst-family coverage, set size and shift diagnosis.
+3. Closed-loop planning: official route/task metrics plus infraction, actor-class, near-miss/contact and intervention denominators when supported.
+4. Generalization: paired ID/OOD route degradation, worst-shift family and recovery/abstention outcomes.
+5. Decision quality: action ranking reversals, regret to a finite feasible alternative set and model-relative avoidability.
+6. Runtime: p50/p95/p99 wall time, deadline misses, memory/energy and all measurement overhead on named hardware.
+
+### Prospective competitive targets
+
+These are pre-registration candidates, not achieved results:
+- Zero train/calibration/evaluation scenario-family leakage; zero duplicate execution/observation receipt accepted.
+- Empirical 90% and 95% marginal coverage compatible with target on sufficiently powered exchangeable holdouts, with confidence intervals and family diagnostics; never claim conditional/OOD coverage from the marginal result.
+- At matched coverage, reduce median and p95 prediction-set measure by at least 20% versus a frozen heuristic tube without worsening worst-family coverage.
+- On a paper/protocol-faithful Fail2Drive replication, reduce paired OOD success-rate degradation by at least 25% relative to the strongest reproduced baseline while ID success is no more than 1 percentage point worse. Report absolute percentage-point changes as well as relative reduction.
+- At matched compute and a frozen action set, reduce median and p95 counterfactual regret by at least 10% versus the strongest reproduced planner baseline, without increasing infeasibility or runtime-budget violations.
+- For each named compute budget, publish the full quality–coverage–regret–latency Pareto frontier; never hide compute or calibration overhead.
+
+### Where to try to outperform the field
+
+Do not try to beat a 4B VLA at visual perception from this bicycle-model research tranche. That would be a different system and a misleading comparison. The defensible opportunity is a stronger **evidence-qualified decision stack**:
+- preserve competitive point forecasting as an upstream swappable interface;
+- produce calibrated, size-aware uncertainty sets;
+- use interactive actors rather than fixed scripted futures;
+- evaluate selected actions across named model discrepancies and OOD families;
+- retain counterexamples and independently replay them;
+- make abstention/fallback and unsupported capability outcomes visible;
+- optimize all-in performance under resource constraints.
+
+A future SOTA claim should be split into a paper-faithful benchmark reproduction, an improvement on the official metric, and a separate robustness/decision-quality result. Passing one does not imply the other.
