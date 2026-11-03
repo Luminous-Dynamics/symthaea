@@ -95,7 +95,6 @@ pub enum ModelStabilityError {
     InvalidCommandDigest,
     InvalidObjective,
     InvalidReceipt,
-    DuplicateAction,
     DuplicateModelProfile,
     DuplicateModelAction,
     DuplicateExecutionReceipt,
@@ -747,6 +746,26 @@ mod tests {
         let bytes = serde_json::to_vec(&report).unwrap();
         report.report_digest = blake3::hash(&bytes).to_hex().to_string();
         assert!(!report.identity_is_valid());
+    }
+
+    #[test]
+    fn rejects_duplicate_receipts_and_single_model_inputs() {
+        let mut duplicate = input();
+        duplicate.evaluations[2].execution_receipt_id =
+            duplicate.evaluations[0].execution_receipt_id.clone();
+        assert_eq!(
+            evaluate_vehicle_model_stability(duplicate).unwrap_err(),
+            ModelStabilityError::DuplicateExecutionReceipt
+        );
+
+        let mut one_model = input();
+        one_model
+            .evaluations
+            .retain(|evaluation| evaluation.model_id == "model-dry");
+        assert_eq!(
+            evaluate_vehicle_model_stability(one_model).unwrap_err(),
+            ModelStabilityError::TooFewModels
+        );
     }
 
     #[test]
