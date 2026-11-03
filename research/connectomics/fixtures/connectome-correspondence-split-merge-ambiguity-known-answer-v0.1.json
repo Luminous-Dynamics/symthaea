@@ -304,9 +304,9 @@
     "source_manifest_sha256": "37ced3556c7fecfbce6874cf5a6c95fd1eed4933d10694e4ab5ffaf7e01b7515",
     "target_manifest_sha256": "b158dc4cacf2a39d3766d99cc554a8f166b9ab333ffb50f498b1a178c3fe51ed",
     "lineage_receipt_sha256": null,
-    "mapping_policy_sha256": "96e4cc525f8bbf0f6bf2979cf88ed96734ee75ebd24b782117dd6d9350a93d0c",
+    "mapping_policy_sha256": "2d9c68e6c835e266225a680601d79e15c1aed79ff53204b67386187b001f45eb",
     "correspondence_engine_sha256": null,
-    "verifier_protocol_sha256": "026fa7f8ea0fa93fd7bb18d22b8c1b0fa65ac5e56d7d8e563bba61c90998a6b0",
+    "verifier_protocol_sha256": "e341601d28f54c7260bedeff62af8d91468fd152e8871200b2342192602a6dcf",
     "verifier_sha256": null,
     "report_schema_sha256": "10c3eb5ab6deb5d4044897501a97336e8ae3ec2a6a3520e9d19e5f313dccad9c",
     "world_manifest_schema_sha256": "b8bbc20a6e581232b7439a1fbbbecf65bbcb6b6b702732c98720a2dce8575f06"
