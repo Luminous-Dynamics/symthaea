@@ -1,0 +1,123 @@
+{
+  "schema_version": "0.1.0",
+  "evaluation_id": "known-answer-compatibility-query-estimability-axis-v0.1",
+  "query": {
+    "query_id": "pathway-strength-over-registered-threshold",
+    "definition_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "decision_rule_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "metric": "directed_pathway_strength",
+    "unit": "normalized_synthetic_strength",
+    "baseline_decision": "BELOW_THRESHOLD"
+  },
+  "candidate_universe": {
+    "universe_id": "single-candidate-graph",
+    "manifest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "generator_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "closure_disposition": "CLOSED_VERIFIED",
+    "world_ids": [
+      "candidate-one"
+    ]
+  },
+  "reference_challenge": {
+    "challenge_id": "status-axis-independent-reference",
+    "manifest_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "generator_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "freeze_receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "oracle_boundary": "EVALUATOR_ONLY_VERIFIED",
+    "required_error_families": [
+      "merge_split",
+      "registration_uncertainty"
+    ]
+  },
+  "candidate_worlds": [
+    {
+      "world_id": "candidate-one",
+      "error_family": "merge_split",
+      "query_state": "BELOW_THRESHOLD",
+      "canonical_structural_sha256": "f4979c0986a297aca4e97be92cfeb3ee06096b6a0e09eba08b04d84ff39686dc"
+    }
+  ],
+  "reference_worlds": [
+    {
+      "world_id": "reference-compatible-query-not-estimable",
+      "error_family": "merge_split",
+      "evidence_compatibility": "COMPATIBLE",
+      "query_state": null,
+      "canonical_structural_sha256": "f4979c0986a297aca4e97be92cfeb3ee06096b6a0e09eba08b04d84ff39686dc"
+    },
+    {
+      "world_id": "reference-compatibility-indeterminate",
+      "error_family": "registration_uncertainty",
+      "evidence_compatibility": "INDETERMINATE",
+      "query_state": "BELOW_THRESHOLD",
+      "canonical_structural_sha256": "26bb0d3c3acbdd1c0feab01e943fd64fcbffad10e1a4e828bdc2472bde389417"
+    },
+    {
+      "world_id": "reference-incompatible",
+      "error_family": "merge_split",
+      "evidence_compatibility": "INCOMPATIBLE",
+      "query_state": "AT_OR_ABOVE_THRESHOLD",
+      "canonical_structural_sha256": "b197153da419139e021a1ba672d4ea744683622ca98d93c94581e48281428953"
+    }
+  ],
+  "summary": {
+    "candidate_world_count": 1,
+    "reference_world_count": 3,
+    "compatible_reference_count": 1,
+    "incompatible_reference_count": 1,
+    "indeterminate_reference_count": 1,
+    "compatible_estimable_reference_count": 0,
+    "compatible_query_not_estimable_reference_count": 1,
+    "structurally_included_count": 1,
+    "query_state_covered_count": 0,
+    "query_flipping_reference_count": 0,
+    "omitted_query_flipping_count": 0,
+    "false_invariance_count": 0,
+    "false_ambiguity_count": 0,
+    "candidate_duplicate_structure_group_count": 0,
+    "reference_duplicate_structure_group_count": 0,
+    "candidate_not_estimable_count": 0
+  },
+  "family_summaries": [
+    {
+      "error_family": "merge_split",
+      "compatible_reference_count": 1,
+      "incompatible_reference_count": 1,
+      "indeterminate_reference_count": 0,
+      "compatible_estimable_reference_count": 0,
+      "compatible_query_not_estimable_reference_count": 1,
+      "structurally_included_count": 1,
+      "query_flipping_reference_count": 0,
+      "omitted_query_flipping_count": 0,
+      "false_invariance_count": 0,
+      "false_ambiguity_count": 0,
+      "candidate_not_estimable_count": 0
+    },
+    {
+      "error_family": "registration_uncertainty",
+      "compatible_reference_count": 0,
+      "incompatible_reference_count": 0,
+      "indeterminate_reference_count": 1,
+      "compatible_estimable_reference_count": 0,
+      "compatible_query_not_estimable_reference_count": 0,
+      "structurally_included_count": 0,
+      "query_flipping_reference_count": 0,
+      "omitted_query_flipping_count": 0,
+      "false_invariance_count": 0,
+      "false_ambiguity_count": 0,
+      "candidate_not_estimable_count": 0
+    }
+  ],
+  "dispositions": {
+    "enumeration_closure": "CLOSED_VERIFIED",
+    "universe_adequacy": "ADEQUACY_NOT_ESTIMABLE"
+  },
+  "provenance": {
+    "evaluator_protocol_sha256": "df83b9386deee6ed881e58b6aaa78919206233619571459c94c611dfccbb82e5",
+    "rules_sha256": "60c1b8a20a774908f239160c0c9a7b816c22e4c4a8a40b3ed45b9d7f87ea08a4",
+    "truth_separation_verified": true,
+    "canonicalizer_sha256": "578a939bfdf68a11f279fcce606f97d2c11dfd90cd569fa1edd1fc7e8e8c6a70",
+    "candidate_structure_manifest_sha256": "43e9198ebfe96b70288a12b685bbb4b78062f70881d562db4323e8266fa86564",
+    "reference_structure_manifest_sha256": "2a1e5701a4dc1176cfbc2101e415c661b8dd83c6ca52d3be292639612281dea0"
+  }
+}
