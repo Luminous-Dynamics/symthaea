@@ -64,6 +64,12 @@ It returns a validation summary only. It does not choose a dose, estimate cleani
 
 The illustrative tests use fake calibration data and arbitrary masses solely to test logic. They are not formulation guidance.
 
+### Dose arithmetic and delivery timing implementation boundary
+
+The proposed-plan validator now uses integer milligrams (`u64`) for commanded component mass, with checked arithmetic for component and total accumulators. It does not compare floating-point gram values at a chemical dose boundary. The per-release CSV stores integer mg; cycle-level totals may remain in grams for product energy/resource accounting.
+
+Each release includes both a start time and delivery duration. The complete physical delivery must finish within the relevant phase window. Evidence-backed incompatibility separation is measured between the end of one component's release and the start of another, not merely between their start timestamps. A commanded schedule is still not proof that a dispenser delivered that mass; actual dose must be measured and archived separately.
+
 ## Competitive benchmark matrix
 
 Compare exact SKUs and exact programmes; capture market, label, detergent, options and firmware where available.
