@@ -1116,85 +1116,113 @@ mod tests {
         assert!(!result.payload.targeted_partner_sensitivity);
     }
 
-    #[test]
-    fn rejects_hidden_mutable_policy_state() {
-        use std::cell::Cell;
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct TwoCallCounterPolicy {
+        calls: u32,
+    }
 
-        struct HiddenCounterPolicy {
-            calls: Cell<u32>,
-        }
+    impl RmiPolicyV1 for TwoCallCounterPolicy {
+        fn policy_id(&self) -> &str { "two-call-counter-agent" }
+        fn policy_version(&self) -> &str { "1" }
 
-        impl RmiPolicyV1 for HiddenCounterPolicy {
-            fn policy_id(&self) -> &str { "hidden-counter" }
-            fn policy_version(&self) -> &str { "1" }
-
-            fn respond(
-                &self,
-                _history: &[RmiHistoryEventV1],
-                observation: &RmiPartnerObservationV1,
-                _seed: u64,
-            ) -> RmiAgentActionV1 {
-                let next = self.calls.get() + 1;
-                self.calls.set(next);
-                let mut features = observation.features.clone();
-                features.tempo_milli_bpm += next;
-                RmiAgentActionV1 {
-                    action_id: format!("counter-{next}"),
-                    features,
-                }
+        fn respond(
+            &mut self,
+            _history: &[RmiHistoryEventV1],
+            _observation: &RmiPartnerObservationV1,
+            _seed: u64,
+        ) -> RmiAgentActionV1 {
+            // Deliberately ignores the partner observation. The old evaluator
+            // called control twice (A/A) then treatment twice (B/B), so its
+            // within-arm duplicate checks passed while order manufactured a
+            // false treatment effect.
+            let call = self.calls;
+            self.calls += 1;
+            let mut features = base_features();
+            if call >= 2 {
+                features.role = RmiRoleV1::Accompaniment;
+            }
+            RmiAgentActionV1 {
+                action_id: if call >= 2 { "late-state".into() } else { "early-state".into() },
+                features,
             }
         }
-
-        let policy = HiddenCounterPolicy { calls: Cell::new(0) };
-        assert!(matches!(
-            evaluate_rmi_pair(&policy, &pair_for(RmiTargetFeatureV1::Role)),
-            Err(RmiEvaluationErrorV1::NonDeterministicPolicyOutput { .. })
-        ));
     }
 
     #[test]
-    fn rejects_hidden_mutable_partner_policy_state() {
-        use std::cell::Cell;
+    fn policy_state_is_forked_before_each_counterfactual_arm() {
+        let policy = TwoCallCounterPolicy { calls: 0 };
+        let result = evaluate_rmi_pair(&policy, &pair_for(RmiTargetFeatureV1::Role)).unwrap();
 
-        struct HiddenCounterPartner {
-            calls: Cell<u32>,
-        }
+        assert!(!result.payload.targeted_input_sensitivity);
+        assert_eq!(
+            result.payload.control_action,
+            result.payload.treatment_action,
+            "state progression alone must not manufacture partner-to-agent sensitivity"
+        );
+        assert_eq!(
+            result.payload.control_policy_post_state_sha256,
+            result.payload.treatment_policy_post_state_sha256,
+            "both arms start from the same state and take one corresponding transition"
+        );
+        assert_eq!(result.payload.policy_pre_state_sha256.len(), 64);
+    }
 
-        impl RmiPartnerPolicyV1 for HiddenCounterPartner {
-            fn policy_id(&self) -> &str { "hidden-counter-partner" }
-            fn policy_version(&self) -> &str { "1" }
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct TwoCallCounterPartner {
+        calls: u32,
+    }
 
-            fn respond(
-                &self,
-                _history: &[RmiHistoryEventV1],
-                agent_action: &RmiAgentActionV1,
-                _seed: u64,
-            ) -> RmiPartnerResponseV1 {
-                let next = self.calls.get() + 1;
-                self.calls.set(next);
-                let mut features = agent_action.features.clone();
-                features.tempo_milli_bpm += next;
-                RmiPartnerResponseV1 {
-                    response_id: format!("counter-{next}"),
-                    features,
-                }
+    impl RmiPartnerPolicyV1 for TwoCallCounterPartner {
+        fn policy_id(&self) -> &str { "two-call-counter-partner" }
+        fn policy_version(&self) -> &str { "1" }
+
+        fn respond(
+            &mut self,
+            _history: &[RmiHistoryEventV1],
+            _agent_action: &RmiAgentActionV1,
+            _seed: u64,
+        ) -> RmiPartnerResponseV1 {
+            // Also ignores the agent action; the output transition depends
+            // only on an internal serialized call counter.
+            let call = self.calls;
+            self.calls += 1;
+            let mut features = base_features();
+            if call >= 2 {
+                features.role = RmiRoleV1::Accompaniment;
+            }
+            RmiPartnerResponseV1 {
+                response_id: if call >= 2 { "late-state".into() } else { "early-state".into() },
+                features,
             }
         }
+    }
 
+    #[test]
+    fn partner_state_is_forked_before_each_counterfactual_arm() {
         let agent = FixedResponsePolicyV1 {
             id: "fixed-agent".into(),
             version: "1".into(),
             response: fixed_action(),
         };
-        let partner = HiddenCounterPartner { calls: Cell::new(0) };
-        assert!(matches!(
-            evaluate_rmi_reciprocal_pair(
-                &agent,
-                &partner,
-                &pair_for(RmiTargetFeatureV1::Role)
-            ),
-            Err(RmiEvaluationErrorV1::NonDeterministicPartnerOutput { .. })
-        ));
+        let partner = TwoCallCounterPartner { calls: 0 };
+        let result = evaluate_rmi_reciprocal_pair(
+            &agent,
+            &partner,
+            &pair_for(RmiTargetFeatureV1::Role),
+        )
+        .unwrap();
+
+        assert!(!result.payload.targeted_partner_sensitivity);
+        assert_eq!(
+            result.payload.control_partner_response,
+            result.payload.treatment_partner_response,
+            "partner state progression alone must not manufacture agent-to-partner influence"
+        );
+        assert_eq!(
+            result.payload.control_partner_post_state_sha256,
+            result.payload.treatment_partner_post_state_sha256
+        );
+        assert_eq!(result.payload.partner_policy_pre_state_sha256.len(), 64);
     }
 
     #[test]
