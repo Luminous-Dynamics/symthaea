@@ -458,7 +458,9 @@
         "suite_id",
         "artifact_digest",
         "case_count",
-        "claim_ceiling"
+        "claim_ceiling",
+        "input_representation_digest",
+        "output_representation_digest"
       ],
       "properties": {
         "suite_id": {
@@ -480,6 +482,12 @@
             "differential_test_evidence",
             "mutation_test_evidence"
           ]
+        },
+        "input_representation_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "output_representation_digest": {
+          "$ref": "#/$defs/digest"
         }
       }
     },
@@ -491,7 +499,9 @@
         "proof_digest",
         "checker_id",
         "checker_binary_digest",
-        "outcome"
+        "outcome",
+        "input_representation_digest",
+        "output_representation_digest"
       ],
       "properties": {
         "adapter_id": {
@@ -514,6 +524,12 @@
         },
         "outcome": {
           "const": "accepted"
+        },
+        "input_representation_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "output_representation_digest": {
+          "$ref": "#/$defs/digest"
         }
       }
     },
