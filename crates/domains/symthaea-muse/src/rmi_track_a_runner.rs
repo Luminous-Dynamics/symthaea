@@ -463,6 +463,25 @@ mod tests {
     }
 
     #[test]
+    fn target_trial_seed_ordinals_are_unique_and_bounded() {
+        use std::collections::BTreeSet;
+
+        let mut seeds = BTreeSet::new();
+        for target in targets_v1() {
+            for trial_index in 0..32 {
+                let fixture = make_rmi_track_a_fixture_v1(target, trial_index, 7).unwrap();
+                assert!(seeds.insert(fixture.seed), "duplicate seed {}", fixture.seed);
+            }
+        }
+        assert!(make_rmi_track_a_fixture_v1(
+            RmiTargetFeatureV1::Motif,
+            RMI_TRACK_A_MAX_TRIALS_PER_TARGET_V1,
+            7
+        )
+        .is_err());
+    }
+
+    #[test]
     fn report_is_deterministic_and_exposes_control_expectations() {
         let first = run_rmi_track_a_suite_v1(2, 42).unwrap();
         let second = run_rmi_track_a_suite_v1(2, 42).unwrap();
