@@ -278,8 +278,14 @@ def audit_dimacs(text: str, profile: str = "strict") -> AuditResult:
             positive = raw_weights.get(variable)
             negative = raw_weights.get(-variable)
             normalized_weights[str(variable)] = [
-                str(positive) if positive is not None else None,
-                str(negative) if negative is not None else None,
+                str(positive) if isinstance(positive, Fraction) else (
+                    f"{positive[0]}+{positive[1]}i" if positive and positive[1] >= 0
+                    else f"{positive[0]}{positive[1]}i" if positive else None
+                ),
+                str(negative) if isinstance(negative, Fraction) else (
+                    f"{negative[0]}+{negative[1]}i" if negative and negative[1] >= 0
+                    else f"{negative[0]}{negative[1]}i" if negative else None
+                ),
             ]
 
     if mode == "mc":
@@ -324,20 +330,28 @@ def audit_dimacs(text: str, profile: str = "strict") -> AuditResult:
     if weight_kind == "complex" and mode != "amc-complex":
         fail("complex weights require amc-complex mode")
 
-    # Validate complementary literal weight rules.
+    # Resolve effective defaults and validate complementary literal weight rules.
     for variable in range(1, (n or 0) + 1):
         positive = raw_weights.get(variable)
         negative = raw_weights.get(-variable)
         if positive is None and negative is None:
+            if mode in {"wmc", "pwmc"}:
+                normalized_weights[str(variable)] = ["1", "1"]
+            elif mode == "amc-complex":
+                normalized_weights[str(variable)] = ["1+0i", "1+0i"]
             continue
+
         if mode == "amc-complex":
             if positive is None or negative is None:
                 fail(f"AMC variable {variable} has only one literal weight")
         else:
             def scalar(value):
                 return value if isinstance(value, Fraction) else None
-            for literal, value, opposite in (
-                (variable, positive, negative), (-variable, negative, positive)
+
+            pair = normalized_weights.setdefault(str(variable), [None, None])
+            for literal, value, opposite, own_index, opposite_index in (
+                (variable, positive, negative, 0, 1),
+                (-variable, negative, positive, 1, 0),
             ):
                 if value is None:
                     continue
@@ -348,9 +362,15 @@ def audit_dimacs(text: str, profile: str = "strict") -> AuditResult:
                 if v <= 0 and opposite is None:
                     fail(f"non-positive weight for literal {literal} requires opposite literal weight")
                 elif 0 < v < 1 and opposite is None:
-                    warnings.append(f"literal {literal} missing opposite weight; v1.2 complement rule applies")
+                    inferred = Fraction(1) - v
+                    pair[opposite_index] = str(inferred)
+                    warnings.append(
+                        f"literal {literal} missing opposite weight; inferred exact complement {inferred}"
+                    )
                 elif v >= 1 and opposite is None:
-                    unresolved.append(f"literal {literal} weight >= 1 has no documented inferred complement")
+                    unresolved.append(
+                        f"literal {literal} weight >= 1 has no documented inferred complement"
+                    )
 
         if positive == 0 or negative == 0:
             warnings.append(f"variable {variable} has a zero literal weight")
@@ -431,5 +451,23 @@ def fixture_tests():
     }
 
 
+def effective_weight_checks():
+    inferred = audit_dimacs(
+        "c t wmc\np cnf 1 0\nc p weight 1 1/4 0\n", "strict"
+    )
+    defaulted = audit_dimacs("c t wmc\np cnf 2 0\n", "strict")
+    amc_defaulted = audit_dimacs("c t amc-complex\np cnf 1 0\n", "strict")
+    assert inferred.status == "valid" and inferred.weights["1"] == ["1/4", "3/4"]
+    assert defaulted.weights == {"1": ["1", "1"], "2": ["1", "1"]}
+    assert amc_defaulted.weights == {"1": ["1+0i", "1+0i"]}
+    return {
+        "complement_inference": inferred.weights,
+        "wmc_defaults": defaulted.weights,
+        "amc_defaults": amc_defaulted.weights,
+    }
+
+
 if __name__ == "__main__":
-    print(json.dumps(fixture_tests(), indent=2, sort_keys=True))
+    result = fixture_tests()
+    result["effective_weight_checks"] = effective_weight_checks()
+    print(json.dumps(result, indent=2, sort_keys=True))
