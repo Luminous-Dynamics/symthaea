@@ -1,0 +1,75 @@
+{
+  "suite": "ETH-019 exact incremental cache with normalized inputs and minimal message scopes",
+  "seed": 20261103,
+  "normalizer": {
+    "id": "symthaea.same-scope-pointwise-product-and-unit-elision/v1",
+    "same_scope_factor_split_merge_cache_hits": 2,
+    "multiplicative_identity_factor_elision_cache_hits": 2,
+    "incorrect_normalized_factor_rejected": true,
+    "tested_algebras": [
+      "natural-count",
+      "MaxCount"
+    ]
+  },
+  "message_canonicalizer": {
+    "id": "symthaea.exact-scope-independence-elision/v1",
+    "separator_axes_removed": {
+      "natural_count": 1,
+      "maxcount": 1
+    },
+    "raw_bucket_independent_checker_accepts_reduced_scope": true,
+    "same_result_upstream_change_reuse": {
+      "natural_count": {
+        "upstream_misses": 1,
+        "downstream_hits": 2
+      },
+      "maxcount": {
+        "upstream_misses": 1,
+        "downstream_hits": 2
+      }
+    },
+    "claim_boundary": "A message axis is removed only when all exact values are equal across that axis for every assignment of retained axes. The independent raw-bucket checker replays every raw separator assignment against the smaller candidate table.",
+    "scope_value_comparisons": {
+      "natural_count": 4,
+      "maxcount": 4
+    },
+    "measure": "exact encoded-value equality; no floating tolerance"
+  },
+  "cache_identity_binds": [
+    "schema",
+    "normalizer_id",
+    "message_canonicalizer_id",
+    "algebra",
+    "cardinalities",
+    "eliminated_variable",
+    "multiset_of_normalized_input_factor_content_digests",
+    "checker_id"
+  ],
+  "algebras": [
+    "natural-count/unbounded-int/v1",
+    "maxcount/multiplicity-distinct-support/v2"
+  ],
+  "single_factor_edit_disconnected_hits": 3,
+  "single_factor_edit_disconnected_misses": 3,
+  "factor_permutation_hits": 6,
+  "same_scope_split_merge_hits_natural_count": 2,
+  "unit_factor_elision_hits_natural_count": 2,
+  "same_scope_split_merge_hits_maxcount": 2,
+  "scope_edit_exact": true,
+  "tampered_rehashed_payload_rejected": 1,
+  "wrong_authentication_key_rejected": 6,
+  "randomized_graphs": 64,
+  "randomized_algebras": 2,
+  "randomized_edits": 128,
+  "randomized_exact_matches_incremental_cold_direct": 128,
+  "cache_hits": 520,
+  "cache_misses": 248,
+  "invalidated_message_steps": 248,
+  "cold_producer_additions": 6999,
+  "cold_producer_multiplications": 12994,
+  "incremental_producer_additions": 2016,
+  "incremental_producer_multiplications": 3820,
+  "producer_addition_reduction_fraction": 0.7119588512644663,
+  "producer_multiplication_reduction_fraction": 0.7060181622287209,
+  "claim_boundary": "Python finite reference only. Producer arithmetic excludes normalizer and scope-minimization work; explicit scope comparison counts are recorded for the two crafted reductions. Checker replay, HMAC, serialization, cache memory and wall-time costs are excluded. No Rust compile, Lean proof, public benchmark or measured runtime speedup."
+}
