@@ -50,7 +50,7 @@ def main():
         "instance_sha256": __import__("hashlib").sha256(instance_path.read_bytes()).hexdigest(),
         "dialect": "2020-12",
         "external_refs_allowed": False,
-        "synthetic": bool(instance.get("dataset", {}).get("synthetic")),
+        "synthetic": instance.get("benchmark", {}).get("access_class") == "synthetic",
         "run_id": instance.get("run_id"),
     }, indent=2))
 
