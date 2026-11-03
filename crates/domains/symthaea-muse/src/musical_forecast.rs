@@ -1052,6 +1052,37 @@ mod tests {
     }
 
     #[test]
+    fn invalidated_forecast_cannot_be_scored_as_current() {
+        let mut ledger = MusicalForecastLedgerV1::default();
+        ledger.append_forecast(forecast(1, 5, None)).unwrap();
+        ledger.append_invalidation(
+            2,
+            7,
+            ForecastInvalidationV1 {
+                forecast_id: "forecast-1".into(),
+                reason: "new collaborator input invalidated the preview".into(),
+            },
+        ).unwrap();
+        ledger.validate().unwrap();
+        let result = evaluate_musical_forecast_v1(
+            &ledger,
+            "forecast-1",
+            &context(12),
+            ForecastScoringPolicyV1::default(),
+        );
+        assert!(result.unwrap_err().contains("superseded or invalidated"));
+    }
+
+    #[test]
+    fn serialized_ledger_tail_metadata_must_match_the_event_chain() {
+        let mut ledger = MusicalForecastLedgerV1::default();
+        ledger.append_forecast(forecast(1, 5, None)).unwrap();
+        let mut corrupted = ledger.clone();
+        corrupted.last_sequence = 88;
+        assert!(corrupted.validate().is_err());
+    }
+
+    #[test]
     fn ledger_hash_chain_detects_event_body_and_link_mutation() {
         let mut ledger = MusicalForecastLedgerV1::default();
         ledger.append_forecast(forecast(1, 5, None)).unwrap();
