@@ -969,6 +969,35 @@ mod tests {
     }
 
     #[test]
+    fn reports_runner_latency_separately_from_musical_frame_error() {
+        let mut predicted = prediction();
+        predicted.chunks[1].decision_at_ns = 20_500_000;
+        predicted.chunks[1].disposition = MusicalTurnDispositionV1::Action {
+            action: MusicalTurnActionV1::Respond,
+            effect_frame: Some(220),
+            effect_at_ns: Some(22_500_000),
+        };
+        let score = score_musical_turn_taking(&truth(), &predicted).unwrap();
+
+        assert_eq!(score.decision_latency_p95_ms, Some(0.5));
+        assert_eq!(score.effect_latency_p50_ms, Some(2.0));
+        assert_eq!(score.signed_effect_errors_ms[0], 0.0);
+    }
+
+    #[test]
+    fn effect_frame_cannot_be_backdated_before_observed_audio() {
+        let mut predicted = prediction();
+        predicted.chunks[1].disposition = MusicalTurnDispositionV1::Action {
+            action: MusicalTurnActionV1::Respond,
+            effect_frame: Some(199),
+            effect_at_ns: Some(22_000_000),
+        };
+        assert!(score_musical_turn_taking(&truth(), &predicted)
+            .unwrap_err()
+            .contains(&MusicalTurnTakingIssue::EffectFrameBeforeObservedInput { position: 1 }));
+    }
+
+    #[test]
     fn missing_chunk_is_rejected() {
         let mut predicted = prediction();
         predicted.chunks.remove(2);
