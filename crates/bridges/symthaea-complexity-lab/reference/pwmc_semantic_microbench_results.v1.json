@@ -4,8 +4,8 @@
   "exact_zero_nonempty_support": "passed",
   "format": "symthaea.pwmc-semantic-microbench-results",
   "hidden_witness_invariance": "passed",
-  "input_sha256": "sha256:9f785d6033affab23351307ad47d8d02296d31f4cbabe579c1f8f00888b16ab6",
-  "metamorphic_test_count": 6,
+  "input_sha256": "sha256:d9514a22e92bfccad1a6eab0bb901255007fb1ae9d06044a14d571b333c0adf6",
+  "metamorphic_test_count": 8,
   "metamorphic_tests": [
     {
       "base_full_model_count": "2",
@@ -72,6 +72,28 @@
       "transformed_full_model_count": "2",
       "transformed_pwmc": "4/3",
       "transformed_support_cardinality": "2"
+    },
+    {
+      "base_full_model_count": "2",
+      "base_pwmc": "2/3",
+      "base_support_cardinality": "1",
+      "operation": "add_unique_definitional_hidden",
+      "status": "exact_metamorphic_relation_passed",
+      "test_id": "unique-definitional-hidden-extension",
+      "transformed_full_model_count": "2",
+      "transformed_pwmc": "2/3",
+      "transformed_support_cardinality": "1"
+    },
+    {
+      "base_full_model_count": "6",
+      "base_pwmc": "-2/5",
+      "base_support_cardinality": "3",
+      "operation": "substitute_visible_weight_map",
+      "status": "exact_metamorphic_relation_passed",
+      "test_id": "weight-map-substitution",
+      "transformed_full_model_count": "6",
+      "transformed_pwmc": "17/24",
+      "transformed_support_cardinality": "3"
     }
   ],
   "method": "visible-first existential support compilation; independent full-assignment exact replay; Fraction arithmetic",
