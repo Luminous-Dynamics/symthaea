@@ -223,9 +223,10 @@ fn validate_formulation(formulation: &ValidatedFormulation) -> Result<(), Chemis
                 field: "empty supported scope",
             });
         }
-        if component.minimum_temperature_c.is_finite().not()
-            || component.maximum_temperature_c.is_finite().not()
-            || component.minimum_temperature_c > component.maximum_temperature_c
+        if !component.minimum_temperature_c.is_finite()
+            || !component.maximum_temperature_c.is_finite()
+            || component.minimum_temperature_c < 0.0
+            || component.maximum_temperature_c < component.minimum_temperature_c
         {
             return Err(ChemistryError::InvalidComponentCalibration {
                 component_id: component.component_id.clone(),
@@ -300,16 +301,6 @@ fn validate_formulation(formulation: &ValidatedFormulation) -> Result<(), Chemis
     }
 
     Ok(())
-}
-
-trait FloatFiniteNot {
-    fn not(self) -> bool;
-}
-
-impl FloatFiniteNot for bool {
-    fn not(self) -> bool {
-        !self
-    }
 }
 
 fn validate_stage_windows(
