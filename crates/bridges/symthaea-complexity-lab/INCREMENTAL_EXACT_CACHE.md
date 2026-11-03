@@ -15,13 +15,20 @@ Repeated exact inference and message reuse in trees/junction trees is also estab
 
 Treat intermediate bucket messages as immutable exact artifacts.
 
-A message key binds:
+A raw bucket is first transformed using a versioned normalizer:
+- group factors with identical scopes and multiply their table cells pointwise;
+- remove a factor whose every cell equals the algebra's multiplicative identity;
+- an independent normalizer checker reconstructs the grouped products from the raw inputs;
+- the message checker replays the generated message against the raw bucket, including any separator axes removed with identity factors.
+
+The message key binds:
 1. schema/protocol version;
-2. exact algebra identity and semantics version;
-3. variable cardinalities;
-4. eliminated variable;
-5. the **multiset** of canonical input-factor/message digests (duplicates are significant);
-6. checker identity.
+2. normalizer identity/version;
+3. exact algebra identity and semantics version;
+4. variable cardinalities;
+5. eliminated variable;
+6. the **multiset** of canonical normalized input-factor/message digests (duplicates are significant);
+7. checker identity.
 
 A factor's content digest binds its sorted scope and all exact table cells. The key intentionally does not bind factor IDs or input-list order, so semantically identical inputs reuse the same message. The bucket inputs are sorted by digest while preserving duplicates.
 
@@ -54,13 +61,15 @@ Seed: `20261103`.
 | One factor edit in one of two disconnected triangles | 3 dependent misses; 3 unaffected-component hits |
 | Result agreement for that edit | Incremental = cold = direct enumeration |
 | Reordering original factor list | 6/6 message hits |
+| Same-scope factor split/merge plus unit-factor elision | 2/2 message hits |
+| Incorrect normalized same-scope product | Rejected by independent normalizer checker |
 | Factor-scope edit | Recomputed safely; exact agreement |
 | Forged/rehashed payload without valid HMAC | Rejected and recomputed |
 | Cache copied under wrong auth key | Entries rejected and recomputed |
 | Cross-algebra cache namespace | 0 cross-algebra hits |
 | Randomized mixed-cardinality updates | 64 graphs × 2 algebras = 128/128 exact matches |
-| Randomized edits: cache hits / misses | 509 / 259 |
-| Randomized edits: invalidated message steps | 253 |
+| Randomized edits: cache hits / misses | 538 / 230 |
+| Randomized edits: invalidated message steps | 230 |
 
 Across the 128 randomized edits, the cached producer executed 1,964 additions and 3,804 multiplications versus 7,098 additions and 13,136 multiplications for cold recomputation. This is a reduction of roughly 72.3% and 71.0% in **producer operation counts** on this specific fixture/seed. It is not wall-time speedup: Python object/digest/HMAC costs, fresh-message checker replay, serialization, cache memory and public benchmark behaviour are not included in that comparison.
 
