@@ -1,0 +1,19 @@
+{
+  "benchmark": "HIST-CAUSAL-001",
+  "version": "0.9",
+  "method": "candidate-specific Monte Carlo lower-tail p-values + intersection-union model-adequacy test",
+  "alpha": 0.05,
+  "recipes": 24,
+  "calibration_replicates_per_candidate_per_recipe": 5000,
+  "evaluation_replicates_per_truth_per_recipe": 2000,
+  "probes": 6,
+  "n_observations_per_probe": [1,2,5,10,20],
+  "aggregate": {
+    "1": {"ood_detection":0.06977083333333334,"pooled_false_ood":0.005503472222222222,"worst_candidate_false_ood":0.0305,"worst_model":"actuator_noncompliance"},
+    "2": {"ood_detection":0.24285416666666668,"pooled_false_ood":0.01592708333333333,"worst_candidate_false_ood":0.044729166666666674,"worst_model":"actuator_noncompliance"},
+    "5": {"ood_detection":0.540625,"pooled_false_ood":0.011586805555555557,"worst_candidate_false_ood":0.04975,"worst_model":"actuator_noncompliance"},
+    "10": {"ood_detection":0.8508541666666666,"pooled_false_ood":0.009972222222222223,"worst_candidate_false_ood":0.0495625,"worst_model":"actuator_noncompliance"},
+    "20": {"ood_detection":0.9847708333333335,"pooled_false_ood":0.009329861111111112,"worst_candidate_false_ood":0.0508125,"worst_model":"actuator_noncompliance"}
+  },
+  "claim_ceiling": "conditional finite-sample composite-null calibration for known point parameters and independent exchangeable units; not general OOD validity"
+}
