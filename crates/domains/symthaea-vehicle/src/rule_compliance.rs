@@ -567,8 +567,15 @@ fn requirement_numeric_fields_are_finite(requirement: &TrafficRuleRequirement) -
 }
 
 fn evidence_is_well_formed(evidence: &TrafficRuleEvidence) -> bool {
-    !evidence.evidence_id.trim().is_empty()
-        && !evidence.source_id.trim().is_empty()
+    if evidence.evidence_id.trim().is_empty() {
+        return false;
+    }
+    if evidence.status == TrafficRuleEvidenceStatus::Unavailable {
+        // The absence of a usable source is itself the declared state.
+        // No invented source ID or digest is required.
+        return true;
+    }
+    !evidence.source_id.trim().is_empty()
         && evidence.source_artifact_digest.len() == 64
         && evidence
             .source_artifact_digest
@@ -665,6 +672,11 @@ mod tests {
             TrafficRuleEvidenceStatus::Conflicted,
             TrafficRuleEvidenceStatus::Unavailable,
         ] {
+            let mut supplied_evidence = evidence(status);
+            if status == TrafficRuleEvidenceStatus::Unavailable {
+                supplied_evidence.source_id.clear();
+                supplied_evidence.source_artifact_digest.clear();
+            }
             let rule = TrafficRuleRequirement {
                 rule_id: format!("speed-{status:?}"),
                 active_start_progress_m: 0.0,
@@ -673,7 +685,7 @@ mod tests {
                     maximum_speed_mps: 10.0,
                     tolerance_mps: 0.0,
                 },
-                evidence: evidence(status),
+                evidence: supplied_evidence,
             };
             let report = evaluate_traffic_rules(
                 &[rule],
