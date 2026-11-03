@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::fs::File;
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use ceb_receipt_verifier::{verify_pair, PairInputs};
@@ -42,7 +42,7 @@ enum Command {
     },
 }
 
-fn read_limited(path: &PathBuf, limit: u64) -> Result<Vec<u8>, String> {
+fn read_limited(path: &Path, limit: u64) -> Result<Vec<u8>, String> {
     let metadata = std::fs::metadata(path)
         .map_err(|error| format!("cannot stat {}: {error}", path.display()))?;
     if !metadata.is_file() {
