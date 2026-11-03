@@ -9,6 +9,7 @@
 //! separate Reward Network task environment; neither claims to model human
 //! culture generally.
 
+pub mod adaptive_transmission;
 pub mod cultural_evolution;
 pub mod few_shot_transfer;
 pub mod intentional_teaching;
