@@ -20,3 +20,4 @@ Negative controls:
 Acceptance means structural schema validation and reference cross-field checks only.
 It is not a formal proof, SCPOG check, compiler correctness theorem, or solver result.
 11. Proof/test evidence bound to the wrong stage output digest.
+12. PWMC aggregation plan uses count instead of weighted_sum.
