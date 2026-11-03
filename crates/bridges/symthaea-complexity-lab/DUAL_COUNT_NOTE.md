@@ -34,7 +34,7 @@ At each backpointer row, choose a maximizing state with probability equal to its
 
 Rust's sampler takes a callback that must return an unbiased integer in `[0, bound)`. It checks structure, root-support product and the returned assignment's score; it trusts backpointer argmax/support contents, so externally supplied results must be independently certificate-checked before use.
 
-The Python v2 certificate reference checks 1,383 assignment-path probabilities exactly with `fractions.Fraction`; every probability is `1 / support_size`, including all six triangle MaxCut optima at 1/6 each.
+The Python v2 certificate reference checks 1,389 assignment-path probabilities exactly with `fractions.Fraction`; every probability is `1 / support_size`, including all six triangle MaxCut optima at 1/6 each and a disconnected 2×3-support instance.
 
 ## Lean proof obligations
 
@@ -55,6 +55,6 @@ A proof of the triple algebra alone does not prove the input lift or disjoint-bl
 
 - reference/maxcount_dual_count_oracle.py: 20,000 randomized exact algebra-law checks; 512 mixed-cardinality factor graphs with three elimination orders each (1,536 runs); all MaxCount outputs matched direct enumeration and 512/512 distinct-support values matched direct optimum-assignment enumeration.
 - Local v2 certificate reference src/maxcount_witness_oracle.py: 240/240 randomized cases, 240/240 direct support matches, 240/240 certificate replay passes, and 11/11 rehashed semantic mutants rejected.
-- Handcrafted controls: triangle MaxCut (2,6,6); weighted unique optimum (6,4,1); unequal-weight tie (5,6,2), ordered as (score, multiplicity, distinct assignments).
+- Handcrafted controls: triangle MaxCut (2,6,6); weighted unique optimum (6,4,1); unequal-weight tie (5,6,2), disconnected product (0,50,6), ordered as (score, multiplicity, distinct assignments).
 
 These are Python exact references. They are not Rust execution, Lean proof or hardware performance evidence.
