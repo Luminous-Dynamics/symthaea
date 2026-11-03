@@ -28,7 +28,7 @@ Windows may use:
 - **Beats:** absolute beat positions from the start of the Score.
 - **Seconds:** elapsed seconds from score start, converted using the Score's single constant tempo.
 
-A requirement result retains exact matching note indices. Note indices are scoped to the exact serialized Score digest in the report; they are not persistent event IDs. The legacy Score has voice role and optional part identity but no instrument-identity field, so V1 cannot prove an instrument-specific entry/exit. The report binds the schema, contract digest, exact serialized Score digest, tempo and duration. V1 serialization hashes are over the repository's `serde_json` representation; they are not claimed as a universal cross-language canonical JSON format.
+A requirement result retains exact matching note indices. Note indices are scoped to the exact serialized Score digest in the report; they are not persistent event IDs. The legacy Score has voice role and optional part identity but no instrument-identity field, so V1 cannot prove an instrument-specific entry/exit. The report binds the schema and explicit verifier version, contract digest, exact serialized Score digest, tempo and duration. V1 serialization hashes are over the repository's `serde_json` representation; they are not claimed as a universal cross-language canonical JSON format.
 
 ## Fail-closed behavior
 
@@ -47,7 +47,10 @@ An unsupported timing map must not be silently approximated. V1 does not support
 2. Seconds convert under the exact constant score tempo.
 3. Silence checks detect a note that sustains into the requested interval.
 4. Unassigned part identity is rejected rather than guessed.
-5. Duplicate requirement IDs and reversed windows fail closed.
+5. Dense decoy onsets exceeding the declared maximum fail rather than scoring as success.
+6. Windows extending beyond the Score fail closed.
+7. Report digests resolve to the exact serialized Score and contract, and the verifier version is explicit.
+8. Duplicate requirement IDs and reversed windows fail closed.
 
 These tests are authored only; no Cargo compilation, rustfmt or test pass is claimed.
 

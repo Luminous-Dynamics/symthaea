@@ -15,6 +15,7 @@ use std::fmt::Write as FmtWrite;
 use symthaea_music_theory::{PartId, Score, VoiceRole};
 
 pub const SCORE_TIMING_CONTRACT_SCHEMA_VERSION_V1: u32 = 1;
+pub const SCORE_TIMING_VERIFIER_VERSION_V1: &str = "score-timing-verifier-v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "basis")]
@@ -198,6 +199,7 @@ pub struct ScoreTimingRequirementResultV1 {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScoreTimingReportV1 {
     pub schema_version: u32,
+    pub verifier_version: String,
     pub contract_id: String,
     pub contract_sha256: String,
     pub score_sha256: String,
@@ -319,6 +321,7 @@ pub fn verify_score_timing_v1(
 
     Ok(ScoreTimingReportV1 {
         schema_version: SCORE_TIMING_CONTRACT_SCHEMA_VERSION_V1,
+        verifier_version: SCORE_TIMING_VERIFIER_VERSION_V1.to_owned(),
         contract_id: contract.contract_id.clone(),
         contract_sha256,
         score_sha256,
@@ -491,6 +494,25 @@ mod tests {
                 requirement_id: "event-window-1".into()
             })
         ));
+    }
+
+    #[test]
+    fn report_binds_exact_score_contract_and_verifier_version() {
+        let source_score = score();
+        let source_contract = contract(ScoreTimingCheckV1::OnsetCount {
+            selector: ScoreEventSelectorV1::VoiceRole {
+                role: VoiceRole::Melody,
+            },
+            window: ScoreTimeWindowV1::Beats { start: 0.0, end: 1.0 },
+            min_count: 1,
+            max_count: Some(1),
+        });
+        let report = verify_score_timing_v1(&source_score, &source_contract).unwrap();
+        assert_eq!(report.verifier_version, SCORE_TIMING_VERIFIER_VERSION_V1);
+        assert_eq!(report.score_sha256, digest_json_v1(&source_score).unwrap());
+        assert_eq!(report.contract_sha256, digest_json_v1(&source_contract).unwrap());
+        assert_eq!(report.score_sha256.len(), 64);
+        assert_eq!(report.contract_sha256.len(), 64);
     }
 
     #[test]
