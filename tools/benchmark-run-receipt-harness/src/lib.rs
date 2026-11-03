@@ -386,7 +386,10 @@ fn validate_grade(value: &Value, grading_mode: &str, context: &str) -> Result<()
     let valid = match grading_mode {
         "binary" => grade_value.is_boolean(),
         "numeric" => grade_value.as_f64().is_some_and(f64::is_finite),
-        "categorical" | "custom" => grade_value.as_str().is_some(),
+        "categorical" => grade_value.as_str().is_some(),
+        "custom" => grade_value.is_boolean()
+            || grade_value.as_str().is_some()
+            || grade_value.as_f64().is_some_and(f64::is_finite),
         other => {
             return Err(error(
                 ReceiptErrorKind::SchemaViolation,
@@ -653,24 +656,36 @@ fn validate_resource_objects(
 
 fn validate_official_and_derived(value: &Value, derived: &Value) -> Result<(), ReceiptError> {
     let score = obj(value, "official_score")?;
-    strict_keys(score, &["metric_id","formula_version","value","unit","numerator","denominator","is_official","source_output_sha256"], &[], "official_score")?;
+    strict_keys(score, &["metric_id","formula_version","value","unit","numerator","denominator","is_official","source_output_sha256","unavailable_reason"], &[], "official_score")?;
     string(required(score, "metric_id", "official_score")?, "official_score.metric_id", false)?;
     string(required(score, "formula_version", "official_score")?, "official_score.formula_version", false)?;
-    required(score, "value", "official_score")?.as_f64().filter(|n| n.is_finite()).ok_or_else(|| {
-        error(ReceiptErrorKind::SchemaViolation, "official_score.value must be finite")
-    })?;
     string(required(score, "unit", "official_score")?, "official_score.unit", false)?;
     if !bool_value(required(score, "is_official", "official_score")?, "official_score.is_official")? {
         return Err(error(ReceiptErrorKind::SchemaViolation, "official_score.is_official must be true"));
     }
     sha256_field(required(score, "source_output_sha256", "official_score")?, "official_score.source_output_sha256")?;
-    let denominator = required(score, "denominator", "official_score")?;
-    if denominator.is_null() || denominator.as_f64().is_none_or(|n| !n.is_finite() || n <= 0.0) {
-        return Err(error(ReceiptErrorKind::SchemaViolation, "official_score.denominator must be positive and finite"));
-    }
+    let score_value = required(score, "value", "official_score")?;
     let numerator = required(score, "numerator", "official_score")?;
-    if !numerator.is_null() && numerator.as_f64().is_none_or(|n| !n.is_finite()) {
-        return Err(error(ReceiptErrorKind::SchemaViolation, "official_score.numerator must be finite or null"));
+    let denominator = required(score, "denominator", "official_score")?;
+    let unavailable_reason = required(score, "unavailable_reason", "official_score")?;
+    if score_value.is_null() {
+        if !numerator.is_null() || !denominator.is_null() {
+            return Err(error(ReceiptErrorKind::SchemaViolation, "unavailable official score requires null numerator and denominator"));
+        }
+        string(unavailable_reason, "official_score.unavailable_reason", false)?;
+    } else {
+        if score_value.as_f64().is_none_or(|n| !n.is_finite()) {
+            return Err(error(ReceiptErrorKind::SchemaViolation, "official_score.value must be finite or null"));
+        }
+        if denominator.is_null() || denominator.as_f64().is_none_or(|n| !n.is_finite() || n <= 0.0) {
+            return Err(error(ReceiptErrorKind::SchemaViolation, "official_score.denominator must be positive and finite for a reported score"));
+        }
+        if !numerator.is_null() && numerator.as_f64().is_none_or(|n| !n.is_finite()) {
+            return Err(error(ReceiptErrorKind::SchemaViolation, "official_score.numerator must be finite or null"));
+        }
+        if !unavailable_reason.is_null() {
+            return Err(error(ReceiptErrorKind::SchemaViolation, "official_score.unavailable_reason must be null for a reported score"));
+        }
     }
 
     for (index, item) in arr(derived, "derived_metrics")?.iter().enumerate() {
@@ -839,19 +854,32 @@ pub fn validate_comparable_arms(receipts: &[VerifiedReceipt]) -> Result<(), Rece
     if first_comparison.is_null() {
         return Err(error(ReceiptErrorKind::NonComparable, "comparison metadata is null"));
     }
-    let first_fields = [
-        "benchmark", "target_scope", "runner", "budget_caps",
-        "eligible_task_set_sha256", "comparison",
-    ];
+    let first_benchmark = obj(required(first_top, "benchmark", "receipt")?, "benchmark")?;
+    let first_grading_mode = required(first_top, "grading_mode", "receipt")?;
     for receipt in receipts.iter().skip(1) {
         let top = obj(&receipt.value, "receipt")?;
-        for field in first_fields {
+        let benchmark = obj(required(top, "benchmark", "receipt")?, "benchmark")?;
+        for field in ["id","version","revision","dataset_manifest_sha256","access_class","scoring_formula_id","grader_version"] {
+            if required(benchmark, field, "benchmark")? != required(first_benchmark, field, "benchmark")? {
+                return Err(error(
+                    ReceiptErrorKind::NonComparable,
+                    format!("run '{}' differs in benchmark field '{field}'", receipt.run_id),
+                ));
+            }
+        }
+        for field in ["target_scope","runner","budget_caps","eligible_task_set_sha256","task_universe_sha256","comparison","grading_mode"] {
             if required(top, field, "receipt")? != required(first_top, field, "receipt")? {
                 return Err(error(
                     ReceiptErrorKind::NonComparable,
                     format!("run '{}' differs in comparison field '{field}'", receipt.run_id),
                 ));
             }
+        }
+        if required(top, "grading_mode", "receipt")? != first_grading_mode {
+            return Err(error(
+                ReceiptErrorKind::NonComparable,
+                format!("run '{}' differs in grading_mode", receipt.run_id),
+            ));
         }
     }
     Ok(())
