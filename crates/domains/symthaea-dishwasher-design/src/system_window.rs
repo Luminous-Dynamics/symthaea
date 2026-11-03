@@ -1386,6 +1386,74 @@ mod tests {
     }
 
     #[test]
+    fn queued_request_cancelled_before_start_is_not_counted_as_unresolved() {
+        let requests = [request(
+            "service-cancelled-queued",
+            20,
+            None,
+            WindowRequestState::Cancelled { cancelled_at_s: 40 },
+            &["cup-not-started"],
+            None,
+        )];
+        let result = account_system_window(
+            &spec(&REQUIRED),
+            &requests,
+            &[],
+            &basic_resources(),
+        ).unwrap();
+        assert_eq!(result.cancelled_requests_in_window, 1);
+        assert_eq!(result.cancelled_items_in_accepted_cohort, 1);
+        assert_eq!(result.unresolved_requests_at_window_end, 0);
+        assert_eq!(result.active_request_seconds, 0);
+        assert_eq!(result.verified_item_release_count, 0);
+    }
+
+    #[test]
+    fn cancellation_after_physical_work_retains_qualified_releases_and_attempts() {
+        let requests = [request(
+            "service-cancelled-partial",
+            5,
+            Some(10),
+            WindowRequestState::Cancelled { cancelled_at_s: 50 },
+            &["cup-passed", "cup-pending"],
+            Some(report("service-cancelled-partial", &["cup-passed"], &["cup-pending"], &["cup-passed"])),
+        )];
+        let result = account_system_window(
+            &spec(&REQUIRED),
+            &requests,
+            &[release("service-cancelled-partial", "cup-passed", 45)],
+            &basic_resources(),
+        ).unwrap();
+        assert_eq!(result.cancelled_requests_in_window, 1);
+        assert_eq!(result.cancelled_items_in_accepted_cohort, 2);
+        assert_eq!(result.unresolved_requests_at_window_end, 0);
+        assert_eq!(result.verified_item_release_count, 1);
+        assert_eq!(result.active_request_seconds, 40);
+        assert_eq!(result.physical_attempt_count_total, 1);
+    }
+
+    #[test]
+    fn release_after_request_cancellation_is_rejected() {
+        let requests = [request(
+            "service-cancelled-late",
+            5,
+            Some(10),
+            WindowRequestState::Cancelled { cancelled_at_s: 50 },
+            &["cup-passed"],
+            Some(report("service-cancelled-late", &["cup-passed"], &[], &["cup-passed"])),
+        )];
+        assert!(matches!(
+            account_system_window(
+                &spec(&REQUIRED),
+                &requests,
+                &[release("service-cancelled-late", "cup-passed", 55)],
+                &basic_resources(),
+            ),
+            Err(SystemWindowError::ReleaseOutsideService { .. })
+        ));
+    }
+
+    #[test]
     fn queued_unresolved_request_is_right_censored_and_never_released() {
         let requests = [request(
             "service-queued",
