@@ -14,7 +14,7 @@ This module therefore separates three things:
 
 The system window uses one declared monotonic clock domain. Every request, release event and resource-meter interval must use that clock. The interval is `[start_at_s, end_at_s)`; events exactly at the end belong to the next window. Meter instrument IDs identify independently calibrated measurement streams, not a multi-channel data-acquisition chassis; distinct channels need distinct stream identities in this schema.
 
-Each scored window also freezes the machine-unit ID, whole-system configuration SHA-256 and utility-topology ID. Each request carries a compartment/cell ID and a compartment-configuration SHA-256. Reusing one cell ID for two configuration digests within one window is rejected; a configuration change is a different experimental condition and must not be pooled as if it were the same cell.
+Each scored window also freezes the machine-unit ID, whole-system configuration SHA-256 and utility-topology ID. Each request carries a compartment/cell ID and a compartment-configuration SHA-256. Reusing one cell ID for two configuration digests within one window is rejected; a configuration change is a different experimental condition and must not be pooled as if it were the same cell. Each window also freezes one `service_class_id` and one `protocol_id`; every request must match both. A window for lightly soiled glassware therefore cannot be mixed with a normally soiled plate workload or a different independent-assay protocol. Mixed workloads require separate windows or a separately specified workload-mix benchmark with fixed, declared proportions.
 
 ## Definitions
 
@@ -62,7 +62,7 @@ A zero resource measurement must be represented by an explicit row. A missing re
 For each condition:
 
 1. Freeze machine unit, whole-system configuration digest, utility-topology ID, compartment IDs/configuration digests, programme/firmware, water batch/hardness/inlet temperature, detergent and rinse-aid lots, soil family/age, loading recipe, required independent endpoints, resource meter map and clock source.
-2. Register an arrival trace and service-request item set before dispatch. Retain every accepted, queued, started, cancelled, failed, interrupted and unresolved request. Cancellation time and reason are distinct from right-censoring at the window boundary.
+2. Register an arrival trace and service-request item set before dispatch. Retain every accepted, queued, started, cancelled, failed, interrupted and unresolved request. Cancellation time and reason are distinct from right-censoring at the window boundary. A queued cancellation has no physical attempt/report; a cancellation after start retains the service report and any releases independently qualified before cancellation. Releases at or after the cancellation timestamp are rejected.
 3. Randomize service order within declared blocks. Capture actual start, item-level release, close, rewash and abort timestamps against the same monotonic clock.
 4. Measure system-boundary wall electricity, upstream hot-water energy, fresh water, delivered detergent/rinse aid and operator person-seconds. Allocate shared preheat, standby, purge and fill overhead once at a documented boundary.
 5. Use the exact per-item independent soil-removal, final-rinse-residue and cross-transfer assays. Keep microbiological efficacy and sanitization separate.
@@ -103,6 +103,6 @@ Sources:
 
 ## Acceptance tests
 
-Source-authored Rust tests cover concurrent versus sequential service, carry-in requests, queued and in-flight cancellation, post-cancellation release rejection, right-censored queued and started requests, independent-assay release qualification, duplicate releases, clock mismatch, cross-instrument boundary overlap, declared parent/branch duplication, parallel operator person-time, missing required resource dimensions, first-pass yield, rewash aggregation, per-compartment statistics and configuration mismatch, and inconsistent upstream service reports. The module currently contains 22 tests; none are executed until the exact PR head is compiled and run.
+Source-authored Rust tests cover concurrent versus sequential service, carry-in requests, queued and in-flight cancellation, post-cancellation release rejection, right-censored queued and started requests, independent-assay release qualification, duplicate releases, clock mismatch, cross-instrument boundary overlap, declared parent/branch duplication, parallel operator person-time, missing required resource dimensions, first-pass yield, rewash aggregation, per-compartment statistics and configuration mismatch, and inconsistent upstream service reports. The module currently contains 23 tests; none are executed until the exact PR head is compiled and run.
 
 All tests, formatting and clippy must run on the exact pull-request head before any pass claim. The validator does not authenticate referenced evidence bytes, prove assay independence, establish the truth of boundary IDs, infer omitted requests, or establish physical cleaning/hygiene performance.
