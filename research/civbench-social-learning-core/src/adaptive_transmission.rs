@@ -763,10 +763,25 @@ fn build_schedule(
         TransmissionPolicy::StateAwareFrontier => state_aware_schedule(task, graph, agents, config),
         TransmissionPolicy::StateAwareContentShuffled => {
             let mut actions = state_aware_schedule(task, graph, agents, config);
-            for action in &mut actions {
-                let candidates: Vec<u16> = agents[action.sender].known_recipes.iter().copied().collect();
-                if !candidates.is_empty() {
-                    action.recipe_id = candidates[rng.index(candidates.len())];
+
+            // Preserve the exact sender/receiver schedule and the multiset of
+            // recipes each sender intended to transmit. Shuffle only which of
+            // that sender's selected recipes goes to which scheduled recipient.
+            let mut action_positions_by_sender: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+            for (position, action) in actions.iter().enumerate() {
+                action_positions_by_sender
+                    .entry(action.sender)
+                    .or_default()
+                    .push(position);
+            }
+            for positions in action_positions_by_sender.values() {
+                let mut payloads: Vec<u16> = positions
+                    .iter()
+                    .map(|&position| actions[position].recipe_id)
+                    .collect();
+                rng.shuffle(&mut payloads);
+                for (&position, recipe_id) in positions.iter().zip(payloads) {
+                    actions[position].recipe_id = recipe_id;
                 }
             }
             actions
@@ -1026,11 +1041,10 @@ mod tests {
     }
 
     #[test]
-    fn state_aware_and_content_shuffled_keep_identical_pair_schedules() {
+    fn state_aware_ablation_preserves_schedule_and_per_sender_content_multiset() {
         let task = InnovationTask::family_task(TaskFamily::Layered);
         let config = deterministic_config(TransmissionPolicy::StateAwareFrontier);
         let mut rng_a = Rng::new(77);
-        let mut rng_b = Rng::new(77);
         let graph = SocialGraph::generate(config.population_size, 0.0, &mut rng_a);
         let agents = simulate(&task, Config { steps: 1, ..config }, 1).unwrap().agents;
         let mut rng_pairs = Rng::new(91);
@@ -1046,11 +1060,23 @@ mod tests {
         let pairs_a: Vec<_> = state_aware.iter().map(|a| (a.sender, a.receiver)).collect();
         let pairs_b: Vec<_> = shuffled.iter().map(|a| (a.sender, a.receiver)).collect();
         assert_eq!(pairs_a, pairs_b);
-        assert!(shuffled.iter().all(|action| {
-            agents[action.sender].known_recipes.contains(&action.recipe_id)
-        }));
-        // Both schedules are valid; the content-shuffled ablation may be less relevant.
-        let _ = &mut rng_b;
+
+        let mut payloads_by_sender_a: BTreeMap<usize, Vec<u16>> = BTreeMap::new();
+        let mut payloads_by_sender_b: BTreeMap<usize, Vec<u16>> = BTreeMap::new();
+        for action in &state_aware {
+            payloads_by_sender_a.entry(action.sender).or_default().push(action.recipe_id);
+        }
+        for action in &shuffled {
+            assert!(agents[action.sender].known_recipes.contains(&action.recipe_id));
+            payloads_by_sender_b.entry(action.sender).or_default().push(action.recipe_id);
+        }
+        for payloads in payloads_by_sender_a.values_mut() {
+            payloads.sort_unstable();
+        }
+        for payloads in payloads_by_sender_b.values_mut() {
+            payloads.sort_unstable();
+        }
+        assert_eq!(payloads_by_sender_a, payloads_by_sender_b);
     }
 
     #[test]
