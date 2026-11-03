@@ -439,3 +439,25 @@ Therefore:
 7. Reuse the existing ReplayTape/WorldSnapshot infrastructure for systems built on `PhysicsWorld`; do not claim it covers the BicycleModelSimulator until an explicit bridge and independent parity test exist.
 
 The adapter contract is tracked in Symtropy #3387. This is a bounded replay/evidence layer, not a new simulator.
+
+
+## 16. Calibrated event-risk forecasting — proper scores, reliability and censoring
+
+The new `symthaea_vehicle::risk_calibration` module evaluates probabilities for one explicit event definition and one fixed forecast horizon. It reports Brier score, log loss, ECE, maximum calibration gap, reliability bins, family-macro Brier and worst-family Brier.
+
+Censored or interrupted episodes are retained as a separate count and excluded from proper scores; they are not silently relabeled as "no event". A report cannot be produced when all observations are censored. The module retains and canonically orders the raw observations, reconstructs every metric, and validates its BLAKE3 output fingerprint.
+
+This complements (but does not replace) #6283 measurement-validity and #3385 rare-event inference. Calibration is conditional on the supplied labels, family corpus, event definition, horizon and sampling profile. An adversarial stress corpus cannot estimate real-world prevalence. Keep a separately sampled representative track and stress track; do not pool them by default.
+
+Proposed evaluation sequence:
+1. Fix event semantics and event horizon (for example, a model-relative pedestrian-envelope overlap within 1 s).
+2. Freeze predictor, outcome evaluator, sampling profile and scenario families.
+3. Report reliability diagrams, bin counts, Brier and log loss, plus discrimination (AUROC/AUPRC) and event prevalence.
+4. Report family-macro and worst-family calibration; expose censoring and indeterminate/unsupported outcomes.
+5. Repeat on disjoint ODD shifts and after simulator/model/map changes to measure calibration drift.
+6. Compare raw forecasts, post-hoc isotonic/Platt calibration and calibration-aware training on identical holdouts.
+7. Only then evaluate whether calibrated outputs improve RTA abstention or fallback decisions. Do not allow forecast confidence to set its own safety threshold.
+
+Nine unit tests are authored but not compiled/run. No event forecast or calibration result is currently claimed.
+
+Protocol: [RISK_FORECAST_CALIBRATION_V0_1.md](./RISK_FORECAST_CALIBRATION_V0_1.md).
