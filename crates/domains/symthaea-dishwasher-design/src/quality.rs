@@ -426,10 +426,9 @@ pub fn qualify_pilot_evidence(
     let criteria_for_envelope: Vec<EndpointCriterion> = required
         .iter()
         .map(|endpoint| {
-            criteria_by_endpoint
+            (**criteria_by_endpoint
                 .get(endpoint)
-                .expect("required criterion checked above")
-                .to_owned()
+                .expect("required criterion checked above"))
                 .clone()
         })
         .collect();
