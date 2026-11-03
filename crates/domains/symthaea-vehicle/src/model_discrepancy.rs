@@ -686,7 +686,7 @@ mod tests {
         VehicleModelDiscrepancyInput{
             predictor_model_id:"predictor-v0".into(),predictor_artifact_digest:h('3'),reference_model_id:"reference-v0".into(),reference_model_artifact_digest:h('4'),
             evaluator_id:"evaluator-v0".into(),evaluator_artifact_digest:h('5'),planner_id:"planner-v0".into(),planner_artifact_digest:h('6'),sampling_profile_digest:h('7'),
-            protocol_id:"SAM-MODEL-RESIDUAL-001".into(),protocol_digest:h('8'),expected_residual_slots,residual_observations,decisions:vec![decision()]
+            protocol_id:"SAM-MODEL-RESIDUAL-001".into(),protocol_digest:h('8'),expected_schedule_artifact_digest:h('9'),expected_residual_slots,residual_observations,decisions:vec![decision()]
         }
     }
     #[test]
