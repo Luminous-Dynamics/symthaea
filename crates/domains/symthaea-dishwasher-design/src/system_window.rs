@@ -106,6 +106,7 @@ pub struct SystemWindowReport {
     pub window_id: String,
     pub elapsed_wall_seconds: u64,
     pub request_record_count: usize,
+    pub carry_in_requests_at_window_start: usize,
     pub requests_accepted_in_window: usize,
     pub requests_started_in_window: usize,
     pub requests_completed_in_window: usize,
@@ -426,6 +427,7 @@ pub fn account_system_window(
         }
     }
 
+    let mut carry_in_count = 0_usize;
     let mut accepted_count = 0_usize;
     let mut started_count = 0_usize;
     let mut completed_count = 0_usize;
@@ -441,6 +443,14 @@ pub fn account_system_window(
     let mut concurrency_events: Vec<(u64, i8)> = Vec::new();
 
     for request in requests {
+        let request_end_at_s = match request.state {
+            WindowRequestState::Completed { closed_at_s } => closed_at_s,
+            WindowRequestState::Unresolved { .. } => spec.end_at_s,
+        };
+        if request.accepted_at_s < spec.start_at_s && request_end_at_s > spec.start_at_s {
+            carry_in_count = carry_in_count.checked_add(1)
+                .ok_or(SystemWindowError::CounterOverflow("carry_in_requests"))?;
+        }
         let accepted_in_window =
             request.accepted_at_s >= spec.start_at_s && request.accepted_at_s < spec.end_at_s;
         if accepted_in_window {
@@ -753,6 +763,7 @@ pub fn account_system_window(
         window_id: spec.window_id.clone(),
         elapsed_wall_seconds,
         request_record_count: requests.len(),
+        carry_in_requests_at_window_start: carry_in_count,
         requests_accepted_in_window: accepted_count,
         requests_started_in_window: started_count,
         requests_completed_in_window: completed_count,
