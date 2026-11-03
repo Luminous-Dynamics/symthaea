@@ -98,6 +98,7 @@ pub mod scenarios;
 pub mod simulator;
 pub mod subterranean;
 pub mod subterranean_navigation;
+pub mod trajectory_coverage;
 pub mod swarm;
 pub mod training;
 pub mod types;
@@ -126,6 +127,13 @@ pub use counterfactual_decision::{
     CounterfactualFeasibility, CounterfactualMetricDirection, evaluate_counterfactual_decision,
 };
 pub use controller::VehicleController;
+pub use trajectory_coverage::{
+    MIN_FAMILY_COVERAGE_SAMPLES, TRAJECTORY_COVERAGE_TARGET_P95,
+    VEHICLE_TRAJECTORY_COVERAGE_SCHEMA, TrajectoryCalibrationObservation,
+    TrajectoryCoverageError, TrajectoryCoverageResult, TrajectoryEvaluationObservation,
+    TrajectoryFamilyCoverage, VehicleTrajectoryCoverageReport,
+    summarize_vehicle_trajectory_coverage,
+};
 pub use encoder::VehicleHdcEncoder;
 pub use fep_agent::{ActiveInferenceVehicleAgent, VehicleFepConfig, VehicleFepResult};
 pub use perturbations::{PerturbationSchedule, VehiclePerturbation};
