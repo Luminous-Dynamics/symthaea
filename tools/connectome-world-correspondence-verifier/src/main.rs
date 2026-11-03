@@ -302,10 +302,10 @@ fn parse_cardinality(source_count: usize, target_count: usize) -> Result<Cardina
         return Err("mapping source_object_ids must not be empty".to_owned());
     }
     Ok(match (source_count, target_count) {
+        (_, 0) => Cardinality::Unmapped,
         (1, 1) => Cardinality::OneToOne,
         (1, _) => Cardinality::OneToMany,
         (_, 1) => Cardinality::ManyToOne,
-        (_, 0) => Cardinality::Unmapped,
         (_, _) => Cardinality::ManyToMany,
     })
 }
@@ -672,9 +672,9 @@ fn verify_receipt(
             source_coverage.insert(source_id.clone());
             let current = (relation_type.clone(), alternative_set_id.clone());
             if let Some(previous) = source_mapping_kinds.get(source_id) {
-                if previous != &current {
+                if previous != &current || current.1.is_none() {
                     return Err(format!(
-                        "{context}: source object {source_id} appears in multiple mappings outside one shared alternative set"
+                        "{context}: source object {source_id} appears in repeated mapping rows without one shared, explicit alternative set"
                     ));
                 }
             } else {
@@ -742,8 +742,12 @@ fn verify_receipt(
             if group.0 != relation_type || group.1 != source_ids {
                 return Err(format!("alternative set {group_id} mixes relation types or source ID sets"));
             }
-            let target_key = target_ids.join("\u{1f}");
-            if !group.2.insert(target_key) {
+            if target_ids.iter().any(|target_id| {
+                group.2.iter().any(|existing| existing.contains(target_id))
+            }) {
+                return Err(format!("alternative set {group_id} reuses a target object across mutually exclusive alternatives"));
+            }
+            if !group.2.insert(target_ids.clone()) {
                 return Err(format!("alternative set {group_id} contains duplicate target alternative"));
             }
         }
