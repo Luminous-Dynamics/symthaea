@@ -192,6 +192,23 @@ jobs:
                   raise ValueError("duplicate configuration-world ID")
               if len(world_ids) != 8:
                   raise ValueError("V0 requires the complete 2x2x2 target/feature world matrix")
+              required_feature_modes = {
+                  (True, frozenset()),
+                  (False, frozenset({"audit"})),
+                  (False, frozenset({"windows-native"})),
+                  (False, frozenset({"audit", "windows-native"}))
+              }
+              required_configurations = {
+                  (target_os, defaults_enabled, explicit)
+                  for target_os in {"linux", "windows"}
+                  for defaults_enabled, explicit in required_feature_modes
+              }
+              observed_configurations = {
+                  (world["target_os"], world["default_features_enabled"], frozenset(world["explicit_features"]))
+                  for world in worlds_value["worlds"]
+              }
+              if observed_configurations != required_configurations:
+                  raise ValueError("world matrix does not cover each default/explicit feature mode exactly once on both targets")
               all_fact_ids = set(fact_ids)
               for world in worlds_value["worlds"]:
                   target_os = world["target_os"]
@@ -270,6 +287,12 @@ jobs:
           mutant_worlds = copy.deepcopy(worlds)
           mutant_worlds["worlds"][0]["target_triple"] = "x86_64-pc-windows-msvc"
           expect_world_reject(mutant_worlds, graph, "target triple does not match target OS")
+
+          mutant_worlds = copy.deepcopy(worlds)
+          windows_default = next(world for world in mutant_worlds["worlds"] if world["id"] == "windows-default")
+          windows_default["default_features_enabled"] = False
+          windows_default["explicit_features"] = ["audit"]
+          expect_world_reject(mutant_worlds, graph, "duplicated feature configuration hides missing default world")
 
           mutant_worlds = copy.deepcopy(worlds)
           mutant_worlds["worlds"][1]["id"] = mutant_worlds["worlds"][0]["id"]
@@ -529,7 +552,7 @@ jobs:
           print(
               "CEB_CONTRACT_SCHEMA_PASS: "
               f"tasks={len(task_ids)} unique_tasks={len(set(task_ids))} "
-              f"schemas=4 negative_controls=38 worlds={world_count} conditional_facts={conditional_fact_count}"
+              f"schemas=4 negative_controls=39 worlds={world_count} conditional_facts={conditional_fact_count}"
           )
           print("CEB_CLAIM_BOUNDARY: schema validation is not DSSE signature verification or runner qualification")
           PY
