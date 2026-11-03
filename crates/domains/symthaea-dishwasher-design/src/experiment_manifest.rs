@@ -87,6 +87,16 @@ pub struct ResourceMeasurement {
     pub evidence_sha256: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhysicalItemRecord {
+    pub item_id: String,
+    pub material: String,
+    pub surface_finish: String,
+    pub geometry: String,
+    pub location_stratum: String,
+    pub item_batch_id: String,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct PhysicalRunEvidenceBundle {
     pub schema_version: u16,
@@ -97,9 +107,14 @@ pub struct PhysicalRunEvidenceBundle {
     pub protocol_id: String,
     pub randomization_block_id: String,
     pub treatment_assignment_id: String,
+    pub soil_age_at_start_s: u64,
+    pub water_hardness_ppm_as_caco3: u16,
+    pub inlet_temperature_millic: u32,
+    pub ambient_temperature_millic: u32,
+    pub ambient_relative_humidity_permille: u16,
     pub start_utc_s: u64,
     pub end_utc_s: u64,
-    pub item_ids: Vec<String>,
+    pub items: Vec<PhysicalItemRecord>,
     pub required_endpoints: Vec<Endpoint>,
     pub calibrations: Vec<InstrumentCalibration>,
     pub sensor_traces: Vec<SensorTraceArtifact>,
@@ -270,16 +285,28 @@ pub fn validate_physical_run_bundle(
         return Err(EvidenceBundleError::InvalidRunInterval);
     }
 
-    if bundle.item_ids.is_empty() {
+    if bundle.items.is_empty() {
         return Err(EvidenceBundleError::EmptyItemSet);
     }
+    if bundle.ambient_relative_humidity_permille > 1_000 {
+        return Err(EvidenceBundleError::InvalidIdentity("ambient_relative_humidity_permille"));
+    }
     let mut items = BTreeSet::new();
-    for id in &bundle.item_ids {
-        if !non_empty(id) {
-            return Err(EvidenceBundleError::InvalidIdentity("item_id"));
+    for item in &bundle.items {
+        for (field, value) in [
+            ("item_id", item.item_id.as_str()),
+            ("item.material", item.material.as_str()),
+            ("item.surface_finish", item.surface_finish.as_str()),
+            ("item.geometry", item.geometry.as_str()),
+            ("item.location_stratum", item.location_stratum.as_str()),
+            ("item.item_batch_id", item.item_batch_id.as_str()),
+        ] {
+            if !non_empty(value) {
+                return Err(EvidenceBundleError::InvalidIdentity(field));
+            }
         }
-        if !items.insert(id.as_str()) {
-            return Err(EvidenceBundleError::DuplicateItem(id.clone()));
+        if !items.insert(item.item_id.as_str()) {
+            return Err(EvidenceBundleError::DuplicateItem(item.item_id.clone()));
         }
     }
 
@@ -416,11 +443,11 @@ pub fn validate_physical_run_bundle(
             });
         }
     }
-    for item_id in &bundle.item_ids {
+    for item in &bundle.items {
         for endpoint in &bundle.required_endpoints {
-            if !assay_pairs.contains(&(item_id.as_str(), *endpoint)) {
+            if !assay_pairs.contains(&(item.item_id.as_str(), *endpoint)) {
                 return Err(EvidenceBundleError::MissingAssay {
-                    item_id: item_id.clone(),
+                    item_id: item.item_id.clone(),
                     endpoint: *endpoint,
                 });
             }
@@ -513,7 +540,7 @@ pub fn validate_physical_run_bundle(
     Ok(EvidenceBundleValidationReport {
         schema_version: bundle.schema_version,
         run_id: bundle.run.run_id.clone(),
-        physical_item_count: bundle.item_ids.len(),
+        physical_item_count: bundle.items.len(),
         required_endpoint_count: bundle.required_endpoints.len(),
         sensor_trace_count: bundle.sensor_traces.len(),
         assay_record_count: bundle.assays.len(),
@@ -598,9 +625,21 @@ mod tests {
             protocol_id: "protocol-v1".to_owned(),
             randomization_block_id: "block-01".to_owned(),
             treatment_assignment_id: "assignment-01".to_owned(),
+            soil_age_at_start_s: 3_600,
+            water_hardness_ppm_as_caco3: 75,
+            inlet_temperature_millic: 18_000,
+            ambient_temperature_millic: 22_000,
+            ambient_relative_humidity_permille: 500,
             start_utc_s: 1_000,
             end_utc_s: 1_800,
-            item_ids: vec!["cup-01".to_owned()],
+            items: vec![PhysicalItemRecord {
+                item_id: "cup-01".to_owned(),
+                material: "glass".to_owned(),
+                surface_finish: "smooth".to_owned(),
+                geometry: "cup".to_owned(),
+                location_stratum: "shadow-rear".to_owned(),
+                item_batch_id: "glassware-lot-01".to_owned(),
+            }],
             required_endpoints: vec![
                 Endpoint::SoilRemovalResidual,
                 Endpoint::FinalRinseResidue,
@@ -720,7 +759,7 @@ mod tests {
     #[test]
     fn rejects_duplicate_items_and_duplicate_assay_pairs() {
         let mut bundle = valid_bundle();
-        bundle.item_ids.push("cup-01".to_owned());
+        bundle.items.push(bundle.items[0].clone());
         assert_eq!(
             validate_physical_run_bundle(&bundle, &[ResourceKind::FreshWater]),
             Err(EvidenceBundleError::DuplicateItem("cup-01".to_owned()))
