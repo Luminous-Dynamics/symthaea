@@ -306,7 +306,7 @@
     "lineage_receipt_sha256": null,
     "mapping_policy_sha256": "2d9c68e6c835e266225a680601d79e15c1aed79ff53204b67386187b001f45eb",
     "correspondence_engine_sha256": null,
-    "verifier_protocol_sha256": "e341601d28f54c7260bedeff62af8d91468fd152e8871200b2342192602a6dcf",
+    "verifier_protocol_sha256": "935643661ebacd206cee3dc153806deba6dd245dbf20c5d4b402207c16b53c92",
     "verifier_sha256": null,
     "report_schema_sha256": "10c3eb5ab6deb5d4044897501a97336e8ae3ec2a6a3520e9d19e5f313dccad9c",
     "world_manifest_schema_sha256": "b8bbc20a6e581232b7439a1fbbbecf65bbcb6b6b702732c98720a2dce8575f06"
