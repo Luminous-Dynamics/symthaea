@@ -1971,6 +1971,39 @@ mod tests {
     }
 
     #[test]
+    fn idle_installed_compartment_remains_in_utilization_denominator() {
+        let request = request(
+            "service-cell-one",
+            0,
+            Some(0),
+            WindowRequestState::Completed { closed_at_s: 60 },
+            &["cup-one"],
+            Some(report("service-cell-one", &["cup-one"], &[], &["cup-one"])),
+        );
+        let mut window = spec(&REQUIRED);
+        window.compartments.push(CompartmentConfiguration {
+            compartment_id: "cell-02".to_owned(),
+            configuration_sha256: digest('e'),
+        });
+        let result = account_system_window(
+            &window,
+            &[request],
+            &[release("service-cell-one", "cup-one", 50)],
+            &basic_resources(),
+        ).unwrap();
+        assert_eq!(result.compartment_count, 2);
+        assert_eq!(result.compartment_stats.len(), 2);
+        assert_eq!(result.maximum_concurrent_compartments, 1);
+        assert_eq!(result.active_compartment_seconds_total, 60);
+        assert_eq!(result.compartment_utilization_fraction, 0.3);
+        let idle = result.compartment_stats.iter()
+            .find(|cell| cell.compartment_id == "cell-02")
+            .unwrap();
+        assert_eq!(idle.active_compartment_seconds, 0);
+        assert_eq!(idle.compartment_utilization_fraction, 0.0);
+    }
+
+    #[test]
     fn reports_per_compartment_activity_and_release_counts() {
         let requests = [
             request(
