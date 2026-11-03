@@ -89,6 +89,7 @@ pub struct SonataMotifDevelopmentBatchV1 {
     pub capability_sha256: String,
     pub source_motif_id: String,
     pub source_motif_family_id: String,
+    pub requested_transformation: ReturnTransformation,
     pub source_section: SonataSectionKind,
     pub target_section: SonataSectionKind,
     pub source_note_indices: Vec<usize>,
@@ -144,10 +145,20 @@ pub fn generate_sonata_motif_development_v1(
         .iter()
         .find(|demand| demand.id == driving_id)
         .ok_or(SonataMotifDevelopmentErrorV1::DrivingObligationNotFound)?;
-    let motif_id = match &demand.kind {
-        ObligationKind::ReturnMotif { motif_id, .. } => motif_id.as_str(),
+    let (motif_id, requested_transformation) = match &demand.kind {
+        ObligationKind::DevelopMotif { motif_id, transformation } => {
+            (motif_id.as_str(), *transformation)
+        }
         _ => return Err(SonataMotifDevelopmentErrorV1::DrivingObligationIsNotNamedMotif),
     };
+    if !matches!(
+        requested_transformation,
+        ReturnTransformation::Transposed | ReturnTransformation::Inverted
+    ) {
+        return Err(SonataMotifDevelopmentErrorV1::UnsupportedTransformation {
+            transformation: requested_transformation,
+        });
+    }
     let source_kind = match motif_id {
         "sonata.primary" => SonataSectionKind::ExpositionPrimary,
         "sonata.secondary" => SonataSectionKind::ExpositionSecondary,
@@ -228,10 +239,7 @@ pub fn generate_sonata_motif_development_v1(
         source_motif.clone(),
         PhraseRole::Transition,
         vec![MotifInvariant::EventCount(source_note_indices.len())],
-        vec![
-            ReturnTransformation::Transposed,
-            ReturnTransformation::Inverted,
-        ],
+        vec![requested_transformation],
         // The Sonata style does not yet have a Style enum value. An empty
         // compatibility list is more honest than asserting Classical fit.
         Vec::new(),
@@ -262,7 +270,7 @@ pub fn generate_sonata_motif_development_v1(
         }
     })?;
 
-    let mut candidates = Vec::with_capacity(3);
+    let mut candidates = Vec::with_capacity(2);
     candidates.push(build_candidate(
         "identity-baseline",
         SonataMotifDevelopmentStrategyV1::IdentityBaseline,
@@ -275,14 +283,39 @@ pub fn generate_sonata_motif_development_v1(
         &realization.plan,
     )?);
 
-    let transposed = source_motif.transpose(1);
-    let transposed_score = apply_pitch_motif(
+    let (strategy, candidate_id, transformed_motif) = match requested_transformation {
+        ReturnTransformation::Transposed => (
+            SonataMotifDevelopmentStrategyV1::TransposedUpOneDiatonicDegree,
+            "transposed-up-one-diatonic-degree",
+            source_motif.transpose(1),
+        ),
+        ReturnTransformation::Inverted => {
+            let pivot = source_motif
+                .notes
+                .first()
+                .and_then(|note| note.degree)
+                .ok_or(SonataMotifDevelopmentErrorV1::SourcePitchOutsideDiatonicScale {
+                    source_note_index: source_note_indices[0],
+                })?;
+            (
+                SonataMotifDevelopmentStrategyV1::InvertedAroundFirstDegree,
+                "inversion-about-first-source-degree",
+                source_motif.invert(pivot),
+            )
+        }
+        unsupported => {
+            return Err(SonataMotifDevelopmentErrorV1::UnsupportedTransformation {
+                transformation: unsupported,
+            });
+        }
+    };
+    let transformed_score = apply_pitch_motif(
         &realization.score,
         &target_note_indices,
-        &transposed,
+        &transformed_motif,
     )?;
-    let transposed_target_motif =
-        motif_from_score_indices(&transposed_score, &target_note_indices).map_err(
+    let transformed_target_motif =
+        motif_from_score_indices(&transformed_score, &target_note_indices).map_err(
             |target_note_index| {
                 SonataMotifDevelopmentErrorV1::TargetPitchOutsideDiatonicScale {
                     target_note_index,
@@ -290,47 +323,14 @@ pub fn generate_sonata_motif_development_v1(
             },
         )?;
     candidates.push(build_candidate(
-        "transposed-up-one-diatonic-degree",
-        SonataMotifDevelopmentStrategyV1::TransposedUpOneDiatonicDegree,
-        Some(ReturnTransformation::Transposed),
-        transposed_score,
+        candidate_id,
+        strategy,
+        Some(requested_transformation),
+        transformed_score,
         &realization.score,
         &target_note_indices,
         &family,
-        &transposed_target_motif,
-        &realization.plan,
-    )?);
-
-    let pivot = source_motif
-        .notes
-        .first()
-        .and_then(|note| note.degree)
-        .ok_or(SonataMotifDevelopmentErrorV1::SourcePitchOutsideDiatonicScale {
-            source_note_index: source_note_indices[0],
-        })?;
-    let inverted = source_motif.invert(pivot);
-    let inverted_score = apply_pitch_motif(
-        &realization.score,
-        &target_note_indices,
-        &inverted,
-    )?;
-    let inverted_target_motif =
-        motif_from_score_indices(&inverted_score, &target_note_indices).map_err(
-            |target_note_index| {
-                SonataMotifDevelopmentErrorV1::TargetPitchOutsideDiatonicScale {
-                    target_note_index,
-                }
-            },
-        )?;
-    candidates.push(build_candidate(
-        "inversion-about-first-source-degree",
-        SonataMotifDevelopmentStrategyV1::InvertedAroundFirstDegree,
-        Some(ReturnTransformation::Inverted),
-        inverted_score,
-        &realization.score,
-        &target_note_indices,
-        &family,
-        &inverted_target_motif,
+        &transformed_target_motif,
         &realization.plan,
     )?);
 
@@ -340,6 +340,7 @@ pub fn generate_sonata_motif_development_v1(
         capability_sha256,
         source_motif_id: motif_id.to_owned(),
         source_motif_family_id,
+        requested_transformation,
         source_section: source_kind,
         target_section: SonataSectionKind::Development,
         source_note_indices,
