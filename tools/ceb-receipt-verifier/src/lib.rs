@@ -1606,7 +1606,7 @@ mod tests {
         patch_sha256: &str,
         artifact_root: &std::path::Path,
     ) -> Value {
-        let patch_bytes = b"diff --git a/src/lib.rs b/src/lib.rs\\n+pub fn verified() -> bool { true }\\n";
+        let patch_bytes = b"diff --git a/src/lib.rs b/src/lib.rs\n+pub fn verified() -> bool { true }\n";
         let log_bytes = format!("independent {stage} test evidence").into_bytes();
         let report_bytes = format!("signed {stage} run report").into_bytes();
         let patch_artifact = write_test_artifact(artifact_root, "candidate.patch", patch_bytes);
