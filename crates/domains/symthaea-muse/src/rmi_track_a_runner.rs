@@ -9,14 +9,17 @@
 //! collaboration. Those require separate candidate adapters and studies.
 
 use crate::rmi_benchmark::{
-    evaluate_rmi_pair, evaluate_rmi_reciprocal_pair, serialized_sha256_v1,
-    FixedPartnerResponsePolicyV1, FixedResponsePolicyV1, ImitationOnlyPolicyV1,
-    RmiActionDeltaV1, RmiAgentActionV1, RmiEvaluationEnvelopeV1, RmiInterventionPairV1,
-    RmiMusicalFeaturesV1, RmiPartnerObservationV1, RmiPartnerPolicyV1, RmiPartnerResponseV1,
-    RmiPolicyV1, RmiReciprocalEvaluationEnvelopeV1, RmiRoleV1, RmiTargetFeatureV1,
+    evaluate_rmi_pair, evaluate_rmi_reciprocal_pair, FixedPartnerResponsePolicyV1,
+    FixedResponsePolicyV1, ImitationOnlyPolicyV1, RmiAgentActionV1,
+    RmiEvaluationEnvelopeV1, RmiHistoryActorV1, RmiHistoryEventV1,
+    RmiInterventionPairV1, RmiMusicalFeaturesV1, RmiPartnerObservationV1,
+    RmiPartnerResponseV1, RmiReciprocalEvaluationEnvelopeV1, RmiRoleV1,
+    RmiTargetFeatureV1,
     SyntheticContingentPolicyV1, SyntheticResponsivePartnerPolicyV1,
 };
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::fmt::Write as FmtWrite;
 
 pub const RMI_TRACK_A_RUNNER_VERSION_V1: &str = "rmi-track-a-offline-runner-v1";
 pub const RMI_TRACK_A_MAX_TRIALS_PER_TARGET_V1: usize = 10_000;
@@ -59,7 +62,8 @@ pub struct RmiTrackASummaryV1 {
     pub fixed_partner_did_not_respond: usize,
     pub reciprocal_positive_control_both_directions: usize,
     pub reciprocal_positive_control_zero_collateral: usize,
-    pub order_swap_verified: usize,
+    pub agent_order_swap_verified: usize,
+    pub partner_order_swap_verified: usize,
     /// All registered synthetic positive/negative-control expectations held.
     /// This is evaluator-fixture qualification, not a Melothaea score.
     pub synthetic_fixture_expectations_satisfied: bool,
@@ -183,7 +187,7 @@ pub fn make_rmi_track_a_fixture_v1(
             features: control.clone(),
         },
     ];
-    let pre_state_sha256 = serialized_sha256_v1(&history)?;
+    let pre_state_sha256 = digest_v1(&history)?;
     let pair = RmiInterventionPairV1 {
         trial_id,
         seed,
@@ -263,6 +267,16 @@ fn capture<T>(result: Result<T, impl std::fmt::Debug>) -> Result<T, String> {
     result.map_err(|error| format!("{error:?}"))
 }
 
+fn digest_v1<T: Serialize>(value: &T) -> Result<String, String> {
+    let bytes = serde_json::to_vec(value).map_err(|error| error.to_string())?;
+    let digest = Sha256::digest(&bytes);
+    let mut encoded = String::with_capacity(64);
+    for byte in digest {
+        let _ = write!(&mut encoded, "{byte:02x}");
+    }
+    Ok(encoded)
+}
+
 pub fn run_rmi_track_a_suite_v1(
     trials_per_target: usize,
     seed_root: u64,
@@ -292,7 +306,7 @@ pub fn run_rmi_track_a_suite_v1(
         ],
         claim_boundary: "Synthetic evaluator qualification only; not a Melothaea performance, musical-quality, human-influence, collaboration-value, authorship, or consciousness result.".into(),
     };
-    let manifest_sha256 = serialized_sha256_v1(&manifest)?;
+    let manifest_sha256 = digest_v1(&manifest)?;
     let total_trials = trials_per_target
         .checked_mul(targets.len())
         .ok_or_else(|| "total trial count overflow".to_owned())?;
@@ -301,7 +315,7 @@ pub fn run_rmi_track_a_suite_v1(
     for target in targets {
         for trial_index in 0..trials_per_target {
             let pair = make_rmi_track_a_fixture_v1(target, trial_index, seed_root)?;
-            let pair_sha256 = serialized_sha256_v1(&pair)?;
+            let pair_sha256 = digest_v1(&pair)?;
 
             let fixed_agent = capture(evaluate_rmi_pair(&fixed_agent_v1(), &pair));
             let imitation_agent = capture(evaluate_rmi_pair(&imitation_agent_v1(), &pair));
@@ -357,27 +371,33 @@ pub fn run_rmi_track_a_suite_v1(
         if let Ok(result) = &trial.fixed_agent {
             summary.fixed_agent_zero_sensitivity +=
                 usize::from(!result.payload.targeted_input_sensitivity);
-            summary.order_swap_verified += usize::from(result.payload.arm_order_swap_verified);
+            summary.agent_order_swap_verified += usize::from(result.payload.arm_order_swap_verified);
         }
         if let Ok(result) = &trial.imitation_agent {
             summary.imitation_agent_target_sensitive +=
                 usize::from(result.payload.targeted_input_sensitivity);
-            summary.order_swap_verified += usize::from(result.payload.arm_order_swap_verified);
+            summary.agent_order_swap_verified += usize::from(result.payload.arm_order_swap_verified);
         }
         if let Ok(result) = &trial.synthetic_contingent_agent {
             summary.positive_agent_target_sensitive +=
                 usize::from(result.payload.targeted_input_sensitivity);
-            summary.order_swap_verified += usize::from(result.payload.arm_order_swap_verified);
+            summary.agent_order_swap_verified += usize::from(result.payload.arm_order_swap_verified);
         }
         if let Ok(result) = &trial.fixed_agent_with_responsive_partner {
             summary.fixed_agent_did_not_influence_partner +=
                 usize::from(!result.payload.targeted_partner_sensitivity);
+            summary.partner_order_swap_verified +=
+                usize::from(result.payload.partner_arm_order_swap_verified);
         }
         if let Ok(result) = &trial.synthetic_agent_with_fixed_partner {
             summary.fixed_partner_did_not_respond +=
                 usize::from(!result.payload.targeted_partner_sensitivity);
+            summary.partner_order_swap_verified +=
+                usize::from(result.payload.partner_arm_order_swap_verified);
         }
         if let Ok(result) = &trial.synthetic_agent_with_responsive_partner {
+            summary.partner_order_swap_verified +=
+                usize::from(result.payload.partner_arm_order_swap_verified);
             let both = result.payload.agent_targeted_sensitivity
                 && result.payload.targeted_partner_sensitivity;
             summary.reciprocal_positive_control_both_directions += usize::from(both);
@@ -396,7 +416,9 @@ pub fn run_rmi_track_a_suite_v1(
         && summary.fixed_agent_did_not_influence_partner == summary.trials
         && summary.fixed_partner_did_not_respond == summary.trials
         && summary.reciprocal_positive_control_both_directions == summary.trials
-        && summary.reciprocal_positive_control_zero_collateral == summary.trials;
+        && summary.reciprocal_positive_control_zero_collateral == summary.trials
+        && summary.agent_order_swap_verified == summary.trials * 3
+        && summary.partner_order_swap_verified == summary.trials * 3;
 
     let payload = RmiTrackAReportPayloadV1 {
         manifest,
@@ -404,7 +426,7 @@ pub fn run_rmi_track_a_suite_v1(
         summary,
         trials,
     };
-    let payload_sha256 = serialized_sha256_v1(&payload)?;
+    let payload_sha256 = digest_v1(&payload)?;
     Ok(RmiTrackAReportV1 {
         payload,
         payload_sha256,
