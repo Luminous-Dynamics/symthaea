@@ -101,21 +101,27 @@ This can explain why a transformation preserves one contract but not another. A 
 
 Fibre profiles are explanatory metadata until backed by a checked proof. A producer-supplied integer k is not evidence.
 
-## 5. SCPOG proof-generation bottleneck: a focused research opportunity
+## 5. SCPOG proof-generation bottleneck: improve the existing portfolio, do not reinvent it
 
-SCPOG already uses an important architecture: the Skolem POG represents the projected d-DNNF and gives a hidden-variable witness for every supported visible assignment. The checker can then validate reverse implication and structural conditions without requiring a giant producer-emitted clause sequence for every input clause.
+The SAT 2025 SCPOG implementation already has two forward-proof-generation modes:
+- a monolithic proof-generating SAT solver on the input, the POG Tseitin encoding, and the negated root;
+- a hybrid that recursively traverses the POG and switches to monolithic generation for sufficiently small subgraphs.
 
-The published evaluation identifies forward-implication proof generation as the major weakness. The next work should be a controlled proof-generation portfolio rather than a replacement checker:
+It also uses proof-producing SAT for some mutual-exclusion obligations. These are upstream baselines, not new Symthaea proposals. The published evaluation identifies forward-implication proof generation as the major weakness, so the research question is how to improve the existing portfolio and extend its transformation coverage.
 
-1. Baseline A: reproduce the upstream SCPOG generator and checker unchanged.
-2. Baseline B: retain the same Skolem POG but generate the forward implication proof using an independent SAT proof-producing check of F(X,H) AND NOT psi(X), with an independently validated CNF encoding of NOT psi.
-3. Candidate C: reuse D4's component/decomposition trace to produce local implication lemmas and compose them through the same target root.
-4. Candidate D: hash-cons repeated forward lemmas, share proof sub-DAGs, and eliminate duplicate/subsumed derivation work where the proof calculus permits it.
-5. Candidate E: compare eager full Skolem witness materialization with lazy, component-local witness generation, while retaining exact Skolem semantics and a checker that validates the declared representation.
+Proposed experiments:
 
-These are hypotheses. A SAT refutation of F AND NOT psi is a valid way to establish the forward direction only when the target formula encoding and its equivalence to NOT psi is itself correctly bound and checked. It does not establish the reverse projected implication; the Skolem witness/checking obligation remains.
+1. **Baseline A — unchanged upstream:** pin and reproduce the SCPOG generator, monolithic mode, hybrid mode, C checker and CakeML checker on the same artifact inputs.
+2. **Candidate B — adaptive cut selection:** choose hybrid proof boundaries using component structure, separator size, clause/variable incidence, local proof difficulty and preprocessing provenance. Compare against the paper's subgraph-size threshold.
+3. **Candidate C — shared proof sub-DAGs:** hash-cons repeated implication lemmas and reuse derivations across components/branches where the proof calculus permits it. Measure generation time, proof bytes, checker time and peak memory.
+4. **Candidate D — preprocessing-aware reverse checks:** record each preprocessing operation and the exact partial-assignment context under which it was applied. Develop a checked reconstruction/relation obligation for transformations that are not full-model-equivalent. Test blocked-clause elimination and other inprocessing separately for SAT, full-model, projected-support and weighted-value preservation; never infer a counting guarantee from equisatisfiability.
+5. **Candidate E — compact context-specific Skolem witnesses:** determine whether component-local witness functions or lazy witness materialization can reduce Skolem POG size while preserving the same reverse-implication guarantee.
 
-Every candidate must be compared on the same inputs and hardware, recording proof generation time/bytes, checker time/RSS, compiled DAG size and complete verified wall time.
+The paper already describes a hybrid generator and a restricted treatment of pure-literal elimination. It identifies more general blocked-clause elimination under partial assignments as an unresolved reverse-implication challenge. A Symthaea contribution here should be a general, independently checked context-sensitive relation—not merely adding more preprocessing passes.
+
+A possible proof boundary for the forward direction is an UNSAT certificate for the conjunction of source CNF, the declared target POG encoding, and the negated root. The encoding must itself be tied to the target representation and independently validated. This is the logic underlying the upstream monolithic approach; the proposed improvement is the adaptive factoring, lemma sharing and proof amortization around it, not the bare use of a SAT proof.
+
+These are hypotheses. Each candidate must be compared against the unchanged upstream methods on identical compilation outputs and checker obligations. Report proof generation time/bytes, checker time/RSS, compiled DAG size and complete verified wall time. A smaller proof that cannot be checked within the resource budget is not a win.
 
 ## 6. A new primary benchmark: transformation coverage
 
