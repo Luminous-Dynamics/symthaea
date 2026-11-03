@@ -8,8 +8,9 @@
 //! replay ledger before dispatching the command.
 
 use crate::mobile_tool_effects::{
-    EffectCeiling, MobileProviderCapabilityReport, MobileTool, ProviderBoundToolAuthorization,
-    ToolAuthorizationError, authorize_reported_mobile_tool,
+    EffectCeiling, MOBILE_DEVICE_READ_ONLY_POLICY_ID, MobileProviderCapabilityReport,
+    MobileTool, ProviderBoundToolAuthorization, ToolAuthorizationError,
+    authorize_mobile_device_observation, authorize_reported_mobile_tool, mobile_tool_catalog_sha256,
 };
 use crate::{canonical_jcs_bytes, sha256_hex};
 use serde::{Deserialize, Serialize};
@@ -127,6 +128,7 @@ pub enum MobileInvocationError {
     InvalidTimestamp(&'static str),
     ConsentExpired,
     ConsentRevoked,
+    PolicyScopeMismatch,
     ReplayCapacityExceeded,
     ConsentScopeMismatch(&'static str),
     SessionMismatch(&'static str),
@@ -147,6 +149,7 @@ impl fmt::Display for MobileInvocationError {
             Self::InvalidTimestamp(field) => write!(f, "{field} is invalid"),
             Self::ConsentExpired => write!(f, "caller consent is expired or not yet valid"),
             Self::ConsentRevoked => write!(f, "caller consent has been revoked"),
+            Self::PolicyScopeMismatch => write!(f, "invocation is not restricted to the mobile read-only policy"),
             Self::ReplayCapacityExceeded => write!(f, "process-local replay guard reached its bounded capacity"),
             Self::ConsentScopeMismatch(field) => write!(f, "consent does not authorize {field}"),
             Self::SessionMismatch(field) => write!(f, "selected device session does not match {field}"),
@@ -183,6 +186,11 @@ pub fn prepare_mobile_invocation(
     ceiling: EffectCeiling,
     now_unix_ms: u64,
 ) -> Result<AuthorizedMobileInvocation, MobileInvocationError> {
+    if policy_id != MOBILE_DEVICE_READ_ONLY_POLICY_ID
+        || ceiling != EffectCeiling::MOBILE_DEVICE_READ_ONLY
+    {
+        return Err(MobileInvocationError::PolicyScopeMismatch);
+    }
     validate_opaque_id(&request.invocation_id, "invocation_id", "inv_")?;
     validate_opaque_id(&request.invocation_nonce, "invocation_nonce", "nonce_")?;
     validate_opaque_id(&consent.consent_id, "consent_id", "consent_")?;
@@ -378,6 +386,24 @@ pub fn verify_mobile_invocation_receipt(
     }
     if receipt.schema != "luminous.mobile-invocation-receipt.v1" {
         return Err(MobileInvocationError::InvalidIdentifier("receipt schema"));
+    }
+    if receipt.policy_id != MOBILE_DEVICE_READ_ONLY_POLICY_ID {
+        return Err(MobileInvocationError::PolicyScopeMismatch);
+    }
+    let expected_catalog_sha256 = mobile_tool_catalog_sha256()
+        .map_err(|error| MobileInvocationError::Provider(error))?;
+    if receipt.effect_catalog_sha256 != expected_catalog_sha256 {
+        return Err(MobileInvocationError::Canonicalization(
+            "effect catalog digest does not match the pinned mobile catalog".to_owned(),
+        ));
+    }
+    let expected_authorization = authorize_mobile_device_observation(receipt.tool.as_str())?;
+    if receipt.policy_sha256 != expected_authorization.policy_sha256
+        || receipt.effect_sha256 != expected_authorization.effect_sha256
+    {
+        return Err(MobileInvocationError::Canonicalization(
+            "tool/policy/effect digests do not match the pinned read-only catalog".to_owned(),
+        ));
     }
     if receipt.expires_at_unix_ms <= receipt.issued_at_unix_ms
         || receipt.expires_at_unix_ms - receipt.issued_at_unix_ms > MOBILE_INVOCATION_MAX_TTL_MS
@@ -719,6 +745,41 @@ mod tests {
             .unwrap_err(),
             MobileInvocationError::InvalidArguments
         );
+    }
+
+    #[test]
+    fn rejects_attempt_to_prepare_with_a_broader_effect_ceiling() {
+        let (session, consent) = aliases();
+        let elevated = EffectCeiling {
+            allow_mutates_target: true,
+            allow_mutates_session: true,
+            allow_writes_filesystem: true,
+            allow_launches_process: true,
+            allow_accesses_network: true,
+            allow_changes_ui_state: true,
+            allow_may_discard_data: true,
+            allow_executes_foreign_code: true,
+            allow_mutates_device: true,
+        };
+        let error = prepare_mobile_invocation(
+            &build_request(&session, &consent), &consent, &session, &report(),
+            "operator-custom-elevated", elevated, NOW,
+        ).unwrap_err();
+        assert_eq!(error, MobileInvocationError::PolicyScopeMismatch);
+    }
+
+    #[test]
+    fn rejects_receipt_when_tool_or_policy_digest_is_rewritten() {
+        let (session, consent) = aliases();
+        let authorized = prepare_mobile_invocation(
+            &build_request(&session, &consent), &consent, &session, &report(),
+            MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW,
+        ).unwrap();
+        let mut forged = authorized.receipt.clone();
+        forged.tool = MobileTool::InstallAdbPackage;
+        forged.effect_sha256 = "8".repeat(64);
+        forged.receipt_sha256 = mobile_invocation_receipt_sha256(&forged).unwrap();
+        assert!(verify_mobile_invocation_receipt(&forged).is_err());
     }
 
     #[test]
