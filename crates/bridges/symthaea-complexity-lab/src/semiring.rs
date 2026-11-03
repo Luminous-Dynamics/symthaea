@@ -656,6 +656,10 @@ impl ExactFactorGraph<MaxCountValue> {
     /// of distinct partial assignments represented by that branch. Products
     /// of branch supports correspond to disjoint earlier-eliminated blocks,
     /// so the conditional probabilities telescope to 1 / total support.
+    ///
+    /// The result must come from evaluate_with_witness on this graph or have
+    /// been independently certificate-checked. The structural checks below
+    /// do not replay every local argmax against the source factor tables.
     pub fn sample_optimal_assignment<F>(
         &self,
         result: &MaxCountWitnessResult,
@@ -1159,7 +1163,10 @@ mod tests {
                 .map(|&(u,v)| if assignment[u] != assignment[v] { 1i128 } else { 0i128 }).sum();
             assert_eq!(score, 2);
         }
-        assert!(graph.sample_optimal_assignment(&result, |_| u128::MAX).is_err());
+        assert!(matches!(
+            graph.sample_optimal_assignment(&result, |_| u128::MAX),
+            Err(EliminationError::InvalidRandomDraw { .. })
+        ));
         let mut inconsistent = result.clone();
         inconsistent.distinct_optimal_assignments += 1;
         assert!(graph.sample_optimal_assignment(&inconsistent, |_| 0).is_err());
