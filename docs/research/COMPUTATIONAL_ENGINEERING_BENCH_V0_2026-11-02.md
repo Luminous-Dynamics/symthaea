@@ -299,8 +299,8 @@ and derives every active/inactive fact set.
 Six new world controls cover false Windows activation on Linux, missed default
 audit activation, missed explicitly selected audit activation, inconsistent
 effective-feature declarations, target-triple mismatch and duplicate world IDs.
-Together with the 31 existing controls, this brings the contract workflow to
-37 authored negative controls across four Draft 2020-12 schemas. Static matrix
+Together with the 32 existing controls, this brings the contract workflow to
+38 authored negative controls across four Draft 2020-12 schemas. Static matrix
 consistency checks passed in this repository review, but these CI controls have
 not yet passed a successful exact-head workflow. All eight worlds remain
 design-only expectations, not compiler-confirmed results.
