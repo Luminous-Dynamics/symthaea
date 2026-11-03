@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/connectomics/connectome-universe-structure-artifacts-v0.1.schema.json",
+  "title": "Connectome universe adequacy structural artifacts v0.1",
+  "description": "Evaluator-only canonical-graph inputs. The semantic verifier validates node/edge references, canonicalizes order, and recomputes each world's domain-separated structural digest.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "worlds"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "worlds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "world_id",
+          "structure"
+        ],
+        "properties": {
+          "world_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "structure": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "nodes",
+              "edges"
+            ],
+            "properties": {
+              "nodes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "node_id",
+                    "attributes"
+                  ],
+                  "properties": {
+                    "node_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "attributes": {
+                      "type": "object"
+                    }
+                  }
+                }
+              },
+              "edges": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "edge_id",
+                    "source",
+                    "target",
+                    "attributes"
+                  ],
+                  "properties": {
+                    "edge_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "source": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "attributes": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$comment": "The canonical structural digest is SHA-256(\"CONNECTOME-STRUCTURAL-GRAPH-CANONICAL-V1\\0\" || canonical_json({nodes: sorted_by_node_id, edges: sorted_by_edge_id})). Object keys use serde_json's ordered map serialization under the pinned toolchain. The digest is not a biological correctness proof."
+}
