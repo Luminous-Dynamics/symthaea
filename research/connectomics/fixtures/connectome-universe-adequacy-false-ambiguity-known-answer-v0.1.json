@@ -71,11 +71,12 @@
     "query_flipping_reference_count": 0,
     "omitted_query_flipping_count": 0,
     "false_invariance_count": 0,
-    "not_estimable_count": 0,
     "false_ambiguity_count": 1,
     "candidate_duplicate_structure_group_count": 0,
     "reference_duplicate_structure_group_count": 0,
-    "candidate_not_estimable_count": 0
+    "candidate_not_estimable_count": 0,
+    "compatible_estimable_reference_count": 2,
+    "compatible_query_not_estimable_reference_count": 0
   },
   "family_summaries": [
     {
@@ -86,8 +87,11 @@
       "omitted_query_flipping_count": 0,
       "false_invariance_count": 0,
       "false_ambiguity_count": 0,
-      "not_estimable_count": 0,
-      "candidate_not_estimable_count": 0
+      "candidate_not_estimable_count": 0,
+      "incompatible_reference_count": 0,
+      "indeterminate_reference_count": 0,
+      "compatible_estimable_reference_count": 1,
+      "compatible_query_not_estimable_reference_count": 0
     },
     {
       "error_family": "continuation_loss",
@@ -97,8 +101,11 @@
       "omitted_query_flipping_count": 0,
       "false_invariance_count": 0,
       "false_ambiguity_count": 1,
-      "not_estimable_count": 0,
-      "candidate_not_estimable_count": 0
+      "candidate_not_estimable_count": 0,
+      "incompatible_reference_count": 0,
+      "indeterminate_reference_count": 0,
+      "compatible_estimable_reference_count": 1,
+      "compatible_query_not_estimable_reference_count": 0
     }
   ],
   "dispositions": {
