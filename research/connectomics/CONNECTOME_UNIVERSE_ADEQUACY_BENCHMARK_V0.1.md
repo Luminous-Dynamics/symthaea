@@ -57,7 +57,15 @@ Where the ordering cannot be authenticated, output ADEQUACY_NOT_ESTIMABLE and pr
 
 ## 4. World identity and comparability
 
-World IDs must be canonical, content-addressed identifiers with domain separation and a versioned canonicalization rule. In addition, every candidate and reference world carries an evaluator-recomputed `canonical_structural_sha256` produced by the same versioned structural canonicalizer. Structural inclusion is based on canonical structural digest equality, not raw world-ID equality: candidate and reference IDs may differ while the represented graph is equivalent. The canonicalizer must declare node/edge identity, direction, synapse attributes, coordinate-frame normalization and permitted equivalence transformations. A canonical digest is an identity/equivalence key under that declared canonicalizer, not proof of biological truth.
+World IDs must be canonical, content-addressed identifiers with domain separation and a versioned canonicalization rule. In addition, every candidate and reference world carries an evaluator-recomputed `canonical_structural_sha256` produced by the same versioned structural canonicalizer. Structural inclusion is based on canonical structural digest equality, not raw world-ID equality: candidate and reference IDs may differ while the represented graph is equivalent.
+
+The evaluator consumes separate candidate/reference structure sidecars conforming to `connectome-universe-structure-artifacts-v0.1.schema.json`. The report binds the SHA-256 of the exact sidecar bytes plus the canonicalizer identity. For the synthetic V1 representation:
+- nodes are records with unique `node_id` and canonical JSON `attributes`;
+- directed edges are records with unique `edge_id`, existing `source` / `target` node references and canonical JSON `attributes`;
+- nodes are sorted by `node_id`, edges by `edge_id`, and object keys use the pinned serde_json ordered-map encoding;
+- the per-world digest is SHA-256 over `CONNECTOME-STRUCTURAL-GRAPH-CANONICAL-V1\\0` followed by canonical JSON bytes for the sorted `{nodes, edges}` object.
+
+The canonicalizer must declare node/edge identity, direction, synapse attributes, coordinate-frame normalization and permitted equivalence transformations before any biological use. The initial fixture is a small synthetic directed graph; it does not establish an anatomical mesh or voxel equivalence canonicalizer. A canonical digest is an identity/equivalence key under that declared canonicalizer, not proof of biological truth.
 
 The evaluator must distinguish:
 - **structural inclusion:** a reference structural world is equivalent to a candidate world under the declared canonical equivalence;
@@ -144,7 +152,7 @@ All methods must use the same source observations, frozen query and cost/evidenc
 
 ## 10. Schema and validation contract
 
-The first report shape is defined in `connectome-universe-adequacy-report-v0.1.schema.json`.
+The report shape is defined in `connectome-universe-adequacy-report-v0.1.schema.json`; evaluator-only graph sidecars are defined in `connectome-universe-structure-artifacts-v0.1.schema.json`.
 
 JSON Schema checks structural shape only. A Rust semantic validator must additionally enforce:
 - unique candidate and reference world IDs;
@@ -153,7 +161,8 @@ JSON Schema checks structural shape only. A Rust semantic validator must additio
 - exact count reconciliation between world arrays and `summary`;
 - compatible + incompatible + indeterminate = reference count;
 - all count numerators are bounded by the appropriate denominators;
-- candidate and reference structural digests are recomputed by the pinned evaluator canonicalizer; duplicate canonical structures with distinct world IDs are counted separately for candidate and reference worlds;
+- candidate and reference sidecar raw-byte hashes match the report's structure-manifest digests;
+- the pinned evaluator canonicalizer recomputes each world structural digest from sidecar graph bytes; duplicate canonical structures with distinct world IDs are counted separately for candidate and reference worlds;
 - query evaluation is deterministic for a canonical structure: structurally equivalent worlds with different query states under the same query/code digest invalidate the report;
 - `false_ambiguity_count` is recomputed as candidate worlds whose query state is absent from the compatible, estimable reference query-state set;
 - family totals reconcile without duplicate family keys, and every predeclared required family has exactly one summary row;
