@@ -332,6 +332,7 @@ impl<S: ExactSemiring> ExactFactorGraph<S> {
         let mut stats = EliminationStats::default();
 
         for &eliminated in order {
+            validate_support_factor_alignment(&factors, &support_factors)?;
             let bucket_indices: Vec<usize> = factors.iter().enumerate()
                 .filter_map(|(i, f)| f.scope.contains(&eliminated).then_some(i)).collect();
             let mut joined = BTreeSet::new();
@@ -393,6 +394,35 @@ impl<S: ExactSemiring> ExactFactorGraph<S> {
     }
 }
 
+
+
+/// Fail closed if the weighted MaxCount tables and parallel distinct-support
+/// tables cease to describe the same factor scopes/cells.
+fn validate_support_factor_alignment(
+    factors: &[ExactFactor<MaxCountValue>],
+    support_factors: &[ExactFactor<u128>],
+) -> Result<(), EliminationError> {
+    if factors.len() != support_factors.len() {
+        return Err(EliminationError::InvalidEliminationOrder {
+            reason: "MaxCount and support factor counts diverged",
+        });
+    }
+    for (factor, support) in factors.iter().zip(support_factors.iter()) {
+        if factor.scope != support.scope || factor.values.len() != support.values.len() {
+            return Err(EliminationError::InvalidEliminationOrder {
+                reason: "MaxCount and support factor tables are misaligned",
+            });
+        }
+        for (weighted, distinct) in factor.values.iter().zip(support.values.iter()) {
+            if weighted.optimum().is_none() != (*distinct == 0) {
+                return Err(EliminationError::InvalidEliminationOrder {
+                    reason: "MaxCount feasibility and distinct support disagree",
+                });
+            }
+        }
+    }
+    Ok(())
+}
 
 /// MaxCount-specialized elimination retaining every local maximizer.
 /// The reverse pass returns a canonical optimum witness without conditional
@@ -558,6 +588,7 @@ impl ExactFactorGraph<MaxCountValue> {
             increment_usize(&mut stats.generated_factors, "generated factors")?;
         }
 
+        validate_support_factor_alignment(&factors, &support_factors)?;
         let mut result = self.one.clone();
         let mut distinct_optimal_assignments = 1u128;
         for (factor, support_factor) in factors.iter().zip(support_factors.iter()) {
