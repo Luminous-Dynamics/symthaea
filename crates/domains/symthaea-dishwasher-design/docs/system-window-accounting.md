@@ -21,7 +21,8 @@ Each scored window also freezes the machine-unit ID, whole-system configuration 
 - **Accepted request:** one stable service-request identity with one or more requested item IDs.
 - **Started request:** accepted work that has entered physical service. A request can remain queued and unresolved with no start timestamp and no service report.
 - **Completed request:** has a start, a close timestamp and an upstream service-accounting report.
-- **Unresolved request:** not closed at the window boundary. It is right-censored at `end_at_s`; it cannot be silently dropped from the denominator or counted as a complete request.
+- **Cancelled request:** a terminal cancellation timestamp, either while still queued (no physical attempt/report) or after at least one physical attempt (report retained). A cancellation is not an unresolved or completed request.
+- **Unresolved request:** not closed or cancelled at the window boundary. It is right-censored at `end_at_s`; it cannot be silently dropped from the denominator or counted as a complete request.
 - **Verified item release:** an item with an explicit release event whose identity is present in the upstream service report's independently verified item IDs. A timer, turbidity, model prediction or process proxy cannot authorize release.
 - **Carry-in request:** accepted before the observation window and still queued or active at its start. It is reported separately to expose the boundary condition.
 - **Maximum concurrency:** peak number of started service requests active at the same instant. Service intervals are half-open; a request ending at the same timestamp another starts does not create overlap.
@@ -30,14 +31,14 @@ Each scored window also freezes the machine-unit ID, whole-system configuration 
 ## Reported metrics
 
 - Quality-qualified throughput: independently verified item releases divided by elapsed wall-clock window hours.
-- Request count, accepted/started/completed counts, carry-in requests, and unresolved requests at window end.
-- Requested items in the accepted-in-window cohort and items in unresolved accepted requests that have not yet achieved a complete independent-assay qualification. An already-qualified item in a still-open multi-item request is not counted as pending qualification.
+- Request count, accepted/started/completed/cancelled counts, carry-in requests, and unresolved requests at window end.
+- Requested items in the accepted-in-window cohort, items in cancelled accepted requests, and items in unresolved accepted requests that have not yet achieved a complete independent-assay qualification. An already-qualified item in a still-open multi-item request is not counted as pending qualification.
 - Time to first independently verified release.
 - Request latency p50/p95 over completed requests accepted during the window, and queue-wait p50/p95 over requests accepted in-window that actually started (including requests still in service at window end). Both use nearest-rank percentiles. Right-censored request latency is reported separately and is not imputed into percentiles.
 - First-pass yield: first-attempt verified items divided by requested items in completed requests accepted during the window. The service ledger reports first-pass IDs; an item first qualified after a re-wash is not first-pass.
 - Physical attempt count, rewash-attempt count, requests with any rewash attempt, item-attempt visits and reattempted item visits.
 - Unqualified items reported by the service ledgers, active request seconds and maximum concurrency.
-- Per-compartment request counts, independently verified releases, active request seconds, peak within-cell concurrency and the configuration digest.
+- Per-compartment request counts, cancellations, independently verified releases, active request seconds, peak within-cell concurrency and the configuration digest.
 - System-level resource totals by canonical unit, plus window resource totals per verified release when at least one item was released. The field is a window-intensity ratio, not the full lifecycle resource cost for one service request.
 
 A release count is event-based. An item qualified in a service report but not released in the scored window is not counted as a release in that window. A request accepted before the window can still contribute a release during it; this is why carry-in is surfaced.
@@ -61,7 +62,7 @@ A zero resource measurement must be represented by an explicit row. A missing re
 For each condition:
 
 1. Freeze machine unit, whole-system configuration digest, utility-topology ID, compartment IDs/configuration digests, programme/firmware, water batch/hardness/inlet temperature, detergent and rinse-aid lots, soil family/age, loading recipe, required independent endpoints, resource meter map and clock source.
-2. Register an arrival trace and service-request item set before dispatch. Retain every accepted, queued, started, cancelled, failed, interrupted and unresolved request.
+2. Register an arrival trace and service-request item set before dispatch. Retain every accepted, queued, started, cancelled, failed, interrupted and unresolved request. Cancellation time and reason are distinct from right-censoring at the window boundary.
 3. Randomize service order within declared blocks. Capture actual start, item-level release, close, rewash and abort timestamps against the same monotonic clock.
 4. Measure system-boundary wall electricity, upstream hot-water energy, fresh water, delivered detergent/rinse aid and operator person-seconds. Allocate shared preheat, standby, purge and fill overhead once at a documented boundary.
 5. Use the exact per-item independent soil-removal, final-rinse-residue and cross-transfer assays. Keep microbiological efficacy and sanitization separate.
@@ -102,6 +103,6 @@ Sources:
 
 ## Acceptance tests
 
-Source-authored Rust tests cover concurrent versus sequential service, carry-in requests, right-censored queued and started requests, independent-assay release qualification, duplicate releases, clock mismatch, cross-instrument boundary overlap, declared parent/branch duplication, parallel operator person-time, missing required resource dimensions, first-pass yield, rewash aggregation, per-compartment statistics and configuration mismatch, and inconsistent upstream service reports. The module currently contains 19 tests; none are executed until the exact PR head is compiled and run.
+Source-authored Rust tests cover concurrent versus sequential service, carry-in requests, queued and in-flight cancellation, post-cancellation release rejection, right-censored queued and started requests, independent-assay release qualification, duplicate releases, clock mismatch, cross-instrument boundary overlap, declared parent/branch duplication, parallel operator person-time, missing required resource dimensions, first-pass yield, rewash aggregation, per-compartment statistics and configuration mismatch, and inconsistent upstream service reports. The module currently contains 22 tests; none are executed until the exact PR head is compiled and run.
 
 All tests, formatting and clippy must run on the exact pull-request head before any pass claim. The validator does not authenticate referenced evidence bytes, prove assay independence, establish the truth of boundary IDs, infer omitted requests, or establish physical cleaning/hygiene performance.
