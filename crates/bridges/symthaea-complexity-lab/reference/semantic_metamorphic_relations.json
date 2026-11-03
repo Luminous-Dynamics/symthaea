@@ -1,0 +1,89 @@
+{
+  "schema": "symthaea.semantic-metamorphic-relations/v1",
+  "coefficient_domains": {
+    "mc": "Z",
+    "wmc": "Q",
+    "pmc": "Z",
+    "pwmc": "Q",
+    "amc-complex": "Q(i)"
+  },
+  "output_contracts": ["mc", "wmc", "pmc", "pwmc", "amc-complex"],
+  "relations": [
+    {
+      "id": "SYN-001",
+      "name": "syntax_normalization",
+      "operation": ["permute_clauses", "permute_literals", "duplicate_existing_clause", "append_existing_variable_tautology"],
+      "preconditions": ["CNF instance", "at least one existing variable", "no semantic metadata is changed"],
+      "expected": {"mc": "equal", "wmc": "equal", "pmc": "equal", "pwmc": "equal", "amc-complex": "equal"}
+    },
+    {
+      "id": "VAR-001",
+      "name": "variable_complement",
+      "operation": ["flip_sign_of_every_occurrence_of_variable_v", "swap_positive_and_negative_literal_weights_for_v"],
+      "preconditions": ["1 <= v <= n", "projection membership of v is preserved"],
+      "expected": {"mc": "equal", "wmc": "equal", "pmc": "equal", "pwmc": "equal", "amc-complex": "equal"}
+    },
+    {
+      "id": "VAR-002",
+      "name": "variable_id_bijection",
+      "operation": ["apply_bijection_to_literal_ids", "remap_projection_ids", "remap_weight_keys"],
+      "preconditions": ["bijection over all declared variables", "all clauses and metadata remapped consistently"],
+      "expected": {"mc": "equal", "wmc": "equal", "pmc": "equal", "pwmc": "equal", "amc-complex": "equal"}
+    },
+    {
+      "id": "EXT-001",
+      "name": "free_variable_extension",
+      "operation": ["add_fresh_unconstrained_variable_z", "optionally_add_z_to_projection", "attach_literal_weights_when_contract_requires_them"],
+      "preconditions": ["z is fresh", "z occurs in no clause", "wp and wn are exact coefficients"],
+      "expected": {
+        "mc": {"relation": "multiply", "factor": "2"},
+        "wmc": {"relation": "multiply", "factor": "w(z)+ + w(z)-"},
+        "pmc": {"relation": "multiply", "factor": "2 if z in projection else 1"},
+        "pwmc": {"relation": "multiply", "factor": "w(z)+ + w(z)- if z in projection else 1"},
+        "amc-complex": {"relation": "multiply", "factor": "w(z)+ + w(z)-"}
+      }
+    },
+    {
+      "id": "EXT-002",
+      "name": "forced_true_variable_extension",
+      "operation": ["add_fresh_variable_z", "append_unit_clause_z", "optionally_add_z_to_projection"],
+      "preconditions": ["z is fresh", "unit clause z is the only new constraint", "wp and wn are exact coefficients"],
+      "expected": {
+        "mc": {"relation": "equal"},
+        "wmc": {"relation": "multiply", "factor": "w(z)+"},
+        "pmc": {"relation": "equal"},
+        "pwmc": {"relation": "multiply", "factor": "w(z)+ if z in projection else 1"},
+        "amc-complex": {"relation": "multiply", "factor": "w(z)+"}
+      }
+    },
+    {
+      "id": "EXT-003",
+      "name": "unsatisfiable_extension",
+      "operation": ["add_fresh_variable_z", "append_unit_clause_z", "append_unit_clause_not_z"],
+      "preconditions": ["z is fresh"],
+      "expected": {
+        "mc": {"relation": "force_zero"},
+        "wmc": {"relation": "force_zero"},
+        "pmc": {"relation": "force_zero"},
+        "pwmc": {"relation": "force_zero"},
+        "amc-complex": {"relation": "force_zero"}
+      }
+    },
+    {
+      "id": "PROJ-001",
+      "name": "hidden_witness_amplification",
+      "operation": ["add_fresh_unconstrained_hidden_variable"],
+      "preconditions": ["mode is PMC or PWMC", "new variable is not projected"],
+      "expected": {"pmc": "equal", "pwmc": "equal"}
+    }
+  ],
+  "exactness_requirements": {
+    "no_floating_point_coefficients": true,
+    "exact_zero_is_not_epsilon_zero": true,
+    "hidden_witness_multiplicity_is_not_projected_multiplicity": true,
+    "each_edge_binds_input_digest_and_transformation_parameters": true,
+    "record_solver_version_parser_profile_and_raw_output": true
+  },
+  "status": "schema_draft",
+  "qualification": "Relations are reference-tested on small directly enumerable instances. The schema has not yet been consumed by a standalone generator or differentially tested against solver binaries."
+}
