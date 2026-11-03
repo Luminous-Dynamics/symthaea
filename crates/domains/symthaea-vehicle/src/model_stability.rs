@@ -716,8 +716,9 @@ mod tests {
         let mut mismatch = input();
         mismatch.evaluations[2].command = command(-0.1);
         mismatch.evaluations[2].command_digest = command_digest(&mismatch.evaluations[2].command);
-        mismatch.evaluations[2].execution_context_digest =
+        let context_digest =
             model_context_digest(&mismatch, &mismatch.evaluations[2]);
+        mismatch.evaluations[2].execution_context_digest = context_digest;
         assert_eq!(
             evaluate_vehicle_model_stability(mismatch).unwrap_err(),
             ModelStabilityError::MismatchedActionCommand
