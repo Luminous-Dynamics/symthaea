@@ -48,6 +48,7 @@ pub enum TrafficRuleKind {
         stop_line_progress_m: f64,
         stop_speed_threshold_mps: f64,
         required_stationary_duration_s: f64,
+        maximum_sample_gap_s: f64,
         progress_tolerance_m: f64,
     },
 }
@@ -88,6 +89,7 @@ pub enum RuleComplianceReason {
     SpeedLimitExceeded,
     MandatoryDirectionNotFollowed,
     StopLinePassedWithoutRequiredStop,
+    RequirementSatisfied,
     RequiredStopObserved,
     RequirementNotEncountered,
 }
@@ -141,10 +143,6 @@ impl TrafficRuleComplianceReport {
             requirement.rule_id.trim().is_empty()
                 || !rule_ids.insert(requirement.rule_id.as_str())
         }) {
-            return false;
-        }
-
-        if !trajectory_is_valid(&self.trajectory) {
             return false;
         }
 
@@ -259,7 +257,7 @@ fn evaluate_requirement(
         return indeterminate(RuleComplianceReason::RuleMalformed);
     }
 
-    match requirement.kind {
+    match &requirement.kind {
         TrafficRuleKind::SpeedLimit {
             maximum_speed_mps,
             tolerance_mps,
@@ -291,7 +289,7 @@ fn evaluate_requirement(
                 .map(|(_, sample)| sample.speed_mps)
                 .fold(f64::NEG_INFINITY, f64::max);
             let violating = applicable.iter().find(|(_, sample)| {
-                sample.speed_mps > maximum_speed_mps + tolerance_mps
+                sample.speed_mps > *maximum_speed_mps + *tolerance_mps
             });
             match violating {
                 Some((index, _)) => finding(
@@ -306,7 +304,7 @@ fn evaluate_requirement(
                 None => finding(
                     requirement,
                     RuleComplianceOutcome::Compliant,
-                    RuleComplianceReason::RequiredStopObserved,
+                    RuleComplianceReason::RequirementSatisfied,
                     applicable.len(),
                     None,
                     Some(minimum),
@@ -336,8 +334,8 @@ fn evaluate_requirement(
                 return not_encountered(requirement);
             }
             let violating = applicable.iter().find(|(_, sample)| {
-                wrap_angle(sample.heading_rad - required_heading_rad).abs()
-                    > maximum_heading_error_rad
+                wrap_angle(sample.heading_rad - *required_heading_rad).abs()
+                    > *maximum_heading_error_rad
             });
             match violating {
                 Some((index, _)) => finding(
@@ -367,19 +365,21 @@ fn evaluate_requirement(
             progress_tolerance_m,
         } => {
             if !stop_line_progress_m.is_finite()
-                || stop_line_progress_m < requirement.active_start_progress_m
-                || stop_line_progress_m > requirement.active_end_progress_m
+                || *stop_line_progress_m < requirement.active_start_progress_m
+                || *stop_line_progress_m > requirement.active_end_progress_m
                 || !stop_speed_threshold_mps.is_finite()
-                || stop_speed_threshold_mps < 0.0
+                || *stop_speed_threshold_mps < 0.0
                 || !required_stationary_duration_s.is_finite()
-                || required_stationary_duration_s < 0.0
+                || *required_stationary_duration_s < 0.0
+                || !maximum_sample_gap_s.is_finite()
+                || *maximum_sample_gap_s <= 0.0
                 || !progress_tolerance_m.is_finite()
-                || progress_tolerance_m < 0.0
+                || *progress_tolerance_m < 0.0
             {
                 return indeterminate(RuleComplianceReason::RuleMalformed);
             }
             let crossing_index = trajectory.iter().position(|sample| {
-                sample.route_progress_m > stop_line_progress_m + progress_tolerance_m
+                sample.route_progress_m > *stop_line_progress_m + *progress_tolerance_m
             });
             let Some(crossing_index) = crossing_index else {
                 return not_encountered(requirement);
@@ -387,22 +387,26 @@ fn evaluate_requirement(
             let crossing_sample = &trajectory[crossing_index];
             let mut stop_start: Option<usize> = None;
             let mut index = crossing_index;
+            let mut later_timestamp = crossing_sample.timestamp_s;
             while index > 0 {
                 let previous = index - 1;
                 let sample = &trajectory[previous];
-                if sample.route_progress_m > stop_line_progress_m + progress_tolerance_m
-                    || sample.speed_mps > stop_speed_threshold_mps
+                let sample_gap = later_timestamp - sample.timestamp_s;
+                if sample.route_progress_m > *stop_line_progress_m + *progress_tolerance_m
+                    || sample.speed_mps > *stop_speed_threshold_mps
+                    || sample_gap > *maximum_sample_gap_s
                 {
                     break;
                 }
                 stop_start = Some(previous);
+                later_timestamp = sample.timestamp_s;
                 index = previous;
             }
             let observed_dwell = stop_start
                 .map(|start| crossing_sample.timestamp_s - trajectory[start].timestamp_s)
                 .unwrap_or(0.0);
             if stop_start.is_some()
-                && observed_dwell + 1e-9 >= required_stationary_duration_s
+                && observed_dwell + 1e-9 >= *required_stationary_duration_s
             {
                 finding(
                     requirement,
@@ -678,6 +682,31 @@ mod tests {
         let report = evaluate_traffic_rules(&[rule], &noncompliant).unwrap();
         assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::Violation);
         assert_eq!(report.findings[0].first_violating_sample_index, Some(2));
+    }
+
+    #[test]
+    fn stop_line_large_sample_gap_does_not_claim_continuous_dwell() {
+        let rule = TrafficRuleRequirement {
+            rule_id: "stop-line-gap".into(),
+            active_start_progress_m: 0.0,
+            active_end_progress_m: 20.0,
+            kind: TrafficRuleKind::StopBeforeLine {
+                stop_line_progress_m: 10.0,
+                stop_speed_threshold_mps: 0.1,
+                required_stationary_duration_s: 1.0,
+                maximum_sample_gap_s: 0.25,
+                progress_tolerance_m: 0.05,
+            },
+            evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
+        };
+        let trajectory = vec![
+            sample(0.0, 8.0, 2.0, 0.0),
+            sample(0.5, 9.0, 0.0, 0.0),
+            sample(2.0, 9.0, 0.0, 0.0),
+            sample(2.1, 10.2, 1.0, 0.0),
+        ];
+        let report = evaluate_traffic_rules(&[rule], &trajectory).unwrap();
+        assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::Violation);
     }
 
     #[test]
