@@ -148,3 +148,6 @@ This yields 4/5 attempted coverage, 2/5 graded coverage, 2/5 coverage-adjusted t
 The fixture has **no benchmark-owner official score**. Its `official_score.is_official` is false, the value/numerator/denominator and official output digest are null, and a reason explains why. The JSON Schema and Rust validator reject a synthetic-access receipt that claims an official score. A synthetic grader result may validate the fixture's test cases; it must not be relabelled as an official leaderboard score.
 
 The Rust validator also recomputes the four recognized derived metrics—eligible coverage, graded coverage, coverage-adjusted task yield and conditional success—from the validated task accounting. It rejects duplicate derived metric IDs, incorrect values, wrong formulas/units, and non-null values when their denominator is zero. Other derived metric identifiers remain explicitly non-official declarations; this generic v1 validator does not claim to independently reproduce every benchmark-specific metric.
+
+
+The Python 3.12 CI environment also pins `typing-extensions` explicitly: `referencing 0.37.0` uses its TypeVar-default backport on Python versions before 3.13. The audit environment installs the complete dependency set with `--no-deps`, so each conditional/transitive dependency must be listed and version-asserted rather than relying on pip resolution.
