@@ -63,3 +63,12 @@ That work must compose the vehicle-dynamics owner #6247 and Symtropy's execution
 Unit tests cover identity validation, input rejection, temporal ordering, same-state PD proposals, retained trace and disagreement distribution. They are authored only until the exact PR head is compiled/formatted/tested in a Rust-capable environment.
 
 A passing test would establish only that the proposal-comparison primitive records the named same-state inputs and outputs. It does not establish controller superiority, closed-loop behavior, dynamics credibility, collision avoidability, safety, roadworthiness, legal compliance or SAE Level 4/5 capability.
+
+
+## Paired closed-loop implementation update
+
+The follow-on module `symthaea_vehicle::paired_rollout` now supplies the first paired closed-loop lane-keeping runner for the existing bicycle-model simulator. It clones the same initial simulator into independent advanced and PD plants, applies the same external perturbation schedule, evolves each plant on its own state, and retains both complete frame traces. Its profile binds actual resolved road geometry, simulator/dynamics profile, initial state, controller identities, perturbation schedule, target speed, timestep and step budget; its output digest binds the trace and summaries.
+
+The runner checks command ranges, finite states before/after each step, simulator profile validity and expected simulation-clock increments. It remains a lane-keeping test harness only. The bicycle model has no pedestrian, cyclist, general traffic actors or intersection collision observable, so this does not execute or score the intersection candidate generator.
+
+See [PAIRED_CLOSED_LOOP_ROLLOUT_V0_1.md](./PAIRED_CLOSED_LOOP_ROLLOUT_V0_1.md). The earlier text about paired rollouts being a missing next step is superseded for this limited bicycle-model lane-keeping scope.
