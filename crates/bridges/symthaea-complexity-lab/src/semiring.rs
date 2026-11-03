@@ -334,7 +334,6 @@ impl<S: ExactSemiring> ExactFactorGraph<S> {
         let mut stats = EliminationStats::default();
 
         for &eliminated in order {
-            validate_support_factor_alignment(&factors, &support_factors)?;
             let bucket_indices: Vec<usize> = factors.iter().enumerate()
                 .filter_map(|(i, f)| f.scope.contains(&eliminated).then_some(i)).collect();
             let mut joined = BTreeSet::new();
@@ -503,6 +502,7 @@ impl ExactFactorGraph<MaxCountValue> {
         let mut backpointers = Vec::with_capacity(order.len());
 
         for &eliminated in order {
+            validate_support_factor_alignment(&factors, &support_factors)?;
             let bucket_indices: Vec<usize> = factors.iter().enumerate()
                 .filter_map(|(i, f)| f.scope.contains(&eliminated).then_some(i)).collect();
             let mut joined = BTreeSet::new();
