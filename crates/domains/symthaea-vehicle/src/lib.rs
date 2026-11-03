@@ -86,6 +86,7 @@ pub mod paired_rollout;
 pub mod paired_statistics;
 pub mod plugin;
 pub mod reward;
+pub mod risk_calibration;
 pub mod rule_compliance;
 pub mod road;
 pub mod runtime_assurance;
@@ -103,6 +104,13 @@ pub mod types;
 pub use classical_baselines::{
     PURE_PURSUIT_ROAD_BASELINE_POLICY_ID, STANLEY_ROAD_BASELINE_POLICY_ID,
     PurePursuitRoadConfig, StanleyRoadConfig, VehicleClassicalBaseline,
+};
+pub use risk_calibration::{
+    DEFAULT_RISK_CALIBRATION_BINS, MAX_RISK_CALIBRATION_BINS,
+    MIN_RISK_CALIBRATION_BINS, RISK_LOG_LOSS_EPSILON,
+    RiskCalibrationBin, RiskCalibrationError, RiskFamilyCalibration,
+    RiskForecastObservation, RiskForecastOutcome, VEHICLE_RISK_CALIBRATION_SCHEMA,
+    VehicleRiskCalibrationReport, summarize_vehicle_risk_forecasts,
 };
 pub use rule_compliance::{
     RuleComplianceFinding, RuleComplianceOutcome, RuleComplianceReason, RuleEvaluationError,
