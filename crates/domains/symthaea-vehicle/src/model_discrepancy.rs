@@ -706,5 +706,5 @@ mod tests {
 
     #[test] fn rejects_action_set_digest_mismatch(){let mut x=input();x.decisions[0].action_set_digest=h('9');x.decisions[0].decision_context_digest=model_discrepancy_decision_context_digest(&x.decisions[0]).unwrap();assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::InvalidActionSetDigest);}
     #[test] fn canonicalizes_row_and_action_order(){let x=input();let a=summarize_vehicle_model_discrepancy(&x).unwrap();let mut y=x;y.residual_observations.reverse();y.decisions[0].actions.reverse();let b=summarize_vehicle_model_discrepancy(&y).unwrap();assert_eq!(a.report_digest,b.report_digest);}
-    #[test] fn report_digest_detects_tampering(){let mut r=summarize_vehicle_model_discrepancy(&input()).unwrap();assert!(r.identity_is_valid());r.horizon_summaries[0].p95_absolute_residual+=1.0;assert!(!r.identity_is_valid());}
+    #[test] fn report_digest_detects_tampering(){let mut r=summarize_vehicle_model_discrepancy(&input()).unwrap();assert!(r.identity_is_valid());r.horizon_summaries[0].p95_absolute_residual=Some(r.horizon_summaries[0].p95_absolute_residual.unwrap()+1.0);assert!(!r.identity_is_valid());}
 }
