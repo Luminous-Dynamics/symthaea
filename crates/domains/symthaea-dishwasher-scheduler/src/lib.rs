@@ -305,6 +305,11 @@ pub fn simulate_with_pilot_evidence(
     full: &EvidenceBoundMode,
     policy: Policy,
 ) -> Result<SimulationResult, &'static str> {
+    quick.profile.validate(Some(1))?;
+    full.profile.validate(None)?;
+    if full.profile.capacity < 2 {
+        return Err("FullLoad capacity must be at least two");
+    }
     simulate(jobs, quick.profile(), full.profile(), policy)
 }
 
