@@ -75,6 +75,30 @@ pub struct EvaluatorTruth {
     event_present: Vec<bool>,
 }
 
+impl EvaluatorTruth {
+    /// Construct an evaluator-only sidecar. Keep this value in the evaluator
+    /// process; do not pass it to the participant-facing task or candidate.
+    pub fn new(
+        trial_ids: Vec<u64>,
+        event_present: Vec<bool>,
+    ) -> Result<Self, ObservationError> {
+        if trial_ids.is_empty() {
+            return Err(ObservationError::EmptyCampaign);
+        }
+        if trial_ids.len() != event_present.len() {
+            return Err(ObservationError::MisalignedTruth);
+        }
+        let mut seen = BTreeSet::new();
+        if trial_ids.iter().any(|trial_id| !seen.insert(*trial_id)) {
+            return Err(ObservationError::DuplicateTrialId);
+        }
+        Ok(Self {
+            trial_ids,
+            event_present,
+        })
+    }
+}
+
 /// Explicit malformed-input dispositions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObservationError {
@@ -509,10 +533,11 @@ mod tests {
             CandidateTrial { trial_id: 4, participant_id: 0, session_id: 0, stimulus_onset_ns: 5_000, decision_yes: Some(false), decision_time_ns: Some(5_200), confidence_level: Some(2), confidence_time_ns: Some(5_300), clock_resolution_ns: 1, onset_uncertainty_ns: 1, input_latency_uncertainty_ns: 1 },
             CandidateTrial { trial_id: 5, participant_id: 0, session_id: 0, stimulus_onset_ns: 6_000, decision_yes: Some(false), decision_time_ns: Some(6_100), confidence_level: Some(3), confidence_time_ns: Some(6_200), clock_resolution_ns: 1, onset_uncertainty_ns: 1, input_latency_uncertainty_ns: 1 },
         ];
-        let truth = EvaluatorTruth {
-            trial_ids: (0..6).collect(),
-            event_present: vec![true, true, true, false, false, false],
-        };
+        let truth = EvaluatorTruth::new(
+            (0..6).collect(),
+            vec![true, true, true, false, false, false],
+        )
+        .unwrap();
         (CandidateView { profile: profile(), trials: rows }, truth)
     }
 
@@ -626,10 +651,7 @@ mod tests {
                 onset_uncertainty_ns: 1, input_latency_uncertainty_ns: 1,
             },
         ];
-        let truth = EvaluatorTruth {
-            trial_ids: vec![0, 1],
-            event_present: vec![true, false],
-        };
+        let truth = EvaluatorTruth::new(vec![0, 1], vec![true, false]).unwrap();
         let report = evaluate(&CandidateView { profile, trials: rows }, &truth).unwrap();
         assert_eq!(report.rt_roc_auc, Some(0.5));
     }
