@@ -131,6 +131,8 @@ impl CounterexampleEvaluationReceipt {
         predicate_id: &str,
     ) -> bool {
         self.candidate_id == candidate.candidate_id
+            && &self.candidate == candidate
+            && self.candidate.identity_is_valid()
             && self.predicate_id == predicate_id
             && !self.evaluator_id.trim().is_empty()
             && !self.execution_receipt_id.trim().is_empty()
@@ -1035,6 +1037,25 @@ mod tests {
             }).unwrap_err(),
             CounterexampleMinimizationError::EmptyPredicateId
         );
+    }
+
+    #[test]
+    fn counterexample_minimizer_rejects_receipt_with_matching_id_but_different_candidate() {
+        let source = generate_stratified_intersection_candidates(13, 1).unwrap().remove(0);
+        let error = minimize_intersection_counterexample(
+            &source,
+            "crossing-failure-v1",
+            32,
+            |candidate| {
+                let mut receipt = mock_receipt(candidate, "crossing-failure-v1", true);
+                receipt.candidate.sensor_delay_s =
+                    (receipt.candidate.sensor_delay_s + 0.01).min(SENSOR_DELAY_RANGE_S.1);
+                // Keep the original candidate ID to model a malformed receipt.
+                receipt
+            },
+        )
+        .unwrap_err();
+        assert_eq!(error, CounterexampleMinimizationError::InvalidEvaluationReceipt);
     }
 
     #[test]
