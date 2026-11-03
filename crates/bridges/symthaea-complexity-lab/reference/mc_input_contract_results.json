@@ -12,9 +12,28 @@
     "ganak_2026_compat"
   ],
   "effective_weight_checks": {
-    "complement_inference": {"1": ["1/4", "3/4"]},
-    "wmc_defaults": {"1": ["1", "1"], "2": ["1", "1"]},
-    "amc_defaults": {"1": ["1+0i", "1+0i"]}
+    "complement_inference": {
+      "1": [
+        "1/4",
+        "3/4"
+      ]
+    },
+    "wmc_defaults": {
+      "1": [
+        "1",
+        "1"
+      ],
+      "2": [
+        "1",
+        "1"
+      ]
+    },
+    "amc_defaults": {
+      "1": [
+        "1+0i",
+        "1+0i"
+      ]
+    }
   },
   "adversarial_cases": [
     "duplicate/conflicting type headers",
@@ -28,5 +47,26 @@
     "unknown problem directive"
   ],
   "all_passed": true,
-  "claim_ceiling": "Finite parser fixtures and 2,000 deterministic malformed-input fuzz cases. Not an official MC2026 parser qualification, Ganak differential test, Rust port, solver or performance result."
+  "claim_ceiling": "Finite parser fixtures and 2,000 deterministic malformed-input fuzz cases. Not an official MC2026 parser qualification, Ganak differential test, Rust port, solver or performance result.",
+  "effective_contract_checks": {
+    "strict_no_show": {
+      "status": "ambiguous",
+      "output": null
+    },
+    "v1_2_no_show": {
+      "status": "valid",
+      "output": "sat_decision"
+    },
+    "ganak_compat_no_show": {
+      "status": "valid",
+      "output": "projected_model_count",
+      "projection": [
+        1,
+        2
+      ]
+    },
+    "partial_projection": "projected_model_count",
+    "all_variables_projection": "model_count"
+  },
+  "semantic_contract_note": "Raw declared mode and effective output contract are separate fields; v1.2 PMC without show resolves to SAT decision, Ganak compatibility resolves to all-variable projected count, and strict mode leaves it ambiguous."
 }
