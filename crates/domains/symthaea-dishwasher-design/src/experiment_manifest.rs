@@ -149,6 +149,12 @@ pub enum EvidenceBundleError {
     ManualResourceNotAllowed(ResourceKind),
     ResourceEvidenceMissing(String),
     ResourceTotalOverflow(ResourceKind),
+    OverlappingResourceIntervals {
+        kind: ResourceKind,
+        instrument_id: String,
+        first_measurement_id: String,
+        second_measurement_id: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -418,6 +424,8 @@ pub fn validate_physical_run_bundle(
     let mut resource_ids = HashSet::new();
     let mut present_resources = BTreeSet::new();
     let mut resource_totals: BTreeMap<ResourceKind, f64> = BTreeMap::new();
+    let mut instrument_intervals: BTreeMap<(ResourceKind, String), Vec<(u64, u64, String)>> =
+        BTreeMap::new();
     for resource in &bundle.resources {
         if !non_empty(&resource.measurement_id) {
             return Err(EvidenceBundleError::InvalidIdentity("resource_measurement_id"));
@@ -453,6 +461,27 @@ pub fn validate_physical_run_bundle(
                     .map_err(|_| EvidenceBundleError::ResourceInstrumentCalibrationMismatch(resource.measurement_id.clone()))?;
                 validate_calibration(&calibrations, calibration_id, instrument, resource.end_utc_s)
                     .map_err(|_| EvidenceBundleError::ResourceInstrumentCalibrationMismatch(resource.measurement_id.clone()))?;
+
+                // A single meter cannot contribute overlapping intervals to the
+                // same resource total. Separate instruments/branches may be
+                // combined, but each stream must be non-overlapping.
+                let key = (resource.kind, instrument.clone());
+                let intervals = instrument_intervals.entry(key).or_default();
+                if let Some((_, _, first_id)) = intervals.iter().find(|(start, end, _)| {
+                    resource.start_utc_s < *end && *start < resource.end_utc_s
+                }) {
+                    return Err(EvidenceBundleError::OverlappingResourceIntervals {
+                        kind: resource.kind,
+                        instrument_id: instrument.clone(),
+                        first_measurement_id: first_id.clone(),
+                        second_measurement_id: resource.measurement_id.clone(),
+                    });
+                }
+                intervals.push((
+                    resource.start_utc_s,
+                    resource.end_utc_s,
+                    resource.measurement_id.clone(),
+                ));
             }
             (None, None) if resource.kind == ResourceKind::ActiveOperatorTime => {}
             (None, None) => return Err(EvidenceBundleError::ManualResourceNotAllowed(resource.kind)),
@@ -784,6 +813,39 @@ mod tests {
             validate_physical_run_bundle(&bundle, &[ResourceKind::FreshWater]),
             Err(EvidenceBundleError::ManualResourceNotAllowed(ResourceKind::FreshWater))
         );
+    }
+
+    #[test]
+    fn rejects_overlapping_intervals_from_the_same_resource_meter() {
+        let mut bundle = valid_bundle();
+        let mut duplicate_interval = bundle.resources[0].clone();
+        duplicate_interval.measurement_id = "wall-kwh-overlap".to_owned();
+        duplicate_interval.start_utc_s = 1_500;
+        duplicate_interval.end_utc_s = 1_700;
+        duplicate_interval.value = 0.01;
+        bundle.resources.push(duplicate_interval);
+        assert!(matches!(
+            validate_physical_run_bundle(&bundle, &[ResourceKind::ApplianceWallElectricity]),
+            Err(EvidenceBundleError::OverlappingResourceIntervals {
+                kind: ResourceKind::ApplianceWallElectricity,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn allows_disjoint_intervals_from_the_same_resource_meter() {
+        let mut bundle = valid_bundle();
+        let mut second_interval = bundle.resources[0].clone();
+        second_interval.measurement_id = "wall-kwh-second".to_owned();
+        second_interval.start_utc_s = 1_400;
+        second_interval.end_utc_s = 1_800;
+        bundle.resources[0].end_utc_s = 1_400;
+        bundle.resources.push(second_interval);
+        assert!(validate_physical_run_bundle(
+            &bundle,
+            &[ResourceKind::ApplianceWallElectricity],
+        ).is_ok());
     }
 
     #[test]
