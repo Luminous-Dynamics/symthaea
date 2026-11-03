@@ -207,3 +207,14 @@ Next stages:
 References:
 - Paper: https://arxiv.org/abs/2608.24545
 - Author publication record: https://www.cedriccolas.com/publications/
+
+
+### Cross-project adaptive-transmission interoperability
+
+A proposed event contract now links the state-aware transmission benchmark with the existing civilizational claim, evidence, run and skill-capsule envelopes:
+- `ADAPTIVE_TRANSMISSION_INTERCHANGE_V0_1.md`
+- `ADAPTIVE_TRANSMISSION_EVENT_V0_1.schema.json`
+
+The contract binds the exact payload and task scope to a program/version digest, sender/recipient references, consent mode, minimized recipient-need signal, route and resource budget, and separate delivery/observation/acquisition/integration/execution/retention/correction/transfer outcomes. It explicitly supports positive skills, scoped negative results, corrections, requests and contextual warnings.
+
+This is not a new evidence ledger and does not require a central collector to ingest full recipient inventories. Symthaea owns cognitive selection and learning; Symtropy owns population-scale simulation; Mycelix owns identity/rights/provenance/disputes; Sol-Atlas owns projection and spatial-temporal inspection. Runtime enforcement is not yet implemented.
