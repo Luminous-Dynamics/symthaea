@@ -1023,7 +1023,7 @@ fn validate_official_and_derived(
                 "synthetic receipts cannot claim a benchmark-owner official score",
             ));
         }
-        sha256_value(source_output, "official_score.source_output_sha256")?;
+        sha256_field(source_output, "official_score.source_output_sha256")?;
         if score_value.is_null() {
             if !numerator.is_null() || !denominator.is_null() {
                 return Err(error(
