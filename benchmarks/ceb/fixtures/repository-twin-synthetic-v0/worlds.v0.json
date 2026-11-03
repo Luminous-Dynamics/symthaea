@@ -57,7 +57,6 @@
       "id": "linux-default",
       "target_os": "linux",
       "target_triple": "x86_64-unknown-linux-gnu",
-      "enabled_features": [],
       "expected_active_nodes": [
         "feature.api.audit",
         "sym.audit.AccessRecord",
@@ -69,15 +68,16 @@
         "sym.windows.os_version",
         "target.api.windows"
       ],
-      "default_features_enabled": true
+      "default_features_enabled": true,
+      "explicit_features": [],
+      "effective_features": [
+        "audit"
+      ]
     },
     {
       "id": "linux-windows-native",
       "target_os": "linux",
       "target_triple": "x86_64-unknown-linux-gnu",
-      "enabled_features": [
-        "windows-native"
-      ],
       "expected_active_nodes": [
         "feature.api.windows_native"
       ],
@@ -89,15 +89,18 @@
         "sym.windows.os_version",
         "target.api.windows"
       ],
-      "default_features_enabled": false
+      "default_features_enabled": false,
+      "explicit_features": [
+        "windows-native"
+      ],
+      "effective_features": [
+        "windows-native"
+      ]
     },
     {
       "id": "linux-audit",
       "target_os": "linux",
       "target_triple": "x86_64-unknown-linux-gnu",
-      "enabled_features": [
-        "audit"
-      ],
       "expected_active_nodes": [
         "feature.api.audit",
         "sym.audit.AccessRecord",
@@ -109,16 +112,18 @@
         "sym.windows.os_version",
         "target.api.windows"
       ],
-      "default_features_enabled": false
+      "default_features_enabled": false,
+      "explicit_features": [
+        "audit"
+      ],
+      "effective_features": [
+        "audit"
+      ]
     },
     {
       "id": "linux-audit-windows-native",
       "target_os": "linux",
       "target_triple": "x86_64-unknown-linux-gnu",
-      "enabled_features": [
-        "audit",
-        "windows-native"
-      ],
       "expected_active_nodes": [
         "feature.api.audit",
         "feature.api.windows_native",
@@ -130,13 +135,20 @@
         "sym.windows.os_version",
         "target.api.windows"
       ],
-      "default_features_enabled": false
+      "default_features_enabled": false,
+      "explicit_features": [
+        "audit",
+        "windows-native"
+      ],
+      "effective_features": [
+        "audit",
+        "windows-native"
+      ]
     },
     {
       "id": "windows-default",
       "target_os": "windows",
       "target_triple": "x86_64-pc-windows-msvc",
-      "enabled_features": [],
       "expected_active_nodes": [
         "feature.api.audit",
         "sym.audit.AccessRecord",
@@ -148,15 +160,16 @@
         "feature.api.windows_native",
         "sym.windows.os_version"
       ],
-      "default_features_enabled": true
+      "default_features_enabled": true,
+      "explicit_features": [],
+      "effective_features": [
+        "audit"
+      ]
     },
     {
       "id": "windows-windows-native",
       "target_os": "windows",
       "target_triple": "x86_64-pc-windows-msvc",
-      "enabled_features": [
-        "windows-native"
-      ],
       "expected_active_nodes": [
         "dep.windows-sys",
         "feature.api.windows_native",
@@ -168,15 +181,18 @@
         "sym.audit.AccessRecord",
         "sym.audit.record_access"
       ],
-      "default_features_enabled": false
+      "default_features_enabled": false,
+      "explicit_features": [
+        "windows-native"
+      ],
+      "effective_features": [
+        "windows-native"
+      ]
     },
     {
       "id": "windows-audit",
       "target_os": "windows",
       "target_triple": "x86_64-pc-windows-msvc",
-      "enabled_features": [
-        "audit"
-      ],
       "expected_active_nodes": [
         "feature.api.audit",
         "sym.audit.AccessRecord",
@@ -188,16 +204,18 @@
         "feature.api.windows_native",
         "sym.windows.os_version"
       ],
-      "default_features_enabled": false
+      "default_features_enabled": false,
+      "explicit_features": [
+        "audit"
+      ],
+      "effective_features": [
+        "audit"
+      ]
     },
     {
       "id": "windows-audit-windows-native",
       "target_os": "windows",
       "target_triple": "x86_64-pc-windows-msvc",
-      "enabled_features": [
-        "audit",
-        "windows-native"
-      ],
       "expected_active_nodes": [
         "dep.windows-sys",
         "feature.api.audit",
@@ -208,7 +226,15 @@
         "target.api.windows"
       ],
       "expected_inactive_nodes": [],
-      "default_features_enabled": false
+      "default_features_enabled": false,
+      "explicit_features": [
+        "audit",
+        "windows-native"
+      ],
+      "effective_features": [
+        "audit",
+        "windows-native"
+      ]
     }
   ]
 }
