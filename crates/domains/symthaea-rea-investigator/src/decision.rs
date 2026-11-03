@@ -856,6 +856,7 @@ pub fn plan_next_experiment_decision_aware(
     if !proposals.is_empty() {
         validate_scenario_set(scenarios, proposals)?;
     }
+    let catalog = validate_evidence_catalog(evidence)?;
     let validation = validate_hypotheses(hypotheses, &catalog);
     let (priors, grounded_hypothesis_ids, support_evidence_ids, independent_root_evidence_ids) =
         match validation {
@@ -997,7 +998,6 @@ pub fn plan_next_experiment_decision_aware(
             continue;
         }
 
-        saw_eligible_candidate = true;
         let policy = if config.ranking_policy == DecisionRankingPolicy::MinimaxRegret {
             match minimax_regret_policy(
                 &evaluations,
@@ -1021,6 +1021,7 @@ pub fn plan_next_experiment_decision_aware(
             mixture_policy(proposal, &evaluations, &utilities, &priors)
         };
 
+        saw_eligible_candidate = true;
         let metrics = candidate_metrics(
             proposal,
             &evaluations,
