@@ -387,7 +387,23 @@ impl fmt::Display for CurveError {
 impl std::error::Error for CurveError {}
 
 impl MeasuredOccupancyCurve {
-    pub fn new(
+    /// Build the complete curve only from run-level physical measurements.
+    ///
+    /// This public constructor prevents callers from supplying hand-entered
+    /// average summaries as if they were measured data. Every occupancy point
+    /// is independently validated and aggregated before the curve is created.
+    pub fn from_runs(
+        scope: CurveScope,
+        run_sets: Vec<(usize, Vec<PhysicalRunMeasurement>)>,
+    ) -> Result<Self, CurveError> {
+        let mut observations = Vec::with_capacity(run_sets.len());
+        for (occupancy, runs) in run_sets {
+            observations.push(OccupancyObservation::from_runs(occupancy, runs)?);
+        }
+        Self::new(scope, observations)
+    }
+
+    fn new(
         scope: CurveScope,
         mut points: Vec<OccupancyObservation>,
     ) -> Result<Self, CurveError> {
@@ -618,6 +634,31 @@ mod tests {
                 metric: "energy_kwh",
                 ..
             })
+        ));
+    }
+
+    #[test]
+    fn public_curve_constructor_aggregates_only_raw_run_sets() {
+        let curve = MeasuredOccupancyCurve::from_runs(
+            scope(),
+            vec![(1, raw_runs(1)), (2, raw_runs(2))],
+        )
+        .unwrap();
+        assert_eq!(curve.points().len(), 2);
+        assert!(curve.estimate(1).unwrap().exact_measurement);
+        assert!(!curve.estimate(1).unwrap().energy_kwh.mean.is_nan());
+    }
+
+    #[test]
+    fn public_curve_constructor_rejects_failed_occupancy() {
+        let mut failed_runs = raw_runs(2);
+        failed_runs[0].rinse_pass = false;
+        assert!(matches!(
+            MeasuredOccupancyCurve::from_runs(
+                scope(),
+                vec![(1, raw_runs(1)), (2, failed_runs)],
+            ),
+            Err(CurveError::QualityGateFailed { .. })
         ));
     }
 
