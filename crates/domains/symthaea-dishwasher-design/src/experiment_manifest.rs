@@ -151,6 +151,7 @@ pub enum EvidenceBundleError {
     InvalidTraceSampling(String),
     TraceRunMismatch { artifact_id: String, observed_run_id: String },
     InvalidAssayRun { record_id: String, observed_run_id: String },
+    InvalidResourceRun { measurement_id: String, observed_run_id: String },
     UnknownAssayItem { record_id: String, item_id: String },
     UnexpectedAssayEndpoint { record_id: String, endpoint: Endpoint },
     DuplicateAssay { item_id: String, endpoint: Endpoint },
@@ -485,8 +486,8 @@ pub fn validate_physical_run_bundle(
         BTreeMap::new();
     for resource in &bundle.resources {
         if resource.source_run_id != bundle.run.run_id {
-            return Err(EvidenceBundleError::InvalidAssayRun {
-                record_id: resource.measurement_id.clone(),
+            return Err(EvidenceBundleError::InvalidResourceRun {
+                measurement_id: resource.measurement_id.clone(),
                 observed_run_id: resource.source_run_id.clone(),
             });
         }
@@ -956,10 +957,10 @@ mod tests {
         bundle.resources[0].source_run_id = "other-run".to_owned();
         assert!(matches!(
             validate_physical_run_bundle(&bundle, &[ResourceKind::ApplianceWallElectricity]),
-            Err(EvidenceBundleError::InvalidAssayRun {
-                record_id,
+            Err(EvidenceBundleError::InvalidResourceRun {
+                measurement_id,
                 observed_run_id,
-            }) if record_id == "wall-kwh-01" && observed_run_id == "other-run"
+            }) if measurement_id == "wall-kwh-01" && observed_run_id == "other-run"
         ));
     }
 
