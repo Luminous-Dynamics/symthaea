@@ -1,17 +1,21 @@
 {
-  "all_passed": true,
-  "claim_ceiling": "Finite Boolean-factor PMC/PWMC-style semantics and exact rational visible weights. Not the complete MC2026 parser, general projected weight semantics, Rust/Lean proof or performance claim.",
-  "hidden_quantifier": "existential Boolean OR",
-  "mixed_order_checks": 480,
-  "multiple_witness_control": {
-    "ordinary_satisfying_assignments": 2,
-    "projected_assignments": 1,
-    "projected_weighted_value": "1"
+  "suite": "ETH-021 reference prototype status",
+  "execution_status": "not_executed_in_this_session",
+  "source_status": "committed_research_prototype_unqualified",
+  "planned_test_design": {
+    "random_instances": 160,
+    "planned_mixed_order_checks": 480,
+    "orders": [
+      "forward",
+      "reverse",
+      "random"
+    ],
+    "witness_control": {
+      "ordinary_assignments": 2,
+      "projected_assignments": 1
+    }
   },
-  "orders": {"forward":160,"random":160,"reverse":160},
-  "projected_accumulator": "exact rational sum over distinct supported visible assignments",
-  "random_instances": 160,
-  "seed": "0xE7021",
-  "suite": "ETH-021 projected-count mixed-elimination reference",
-  "visible_weight_domain": "exact Q rational, including negative values"
+  "actual_results": null,
+  "all_passed": null,
+  "claim_ceiling": "Test counts are planned corpus parameters only. The associated Python source was not executed in this session; no pass/reject/semantic-equivalence result is established."
 }
