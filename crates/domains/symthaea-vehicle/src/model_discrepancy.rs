@@ -284,9 +284,25 @@ fn derive_report(input: &VehicleModelDiscrepancyInput) -> Result<VehicleModelDis
         if [row.initial_state_digest.as_str(),row.environment_digest.as_str(),row.dynamics_digest.as_str(),row.action_history_digest.as_str(),row.observation_availability_digest.as_str()].iter().any(|d| !valid_digest(d)) {
             return Err(VehicleModelDiscrepancyError::InvalidDigest);
         }
-        if !row.predicted_value.is_finite() || !row.realized_value.is_finite()
-            || !(row.predicted_value - row.realized_value).is_finite()
-        { return Err(VehicleModelDiscrepancyError::InvalidResidual); }
+        match row.reference_status {
+            ReferenceOutcomeStatus::Observed => {
+                let (Some(predicted), Some(realized)) = (row.predicted_value, row.realized_value)
+                else { return Err(VehicleModelDiscrepancyError::InvalidResidual); };
+                if !predicted.is_finite() || !realized.is_finite()
+                    || !(predicted - realized).is_finite()
+                {
+                    return Err(VehicleModelDiscrepancyError::InvalidResidual);
+                }
+            }
+            ReferenceOutcomeStatus::Missing | ReferenceOutcomeStatus::Censored
+            | ReferenceOutcomeStatus::TimedOut | ReferenceOutcomeStatus::Unsupported => {
+                if row.realized_value.is_some() || row.prediction_set_contains_realized.is_some()
+                    || row.predicted_value.is_some_and(|value| !value.is_finite())
+                {
+                    return Err(VehicleModelDiscrepancyError::InvalidResidual);
+                }
+            }
+        }
         let key = (row.scenario_id.clone(),row.actor_policy_id.clone(),row.action_history_digest.clone(),row.metric_id.clone());
         let ctx = residual_context_digest(row)?;
         if let Some(old) = contexts.get(&key) {
@@ -305,23 +321,52 @@ fn derive_report(input: &VehicleModelDiscrepancyInput) -> Result<VehicleModelDis
     }
 
     let family_horizon_summaries = families.iter().map(|((h,f),rows)| {
-        let signed = rows.iter().map(|r| r.predicted_value-r.realized_value).collect::<Vec<_>>();
+        let observed = rows.iter().filter(|r| r.reference_status == ReferenceOutcomeStatus::Observed).collect::<Vec<_>>();
+        let signed = observed.iter().map(|r| r.predicted_value.expect("observed prediction") - r.realized_value.expect("observed reference")).collect::<Vec<_>>();
         let absolute = signed.iter().map(|v| v.abs()).collect::<Vec<_>>();
-        FamilyHorizonResidualSummary { horizon_ms:*h, failure_family_id:f.clone(), observation_count:rows.len(), mean_signed_residual:mean(&signed), p95_absolute_residual:quantile(&absolute,0.95) }
+        FamilyHorizonResidualSummary {
+            horizon_ms:*h,
+            failure_family_id:f.clone(),
+            outcome_count:rows.len(),
+            observed_count:status_count(rows, ReferenceOutcomeStatus::Observed),
+            missing_count:status_count(rows, ReferenceOutcomeStatus::Missing),
+            censored_count:status_count(rows, ReferenceOutcomeStatus::Censored),
+            timed_out_count:status_count(rows, ReferenceOutcomeStatus::TimedOut),
+            unsupported_count:status_count(rows, ReferenceOutcomeStatus::Unsupported),
+            mean_signed_residual:optional_mean(&signed),
+            p95_absolute_residual:optional_quantile(&absolute,0.95),
+        }
     }).collect::<Vec<_>>();
 
     let mut horizon_summaries = Vec::new();
     for (h,rows) in horizons {
-        let signed = rows.iter().map(|r| r.predicted_value-r.realized_value).collect::<Vec<_>>();
+        let observed = rows.iter().filter(|r| r.reference_status == ReferenceOutcomeStatus::Observed).collect::<Vec<_>>();
+        let signed = observed.iter().map(|r| r.predicted_value.expect("observed prediction") - r.realized_value.expect("observed reference")).collect::<Vec<_>>();
         let absolute = signed.iter().map(|v| v.abs()).collect::<Vec<_>>();
-        let worst = family_horizon_summaries.iter().filter(|f| f.horizon_ms==h).map(|f| f.p95_absolute_residual).fold(0.0_f64,f64::max);
-        let memberships = rows.iter().filter(|r| r.prediction_set_contains_realized.is_some()).collect::<Vec<_>>();
+        let family_p95 = family_horizon_summaries.iter()
+            .filter(|family| family.horizon_ms == h)
+            .filter_map(|family| family.p95_absolute_residual)
+            .collect::<Vec<_>>();
+        let worst = family_p95.iter().copied().reduce(f64::max);
+        let memberships = observed.iter().filter(|r| r.prediction_set_contains_realized.is_some()).collect::<Vec<_>>();
         let covered = memberships.iter().filter(|r| r.prediction_set_contains_realized==Some(true)).count();
         horizon_summaries.push(HorizonResidualSummary {
-            horizon_ms:h, observation_count:rows.len(), failure_family_count:rows.iter().map(|r|r.failure_family_id.as_str()).collect::<BTreeSet<_>>().len(),
-            mean_signed_residual:mean(&signed), median_signed_residual:quantile(&signed,0.5),
-            median_absolute_residual:quantile(&absolute,0.5), p90_absolute_residual:quantile(&absolute,0.9), p95_absolute_residual:quantile(&absolute,0.95),
-            worst_family_p95_absolute_residual:worst, prediction_set_membership_count:memberships.len(), prediction_set_covered_count:covered
+            horizon_ms:h,
+            outcome_count:rows.len(),
+            observed_count:status_count(&rows, ReferenceOutcomeStatus::Observed),
+            missing_count:status_count(&rows, ReferenceOutcomeStatus::Missing),
+            censored_count:status_count(&rows, ReferenceOutcomeStatus::Censored),
+            timed_out_count:status_count(&rows, ReferenceOutcomeStatus::TimedOut),
+            unsupported_count:status_count(&rows, ReferenceOutcomeStatus::Unsupported),
+            failure_family_count:rows.iter().map(|r|r.failure_family_id.as_str()).collect::<BTreeSet<_>>().len(),
+            mean_signed_residual:optional_mean(&signed),
+            median_signed_residual:optional_quantile(&signed,0.5),
+            median_absolute_residual:optional_quantile(&absolute,0.5),
+            p90_absolute_residual:optional_quantile(&absolute,0.9),
+            p95_absolute_residual:optional_quantile(&absolute,0.95),
+            worst_family_p95_absolute_residual:worst,
+            prediction_set_membership_count:memberships.len(),
+            prediction_set_covered_count:covered
         });
     }
 
@@ -329,8 +374,14 @@ fn derive_report(input: &VehicleModelDiscrepancyInput) -> Result<VehicleModelDis
     for ((scenario,actor,action,metric),rows) in paired {
         let mut ordered=rows; ordered.sort_by_key(|r|r.horizon_ms);
         for w in ordered.windows(2) {
-            let from=w[0].predicted_value-w[0].realized_value;
-            let to=w[1].predicted_value-w[1].realized_value;
+            // Do not bridge an explicitly missing/censored/timed-out horizon.
+            if w[0].reference_status != ReferenceOutcomeStatus::Observed
+                || w[1].reference_status != ReferenceOutcomeStatus::Observed
+            {
+                continue;
+            }
+            let from=w[0].predicted_value.expect("observed prediction")-w[0].realized_value.expect("observed reference");
+            let to=w[1].predicted_value.expect("observed prediction")-w[1].realized_value.expect("observed reference");
             paired_horizon_growth.push(PairedHorizonResidualGrowth {
                 scenario_id:scenario.clone(),actor_policy_id:actor.clone(),action_history_digest:action.clone(),metric_id:metric.clone(),
                 from_horizon_ms:w[0].horizon_ms,to_horizon_ms:w[1].horizon_ms,from_signed_residual:from,to_signed_residual:to,
@@ -481,6 +532,10 @@ fn hash_json<T:Serialize>(value:&T)->Result<String,VehicleModelDiscrepancyError>
     Ok(blake3::hash(&bytes).to_hex().to_string())
 }
 fn valid_digest(value:&str)->bool { value.len()==64 && value.bytes().all(|b|b.is_ascii_hexdigit()) }
+fn status_count(rows: &[&ModelResidualObservation], status: ReferenceOutcomeStatus) -> usize {
+    rows.iter().filter(|row| row.reference_status == status).count()
+}
+
 fn mean(values:&[f64])->f64 {
     values.iter().enumerate().fold(0.0, |average, (index, value)| {
         let count = (index + 1) as f64;
