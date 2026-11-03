@@ -32,6 +32,7 @@ Equality saturation and rewrite discovery are established fields. Relevant work 
 - The existing Symthaea EML e-graph spike is isolated under crates/core/symthaea-eml-egraph. ETH-018 does not reuse its EML rewrite rules as exact factor-algebra rules; the semantic domains and proof obligations differ.
 - opt_einsum's dynamic-programming path planner already exploits traces and disconnected network components: https://optimized-einsum.readthedocs.io/en/stable/dp_path.html
 - Certified propositional model counting is established prior art: Fichte, Hecher & Roland (SAT 2022), https://doi.org/10.4230/LIPIcs.SAT.2022.30; Bryant et al. (JAIR 2025), https://arxiv.org/abs/2501.12906.
+- Arbore, Cheung & Willsey, *Optimism in Equality Saturation* (PACMPL / PLDI 2026): https://doi.org/10.1145/3808302. It demonstrates why abstract facts over e-classes need careful soundness treatment when cyclic or ill-formed represented graphs are present; the algebraic rewrite engine must validate the actual matched term and its guard, not trust a loosely attached analysis fact.
 
 The hypothesis to test is the combined system: output-contract-directed algebra selection, domain-qualified rewrite rules, replayable local proof objects, and plan extraction that includes the cost of independent verification. No novelty claim is justified until this combination is compared carefully with existing rewriting, tensor contraction and proof-carrying computation systems.
 
@@ -165,7 +166,19 @@ Do not optimize only operation count or induced width. Return a Pareto set over:
 
 The caller may then choose a plan under a memory cap, solve-time limit or verification budget. Do not hide the trade-off in an unvalidated scalar score.
 
-## 7. How this could outperform current systems
+## 7. Competition and coefficient-domain extension
+
+The 2026 Model Counting Competition includes exact model counting, weighted model counting with negative weights, projected counting, projected weighted counting, and complex-weighted model counting. The reported Ganak entry gives different exact completion totals for those tracks (133/200 unweighted, 120/200 weighted, 125/200 projected, 135/200 projected weighted, and 49/100 complex weighted); these are one entrant's results, not the full competition winner table: https://github.com/meelgroup/mccomp-ganak-appmc-2026.
+
+This makes the algebra registry and benchmark matrix more demanding:
+- negative weights require domains with additive inverses; natural-number semiring assumptions are insufficient;
+- complex weights require an explicit exact complex coefficient domain (initially Gaussian rationals, Q(i), represented as pairs of reduced rationals), not floating-point complex values mislabeled exact;
+- projected counting is a different output contract, not ordinary #SAT with a renamed label;
+- every competition track needs its own exact parser, semantics, oracle and comparison row.
+
+Do not enable a Q(i) backend by just adding another enum tag. First define canonical encoding, exact arithmetic, domain laws, ring/Q-algebra proof obligations, and independent checker tests. The current six-algebra prototype does not implement complex coefficients or projected counting.
+
+## 8. How this could outperform current systems
 
 Potential advantages to test—not claims already achieved:
 
@@ -177,7 +190,7 @@ Potential advantages to test—not claims already achieved:
 
 These ideas must be compared with existing knowledge-compilation, tensor-network and optimization systems on matched output contracts.
 
-## 8. Benchmark programme
+## 9. Benchmark programme
 
 | Workload | Compatible baselines | Required output |
 |---|---|---|
@@ -207,7 +220,7 @@ Acceptance targets (aspirational, not achieved):
 - less than 5% planning overhead on a preregistered medium-instance slice;
 - at least 10% lower measured verified end-to-end cost on a held-out structured slice, against the strongest compatible baseline, with memory and proof size reported.
 
-## 9. Next implementation sequence
+## 10. Next implementation sequence
 
 1. Freeze v1 encoding and expand the mutation corpus.
 2. Port the closed algebra registry, typed term DAG and local rewrite checker to Rust.
@@ -217,6 +230,6 @@ Acceptance targets (aspirational, not achieved):
 6. Implement full profile and tensor-network cases only after the core path is qualified.
 7. Benchmark against compatible industry systems with exact output and hardware budgets.
 
-## 10. Claim ceiling
+## 11. Claim ceiling
 
 At this stage ETH-018 has a finite exact Python reference experiment and a separate-process structural checker. It does not have a Rust engine, Lean proof, general e-graph implementation, arbitrary-precision production backend, weighted subexponential implementation, scalable certificate format, or SOTA performance result.
