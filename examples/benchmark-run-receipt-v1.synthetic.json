@@ -111,7 +111,8 @@
     "numerator": 1,
     "denominator": 1,
     "is_official": true,
-    "source_output_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    "source_output_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "unavailable_reason": null
   },
   "derived_metrics": [
     {
