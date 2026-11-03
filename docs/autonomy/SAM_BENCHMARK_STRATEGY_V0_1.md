@@ -402,3 +402,18 @@ Benchmark sequence:
 Proposed stretch target after exact reproduction: at least 90% macro-averaged Sign-Compliant Destination, at least 80% destination completion, and no degradation in the separately reported collision/contact metric versus the strongest reproduced baseline. These are proposed targets only.
 
 Protocol: [TRAFFIC_RULE_COMPLIANCE_V0_1.md](./TRAFFIC_RULE_COMPLIANCE_V0_1.md).
+
+
+## 14. Counterfactual decision quality — NIST Tier-3 alignment
+
+NIST's 2026 Measurement Science for Automated Vehicles programme separates four measurement layers: observed surrogate-safety metrics, forward outcome prediction, action comparison against counterfactual alternatives, and diagnosis of recurring decision weaknesses across scenarios.
+
+The new `symthaea_vehicle::counterfactual_decision` module begins a bounded Tier-3 interface. It evaluates one selected action against a caller-declared finite set of alternative vehicle commands, using a single named metric and a common evaluator identity. It reports whether a better feasible alternative was found, model-relative infeasibility, absence of feasible actions or indeterminate evidence.
+
+Every action includes the exact command payload digest plus execution receipt/digest. A caller completeness flag is required; incomplete candidate sets cannot produce a "no better action found" result. The report validator re-computes the finding from the retained action set.
+
+This is not a simulator or an optimal-control solver. It does not prove that the action set is exhaustive, that the independent evaluator is actually independent or that the declared model is physically correct. Symtropy #3387 remains responsible for exact action-conditioned execution/replay. Symthaea owns action-set design, criteria, family statistics and interpretation.
+
+Run separate reports for safety margin, rule compliance, progress, comfort and energy; avoid a hidden weighted composite. For each scenario family, report counterfactual regret distributions and the fraction of decisions where a better feasible alternative was found. A positive regret is evidence of an opportunity within the evaluated set/model, not proof that the deployed controller could have safely executed that alternative in reality.
+
+Protocol: [COUNTERFACTUAL_DECISION_QUALITY_V0_1.md](./COUNTERFACTUAL_DECISION_QUALITY_V0_1.md).
