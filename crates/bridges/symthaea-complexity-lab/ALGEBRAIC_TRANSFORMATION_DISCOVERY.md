@@ -1,6 +1,6 @@
 # ETH-018: proof-carrying algebraic transformation discovery
 
-**Status:** Finite exact Python reference prototype committed on a research branch. Rust search engine, Lean proofs and performance qualification remain open.
+**Status:** Python producer and separate checker source committed; the reference suite was not executed in this session. Rust search, Lean proofs and performance qualification remain open.
 
 ## 1. Why this follows ETH-015/016/017
 
