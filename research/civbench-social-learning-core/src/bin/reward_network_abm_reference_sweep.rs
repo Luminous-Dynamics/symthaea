@@ -117,17 +117,32 @@ struct GenerationStats {
 }
 
 impl GenerationStats {
+    fn push_defined(stats: &mut OnlineStats, value: Option<f64>) {
+        if let Some(value) = value {
+            stats.push(value);
+        }
+    }
+
     fn observe(&mut self, metrics: GenerationMetrics) {
-        self.human_optimal.push(metrics.human_optimal_prevalence);
-        self.machine_optimal.push(metrics.machine_optimal_prevalence);
-        self.human_myopic.push(metrics.human_myopic_prevalence);
-        self.human_random.push(metrics.human_random_prevalence);
-        self.individual_optimal.push(metrics.human_individual_optimal_discovery_rate);
-        self.social_optimal.push(metrics.human_social_optimal_acquisition_rate);
-        self.social_only_optimal.push(metrics.human_social_only_optimal_integration_rate);
-        self.machine_lineage_optimal.push(metrics.human_machine_lineage_optimal_prevalence);
+        Self::push_defined(&mut self.human_optimal, metrics.human_optimal_prevalence);
+        Self::push_defined(&mut self.machine_optimal, metrics.machine_optimal_prevalence);
+        Self::push_defined(&mut self.human_myopic, metrics.human_myopic_prevalence);
+        Self::push_defined(&mut self.human_random, metrics.human_random_prevalence);
+        Self::push_defined(
+            &mut self.individual_optimal,
+            metrics.human_individual_optimal_discovery_rate,
+        );
+        Self::push_defined(&mut self.social_optimal, metrics.human_social_optimal_acquisition_rate);
+        Self::push_defined(
+            &mut self.social_only_optimal,
+            metrics.human_social_only_optimal_integration_rate,
+        );
+        Self::push_defined(
+            &mut self.machine_lineage_optimal,
+            metrics.human_machine_lineage_optimal_prevalence,
+        );
         self.mean_reward.push(metrics.mean_demonstration_reward);
-        self.social_success.push(metrics.social_learning_rate_observed);
+        Self::push_defined(&mut self.social_success, metrics.social_learning_rate_observed);
     }
 }
 
