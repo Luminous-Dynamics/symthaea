@@ -164,6 +164,7 @@ pub enum MusicalTurnTakingIssue {
     DecisionBeforeChunkReceipt { position: usize },
     NonMonotonicChunkReceiptTime { position: usize },
     NonMonotonicDecisionTime { position: usize },
+    NonMonotonicEffectTime { position: usize },
     EffectFrameBeforeObservedInput { position: usize },
     EffectBeforeDecision { position: usize },
     EffectTimestampPairMismatch { position: usize },
@@ -307,6 +308,7 @@ pub fn validate_musical_turn_prediction(
 
     let mut previous_received_at = None;
     let mut previous_decision_at = None;
+    let mut previous_effect_at = None;
     for (position, chunk) in prediction.chunks.iter().enumerate() {
         if chunk.observed_through_frame != chunk.input_interval.end_frame {
             issues.push(MusicalTurnTakingIssue::ObservedThroughMismatch { position });
@@ -351,6 +353,10 @@ pub fn validate_musical_turn_prediction(
                         if *effect_time < chunk.decision_at_ns {
                             issues.push(MusicalTurnTakingIssue::EffectBeforeDecision { position });
                         }
+                        if previous_effect_at.is_some_and(|previous| *effect_time < previous) {
+                            issues.push(MusicalTurnTakingIssue::NonMonotonicEffectTime { position });
+                        }
+                        previous_effect_at = Some(*effect_time);
                     }
                 } else if effect_frame.is_some() || effect_at_ns.is_some() {
                     issues.push(MusicalTurnTakingIssue::UntimedActionHasEffect { position });
@@ -998,6 +1004,19 @@ mod tests {
     }
 
     #[test]
+    fn effect_times_must_be_monotonic_across_the_stream() {
+        let mut predicted = prediction();
+        predicted.chunks[3].disposition = MusicalTurnDispositionV1::Action {
+            action: MusicalTurnActionV1::Yield,
+            effect_frame: Some(420),
+            effect_at_ns: Some(21_000_000),
+        };
+        assert!(score_musical_turn_taking(&truth(), &predicted)
+            .unwrap_err()
+            .contains(&MusicalTurnTakingIssue::NonMonotonicEffectTime { position: 3 }));
+    }
+
+    #[test]
     fn missing_chunk_is_rejected() {
         let mut predicted = prediction();
         predicted.chunks.remove(2);
@@ -1032,6 +1051,15 @@ mod tests {
         };
         assert!(validate_musical_turn_prediction(&predicted)
             .contains(&MusicalTurnTakingIssue::UntimedActionHasEffect { position: 0 }));
+
+        predicted = prediction();
+        predicted.chunks[2].disposition = MusicalTurnDispositionV1::Action {
+            action: MusicalTurnActionV1::Continue,
+            effect_frame: Some(301),
+            effect_at_ns: Some(30_100_000),
+        };
+        assert!(validate_musical_turn_prediction(&predicted)
+            .contains(&MusicalTurnTakingIssue::UntimedActionHasEffect { position: 2 }));
     }
 
     #[test]
