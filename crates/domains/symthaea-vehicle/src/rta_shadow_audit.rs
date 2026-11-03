@@ -347,6 +347,18 @@ mod tests {
     }
 
     #[test]
+    fn aggregate_counts_must_match_frames_even_when_digest_is_recomputed() {
+        let mut audit = VehicleRtaShadowAudit::new(VehicleRtaConfig::default()).unwrap();
+        audit.observe(&observation(0.0));
+        let mut report = audit.report();
+        report.baseline_frames += 1;
+        report.report_digest.clear();
+        let bytes = serde_json::to_vec(&report).unwrap();
+        report.report_digest = blake3::hash(&bytes).to_hex().to_string();
+        assert!(!report.identity_is_valid());
+    }
+
+    #[test]
     fn monitor_epoch_reset_does_not_erase_existing_audit_frames() {
         let mut audit = VehicleRtaShadowAudit::new(VehicleRtaConfig::default()).unwrap();
         audit.observe(&observation(0.0));
