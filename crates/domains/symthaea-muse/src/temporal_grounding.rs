@@ -9,7 +9,7 @@
 //! with respect to the declared audio clock. This module scores supplied
 //! annotations and predictions; it does not detect events in waveforms.
 
-use crate::evidence_digest::{canonical_json_sha256, decode_hex_32};
+use crate::evidence_digest::canonical_json_sha256;
 use serde::{Deserialize, Serialize};
 
 pub const TEMPORAL_GROUNDING_SCHEMA_V1: &str = "mel-temporal-grounding-v1";
@@ -40,7 +40,7 @@ pub struct FrameIntervalV1 {
 
 impl FrameIntervalV1 {
     pub fn len_frames(self) -> u64 {
-        self.end_frame - self.start_frame
+        self.end_frame.saturating_sub(self.start_frame)
     }
 }
 
@@ -310,8 +310,8 @@ pub fn frame_interval_iou(left: FrameIntervalV1, right: FrameIntervalV1) -> f64 
     if intersection == 0 {
         return 0.0;
     }
-    let left_len = u128::from(left.end_frame - left.start_frame);
-    let right_len = u128::from(right.end_frame - right.start_frame);
+    let left_len = u128::from(left.end_frame.saturating_sub(left.start_frame));
+    let right_len = u128::from(right.end_frame.saturating_sub(right.start_frame));
     let union = left_len + right_len - intersection;
     intersection as f64 / union as f64
 }
@@ -387,7 +387,7 @@ pub fn score_temporal_grounding(
         GroundingPredictionStateV1::Ambiguous { .. }
             | GroundingPredictionStateV1::NotEstimable { .. }
     ) || (truth.state == GroundTruthStateV1::Absent
-        && prediction.state == GroundingPredictionStateV1::NotDetected);
+        && matches!(&prediction.state, GroundingPredictionStateV1::NotDetected));
     let predicted_occurrences = predicted_intervals.len();
 
     if !scored {
@@ -417,7 +417,7 @@ pub fn score_temporal_grounding(
     }
 
     if truth.state == GroundTruthStateV1::Absent {
-        let correct_absence_claim = match prediction.state {
+        let correct_absence_claim = match &prediction.state {
             GroundingPredictionStateV1::QueryAbsent => Some(true),
             GroundingPredictionStateV1::Occurrences { .. } => Some(false),
             GroundingPredictionStateV1::NotDetected
