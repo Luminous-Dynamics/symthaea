@@ -1,11 +1,23 @@
 {
- "format":"symthaea.projected-bce-step-results","version":1,
- "claim_ceiling":"syntactic_static_BCE_receipt_validation_plus_exhaustive_fixture_oracle_not_formal_proof",
- "certificate_check":"passed","source_full_models":2,"target_full_models":3,
- "source_projected_support":["0","1"],"target_projected_support":["0","1"],
- "pwmc_visible_weighted_value":"1/1","negative_controls":9,"negative_controls_rejected":9,
- "source_digest":"sha256:830b54bf96367013edf6d8a50b9c1eec2cfa4bdd1c73787c30ccd0e9f08e5f8b",
- "target_digest":"sha256:941121948294a17ba002c6549ee65c2f365459f623f7de612c582ddc5375913b",
- "certificate_sha256":"sha256:623eb9beed7063c5aa273019de6f93492589b4a5617cb40e18003bae49bdac6a",
- "checker_sha256":"sha256:df75fdee730c25a295ac00d1359bdd982f09cd1217e3990f6d927d726b495f2e"
+  "format": "symthaea.projected-bce-step-results",
+  "version": 1,
+  "claim_ceiling": "syntactic_static_BCE_receipt_validation_plus_exhaustive_fixture_oracle_not_formal_proof",
+  "certificate_check": "passed",
+  "source_full_models": 2,
+  "target_full_models": 3,
+  "source_projected_support": [
+    "0",
+    "1"
+  ],
+  "target_projected_support": [
+    "0",
+    "1"
+  ],
+  "pwmc_visible_weighted_value": "1/1",
+  "negative_controls": 9,
+  "negative_controls_rejected": 9,
+  "source_digest": "sha256:830b54bf96367013edf6d8a50b9c1eec2cfa4bdd1c73787c30ccd0e9f08e5f8b",
+  "target_digest": "sha256:941121948294a17ba002c6549ee65c2f365459f623f7de612c582ddc5375913b",
+  "certificate_git_blob_sha1": "747732281992d62929aad686632a3705749e8fdf",
+  "checker_git_blob_sha1": "8bf663a393e89f07ff4b7e2bef31015c4d419824"
 }
