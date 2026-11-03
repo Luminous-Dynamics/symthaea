@@ -10,6 +10,7 @@
 
 pub mod chemistry;
 pub mod quality;
+pub mod service;
 pub mod validation;
 
 pub mod energy {
