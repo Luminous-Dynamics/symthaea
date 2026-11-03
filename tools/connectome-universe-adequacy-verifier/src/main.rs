@@ -628,7 +628,7 @@ fn validate_report(
                 .map(|world| (&world.id, &world.structural_sha256, world.state.clone())),
         )
     {
-        if let Some(state) = state.filter(|state| state != "NOT_ESTIMABLE") {
+        if let Some(state) = state.filter(|state| state.as_str() != "NOT_ESTIMABLE") {
             if let Some(previous) = state_by_structure.insert(structural_sha256.clone(), state.clone()) {
                 if previous != state {
                     return Err(format!(
@@ -863,7 +863,12 @@ fn validate_report(
     let every_required_family_supported = family_counts
         .values()
         .all(|counts| counts.compatible_reference_count > 0);
-    let can_support = closure_disposition == "CLOSED_VERIFIED"
+    // This crate does not yet consume an authenticated #10204 freeze-auth receipt or
+    // independently replay the #10137 Cartesian-closure receipt. Until those adapters
+    // are wired in, it must never promote a success claim based on report booleans.
+    let authenticated_external_receipts_available = false;
+    let can_support = authenticated_external_receipts_available
+        && closure_disposition == "CLOSED_VERIFIED"
         && oracle_boundary == "EVALUATOR_ONLY_VERIFIED"
         && freeze_receipt_present
         && truth_separation_verified
@@ -889,7 +894,9 @@ fn validate_report(
     Ok(json!({
         "schema_version": REPORT_VERSION,
         "evaluation_id": evaluation_id,
-        "status": "VERIFIED",
+        "status": "COUNTERS_RECOMPUTED",
+        "trusted_promotion": false,
+        "claim_ceiling": "supplied reference challenge only; external worldset closure and pre-outcome freeze authentication are not verified by this tool",
         "canonicalizer_protocol": CANONICALIZER_PROTOCOL,
         "candidate_structure_manifest_sha256": candidate_manifest,
         "reference_structure_manifest_sha256": reference_manifest,
