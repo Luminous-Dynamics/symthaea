@@ -1084,6 +1084,69 @@
         "no_silent_fallback"
       ],
       "claim_ceiling": "Exact minimax is exact only on the finite supplied scenario set; held-out results quantify rather than eliminate out-of-ensemble risk."
+    },
+    {
+      "id": "decision_aware_value_of_information",
+      "status": "planned",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10109",
+      "follow_on_issues": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10207",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10208"
+      ],
+      "ablations": [
+        "point_EIG",
+        "scenario_robust_EIG",
+        "expected_EVSI",
+        "worst_case_shared_policy_EVSI",
+        "lower_tail_shared_policy_CVaR_EVSI",
+        "minimax_regret_policy",
+        "random_eligible_probe",
+        "cost_only_heuristic"
+      ],
+      "case_families": [
+        "high_EIG_but_no_terminal_action_change",
+        "low_entropy_rare_high_consequence_fault",
+        "scenario_fragile_decision_boundary",
+        "uninformative_plausible_likelihood_model",
+        "utility_matrix_misspecification",
+        "hard_noncompensable_constraint",
+        "missing_or_ambiguous_utility_dimension",
+        "no_independent_evidence_grounding",
+        "unauthorized_or_irreversible_experiment",
+        "combinatorial_policy_search_budget_exhaustion"
+      ],
+      "metrics": [
+        "expected_EVSI_prediction_error",
+        "worst_case_shared_policy_EVSI",
+        "lower_tail_shared_policy_CVaR_EVSI",
+        "expected_decision_regret",
+        "worst_case_decision_regret",
+        "scenario_decision_stability",
+        "wrong_terminal_decision_rate",
+        "abstention_precision_and_recall",
+        "utility_model_sensitivity",
+        "likelihood_calibration_Brier_logloss_ECE",
+        "p50_p95_investigation_latency",
+        "resource_cost_and_target_impact"
+      ],
+      "target": "at_least_20_percent_reduction_in_90th_percentile_decision_regret_vs_point_EIG_on_preregistered_misspecification_corpus_without_over_10_percent_median_investigation_cost_increase",
+      "safeguards": [
+        "utility_owner_scope_units_and_exclusions_recorded",
+        "unknown_objective_dimensions_are_not_zero_filled",
+        "hard_constraints_filter_before_utility_aggregation",
+        "caller_supplied_likelihoods_and_utility_are_not_claimed_calibrated",
+        "same authorization and resource gates for all planner variants",
+        "terminal decisions remain proposals and are never executed"
+      ],
+      "reporting": {
+        "per_fault_family": true,
+        "per_platform_and_target_cohort": true,
+        "scenario_coverage": true,
+        "utility_exclusions": true,
+        "confidence_intervals": true,
+        "all_abstentions_and_rejections_in_denominator": true
+      },
+      "claim_ceiling": "Results qualify only the frozen likelihood scenarios, utility models, source-derived corpus and target cohorts. They do not establish universal human utility, global adversarial robustness or execution safety."
     }
   ],
   "promotion_policy": {
@@ -1126,7 +1189,10 @@
     "https://github.com/Luminous-Dynamics/symthaea/pull/9965",
     "https://github.com/Luminous-Dynamics/symthaea/pull/10171",
     "https://github.com/Luminous-Dynamics/symthaea/issues/10174",
-    "https://github.com/Luminous-Dynamics/symthaea/issues/10175"
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10175",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10109",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10207",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10208"
   ],
   "claim_ceiling": {
     "rust_port_completed": false,
