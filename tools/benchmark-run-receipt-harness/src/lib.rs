@@ -1964,6 +1964,25 @@ mod tests {
     }
 
     #[test]
+    fn rejects_falsified_known_coverage_metric() {
+        let mut receipt = base_receipt();
+        receipt["derived_metrics"] = json!([
+            {
+                "metric_id":"coverage-adjusted-task-yield",
+                "value":0.6,
+                "unit":"fraction",
+                "formula":"passed / eligible",
+                "is_official":false,
+                "unavailable_reason":null
+            }
+        ]);
+        assert_eq!(
+            verify_receipt_value(&receipt).unwrap_err().kind,
+            ReceiptErrorKind::AccountingMismatch
+        );
+    }
+
+    #[test]
     fn rejects_unknown_top_level_fields() {
         let mut receipt = base_receipt();
         receipt["unreviewed"] = json!(true);
