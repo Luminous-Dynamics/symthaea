@@ -1103,16 +1103,24 @@ mod tests {
                 ..
             }
         ));
-        assert!(evidence.verified, "default planned development should preserve its named motif");
+        assert!(
+            !evidence.verified,
+            "the generic composer is not permitted to claim it executed the explicit one-degree development transform"
+        );
     }
 
     #[test]
-    fn planned_realization_resolves_every_form_obligation() {
+    fn planned_realization_leaves_unrealized_motif_development_pending() {
         let home = Key::major(PitchClass::C);
         let realized = realize_sonata_with_plan(home, 100.0, 4.0, &theme(), 17, &intent());
 
-        assert!(realized.resolution.all_fulfilled());
-        assert!(realized.resolution.unresolved().is_empty());
+        assert!(!realized.resolution.all_fulfilled());
+        assert_eq!(realized.resolution.unresolved().len(), 1);
+        assert_eq!(
+            realized.resolution.unresolved()[0].id,
+            DEVELOP_PRIMARY_MOTIF,
+            "the generic Sonata composer must not claim the explicit motif-development action"
+        );
         assert_eq!(realized.score.total_beats, realized.plan.sections[4].end);
     }
 
@@ -1125,7 +1133,17 @@ mod tests {
             realized.verification.len(),
             realized.plan.obligations.items().len()
         );
-        assert!(realized.verification.iter().all(|item| item.verified));
+        let development = realized.verification.iter()
+            .find(|item| item.obligation_id == DEVELOP_PRIMARY_MOTIF)
+            .unwrap();
+        assert!(!development.verified);
+        assert!(matches!(
+            &development.metric,
+            SonataVerificationMetric::MotifDevelopment { .. }
+        ));
+        assert!(realized.verification.iter()
+            .filter(|item| item.obligation_id != DEVELOP_PRIMARY_MOTIF)
+            .all(|item| item.verified));
         assert!(realized.resolution.fulfilled().iter().all(|item| {
             item.resolution_note
                 .as_deref()
