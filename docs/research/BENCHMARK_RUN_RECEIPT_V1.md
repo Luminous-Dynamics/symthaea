@@ -151,3 +151,8 @@ The Rust validator also recomputes the four recognized derived metrics—eligibl
 
 
 The Python 3.12 CI environment also pins `typing-extensions` explicitly: `referencing 0.37.0` uses its TypeVar-default backport on Python versions before 3.13. The audit environment installs the complete dependency set with `--no-deps`, so each conditional/transitive dependency must be listed and version-asserted rather than relying on pip resolution.
+
+
+### Official score provenance binding
+
+When `official_score.is_official=true`, the validator requires `official_score.source_output_sha256` to equal `benchmark.grader_output_sha256`. This prevents a receipt from attaching a valid but unrelated grader-output digest to an official value. The standard JSON Schema validates each digest's shape; the Rust semantic validator enforces this cross-field equality and emits `DigestMismatch` on substitution. This still does not authenticate the grader or verify the score formula against a benchmark-owner implementation; it binds the claimed score to the exact grader artifact declared by the receipt.
