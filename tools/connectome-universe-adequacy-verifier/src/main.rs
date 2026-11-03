@@ -307,6 +307,10 @@ fn set_summary_field(summary: &Summary, key: &str, value: &Value) -> Result<(), 
         "compatible_reference_count" => summary.compatible_reference_count,
         "incompatible_reference_count" => summary.incompatible_reference_count,
         "indeterminate_reference_count" => summary.indeterminate_reference_count,
+        "compatible_estimable_reference_count" => summary.compatible_estimable_reference_count,
+        "compatible_query_not_estimable_reference_count" => {
+            summary.compatible_query_not_estimable_reference_count
+        }
         "structurally_included_count" => summary.structurally_included_count,
         "query_state_covered_count" => summary.query_state_covered_count,
         "query_flipping_reference_count" => summary.query_flipping_reference_count,
@@ -871,6 +875,20 @@ fn validate_report(
         != summary.reference_world_count
     {
         return Err("reference compatibility counts do not reconcile to reference_world_count".to_owned());
+    }
+    if summary.compatible_estimable_reference_count
+        + summary.compatible_query_not_estimable_reference_count
+        != summary.compatible_reference_count
+    {
+        return Err("compatible query-estimability counts do not reconcile to compatible_reference_count".to_owned());
+    }
+    if summary.structurally_included_count > summary.compatible_reference_count
+        || summary.query_state_covered_count > summary.compatible_estimable_reference_count
+        || summary.query_flipping_reference_count > summary.compatible_estimable_reference_count
+        || summary.omitted_query_flipping_count > summary.query_flipping_reference_count
+        || summary.false_invariance_count > summary.compatible_estimable_reference_count
+    {
+        return Err("one or more adequacy numerators exceed their eligible denominators".to_owned());
     }
 
     let dispositions = report
