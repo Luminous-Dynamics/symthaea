@@ -584,6 +584,41 @@ mod tests {
     }
 
     #[test]
+    fn identical_frozen_runs_produce_identical_output_receipts() {
+        let (sim, road, perturbations, mut controller, mut encoder) = setup();
+        let first = run_paired_lane_keep_rollout(
+            "lane-keep-replay-001",
+            "straight-road-v1",
+            "9".repeat(64),
+            &sim,
+            &road,
+            &perturbations,
+            10.0,
+            0.005,
+            16,
+            &mut controller,
+            &mut encoder,
+        )
+        .unwrap();
+        let second = run_paired_lane_keep_rollout(
+            "lane-keep-replay-001",
+            "straight-road-v1",
+            "9".repeat(64),
+            &sim,
+            &road,
+            &perturbations,
+            10.0,
+            0.005,
+            16,
+            &mut controller,
+            &mut encoder,
+        )
+        .unwrap();
+        assert_eq!(first.profile.experiment_profile_digest, second.profile.experiment_profile_digest);
+        assert_eq!(first.run_output_digest, second.run_output_digest);
+    }
+
+    #[test]
     fn paired_rollout_applies_identical_crosswind_to_both_plants() {
         let (sim, road, _, mut controller, mut encoder) = setup();
         let (weights, _) = controller.output_projection();
