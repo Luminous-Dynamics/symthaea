@@ -459,8 +459,8 @@ mod tests {
             initial_state_digest:h('a'),environment_digest:h('b'),dynamics_digest:h('c'),action_history_digest:h('d'),observation_availability_digest:h('e'),forecast_issued_at_ms:1000,
             decision_context_digest:String::new(),action_set_digest:String::new(),utility_id:"progress-risk".into(),utility_unit_id:"utility".into(),tie_tolerance:1e-9,selected_action_id:"yield".into(),
             candidate_set_complete:true,selection_commit_sequence:10,reference_outcome_reveal_sequence:11,selection_receipt_id:"select-1".into(),actions:vec![
-                DiscrepancyActionOutcome{action_id:"yield".into(),command_digest:h('f'),feasibility:DiscrepancyFeasibility::Feasible,predicted_utility:10.0,realized_utility:2.0,execution_receipt_id:"exec-y".into(),execution_digest:h('1'),evaluator_receipt_id:"eval-y".into()},
-                DiscrepancyActionOutcome{action_id:"continue".into(),command_digest:h('0'),feasibility:DiscrepancyFeasibility::Feasible,predicted_utility:7.0,realized_utility:8.0,execution_receipt_id:"exec-c".into(),execution_digest:h('2'),evaluator_receipt_id:"eval-c".into()}
+                DiscrepancyActionOutcome{action_id:"yield".into(),command_digest:h('f'),feasibility:DiscrepancyFeasibility::Feasible,reference_status:ReferenceOutcomeStatus::Observed,predicted_utility:10.0,realized_utility:Some(2.0),execution_receipt_id:Some("exec-y".into()),execution_digest:Some(h('1')),evaluator_receipt_id:Some("eval-y".into())},
+                DiscrepancyActionOutcome{action_id:"continue".into(),command_digest:h('0'),feasibility:DiscrepancyFeasibility::Feasible,reference_status:ReferenceOutcomeStatus::Observed,predicted_utility:7.0,realized_utility:Some(8.0),execution_receipt_id:Some("exec-c".into()),execution_digest:Some(h('2')),evaluator_receipt_id:Some("eval-c".into())}
             ]};
         d.actions.sort_by(|a,b|a.action_id.cmp(&b.action_id));
         d.action_set_digest=hash_json(&d.actions.iter().map(|a|(a.action_id.as_str(),a.command_digest.as_str())).collect::<Vec<_>>()).unwrap();
@@ -533,7 +533,31 @@ mod tests {
     #[test] fn missing_horizons_are_not_imputed(){let mut x=input();x.residual_observations.truncate(1);assert!(summarize_vehicle_model_discrepancy(&x).unwrap().paired_horizon_growth.is_empty());}
     #[test] fn detects_planner_ranking_reversal_and_regret(){let r=summarize_vehicle_model_discrepancy(&input()).unwrap();let d=&r.decision_results[0];assert_eq!(d.predicted_best_action_id.as_deref(),Some("yield"));assert_eq!(d.realized_best_action_id.as_deref(),Some("continue"));assert_eq!(d.ranking_reversed,Some(true));assert_eq!(d.selected_action_regret,Some(6.0));assert_eq!(d.optimism_gap,Some(9.0));}
     #[test] fn rejects_outcome_leakage(){let mut x=input();x.decisions[0].reference_outcome_reveal_sequence=9;x.decisions[0].decision_context_digest=decision_context_digest(&x.decisions[0]).unwrap();assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::OutcomeLeakage);}
-    #[test] fn unknown_feasibility_makes_decision_indeterminate(){let mut x=input();x.decisions[0].actions[0].feasibility=DiscrepancyFeasibility::Indeterminate;x.decisions[0].action_set_digest=hash_json(&x.decisions[0].actions.iter().map(|a|(a.action_id.as_str(),a.command_digest.as_str())).collect::<Vec<_>>()).unwrap();let r=summarize_vehicle_model_discrepancy(&x).unwrap();assert_eq!(r.decision_results[0].status,DecisionAuditStatus::IndeterminateFeasibility);}
+    #[test] fn unknown_feasibility_makes_decision_indeterminate(){let mut x=input();x.decisions[0].actions[0].feasibility=DiscrepancyFeasibility::Indeterminate;x.decisions[0].actions[0].realized_utility=None;let r=summarize_vehicle_model_discrepancy(&x).unwrap();assert_eq!(r.decision_results[0].status,DecisionAuditStatus::IndeterminateFeasibility);}
+    #[test]
+    fn missing_or_censored_reference_outcomes_make_decision_incomplete() {
+        for status in [
+            ReferenceOutcomeStatus::Missing,
+            ReferenceOutcomeStatus::Censored,
+            ReferenceOutcomeStatus::TimedOut,
+            ReferenceOutcomeStatus::Unsupported,
+        ] {
+            let mut sample = input();
+            let action = &mut sample.decisions[0].actions[0];
+            action.reference_status = status;
+            action.feasibility = DiscrepancyFeasibility::Indeterminate;
+            action.realized_utility = None;
+            action.execution_receipt_id = None;
+            action.execution_digest = None;
+            action.evaluator_receipt_id = None;
+            let report = summarize_vehicle_model_discrepancy(&sample).unwrap();
+            assert_eq!(report.decision_results[0].status, DecisionAuditStatus::IncompleteReference);
+            assert_eq!(report.decision_summary.incomplete_reference_decision_count, 1);
+            assert_eq!(report.decision_results[0].ranking_reversed, None);
+            assert_eq!(report.decision_results[0].selected_action_regret, None);
+        }
+    }
+
     #[test] fn rejects_action_set_digest_mismatch(){let mut x=input();x.decisions[0].action_set_digest=h('9');x.decisions[0].decision_context_digest=decision_context_digest(&x.decisions[0]).unwrap();assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::InvalidActionSetDigest);}
     #[test] fn canonicalizes_row_and_action_order(){let x=input();let a=summarize_vehicle_model_discrepancy(&x).unwrap();let mut y=x;y.residual_observations.reverse();y.decisions[0].actions.reverse();let b=summarize_vehicle_model_discrepancy(&y).unwrap();assert_eq!(a.report_digest,b.report_digest);}
     #[test] fn report_digest_detects_tampering(){let mut r=summarize_vehicle_model_discrepancy(&input()).unwrap();assert!(r.identity_is_valid());r.horizon_summaries[0].p95_absolute_residual+=1.0;assert!(!r.identity_is_valid());}
