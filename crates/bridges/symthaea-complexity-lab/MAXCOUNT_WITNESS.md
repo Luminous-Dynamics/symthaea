@@ -137,3 +137,20 @@ Aspirational gates (not achieved): 100% agreement with exhaustive support on tra
 - an optimal-solution DAG != a polynomial-size DAG for every instance;
 - proof-carrying backpointers != a new general proof system;
 - no hardware runtime, broad benchmark win or SOTA claim yet.
+
+
+## Rejection-sampled bounded draws and replayable randomness receipts
+
+The earlier sampler APIs accept an already-unbiased `uniform_below(bound)` callback. A new Rust adapter, `sample_optimal_assignment_with_words`, lowers the caller's obligation to supplying raw 128-bit words from its chosen random source. It uses bit-mask rejection:
+
+1. set (k=\lceil\log_2(bound)\rceil);
+2. mask each raw word to its low (k) bits;
+3. reject candidates outside ([0,bound));
+4. record every raw word, including rejected words, and the accepted bounded draw.
+
+This avoids modulo bias. The API returns a `MaxCountSamplingTranscript` recording the measure, per-step upper bounds, raw random words, accepted values and final assignment. `verify_sampling_transcript` replays the bounded choices against the same checked backpointer result and rejects an incorrect range, missing/extra words, false accepted value or assignment mismatch.
+
+The transcript proves **how** the raw words determined the sample. It does not prove that the raw-word source was unbiased, unpredictable or honestly seeded. Those remain explicit entropy-source assumptions. A cryptographic PRNG can provide a practical pseudorandom source; a public randomness beacon or committed seed could add provenance, but neither is magically an information-theoretic proof of entropy.
+
+The standalone exact Python oracle `reference/maxcount_bounded_draw_oracle.py` exhaustively checks all two-word paths for bounds 1–64 (149,797 paths), checks the full-width (u128) rejection case, confirms bound one consumes no randomness, and rejects three mutated transcripts. This is finite combinatorial evidence, not a cryptographic entropy analysis or measured solver benchmark.
+
