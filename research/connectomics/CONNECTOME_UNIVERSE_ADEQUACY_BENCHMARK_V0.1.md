@@ -1,0 +1,168 @@
+# Connectome structural-universe adequacy benchmark v0.1
+
+**Status:** protocol and report schema; implementation and execution are not yet qualified.  
+**Issue:** [#10217](https://github.com/Luminous-Dynamics/symthaea/issues/10217)  
+**Related:** [#10091](https://github.com/Luminous-Dynamics/symthaea/issues/10091), [PR #10137](https://github.com/Luminous-Dynamics/symthaea/pull/10137), [#10054](https://github.com/Luminous-Dynamics/symthaea/issues/10054), [#9891](https://github.com/Luminous-Dynamics/symthaea/issues/9891), [#9960](https://github.com/Luminous-Dynamics/symthaea/issues/9960)
+
+## 1. The claim this benchmark separates
+
+A finite-world verifier can establish that every member of a declared finite universe was enumerated. It cannot establish that the declared universe contains every biologically or scientifically relevant alternative.
+
+This benchmark therefore reports two independent dispositions:
+
+1. **Enumeration closure:** exact coverage of the candidate's declared universe.
+2. **Universe adequacy:** coverage of an independently generated reference challenge set, scoped to a frozen scientific query.
+
+A report can be CLOSED_VERIFIED and ADEQUACY_FAILED. That is the central negative control: perfect enumeration of an incomplete list must not produce a scientifically adequate result.
+
+Even an adequacy pass means only "supported within tested challenges." It is not a proof over every possible biological structure.
+
+## 2. Threat model
+
+The evaluator must detect candidate universes that omit:
+- an entire structural error family;
+- one specific query-flipping world;
+- a continuation, orphan-fragment or missing-neurite alternative;
+- a root identity/reassignment alternative;
+- a synapse endpoint alternative;
+- a correlated detector, registration or morphology failure;
+- a compound error whose individual components are non-material but whose interaction changes the query.
+
+The benchmark also tests false ambiguity: a candidate universe that introduces alternatives incompatible with the frozen source evidence can make a query appear less stable than warranted.
+
+The reference generator must be independent of the candidate-universe generator. Reusing the same generator, seeds, hidden labels or pruning rules for both sides invalidates the adequacy estimate.
+
+## 3. Evaluator boundary and freeze order
+
+The candidate generator may receive only:
+- permitted source observations and their immutable artifact references;
+- the declared query-independent candidate-generation protocol;
+- the pre-outcome admissibility policy;
+- the authorized evidence available to the candidate at decision time.
+
+It must not receive reference-world identities, evaluator-only truth labels, held-out perturbation seeds, or query outcomes used to score adequacy.
+
+The evaluator-only reference challenge set is frozen before candidate output is opened. A trusted freeze receipt is required for claims about pre-outcome separation; a producer-authored timestamp or boolean does not qualify. Until the trust adapter in [#10204](https://github.com/Luminous-Dynamics/symthaea/issues/10204) is implemented and qualified, `oracle_boundary` must not be reported as `EVALUATOR_ONLY_VERIFIED`.
+
+The evaluator records an append-only sequence:
+1. freeze query definition, decision rule, source cohort and challenge-generation protocol;
+2. freeze the candidate-universe protocol and admissibility policy;
+3. freeze reference challenge manifest and hidden truth;
+4. run candidate-universe generation without access to reference data/outcomes;
+5. enumerate and independently verify the declared candidate universe;
+6. evaluate both candidate and reference worlds using the exact same frozen query implementation;
+7. compute the adequacy report in the evaluator boundary.
+
+Where the ordering cannot be authenticated, output ADEQUACY_NOT_ESTIMABLE and preserve the evidence gap.
+
+## 4. World identity and comparability
+
+World IDs must be canonical, content-addressed identifiers with domain separation and a versioned canonicalization rule. Candidate and reference worlds must be comparable under an evaluator-owned structural canonicalizer. A raw string match is not enough if IDs were produced by unrelated rules.
+
+The evaluator must distinguish:
+- **structural inclusion:** a reference structural world is equivalent to a candidate world under the declared canonical equivalence;
+- **query-state coverage:** the reference world's query decision state is represented somewhere in the candidate universe, even when its exact structure is not included;
+- **evidence compatibility:** whether the reference world is compatible with the observations available to the candidate.
+
+An evidence-incompatible reference world is counted and disclosed but does not count as a missed admissible world. An indeterminate reference world is not silently counted as compatible or incompatible; it contributes to NOT_ESTIMABLE / abstention reporting.
+
+The initial protocol must not assign probabilities to worlds. Challenge-set frequencies are not population prevalence.
+
+## 5. Query-specific metrics
+
+For every frozen query, report counts and denominators before percentages:
+
+- candidate world count;
+- reference challenge world count;
+- compatible / incompatible / indeterminate reference counts;
+- exact structural inclusion among compatible reference worlds;
+- query-state coverage among compatible, estimable reference worlds;
+- reference worlds that flip the baseline query decision;
+- omitted query-flipping worlds;
+- false-invariance events (candidate universe has one decision state, while a compatible reference world has another);
+- false-ambiguity events (candidate permits a decision state unsupported by compatible reference worlds);
+- NOT_ESTIMABLE / abstention counts.
+
+Report the same quantities per error family and per source cluster. A pooled average must not conceal an entire omitted family. Where challenge generation is not probability sampled, use the name **challenge-set coverage**, never population recall.
+
+Do not reduce structural inclusion, query-state coverage and false-invariance risk to one scalar.
+
+## 6. Required synthetic challenge families
+
+Start from exactly known small connectomes and controlled structural transformations:
+- false merge of distinct neurites;
+- false split of one neurite;
+- continuation loss / orphan fragment;
+- root reassignment;
+- branch insertion, deletion or duplication;
+- synapse endpoint reassignment;
+- crossing / near-contact ambiguity;
+- anisotropic coordinate transform / registration error;
+- correlated detector or segmentation failure;
+- compound perturbations with non-additive query consequences.
+
+Queries should include edge presence, directed path/reachability, in/out degree, motif count, pathway threshold, cell-type-specific connectivity and a small number of pre-registered graph statistics. Each query must bind its metric, units, decision rule, threshold and implementation digest.
+
+## 7. Mandatory baselines
+
+1. Single best reconstruction.
+2. Marginal rectangular uncertainty product.
+3. Hand-authored finite alternatives.
+4. Existing evidence-conditioned candidate generator.
+5. Union of independent candidate channels (morphology, detector disagreement, graph consistency and adjudicated human alternatives), preserving provenance.
+6. Evaluator-only oracle reference universe, marked unattainable.
+7. Deliberately incomplete universe controls.
+
+All methods must use the same source observations, frozen query and cost/evidence budget. Additional reference information cannot leak into a candidate baseline.
+
+## 8. Adversarial known-answer matrix
+
+- Remove one query-flipping world while preserving a valid, fully resealed Cartesian manifest: closure remains true; adequacy must fail.
+- Remove an entire structural error family from the candidate axes.
+- Combine two individually non-material errors into one material compound world.
+- Make all candidate channels share a correlated failure that the independent reference generator exposes.
+- Introduce an evidence-incompatible reference world: count it, but do not classify it as an admissible omission.
+- Introduce an evidence-indeterminate world: abstain rather than force a yes/no adequacy label.
+- Make a candidate world structurally different but query-equivalent: structural inclusion and query-state coverage must differ.
+- Add semantically duplicate worlds with different IDs: canonical equivalence detects duplication.
+- Apply anisotropic resampling / coordinate-frame changes: physical equivalence must be handled by a declared transform, not a pixel-index heuristic.
+- Ensure candidate and evaluator share no hidden seed, target label or query outcome.
+
+## 9. Acceptance gates (targets, not results)
+
+- 100% detection of deliberately omitted query-flipping worlds in the frozen synthetic adversarial suite.
+- Zero false query-invariant reports in known-truth controls.
+- At least 95% challenge-set coverage for independently adjudicated, query-material alternatives on supported strata; report cluster-aware uncertainty and exact denominators.
+- 100% explicit NOT_ESTIMABLE / abstention for unsupported evidence or unauthenticated oracle separation.
+- 100% of error-family denominators visible; no blind family hidden by pooling.
+- Independent replay emits byte-identical reports for identical pinned inputs.
+- Altered query, source artifact, generator, reference challenge, or candidate universe changes the report digest or invalidates verification.
+- No probabilities or population-level recall claims without a defensible sampling design.
+
+## 10. Schema and validation contract
+
+The first report shape is defined in `connectome-universe-adequacy-report-v0.1.schema.json`.
+
+JSON Schema checks structural shape only. A Rust semantic validator must additionally enforce:
+- unique candidate and reference world IDs;
+- canonical world-ID validity and digest recomputation;
+- exact equality between `candidate_universe.world_ids` and `candidate_worlds.world_id` set;
+- exact count reconciliation between world arrays and `summary`;
+- compatible + incompatible + indeterminate = reference count;
+- all count numerators are bounded by the appropriate denominators;
+- family totals reconcile without duplicate family keys;
+- false-invariance and omitted-flipping counts are independently recomputed;
+- query-state coverage is calculated only over estimable, evidence-compatible reference worlds;
+- ADEQUACY_SUPPORTED_WITHIN_TESTED_CHALLENGES is impossible when oracle separation is unverified, a material compatible world is omitted, or any required challenge family is absent;
+- closure and adequacy dispositions remain independent.
+
+## 11. Claim ceiling
+
+A pass establishes only that the candidate universe covered the frozen, independently generated reference challenge set for the specified query and source evidence under the declared canonicalizer. It does not prove:
+- all biologically possible reconstructions were generated;
+- source EM or segmentation is anatomically perfect;
+- any structural alternative is probable;
+- the scientific query is causally identified;
+- the result generalizes to another volume, species, query or acquisition protocol.
+
+The benchmark is intended to make universe misspecification visible and falsifiable, not to eliminate biological uncertainty.
