@@ -296,6 +296,29 @@ fn verify(
     let (correspondence_world_id, correspondence_release_id, mappings, alternative_groups) =
         parse_mappings(&correspondence)?;
 
+    // Cross-check every mapping target against the exact target inventory, including
+    // mapping rows that have no fate record due to a malformed or incomplete receipt.
+    for (mapping_id, mapping) in &mappings {
+        let expected_type = match mapping.relation_type.as_str() {
+            "ARTIFACT_IDENTITY" => "ARTIFACT",
+            "SEGMENT_LINEAGE" => "SEGMENT",
+            "NEURON_CORRESPONDENCE" => "NEURON",
+            "SYNAPSE_CORRESPONDENCE" => "SYNAPSE",
+            other => return Err(format!("mapping {mapping_id}: unsupported relation_type {other}")),
+        };
+        for target_id in &mapping.target_ids {
+            let target = inventory.get(target_id).ok_or_else(|| {
+                format!("mapping {mapping_id}: target object {target_id} is absent from target manifest")
+            })?;
+            if target.object_type != expected_type {
+                return Err(format!(
+                    "mapping {mapping_id}: target object {target_id} is {}, expected {expected_type}",
+                    target.object_type
+                ));
+            }
+        }
+    }
+
     for (name, value) in [
         ("manifest", &manifest_world_id),
         ("correspondence", &correspondence_world_id),
