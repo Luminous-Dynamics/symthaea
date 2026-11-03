@@ -832,6 +832,21 @@ mod tests {
             64
         );
         assert_eq!(batch.candidates.len(), 5);
+
+        // Historical batch JSON predates the qualification field. Decode it
+        // conservatively as shadow-only, never as current execution authority.
+        let mut legacy_json = serde_json::to_value(&batch).unwrap();
+        legacy_json
+            .as_object_mut()
+            .unwrap()
+            .remove("action_qualification");
+        let legacy: SonataInterventionBatch = serde_json::from_value(legacy_json).unwrap();
+        assert!(!legacy.action_qualification.is_executable());
+        assert!(matches!(
+            &legacy.action_qualification.status,
+            SonataActionQualificationStatusV1::ShadowOnly { .. }
+        ));
+
         let selected = batch.selection.recommended_id.as_deref().unwrap();
         let selected = batch
             .candidates
