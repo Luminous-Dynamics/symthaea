@@ -4,7 +4,76 @@
   "exact_zero_nonempty_support": "passed",
   "format": "symthaea.pwmc-semantic-microbench-results",
   "hidden_witness_invariance": "passed",
-  "input_sha256": "sha256:c26471c634c9b956d7f229695f5fc3cceb4662501a6a73cba01d3916421d1707",
+  "input_sha256": "sha256:9f785d6033affab23351307ad47d8d02296d31f4cbabe579c1f8f00888b16ab6",
+  "metamorphic_test_count": 6,
+  "metamorphic_tests": [
+    {
+      "base_full_model_count": "2",
+      "base_pwmc": "2/3",
+      "base_support_cardinality": "1",
+      "operation": "add_free_hidden",
+      "status": "exact_metamorphic_relation_passed",
+      "test_id": "free-hidden-addition-invariance",
+      "transformed_full_model_count": "4",
+      "transformed_pwmc": "2/3",
+      "transformed_support_cardinality": "1"
+    },
+    {
+      "base_full_model_count": "6",
+      "base_pwmc": "-2/5",
+      "base_support_cardinality": "3",
+      "operation": "permute_variable_order",
+      "status": "exact_metamorphic_relation_passed",
+      "test_id": "variable-order-permutation-invariance",
+      "transformed_full_model_count": "6",
+      "transformed_pwmc": "-2/5",
+      "transformed_support_cardinality": "3"
+    },
+    {
+      "base_full_model_count": "6",
+      "base_pwmc": "-2/5",
+      "base_support_cardinality": "3",
+      "operation": "duplicate_clause_and_literal",
+      "status": "exact_metamorphic_relation_passed",
+      "test_id": "clause-and-literal-idempotence",
+      "transformed_full_model_count": "6",
+      "transformed_pwmc": "-2/5",
+      "transformed_support_cardinality": "3"
+    },
+    {
+      "base_full_model_count": "2",
+      "base_pwmc": "2/3",
+      "base_support_cardinality": "1",
+      "operation": "add_subsumed_clause",
+      "status": "exact_metamorphic_relation_passed",
+      "test_id": "subsumed-clause-invariance",
+      "transformed_full_model_count": "2",
+      "transformed_pwmc": "2/3",
+      "transformed_support_cardinality": "1"
+    },
+    {
+      "base_full_model_count": "2",
+      "base_pwmc": "2/3",
+      "base_support_cardinality": "1",
+      "operation": "add_free_visible",
+      "status": "exact_metamorphic_relation_passed",
+      "test_id": "free-visible-expansion-law",
+      "transformed_full_model_count": "4",
+      "transformed_pwmc": "10/3",
+      "transformed_support_cardinality": "2"
+    },
+    {
+      "base_full_model_count": "2",
+      "base_pwmc": "2/3",
+      "base_support_cardinality": "1",
+      "operation": "move_hidden_to_visible",
+      "status": "exact_metamorphic_relation_passed",
+      "test_id": "projection-boundary-is-semantic-input",
+      "transformed_full_model_count": "2",
+      "transformed_pwmc": "4/3",
+      "transformed_support_cardinality": "2"
+    }
+  ],
   "method": "visible-first existential support compilation; independent full-assignment exact replay; Fraction arithmetic",
   "projection_algorithms": {
     "agreement": "exact",
