@@ -527,6 +527,7 @@ fn action_for_obligation(kind: &ObligationKind) -> Option<SymbolicAction> {
         ObligationKind::ReturnMotif { .. } | ObligationKind::RestoreIdentity { .. } => {
             Some(SymbolicAction::ReturnOpeningMaterial)
         }
+        ObligationKind::DevelopMotif { .. } => Some(SymbolicAction::DevelopMotif),
         ObligationKind::ReachKey { .. } => Some(SymbolicAction::ModulateToRelatedKey),
         ObligationKind::Cadence { .. } | ObligationKind::ResolveAlteredDegree { .. } => {
             Some(SymbolicAction::StrengthenCadence)
