@@ -219,6 +219,11 @@ fn validate_formulation(formulation: &ValidatedFormulation) -> Result<(), Chemis
         if component.allowed_stages.is_empty()
             || component.supported_soil_classes.is_empty()
             || component.supported_surface_materials.is_empty()
+            || component.supported_soil_classes.iter().any(|value| !non_empty(value))
+            || component
+                .supported_surface_materials
+                .iter()
+                .any(|value| !non_empty(value))
         {
             return Err(ChemistryError::InvalidComponentCalibration {
                 component_id: component.component_id.clone(),
@@ -322,6 +327,9 @@ fn validate_stage_windows(
         if window.start_s >= window.end_s || window.end_s > cycle_duration_s {
             return Err(ChemistryError::InvalidStageWindow);
         }
+        if map.contains_key(&window.stage) {
+            return Err(ChemistryError::DuplicateStageWindow(window.stage));
+        }
         let stage_order = match window.stage {
             WashStage::Prewash => 0,
             WashStage::MainWash => 1,
@@ -339,9 +347,7 @@ fn validate_stage_windows(
             (_, Some(temperature)) if temperature.is_finite() && temperature >= 0.0 => {}
             _ => return Err(ChemistryError::InvalidStageWindow),
         }
-        if map.insert(window.stage, *window).is_some() {
-            return Err(ChemistryError::DuplicateStageWindow(window.stage));
-        }
+        map.insert(window.stage, *window);
     }
     if ordered
         .windows(2)
@@ -781,6 +787,22 @@ mod tests {
         assert!(matches!(
             validate_dose_plan(&formulation(), &input),
             Err(ChemistryError::EmptyDosePlan)
+        ));
+    }
+
+    #[test]
+    fn rejects_duplicate_stage_windows() {
+        let mut input = request();
+        input.stage_windows.push(StageWindow {
+            stage: WashStage::Prewash,
+            start_s: 1_800,
+            end_s: 1_900,
+            water_temperature_c: Some(40.0),
+        });
+        input.cycle_duration_s = 2_000;
+        assert!(matches!(
+            validate_dose_plan(&formulation(), &input),
+            Err(ChemistryError::DuplicateStageWindow(WashStage::Prewash))
         ));
     }
 
