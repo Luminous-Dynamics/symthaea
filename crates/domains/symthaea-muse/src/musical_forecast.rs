@@ -408,7 +408,7 @@ impl MusicalForecastLedgerV1 {
     ) -> bool {
         self.events.iter().any(|item| {
             item.sequence <= sequence
-                && item.event_tick < event_tick
+                && item.event_tick <= event_tick
                 && matches!(
                     &item.event,
                     MusicalForecastLedgerEventKindV1::Displayed { receipt }
@@ -977,17 +977,23 @@ mod tests {
     }
 
     #[test]
-    fn post_hoc_forecast_is_rejected() {
-        let mut late = forecast(1, 15, None);
-        late.target_window_start_tick = 10;
-        late.target_window_end_tick = 30;
-        late.expires_at_tick = 30;
+    fn forecast_cannot_be_committed_at_or_after_target_window_start() {
         let mut ledger = MusicalForecastLedgerV1::default();
-        ledger.append_forecast(late).unwrap();
+        let late = forecast(1, 10, None);
+        assert!(late.validate().unwrap_err().contains("before the target execution window"));
+        assert!(ledger.append_forecast(late).is_err());
+    }
+
+    #[test]
+    fn post_hoc_forecast_is_rejected() {
+        // The forecast is validly committed before its target window begins,
+        // but the supplied realization timestamp predates that commitment.
+        let mut ledger = MusicalForecastLedgerV1::default();
+        ledger.append_forecast(forecast(1, 5, None)).unwrap();
         let result = evaluate_musical_forecast_v1(
             &ledger,
             "forecast-1",
-            &context(12),
+            &context(4),
             ForecastScoringPolicyV1::default(),
         );
         assert!(result.unwrap_err().contains("post-hoc"));
@@ -1241,8 +1247,10 @@ mod tests {
     #[test]
     fn a_forecast_is_not_active_before_its_commit_time() {
         let mut ledger = MusicalForecastLedgerV1::default();
-        ledger.append_forecast(forecast(1, 15, None)).unwrap();
-        assert!(!ledger.is_active_at("forecast-1", 12));
+        let mut item = forecast(1, 15, None);
+        item.target_window_start_tick = 20;
+        ledger.append_forecast(item).unwrap();
+        assert!(!ledger.is_active_at("forecast-1", 14));
         assert!(ledger.is_active_at("forecast-1", 16));
     }
 
