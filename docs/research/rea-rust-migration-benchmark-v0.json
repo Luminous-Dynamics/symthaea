@@ -1401,5 +1401,140 @@
       "url": "https://proceedings.mlr.press/v337/harikumar26a.html",
       "implication": "separate robust information gain from downstream decision utility and regret"
     }
-  ]
+  ],
+  "external_baseline_snapshots": [
+    {
+      "id": "sre_bench",
+      "as_of": "2026-10",
+      "source": "https://daplab.cs.columbia.edu/benchmarks/sre-bench/",
+      "public_scale": {
+        "private_programs": 19,
+        "binary_instances": 262,
+        "graded_tasks": 1572,
+        "domains": 5,
+        "source_languages": 4,
+        "anti_analysis_mechanisms": 44
+      },
+      "public_facing_results": [
+        {
+          "model": "GPT-6-Astra",
+          "graded": 181,
+          "eligible": 262,
+          "mean_tasks_passed_per_binary": 5.55,
+          "fully_solved": 149,
+          "fully_solved_rate_on_graded": 0.823,
+          "zero_credit": 7,
+          "zero_credit_rate_on_graded": 0.039,
+          "coverage": 0.691
+        },
+        {
+          "model": "GPT-5.6-Sol",
+          "graded": 254,
+          "eligible": 262,
+          "mean_tasks_passed_per_binary": 3.69,
+          "fully_solved": 80,
+          "fully_solved_rate_on_graded": 0.315,
+          "zero_credit": 41,
+          "zero_credit_rate_on_graded": 0.161,
+          "coverage": 0.969
+        }
+      ],
+      "note": "Official score is conditional on graded instances; coverage and refusals remain separate. External benchmark output only."
+    },
+    {
+      "id": "agentre_bench_v3_1",
+      "as_of": "2026-10-25",
+      "source": "https://www.agentre-bench.ai/",
+      "public_scale": {
+        "distinct_challenges": 33,
+        "ecosystems": [
+          "Linux ELF",
+          "Windows PE"
+        ],
+        "v3_1_windows_artifacts": 20,
+        "models": 5,
+        "attempts_per_artifact": 5,
+        "episodes": 500,
+        "tool_call_budget_per_episode": 25
+      },
+      "leaderboard": [
+        {
+          "model": "Muse Wonder",
+          "overall": 87.37,
+          "main": 87.37,
+          "bonus": 87.37,
+          "valid_answers": 100,
+          "episodes": 100,
+          "ci95": [
+            85.18,
+            89.56
+          ]
+        },
+        {
+          "model": "GPT-6 Astra",
+          "overall": 87.04,
+          "main": 86.4,
+          "bonus": 92.82,
+          "valid_answers": 100,
+          "episodes": 100,
+          "ci95": [
+            85.8,
+            88.29
+          ]
+        },
+        {
+          "model": "Grok 4.7",
+          "overall": 79.62,
+          "main": 81.02,
+          "bonus": 67.04,
+          "valid_answers": 96,
+          "episodes": 100,
+          "ci95": [
+            76.59,
+            82.65
+          ]
+        }
+      ],
+      "scoring": "five-attempt average; overall 90% main plus 10% bonus; unanswered attempts score zero",
+      "note": "Independent binary-first leaderboard. Do not pool with SRE-Bench."
+    },
+    {
+      "id": "decompile_bench",
+      "as_of": "2025-12",
+      "source": "https://proceedings.neurips.cc/paper_files/paper/2025/hash/079cf13ae174c31f148207d94d213bdc-Abstract-Datasets_and_Benchmarks_Track.html",
+      "public_scale": {
+        "binary_source_function_pairs": 2000000,
+        "source_pairs_collected": 100000000,
+        "binary_volume_gb": 450
+      },
+      "published_claim": "dataset fine-tuning improved re-executability rate by 20% over previous benchmarks in the paper's evaluation",
+      "note": "Text similarity and function matching do not prove executable or semantic equivalence."
+    },
+    {
+      "id": "reprobench",
+      "as_of": "2026-09-28",
+      "source": "https://arxiv.org/abs/2609.34450",
+      "public_scale": {
+        "iot_firmware_cves": 30,
+        "models": 5,
+        "trials_per_cve": 3,
+        "total_runs": 450,
+        "phases": 6
+      },
+      "published_findings": {
+        "simulation_substitution_rate": 0.453,
+        "successful_cve_model_pairs_rate": 0.053
+      },
+      "phases": [
+        "information_gathering",
+        "firmware_acquisition",
+        "firmware_extraction",
+        "binary_identification_root_cause",
+        "service_rehosting",
+        "vulnerability_triggering"
+      ],
+      "note": "Pre-environment CVE-only benchmark; not comparable to binary-first benchmarks."
+    }
+  ],
+  "external_baseline_document": "docs/research/REA_BENCHMARK_EXTERNAL_BASELINES_2026Q4.md"
 }
