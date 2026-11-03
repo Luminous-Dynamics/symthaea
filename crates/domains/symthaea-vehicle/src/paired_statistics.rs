@@ -92,7 +92,7 @@ impl PairedMetricSummary {
 
         let mut family_ids = BTreeSet::new();
         let mut scenario_ids = BTreeSet::new();
-        let mut grouped: BTreeMap<&str, Vec<&PairedMetricObservation>> = BTreeMap::new();
+        let mut grouped: BTreeMap<String, Vec<&PairedMetricObservation>> = BTreeMap::new();
         if self.observations.len() != self.scenario_count {
             return false;
         }
@@ -106,11 +106,19 @@ impl PairedMetricSummary {
                 return false;
             }
             grouped
-                .entry(observation.failure_family_id.as_str())
+                .entry(observation.failure_family_id.clone())
                 .or_default()
                 .push(observation);
         }
         if grouped.len() != self.failure_family_count {
+            return false;
+        }
+
+        if self.observations.windows(2).any(|pair| {
+            pair[0].failure_family_id > pair[1].failure_family_id
+                || (pair[0].failure_family_id == pair[1].failure_family_id
+                    && pair[0].scenario_id >= pair[1].scenario_id)
+        }) {
             return false;
         }
 
@@ -126,7 +134,7 @@ impl PairedMetricSummary {
             {
                 return false;
             }
-            let Some(observations) = grouped.get(family.failure_family_id.as_str()) else {
+            let Some(observations) = grouped.get(&family.failure_family_id) else {
                 return false;
             };
             let mut expected_scenario_ids = observations
@@ -287,6 +295,12 @@ pub fn summarize_paired_metric(
         .iter()
         .map(|family| family.mean_improvement)
         .collect::<Vec<_>>();
+    let mut retained_observations = observations.to_vec();
+    retained_observations.sort_by(|left, right| {
+        left.failure_family_id
+            .cmp(&right.failure_family_id)
+            .then_with(|| left.scenario_id.cmp(&right.scenario_id))
+    });
     let mut sorted = improvements.clone();
     sorted.sort_by(f64::total_cmp);
     let bootstrap = bootstrap_family_means(&improvements, seed, bootstrap_replicates);
@@ -298,7 +312,7 @@ pub fn summarize_paired_metric(
         bootstrap_replicates,
         failure_family_count: family_effects.len(),
         scenario_count: family_effects.iter().map(|family| family.scenario_ids.len()).sum(),
-        observations: observations.to_vec(),
+        observations: retained_observations,
         mean_family_improvement: arithmetic_mean(&improvements),
         median_family_improvement: percentile(&sorted, 0.5),
         family_win_fraction: improvements.iter().filter(|value| **value > 0.0).count() as f64
