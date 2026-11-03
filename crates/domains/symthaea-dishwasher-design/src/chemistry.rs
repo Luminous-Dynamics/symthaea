@@ -112,11 +112,57 @@ pub struct DosePlanCheckSummary {
     pub cycle_duration_s: u32,
 }
 
+/// Calibrated tolerance for comparing commanded and reported dispenser delivery.
+/// The calibration must be established for the exact dispenser/channel and
+/// formulation viscosity/temperature envelope; a digest alone does not authenticate it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DoseDeliveryCalibration {
+    pub calibration_id: String,
+    pub calibration_evidence_sha256: String,
+    /// Allowed under-delivery in basis points; must be below 10,000 (100%).
+    pub maximum_underdelivery_bps: u16,
+    /// Allowed over-delivery in basis points.
+    pub maximum_overdelivery_bps: u16,
+    /// Maximum deviation for both release start and delivery duration.
+    pub maximum_timing_deviation_s: u32,
+}
+
+/// Reported telemetry for one physical dispenser event. Evidence references and
+/// digests are checked for presence/shape only; they are not authenticated here.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DoseDeliveryMeasurement {
+    pub event_id: String,
+    pub calibration_id: String,
+    pub actual_dose_mg: u64,
+    pub actual_elapsed_s: u32,
+    pub actual_duration_s: u32,
+    pub measurement_evidence_sha256: String,
+    pub calibration_bundle_sha256: String,
+}
+
+/// Result of comparing reported telemetry with a calibrated command tolerance.
+/// This is not proof that the sensor reading is true or that cleaning succeeded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DoseDeliveryCheckSummary {
+    pub commanded_dose_mg: u64,
+    pub actual_dose_mg: u64,
+    pub minimum_allowed_dose_mg: u64,
+    pub maximum_allowed_dose_mg: u64,
+    pub actual_elapsed_s: u32,
+    pub actual_duration_s: u32,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum ChemistryError {
     InvalidFormulationId,
     InvalidEvidenceDigest(&'static str),
     InvalidMaximumTotalDose,
+    InvalidDeliveryCalibration,
+    InvalidDeliveryEvidence,
+    DeliveryCalibrationMismatch,
+    DeliveryEventMismatch,
+    ActualDoseOutsideTolerance,
+    ActualDeliveryTimingOutsideTolerance,
     ComponentDoseOverflow {
         component_id: String,
     },
@@ -401,6 +447,79 @@ fn validate_stage_windows(
 /// recipe is chemically optimal, safe for human contact, or sufficient to clean.
 /// Those conclusions must be established by the formulation owner and independent
 /// physical acceptance tests. If a condition is outside scope, the plan rejects.
+/// Compare reported dispenser telemetry with a separately calibrated delivery
+/// tolerance. This checks quantities and timing only; it does not authenticate
+/// the sensor, calibration record or evidence, and does not establish cleaning.
+pub fn check_reported_dose_delivery(
+    commanded: &DoseEvent,
+    calibration: &DoseDeliveryCalibration,
+    measurement: &DoseDeliveryMeasurement,
+) -> Result<DoseDeliveryCheckSummary, ChemistryError> {
+    if !canonical_non_empty(&commanded.event_id)
+        || commanded.dose_mg == 0
+        || commanded.release_duration_s == 0
+    {
+        return Err(ChemistryError::DeliveryEventMismatch);
+    }
+    if !canonical_non_empty(&calibration.calibration_id)
+        || calibration.maximum_underdelivery_bps >= 10_000
+        || !valid_digest(&calibration.calibration_evidence_sha256)
+    {
+        return Err(ChemistryError::InvalidDeliveryCalibration);
+    }
+    if !canonical_non_empty(&measurement.event_id)
+        || !valid_digest(&measurement.measurement_evidence_sha256)
+        || !valid_digest(&measurement.calibration_bundle_sha256)
+    {
+        return Err(ChemistryError::InvalidDeliveryEvidence);
+    }
+    if measurement.event_id != commanded.event_id {
+        return Err(ChemistryError::DeliveryEventMismatch);
+    }
+    if measurement.calibration_id != calibration.calibration_id {
+        return Err(ChemistryError::DeliveryCalibrationMismatch);
+    }
+    if measurement.actual_duration_s == 0 {
+        return Err(ChemistryError::ActualDeliveryTimingOutsideTolerance);
+    }
+
+    const BASIS_POINTS: u128 = 10_000;
+    let commanded_mg = u128::from(commanded.dose_mg);
+    let minimum_numerator = commanded_mg
+        * (BASIS_POINTS - u128::from(calibration.maximum_underdelivery_bps));
+    // Round the allowed minimum upward so the check never silently widens
+    // the permitted under-delivery tolerance.
+    let minimum_allowed_dose_mg =
+        ((minimum_numerator + BASIS_POINTS - 1) / BASIS_POINTS) as u64;
+    let maximum_numerator = commanded_mg
+        * (BASIS_POINTS + u128::from(calibration.maximum_overdelivery_bps));
+    let maximum_allowed_dose_mg = (maximum_numerator / BASIS_POINTS)
+        .try_into()
+        .unwrap_or(u64::MAX);
+
+    if measurement.actual_dose_mg < minimum_allowed_dose_mg
+        || measurement.actual_dose_mg > maximum_allowed_dose_mg
+    {
+        return Err(ChemistryError::ActualDoseOutsideTolerance);
+    }
+    if measurement.actual_elapsed_s.abs_diff(commanded.elapsed_s)
+        > calibration.maximum_timing_deviation_s
+        || measurement.actual_duration_s.abs_diff(commanded.release_duration_s)
+            > calibration.maximum_timing_deviation_s
+    {
+        return Err(ChemistryError::ActualDeliveryTimingOutsideTolerance);
+    }
+
+    Ok(DoseDeliveryCheckSummary {
+        commanded_dose_mg: commanded.dose_mg,
+        actual_dose_mg: measurement.actual_dose_mg,
+        minimum_allowed_dose_mg,
+        maximum_allowed_dose_mg,
+        actual_elapsed_s: measurement.actual_elapsed_s,
+        actual_duration_s: measurement.actual_duration_s,
+    })
+}
+
 pub fn validate_dose_plan(
     formulation: &FormulationCalibrationProfile,
     request: &DosePlanRequest,
@@ -580,6 +699,108 @@ pub fn validate_dose_plan(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn delivery_calibration() -> DoseDeliveryCalibration {
+        DoseDeliveryCalibration {
+            calibration_id: "dispenser-channel-a-v1".to_owned(),
+            calibration_evidence_sha256: "d".repeat(64),
+            maximum_underdelivery_bps: 500,
+            maximum_overdelivery_bps: 500,
+            maximum_timing_deviation_s: 2,
+        }
+    }
+
+    fn delivery_measurement(event: &DoseEvent) -> DoseDeliveryMeasurement {
+        DoseDeliveryMeasurement {
+            event_id: event.event_id.clone(),
+            calibration_id: "dispenser-channel-a-v1".to_owned(),
+            actual_dose_mg: event.dose_mg + 10,
+            actual_elapsed_s: event.elapsed_s + 1,
+            actual_duration_s: event.release_duration_s,
+            measurement_evidence_sha256: "e".repeat(64),
+            calibration_bundle_sha256: "f".repeat(64),
+        }
+    }
+
+    #[test]
+    fn accepts_reported_delivery_inside_calibrated_integer_mass_and_timing_tolerance() {
+        let event = request().events.remove(0);
+        let summary = check_reported_dose_delivery(
+            &event,
+            &delivery_calibration(),
+            &delivery_measurement(&event),
+        )
+        .unwrap();
+        assert_eq!(summary.commanded_dose_mg, 500);
+        assert_eq!(summary.actual_dose_mg, 510);
+        assert_eq!(summary.minimum_allowed_dose_mg, 475);
+        assert_eq!(summary.maximum_allowed_dose_mg, 525);
+    }
+
+    #[test]
+    fn rejects_reported_under_and_over_delivery() {
+        let event = request().events.remove(0);
+        let mut under = delivery_measurement(&event);
+        under.actual_dose_mg = 474;
+        assert!(matches!(
+            check_reported_dose_delivery(&event, &delivery_calibration(), &under),
+            Err(ChemistryError::ActualDoseOutsideTolerance)
+        ));
+
+        let mut over = delivery_measurement(&event);
+        over.actual_dose_mg = 526;
+        assert!(matches!(
+            check_reported_dose_delivery(&event, &delivery_calibration(), &over),
+            Err(ChemistryError::ActualDoseOutsideTolerance)
+        ));
+    }
+
+    #[test]
+    fn rejects_reported_delivery_timing_deviation() {
+        let event = request().events.remove(0);
+        let mut measurement = delivery_measurement(&event);
+        measurement.actual_elapsed_s += 3;
+        assert!(matches!(
+            check_reported_dose_delivery(&event, &delivery_calibration(), &measurement),
+            Err(ChemistryError::ActualDeliveryTimingOutsideTolerance)
+        ));
+    }
+
+    #[test]
+    fn rejects_delivery_event_calibration_and_evidence_mismatch() {
+        let event = request().events.remove(0);
+        let mut wrong_event = delivery_measurement(&event);
+        wrong_event.event_id = "another-event".to_owned();
+        assert!(matches!(
+            check_reported_dose_delivery(&event, &delivery_calibration(), &wrong_event),
+            Err(ChemistryError::DeliveryEventMismatch)
+        ));
+
+        let mut wrong_calibration = delivery_measurement(&event);
+        wrong_calibration.calibration_id = "other-channel".to_owned();
+        assert!(matches!(
+            check_reported_dose_delivery(&event, &delivery_calibration(), &wrong_calibration),
+            Err(ChemistryError::DeliveryCalibrationMismatch)
+        ));
+
+        let mut bad_evidence = delivery_measurement(&event);
+        bad_evidence.measurement_evidence_sha256 = "missing".to_owned();
+        assert!(matches!(
+            check_reported_dose_delivery(&event, &delivery_calibration(), &bad_evidence),
+            Err(ChemistryError::InvalidDeliveryEvidence)
+        ));
+    }
+
+    #[test]
+    fn rejects_invalid_delivery_tolerance_profile() {
+        let event = request().events.remove(0);
+        let mut calibration = delivery_calibration();
+        calibration.maximum_underdelivery_bps = 10_000;
+        assert!(matches!(
+            check_reported_dose_delivery(&event, &calibration, &delivery_measurement(&event)),
+            Err(ChemistryError::InvalidDeliveryCalibration)
+        ));
+    }
 
     fn calibration(
         component_id: &str,
