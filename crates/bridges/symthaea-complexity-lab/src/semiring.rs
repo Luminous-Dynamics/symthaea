@@ -181,6 +181,7 @@ pub enum EliminationError {
     TableSizeOverflow { factor: Option<usize> },
     TableLengthMismatch { factor: usize, expected: usize, actual: usize },
     InvalidEliminationOrder { reason: &'static str },
+    StatisticsOverflow { metric: &'static str },
     Semiring(SemiringError),
 }
 impl fmt::Display for EliminationError {
@@ -192,6 +193,7 @@ impl fmt::Display for EliminationError {
             Self::TableSizeOverflow { factor } => write!(f, "factor table size overflow: {factor:?}"),
             Self::TableLengthMismatch { factor, expected, actual } => write!(f, "factor {factor} has {actual} entries; expected {expected}"),
             Self::InvalidEliminationOrder { reason } => write!(f, "invalid elimination order: {reason}"),
+            Self::StatisticsOverflow { metric } => write!(f, "elimination statistics overflow: {metric}"),
             Self::Semiring(error) => write!(f, "semiring evaluation error: {error}"),
         }
     }
@@ -266,6 +268,19 @@ pub struct MaxCountWitnessResult {
     pub stats: EliminationStats,
 }
 
+
+/// Checked counters are part of the execution receipt: overflow must not
+/// silently wrap and make the recorded work understated.
+fn increment_u128(counter: &mut u128, metric: &'static str) -> Result<(), EliminationError> {
+    *counter = counter.checked_add(1).ok_or(EliminationError::StatisticsOverflow { metric })?;
+    Ok(())
+}
+
+fn increment_usize(counter: &mut usize, metric: &'static str) -> Result<(), EliminationError> {
+    *counter = counter.checked_add(1).ok_or(EliminationError::StatisticsOverflow { metric })?;
+    Ok(())
+}
+
 /// Exact finite-domain factor graph evaluated by bucket variable elimination.
 #[derive(Clone, Debug)]
 pub struct ExactFactorGraph<S> {
@@ -338,10 +353,10 @@ impl<S: ExactSemiring> ExactFactorGraph<S> {
                         let factor = &factors[factor_index];
                         let value = &factor.values[factor.table_index(&assignment, &self.cardinalities)];
                         product = product.checked_mul(value)?;
-                        stats.semiring_multiplications += 1;
+                        increment_u128(&mut stats.semiring_multiplications, "semiring multiplications")?;
                     }
                     sum = sum.checked_add(&product)?;
-                    stats.semiring_additions += 1;
+                    increment_u128(&mut stats.semiring_additions, "semiring additions")?;
                 }
                 output.push(sum);
             }
@@ -352,8 +367,8 @@ impl<S: ExactSemiring> ExactFactorGraph<S> {
             }
             retained.push(ExactFactor { scope: output_scope, values: output });
             factors = retained;
-            stats.eliminated_variables += 1;
-            stats.generated_factors += 1;
+            increment_usize(&mut stats.eliminated_variables, "eliminated variables")?;
+            increment_usize(&mut stats.generated_factors, "generated factors")?;
         }
 
         let mut result = self.one.clone();
@@ -362,7 +377,7 @@ impl<S: ExactSemiring> ExactFactorGraph<S> {
                 return Err(EliminationError::InvalidEliminationOrder { reason: "factor retained an uneliminated variable" });
             }
             result = result.checked_mul(&factor.values[0])?;
-            stats.semiring_multiplications += 1;
+            increment_u128(&mut stats.semiring_multiplications, "semiring multiplications")?;
         }
         Ok((result, stats))
     }
@@ -427,7 +442,7 @@ impl ExactFactorGraph<MaxCountValue> {
                         let factor = &factors[factor_index];
                         let value = &factor.values[factor.table_index(&assignment, &self.cardinalities)];
                         product = product.checked_mul(value)?;
-                        stats.semiring_multiplications += 1;
+                        increment_u128(&mut stats.semiring_multiplications, "semiring multiplications")?;
                     }
                     if let Some(term) = product.optimum() {
                         match best_score {
@@ -456,7 +471,7 @@ impl ExactFactorGraph<MaxCountValue> {
                             Some(_) => {}
                         }
                     }
-                    stats.semiring_additions += 1;
+                    increment_u128(&mut stats.semiring_additions, "semiring additions")?;
                 }
                 let value = match best_score {
                     Some(score) => MaxCountValue::candidate(score, best_count),
@@ -481,8 +496,8 @@ impl ExactFactorGraph<MaxCountValue> {
                 separator: output_scope,
                 rows,
             });
-            stats.eliminated_variables += 1;
-            stats.generated_factors += 1;
+            increment_usize(&mut stats.eliminated_variables, "eliminated variables")?;
+            increment_usize(&mut stats.generated_factors, "generated factors")?;
         }
 
         let mut result = self.one.clone();
@@ -491,7 +506,7 @@ impl ExactFactorGraph<MaxCountValue> {
                 return Err(EliminationError::InvalidEliminationOrder { reason: "factor retained an uneliminated variable" });
             }
             result = result.checked_mul(&factor.values[0])?;
-            stats.semiring_multiplications += 1;
+            increment_u128(&mut stats.semiring_multiplications, "semiring multiplications")?;
         }
 
         let witness = if result.optimum().is_none() {
