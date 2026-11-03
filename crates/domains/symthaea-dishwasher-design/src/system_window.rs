@@ -243,6 +243,130 @@ fn percentile_nearest_rank(values: &mut [u64], percentile: f64) -> Option<u64> {
     Some(values[rank - 1])
 }
 
+#[derive(Debug, Default)]
+struct CompartmentAccumulator {
+    configuration_sha256: String,
+    request_record_count: usize,
+    requests_accepted_in_window: usize,
+    requests_started_in_window: usize,
+    requests_completed_in_window: usize,
+    unresolved_requests_at_window_end: usize,
+    verified_item_release_count: usize,
+    active_request_seconds: u64,
+    concurrency_events: Vec<(u64, i8)>,
+}
+
+fn maximum_concurrency(events: &mut [(u64, i8)]) -> Result<usize, SystemWindowError> {
+    events.sort_unstable_by_key(|(timestamp, delta)| (*timestamp, *delta));
+    let mut current = 0_isize;
+    let mut maximum = 0_usize;
+    for (_, delta) in events.iter() {
+        current += *delta as isize;
+        if current < 0 {
+            return Err(SystemWindowError::InvalidWindow);
+        }
+        maximum = maximum.max(current as usize);
+    }
+    if current != 0 {
+        return Err(SystemWindowError::InvalidWindow);
+    }
+    Ok(maximum)
+}
+
+fn build_compartment_stats(
+    spec: &SystemWindowSpec,
+    requests: &[ServiceWindowRequest],
+    releases: &[ItemReleaseEvent],
+) -> Result<Vec<CompartmentWindowStats>, SystemWindowError> {
+    let mut accumulators: BTreeMap<String, CompartmentAccumulator> = BTreeMap::new();
+    let mut request_by_id = HashMap::with_capacity(requests.len());
+
+    for request in requests {
+        request_by_id.insert(request.service_request_id.as_str(), request);
+        let stats = accumulators
+            .entry(request.compartment_id.clone())
+            .or_insert_with(|| CompartmentAccumulator {
+                configuration_sha256: request.compartment_configuration_sha256.clone(),
+                ..CompartmentAccumulator::default()
+            });
+        if stats.configuration_sha256 != request.compartment_configuration_sha256 {
+            return Err(SystemWindowError::CompartmentConfigurationMismatch {
+                compartment_id: request.compartment_id.clone(),
+            });
+        }
+        stats.request_record_count = stats.request_record_count.checked_add(1)
+            .ok_or(SystemWindowError::CounterOverflow("compartment_request_record_count"))?;
+
+        let accepted_in_window =
+            request.accepted_at_s >= spec.start_at_s && request.accepted_at_s < spec.end_at_s;
+        if accepted_in_window {
+            stats.requests_accepted_in_window = stats.requests_accepted_in_window.checked_add(1)
+                .ok_or(SystemWindowError::CounterOverflow("compartment_accepted_count"))?;
+        }
+
+        if let Some(started_at_s) = request.started_at_s {
+            if started_at_s >= spec.start_at_s && started_at_s < spec.end_at_s {
+                stats.requests_started_in_window = stats.requests_started_in_window.checked_add(1)
+                    .ok_or(SystemWindowError::CounterOverflow("compartment_started_count"))?;
+            }
+            let service_end = match request.state {
+                WindowRequestState::Completed { closed_at_s } => closed_at_s,
+                WindowRequestState::Unresolved { .. } => spec.end_at_s,
+            };
+            let start = started_at_s.max(spec.start_at_s);
+            let end = service_end.min(spec.end_at_s);
+            if end > start {
+                let duration = end - start;
+                stats.active_request_seconds = stats.active_request_seconds.checked_add(duration)
+                    .ok_or(SystemWindowError::CounterOverflow("compartment_active_request_seconds"))?;
+                stats.concurrency_events.push((start, 1));
+                stats.concurrency_events.push((end, -1));
+            }
+        }
+
+        match request.state {
+            WindowRequestState::Completed { closed_at_s }
+                if closed_at_s >= spec.start_at_s && closed_at_s < spec.end_at_s =>
+            {
+                stats.requests_completed_in_window = stats.requests_completed_in_window.checked_add(1)
+                    .ok_or(SystemWindowError::CounterOverflow("compartment_completed_count"))?;
+            }
+            WindowRequestState::Unresolved { .. } => {
+                stats.unresolved_requests_at_window_end = stats.unresolved_requests_at_window_end.checked_add(1)
+                    .ok_or(SystemWindowError::CounterOverflow("compartment_unresolved_count"))?;
+            }
+            _ => {}
+        }
+    }
+
+    for release in releases {
+        let request = request_by_id.get(release.service_request_id.as_str())
+            .ok_or_else(|| SystemWindowError::ReleaseForUnknownRequest(
+                release.service_request_id.clone()
+            ))?;
+        let stats = accumulators.get_mut(&request.compartment_id)
+            .ok_or(SystemWindowError::InvalidIdentity("release_compartment"))?;
+        stats.verified_item_release_count = stats.verified_item_release_count.checked_add(1)
+            .ok_or(SystemWindowError::CounterOverflow("compartment_release_count"))?;
+    }
+
+    accumulators.into_iter().map(|(compartment_id, mut stats)| {
+        let maximum_concurrent_requests = maximum_concurrency(&mut stats.concurrency_events)?;
+        Ok(CompartmentWindowStats {
+            compartment_id,
+            compartment_configuration_sha256: stats.configuration_sha256,
+            request_record_count: stats.request_record_count,
+            requests_accepted_in_window: stats.requests_accepted_in_window,
+            requests_started_in_window: stats.requests_started_in_window,
+            requests_completed_in_window: stats.requests_completed_in_window,
+            unresolved_requests_at_window_end: stats.unresolved_requests_at_window_end,
+            verified_item_release_count: stats.verified_item_release_count,
+            active_request_seconds: stats.active_request_seconds,
+            maximum_concurrent_requests,
+        })
+    }).collect()
+}
+
 fn validate_service_report(
     request: &ServiceWindowRequest,
     completed: bool,
