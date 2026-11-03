@@ -50,7 +50,6 @@
       "error_family": "merge_split",
       "evidence_compatibility": "COMPATIBLE",
       "query_state": "BELOW_THRESHOLD",
-      "material_to_query": false,
       "canonical_structural_sha256": "f4979c0986a297aca4e97be92cfeb3ee06096b6a0e09eba08b04d84ff39686dc"
     },
     {
@@ -58,7 +57,6 @@
       "error_family": "continuation_loss",
       "evidence_compatibility": "COMPATIBLE",
       "query_state": "BELOW_THRESHOLD",
-      "material_to_query": false,
       "canonical_structural_sha256": "26bb0d3c3acbdd1c0feab01e943fd64fcbffad10e1a4e828bdc2472bde389417"
     }
   ],
