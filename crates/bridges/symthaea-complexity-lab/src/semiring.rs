@@ -774,9 +774,33 @@ impl ExactFactorGraph<MaxCountValue> {
             }
             Some(term) => term,
         };
+        // Scalar factors are constant across every variable assignment. Their
+        // multiplicities scale the global MaxCount total but must cancel from
+        // the conditional distribution over assignments.
+        let scalar_multiplicity = self.factors.iter()
+            .filter(|factor| factor.scope.is_empty())
+            .try_fold(1u128, |total, factor| {
+                let term = factor.values[0].optimum().ok_or(
+                    EliminationError::InvalidEliminationOrder {
+                        reason: "feasible global optimum contains an infeasible scalar factor",
+                    }
+                )?;
+                total.checked_mul(term.count).ok_or(
+                    SemiringError::CountOverflow {
+                        operation: "scalar-factor multiplicity product for sampler",
+                    }.into()
+                )
+            })?;
         let expected_total = match measure {
             MaxCountSamplingMeasure::DistinctAssignments => result.distinct_optimal_assignments,
-            MaxCountSamplingMeasure::WeightedMultiplicity => optimum.count,
+            MaxCountSamplingMeasure::WeightedMultiplicity => {
+                if optimum.count % scalar_multiplicity != 0 {
+                    return Err(EliminationError::InvalidEliminationOrder {
+                        reason: "scalar multiplicity does not divide the global MaxCount total",
+                    });
+                }
+                optimum.count / scalar_multiplicity
+            }
         };
         if expected_total == 0 {
             return Err(EliminationError::InvalidEliminationOrder {
@@ -1279,6 +1303,21 @@ mod tests {
             graph.sample_optimal_assignment_by_multiplicity(&result, |_| 4).unwrap(),
             Some(vec![1])
         );
+    }
+
+    #[test]
+    fn multiplicity_weighted_sampler_cancels_constant_scalar_factor_weights() {
+        let mut graph = ExactFactorGraph::new(vec![2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        graph.add_factor(vec![0], vec![
+            MaxCountValue::candidate(5, 4),
+            MaxCountValue::candidate(5, 2),
+        ]).unwrap();
+        graph.add_factor(vec![], vec![MaxCountValue::candidate(7, 9)]).unwrap();
+        let result = graph.evaluate_with_witness(&[0]).unwrap();
+        assert_eq!(result.value.optimum(), Some(MaxCountTerm { score: 12, count: 54 }));
+        assert_eq!(result.distinct_optimal_assignments, 2);
+        assert_eq!(graph.sample_optimal_assignment_by_multiplicity(&result, |_| 3).unwrap(), Some(vec![0]));
+        assert_eq!(graph.sample_optimal_assignment_by_multiplicity(&result, |_| 4).unwrap(), Some(vec![1]));
     }
 
     #[test]
