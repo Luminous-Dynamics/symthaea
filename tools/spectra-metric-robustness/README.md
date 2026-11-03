@@ -102,6 +102,54 @@ their assumptions and exact releases are qualified. Repeated trials are not
 independent replicates; the campaign seed, not each trial row, is the unit for
 sweep-level diagnostic rates.
 
+## Severity dose-response
+
+The generator also exposes:
+
+```rust
+simulate_with_severity(world, design, severity)
+```
+
+Severity must be finite and in [0, 1]. The default `simulate(world, design)`
+uses severity 1.0 and is defined as a wrapper around the new API, preserving
+the original v0 world outputs at full strength. At severity 0.0 the selected
+injected departure is removed; intermediate values define a benchmark-specific
+dose path, not a universal physical effect-size scale.
+
+The first dose-path implementation is:
+
+| World | Severity-controlled parameter |
+|---|---|
+| Unequal variance | Signal SD multiplier: 1 + 0.8 × severity |
+| Heavy tails | Probability of a standardized Student-t(3) draw versus a Gaussian draw |
+| Contaminated mixture | Contamination probability 0.08 × severity; outlier multiplier 1 + 4 × severity |
+| Serial dependence | AR(1) coefficient rho = 0.8 × severity |
+| Sensitivity drift | End-to-end sensitivity change scales from 0 to the v0 profile |
+| Criterion drift | Criterion excursion scales from 0 to the v0 profile |
+| Participant heterogeneity | Between-participant sensitivity spread scales from 0 to the v0 profile |
+| Session MAR | Session-gradient term scales from 0 to the v0 profile, with 5% uniform dropout retained |
+| Outcome-dependent MNAR | Positive signal-response dropout scales from 5% to 100%; other rows retain 5% |
+| Auxiliary leakage | Auxiliary-channel class offset scales from 0 to the v0 profile |
+
+This is a first one-dimensional severity parameter. The scale is comparable
+within a world, not across different worlds. The detailed ladders in
+SPECTRA-METRIC-DOSE-001 (#10181)—for example distinct AR coefficients, variance
+ratios, t degrees-of-freedom and contamination rates—remain the next
+qualification layer. At intermediate heavy-tail severities, the deterministic
+mixture branch consumes a severity-dependent random stream; identical seeds
+replay exactly, but those cells are not claimed to use common random numbers
+for every draw.
+
+Run the dose-response sweep:
+
+    cargo run --release --bin run_dose_sweep -- 128 > metric-dose.csv
+
+It evaluates ten injected worlds at severities [0, 0.10, 0.25, 0.50, 0.75, 1.0].
+Seed-level rows are written to stdout; per-world/per-severity any-flag and
+per-diagnostic rates are written to stderr. These are descriptive rates, not
+confidence intervals, hypothesis-test p-values or formal familywise guarantees.
+Use disjoint seed families for any threshold calibration and final evaluation.
+
 ## Run
 
 From this directory:
