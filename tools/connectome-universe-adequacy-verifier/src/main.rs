@@ -913,8 +913,9 @@ fn validate_report(
         "candidate_structure_manifest_sha256": candidate_manifest,
         "reference_structure_manifest_sha256": reference_manifest,
         "dispositions": {
-            "enumeration_closure": closure_disposition,
-            "universe_adequacy": recomputed_adequacy
+            "claimed_enumeration_closure": closure_disposition,
+            "worldset_closure_validation": "NOT_PERFORMED_BY_THIS_TOOL",
+            "universe_adequacy_against_supplied_challenge": recomputed_adequacy
         },
         "recomputed_summary": {
             "candidate_world_count": summary.candidate_world_count,
@@ -1003,11 +1004,15 @@ mod tests {
         let result = evaluate(OMITTED_REPORT, OMITTED_CANDIDATE, OMITTED_REFERENCE)
             .expect("fixture should be internally consistent");
         assert_eq!(
-            result["dispositions"]["enumeration_closure"],
+            result["dispositions"]["claimed_enumeration_closure"],
             "CLOSED_VERIFIED"
         );
         assert_eq!(
-            result["dispositions"]["universe_adequacy"],
+            result["dispositions"]["worldset_closure_validation"],
+            "NOT_PERFORMED_BY_THIS_TOOL"
+        );
+        assert_eq!(
+            result["dispositions"]["universe_adequacy_against_supplied_challenge"],
             "ADEQUACY_FAILED"
         );
         assert_eq!(result["recomputed_summary"]["omitted_query_flipping_count"], 1);
