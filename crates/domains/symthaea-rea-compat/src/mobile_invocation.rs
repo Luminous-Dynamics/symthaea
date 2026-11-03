@@ -532,7 +532,7 @@ mod tests {
         assert_eq!(authorized.receipt.arguments_sha256, sha256_hex(
             &canonical_jcs_bytes(&request.arguments).unwrap()
         ));
-        assert_ne!(authorized.receipt.session_nonce_sha256, sha256_hex(session.session_nonce.as_bytes()));
+        assert_eq!(authorized.receipt.session_nonce_sha256, sha256_hex(session.session_nonce.as_bytes()));
         verify_mobile_invocation_receipt(&authorized.receipt).unwrap();
     }
 
