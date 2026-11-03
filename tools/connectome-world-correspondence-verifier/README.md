@@ -55,6 +55,6 @@ The affine transform is interpreted using column vectors in nanometres: `p_targe
 
 ## Authored tests and execution status
 
-Sixteen Rust unit tests are authored. They cover valid split/merge/ambiguity, non-promotion of producer status claims, manifest byte mutation, cardinality mismatch, unknown objects, query-output contradictions, non-affine and singular transforms, duplicate mappings, omitted source inventory objects, alternative-set consistency/overlap, relation/object-type mismatch, and invalid NOT_ESTIMABLE query outputs.
+Seventeen Rust unit tests are authored. They cover valid split/merge/ambiguity, non-promotion of producer status claims, manifest byte mutation, cardinality mismatch, unknown objects, query-output contradictions, non-affine and singular transforms, duplicate mappings, omitted source inventory objects, alternative-set consistency/overlap, relation/object-type mismatch, and invalid NOT_ESTIMABLE query outputs.
 
 They have **not** been compiled or executed in this authoring environment because `cargo`, `rustc` and `rustfmt` are unavailable. No compile, test, formatting, Clippy or CI pass is claimed.
