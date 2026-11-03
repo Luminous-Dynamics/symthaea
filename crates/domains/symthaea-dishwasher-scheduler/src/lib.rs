@@ -1207,6 +1207,24 @@ mod evidence_bound_mode_tests {
         machine_model: &str,
         detergent_batch: &str,
     ) -> PilotEvidenceEnvelope {
+        envelope_with_criterion_version(
+            programme,
+            soil,
+            occupancy,
+            machine_model,
+            detergent_batch,
+            "v1",
+        )
+    }
+
+    fn envelope_with_criterion_version(
+        programme: &str,
+        soil: SoilClass,
+        occupancy: usize,
+        machine_model: &str,
+        detergent_batch: &str,
+        criterion_version: &str,
+    ) -> PilotEvidenceEnvelope {
         let item_ids: Vec<String> = (0..occupancy)
             .map(|index| format!("item-{index:02}"))
             .collect();
@@ -1229,7 +1247,7 @@ mod evidence_bound_mode_tests {
         let criteria = vec![
             EndpointCriterion {
                 endpoint: Endpoint::SoilRemovalResidual,
-                criterion_id: "soil-limit-v1".to_owned(),
+                criterion_id: format!("soil-limit-{criterion_version}"),
                 metric_id: "residual_soil_area_fraction".to_owned(),
                 unit: "fraction".to_owned(),
                 direction: LimitDirection::AtMost,
@@ -1238,7 +1256,7 @@ mod evidence_bound_mode_tests {
             },
             EndpointCriterion {
                 endpoint: Endpoint::FinalRinseResidue,
-                criterion_id: "rinse-limit-v1".to_owned(),
+                criterion_id: format!("rinse-limit-{criterion_version}"),
                 metric_id: "final_rinse_residue".to_owned(),
                 unit: "mg/L".to_owned(),
                 direction: LimitDirection::AtMost,
@@ -1247,7 +1265,7 @@ mod evidence_bound_mode_tests {
             },
             EndpointCriterion {
                 endpoint: Endpoint::CrossContamination,
-                criterion_id: "cross-transfer-limit-v1".to_owned(),
+                criterion_id: format!("cross-transfer-limit-{criterion_version}"),
                 metric_id: "marker_transfer_mass".to_owned(),
                 unit: "mg".to_owned(),
                 direction: LimitDirection::AtMost,
@@ -1281,7 +1299,7 @@ mod evidence_bound_mode_tests {
                         criterion_id: criterion.criterion_id.clone(),
                         metric_id: criterion.metric_id.clone(),
                         evidence_kind: EvidenceKind::IndependentOutcomeAssay,
-                        method_id: method.to_owned(),
+                        method_id: format!("{method}-{criterion_version}"),
                         protocol_id: "pilot-protocol-v1".to_owned(),
                         measured_value,
                         expanded_uncertainty: uncertainty,
@@ -1378,6 +1396,27 @@ mod evidence_bound_mode_tests {
             ],
         );
         assert_eq!(result, Err(EvidenceBoundModeError::InconsistentPhysicalScope));
+    }
+
+    #[test]
+    fn acceptance_criteria_and_assay_versions_must_match_across_load_sizes() {
+        let result = EvidenceBoundMode::from_pilot_evidence(
+            mode_profile("full-load-v1", 2, false),
+            vec![
+                envelope_with_criterion_version(
+                    "full-load-v1", SoilClass::Starch, 1, "prototype-a", "detergent-1", "v1"
+                ),
+                envelope_with_criterion_version(
+                    "full-load-v1", SoilClass::Starch, 2, "prototype-a", "detergent-1", "v2"
+                ),
+            ],
+        );
+        assert_eq!(
+            result,
+            Err(EvidenceBoundModeError::InconsistentAcceptanceCriteria {
+                soil: SoilClass::Starch
+            })
+        );
     }
 
     #[test]
