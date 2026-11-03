@@ -209,7 +209,8 @@ jobs:
           fixture_ready["environment"].update({
               "image": "oci://fixture@sha256:" + "b" * 64,
               "toolchain_lock_sha256": "c" * 64,
-              "runner_profile": "trusted_host_development"
+              "runner_profile": "trusted_host_development",
+              "runner_policy_sha256": "f" * 64
           })
           fixture_ready["acceptance"].update({
               "reference_patch_sha256": "d" * 64,
