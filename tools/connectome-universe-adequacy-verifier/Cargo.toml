@@ -1,0 +1,17 @@
+[package]
+name = "connectome-universe-adequacy-verifier"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Independent semantic verifier for query-scoped finite connectome universe adequacy"
+
+[[bin]]
+name = "connectome-universe-adequacy-verifier"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"
+
+[workspace]
