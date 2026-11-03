@@ -746,8 +746,8 @@ mod tests {
     fn speed_limit_is_evaluated_only_when_rule_evidence_is_uncontradicted() {
         let rule = TrafficRuleRequirement {
             rule_id: "speed-30".into(),
-            active_start_progress_m: 0.0,
-            active_end_progress_m: 100.0,
+            active_start_progress_m: 1.0,
+            active_end_progress_m: 2.0,
             kind: TrafficRuleKind::SpeedLimit {
                 maximum_speed_mps: 13.4,
                 tolerance_mps: 0.2,
@@ -800,8 +800,8 @@ mod tests {
     fn sparse_samples_inside_speed_zone_are_indeterminate() {
         let rule = TrafficRuleRequirement {
             rule_id: "speed-sparse".into(),
-            active_start_progress_m: 0.0,
-            active_end_progress_m: 100.0,
+            active_start_progress_m: 1.0,
+            active_end_progress_m: 2.0,
             kind: TrafficRuleKind::SpeedLimit {
                 maximum_speed_mps: 13.4,
                 tolerance_mps: 0.2,
@@ -816,6 +816,32 @@ mod tests {
         let report = evaluate_traffic_rules(&[rule], &trajectory).unwrap();
         assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::Indeterminate);
         assert_eq!(report.findings[0].reason, RuleComplianceReason::TrajectorySamplingGap);
+    }
+
+    #[test]
+    fn partial_rule_zone_coverage_is_indeterminate_not_compliant() {
+        let rule = TrafficRuleRequirement {
+            rule_id: "speed-partial-zone".into(),
+            active_start_progress_m: 1.0,
+            active_end_progress_m: 3.0,
+            kind: TrafficRuleKind::SpeedLimit {
+                maximum_speed_mps: 13.4,
+                tolerance_mps: 0.2,
+                maximum_sample_gap_s: 0.25,
+            },
+            evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
+        };
+        let trajectory = vec![
+            sample(0.0, 1.0, 10.0, 0.0),
+            sample(0.1, 1.5, 10.0, 0.0),
+            sample(0.2, 2.0, 10.0, 0.0),
+        ];
+        let report = evaluate_traffic_rules(&[rule], &trajectory).unwrap();
+        assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::Indeterminate);
+        assert_eq!(
+            report.findings[0].reason,
+            RuleComplianceReason::TrajectoryCoverageInsufficient
+        );
     }
 
     #[test]
@@ -871,8 +897,8 @@ mod tests {
     fn mandatory_direction_obeys_angle_wraparound() {
         let rule = TrafficRuleRequirement {
             rule_id: "mandatory-left".into(),
-            active_start_progress_m: 0.0,
-            active_end_progress_m: 10.0,
+            active_start_progress_m: 1.0,
+            active_end_progress_m: 2.0,
             kind: TrafficRuleKind::MandatoryDirection {
                 required_heading_rad: -std::f64::consts::PI + 0.05,
                 maximum_heading_error_rad: 0.1,
@@ -892,8 +918,8 @@ mod tests {
     fn mandatory_direction_sparse_samples_are_indeterminate() {
         let rule = TrafficRuleRequirement {
             rule_id: "mandatory-sparse".into(),
-            active_start_progress_m: 0.0,
-            active_end_progress_m: 10.0,
+            active_start_progress_m: 1.0,
+            active_end_progress_m: 2.0,
             kind: TrafficRuleKind::MandatoryDirection {
                 required_heading_rad: 0.0,
                 maximum_heading_error_rad: 0.2,
@@ -914,8 +940,8 @@ mod tests {
     fn mandatory_direction_violation_is_located_in_trace() {
         let rule = TrafficRuleRequirement {
             rule_id: "mandatory-left".into(),
-            active_start_progress_m: 0.0,
-            active_end_progress_m: 10.0,
+            active_start_progress_m: 1.0,
+            active_end_progress_m: 2.0,
             kind: TrafficRuleKind::MandatoryDirection {
                 required_heading_rad: 1.0,
                 maximum_heading_error_rad: 0.2,
@@ -1211,8 +1237,8 @@ mod tests {
     fn report_recomputes_findings_and_detects_digest_recalculation_tampering() {
         let rule = TrafficRuleRequirement {
             rule_id: "speed-30".into(),
-            active_start_progress_m: 0.0,
-            active_end_progress_m: 10.0,
+            active_start_progress_m: 1.0,
+            active_end_progress_m: 2.0,
             kind: TrafficRuleKind::SpeedLimit {
                 maximum_speed_mps: 10.0,
                 tolerance_mps: 0.0,
