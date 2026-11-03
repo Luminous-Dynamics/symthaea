@@ -90,6 +90,7 @@ pub enum RuleComplianceReason {
     MandatoryDirectionNotFollowed,
     StopLinePassedWithoutRequiredStop,
     RequirementSatisfied,
+    RequirementSatisfied,
     RequiredStopObserved,
     RequirementNotEncountered,
 }
@@ -110,6 +111,7 @@ pub struct RuleComplianceFinding {
 pub enum RuleEvaluationError {
     EmptyTrajectory,
     DuplicateRuleId,
+    EmptyRuleId,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -189,11 +191,13 @@ pub fn evaluate_traffic_rules(
     }
 
     let mut rule_ids = BTreeSet::new();
-    if requirements.iter().any(|requirement| {
-        requirement.rule_id.trim().is_empty()
-            || !rule_ids.insert(requirement.rule_id.as_str())
-    }) {
-        return Err(RuleEvaluationError::DuplicateRuleId);
+    for requirement in requirements {
+        if requirement.rule_id.trim().is_empty() {
+            return Err(RuleEvaluationError::EmptyRuleId);
+        }
+        if !rule_ids.insert(requirement.rule_id.as_str()) {
+            return Err(RuleEvaluationError::DuplicateRuleId);
+        }
     }
 
     let findings = requirements
@@ -318,7 +322,7 @@ fn evaluate_requirement(
         } => {
             if !required_heading_rad.is_finite()
                 || !maximum_heading_error_rad.is_finite()
-                || !(0.0..=std::f64::consts::PI).contains(&maximum_heading_error_rad)
+                || !(0.0..=std::f64::consts::PI).contains(maximum_heading_error_rad)
             {
                 return indeterminate(RuleComplianceReason::RuleMalformed);
             }
@@ -350,7 +354,7 @@ fn evaluate_requirement(
                 None => finding(
                     requirement,
                     RuleComplianceOutcome::Compliant,
-                    RuleComplianceReason::RequiredStopObserved,
+                    RuleComplianceReason::RequirementSatisfied,
                     applicable.len(),
                     None,
                     None,
@@ -362,6 +366,7 @@ fn evaluate_requirement(
             stop_line_progress_m,
             stop_speed_threshold_mps,
             required_stationary_duration_s,
+            maximum_sample_gap_s,
             progress_tolerance_m,
         } => {
             if !stop_line_progress_m.is_finite()
