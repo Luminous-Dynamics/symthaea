@@ -110,6 +110,16 @@ Use an explicit cost model:
 
 Publish Pareto alternatives rather than hiding trade-offs in a single opaque score.
 
+## Phase-resolved chemistry and dosing
+
+Treat detergent formulation as a set of controlled components with separate release events, not a single undifferentiated dose. Each event is scoped to its formulation and component batch, wash phase, soil/material class, water hardness and the temperature measured at release.
+
+The controller may select only a prevalidated schedule from the formulation owner's calibration envelope. Component interactions and minimum separation times require exact-formulation evidence; never infer compatibility or dosing mass from a generic ingredient label. The stage plan must be phase ordered, and total delivered chemical mass must be measured separately from the commanded dose.
+
+LG AI SenseClean and Henkel Somat Smartwash are current competitive references for adaptive detergent amount / phase-aware multi-component dosing. Therefore, the differentiator is not automatic dosing alone. It is independently verified cleaning and rinse outcomes, exact delivered-mass accounting, calibrated uncertainty, and robust fallback when sensor or formulation identity is invalid.
+
+The Symthaea design crate exposes `chemistry::validate_dose_plan` for this contract. It validates schedules against supplied calibrations but does not formulate detergent, choose doses, measure actual delivery or certify cleaning. See [phase-resolved-chemistry-benchmark.md](phase-resolved-chemistry-benchmark.md).
+
 ## Control and safety partition
 
 ### Deterministic safety supervisor
