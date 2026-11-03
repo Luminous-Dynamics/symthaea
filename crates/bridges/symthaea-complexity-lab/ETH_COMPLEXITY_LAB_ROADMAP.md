@@ -31,7 +31,7 @@ Certified model counting, equality saturation, treewidth/hypertree-width algorit
 | ETH-022 | Can a compact trace be checked by deterministic replay without serializing all intermediate tables? | EXACT_REPLAY_CERTIFICATES.md, Q(i) trace/checker | Replay producer/checker source committed but not executed; no bounded-memory claim, Rust or Lean proof |
 | ETH-023 | Can an input auditor resolve MC/WMC/PMC/PWMC/AMC semantics before choosing an engine? | MC_INPUT_CONTRACT_AUDITOR.md, parser reference | 34 fixture expectations and malformed-input fuzz plan committed but not executed; explicit effective output contract added; official-corpus and Ganak differential tests open |
 | ETH-024 | Can every complexity claim be connected to theorem scope, output, encoding, machine and immutable evidence? | CLAIM_EVIDENCE_LEDGER.md, JSON ledger and validator | 4 claims/7 pinned sources; 8 claim-inflation mutations rejected by independent JS policy replay |
-| ETH-025 | Can semantics-preserving transformations test solver behavior when large-instance ground truth is unavailable? | SEMANTIC_METAMORPHIC_BENCHMARK.md, exact oracle and versioned relation schema | 3,000 exact relation checks + 200 hidden-witness checks actually executed across five contracts; zero failures; no solver-binary differential run yet |
+| ETH-025 | Can semantics-preserving transformations test solver behavior when large-instance ground truth is unavailable? | SEMANTIC_METAMORPHIC_BENCHMARK.md, exact oracle and versioned relation schema | 30,000 exact relation checks + 2,000 hidden-witness checks in the expanded run across five contracts; zero failures; no solver-binary differential run yet |
 
 ## 3. Current exactness and implementation boundary
 
