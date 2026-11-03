@@ -824,6 +824,27 @@
         "support_cardinality": "2",
         "pwmc": "4/3"
       }
+    },
+    {
+      "id": "unique-definitional-hidden-extension",
+      "operation": "add_unique_definitional_hidden",
+      "source": "single-hidden-witness-scope",
+      "expected": {
+        "full_model_count": "unchanged",
+        "projected_support": "unchanged",
+        "pwmc": "unchanged"
+      }
+    },
+    {
+      "id": "weight-map-substitution",
+      "operation": "substitute_visible_weight_map",
+      "source": "reusable_projection",
+      "expected": {
+        "projected_support": "unchanged",
+        "base_weight_map_id": "map-00",
+        "new_weight_map_id": "map-01",
+        "pwmc": "17/24"
+      }
     }
   ]
 }
