@@ -240,11 +240,12 @@
         "query_flipping_reference_count",
         "omitted_query_flipping_count",
         "false_invariance_count",
-        "not_estimable_count",
         "false_ambiguity_count",
         "candidate_duplicate_structure_group_count",
         "reference_duplicate_structure_group_count",
-        "candidate_not_estimable_count"
+        "candidate_not_estimable_count",
+        "compatible_estimable_reference_count",
+        "compatible_query_not_estimable_reference_count"
       ],
       "properties": {
         "candidate_world_count": {
@@ -287,10 +288,6 @@
           "type": "integer",
           "minimum": 0
         },
-        "not_estimable_count": {
-          "type": "integer",
-          "minimum": 0
-        },
         "false_ambiguity_count": {
           "type": "integer",
           "minimum": 0
@@ -304,6 +301,14 @@
           "minimum": 0
         },
         "candidate_not_estimable_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "compatible_estimable_reference_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "compatible_query_not_estimable_reference_count": {
           "type": "integer",
           "minimum": 0
         }
@@ -321,9 +326,12 @@
           "query_flipping_reference_count",
           "omitted_query_flipping_count",
           "false_invariance_count",
-          "not_estimable_count",
           "false_ambiguity_count",
-          "candidate_not_estimable_count"
+          "candidate_not_estimable_count",
+          "incompatible_reference_count",
+          "indeterminate_reference_count",
+          "compatible_estimable_reference_count",
+          "compatible_query_not_estimable_reference_count"
         ],
         "properties": {
           "error_family": {
@@ -350,15 +358,27 @@
             "type": "integer",
             "minimum": 0
           },
-          "not_estimable_count": {
-            "type": "integer",
-            "minimum": 0
-          },
           "false_ambiguity_count": {
             "type": "integer",
             "minimum": 0
           },
           "candidate_not_estimable_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "incompatible_reference_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "indeterminate_reference_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "compatible_estimable_reference_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "compatible_query_not_estimable_reference_count": {
             "type": "integer",
             "minimum": 0
           }
