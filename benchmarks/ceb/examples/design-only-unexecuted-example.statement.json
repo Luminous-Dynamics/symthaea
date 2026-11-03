@@ -12,6 +12,12 @@
       "digest": {
         "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
       }
+    },
+    {
+      "name": "ceb/result.tree",
+      "digest": {
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
     }
   ],
   "predicateType": "https://luminousdynamics.io/attestations/ceb-run/v0",
