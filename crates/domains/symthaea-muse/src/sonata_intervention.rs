@@ -570,6 +570,7 @@ fn descriptor_for(
 fn obligation_class(kind: &ObligationKind) -> ObligationClass {
     match kind {
         ObligationKind::ReturnMotif { .. } => ObligationClass::ReturnMotif,
+        ObligationKind::DevelopMotif { .. } => ObligationClass::MotifDevelopment,
         ObligationKind::ReachKey { .. } => ObligationClass::ReachKey,
         ObligationKind::RestoreIdentity { .. } => ObligationClass::RestoreIdentity,
         ObligationKind::ResolveAlteredDegree { .. } => ObligationClass::ResolveAlteredDegree,
