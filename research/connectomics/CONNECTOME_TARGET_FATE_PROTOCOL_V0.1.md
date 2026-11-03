@@ -34,7 +34,7 @@ The fate receipt binds:
 - a fate record and evidence-ID list for each target object;
 - independently recomputable total and per-object-type counters.
 
-The semantic verifier loads the exact target manifest bytes and the correspondence receipt bytes itself. It must not trust copied object IDs, summary counters, or digest strings without recomputation. The fixture's target-manifest digest is the SHA-256 of the exact bytes in `connectome-target-fate-target-world-v0.1.json`.
+The semantic verifier at `tools/connectome-target-fate-verifier/` loads the exact target manifest bytes and the correspondence receipt bytes itself. It must not trust copied object IDs, summary counters, or digest strings without recomputation. The included correspondence envelope fixture is a compact test input for the mapping-table interface; production use must pass the full receipt already checked by the upstream correspondence verifier. The fixture's target-manifest digest is the SHA-256 of the exact bytes in `connectome-target-fate-target-world-v0.1.json`.
 
 ## 4. Normative invariants
 
@@ -66,7 +66,7 @@ The target-only synapse does not claim synaptogenesis. The alternative neuron ca
 
 ## 6. Adversarial qualification matrix
 
-The semantic implementation must reject:
+The semantic implementation and its unit tests are authored in Rust. It must reject:
 - missing, duplicate, unknown, or wrong-type target fate records;
 - a mapping reference absent from the correspondence receipt;
 - a mapping reference that does not include the target object;
@@ -92,3 +92,4 @@ Mutation tests must change one field at a time and assert deterministic rejectio
 ## 8. Claim ceiling
 
 A valid V0.1 fate inventory demonstrates only exhaustive structural accounting against one pinned target manifest. It does not demonstrate that the mapped objects are biologically identical, that target-only objects are biologically new, or that evidence authorities are authentic. Biological claims require separate evidence authentication and independent adjudication.
+\n## 9. Current implementation status\n\nThe Rust CLI verifier and nineteen mutation/known-answer unit tests are authored under `tools/connectome-target-fate-verifier/`. They have not been compiled or executed in the current authoring environment because Rust toolchain binaries are unavailable. The exact raw-byte fixture pins are recorded in the known-answer fixture. Do not interpret authored tests as passing tests; exact-head CI remains the required execution evidence.\n
