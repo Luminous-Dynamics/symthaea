@@ -750,11 +750,15 @@ mod tests {
 
     #[test]
     fn dimension_arithmetic_is_deterministic() {
-        let force = PhysicalDimension::MASS.add(PhysicalDimension::ACCELERATION);
+        let force = PhysicalDimension::MASS + PhysicalDimension::ACCELERATION;
         assert_eq!(force, PhysicalDimension::FORCE);
         assert_eq!(
-            PhysicalDimension::FORCE.add(PhysicalDimension::LENGTH),
+            PhysicalDimension::FORCE + PhysicalDimension::LENGTH,
             PhysicalDimension::ENERGY
+        );
+        assert_eq!(
+            PhysicalDimension::LENGTH - PhysicalDimension::TIME,
+            PhysicalDimension::VELOCITY
         );
     }
 
