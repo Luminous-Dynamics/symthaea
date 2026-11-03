@@ -5,25 +5,47 @@
   "description": "Content-addressed typed nodes, multi-relational edges and provenance artifacts. Hash verification is not semantic authentication; v0 never admits an edge directly to the proof scheduler.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "evidence_class", "snapshot", "nodes", "edges", "artifacts"],
+  "required": [
+    "schema_version",
+    "evidence_class",
+    "snapshot",
+    "nodes",
+    "edges",
+    "artifacts"
+  ],
   "properties": {
-    "schema_version": { "const": "pitb.proof-graph-evidence.v0" },
-    "evidence_class": { "enum": ["synthetic_contract_fixture", "measured_snapshot"] },
-    "snapshot": { "$ref": "#/$defs/snapshot" },
+    "schema_version": {
+      "const": "pitb.proof-graph-evidence.v0"
+    },
+    "evidence_class": {
+      "enum": [
+        "synthetic_contract_fixture",
+        "measured_snapshot"
+      ]
+    },
+    "snapshot": {
+      "$ref": "#/$defs/snapshot"
+    },
     "nodes": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/node" }
+      "items": {
+        "$ref": "#/$defs/node"
+      }
     },
     "edges": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/edge" }
+      "items": {
+        "$ref": "#/$defs/edge"
+      }
     },
     "artifacts": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/artifact" }
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
     }
   },
   "$defs": {
@@ -47,12 +69,27 @@
         "extractor_config_sha256"
       ],
       "properties": {
-        "snapshot_id": { "type": "string", "minLength": 1 },
-        "repository_commit": { "$ref": "#/$defs/sha1" },
-        "environment_sha256": { "$ref": "#/$defs/sha256" },
-        "extractor_id": { "type": "string", "minLength": 1 },
-        "extractor_version": { "type": "string", "minLength": 1 },
-        "extractor_config_sha256": { "$ref": "#/$defs/sha256" }
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository_commit": {
+          "$ref": "#/$defs/sha1"
+        },
+        "environment_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "extractor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "extractor_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "extractor_config_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
       }
     },
     "node": {
@@ -68,7 +105,11 @@
         "formal_name"
       ],
       "properties": {
-        "node_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "node_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
         "kind": {
           "enum": [
             "formal_declaration",
@@ -78,15 +119,75 @@
             "environment_artifact"
           ]
         },
-        "label": { "type": "string", "minLength": 1 },
-        "statement_sha256": { "$ref": "#/$defs/sha256" },
-        "statement_artifact_id": { "type": "string", "minLength": 1 },
-        "source_locator": { "type": "string", "minLength": 1 },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "statement_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "statement_artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_locator": {
+          "type": "string",
+          "minLength": 1
+        },
         "formal_name": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "minLength": 1
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "formal_declaration"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "formal_name": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "blueprint_node",
+                  "informal_statement",
+                  "module",
+                  "environment_artifact"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "formal_name": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
     },
     "edge": {
       "type": "object",
@@ -104,9 +205,19 @@
         "reviewer_key_id"
       ],
       "properties": {
-        "edge_id": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "source_node_id": { "type": "string", "minLength": 1 },
-        "target_node_id": { "type": "string", "minLength": 1 },
+        "edge_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "source_node_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_node_id": {
+          "type": "string",
+          "minLength": 1
+        },
         "relation": {
           "enum": [
             "type_reference",
@@ -129,35 +240,327 @@
           ]
         },
         "status": {
-          "enum": ["observed", "candidate", "human_reviewed", "rejected"]
+          "enum": [
+            "observed",
+            "candidate",
+            "human_reviewed",
+            "rejected"
+          ]
         },
-        "evidence_artifact_id": { "type": "string", "minLength": 1 },
+        "evidence_artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
         "confidence": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0,
           "maximum": 1
         },
         "review_artifact_id": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "minLength": 1
         },
         "reviewer_key_id": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "minLength": 1
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "relation": {
+                "const": "type_reference"
+              }
+            },
+            "required": [
+              "relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_class": {
+                "const": "lean_elaborator"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "relation": {
+                "const": "proof_term_reference"
+              }
+            },
+            "required": [
+              "relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_class": {
+                "const": "lean_elaborator"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "relation": {
+                "const": "instance_synthesis"
+              }
+            },
+            "required": [
+              "relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_class": {
+                "const": "lean_instance_trace"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "relation": {
+                "const": "blueprint_dependency"
+              }
+            },
+            "required": [
+              "relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_class": {
+                "const": "blueprint_curated"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "relation": {
+                "const": "informal_candidate_dependency"
+              }
+            },
+            "required": [
+              "relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_class": {
+                "const": "informal_extractor"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "relation": {
+                "const": "cross_formality_match"
+              }
+            },
+            "required": [
+              "relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_class": {
+                "const": "llm_alignment"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "relation": {
+                "const": "module_environment_dependency"
+              }
+            },
+            "required": [
+              "relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_class": {
+                "const": "lean_build_graph"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "observed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "relation": {
+                "enum": [
+                  "type_reference",
+                  "proof_term_reference",
+                  "instance_synthesis",
+                  "module_environment_dependency"
+                ]
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "review_artifact_id": {
+                "type": "null"
+              },
+              "reviewer_key_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "candidate"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "relation": {
+                "enum": [
+                  "blueprint_dependency",
+                  "informal_candidate_dependency",
+                  "cross_formality_match"
+                ]
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "review_artifact_id": {
+                "type": "null"
+              },
+              "reviewer_key_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "human_reviewed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "relation": {
+                "enum": [
+                  "blueprint_dependency",
+                  "informal_candidate_dependency",
+                  "cross_formality_match"
+                ]
+              },
+              "review_artifact_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reviewer_key_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "rejected"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confidence": {
+                "type": "null"
+              },
+              "review_artifact_id": {
+                "type": "null"
+              },
+              "reviewer_key_id": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
     },
     "artifact": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["artifact_id", "kind", "path", "sha256"],
+      "required": [
+        "artifact_id",
+        "kind",
+        "path",
+        "sha256"
+      ],
       "properties": {
-        "artifact_id": { "type": "string", "minLength": 1 },
-        "kind": {
-          "enum": ["statement", "edge_evidence", "review_attestation"]
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1
         },
-        "path": { "type": "string", "minLength": 1 },
-        "sha256": { "$ref": "#/$defs/sha256" }
+        "kind": {
+          "enum": [
+            "statement",
+            "edge_evidence",
+            "review_attestation"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
       }
     }
   }
