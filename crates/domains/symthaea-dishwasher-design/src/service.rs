@@ -90,7 +90,7 @@ pub struct ServiceAttempt {
     pub run_id: String,
     pub started_at_s: u64,
     pub finished_at_s: u64,
-    /// Stable IDs for individual service requests, not dish type labels.
+    /// Stable IDs for each requested item in this service request, not dish type labels.
     pub item_ids: Vec<String>,
     /// Include allocated preheat/standby/purge overhead in this resource vector.
     pub resources: AttemptResources,
@@ -327,7 +327,9 @@ pub fn account_service(
         .then(|| total_resources.divided_by(verified_successful_item_count));
 
     Ok(ServiceAccountingReport {
-        service_request_id: service_request_id.expect("non-empty attempts set the service request ID").to_owned(),
+        service_request_id: service_request_id
+            .ok_or(ServiceAccountingError::InvalidIdentity("service_request_id"))?
+            .to_owned(),
         attempt_count: attempts.len(),
         physical_run_count: run_ids.len(),
         unique_item_count,
