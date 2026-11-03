@@ -80,7 +80,7 @@ The distinct-support counts permit exact uniform sampling without enumerating ev
 
 Rust adds ExactFactorGraph<MaxCountValue>::sample_optimal_assignment. The caller supplies a uniform_below(bound) callback that must return an unbiased integer in [0,bound). This avoids a dependency on a specific RNG crate. The sampler validates the variable permutation, separator ordering, row encoding, parallel branch-array lengths, positive branch counts, root-support product, and the returned assignment's score. It trusts the supplied argmax/support contents; externally supplied results must be independently certificate-checked before sampling.
 
-The Python v2 reference checks 1,383 path probabilities exactly with fractions.Fraction: each tested optimum has probability exactly 1 / support_size; all six triangle MaxCut optima have probability 1/6. This is an exact finite probability check, not a runtime benchmark.
+The Python v2 reference checks 1,389 path probabilities exactly with fractions.Fraction: each tested optimum has probability exactly 1 / support_size; all six triangle MaxCut optima have probability 1/6. This is an exact finite probability check, not a runtime benchmark.
 
 ## Benchmarks and qualification targets
 
