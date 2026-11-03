@@ -1,6 +1,6 @@
 # ETH-020: exact Gaussian-rational algebraic model counting
 
-**Status:** Finite Python reference arithmetic and bucket variable-elimination oracle committed. Rust/Lean qualification and competition evaluation remain open.
+**Status:** Finite Python Q(i) reference arithmetic and bucket variable-elimination oracle committed. Ganak already provides exact complex-rational support, so Q(i) alone is not a novelty claim; Rust/Lean qualification, proof-carrying execution and competitive evaluation remain open.
 
 ## 1. Why this matters now
 
@@ -65,7 +65,24 @@ Executed locally using Python standard-library Fraction arithmetic:
 
 These are finite reference tests, not a complexity or runtime result. The script is a small exact oracle, not a production WMC parser or competition solver.
 
-## 5. What is needed to compete
+## 5. Baseline correction: Q(i) is established capability
+
+Ganak already supports exact complex-rational weights (MPQ) and broader algebraic model-counting modes, including polynomial/Laurent-polynomial and custom-field capability in its public code/documentation. Therefore, implementing Q(i) in isolation is not a new capability relative to the strongest relevant baseline.
+
+ETH-020 must be positioned as a qualification and integration exercise:
+- verify that Symthaea's exact algebra registry can represent and reason about Q(i);
+- bind exact operations to field/Q-algebra laws and rule permissions;
+- generate replayable factor-join and sum-out certificates;
+- select plans using the coefficient growth and independent-checking cost;
+- compare verified end-to-end execution against Ganak's exact MPQ mode on the same instances.
+
+Ganak is a strong and necessary baseline, not a straw man. If it outperforms Symthaea, report that directly. The research value is established only if the certificate and planner integration gives a measurable advantage, or provides an independently valuable verification guarantee, without claiming arithmetic novelty.
+
+Source: Ganak's 2026 MC competition submission and implementation:
+- https://github.com/meelgroup/mccomp-ganak-appmc-2026
+- https://github.com/meelgroup/ganak
+
+## 6. What is needed to compete
 
 1. **Rust backend:** arbitrary-precision numerator/denominator components and exact Gaussian-rational operations. Prefer an audited arbitrary-precision library; never use f64 for values or equality.
 2. **Lean domain:** define Q(i) and prove commutative field / Q-algebra laws. The runtime registry may only expose the corresponding capabilities after its representation and operations are bound to these proofs.
@@ -74,13 +91,13 @@ These are finite reference tests, not a complexity or runtime result. The script
 5. **Benchmark protocol:** freeze the public suite, keep a family-held-out validation set, and use the same 3,600s / 32GB budget. Record exact solved count, producer time, proof generation, checker time/RSS, peak live factor size, coefficient bit lengths and zero-cancellation cases.
 6. **Beyond Q(i):** inspect the actual benchmark coefficient sets. Add algebraic number fields only if needed, with exact root identity and canonical arithmetic.
 
-## 6. Compatible baselines and targets
+## 7. Compatible baselines and targets
 
 The direct baseline for the complex AMC track is Ganak's exact MPQ path, together with any other submitted solver that actually supports the same instance format and exact result contract. Do not use the approximate MPFR score as an exact baseline.
 
 A first milestone is exact agreement on the public rational-complex instances and a complete, mutation-tested certificate checker. A later target is at least 10% more exact instances solved or 10% lower verified end-to-end time on a preregistered held-out subset under identical budgets. Both are aspirations, not observed results.
 
-## 7. Relationship to the other ETH lines
+## 8. Relationship to the other ETH lines
 
 - ETH-015 selects the requested algebra.
 - ETH-016 certifies exact elimination.
@@ -91,6 +108,6 @@ A first milestone is exact agreement on the public rational-complex instances an
 
 The key comparison is verified end-to-end computation, not arithmetic kernel speed in isolation.
 
-## 8. Claim ceiling
+## 9. Claim ceiling
 
-This prototype demonstrates exact Q(i) arithmetic and small factor-network VE equivalence. It does not establish full complex-field AMC coverage, projected counting, algebraic-number fields, Rust implementation, Lean proofs, competition performance, or better-than-SOTA results.
+This prototype demonstrates a Symthaea-side exact Q(i) reference and small factor-network VE equivalence; it does not establish a capability absent from Ganak. It does not establish full complex-field AMC coverage, projected counting, algebraic-number fields, Rust implementation, Lean proofs, competition performance, or better-than-SOTA results.
