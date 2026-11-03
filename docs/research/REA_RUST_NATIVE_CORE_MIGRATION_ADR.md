@@ -713,3 +713,77 @@ Two research gaps remain independent of the implementation:
 - [#10208](https://github.com/Luminous-Dynamics/symthaea/issues/10208): utility-model uncertainty, Pareto dominance, hard non-compensable constraints and preference sensitivity.
 
 The machine-readable benchmark manifest contains a separate decision-aware value-of-information family. It compares point EIG, robust EIG, EVSI, lower-tail policy EVSI and minimax regret, with known-answer and misspecification tests. A target of 20% lower 90th-percentile decision regret versus point EIG is proposed, not measured.
+
+
+## 16. Industry benchmark update: SRE-Bench denominator and OWASP MASTG knowledge graph
+
+### 16.1 SRE-Bench — the leading public-facing number is conditional
+
+The official October 2026 SRE-Bench snapshot reports:
+
+| Public-facing model | Mean passed tasks / 6 | Graded instances | Fully solved / graded | Zero-credit / graded |
+|---|---:|---:|---:|---:|
+| GPT-6-Astra | 5.55 | 181 / 262 (69.1%) | 149 / 181 (82.3%) | 7 / 181 (3.9%) |
+| GPT-5.6-Sol | 3.69 | 254 / 262 (96.9%) | 80 / 254 (31.5%) | 41 / 254 (16.1%) |
+| Claude-Fable-5.1 | 2.58 | 223 / 262 (85.1%) | 60 / 223 (26.9%) | 96 / 223 (43.0%) |
+| Claude-Opus-5 | 1.91 | 256 / 262 (97.7%) | 32 / 256 (12.5%) | 118 / 256 (46.1%) |
+
+The leading 82.3% full-solve figure is conditional on 181 graded instances; the graded coverage is 69.1%. The 149 fully solved instances are 56.9% of the full 262-instance corpus. The latter is a derived coverage-adjusted figure, not the benchmark owner's reported full-solve rate.
+
+The official table's setting enables model-side cyber safeguards. A separate unconstrained setting removes safeguards and budget limits. Those are different operating points, not one leaderboard. Preserve the original setting and score while reporting eligible/attempted/completed/graded/refused/abstained/unsupported/timeouts and cost separately. Never optimize the headline by leaving the hard or refused cases out of the denominator.
+
+For the Luminous system, three additional measures should appear alongside the official metric:
+- **coverage-adjusted task yield:** passed tasks divided by the eligible task universe;
+- **selective risk versus coverage:** error rate as the system changes its abstention threshold;
+- **cost-to-correct:** total bounded investigation cost per independently graded correct task.
+
+These are internal derived measures and must not be attributed to SRE-Bench.
+
+### 16.2 OWASP MASTG v2 / MASWE v1 — consume the standard as a graph
+
+The OWASP programme is no longer best treated as a prose checklist. MASTG v2.0.0 (4 July 2026) is the first stable non-beta release of its refactored, machine-addressable guide. The current published index lists 285 tests, 152 demos, 167 techniques, 135 tools, 140 knowledge articles and 72 best practices. MASWE v1.0.0 (17 August 2026) is the first stable, consistently structured and stably numbered weakness taxonomy.
+
+This creates an opportunity for Symthaea to compile a **mobile verification graph**:
+
+```
+MASVS control
+   -> MASWE weakness
+   -> MASTG test
+   -> technique / tool / prerequisite
+   -> raw observation
+   -> versioned evaluation rule
+   -> REA Evidence
+   -> independently qualified control claim
+```
+
+MASTG test records include platform and test type metadata, relate to weakness/profile/knowledge/technique records, and separate raw Observation from Evaluation. Preserve that distinction in our own evidence model. Do not let a model-produced explanation replace raw output or the test's explicit evaluation condition.
+
+The planner should only instantiate tests whose platform and environment prerequisites are satisfied. It must represent prerequisites and outcomes explicitly:
+- not tested;
+- not applicable, with scope reason;
+- unavailable or unsupported;
+- inconclusive;
+- observed but not evaluated;
+- evaluated pass or fail.
+
+No missing test, unsupported platform or unavailable instrumentation may be converted into a pass. A MASTG test pass is not automatically a MASVS control pass: controls may require multiple tests, contextual review, manual testing or business-logic inspection.
+
+The useful Luminous contribution is a compiler that turns pinned OWASP relationships into evidence obligations and an auditable test DAG, then binds every observation/evaluation to artifact digest, target configuration, tool identity and receipt. This should complement OWASP's catalogue, not fork or replace it.
+
+### 16.3 Revised comparative claim
+
+The question is not simply whether Symthaea can beat a scanner or a decompiler. It is whether the REA + Symthaea stack can:
+1. preserve or improve independent task correctness on the same benchmark items;
+2. increase eligible-case coverage without inflating unsupported certainty;
+3. localize correct components and select better discriminating tests;
+4. produce higher traceability from the accepted claim to raw observation and evaluation;
+5. do so at a measured cost/resource budget.
+
+For mobile verification, report MASTG test coverage, MASWE detection and MASVS control qualification separately. For general reverse engineering, keep SRE-Bench, AgentRE-Bench and Decompile-Bench score units separate.
+
+References:
+- SRE-Bench official October 2026 snapshot: https://daplab.cs.columbia.edu/benchmarks/sre-bench/
+- MASTG v2.0.0 announcement: https://mas.owasp.org/news/2026/07/04/mastg-v200-release/
+- MASTG v2.0.0 release: https://github.com/OWASP/mastg/releases/tag/v2.0.0
+- MASWE v1.0.0 announcement: https://mas.owasp.org/news/archive/2026/
+- MASWE catalogue: https://mas.owasp.org/MASWE/
