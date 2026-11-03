@@ -96,3 +96,19 @@ The distinction matters: \`pull_adb_file\` writes a host-side copy but does not 
 MCP annotations are derived from effects exactly as in upstream REA. They are not the policy authority. Unknown or unaudited names fail closed. Authorization results bind a JCS digest of the effect row and a JCS digest of the policy ceiling. The dedicated upstream CI generator also compares all 30 effect rows, annotations and target-content trust flags with the pinned TypeScript source.
 
 This is a policy evaluator and typed catalog, not yet proof that every MCP/CLI/provider execution path calls it. Adapter wiring and exact tool-catalog parity remain acceptance requirements in issue #9909.
+
+
+## Session-bound mobile invocation authorization
+
+The optional `mobile_invocation` module prepares a narrowly scoped one-use authorization lease. It binds:
+- an opaque selected-device alias, generation and ephemeral session nonce;
+- caller ID and a caller-consent receipt digest/verifier label;
+- exact tool name and canonical argument digest;
+- the provider capability report, executable metadata, effect-catalog and policy digests;
+- an invocation ID/nonce and a bounded issue/expiry time window.
+
+The portable receipt contains the **hash** of the ephemeral session nonce, not the raw nonce or a stable device identifier. The prepared authorization retains the arguments only in-process for a narrow executor. A process-local replay guard rejects duplicate invocation IDs and nonces; production gateways must persist those claims transactionally across restarts and share the replay store across direct API/CLI/MCP adapters.
+
+### Important claim ceiling
+
+This is a policy and integrity contract. It does not execute ADB, authenticate the provider executable, validate a consent signature, prove that a human clicked a consent dialog, attest the device, or prove ADB output truth. A gateway must supply an actually verified consent result, selected live session snapshot, fresh clock and provider report before it calls this API. The receipt's self-hash is not a signature. HARDSEC or another independently trusted verifier is required for authenticity claims.
