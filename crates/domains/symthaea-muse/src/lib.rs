@@ -41,6 +41,7 @@ pub mod analysis_crosscheck;
 #[cfg(feature = "theory")]
 pub mod analyst;
 pub mod audio_analyzer;
+pub mod temporal_grounding;
 #[cfg(feature = "theory")]
 pub mod blinded_study;
 pub mod choreography;
