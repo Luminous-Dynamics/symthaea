@@ -1,0 +1,205 @@
+{
+  "schema_version": 0,
+  "fixture_id": "CEB-REPO-001-SYNTHETIC-V0",
+  "status": "design_only_world_matrix",
+  "feature_vocabulary": [
+    "audit",
+    "windows-native"
+  ],
+  "conditional_facts": [
+    {
+      "node_id": "feature.api.audit",
+      "activation": {
+        "feature": "audit"
+      }
+    },
+    {
+      "node_id": "feature.api.windows_native",
+      "activation": {
+        "feature": "windows-native"
+      }
+    },
+    {
+      "node_id": "target.api.windows",
+      "activation": {
+        "target_os": "windows"
+      }
+    },
+    {
+      "node_id": "sym.audit.AccessRecord",
+      "activation": {
+        "feature": "audit"
+      }
+    },
+    {
+      "node_id": "sym.audit.record_access",
+      "activation": {
+        "feature": "audit"
+      }
+    },
+    {
+      "node_id": "sym.windows.os_version",
+      "activation": {
+        "feature": "windows-native",
+        "target_os": "windows"
+      }
+    },
+    {
+      "node_id": "dep.windows-sys",
+      "activation": {
+        "feature": "windows-native",
+        "target_os": "windows"
+      }
+    }
+  ],
+  "worlds": [
+    {
+      "id": "linux-default",
+      "target_os": "linux",
+      "target_triple": "x86_64-unknown-linux-gnu",
+      "enabled_features": [],
+      "expected_active_nodes": [],
+      "expected_inactive_nodes": [
+        "dep.windows-sys",
+        "feature.api.audit",
+        "feature.api.windows_native",
+        "sym.audit.AccessRecord",
+        "sym.audit.record_access",
+        "sym.windows.os_version",
+        "target.api.windows"
+      ]
+    },
+    {
+      "id": "linux-windows-native",
+      "target_os": "linux",
+      "target_triple": "x86_64-unknown-linux-gnu",
+      "enabled_features": [
+        "windows-native"
+      ],
+      "expected_active_nodes": [
+        "feature.api.windows_native"
+      ],
+      "expected_inactive_nodes": [
+        "dep.windows-sys",
+        "feature.api.audit",
+        "sym.audit.AccessRecord",
+        "sym.audit.record_access",
+        "sym.windows.os_version",
+        "target.api.windows"
+      ]
+    },
+    {
+      "id": "linux-audit",
+      "target_os": "linux",
+      "target_triple": "x86_64-unknown-linux-gnu",
+      "enabled_features": [
+        "audit"
+      ],
+      "expected_active_nodes": [
+        "feature.api.audit",
+        "sym.audit.AccessRecord",
+        "sym.audit.record_access"
+      ],
+      "expected_inactive_nodes": [
+        "dep.windows-sys",
+        "feature.api.windows_native",
+        "sym.windows.os_version",
+        "target.api.windows"
+      ]
+    },
+    {
+      "id": "linux-audit-windows-native",
+      "target_os": "linux",
+      "target_triple": "x86_64-unknown-linux-gnu",
+      "enabled_features": [
+        "audit",
+        "windows-native"
+      ],
+      "expected_active_nodes": [
+        "feature.api.audit",
+        "feature.api.windows_native",
+        "sym.audit.AccessRecord",
+        "sym.audit.record_access"
+      ],
+      "expected_inactive_nodes": [
+        "dep.windows-sys",
+        "sym.windows.os_version",
+        "target.api.windows"
+      ]
+    },
+    {
+      "id": "windows-default",
+      "target_os": "windows",
+      "target_triple": "x86_64-pc-windows-msvc",
+      "enabled_features": [],
+      "expected_active_nodes": [
+        "target.api.windows"
+      ],
+      "expected_inactive_nodes": [
+        "dep.windows-sys",
+        "feature.api.audit",
+        "feature.api.windows_native",
+        "sym.audit.AccessRecord",
+        "sym.audit.record_access",
+        "sym.windows.os_version"
+      ]
+    },
+    {
+      "id": "windows-windows-native",
+      "target_os": "windows",
+      "target_triple": "x86_64-pc-windows-msvc",
+      "enabled_features": [
+        "windows-native"
+      ],
+      "expected_active_nodes": [
+        "dep.windows-sys",
+        "feature.api.windows_native",
+        "sym.windows.os_version",
+        "target.api.windows"
+      ],
+      "expected_inactive_nodes": [
+        "feature.api.audit",
+        "sym.audit.AccessRecord",
+        "sym.audit.record_access"
+      ]
+    },
+    {
+      "id": "windows-audit",
+      "target_os": "windows",
+      "target_triple": "x86_64-pc-windows-msvc",
+      "enabled_features": [
+        "audit"
+      ],
+      "expected_active_nodes": [
+        "feature.api.audit",
+        "sym.audit.AccessRecord",
+        "sym.audit.record_access",
+        "target.api.windows"
+      ],
+      "expected_inactive_nodes": [
+        "dep.windows-sys",
+        "feature.api.windows_native",
+        "sym.windows.os_version"
+      ]
+    },
+    {
+      "id": "windows-audit-windows-native",
+      "target_os": "windows",
+      "target_triple": "x86_64-pc-windows-msvc",
+      "enabled_features": [
+        "audit",
+        "windows-native"
+      ],
+      "expected_active_nodes": [
+        "dep.windows-sys",
+        "feature.api.audit",
+        "feature.api.windows_native",
+        "sym.audit.AccessRecord",
+        "sym.audit.record_access",
+        "sym.windows.os_version",
+        "target.api.windows"
+      ],
+      "expected_inactive_nodes": []
+    }
+  ]
+}
