@@ -1,3 +1,5 @@
+pub mod resource_curve;
+
 #![forbid(unsafe_code)]
 
 //! Deterministic household-demand simulation for the InstantClean hybrid
