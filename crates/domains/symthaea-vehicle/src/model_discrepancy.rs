@@ -303,7 +303,11 @@ fn derive_report(input: &VehicleModelDiscrepancyInput) -> Result<VehicleModelDis
         let predicted_max = d.actions.iter().map(|a| a.predicted_utility).fold(f64::NEG_INFINITY, f64::max);
         let realized_min = d.actions.iter().map(|a| a.realized_utility).fold(f64::INFINITY, f64::min);
         let realized_max = d.actions.iter().map(|a| a.realized_utility).fold(f64::NEG_INFINITY, f64::max);
-        if !(predicted_max - predicted_min).is_finite() || !(realized_max - realized_min).is_finite() {
+        let predicted_range = predicted_max - predicted_min;
+        let realized_range = realized_max - realized_min;
+        if !predicted_range.is_finite() || !realized_range.is_finite()
+            || !(predicted_range + realized_range).is_finite()
+        {
             return Err(VehicleModelDiscrepancyError::InvalidUtility);
         }
         for a in &d.actions {
@@ -343,7 +347,7 @@ fn best_action<'a,F:Fn(&DiscrepancyActionOutcome)->f64>(actions:&[&'a Discrepanc
     let mut best=actions[0];
     for candidate in actions.iter().skip(1) {
         let delta=value(candidate)-value(best);
-        if delta>tol || (delta.abs()<=tol && candidate.action_id<best.action_id) { best=*candidate; }
+        if delta>tol || (delta.abs()<=tol && candidate.action_id.as_str()<best.action_id.as_str()) { best=*candidate; }
     }
     best
 }
