@@ -1,0 +1,32 @@
+{
+  "suite": "ETH-023 MC input semantic contract auditor",
+  "seed": "0xE7023",
+  "deterministic_fixtures": 34,
+  "deterministic_fixtures_passed": 34,
+  "deterministic_fixtures_failed": 0,
+  "fuzz_cases": 2000,
+  "fuzz_crashes": 0,
+  "profiles": [
+    "strict",
+    "mccomp_v1_2",
+    "ganak_2026_compat"
+  ],
+  "effective_weight_checks": {
+    "complement_inference": {"1": ["1/4", "3/4"]},
+    "wmc_defaults": {"1": ["1", "1"], "2": ["1", "1"]},
+    "amc_defaults": {"1": ["1+0i", "1+0i"]}
+  },
+  "adversarial_cases": [
+    "duplicate/conflicting type headers",
+    "type header after problem-specific directives",
+    "contradictory mode and weight/projection declarations",
+    "negative/zero weights without opposite literal",
+    "fraction with negative or zero denominator",
+    "malformed complex rational",
+    "out-of-range literal and projection variable",
+    "wrong clause count and unterminated clause",
+    "unknown problem directive"
+  ],
+  "all_passed": true,
+  "claim_ceiling": "Finite parser fixtures and 2,000 deterministic malformed-input fuzz cases. Not an official MC2026 parser qualification, Ganak differential test, Rust port, solver or performance result."
+}
