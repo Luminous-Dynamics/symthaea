@@ -418,10 +418,16 @@ mod tests {
 
     fn sample() -> Vec<RiskForecastObservation> {
         vec![
-            observation("crossing-a", "a-1", 0.25, RiskForecastOutcome::NotOccurred),
-            observation("crossing-a", "a-2", 0.75, RiskForecastOutcome::Occurred),
-            observation("crossing-b", "b-1", 0.25, RiskForecastOutcome::NotOccurred),
+            // Family A: 1/4 observed events in the 0.25 forecast bin.
+            observation("crossing-a", "a-1", 0.25, RiskForecastOutcome::Occurred),
+            observation("crossing-a", "a-2", 0.25, RiskForecastOutcome::NotOccurred),
+            observation("crossing-a", "a-3", 0.25, RiskForecastOutcome::NotOccurred),
+            observation("crossing-a", "a-4", 0.25, RiskForecastOutcome::NotOccurred),
+            // Family B: 3/4 observed events in the 0.75 forecast bin.
+            observation("crossing-b", "b-1", 0.75, RiskForecastOutcome::Occurred),
             observation("crossing-b", "b-2", 0.75, RiskForecastOutcome::Occurred),
+            observation("crossing-b", "b-3", 0.75, RiskForecastOutcome::Occurred),
+            observation("crossing-b", "b-4", 0.75, RiskForecastOutcome::NotOccurred),
         ]
     }
 
@@ -443,9 +449,9 @@ mod tests {
     fn perfect_probability_grouping_has_zero_ece_and_correct_brier() {
         let report = summarize(&sample()).unwrap();
         assert!(report.expected_calibration_error.abs() < 1e-12);
-        assert!((report.brier_score - 0.0625).abs() < 1e-12);
+        assert!((report.brier_score - 0.1875).abs() < 1e-12);
         assert_eq!(report.event_count, 2);
-        assert_eq!(report.observed_count, 4);
+        assert_eq!(report.observed_count, 8);
         assert!(report.identity_is_valid());
     }
 
@@ -474,8 +480,8 @@ mod tests {
         ));
         let report = summarize(&observations).unwrap();
         assert_eq!(report.censored_count, 1);
-        assert_eq!(report.observed_count, 4);
-        assert_eq!(report.event_count, 2);
+        assert_eq!(report.observed_count, 8);
+        assert_eq!(report.event_count, 4);
         assert!(report.identity_is_valid());
     }
 
