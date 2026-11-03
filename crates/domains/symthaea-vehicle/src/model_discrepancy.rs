@@ -136,6 +136,7 @@ pub enum VehicleModelDiscrepancyError {
     EmptyIdentity, InvalidDigest, EmptyResidualSet, InvalidHorizon, InvalidMetric,
     InvalidResidual, DuplicateResidualKey, MismatchedResidualContext,
     EmptyResidualSchedule, DuplicateExpectedResidualSlot, MissingResidualOutcomeSlot,
+    InvalidExpectedScheduleDigest,
     UnexpectedResidualOutcomeSlot,
     InvalidDecisionIdentity, InvalidDecisionContextDigest, InvalidActionSetDigest,
     InvalidTieTolerance, TooFewActions, DuplicateDecisionId, DuplicateActionId,
@@ -247,6 +248,24 @@ impl VehicleModelDiscrepancyReport {
 
 /// Compute the canonical digest of a finite action set from sorted action IDs and command digests.
 /// This binds the declared candidate payload identities; it does not authenticate the commands.
+/// Compute the digest of the frozen expected residual-slot manifest.
+/// Slots are canonically ordered before hashing. This is an integrity identity,
+/// not a signature or proof that the schedule was frozen before outcome access.
+pub fn model_discrepancy_expected_schedule_digest(
+    slots: &[ExpectedResidualSlot],
+) -> Result<String, VehicleModelDiscrepancyError> {
+    if slots.is_empty() {
+        return Err(VehicleModelDiscrepancyError::EmptyResidualSchedule);
+    }
+    let mut canonical = slots.to_vec();
+    canonical.sort_by(|a,b| a.scenario_id.cmp(&b.scenario_id)
+        .then_with(|| a.actor_policy_id.cmp(&b.actor_policy_id))
+        .then_with(|| a.action_history_digest.cmp(&b.action_history_digest))
+        .then_with(|| a.metric_id.cmp(&b.metric_id))
+        .then_with(|| a.horizon_ms.cmp(&b.horizon_ms)));
+    hash_json(&canonical)
+}
+
 pub fn model_discrepancy_action_set_digest(
     actions: &[DiscrepancyActionOutcome],
 ) -> Result<String, VehicleModelDiscrepancyError> {
@@ -305,6 +324,11 @@ fn derive_report(input: &VehicleModelDiscrepancyInput) -> Result<VehicleModelDis
         .then_with(|| a.actor_policy_id.cmp(&b.actor_policy_id))
         .then_with(|| a.action_history_digest.cmp(&b.action_history_digest))
         .then_with(|| a.metric_id.cmp(&b.metric_id)).then_with(|| a.horizon_ms.cmp(&b.horizon_ms)));
+    let computed_schedule_digest =
+        model_discrepancy_expected_schedule_digest(&canonical.expected_residual_slots)?;
+    if computed_schedule_digest != input.expected_schedule_artifact_digest {
+        return Err(VehicleModelDiscrepancyError::InvalidExpectedScheduleDigest);
+    }
     canonical.decisions.sort_by(|a,b| a.decision_id.cmp(&b.decision_id));
     for d in &mut canonical.decisions { d.actions.sort_by(|a,b| a.action_id.cmp(&b.action_id)); }
 
@@ -684,11 +708,12 @@ mod tests {
     }
     fn input()->VehicleModelDiscrepancyInput {
         let residual_observations=vec![residual(1000,1.0,0.0),residual(2000,4.0,0.0)];
-        let expected_residual_slots=residual_observations.iter().map(expected_slot).collect();
+        let expected_residual_slots=residual_observations.iter().map(expected_slot).collect::<Vec<_>>();
+        let expected_schedule_artifact_digest=model_discrepancy_expected_schedule_digest(&expected_residual_slots).unwrap();
         VehicleModelDiscrepancyInput{
             predictor_model_id:"predictor-v0".into(),predictor_artifact_digest:h('3'),reference_model_id:"reference-v0".into(),reference_model_artifact_digest:h('4'),
             evaluator_id:"evaluator-v0".into(),evaluator_artifact_digest:h('5'),planner_id:"planner-v0".into(),planner_artifact_digest:h('6'),sampling_profile_digest:h('7'),
-            protocol_id:"SAM-MODEL-RESIDUAL-001".into(),protocol_digest:h('8'),expected_schedule_artifact_digest:h('9'),expected_residual_slots,residual_observations,decisions:vec![decision()]
+            protocol_id:"SAM-MODEL-RESIDUAL-001".into(),protocol_digest:h('8'),expected_schedule_artifact_digest,expected_residual_slots,residual_observations,decisions:vec![decision()]
         }
     }
     #[test]
