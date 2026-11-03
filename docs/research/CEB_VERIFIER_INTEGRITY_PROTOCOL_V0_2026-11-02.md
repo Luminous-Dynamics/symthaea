@@ -123,23 +123,22 @@ Artifacts:
 - `benchmarks/ceb/dsse-envelope.schema.json` — schema for the outer DSSE envelope.
 - `benchmarks/ceb/examples/design-only-unexecuted-example.statement.json` — a non-evidence example with an unresolved verdict, simulated execution, no image and no signature.
 
-The statement binds at least two subjects: the candidate patch and the source tree. Its CEB predicate records:
+The statement binds exactly three subjects: the candidate patch, the source tree and the computed result tree. Its CEB predicate records:
 
-- Task contract, fixture revision and source-tree digest.
-- Base tree, patch digest, result tree and changed paths.
+- Exact task-contract digest (pinned out of band by the host task registry), fixture revision, CEB-TREE-V1 algorithm ID and source-tree digest.
+- Base tree, patch digest, computed result-tree digest and changed paths; the verifier re-hashes source and result snapshots and compares the receipt's changed-path set with the independently computed tree difference.
 - Model, harness, prompt and agent configuration digests.
-- Runner profile, immutable OCI image digest, network policy, runner-policy digest, toolchain-lock digest and execution times. The verifier requires each runtime value to equal the environment commitment in the task contract.
+- Runner profile, immutable image digest, network policy and execution times.
 - Grader identity/digest, trust domain and hidden-test visibility.
-- The exact task-declared acceptance-check set, authorities, outcomes and evidence digests. The verifier rejects omitted, extra, retyped or weakened checks.
+- Required checks, their authorities, outcomes and evidence digests.
 - Recomputed resource totals (including turns and tool calls) and the run-level verdict. The task-contract digest commits the declared budget; the verifier checks measured wall time, turns, tool calls, input/output tokens and cost against that exact task budget.
-- Artifact paths, roles, byte counts and content hashes. Each receipt must retain the exact submitted patch, at least one execution artifact and exactly one stage-specific report (`primary_report` or `regrade_report`); paths are root-relative, traversal/symlinks are rejected, each artifact is re-hashed, the total artifact budget is capped at 512 MiB, and primary/regrade execution evidence must be disjoint.
 - The relationship to the prior primary receipt for a pristine regrade.
 
-The DSSE envelope carries the serialized statement as base64 with payload type `application/vnd.in-toto+json` and one or more signatures. Verify the DSSE pre-authentication encoding and signatures against an explicit trust-root policy; a key ID by itself is not authentication. The signing key must remain in the host control plane and must never be mounted into the guest or candidate process.
+The DSSE envelope carries the serialized statement as base64 with payload type `application/vnd.in-toto+json` and one or more signatures. Verify the DSSE pre-authentication encoding and signatures against an explicit trust-root policy whose hash is pinned independently; a key ID by itself is not authentication. The host task registry must supply the expected task-contract hash. A user-provided file and a hash calculated from that same untrusted file do not form an authenticity boundary. The signing key must remain in the host control plane and must never be mounted into the guest or candidate process.
 
-**Acceptance is a two-receipt decision.** An individual primary receipt may truthfully record `pass`, and an individual pristine-regrade receipt may also record `pass`; neither is final acceptance on its own. The regrade receipt must link the primary receipt digest. The independent pair verifier must confirm that both receipts bind the same task, source, patch, grader, model/harness and budget; that receipt check definitions exactly match the task's acceptance checks; that they have distinct run identities, signer domains and disjoint execution/check evidence; and that both verdicts agree on pass. The regrade links the SHA-256 digest of the exact primary DSSE envelope bytes. Any required check failure, error, skip, unresolved result, safety violation, protocol violation or provenance mismatch blocks acceptance.
+**Acceptance is a two-receipt decision.** An individual primary receipt may truthfully record `pass`, and an individual pristine-regrade receipt may also record `pass`; neither is final acceptance on its own. The regrade receipt must link the primary receipt digest. The independent pair verifier must confirm that both receipts bind the same task, source, patch, grader, model/harness and budget; that they have distinct run identities, signer domains, check-evidence and execution-artifact digests; that their runtime image, toolchain and runner-policy digests match the task contract; and that both verdicts agree on pass. Any required check failure, error, skip, unresolved result, safety violation, protocol violation or provenance mismatch blocks acceptance.
 
-JSON Schema validates shape, not truth. The verifier additionally recomputes digests, verifies Ed25519 signatures over DSSE PAE bytes against an out-of-band pinned trust policy, reconciles counters with check rows, binds check rows to the task contract, checks timestamps and budgets, and ensures referenced artifacts are present and byte-identical to their declared hashes. JSON Schema's `format` annotation is not a substitute for explicit date-time validation. A first standalone Rust implementation is present in draft PR [#10212](https://github.com/Luminous-Dynamics/symthaea/pull/10212), stacked on schema PR #10115; its tests and build have not yet been run, and it is not qualified for score acceptance. Issue #10167 remains the implementation/qualification tracker.
+JSON Schema validates shape, not truth. The verifier must additionally recompute source/result tree digests, verify signatures, reconcile counters and check definitions with task rows, check task budgets and timestamp ordering, reconcile Git patch paths with the independently computed changed-path set, and ensure all referenced artifacts are present. JSON Schema's `format` annotation is not a substitute for explicit date-time validation. The current schemas are design artifacts; no full Draft 2020-12 validator or Rust verifier is claimed. Implementation is tracked by [issue #10167](https://github.com/Luminous-Dynamics/symthaea/issues/10167).
 
 Standards references:
 
@@ -147,3 +146,23 @@ Standards references:
 - [in-toto envelope specification](https://github.com/in-toto/attestation/blob/main/spec/v1/envelope.md)
 - [DSSE v1.0](https://github.com/secure-systems-lab/dsse/blob/master/protocol.md)
 
+
+
+## 11. Rust verifier implementation slice (2026-11-03)
+
+A first standalone implementation is in [draft PR #10212](https://github.com/Luminous-Dynamics/symthaea/pull/10212), stacked on schema/catalog PR #10115. It is not yet qualified and no build result is claimed.
+
+The implementation currently includes:
+
+- Strict JSON parsing that rejects duplicate object members, embedded Draft 2020-12 schema validation, DSSE v1 PAE construction and Ed25519 signature verification against an out-of-band pinned trust policy.
+- Exact task-contract digest pinning, task-declared acceptance-check parity, recomputed required-check counters and task-budget enforcement.
+- Runtime profile, OCI image digest, network policy, toolchain lock and runner-policy equality with the immutable task environment.
+- CEB-TREE-V1 source and result snapshot hashing. It sorts UTF-8 relative paths and commits entry type, executable bit, byte length, file content digest or symlink-target digest. It rejects .git metadata, non-UTF-8 paths and special files; it does not follow symlinks.
+- Exact reconciliation of receipt changed_paths and Git diff file headers against the independently computed source/result tree delta.
+- Three in-toto subjects (patch, source tree, result tree), exact patch artifact hashing, stage-specific reports, run-generated evidence artifacts, primary/regrade independence and exact primary-envelope linkage.
+
+The implementation deliberately does **not** claim to prove that the candidate patch transforms the supplied source tree into the result tree: it independently hashes both snapshots and reconciles file paths, but a safe independent patch application/reconstruction stage is still outstanding. It also does not qualify the runner's isolation or independently establish test semantic correctness.
+
+Eighteen Rust unit tests are authored, including a complete signed primary/regrade positive control and negative controls for a wrong task pin, tampered result tree, detached regrade link and reused primary evidence. They have not been run. This environment has no Cargo/Rust compiler, and no Cargo.lock has been generated. The dedicated Rust workflow is queued but has not been awaited; its status is not a pass. All ten catalog tasks remain design_only, so no score is possible.
+
+The next gates are: generate and commit a Cargo.lock; execute rustfmt, compile, Clippy and all 18 tests on the exact PR head; add a safe independent patch-application/reconstruction checker; validate schemas and all negative controls with the pinned validator; then red-team the verifier and qualify the microVM isolation in issue #10064.
