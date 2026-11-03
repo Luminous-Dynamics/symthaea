@@ -465,7 +465,7 @@ mod tests {
             attempt(1, "attempt-1", "run-1", 0, 60, &["cup-1"], resources(0.05, 0.7),
                 outcomes("run-1", "cup-1", Decision::Pass)),
             attempt(2, "attempt-2", "run-2", 70, 130, &["cup-1"], resources(0.05, 0.7),
-                outcomes("run-1", "cup-1", Decision::Pass)),
+                outcomes("run-2", "cup-1", Decision::Pass)),
         ];
         assert!(matches!(
             account_service(&attempts, &REQUIRED),
