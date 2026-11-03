@@ -482,7 +482,7 @@ fn wrap_angle(mut angle: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::VehicleConfig;
+    use crate::types::{VehicleConfig, VehiclePerturbation};
     use symthaea_core::genesis::GenesisSeed;
 
     fn setup() -> (BicycleModelSimulator, Road, PerturbationSchedule, VehicleController, VehicleHdcEncoder) {
@@ -529,7 +529,7 @@ mod tests {
             result.frames[0].baseline_plant_state_before.position_x
         );
         assert_eq!(
-            result.actor_capabilities,
+            result.actor_capabilities.iter().map(String::as_str).collect::<Vec<_>>(),
             vec![
                 "no-pedestrian-actors",
                 "no-cyclist-actors",
@@ -540,9 +540,14 @@ mod tests {
     }
 
     #[test]
-    fn paired_rollout_uses_the_same_perturbation_schedule() {
+    fn paired_rollout_applies_identical_crosswind_to_both_plants() {
         let (sim, road, _, mut controller, mut encoder) = setup();
-        let perturbations = PerturbationSchedule::crosswind();
+        let (weights, _) = controller.output_projection();
+        controller.set_output_projection(&vec![0.0; weights.len()], &[0.0, -20.0, -20.0]);
+        let perturbations = PerturbationSchedule {
+            events: vec![(0, VehiclePerturbation::Crosswind { force_n: 100.0 })],
+            clear_step: Some(4),
+        };
         let result = run_paired_lane_keep_rollout(
             "lane-keep-crosswind-001",
             "straight-road-v1",
@@ -557,8 +562,20 @@ mod tests {
             &mut encoder,
         )
         .unwrap();
-        assert_eq!(result.frames[0].advanced_plant_state_before.position_y,
-                   result.frames[0].baseline_plant_state_before.position_y);
+        assert_eq!(
+            result.frames[0].advanced_plant_state_after.lateral_velocity,
+            result.frames[0].baseline_plant_state_after.lateral_velocity
+        );
+        assert_eq!(
+            result.frames[0].advanced_plant_state_after.lateral_accel,
+            result.frames[0].baseline_plant_state_after.lateral_accel
+        );
+        assert_eq!(
+            result.profile.perturbation_schedule_digest,
+            blake3::hash(&serde_json::to_vec(&perturbations).unwrap())
+                .to_hex()
+                .to_string()
+        );
     }
 
     #[test]
