@@ -182,6 +182,7 @@ pub enum EliminationError {
     TableLengthMismatch { factor: usize, expected: usize, actual: usize },
     InvalidEliminationOrder { reason: &'static str },
     StatisticsOverflow { metric: &'static str },
+    InvalidRandomDraw { upper_bound: u128, draw: u128 },
     Semiring(SemiringError),
 }
 impl fmt::Display for EliminationError {
@@ -194,6 +195,7 @@ impl fmt::Display for EliminationError {
             Self::TableLengthMismatch { factor, expected, actual } => write!(f, "factor {factor} has {actual} entries; expected {expected}"),
             Self::InvalidEliminationOrder { reason } => write!(f, "invalid elimination order: {reason}"),
             Self::StatisticsOverflow { metric } => write!(f, "elimination statistics overflow: {metric}"),
+            Self::InvalidRandomDraw { upper_bound, draw } => write!(f, "uniform sampler returned {draw}, outside [0, {upper_bound})"),
             Self::Semiring(error) => write!(f, "semiring evaluation error: {error}"),
         }
     }
@@ -644,6 +646,199 @@ impl ExactFactorGraph<MaxCountValue> {
 
         Ok(MaxCountWitnessResult { value: result, distinct_optimal_assignments, witness, backpointers, stats })
     }
+
+    /// Draw an exactly uniform distinct optimal assignment from the
+    /// backpointer DAG without enumerating all optimal assignments.
+    ///
+    /// The callback must return an unbiased integer in [0, upper_bound).
+    /// It is called once per backpointer row visited in reverse elimination
+    /// order. For each row, branch probability is proportional to the number
+    /// of distinct partial assignments represented by that branch. Products
+    /// of branch supports correspond to disjoint earlier-eliminated blocks,
+    /// so the conditional probabilities telescope to 1 / total support.
+    pub fn sample_optimal_assignment<F>(
+        &self,
+        result: &MaxCountWitnessResult,
+        mut uniform_below: F,
+    ) -> Result<Option<Vec<usize>>, EliminationError>
+    where
+        F: FnMut(u128) -> u128,
+    {
+        let optimum = match result.value.optimum() {
+            None => {
+                if result.distinct_optimal_assignments != 0 || result.witness.is_some() {
+                    return Err(EliminationError::InvalidEliminationOrder {
+                        reason: "infeasible MaxCount result has inconsistent support or witness",
+                    });
+                }
+                return Ok(None);
+            }
+            Some(term) => term,
+        };
+        if result.distinct_optimal_assignments == 0 {
+            return Err(EliminationError::InvalidEliminationOrder {
+                reason: "feasible optimum has zero distinct support",
+            });
+        }
+        let n = self.cardinalities.len();
+        if result.backpointers.len() != n {
+            return Err(EliminationError::InvalidEliminationOrder {
+                reason: "backpointer count does not match variable count",
+            });
+        }
+
+        let mut position = vec![usize::MAX; n];
+        for (i, backpointer) in result.backpointers.iter().enumerate() {
+            let variable = backpointer.variable;
+            if variable >= n || position[variable] != usize::MAX {
+                return Err(EliminationError::InvalidEliminationOrder {
+                    reason: "backpointer variables are not a permutation",
+                });
+            }
+            position[variable] = i;
+        }
+
+        let mut root_support = 1u128;
+        for (step, backpointer) in result.backpointers.iter().enumerate() {
+            if backpointer.separator.windows(2).any(|pair| pair[0] >= pair[1])
+                || backpointer.separator.iter().any(|&v| {
+                    v >= n || v == backpointer.variable || position[v] <= step
+                })
+            {
+                return Err(EliminationError::InvalidEliminationOrder {
+                    reason: "backpointer separator is not a later-variable scope",
+                });
+            }
+            let mut expected_rows = 1usize;
+            for &v in &backpointer.separator {
+                expected_rows = expected_rows.checked_mul(self.cardinalities[v])
+                    .ok_or(EliminationError::TableSizeOverflow { factor: None })?;
+            }
+            if backpointer.rows.len() != expected_rows {
+                return Err(EliminationError::InvalidEliminationOrder {
+                    reason: "backpointer row count does not match separator cardinality",
+                });
+            }
+            for (row_index, row) in backpointer.rows.iter().enumerate() {
+                let mut decoded = vec![0usize; n];
+                decode_assignment(row_index, &backpointer.separator, &self.cardinalities, &mut decoded);
+                let expected_key: Vec<usize> = backpointer.separator.iter().map(|&v| decoded[v]).collect();
+                if row.separator_assignment != expected_key
+                    || row.maximizing_states.len() != row.branch_multiplicities.len()
+                    || row.maximizing_states.len() != row.branch_assignment_counts.len()
+                {
+                    return Err(EliminationError::InvalidEliminationOrder {
+                        reason: "backpointer row encoding or parallel branch arrays are invalid",
+                    });
+                }
+                let mut previous_state = None;
+                let mut row_support = 0u128;
+                for i in 0..row.maximizing_states.len() {
+                    let state = row.maximizing_states[i];
+                    let multiplicity = row.branch_multiplicities[i];
+                    let support = row.branch_assignment_counts[i];
+                    if state >= self.cardinalities[backpointer.variable]
+                        || multiplicity == 0
+                        || support == 0
+                        || previous_state.is_some_and(|previous| state <= previous)
+                    {
+                        return Err(EliminationError::InvalidEliminationOrder {
+                            reason: "backpointer branch state/count is invalid",
+                        });
+                    }
+                    row_support = row_support.checked_add(support)
+                        .ok_or(SemiringError::CountOverflow {
+                            operation: "sampler row support aggregation",
+                        })?;
+                    previous_state = Some(state);
+                }
+                if backpointer.separator.is_empty() {
+                    root_support = root_support.checked_mul(row_support)
+                        .ok_or(SemiringError::CountOverflow {
+                            operation: "sampler root support product",
+                        })?;
+                }
+            }
+        }
+        if root_support != result.distinct_optimal_assignments {
+            return Err(EliminationError::InvalidEliminationOrder {
+                reason: "backpointer root supports disagree with reported distinct optimum count",
+            });
+        }
+
+        let mut chosen = vec![None; n];
+        for backpointer in result.backpointers.iter().rev() {
+            let key: Vec<usize> = backpointer.separator.iter()
+                .map(|&v| chosen[v].ok_or(EliminationError::InvalidEliminationOrder {
+                    reason: "sampler reached an unassigned separator variable",
+                }))
+                .collect::<Result<_, _>>()?;
+            let row_index = backpointer.separator.iter().zip(key.iter())
+                .fold(0usize, |index, (&v, &state)| index * self.cardinalities[v] + state);
+            let row = backpointer.rows.get(row_index)
+                .ok_or(EliminationError::InvalidEliminationOrder {
+                    reason: "sampler backpointer row index out of range",
+                })?;
+            if row.separator_assignment != key {
+                return Err(EliminationError::InvalidEliminationOrder {
+                    reason: "sampler backpointer row key mismatch",
+                });
+            }
+            let mut total_support = 0u128;
+            for &support in &row.branch_assignment_counts {
+                total_support = total_support.checked_add(support)
+                    .ok_or(SemiringError::CountOverflow {
+                        operation: "sampler branch support total",
+                    })?;
+            }
+            if total_support == 0 {
+                return Err(EliminationError::InvalidEliminationOrder {
+                    reason: "reachable backpointer row has zero support",
+                });
+            }
+            let draw = uniform_below(total_support);
+            if draw >= total_support {
+                return Err(EliminationError::InvalidRandomDraw {
+                    upper_bound: total_support,
+                    draw,
+                });
+            }
+            let mut offset = draw;
+            let mut selected_state = None;
+            for (state, &support) in row.maximizing_states.iter()
+                .zip(row.branch_assignment_counts.iter())
+            {
+                if offset < support {
+                    selected_state = Some(*state);
+                    break;
+                }
+                offset -= support;
+            }
+            chosen[backpointer.variable] = Some(selected_state.ok_or(
+                EliminationError::InvalidEliminationOrder {
+                    reason: "sampler failed to select a support interval",
+                }
+            )?);
+        }
+
+        let assignment: Vec<usize> = chosen.into_iter()
+            .map(|state| state.ok_or(EliminationError::InvalidEliminationOrder {
+                reason: "sampler did not assign every variable",
+            }))
+            .collect::<Result<_, _>>()?;
+        let mut evaluated = self.one.clone();
+        for factor in &self.factors {
+            let value = &factor.values[factor.table_index(&assignment, &self.cardinalities)];
+            evaluated = evaluated.checked_mul(value)?;
+        }
+        match evaluated.optimum() {
+            Some(term) if term.score == optimum.score => Ok(Some(assignment)),
+            _ => Err(EliminationError::InvalidEliminationOrder {
+                reason: "sampled assignment does not attain the reported optimum",
+            }),
+        }
+    }
+
 }
 
 fn decode_assignment(mut index: usize, scope: &[usize], cards: &[usize], assignment: &mut [usize]) {
@@ -947,6 +1142,40 @@ mod tests {
         assert_eq!(result.backpointers[0].rows[0].maximizing_states, vec![0, 1]);
         assert_eq!(result.backpointers[0].rows[0].branch_multiplicities, vec![4, 2]);
         assert_eq!(result.backpointers[0].rows[0].branch_assignment_counts, vec![1, 1]);
+    }
+
+    #[test]
+    fn exact_uniform_optimum_sampler_returns_only_maxcut_optima() {
+        let mut graph = ExactFactorGraph::new(vec![2,2,2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        for (u,v) in [(0,1),(1,2),(0,2)] {
+            graph.add_factor(vec![u,v], vec![0,1,1,0]
+                .into_iter().map(|score| MaxCountValue::candidate(score, 1)).collect()).unwrap();
+        }
+        let result = graph.evaluate_with_witness(&[0,1,2]).unwrap();
+        let first = graph.sample_optimal_assignment(&result, |_| 0).unwrap().unwrap();
+        let last = graph.sample_optimal_assignment(&result, |bound| bound - 1).unwrap().unwrap();
+        for assignment in [first, last] {
+            let score: i128 = [(0,1),(1,2),(0,2)].iter()
+                .map(|&(u,v)| if assignment[u] != assignment[v] { 1i128 } else { 0i128 }).sum();
+            assert_eq!(score, 2);
+        }
+        assert!(graph.sample_optimal_assignment(&result, |_| u128::MAX).is_err());
+        let mut inconsistent = result.clone();
+        inconsistent.distinct_optimal_assignments += 1;
+        assert!(graph.sample_optimal_assignment(&inconsistent, |_| 0).is_err());
+    }
+
+    #[test]
+    fn exact_uniform_optimum_sampler_handles_infeasible_and_empty_assignment() {
+        let mut infeasible = ExactFactorGraph::new(vec![2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        infeasible.add_factor(vec![0], vec![MaxCountValue::zero(), MaxCountValue::zero()]).unwrap();
+        let result = infeasible.evaluate_with_witness(&[0]).unwrap();
+        assert_eq!(infeasible.sample_optimal_assignment(&result, |_| 0).unwrap(), None);
+
+        let empty = ExactFactorGraph::new(vec![], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        let empty_result = empty.evaluate_with_witness(&[]).unwrap();
+        assert_eq!(empty_result.distinct_optimal_assignments, 1);
+        assert_eq!(empty.sample_optimal_assignment(&empty_result, |_| 0).unwrap(), Some(vec![]));
     }
 
     #[test]
