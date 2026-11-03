@@ -1025,6 +1025,33 @@ mod tests {
     }
 
     #[test]
+    fn non_monotonic_chunk_receipt_time_is_rejected() {
+        let mut predicted = prediction();
+        predicted.chunks[2].chunk_received_at_ns = 19_000_000;
+        predicted.chunks[2].decision_at_ns = 30_000_000;
+        assert!(score_musical_turn_taking(&truth(), &predicted)
+            .unwrap_err()
+            .contains(&MusicalTurnTakingIssue::NonMonotonicChunkReceiptTime {
+                position: 2,
+            }));
+    }
+
+    #[test]
+    fn event_frame_and_runner_effect_time_must_be_paired() {
+        let mut predicted = prediction();
+        predicted.chunks[1].disposition = MusicalTurnDispositionV1::Action {
+            action: MusicalTurnActionV1::Respond,
+            effect_frame: Some(220),
+            effect_at_ns: None,
+        };
+        assert!(score_musical_turn_taking(&truth(), &predicted)
+            .unwrap_err()
+            .contains(&MusicalTurnTakingIssue::EffectTimestampPairMismatch {
+                position: 1,
+            }));
+    }
+
+    #[test]
     fn missing_chunk_is_rejected() {
         let mut predicted = prediction();
         predicted.chunks.remove(2);
