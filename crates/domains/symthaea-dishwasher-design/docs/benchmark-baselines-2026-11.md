@@ -39,6 +39,15 @@ Government Notice 7859, published 28 August 2026 in Gazette 55257, amends VC9008
 
 Notice record: https://www.acts.co.za/national_/n7859_notice_no__7859_of_2026
 
+### Johannesburg water-hardness reference for local prototype testing
+
+Rand Water's 12-month water-quality report for supply to the Johannesburg municipality (23 April 2024–22 April 2025; generated 14 May 2025) reports total hardness mean 74.51 mg/L as CaCO3, standard deviation 9.51 mg/L and mean + 3 SD of 103.03 mg/L across 336 results. The report lists a 20–200 mg/L operational range for hardness. This is a municipal supply statistic, not a guarantee of hardness at any specific household tap.
+
+For a Johannesburg prototype test matrix, include 20, 50, 75, 100, 150 and 200 mg/L as CaCO3, then add actual local samples at the appliance inlet. Measure every run after household storage tanks/filters/softeners, if present; do not substitute the municipal mean for inlet measurement. Use the same sampled water batch within each randomized matched block and record its hardness and batch ID.
+
+Source: https://www.randwater.co.za/media/sans241/12month_Johannesburg_Apr2025.pdf
+Johannesburg Water 2025 reports portal: https://www.johannesburgwater.co.za/resource-centre/water-quality-reports/water-quality-reports-2025/
+
 ## Commercial architecture and sensor precedents
 
 The following are important incumbents, not novelty claims for InstantClean:
