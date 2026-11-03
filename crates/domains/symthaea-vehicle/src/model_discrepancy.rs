@@ -493,8 +493,8 @@ mod tests {
                 DiscrepancyActionOutcome{action_id:"continue".into(),command_digest:h('0'),feasibility:DiscrepancyFeasibility::Feasible,reference_status:ReferenceOutcomeStatus::Observed,predicted_utility:7.0,realized_utility:Some(8.0),execution_receipt_id:Some("exec-c".into()),execution_digest:Some(h('2')),evaluator_receipt_id:Some("eval-c".into())}
             ]};
         d.actions.sort_by(|a,b|a.action_id.cmp(&b.action_id));
-        d.action_set_digest=hash_json(&d.actions.iter().map(|a|(a.action_id.as_str(),a.command_digest.as_str())).collect::<Vec<_>>()).unwrap();
-        d.decision_context_digest=decision_context_digest(&d).unwrap();d
+        d.action_set_digest=model_discrepancy_action_set_digest(&d.actions).unwrap();
+        d.decision_context_digest=model_discrepancy_decision_context_digest(&d).unwrap();d
     }
     fn input()->VehicleModelDiscrepancyInput{VehicleModelDiscrepancyInput{
         predictor_model_id:"predictor-v0".into(),predictor_artifact_digest:h('3'),reference_model_id:"reference-v0".into(),reference_model_artifact_digest:h('4'),
@@ -562,7 +562,7 @@ mod tests {
     #[test] fn rejects_duplicate_scenario_actor_action_horizon(){let mut x=input();x.residual_observations.push(residual(1000,2.0,0.0));assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::DuplicateResidualKey);}
     #[test] fn missing_horizons_are_not_imputed(){let mut x=input();x.residual_observations.truncate(1);assert!(summarize_vehicle_model_discrepancy(&x).unwrap().paired_horizon_growth.is_empty());}
     #[test] fn detects_planner_ranking_reversal_and_regret(){let r=summarize_vehicle_model_discrepancy(&input()).unwrap();let d=&r.decision_results[0];assert_eq!(d.predicted_best_action_id.as_deref(),Some("yield"));assert_eq!(d.realized_best_action_id.as_deref(),Some("continue"));assert_eq!(d.ranking_reversed,Some(true));assert_eq!(d.selected_action_regret,Some(6.0));assert_eq!(d.optimism_gap,Some(9.0));}
-    #[test] fn rejects_outcome_leakage(){let mut x=input();x.decisions[0].reference_outcome_reveal_sequence=9;x.decisions[0].decision_context_digest=decision_context_digest(&x.decisions[0]).unwrap();assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::OutcomeLeakage);}
+    #[test] fn rejects_outcome_leakage(){let mut x=input();x.decisions[0].reference_outcome_reveal_sequence=9;x.decisions[0].decision_context_digest=model_discrepancy_decision_context_digest(&x.decisions[0]).unwrap();assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::OutcomeLeakage);}
     #[test] fn unknown_feasibility_makes_decision_indeterminate(){let mut x=input();x.decisions[0].actions[0].feasibility=DiscrepancyFeasibility::Indeterminate;x.decisions[0].actions[0].realized_utility=None;let r=summarize_vehicle_model_discrepancy(&x).unwrap();assert_eq!(r.decision_results[0].status,DecisionAuditStatus::IndeterminateFeasibility);}
     #[test]
     fn missing_or_censored_reference_outcomes_make_decision_incomplete() {
@@ -588,7 +588,7 @@ mod tests {
         }
     }
 
-    #[test] fn rejects_action_set_digest_mismatch(){let mut x=input();x.decisions[0].action_set_digest=h('9');x.decisions[0].decision_context_digest=decision_context_digest(&x.decisions[0]).unwrap();assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::InvalidActionSetDigest);}
+    #[test] fn rejects_action_set_digest_mismatch(){let mut x=input();x.decisions[0].action_set_digest=h('9');x.decisions[0].decision_context_digest=model_discrepancy_decision_context_digest(&x.decisions[0]).unwrap();assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::InvalidActionSetDigest);}
     #[test] fn canonicalizes_row_and_action_order(){let x=input();let a=summarize_vehicle_model_discrepancy(&x).unwrap();let mut y=x;y.residual_observations.reverse();y.decisions[0].actions.reverse();let b=summarize_vehicle_model_discrepancy(&y).unwrap();assert_eq!(a.report_digest,b.report_digest);}
     #[test] fn report_digest_detects_tampering(){let mut r=summarize_vehicle_model_discrepancy(&input()).unwrap();assert!(r.identity_is_valid());r.horizon_summaries[0].p95_absolute_residual+=1.0;assert!(!r.identity_is_valid());}
 }
