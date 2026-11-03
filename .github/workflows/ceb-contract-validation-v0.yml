@@ -200,12 +200,22 @@ jobs:
                       raise ValueError(f"Windows world has non-Windows target triple: {world['id']}")
                   if target_os == "linux" and "linux" not in triple:
                       raise ValueError(f"Linux world has non-Linux target triple: {world['id']}")
-                  explicit_features = set(world["enabled_features"])
+                  explicit_features = set(world["explicit_features"])
                   if not explicit_features <= vocabulary:
-                      raise ValueError(f"world enables an undeclared Cargo feature: {world['id']}")
-                  effective_features = set(explicit_features)
+                      raise ValueError(f"world explicitly enables an undeclared Cargo feature: {world['id']}")
+                  computed_effective = set(explicit_features)
                   if world["default_features_enabled"]:
-                      effective_features.update({"audit"})
+                      computed_effective.update({"audit"})
+                  declared_effective = set(world["effective_features"])
+                  if declared_effective != computed_effective:
+                      raise ValueError(f"declared effective Cargo features do not match defaults plus explicit features: {world['id']}")
+                  effective_features = computed_effective
+                  expected_triple = {
+                      "linux": "x86_64-unknown-linux-gnu",
+                      "windows": "x86_64-pc-windows-msvc"
+                  }[world["target_os"]]
+                  if world["target_triple"] != expected_triple:
+                      raise ValueError(f"target triple does not match target_os for world: {world['id']}")
                   computed_active = set()
                   for fact in facts:
                       activation = fact["activation"]
@@ -251,6 +261,15 @@ jobs:
           windows_audit["expected_active_nodes"].remove("sym.audit.record_access")
           windows_audit["expected_inactive_nodes"].append("sym.audit.record_access")
           expect_world_reject(mutant_worlds, graph, "explicitly enabled audit feature symbol incorrectly inactive")
+
+          mutant_worlds = copy.deepcopy(worlds)
+          linux_default = next(world for world in mutant_worlds["worlds"] if world["id"] == "linux-default")
+          linux_default["effective_features"] = []
+          expect_world_reject(mutant_worlds, graph, "effective Cargo feature set disagrees with default-feature policy")
+
+          mutant_worlds = copy.deepcopy(worlds)
+          mutant_worlds["worlds"][0]["target_triple"] = "x86_64-pc-windows-msvc"
+          expect_world_reject(mutant_worlds, graph, "target triple does not match target OS")
 
           mutant_worlds = copy.deepcopy(worlds)
           mutant_worlds["worlds"][1]["id"] = mutant_worlds["worlds"][0]["id"]
@@ -510,7 +529,7 @@ jobs:
           print(
               "CEB_CONTRACT_SCHEMA_PASS: "
               f"tasks={len(task_ids)} unique_tasks={len(set(task_ids))} "
-              f"schemas=4 negative_controls=35 worlds={world_count} conditional_facts={conditional_fact_count}"
+              f"schemas=4 negative_controls=37 worlds={world_count} conditional_facts={conditional_fact_count}"
           )
           print("CEB_CLAIM_BOUNDARY: schema validation is not DSSE signature verification or runner qualification")
           PY
