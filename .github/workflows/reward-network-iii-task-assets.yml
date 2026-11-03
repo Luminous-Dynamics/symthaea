@@ -41,6 +41,17 @@ jobs:
           echo "archive_sha256=$(sha256sum /tmp/rn3/reward-network-iii-v2.0.zip | cut -d' ' -f1)"
           unzip -t /tmp/rn3/reward-network-iii-v2.0.zip
 
+      - name: Inspect allowlisted source layout and LFS configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/rn3/source-layout
+          python research/civbench-social-learning-core/scripts/inspect_reward_network_source_layout.py \
+            --archive /tmp/rn3/reward-network-iii-v2.0.zip \
+            --output-json /tmp/rn3/source-layout/source-layout.json \
+            --output-markdown /tmp/rn3/source-layout/source-layout.md
+          cat /tmp/rn3/source-layout/source-layout.md >> "$GITHUB_STEP_SUMMARY"
+
       - name: Hydrate selected LFS task assets and audit
         shell: bash
         env:
@@ -51,6 +62,15 @@ jobs:
             --archive /tmp/rn3/reward-network-iii-v2.0.zip \
             --output-json /tmp/rn3/network-task-asset-audit.json
           cat /tmp/rn3/network-task-asset-audit.json
+
+      - name: Upload source-layout inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reward-network-iii-source-layout
+          path: /tmp/rn3/source-layout/
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Add aggregate audit to job summary
         shell: bash
