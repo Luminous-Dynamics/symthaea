@@ -1375,9 +1375,9 @@ mod tests {
     }
 
     fn pairwise_and_triplet_response(stimulus_mask: u8, interaction_gain: f64, state: bool) -> f64 {
-        let x1 = f64::from(stimulus_mask & 1 != 0);
-        let x2 = f64::from(stimulus_mask & 2 != 0);
-        let x3 = f64::from(stimulus_mask & 4 != 0);
+        let x1 = if stimulus_mask & 1 != 0 { 1.0 } else { 0.0 };
+        let x2 = if stimulus_mask & 2 != 0 { 1.0 } else { 0.0 };
+        let x3 = if stimulus_mask & 4 != 0 { 1.0 } else { 0.0 };
         x1 + 2.0 * x2 + 3.0 * x3 + 0.5 * x1 * x2 - 0.25 * x1 * x3
             + 0.75 * x2 * x3
             + if state {
