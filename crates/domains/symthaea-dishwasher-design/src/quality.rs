@@ -767,6 +767,17 @@ mod tests {
     }
 
     #[test]
+    fn rejects_measurement_method_not_named_by_its_criterion() {
+        let policy = policy();
+        let mut readings = observations(policy);
+        readings[0].method_id = "fluorescence-assay-v2".to_owned();
+        assert!(matches!(
+            qualify_pilot_evidence(scope(), policy, criteria(policy), readings),
+            Err(QualityError::MethodMismatch(Endpoint::SoilRemovalResidual))
+        ));
+    }
+
+    #[test]
     fn rejects_inconsistent_methods_and_malformed_evidence() {
         let policy = policy();
         let mut readings = observations(policy);
