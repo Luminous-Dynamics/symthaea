@@ -130,6 +130,7 @@ pub enum ConfigError {
     InvalidTemperature,
     InvalidReward,
     InvalidNoise,
+    NonFiniteDemonstrationReward,
 }
 
 impl fmt::Display for ConfigError {
@@ -151,6 +152,7 @@ impl fmt::Display for ConfigError {
             Self::InvalidTemperature => write!(f, "teacher selection temperature must be finite and positive"),
             Self::InvalidReward => write!(f, "demonstration rewards must be finite and non-negative"),
             Self::InvalidNoise => write!(f, "demonstration noise epsilon must be finite and non-negative"),
+            Self::NonFiniteDemonstrationReward => write!(f, "generated demonstration reward is non-finite"),
         }
     }
 }
@@ -605,6 +607,9 @@ pub fn simulate(config: Config, seed: u64) -> Result<Run, ConfigError> {
                 machine, individual, social, learned, teacher_origin, integrated,
             );
             let demonstration_reward = reward_demonstration(integrated, config, &mut rng);
+            if !demonstration_reward.is_finite() {
+                return Err(ConfigError::NonFiniteDemonstrationReward);
+            }
 
             agents.push(AgentState {
                 is_machine: machine,
@@ -899,6 +904,18 @@ mod tests {
         assert_eq!(m.machine_optimal_prevalence, 1.0);
         assert_eq!(m.human_optimal_prevalence, 0.0);
         assert_eq!(m.human_individual_optimal_discovery_rate, 0.0);
+    }
+
+    #[test]
+    fn non_finite_generated_demonstration_reward_fails_closed() {
+        let config = Config {
+            demonstration_noise_epsilon: f64::MAX,
+            ..Config::default()
+        };
+        assert_eq!(
+            simulate(config, 55),
+            Err(ConfigError::NonFiniteDemonstrationReward)
+        );
     }
 
     #[test]
