@@ -65,7 +65,7 @@
           "status": "tested_only",
           "tests": {
             "suite_id": "eth027-semantic-envelope-v1",
-            "artifact_digest": "sha256:9d59da164404dafb2be68672f3735bc4d7cff14fc33370c382d00a1a3984abcc",
+            "artifact_digest": "sha256:3ff0c7867582cc5d7b16c0d38a2dd0bd2c155274176c660bc61973ac4e527e09",
             "case_count": 1,
             "claim_ceiling": "finite_test_evidence",
             "input_representation_digest": "sha256:6a43e1ffb6566b3ccbdcc57f8bd5638294ac56b615fe617c58ded6ee6374b333",
@@ -79,7 +79,7 @@
           "status": "tested_only",
           "tests": {
             "suite_id": "eth027-semantic-envelope-v1",
-            "artifact_digest": "sha256:9d59da164404dafb2be68672f3735bc4d7cff14fc33370c382d00a1a3984abcc",
+            "artifact_digest": "sha256:3ff0c7867582cc5d7b16c0d38a2dd0bd2c155274176c660bc61973ac4e527e09",
             "case_count": 1,
             "claim_ceiling": "finite_test_evidence",
             "input_representation_digest": "sha256:6a43e1ffb6566b3ccbdcc57f8bd5638294ac56b615fe617c58ded6ee6374b333",
@@ -110,7 +110,7 @@
           "status": "tested_only",
           "tests": {
             "suite_id": "eth027-semantic-envelope-v1",
-            "artifact_digest": "sha256:9d59da164404dafb2be68672f3735bc4d7cff14fc33370c382d00a1a3984abcc",
+            "artifact_digest": "sha256:3ff0c7867582cc5d7b16c0d38a2dd0bd2c155274176c660bc61973ac4e527e09",
             "case_count": 1,
             "claim_ceiling": "finite_test_evidence",
             "input_representation_digest": "sha256:74861f0fb6965f2c22004a2281418a63f5722ab6372d71068386c46354cc33d9",
@@ -124,7 +124,7 @@
           "status": "tested_only",
           "tests": {
             "suite_id": "eth027-semantic-envelope-v1",
-            "artifact_digest": "sha256:9d59da164404dafb2be68672f3735bc4d7cff14fc33370c382d00a1a3984abcc",
+            "artifact_digest": "sha256:3ff0c7867582cc5d7b16c0d38a2dd0bd2c155274176c660bc61973ac4e527e09",
             "case_count": 1,
             "claim_ceiling": "finite_test_evidence",
             "input_representation_digest": "sha256:74861f0fb6965f2c22004a2281418a63f5722ab6372d71068386c46354cc33d9",
