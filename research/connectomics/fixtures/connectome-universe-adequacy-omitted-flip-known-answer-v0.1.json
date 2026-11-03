@@ -51,7 +51,6 @@
       "error_family": "merge_split",
       "evidence_compatibility": "COMPATIBLE",
       "query_state": "BELOW_THRESHOLD",
-      "material_to_query": false,
       "canonical_structural_sha256": "f4979c0986a297aca4e97be92cfeb3ee06096b6a0e09eba08b04d84ff39686dc"
     },
     {
@@ -59,7 +58,6 @@
       "error_family": "merge_split",
       "evidence_compatibility": "COMPATIBLE",
       "query_state": "BELOW_THRESHOLD",
-      "material_to_query": false,
       "canonical_structural_sha256": "26bb0d3c3acbdd1c0feab01e943fd64fcbffad10e1a4e828bdc2472bde389417"
     },
     {
@@ -67,7 +65,6 @@
       "error_family": "continuation_loss",
       "evidence_compatibility": "COMPATIBLE",
       "query_state": "AT_OR_ABOVE_THRESHOLD",
-      "material_to_query": true,
       "canonical_structural_sha256": "b197153da419139e021a1ba672d4ea744683622ca98d93c94581e48281428953"
     },
     {
@@ -75,7 +72,6 @@
       "error_family": "registration_uncertainty",
       "evidence_compatibility": "INDETERMINATE",
       "query_state": null,
-      "material_to_query": true,
       "canonical_structural_sha256": "fb2888168c8b9d2504147a31a43e54678ac84a3a67210ea640e6d74da65b07b2"
     }
   ],
