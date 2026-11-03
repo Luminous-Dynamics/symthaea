@@ -348,7 +348,7 @@ pub fn run_paired_lane_keep_rollout_with_baseline(
         let baseline_command = baseline_policy
             .command(
                 &baseline_observation,
-                baseline_projection.road_heading,
+                road,
                 target_speed_mps,
                 initial_simulator.params(),
             )
@@ -704,6 +704,36 @@ mod tests {
             "lane-keep-stanley-001",
             "straight-road-v1",
             "8".repeat(64),
+            &sim,
+            &road,
+            &perturbations,
+            10.0,
+            0.005,
+            4,
+            &baseline,
+            &mut controller,
+            &mut encoder,
+        )
+        .unwrap();
+        assert_eq!(result.profile.baseline_policy_id, baseline.policy_id());
+        assert_eq!(
+            result.profile.baseline_controller_digest,
+            baseline.controller_digest().unwrap()
+        );
+        assert_eq!(result.frames.len(), 4);
+        assert!(result.output_identity_is_valid());
+    }
+
+    #[test]
+    fn paired_rollout_binds_pure_pursuit_baseline_policy_and_digest() {
+        let (sim, road, perturbations, mut controller, mut encoder) = setup();
+        let baseline = VehicleClassicalBaseline::PurePursuitRoad(
+            crate::classical_baselines::PurePursuitRoadConfig::default(),
+        );
+        let result = run_paired_lane_keep_rollout_with_baseline(
+            "lane-keep-pure-pursuit-001",
+            "straight-road-v1",
+            "7".repeat(64),
             &sim,
             &road,
             &perturbations,
