@@ -123,6 +123,8 @@ pub struct VehicleModelDiscrepancyInput {
     pub sampling_profile_digest: String,
     pub protocol_id: String,
     pub protocol_digest: String,
+    /// Digest of the independently frozen expected-slot manifest.
+    pub expected_schedule_artifact_digest: String,
     /// Frozen expected slots; each must have exactly one typed outcome row below.
     pub expected_residual_slots: Vec<ExpectedResidualSlot>,
     pub residual_observations: Vec<ModelResidualObservation>,
@@ -286,7 +288,7 @@ fn derive_report(input: &VehicleModelDiscrepancyInput) -> Result<VehicleModelDis
     if [input.predictor_model_id.as_str(), input.reference_model_id.as_str(), input.evaluator_id.as_str(), input.planner_id.as_str(), input.protocol_id.as_str()].iter().any(|s| s.trim().is_empty()) {
         return Err(VehicleModelDiscrepancyError::EmptyIdentity);
     }
-    if [input.predictor_artifact_digest.as_str(), input.reference_model_artifact_digest.as_str(), input.evaluator_artifact_digest.as_str(), input.planner_artifact_digest.as_str(), input.sampling_profile_digest.as_str(), input.protocol_digest.as_str()].iter().any(|d| !valid_digest(d)) {
+    if [input.predictor_artifact_digest.as_str(), input.reference_model_artifact_digest.as_str(), input.evaluator_artifact_digest.as_str(), input.planner_artifact_digest.as_str(), input.sampling_profile_digest.as_str(), input.protocol_digest.as_str(), input.expected_schedule_artifact_digest.as_str()].iter().any(|d| !valid_digest(d)) {
         return Err(VehicleModelDiscrepancyError::InvalidDigest);
     }
     if input.residual_observations.is_empty() { return Err(VehicleModelDiscrepancyError::EmptyResidualSet); }
