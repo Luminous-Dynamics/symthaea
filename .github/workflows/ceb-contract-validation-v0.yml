@@ -190,10 +190,11 @@ jobs:
               world_ids = [world["id"] for world in worlds_value["worlds"]]
               if len(world_ids) != len(set(world_ids)):
                   raise ValueError("duplicate configuration-world ID")
-              if len(world_ids) != 8:
-                  raise ValueError("V0 requires the complete 2x2x2 target/feature world matrix")
+              if len(world_ids) != 10:
+                  raise ValueError("V0 requires five Cargo feature-selection modes on each of two targets")
               required_feature_modes = {
                   (True, frozenset()),
+                  (False, frozenset()),
                   (False, frozenset({"audit"})),
                   (False, frozenset({"windows-native"})),
                   (False, frozenset({"audit", "windows-native"}))
