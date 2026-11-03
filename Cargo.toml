@@ -15,6 +15,13 @@ members = [
 # members despite being listed below, because of this). `default-members`
 # below may still reference "." — only the `members` array triggers the bug.
 exclude = [
+    # Source-only receipt adapter still imports a removed core API; kept out
+    # of workspace discovery until the owning contract is restored (#7291).
+    "crates/core/symthaea-observation-attestation",
+    # Incomplete directories have no Cargo manifest; source recovery remains
+    # separately owned and no placeholder package is invented.
+    "crates/domains/symthaea-rea-evidence-verifier",
+    "crates/core/symthaea",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
     # `nixward` path dependency. Keep it out of the workspace and build it

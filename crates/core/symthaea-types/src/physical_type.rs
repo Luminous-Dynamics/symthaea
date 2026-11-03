@@ -22,6 +22,24 @@ pub struct PhysicalDimension {
     pub luminous: i8,
 }
 
+impl std::ops::Add for PhysicalDimension {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        self.checked_add(rhs)
+            .expect("physical dimension exponent overflow")
+    }
+}
+
+impl std::ops::Sub for PhysicalDimension {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        self.checked_sub(rhs)
+            .expect("physical dimension exponent overflow")
+    }
+}
+
 impl PhysicalDimension {
     pub const DIMENSIONLESS: Self = Self {
         mass: 0, length: 0, time: 0, current: 0,
@@ -80,16 +98,6 @@ impl PhysicalDimension {
         Some(Self::from_array(out))
     }
 
-    /// Convenience arithmetic for already-bounded exponents.
-    /// New fail-closed inference code should prefer checked_add/checked_sub.
-    pub fn add(self, rhs: Self) -> Self {
-        self.checked_add(rhs).expect("physical dimension exponent overflow")
-    }
-
-    pub fn sub(self, rhs: Self) -> Self {
-        self.checked_sub(rhs).expect("physical dimension exponent overflow")
-    }
-
     pub fn scale(self, factor: i8) -> Option<Self> {
         let mut out = [0i8; 7];
         for (i, exponent) in self.as_array().into_iter().enumerate() {
@@ -110,7 +118,7 @@ impl RationalScale {
     pub const ONE: Self = Self { numerator: 1, denominator: 1 };
 
     pub const fn new(numerator: i64, denominator: i64) -> Option<Self> {
-        if denominator == 0 || denominator < 0 {
+        if denominator <= 0 {
             None
         } else {
             Some(Self { numerator, denominator })
@@ -622,6 +630,7 @@ impl QuantityKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum ScalarDomain {
+    #[default]
     Unknown,
     Integer,
     Rational,
@@ -741,11 +750,15 @@ mod tests {
 
     #[test]
     fn dimension_arithmetic_is_deterministic() {
-        let force = PhysicalDimension::MASS.add(PhysicalDimension::ACCELERATION);
+        let force = PhysicalDimension::MASS + PhysicalDimension::ACCELERATION;
         assert_eq!(force, PhysicalDimension::FORCE);
         assert_eq!(
-            PhysicalDimension::FORCE.add(PhysicalDimension::LENGTH),
+            PhysicalDimension::FORCE + PhysicalDimension::LENGTH,
             PhysicalDimension::ENERGY
+        );
+        assert_eq!(
+            PhysicalDimension::LENGTH - PhysicalDimension::TIME,
+            PhysicalDimension::VELOCITY
         );
     }
 

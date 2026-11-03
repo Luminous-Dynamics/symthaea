@@ -11,7 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{ModelMaturity, PhysicalType, QuantityKind, ScalarDomain, TypeJudgement};
+use crate::{ModelMaturity, PhysicalType, ScalarDomain, TypeJudgement};
 
 pub const SCIENTIFIC_MODEL_SCHEMA: &str = "SCIENTIFIC_MODEL.v0.1";
 
@@ -83,11 +83,6 @@ impl ScientificExpression {
         Ok(())
     }
 
-    fn canonical_key(&self) -> String {
-        // serde_json is used only after validation; all variants are finite,
-        // bounded data, so this is a deterministic structural ordering key.
-        serde_json::to_string(self).expect("scientific expression serialization is infallible")
-    }
 }
 
 /// A named physical quantity/field in the model.
@@ -179,10 +174,10 @@ impl SolverIntent {
         if self.target_accuracy_order == Some(0) {
             return Err("solver target accuracy order must be greater than zero".into());
         }
-        if let Some(backend) = &self.backend_family {
-            if backend.trim().is_empty() {
-                return Err("solver backend family cannot be empty when specified".into());
-            }
+        if let Some(backend) = &self.backend_family
+            && backend.trim().is_empty()
+        {
+            return Err("solver backend family cannot be empty when specified".into());
         }
         Ok(())
     }
@@ -252,6 +247,8 @@ pub struct ScientificModel {
 }
 
 impl ScientificModel {
+    // Preserve the stable constructor while callers migrate to staged builders.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         model_id: impl Into<String>,
         domain: impl Into<String>,

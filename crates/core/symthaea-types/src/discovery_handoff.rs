@@ -22,7 +22,7 @@ fn validate_digest(label: &str, value: &str) -> Result<(), String> {
     Ok(())
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScientificHypothesisHandoff {
     pub schema_revision: String,
     /// Digest of the canonical candidate/model representation.
@@ -47,6 +47,9 @@ pub struct ScientificHypothesisHandoff {
 }
 
 impl ScientificHypothesisHandoff {
+    // Handoff identity is intentionally constructed from all canonical
+    // source fields in one call; keep this compatibility constructor explicit.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         candidate_digest: impl Into<String>,
         physical_type: &PhysicalType,
@@ -287,6 +290,8 @@ pub struct ScientificInquirySelectionReceipt {
 impl ScientificInquirySelectionReceipt {
     pub const SCHEMA_REVISION: &'static str = "SCIENTIFIC_INQUIRY_SELECTION.v2";
 
+    // The inquiry receipt binds each independent reproducibility input.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         hypothesis_handoff_digest: impl Into<String>,
         hypothesis_set_digest: impl Into<String>,

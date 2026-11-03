@@ -47,6 +47,8 @@
 //! experiment is uninformative -- it's simply excluded from that
 //! experiment's variance computation.
 
+use symthaea_types::ScientificInquirySelectionReceipt;
+
 /// Population variance (not sample variance -- deliberate: this scores
 /// *disagreement across the hypothesis set itself*, not an estimate of a
 /// variance parameter from a sample of some larger population).
