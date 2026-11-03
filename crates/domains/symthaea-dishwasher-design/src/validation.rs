@@ -54,6 +54,15 @@ pub enum GroupedValidationError {
     DuplicateRequiredPartition(ValidationPartition),
     InvalidIdentity(&'static str),
     DuplicateRunId(String),
+    EmptyDerivedRecords,
+    DuplicateDerivedRecordId(String),
+    UnknownSourceRun(String),
+    DerivedPartitionMismatch {
+        record_id: String,
+        source_run_id: String,
+        expected: ValidationPartition,
+        observed: ValidationPartition,
+    },
     GroupLeaksAcrossPartitions {
         axis: HoldoutAxis,
         group_id: String,
@@ -221,6 +230,90 @@ pub fn audit_grouped_holdout(
         physical_run_count: records.len(),
         partition_counts,
         held_out_group_counts,
+    })
+}
+
+
+/// One item/image/frame/assay record linked to its source physical run.
+///
+/// Multiple derived records may reference the same source run, but they must
+/// all inherit the partition assigned to that run in the physical-run manifest.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DerivedRecordPartition {
+    pub record_id: String,
+    pub source_run_id: String,
+    pub partition: ValidationPartition,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DerivedPartitionReport {
+    pub source_run_count: usize,
+    pub derived_record_count: usize,
+    pub unique_source_run_count: usize,
+}
+
+/// Verify that every derived record references a known physical run and
+/// inherits exactly that run's partition.
+///
+/// This check prevents one run's images, item observations or assay outputs
+/// from being manually re-assigned to a different split. It still depends on
+/// trustworthy upstream run IDs and does not authenticate the underlying data.
+pub fn audit_derived_record_partitions(
+    runs: &[RunPartitionRecord],
+    derived_records: &[DerivedRecordPartition],
+) -> Result<DerivedPartitionReport, GroupedValidationError> {
+    if runs.is_empty() {
+        return Err(GroupedValidationError::EmptyRuns);
+    }
+    if derived_records.is_empty() {
+        return Err(GroupedValidationError::EmptyDerivedRecords);
+    }
+
+    let mut partition_by_run: BTreeMap<&str, ValidationPartition> = BTreeMap::new();
+    for run in runs {
+        if !canonical_non_empty(&run.run_id) {
+            return Err(GroupedValidationError::InvalidIdentity("run_id"));
+        }
+        if partition_by_run.insert(run.run_id.as_str(), run.partition).is_some() {
+            return Err(GroupedValidationError::DuplicateRunId(run.run_id.clone()));
+        }
+    }
+
+    let mut derived_ids = HashSet::with_capacity(derived_records.len());
+    let mut linked_run_ids = HashSet::with_capacity(derived_records.len());
+    for derived in derived_records {
+        if !canonical_non_empty(&derived.record_id) {
+            return Err(GroupedValidationError::InvalidIdentity("derived_record_id"));
+        }
+        if !canonical_non_empty(&derived.source_run_id) {
+            return Err(GroupedValidationError::InvalidIdentity("source_run_id"));
+        }
+        if !derived_ids.insert(derived.record_id.as_str()) {
+            return Err(GroupedValidationError::DuplicateDerivedRecordId(
+                derived.record_id.clone(),
+            ));
+        }
+        let expected = partition_by_run
+            .get(derived.source_run_id.as_str())
+            .copied()
+            .ok_or_else(|| {
+                GroupedValidationError::UnknownSourceRun(derived.source_run_id.clone())
+            })?;
+        if expected != derived.partition {
+            return Err(GroupedValidationError::DerivedPartitionMismatch {
+                record_id: derived.record_id.clone(),
+                source_run_id: derived.source_run_id.clone(),
+                expected,
+                observed: derived.partition,
+            });
+        }
+        linked_run_ids.insert(derived.source_run_id.as_str());
+    }
+
+    Ok(DerivedPartitionReport {
+        source_run_count: runs.len(),
+        derived_record_count: derived_records.len(),
+        unique_source_run_count: linked_run_ids.len(),
     })
 }
 
@@ -441,4 +534,124 @@ mod tests {
         )
         .is_ok());
     }
+
+    #[test]
+    fn derived_records_inherit_run_partition_and_allow_multiple_records_per_run() {
+        let runs = [
+            record("run-dev", ValidationPartition::Development, "unit-a", "day-a", "soil-a"),
+            record("run-test", ValidationPartition::LockedConfirmation, "unit-b", "day-b", "soil-b"),
+        ];
+        let derived = [
+            DerivedRecordPartition {
+                record_id: "image-1".to_owned(),
+                source_run_id: "run-dev".to_owned(),
+                partition: ValidationPartition::Development,
+            },
+            DerivedRecordPartition {
+                record_id: "assay-1".to_owned(),
+                source_run_id: "run-dev".to_owned(),
+                partition: ValidationPartition::Development,
+            },
+            DerivedRecordPartition {
+                record_id: "image-2".to_owned(),
+                source_run_id: "run-test".to_owned(),
+                partition: ValidationPartition::LockedConfirmation,
+            },
+        ];
+        let report = audit_derived_record_partitions(&runs, &derived).unwrap();
+        assert_eq!(report.source_run_count, 2);
+        assert_eq!(report.derived_record_count, 3);
+        assert_eq!(report.unique_source_run_count, 2);
+    }
+
+    #[test]
+    fn rejects_derived_record_link_to_unknown_run() {
+        let runs = [record(
+            "run-dev",
+            ValidationPartition::Development,
+            "unit-a",
+            "day-a",
+            "soil-a",
+        )];
+        let derived = [DerivedRecordPartition {
+            record_id: "image-x".to_owned(),
+            source_run_id: "missing-run".to_owned(),
+            partition: ValidationPartition::Development,
+        }];
+        assert_eq!(
+            audit_derived_record_partitions(&runs, &derived),
+            Err(GroupedValidationError::UnknownSourceRun(
+                "missing-run".to_owned()
+            ))
+        );
+    }
+
+    #[test]
+    fn rejects_derived_record_partition_that_differs_from_source_run() {
+        let runs = [record(
+            "run-dev",
+            ValidationPartition::Development,
+            "unit-a",
+            "day-a",
+            "soil-a",
+        )];
+        let derived = [DerivedRecordPartition {
+            record_id: "image-x".to_owned(),
+            source_run_id: "run-dev".to_owned(),
+            partition: ValidationPartition::LockedConfirmation,
+        }];
+        assert!(matches!(
+            audit_derived_record_partitions(&runs, &derived),
+            Err(GroupedValidationError::DerivedPartitionMismatch {
+                expected: ValidationPartition::Development,
+                observed: ValidationPartition::LockedConfirmation,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn rejects_duplicate_derived_record_ids() {
+        let runs = [record(
+            "run-dev",
+            ValidationPartition::Development,
+            "unit-a",
+            "day-a",
+            "soil-a",
+        )];
+        let derived = [
+            DerivedRecordPartition {
+                record_id: "duplicate".to_owned(),
+                source_run_id: "run-dev".to_owned(),
+                partition: ValidationPartition::Development,
+            },
+            DerivedRecordPartition {
+                record_id: "duplicate".to_owned(),
+                source_run_id: "run-dev".to_owned(),
+                partition: ValidationPartition::Development,
+            },
+        ];
+        assert_eq!(
+            audit_derived_record_partitions(&runs, &derived),
+            Err(GroupedValidationError::DuplicateDerivedRecordId(
+                "duplicate".to_owned()
+            ))
+        );
+    }
+
+    #[test]
+    fn rejects_empty_derived_record_collection() {
+        let runs = [record(
+            "run-dev",
+            ValidationPartition::Development,
+            "unit-a",
+            "day-a",
+            "soil-a",
+        )];
+        assert_eq!(
+            audit_derived_record_partitions(&runs, &[]),
+            Err(GroupedValidationError::EmptyDerivedRecords)
+        );
+    }
+
 }
