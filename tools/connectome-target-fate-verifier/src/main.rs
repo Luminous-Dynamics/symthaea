@@ -341,7 +341,6 @@ fn verify(
 
     let mut seen_fates = BTreeSet::new();
     let mut counts = Counts::default();
-    let mut fate_objects = BTreeMap::<String, String>::new();
 
     for (index, row) in fate_rows.iter().enumerate() {
         let context = format!("fates[{index}]");
@@ -463,7 +462,6 @@ fn verify(
             }
             _ => return Err(format!("{context}: invalid target fate status {status}")),
         }
-        fate_objects.insert(object_id, status);
     }
 
     let inventory_ids: BTreeSet<String> = inventory.keys().cloned().collect();
@@ -666,9 +664,11 @@ mod tests {
 
     #[test]
     fn rejects_mapping_that_does_not_contain_target() {
-        let mut fate = value(FATE);
-        fate["fates"][0]["target_object_id"] = Value::String("synapse-target-only".to_owned());
-        assert!(verify(serde_json::to_string(&fate).unwrap().as_bytes(), TARGET.as_bytes(), CORRESPONDENCE.as_bytes()).is_err());
+        let fate = value(FATE);
+        let mut correspondence = value(CORRESPONDENCE);
+        correspondence["mappings"][0]["target_object_ids"] = json!(["segment-not-in-fate"]);
+        let (fate_text, corr_text) = bound_inputs(fate, correspondence);
+        assert!(verify(fate_text.as_bytes(), TARGET.as_bytes(), corr_text.as_bytes()).is_err());
     }
 
     #[test]
@@ -692,6 +692,8 @@ mod tests {
         let mut fate = value(FATE);
         fate["fates"][0]["mapping_id"] = Value::String("map-neuron-5-a".to_owned());
         fate["fates"][0]["target_object_id"] = Value::String("neuron-5-candidate-a".to_owned());
+        fate["fates"][0]["object_type"] = Value::String("NEURON".to_owned());
+        fate["fates"][0]["evidence_ids"] = json!(["ev-neuron-morphology-a"]);
         assert!(verify(serde_json::to_string(&fate).unwrap().as_bytes(), TARGET.as_bytes(), CORRESPONDENCE.as_bytes()).is_err());
     }
 
