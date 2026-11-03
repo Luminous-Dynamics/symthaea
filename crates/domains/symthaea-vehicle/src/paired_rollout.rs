@@ -482,7 +482,6 @@ fn wrap_angle(mut angle: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_core::genesis::GenesisSeed;
     use crate::types::VehicleConfig;
     use symthaea_core::genesis::GenesisSeed;
 
