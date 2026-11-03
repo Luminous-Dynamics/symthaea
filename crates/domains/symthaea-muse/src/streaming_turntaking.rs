@@ -1006,10 +1006,15 @@ mod tests {
     #[test]
     fn effect_times_must_be_monotonic_across_the_stream() {
         let mut predicted = prediction();
+        predicted.chunks[1].disposition = MusicalTurnDispositionV1::Action {
+            action: MusicalTurnActionV1::Respond,
+            effect_frame: Some(220),
+            effect_at_ns: Some(45_000_000),
+        };
         predicted.chunks[3].disposition = MusicalTurnDispositionV1::Action {
             action: MusicalTurnActionV1::Yield,
             effect_frame: Some(420),
-            effect_at_ns: Some(21_000_000),
+            effect_at_ns: Some(42_000_000),
         };
         assert!(score_musical_turn_taking(&truth(), &predicted)
             .unwrap_err()
