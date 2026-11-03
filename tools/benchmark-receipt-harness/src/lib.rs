@@ -296,11 +296,36 @@ fn validate_scores(receipt: &Value) -> Result<(), ReceiptValidationError> {
         }
     }
 
+    let accounting = get(receipt, "task_accounting", "receipt")?;
+    let eligible = integer(get(accounting, "eligible", "task_accounting")?, "eligible")?;
+    let attempted = integer(get(accounting, "attempted", "task_accounting")?, "attempted")?;
+    let graded = integer(get(accounting, "graded", "task_accounting")?, "graded")?;
+    let passed = integer(get(get(accounting, "disposition_counts", "task_accounting")?, "passed", "disposition_counts")?, "passed")?;
+
     for (i, metric) in get(receipt, "derived_metrics", "receipt")?.as_array()
         .ok_or_else(|| err(ReceiptErrorKind::InvalidType, "derived_metrics must be array"))?.iter().enumerate()
     {
-        if get(metric, "is_official", &format!("derived_metrics[{i}]"))?.as_bool() != Some(false) {
+        let cx = format!("derived_metrics[{i}]");
+        if get(metric, "is_official", &cx)?.as_bool() != Some(false) {
             return Err(err(ReceiptErrorKind::InvalidDerivedMetric, "derived metrics must be marked non-official"));
+        }
+        let metric_id = text(get(metric, "metric_id", &cx)?, "derived metric_id")?;
+        let value = get(metric, "value", &cx)?;
+        let denominator = eligible as f64;
+        let expected = match metric_id {
+            "eligible_coverage" => Some(attempted as f64 / denominator),
+            "graded_coverage" => Some(graded as f64 / denominator),
+            "coverage_adjusted_task_yield" => Some(passed as f64 / denominator),
+            _ => None,
+        };
+        if let Some(expected) = expected {
+            if denominator <= 0.0 || (number(value, "derived metric value")? - expected).abs() > 1e-12 {
+                return Err(err(ReceiptErrorKind::InvalidDerivedMetric, format!("{metric_id} does not match task accounting")));
+            }
+        } else if value.is_null() {
+            text(get(metric, "null_reason", &cx)?, "derived metric null_reason")?;
+        } else {
+            number(value, "derived metric value")?;
         }
     }
     Ok(())
@@ -573,7 +598,66 @@ mod tests {
             "scoring_revision": "fixture-v1",
             "grader_output_sha256": "e".repeat(64)
         }]);
-        assert_eq!(validate_receipt_value(&v).unwrap_err().kind, ReceiptErrorKind::MissingField);
+        assert_eq!(validate_receipt_value(&v).unwrap_err().kind, ReceiptErrorKind::InvalidOfficialScore);
+    }
+
+    #[test]
+    fn rejects_falsified_coverage_adjusted_metrics() {
+        let mut v: Value = serde_json::from_slice(&fixture()).unwrap();
+        v["derived_metrics"][2]["value"] = Value::from(0.9);
+        assert_eq!(validate_receipt_value(&v).unwrap_err().kind, ReceiptErrorKind::InvalidDerivedMetric);
+    }
+
+    #[test]
+    fn rejects_unmatched_receipt_carrying_a_comparison_claim() {
+        let mut v: Value = serde_json::from_slice(&fixture()).unwrap();
+        v["matched_comparison"]["comparison_group_id"] = Value::String("group-1".to_owned());
+        assert_eq!(validate_receipt_value(&v).unwrap_err().kind, ReceiptErrorKind::InvalidComparison);
+    }
+
+    fn rehash_receipt(value: &mut Value) {
+        let mut semantic = value.clone();
+        semantic["integrity"].as_object_mut().unwrap().remove("receipt_sha256");
+        value["integrity"]["receipt_sha256"] = Value::String(canonical_sha256(&semantic).unwrap());
+    }
+
+    fn make_matched_receipt(run_char: char, arm: &str) -> Value {
+        let mut value: Value = serde_json::from_slice(&fixture()).unwrap();
+        value["run_id"] = Value::String(format!("run_{}", run_char.to_string().repeat(64)));
+        value["arm"] = Value::String(arm.to_owned());
+        let budget_hash = canonical_sha256(&value["budget_caps"]).unwrap();
+        let cohort_hash = canonical_sha256(&value["environment"]).unwrap();
+        let task_hash = value["dataset"]["eligible_task_set_sha256"].clone();
+        value["matched_comparison"] = serde_json::json!({
+            "matched": true,
+            "comparison_group_id": "ablation-group-1",
+            "eligible_task_set_sha256": task_hash,
+            "budget_profile_sha256": budget_hash,
+            "cohort_sha256": cohort_hash,
+            "scoring_revision": "fixture-v1"
+        });
+        rehash_receipt(&mut value);
+        value
+    }
+
+    #[test]
+    fn accepts_budget_and_taskset_matched_distinct_arms() {
+        let rea = make_matched_receipt('b', "rea_only");
+        let combined = make_matched_receipt('c', "rea_plus_symthaea");
+        assert!(validate_matched_receipts(&[rea, combined]).is_ok());
+    }
+
+    #[test]
+    fn rejects_matched_arms_with_different_eligible_task_sets() {
+        let rea = make_matched_receipt('b', "rea_only");
+        let mut combined = make_matched_receipt('c', "rea_plus_symthaea");
+        combined["dataset"]["eligible_task_set_sha256"] = Value::String("d".repeat(64));
+        combined["matched_comparison"]["eligible_task_set_sha256"] = Value::String("d".repeat(64));
+        rehash_receipt(&mut combined);
+        assert_eq!(
+            validate_matched_receipts(&[rea, combined]).unwrap_err().kind,
+            ReceiptErrorKind::InvalidComparison
+        );
     }
 
     #[test]
