@@ -781,6 +781,37 @@ fn check_definitions(predicate: &Value) -> Result<BTreeMap<String, (String, bool
     Ok(output)
 }
 
+fn validate_execution_environment(task: &Value, execution: &Value) -> Result<(), Failure> {
+    let runner_profile = string_field(execution, "runner_profile", "execution")?;
+    let network_policy = string_field(execution, "network_policy", "execution")?;
+    let image_digest = optional_string_field(execution, "image_digest", "execution")?;
+    if !matches!(runner_profile.as_str(), "isolated_container" | "isolated_microvm")
+        || !matches!(network_policy.as_str(), "disabled" | "allowlisted")
+        || image_digest.as_deref().is_none_or(|digest| !digest.starts_with("sha256:") || !is_sha256(&digest[7..]))
+    {
+        return Err(Failure::unresolved("runner profile, image digest, or network policy is not qualified"));
+    }
+    let task_environment = field(task, "environment", "task contract")?;
+    let expected_profile = string_field(task_environment, "runner_profile", "environment")?;
+    let expected_network = string_field(task_environment, "network_policy", "environment")?;
+    let expected_runner_policy = string_field(task_environment, "runner_policy_sha256", "environment")?;
+    let expected_toolchain = string_field(task_environment, "toolchain_lock_sha256", "environment")?;
+    let expected_image = string_field(task_environment, "image", "environment")?;
+    let expected_image_digest = expected_image
+        .rsplit_once("@sha256:")
+        .map(|(_, digest)| format!("sha256:{digest}"))
+        .ok_or_else(|| Failure::unresolved("task environment image is not pinned by an OCI SHA-256 digest"))?;
+    if runner_profile != expected_profile
+        || network_policy != expected_network
+        || image_digest.as_deref() != Some(expected_image_digest.as_str())
+        || string_field(execution, "runner_policy_sha256", "execution")? != expected_runner_policy
+        || string_field(execution, "toolchain_lock_sha256", "execution")? != expected_toolchain
+    {
+        return Err(Failure::protocol("receipt runtime environment differs from the immutable task contract"));
+    }
+    Ok(())
+}
+
 fn check_budget(task: &Value, predicate: &Value) -> Result<(), Failure> {
     let budget = field(task, "budget", "task")?;
     let resources = field(predicate, "resources", "predicate")?;
@@ -942,36 +973,7 @@ fn verify_one_receipt(
         return Err(Failure::protocol("execution finished_at_utc precedes started_at_utc"));
     }
 
-    let runner_profile = string_field(execution, "runner_profile", "execution")?;
-    let network_policy = string_field(execution, "network_policy", "execution")?;
-    let image_digest = optional_string_field(execution, "image_digest", "execution")?;
-    if !matches!(runner_profile.as_str(), "isolated_container" | "isolated_microvm")
-        || !matches!(network_policy.as_str(), "disabled" | "allowlisted")
-        || image_digest.as_deref().is_none_or(|digest| !digest.starts_with("sha256:") || !is_sha256(&digest[7..]))
-    {
-        return Err(Failure::unresolved("runner profile, image digest, or network policy is not qualified"));
-    }
-
-    // The receipts must implement the immutable environment contract, not merely
-    // agree with one another about a potentially incorrect runtime configuration.
-    let task_environment = field(task, "environment", "task contract")?;
-    let expected_profile = string_field(task_environment, "runner_profile", "environment")?;
-    let expected_network = string_field(task_environment, "network_policy", "environment")?;
-    let expected_runner_policy = string_field(task_environment, "runner_policy_sha256", "environment")?;
-    let expected_toolchain = string_field(task_environment, "toolchain_lock_sha256", "environment")?;
-    let expected_image = string_field(task_environment, "image", "environment")?;
-    let expected_image_digest = expected_image
-        .rsplit_once("@sha256:")
-        .map(|(_, digest)| format!("sha256:{digest}"))
-        .ok_or_else(|| Failure::unresolved("task environment image is not pinned by an OCI SHA-256 digest"))?;
-    if runner_profile != expected_profile
-        || network_policy != expected_network
-        || image_digest.as_deref() != Some(expected_image_digest.as_str())
-        || string_field(execution, "runner_policy_sha256", "execution")? != expected_runner_policy
-        || string_field(execution, "toolchain_lock_sha256", "execution")? != expected_toolchain
-    {
-        return Err(Failure::protocol("receipt runtime environment differs from the immutable task contract"));
-    }
+    validate_execution_environment(task, execution)?;
 
     let grader = field(predicate, "grader", "predicate")?;
     if !matches!(string_field(grader, "trust_domain", "grader")?.as_str(), "separate_host_control_plane" | "separate_vm")
@@ -1507,6 +1509,43 @@ mod tests {
         assert!(validate_artifacts(&predicate, &root, &sha256_hex(patch), "primary").is_err());
         fs::remove_dir_all(&root).unwrap();
         fs::remove_file(outside).unwrap();
+    }
+
+    #[test]
+    fn execution_environment_must_match_the_task_contract() {
+        let task = serde_json::json!({
+            "environment": {
+                "image": "oci://registry.example/ceb@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "toolchain_lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "runner_profile": "isolated_microvm",
+                "network_policy": "disabled",
+                "runner_policy_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            }
+        });
+        let execution = serde_json::json!({
+            "runner_profile": "isolated_microvm",
+            "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "runner_policy_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "toolchain_lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "network_policy": "disabled"
+        });
+        assert!(validate_execution_environment(&task, &execution).is_ok());
+
+        let mut changed_image = execution.clone();
+        changed_image["image_digest"] = serde_json::json!("sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd");
+        assert!(validate_execution_environment(&task, &changed_image).is_err());
+
+        let mut changed_network = execution.clone();
+        changed_network["network_policy"] = serde_json::json!("allowlisted");
+        assert!(validate_execution_environment(&task, &changed_network).is_err());
+
+        let mut changed_toolchain = execution.clone();
+        changed_toolchain["toolchain_lock_sha256"] = serde_json::json!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+        assert!(validate_execution_environment(&task, &changed_toolchain).is_err());
+
+        let mut mutable_image = task.clone();
+        mutable_image["environment"]["image"] = serde_json::json!("oci://registry.example/ceb:latest");
+        assert!(validate_execution_environment(&mutable_image, &execution).is_err());
     }
 
 }
