@@ -235,7 +235,7 @@ pub fn account_service(
         if !attempt.interrupted {
             for item_id in &attempt.item_ids {
                 let all_required_pass = required.iter().all(|endpoint| {
-                    decisions.get((item_id.as_str(), *endpoint))
+                    decisions.get(&(item_id.as_str(), *endpoint))
                         .is_some_and(|decision| *decision == Decision::Pass)
                 });
                 if all_required_pass {
