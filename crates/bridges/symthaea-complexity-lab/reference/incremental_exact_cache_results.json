@@ -28,7 +28,12 @@
         "downstream_hits": 2
       }
     },
-    "claim_boundary": "A message axis is removed only when all exact values are equal across that axis for every assignment of retained axes. The independent raw-bucket checker replays every raw separator assignment against the smaller candidate table."
+    "claim_boundary": "A message axis is removed only when all exact values are equal across that axis for every assignment of retained axes. The independent raw-bucket checker replays every raw separator assignment against the smaller candidate table.",
+    "scope_value_comparisons": {
+      "natural_count": 4,
+      "maxcount": 4
+    },
+    "measure": "exact encoded-value equality; no floating tolerance"
   },
   "cache_identity_binds": [
     "schema",
@@ -66,5 +71,5 @@
   "incremental_producer_multiplications": 3820,
   "producer_addition_reduction_fraction": 0.7119588512644663,
   "producer_multiplication_reduction_fraction": 0.7060181622287209,
-  "claim_boundary": "Python finite reference only. Producer operation counts exclude normalization, scope minimization comparisons, checker replay, HMAC, serialization, cache memory and wall-time costs. No Rust compile, Lean proof, public benchmark or measured runtime speedup."
+  "claim_boundary": "Python finite reference only. Producer arithmetic excludes normalizer and scope-minimization work; explicit scope comparison counts are recorded for the two crafted reductions. Checker replay, HMAC, serialization, cache memory and wall-time costs are excluded. No Rust compile, Lean proof, public benchmark or measured runtime speedup."
 }
