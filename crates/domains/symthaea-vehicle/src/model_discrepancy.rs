@@ -751,9 +751,12 @@ mod tests {
         let accelerate_time_s = (2.0 * remaining_distance_m / restart_acceleration_mps2).sqrt();
         let yield_arrival_s = stop_time_s.max(pedestrian_clear_s) + accelerate_time_s;
         let yield_arrival_speed_mps = restart_acceleration_mps2 * accelerate_time_s;
-        let yield_occupancy_start_s =
-            yield_arrival_s - ego_length_m / (2.0 * yield_arrival_speed_mps);
-        let yield_overlap = yield_occupancy_start_s < pedestrian_clear_s;
+        let yield_occupancy = (
+            yield_arrival_s - ego_length_m / (2.0 * yield_arrival_speed_mps),
+            yield_arrival_s + ego_length_m / (2.0 * yield_arrival_speed_mps),
+        );
+        let yield_overlap =
+            yield_occupancy.0 < pedestrian_clear_s && yield_occupancy.1 > 0.0;
 
         assert!((pedestrian_clear_s - 2.857142857142857).abs() < 1e-12);
         assert!((predicted_pedestrian_clear_s - 1.5).abs() < 1e-12);
@@ -761,6 +764,16 @@ mod tests {
         assert!(!yield_overlap);
         assert!((stop_distance_m - 16.666666666666668).abs() < 1e-12);
         assert!((yield_arrival_s - 5.159075191683887).abs() < 1e-12);
+
+        let delay_cost_per_second = 2.0 / (yield_arrival_s - continue_arrival_s);
+        let continue_reference_utility =
+            10.0 - delay_cost_per_second * (continue_arrival_s - 2.0).max(0.0)
+                - if continue_overlap { 8.0 } else { 0.0 };
+        let yield_reference_utility =
+            10.0 - delay_cost_per_second * (yield_arrival_s - 2.0).max(0.0)
+                - if yield_overlap { 8.0 } else { 0.0 };
+        assert!((continue_reference_utility - 2.0).abs() < 1e-12);
+        assert!((yield_reference_utility - 8.0).abs() < 1e-12);
 
         let mut sample = input();
         let mut one_second = residual(
@@ -792,8 +805,8 @@ mod tests {
         assert_eq!(decision.selected_action_regret, Some(6.0));
         assert_eq!(decision.optimism_gap, Some(9.0));
 
-        let expected_growth = 2.0
-            * (pedestrian_speed_predicted_mps - pedestrian_speed_reference_mps);
+        let expected_growth =
+            pedestrian_speed_predicted_mps - pedestrian_speed_reference_mps;
         assert_eq!(report.paired_horizon_growth.len(), 1);
         assert!((report.paired_horizon_growth[0].absolute_residual_growth - expected_growth).abs() < 1e-12);
     }
