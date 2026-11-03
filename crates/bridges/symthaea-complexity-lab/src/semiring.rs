@@ -181,6 +181,8 @@ pub enum EliminationError {
     TableSizeOverflow { factor: Option<usize> },
     TableLengthMismatch { factor: usize, expected: usize, actual: usize },
     InvalidEliminationOrder { reason: &'static str },
+    StatisticsOverflow { metric: &'static str },
+    InvalidRandomDraw { upper_bound: u128, draw: u128 },
     Semiring(SemiringError),
 }
 impl fmt::Display for EliminationError {
@@ -192,6 +194,8 @@ impl fmt::Display for EliminationError {
             Self::TableSizeOverflow { factor } => write!(f, "factor table size overflow: {factor:?}"),
             Self::TableLengthMismatch { factor, expected, actual } => write!(f, "factor {factor} has {actual} entries; expected {expected}"),
             Self::InvalidEliminationOrder { reason } => write!(f, "invalid elimination order: {reason}"),
+            Self::StatisticsOverflow { metric } => write!(f, "elimination statistics overflow: {metric}"),
+            Self::InvalidRandomDraw { upper_bound, draw } => write!(f, "uniform sampler returned {draw}, outside [0, {upper_bound})"),
             Self::Semiring(error) => write!(f, "semiring evaluation error: {error}"),
         }
     }
@@ -235,7 +239,150 @@ pub struct EliminationStats {
     pub maximum_output_factor_entries: usize,
     pub semiring_additions: u128,
     pub semiring_multiplications: u128,
+    /// Extra exact support-count arithmetic performed by witness-aware MaxCount.
+    pub support_count_additions: u128,
+    pub support_count_multiplications: u128,
     pub generated_factors: usize,
+}
+
+/// One separator-assignment row in an exact MaxCount backpointer table.
+/// States and their branch multiplicities are parallel arrays.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MaxCountBackpointerRow {
+    pub separator_assignment: Vec<usize>,
+    pub maximizing_states: Vec<usize>,
+    pub branch_multiplicities: Vec<u128>,
+    /// Number of distinct partial assignments represented by each branch.
+    /// This is not the weighted semiring multiplicity above.
+    pub branch_assignment_counts: Vec<u128>,
+}
+
+/// All locally maximizing states for an eliminated variable, indexed by the
+/// assignment of variables that remain in its separator.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MaxCountBackpointer {
+    pub variable: usize,
+    pub separator: Vec<usize>,
+    pub rows: Vec<MaxCountBackpointerRow>,
+}
+
+/// Measure used when sampling among optimal assignments.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MaxCountSamplingMeasure {
+    /// Every distinct variable assignment has equal probability.
+    DistinctAssignments,
+    /// Assignment probability is proportional to its MaxCount multiplicity.
+    WeightedMultiplicity,
+}
+
+/// One bounded-integer draw, including every rejected raw word. The raw
+/// words are replayable; their statistical quality remains a property of the
+/// caller's random-word source.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BoundedRandomDraw {
+    pub upper_bound: u128,
+    pub random_words: Vec<u128>,
+    pub accepted_draw: u128,
+}
+
+/// Reproducible sampling receipt. This records how the bounded choices were
+/// derived, not proof that the original random-word source had enough entropy.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MaxCountSamplingTranscript {
+    pub measure: MaxCountSamplingMeasure,
+    pub draws: Vec<BoundedRandomDraw>,
+    pub assignment: Option<Vec<usize>>,
+}
+
+/// Convert uniform raw 128-bit words into an unbiased integer in [0, bound)
+/// using bit-mask rejection, avoiding modulo bias. Returns None only for an
+/// invalid zero bound (which a valid backpointer sampler never requests).
+fn draw_below_from_words<F>(
+    bound: u128,
+    next_word: &mut F,
+    consumed_words: &mut Vec<u128>,
+) -> Option<u128>
+where
+    F: FnMut() -> u128,
+{
+    let largest = bound.checked_sub(1)?;
+    let bits = 128usize - largest.leading_zeros() as usize;
+    if bits == 0 {
+        return Some(0);
+    }
+    let mask = if bits == 128 { u128::MAX } else { (1u128 << bits) - 1 };
+    loop {
+        let word = next_word();
+        consumed_words.push(word);
+        let candidate = word & mask;
+        if candidate < bound {
+            return Some(candidate);
+        }
+    }
+}
+
+/// Replay and validate one rejection-sampled bounded draw.
+fn replay_bounded_draw(
+    record: &BoundedRandomDraw,
+    expected_bound: u128,
+) -> Result<u128, EliminationError> {
+    if record.upper_bound != expected_bound || expected_bound == 0 {
+        return Err(EliminationError::InvalidEliminationOrder {
+            reason: "sampling transcript has a wrong or zero upper bound",
+        });
+    }
+    let largest = expected_bound - 1;
+    let bits = 128usize - largest.leading_zeros() as usize;
+    if bits == 0 {
+        if !record.random_words.is_empty() || record.accepted_draw != 0 {
+            return Err(EliminationError::InvalidEliminationOrder {
+                reason: "bound-one sampling transcript must consume no words and accept zero",
+            });
+        }
+        return Ok(0);
+    }
+    let mask = if bits == 128 { u128::MAX } else { (1u128 << bits) - 1 };
+    for (index, &word) in record.random_words.iter().enumerate() {
+        let candidate = word & mask;
+        if candidate < expected_bound {
+            if index + 1 != record.random_words.len() || candidate != record.accepted_draw {
+                return Err(EliminationError::InvalidEliminationOrder {
+                    reason: "sampling transcript accepted draw or trailing words are invalid",
+                });
+            }
+            return Ok(candidate);
+        }
+    }
+    Err(EliminationError::InvalidEliminationOrder {
+        reason: "sampling transcript contains no accepted random word",
+    })
+}
+
+/// Exact optimum, semiring multiplicity, one canonical witness, and the
+/// complete local argmax tables needed to represent the optimal-assignment DAG.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MaxCountWitnessResult {
+    pub value: MaxCountValue,
+    /// Number of distinct full variable assignments attaining the optimum.
+    /// Unlike MaxCountTerm.count, local factor multiplicity weights do not
+    /// inflate this quantity.
+    pub distinct_optimal_assignments: u128,
+    pub witness: Option<Vec<usize>>,
+    pub backpointers: Vec<MaxCountBackpointer>,
+    pub stats: EliminationStats,
+}
+
+
+/// Checked counters are part of the execution receipt: overflow must not
+/// silently wrap and make the recorded work understated.
+fn increment_u128(counter: &mut u128, metric: &'static str) -> Result<(), EliminationError> {
+    *counter = counter.checked_add(1).ok_or(EliminationError::StatisticsOverflow { metric })?;
+    Ok(())
+}
+
+fn increment_usize(counter: &mut usize, metric: &'static str) -> Result<(), EliminationError> {
+    *counter = counter.checked_add(1).ok_or(EliminationError::StatisticsOverflow { metric })?;
+    Ok(())
 }
 
 /// Exact finite-domain factor graph evaluated by bucket variable elimination.
@@ -310,10 +457,10 @@ impl<S: ExactSemiring> ExactFactorGraph<S> {
                         let factor = &factors[factor_index];
                         let value = &factor.values[factor.table_index(&assignment, &self.cardinalities)];
                         product = product.checked_mul(value)?;
-                        stats.semiring_multiplications += 1;
+                        increment_u128(&mut stats.semiring_multiplications, "semiring multiplications")?;
                     }
                     sum = sum.checked_add(&product)?;
-                    stats.semiring_additions += 1;
+                    increment_u128(&mut stats.semiring_additions, "semiring additions")?;
                 }
                 output.push(sum);
             }
@@ -324,8 +471,8 @@ impl<S: ExactSemiring> ExactFactorGraph<S> {
             }
             retained.push(ExactFactor { scope: output_scope, values: output });
             factors = retained;
-            stats.eliminated_variables += 1;
-            stats.generated_factors += 1;
+            increment_usize(&mut stats.eliminated_variables, "eliminated variables")?;
+            increment_usize(&mut stats.generated_factors, "generated factors")?;
         }
 
         let mut result = self.one.clone();
@@ -334,9 +481,648 @@ impl<S: ExactSemiring> ExactFactorGraph<S> {
                 return Err(EliminationError::InvalidEliminationOrder { reason: "factor retained an uneliminated variable" });
             }
             result = result.checked_mul(&factor.values[0])?;
-            stats.semiring_multiplications += 1;
+            increment_u128(&mut stats.semiring_multiplications, "semiring multiplications")?;
         }
         Ok((result, stats))
+    }
+}
+
+
+
+/// Fail closed if the weighted MaxCount tables and parallel distinct-support
+/// tables cease to describe the same factor scopes/cells.
+fn validate_support_factor_alignment(
+    factors: &[ExactFactor<MaxCountValue>],
+    support_factors: &[ExactFactor<u128>],
+) -> Result<(), EliminationError> {
+    if factors.len() != support_factors.len() {
+        return Err(EliminationError::InvalidEliminationOrder {
+            reason: "MaxCount and support factor counts diverged",
+        });
+    }
+    for (factor, support) in factors.iter().zip(support_factors.iter()) {
+        if factor.scope != support.scope || factor.values.len() != support.values.len() {
+            return Err(EliminationError::InvalidEliminationOrder {
+                reason: "MaxCount and support factor tables are misaligned",
+            });
+        }
+        for (weighted, distinct) in factor.values.iter().zip(support.values.iter()) {
+            if weighted.optimum().is_none() != (*distinct == 0) {
+                return Err(EliminationError::InvalidEliminationOrder {
+                    reason: "MaxCount feasibility and distinct support disagree",
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+
+/// Validate one row and return its total distinct assignment support.
+fn maxcount_backpointer_row_support(
+    row: &MaxCountBackpointerRow,
+    variable_cardinality: usize,
+) -> Result<u128, EliminationError> {
+    if row.maximizing_states.len() != row.branch_multiplicities.len()
+        || row.maximizing_states.len() != row.branch_assignment_counts.len()
+    {
+        return Err(EliminationError::InvalidEliminationOrder {
+            reason: "backpointer row parallel branch arrays are invalid",
+        });
+    }
+    let mut total_support = 0u128;
+    let mut previous_state = None;
+    for i in 0..row.maximizing_states.len() {
+        let state = row.maximizing_states[i];
+        let multiplicity = row.branch_multiplicities[i];
+        let support = row.branch_assignment_counts[i];
+        if state >= variable_cardinality
+            || multiplicity == 0
+            || support == 0
+            || previous_state.is_some_and(|previous| state <= previous)
+        {
+            return Err(EliminationError::InvalidEliminationOrder {
+                reason: "backpointer branch state/count is invalid",
+            });
+        }
+        total_support = total_support.checked_add(support)
+            .ok_or(SemiringError::CountOverflow {
+                operation: "sampler row support aggregation",
+            })?;
+        previous_state = Some(state);
+    }
+    Ok(total_support)
+}
+
+/// Return a row's sampling mass under the requested measure after validating
+/// its aligned state, multiplicity, and support arrays.
+fn maxcount_backpointer_row_weight(
+    row: &MaxCountBackpointerRow,
+    variable_cardinality: usize,
+    measure: MaxCountSamplingMeasure,
+) -> Result<u128, EliminationError> {
+    let support_total = maxcount_backpointer_row_support(row, variable_cardinality)?;
+    match measure {
+        MaxCountSamplingMeasure::DistinctAssignments => Ok(support_total),
+        MaxCountSamplingMeasure::WeightedMultiplicity => {
+            row.branch_multiplicities.iter().try_fold(0u128, |total, &count| {
+                total.checked_add(count).ok_or(SemiringError::CountOverflow {
+                    operation: "sampler row multiplicity aggregation",
+                }.into())
+            })
+        }
+    }
+}
+
+/// MaxCount-specialized elimination retaining every local maximizer.
+/// The reverse pass returns a canonical optimum witness without conditional
+/// re-solves. Backpointer multiplicities are distinct from assignment count:
+/// weighted factor multiplicity may exceed the number of variable assignments.
+impl ExactFactorGraph<MaxCountValue> {
+    /// Exact MaxCount elimination with one witness and all local argmax rows.
+    ///
+    /// Every original factor-table cell represents exactly one local
+    /// assignment, irrespective of its MaxCount multiplicity weight. During
+    /// elimination, support counts multiply only across disjoint sets of
+    /// previously eliminated variables and add across tied eliminated states.
+    /// This computes the number of distinct global optimal assignments in the
+    /// same pass as the weighted MaxCount multiplicity.
+    pub fn evaluate_with_witness(&self, order: &[usize]) -> Result<MaxCountWitnessResult, EliminationError> {
+        if order.len() != self.cardinalities.len() {
+            return Err(EliminationError::InvalidEliminationOrder { reason: "must list every variable exactly once" });
+        }
+        let mut seen = vec![false; self.cardinalities.len()];
+        for &v in order {
+            if v >= seen.len() || seen[v] {
+                return Err(EliminationError::InvalidEliminationOrder { reason: "out-of-range or duplicate variable" });
+            }
+            seen[v] = true;
+        }
+
+        let mut factors = self.factors.clone();
+        // Each feasible original table cell corresponds to one local
+        // assignment, even when its weighted multiplicity is greater than 1.
+        let mut support_factors: Vec<ExactFactor<u128>> = self.factors.iter().map(|factor| {
+            ExactFactor {
+                scope: factor.scope.clone(),
+                values: factor.values.iter()
+                    .map(|value| if value.optimum().is_some() { 1u128 } else { 0u128 })
+                    .collect(),
+            }
+        }).collect();
+        let mut stats = EliminationStats::default();
+        let mut backpointers = Vec::with_capacity(order.len());
+
+        for &eliminated in order {
+            validate_support_factor_alignment(&factors, &support_factors)?;
+            let bucket_indices: Vec<usize> = factors.iter().enumerate()
+                .filter_map(|(i, f)| f.scope.contains(&eliminated).then_some(i)).collect();
+            let mut joined = BTreeSet::new();
+            for &i in &bucket_indices { joined.extend(factors[i].scope.iter().copied()); }
+            joined.remove(&eliminated);
+            let output_scope: Vec<usize> = joined.into_iter().collect();
+
+            let mut output_entries = 1usize;
+            for &v in &output_scope {
+                output_entries = output_entries.checked_mul(self.cardinalities[v])
+                    .ok_or(EliminationError::TableSizeOverflow { factor: None })?;
+            }
+            let bucket_variables = output_scope.len() + 1;
+            let bucket_assignments = output_entries.checked_mul(self.cardinalities[eliminated])
+                .ok_or(EliminationError::TableSizeOverflow { factor: None })?;
+            stats.maximum_bucket_variables = stats.maximum_bucket_variables.max(bucket_variables);
+            stats.maximum_bucket_assignments = stats.maximum_bucket_assignments.max(bucket_assignments);
+            stats.maximum_output_factor_entries = stats.maximum_output_factor_entries.max(output_entries);
+
+            let mut output = Vec::with_capacity(output_entries);
+            let mut output_support = Vec::with_capacity(output_entries);
+            let mut rows = Vec::with_capacity(output_entries);
+            for output_index in 0..output_entries {
+                let mut assignment = vec![0usize; self.cardinalities.len()];
+                decode_assignment(output_index, &output_scope, &self.cardinalities, &mut assignment);
+                let mut best_score: Option<i128> = None;
+                let mut best_count = 0u128;
+                let mut best_support = 0u128;
+                let mut maximizing_states = Vec::new();
+                let mut branch_multiplicities = Vec::new();
+                let mut branch_assignment_counts = Vec::new();
+
+                for state in 0..self.cardinalities[eliminated] {
+                    assignment[eliminated] = state;
+                    let mut product = self.one.clone();
+                    let mut support_product = 1u128;
+                    for &factor_index in &bucket_indices {
+                        let factor = &factors[factor_index];
+                        let cell = factor.table_index(&assignment, &self.cardinalities);
+                        product = product.checked_mul(&factor.values[cell])?;
+                        increment_u128(&mut stats.semiring_multiplications, "semiring multiplications")?;
+                        if product.optimum().is_none() {
+                            support_product = 0;
+                            break;
+                        }
+                        support_product = support_product.checked_mul(support_factors[factor_index].values[cell])
+                            .ok_or(SemiringError::CountOverflow { operation: "distinct assignment support multiplication" })?;
+                        increment_u128(&mut stats.support_count_multiplications, "support count multiplications")?;
+                    }
+
+                    if let Some(term) = product.optimum() {
+                        match best_score {
+                            None => {
+                                best_score = Some(term.score);
+                                best_count = term.count;
+                                best_support = support_product;
+                                maximizing_states.clear();
+                                branch_multiplicities.clear();
+                                branch_assignment_counts.clear();
+                                maximizing_states.push(state);
+                                branch_multiplicities.push(term.count);
+                                branch_assignment_counts.push(support_product);
+                            }
+                            Some(score) if term.score > score => {
+                                best_score = Some(term.score);
+                                best_count = term.count;
+                                best_support = support_product;
+                                maximizing_states.clear();
+                                branch_multiplicities.clear();
+                                branch_assignment_counts.clear();
+                                maximizing_states.push(state);
+                                branch_multiplicities.push(term.count);
+                                branch_assignment_counts.push(support_product);
+                            }
+                            Some(score) if term.score == score => {
+                                best_count = best_count.checked_add(term.count)
+                                    .ok_or(SemiringError::CountOverflow { operation: "MaxCount witness tie aggregation" })?;
+                                best_support = best_support.checked_add(support_product)
+                                    .ok_or(SemiringError::CountOverflow { operation: "distinct assignment support tie aggregation" })?;
+                                increment_u128(&mut stats.support_count_additions, "support count additions")?;
+                                maximizing_states.push(state);
+                                branch_multiplicities.push(term.count);
+                                branch_assignment_counts.push(support_product);
+                            }
+                            Some(_) => {}
+                        }
+                    }
+                    increment_u128(&mut stats.semiring_additions, "semiring additions")?;
+                }
+                let value = match best_score {
+                    Some(score) => MaxCountValue::candidate(score, best_count),
+                    None => MaxCountValue::zero(),
+                };
+                output.push(value);
+                output_support.push(best_support);
+                rows.push(MaxCountBackpointerRow {
+                    separator_assignment: output_scope.iter().map(|&v| assignment[v]).collect(),
+                    maximizing_states,
+                    branch_multiplicities,
+                    branch_assignment_counts,
+                });
+            }
+
+            let mut retained = Vec::with_capacity(factors.len() + 1);
+            let mut retained_support = Vec::with_capacity(support_factors.len() + 1);
+            for (i, factor) in factors.into_iter().enumerate() {
+                if !bucket_indices.contains(&i) {
+                    retained.push(factor);
+                    retained_support.push(support_factors[i].clone());
+                }
+            }
+            retained.push(ExactFactor { scope: output_scope.clone(), values: output });
+            retained_support.push(ExactFactor { scope: output_scope.clone(), values: output_support });
+            factors = retained;
+            support_factors = retained_support;
+            backpointers.push(MaxCountBackpointer {
+                variable: eliminated,
+                separator: output_scope,
+                rows,
+            });
+            increment_usize(&mut stats.eliminated_variables, "eliminated variables")?;
+            increment_usize(&mut stats.generated_factors, "generated factors")?;
+        }
+
+        validate_support_factor_alignment(&factors, &support_factors)?;
+        let mut result = self.one.clone();
+        let mut distinct_optimal_assignments = 1u128;
+        for (factor, support_factor) in factors.iter().zip(support_factors.iter()) {
+            if !factor.scope.is_empty() || !support_factor.scope.is_empty() {
+                return Err(EliminationError::InvalidEliminationOrder { reason: "factor retained an uneliminated variable" });
+            }
+            result = result.checked_mul(&factor.values[0])?;
+            increment_u128(&mut stats.semiring_multiplications, "semiring multiplications")?;
+            distinct_optimal_assignments = distinct_optimal_assignments
+                .checked_mul(support_factor.values[0])
+                .ok_or(SemiringError::CountOverflow { operation: "distinct assignment support scalar multiplication" })?;
+            increment_u128(&mut stats.support_count_multiplications, "support count multiplications")?;
+        }
+        if result.optimum().is_none() {
+            distinct_optimal_assignments = 0;
+        }
+
+        let witness = if result.optimum().is_none() {
+            None
+        } else {
+            let mut chosen = vec![None; self.cardinalities.len()];
+            for backpointer in backpointers.iter().rev() {
+                let key: Vec<usize> = backpointer.separator.iter()
+                    .map(|&v| chosen[v].ok_or(EliminationError::InvalidEliminationOrder {
+                        reason: "backpointer separator was not assigned during reverse traversal"
+                    }))
+                    .collect::<Result<_, _>>()?;
+                let row_index = backpointer.separator.iter().zip(key.iter())
+                    .fold(0usize, |index, (&v, &state)| index * self.cardinalities[v] + state);
+                let row = backpointer.rows.get(row_index)
+                    .ok_or(EliminationError::InvalidEliminationOrder { reason: "missing backpointer row" })?;
+                if row.separator_assignment != key {
+                    return Err(EliminationError::InvalidEliminationOrder { reason: "backpointer row encoding mismatch" });
+                }
+                let state = *row.maximizing_states.first()
+                    .ok_or(EliminationError::InvalidEliminationOrder { reason: "empty backpointer for feasible optimum" })?;
+                chosen[backpointer.variable] = Some(state);
+            }
+            let assignment: Vec<usize> = chosen.into_iter()
+                .map(|state| state.ok_or(EliminationError::InvalidEliminationOrder { reason: "witness omitted a variable" }))
+                .collect::<Result<_, _>>()?;
+
+            let mut witness_value = self.one.clone();
+            for factor in &self.factors {
+                let value = &factor.values[factor.table_index(&assignment, &self.cardinalities)];
+                witness_value = witness_value.checked_mul(value)?;
+            }
+            match (witness_value.optimum(), result.optimum()) {
+                (Some(witness_term), Some(optimum)) if witness_term.score == optimum.score => Some(assignment),
+                _ => return Err(EliminationError::InvalidEliminationOrder { reason: "recovered witness does not attain the optimum" }),
+            }
+        };
+
+        Ok(MaxCountWitnessResult { value: result, distinct_optimal_assignments, witness, backpointers, stats })
+    }
+
+    /// Draw an exactly uniform distinct optimal assignment from the
+    /// backpointer DAG without enumerating all optimal assignments.
+    ///
+    /// The callback must return an unbiased integer in [0, upper_bound).
+    /// It is called once per backpointer row visited in reverse elimination
+    /// order. Branch probability is proportional to the number of distinct
+    /// partial assignments represented by that branch.
+    pub fn sample_optimal_assignment<F>(
+        &self,
+        result: &MaxCountWitnessResult,
+        uniform_below: F,
+    ) -> Result<Option<Vec<usize>>, EliminationError>
+    where
+        F: FnMut(u128) -> u128,
+    {
+        self.sample_optimal_assignment_by_measure(
+            result,
+            MaxCountSamplingMeasure::DistinctAssignments,
+            uniform_below,
+        )
+    }
+
+    /// Draw an optimum assignment with probability proportional to its
+    /// MaxCount multiplicity. This is intentionally different from uniform
+    /// sampling over distinct assignments.
+    pub fn sample_optimal_assignment_by_multiplicity<F>(
+        &self,
+        result: &MaxCountWitnessResult,
+        uniform_below: F,
+    ) -> Result<Option<Vec<usize>>, EliminationError>
+    where
+        F: FnMut(u128) -> u128,
+    {
+        self.sample_optimal_assignment_by_measure(
+            result,
+            MaxCountSamplingMeasure::WeightedMultiplicity,
+            uniform_below,
+        )
+    }
+
+    /// Shared exact backpointer sampler for both measures.
+    /// Sample through a raw 128-bit word source using rejection to produce
+    /// unbiased bounded integers. Every rejected word is preserved in the
+    /// returned transcript for deterministic replay.
+    ///
+    /// The caller must still provide an appropriately uniform random-word
+    /// source. The transcript proves how words map to branches, not that the
+    /// entropy source is unbiased or unpredictable.
+    pub fn sample_optimal_assignment_with_words<F>(
+        &self,
+        result: &MaxCountWitnessResult,
+        measure: MaxCountSamplingMeasure,
+        mut next_word: F,
+    ) -> Result<MaxCountSamplingTranscript, EliminationError>
+    where
+        F: FnMut() -> u128,
+    {
+        let mut draws = Vec::new();
+        let mut invalid_bound = false;
+        let assignment = self.sample_optimal_assignment_by_measure(
+            result,
+            measure,
+            |bound| {
+                let mut words = Vec::new();
+                match draw_below_from_words(bound, &mut next_word, &mut words) {
+                    Some(accepted_draw) => {
+                        draws.push(BoundedRandomDraw {
+                            upper_bound: bound,
+                            random_words: words,
+                            accepted_draw,
+                        });
+                        accepted_draw
+                    }
+                    None => {
+                        invalid_bound = true;
+                        0
+                    }
+                }
+            },
+        )?;
+        if invalid_bound {
+            return Err(EliminationError::InvalidEliminationOrder {
+                reason: "sampling requested a zero bounded-integer range",
+            });
+        }
+        Ok(MaxCountSamplingTranscript { measure, draws, assignment })
+    }
+
+    /// Independently replay a sampling transcript against the same checked
+    /// backpointer result and factor graph. This validates the bounded draws
+    /// and selected assignment but does not certify the original entropy.
+    pub fn verify_sampling_transcript(
+        &self,
+        result: &MaxCountWitnessResult,
+        transcript: &MaxCountSamplingTranscript,
+    ) -> Result<bool, EliminationError> {
+        let mut draw_index = 0usize;
+        let mut transcript_error = None;
+        let assignment = self.sample_optimal_assignment_by_measure(
+            result,
+            transcript.measure,
+            |bound| {
+                let record = match transcript.draws.get(draw_index) {
+                    Some(record) => record,
+                    None => {
+                        transcript_error = Some(EliminationError::InvalidEliminationOrder {
+                            reason: "sampling transcript is missing a bounded draw",
+                        });
+                        return 0;
+                    }
+                };
+                draw_index += 1;
+                match replay_bounded_draw(record, bound) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        transcript_error = Some(error);
+                        0
+                    }
+                }
+            },
+        )?;
+        if let Some(error) = transcript_error {
+            return Err(error);
+        }
+        if draw_index != transcript.draws.len() {
+            return Err(EliminationError::InvalidEliminationOrder {
+                reason: "sampling transcript contains unused bounded draws",
+            });
+        }
+        if assignment != transcript.assignment {
+            return Err(EliminationError::InvalidEliminationOrder {
+                reason: "sampling transcript assignment does not match replay",
+            });
+        }
+        Ok(true)
+    }
+
+    pub fn sample_optimal_assignment_by_measure<F>(
+        &self,
+        result: &MaxCountWitnessResult,
+        measure: MaxCountSamplingMeasure,
+        mut uniform_below: F,
+    ) -> Result<Option<Vec<usize>>, EliminationError>
+    where
+        F: FnMut(u128) -> u128,
+    {
+        let optimum = match result.value.optimum() {
+            None => {
+                if result.distinct_optimal_assignments != 0 || result.witness.is_some() {
+                    return Err(EliminationError::InvalidEliminationOrder {
+                        reason: "infeasible MaxCount result has inconsistent support or witness",
+                    });
+                }
+                return Ok(None);
+            }
+            Some(term) => term,
+        };
+        // Scalar factors are constant across every variable assignment. Their
+        // multiplicities scale the global MaxCount total but must cancel from
+        // the conditional distribution over assignments.
+        let scalar_multiplicity = self.factors.iter()
+            .filter(|factor| factor.scope.is_empty())
+            .try_fold(1u128, |total, factor| {
+                let term = factor.values[0].optimum().ok_or(
+                    EliminationError::InvalidEliminationOrder {
+                        reason: "feasible global optimum contains an infeasible scalar factor",
+                    }
+                )?;
+                total.checked_mul(term.count).ok_or(
+                    SemiringError::CountOverflow {
+                        operation: "scalar-factor multiplicity product for sampler",
+                    }.into()
+                )
+            })?;
+        let expected_total = match measure {
+            MaxCountSamplingMeasure::DistinctAssignments => result.distinct_optimal_assignments,
+            MaxCountSamplingMeasure::WeightedMultiplicity => {
+                if optimum.count % scalar_multiplicity != 0 {
+                    return Err(EliminationError::InvalidEliminationOrder {
+                        reason: "scalar multiplicity does not divide the global MaxCount total",
+                    });
+                }
+                optimum.count / scalar_multiplicity
+            }
+        };
+        if expected_total == 0 {
+            return Err(EliminationError::InvalidEliminationOrder {
+                reason: "feasible optimum has zero sampling mass",
+            });
+        }
+        let n = self.cardinalities.len();
+        if result.backpointers.len() != n {
+            return Err(EliminationError::InvalidEliminationOrder {
+                reason: "backpointer count does not match variable count",
+            });
+        }
+
+        let mut position = vec![usize::MAX; n];
+        for (i, backpointer) in result.backpointers.iter().enumerate() {
+            let variable = backpointer.variable;
+            if variable >= n || position[variable] != usize::MAX {
+                return Err(EliminationError::InvalidEliminationOrder {
+                    reason: "backpointer variables are not a permutation",
+                });
+            }
+            position[variable] = i;
+        }
+
+        let mut root_mass = 1u128;
+        for (step, backpointer) in result.backpointers.iter().enumerate() {
+            if backpointer.separator.windows(2).any(|pair| pair[0] >= pair[1])
+                || backpointer.separator.iter().any(|&v| {
+                    v >= n || v == backpointer.variable || position[v] <= step
+                })
+            {
+                return Err(EliminationError::InvalidEliminationOrder {
+                    reason: "backpointer separator is not a later-variable scope",
+                });
+            }
+            let mut expected_rows = 1usize;
+            for &v in &backpointer.separator {
+                expected_rows = expected_rows.checked_mul(self.cardinalities[v])
+                    .ok_or(EliminationError::TableSizeOverflow { factor: None })?;
+            }
+            if backpointer.rows.len() != expected_rows {
+                return Err(EliminationError::InvalidEliminationOrder {
+                    reason: "backpointer row count does not match separator cardinality",
+                });
+            }
+            if backpointer.separator.is_empty() {
+                let root_row = backpointer.rows.get(0)
+                    .ok_or(EliminationError::InvalidEliminationOrder {
+                        reason: "root backpointer is missing its empty-separator row",
+                    })?;
+                if !root_row.separator_assignment.is_empty() {
+                    return Err(EliminationError::InvalidEliminationOrder {
+                        reason: "root backpointer row has a nonempty separator key",
+                    });
+                }
+                let mass = maxcount_backpointer_row_weight(
+                    root_row,
+                    self.cardinalities[backpointer.variable],
+                    measure,
+                )?;
+                root_mass = root_mass.checked_mul(mass)
+                    .ok_or(SemiringError::CountOverflow {
+                        operation: "sampler root mass product",
+                    })?;
+            }
+        }
+        if root_mass != expected_total {
+            return Err(EliminationError::InvalidEliminationOrder {
+                reason: "backpointer root mass disagrees with requested sampling total",
+            });
+        }
+
+        let mut chosen = vec![None; n];
+        for backpointer in result.backpointers.iter().rev() {
+            let key: Vec<usize> = backpointer.separator.iter()
+                .map(|&v| chosen[v].ok_or(EliminationError::InvalidEliminationOrder {
+                    reason: "sampler reached an unassigned separator variable",
+                }))
+                .collect::<Result<_, _>>()?;
+            let row_index = backpointer.separator.iter().zip(key.iter())
+                .fold(0usize, |index, (&v, &state)| index * self.cardinalities[v] + state);
+            let row = backpointer.rows.get(row_index)
+                .ok_or(EliminationError::InvalidEliminationOrder {
+                    reason: "sampler backpointer row index out of range",
+                })?;
+            if row.separator_assignment != key {
+                return Err(EliminationError::InvalidEliminationOrder {
+                    reason: "sampler backpointer row key mismatch",
+                });
+            }
+            let total_mass = maxcount_backpointer_row_weight(
+                row,
+                self.cardinalities[backpointer.variable],
+                measure,
+            )?;
+            if total_mass == 0 {
+                return Err(EliminationError::InvalidEliminationOrder {
+                    reason: "reachable backpointer row has zero sampling mass",
+                });
+            }
+            let draw = uniform_below(total_mass);
+            if draw >= total_mass {
+                return Err(EliminationError::InvalidRandomDraw {
+                    upper_bound: total_mass,
+                    draw,
+                });
+            }
+            let weights = match measure {
+                MaxCountSamplingMeasure::DistinctAssignments => &row.branch_assignment_counts,
+                MaxCountSamplingMeasure::WeightedMultiplicity => &row.branch_multiplicities,
+            };
+            let mut offset = draw;
+            let mut selected_state = None;
+            for (state, &weight) in row.maximizing_states.iter().zip(weights.iter()) {
+                if offset < weight {
+                    selected_state = Some(*state);
+                    break;
+                }
+                offset -= weight;
+            }
+            chosen[backpointer.variable] = Some(selected_state.ok_or(
+                EliminationError::InvalidEliminationOrder {
+                    reason: "sampler failed to select a weighted branch interval",
+                }
+            )?);
+        }
+
+        let assignment: Vec<usize> = chosen.into_iter()
+            .map(|state| state.ok_or(EliminationError::InvalidEliminationOrder {
+                reason: "sampler did not assign every variable",
+            }))
+            .collect::<Result<_, _>>()?;
+        let mut evaluated = self.one.clone();
+        for factor in &self.factors {
+            let value = &factor.values[factor.table_index(&assignment, &self.cardinalities)];
+            evaluated = evaluated.checked_mul(value)?;
+        }
+        match evaluated.optimum() {
+            Some(term) if term.score == optimum.score => Ok(Some(assignment)),
+            _ => Err(EliminationError::InvalidEliminationOrder {
+                reason: "sampled assignment does not attain the reported optimum",
+            }),
+        }
     }
 }
 
@@ -380,6 +1166,8 @@ pub enum OutputContract {
     ExactCount,
     WeightedPartitionFunction,
     OptimumWithMultiplicity,
+    OptimumWithWitnessAndMultiplicity,
+    OptimumWithWitnessMultiplicityAndDistinctAssignmentCount,
     FixedLexicographicOptimumWithMultiplicity,
     FullObjectiveProfile,
     ParetoFrontierWithMultiplicity,
@@ -393,6 +1181,7 @@ pub enum SuggestedAlgebra {
     NaturalCount,
     CommutativeQAlgebra,
     MaxCount,
+    MaxCountWithDistinctSupport,
     WeightProfile,
     ParetoCount,
 }
@@ -403,6 +1192,8 @@ pub fn suggested_algebra(contract: OutputContract) -> SuggestedAlgebra {
         OutputContract::ExactCount => SuggestedAlgebra::NaturalCount,
         OutputContract::WeightedPartitionFunction => SuggestedAlgebra::CommutativeQAlgebra,
         OutputContract::OptimumWithMultiplicity => SuggestedAlgebra::MaxCount,
+        OutputContract::OptimumWithWitnessAndMultiplicity => SuggestedAlgebra::MaxCount,
+        OutputContract::OptimumWithWitnessMultiplicityAndDistinctAssignmentCount => SuggestedAlgebra::MaxCountWithDistinctSupport,
         OutputContract::FixedLexicographicOptimumWithMultiplicity => SuggestedAlgebra::MaxCount,
         OutputContract::FullObjectiveProfile => SuggestedAlgebra::WeightProfile,
         OutputContract::ParetoFrontierWithMultiplicity => SuggestedAlgebra::ParetoCount,
@@ -506,6 +1297,343 @@ pub fn check_algorithm_compatibility(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+
+    #[test]
+    fn max_count_witness_backpointers_recover_triangle_optimum_and_all_ties() {
+        let mut g = ExactFactorGraph::new(vec![2,2,2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        for (u,v) in [(0,1),(1,2),(0,2)] {
+            g.add_factor(vec![u,v], vec![0,1,1,0].into_iter().map(|s| MaxCountValue::candidate(s,1)).collect()).unwrap();
+        }
+        let result = g.evaluate_with_witness(&[0,1,2]).unwrap();
+        assert_eq!(result.value.optimum(), Some(MaxCountTerm { score: 2, count: 6 }));
+        assert_eq!(result.distinct_optimal_assignments, 6);
+        let witness = result.witness.unwrap();
+        let score: i128 = [(0,1),(1,2),(0,2)].iter()
+            .map(|&(u,v)| if witness[u] != witness[v] { 1i128 } else { 0i128 }).sum();
+        assert_eq!(score, 2);
+        assert_eq!(result.backpointers.len(), 3);
+        assert!(result.backpointers.iter().any(|bp| bp.rows.iter().any(|row| row.maximizing_states.len() > 1)));
+    }
+
+    #[test]
+    fn max_count_backpointer_dag_enumerates_every_triangle_maxcut_assignment() {
+        fn visit(
+            position: isize,
+            backpointers: &[MaxCountBackpointer],
+            assignment: &mut [Option<usize>],
+            output: &mut Vec<Vec<usize>>,
+        ) {
+            if position < 0 {
+                output.push(assignment.iter().map(|v| v.unwrap()).collect());
+                return;
+            }
+            let backpointer = &backpointers[position as usize];
+            let key: Vec<usize> = backpointer.separator.iter()
+                .map(|&v| assignment[v].unwrap())
+                .collect();
+            let row_index = backpointer.separator.iter().zip(key.iter())
+                .fold(0usize, |index, (&v, &state)| index * [2usize, 2, 2][v] + state);
+            let row = &backpointer.rows[row_index];
+            assert_eq!(row.separator_assignment, key);
+            for &state in &row.maximizing_states {
+                assignment[backpointer.variable] = Some(state);
+                visit(position - 1, backpointers, assignment, output);
+            }
+            assignment[backpointer.variable] = None;
+        }
+
+        let mut graph = ExactFactorGraph::new(vec![2,2,2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        for (u, v) in [(0,1), (1,2), (0,2)] {
+            graph.add_factor(vec![u,v], vec![0,1,1,0]
+                .into_iter().map(|score| MaxCountValue::candidate(score, 1)).collect()).unwrap();
+        }
+        let result = graph.evaluate_with_witness(&[0,1,2]).unwrap();
+        let mut actual = Vec::new();
+        visit(
+            result.backpointers.len() as isize - 1,
+            &result.backpointers,
+            &mut vec![None; 3],
+            &mut actual,
+        );
+        actual.sort();
+        let mut expected = Vec::new();
+        for a in 0..2 {
+            for b in 0..2 {
+                for c in 0..2 {
+                    let cut = (if a != b { 1 } else { 0 })
+                        + (if b != c { 1 } else { 0 })
+                        + (if a != c { 1 } else { 0 });
+                    if cut == 2 { expected.push(vec![a,b,c]); }
+                }
+            }
+        }
+        expected.sort();
+        assert_eq!(actual, expected);
+        assert_eq!(actual.len(), 6);
+    }
+
+    #[test]
+    fn elimination_statistics_counters_fail_closed_on_overflow() {
+        let mut count = u128::MAX;
+        assert!(matches!(
+            increment_u128(&mut count, "test counter"),
+            Err(EliminationError::StatisticsOverflow { metric: "test counter" })
+        ));
+        let mut steps = usize::MAX;
+        assert!(matches!(
+            increment_usize(&mut steps, "test steps"),
+            Err(EliminationError::StatisticsOverflow { metric: "test steps" })
+        ));
+    }
+
+    #[test]
+    fn max_count_witness_keeps_semiring_multiplicity_distinct_from_assignment_count() {
+        let mut g = ExactFactorGraph::new(vec![2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        g.add_factor(vec![0], vec![
+            MaxCountValue::candidate(5,4),
+            MaxCountValue::candidate(4,1),
+        ]).unwrap();
+        let result = g.evaluate_with_witness(&[0]).unwrap();
+        assert_eq!(result.value.optimum(), Some(MaxCountTerm { score: 5, count: 4 }));
+        assert_eq!(result.distinct_optimal_assignments, 1);
+        assert_eq!(result.witness, Some(vec![0]));
+        assert_eq!(result.backpointers[0].rows[0].maximizing_states, vec![0]);
+        assert_eq!(result.backpointers[0].rows[0].branch_multiplicities, vec![4]);
+        assert_eq!(result.backpointers[0].rows[0].branch_assignment_counts, vec![1]);
+    }
+
+
+    #[test]
+    fn max_count_witness_returns_distinct_support_for_unconstrained_variables() {
+        let graph = ExactFactorGraph::new(vec![2,3,4], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        let result = graph.evaluate_with_witness(&[0,1,2]).unwrap();
+        assert_eq!(result.value.optimum(), Some(MaxCountTerm { score: 0, count: 24 }));
+        assert_eq!(result.distinct_optimal_assignments, 24);
+        assert_eq!(result.witness.as_ref().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn max_count_weighted_ties_separate_multiplicity_from_distinct_support() {
+        let mut graph = ExactFactorGraph::new(vec![2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        graph.add_factor(vec![0], vec![
+            MaxCountValue::candidate(5, 4),
+            MaxCountValue::candidate(5, 2),
+        ]).unwrap();
+        let result = graph.evaluate_with_witness(&[0]).unwrap();
+        assert_eq!(result.value.optimum(), Some(MaxCountTerm { score: 5, count: 6 }));
+        assert_eq!(result.distinct_optimal_assignments, 2);
+        assert_eq!(result.witness, Some(vec![0]));
+        assert_eq!(result.backpointers[0].rows[0].maximizing_states, vec![0, 1]);
+        assert_eq!(result.backpointers[0].rows[0].branch_multiplicities, vec![4, 2]);
+        assert_eq!(result.backpointers[0].rows[0].branch_assignment_counts, vec![1, 1]);
+    }
+
+    #[test]
+    fn exact_uniform_optimum_sampler_returns_only_maxcut_optima() {
+        let mut graph = ExactFactorGraph::new(vec![2,2,2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        for (u,v) in [(0,1),(1,2),(0,2)] {
+            graph.add_factor(vec![u,v], vec![0,1,1,0]
+                .into_iter().map(|score| MaxCountValue::candidate(score, 1)).collect()).unwrap();
+        }
+        let result = graph.evaluate_with_witness(&[0,1,2]).unwrap();
+        let first = graph.sample_optimal_assignment(&result, |_| 0).unwrap().unwrap();
+        let last = graph.sample_optimal_assignment(&result, |bound| bound - 1).unwrap().unwrap();
+        for assignment in [first, last] {
+            let score: i128 = [(0,1),(1,2),(0,2)].iter()
+                .map(|&(u,v)| if assignment[u] != assignment[v] { 1i128 } else { 0i128 }).sum();
+            assert_eq!(score, 2);
+        }
+        assert!(matches!(
+            graph.sample_optimal_assignment(&result, |_| u128::MAX),
+            Err(EliminationError::InvalidRandomDraw { .. })
+        ));
+        let mut inconsistent = result.clone();
+        inconsistent.distinct_optimal_assignments += 1;
+        assert!(graph.sample_optimal_assignment(&inconsistent, |_| 0).is_err());
+    }
+
+    #[test]
+    fn rejection_sampler_records_rejected_words_and_replays_without_modulo_bias() {
+        let mut source = vec![3u128, 2u128].into_iter();
+        let mut consumed = Vec::new();
+        let draw = draw_below_from_words(3, &mut || source.next().unwrap(), &mut consumed).unwrap();
+        assert_eq!(draw, 2);
+        assert_eq!(consumed, vec![3, 2]);
+        assert_eq!(replay_bounded_draw(
+            &BoundedRandomDraw {
+                upper_bound: 3,
+                random_words: consumed,
+                accepted_draw: 2,
+            },
+            3,
+        ).unwrap(), 2);
+        let mut untouched = Vec::new();
+        assert_eq!(draw_below_from_words(1, &mut || panic!("bound one consumes no entropy"), &mut untouched), Some(0));
+        assert!(untouched.is_empty());
+    }
+
+    #[test]
+    fn sampling_transcript_replays_and_rejects_mutated_random_words() {
+        let mut graph = ExactFactorGraph::new(vec![3], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        graph.add_factor(vec![0], vec![
+            MaxCountValue::candidate(7, 1),
+            MaxCountValue::candidate(7, 1),
+            MaxCountValue::candidate(7, 1),
+        ]).unwrap();
+        let result = graph.evaluate_with_witness(&[0]).unwrap();
+        let mut words = vec![3u128, 2u128].into_iter();
+        let transcript = graph.sample_optimal_assignment_with_words(
+            &result,
+            MaxCountSamplingMeasure::DistinctAssignments,
+            || words.next().unwrap(),
+        ).unwrap();
+        assert_eq!(transcript.assignment, Some(vec![2]));
+        assert_eq!(transcript.draws[0].upper_bound, 3);
+        assert_eq!(transcript.draws[0].random_words, vec![3, 2]);
+        assert!(graph.verify_sampling_transcript(&result, &transcript).unwrap());
+
+        let mut mutated = transcript.clone();
+        mutated.draws[0].random_words[0] = 0;
+        assert!(graph.verify_sampling_transcript(&result, &mutated).is_err());
+        let mut missing = transcript.clone();
+        missing.draws.clear();
+        assert!(graph.verify_sampling_transcript(&result, &missing).is_err());
+    }
+
+    #[test]
+    fn multiplicity_weighted_sampler_uses_a_different_distribution_than_uniform_support() {
+        let mut graph = ExactFactorGraph::new(vec![2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        graph.add_factor(vec![0], vec![
+            MaxCountValue::candidate(5, 4),
+            MaxCountValue::candidate(5, 2),
+        ]).unwrap();
+        let result = graph.evaluate_with_witness(&[0]).unwrap();
+        assert_eq!(result.distinct_optimal_assignments, 2);
+        assert_eq!(result.value.optimum().unwrap().count, 6);
+
+        // Distinct-uniform sampling assigns one half of the integer interval
+        // to each state, while multiplicity-weighted sampling uses 4:2.
+        assert_eq!(
+            graph.sample_optimal_assignment(&result, |_| 0).unwrap(),
+            Some(vec![0])
+        );
+        assert_eq!(
+            graph.sample_optimal_assignment(&result, |_| 1).unwrap(),
+            Some(vec![1])
+        );
+        assert_eq!(
+            graph.sample_optimal_assignment_by_multiplicity(&result, |_| 3).unwrap(),
+            Some(vec![0])
+        );
+        assert_eq!(
+            graph.sample_optimal_assignment_by_multiplicity(&result, |_| 4).unwrap(),
+            Some(vec![1])
+        );
+    }
+
+    #[test]
+    fn multiplicity_weighted_sampler_cancels_constant_scalar_factor_weights() {
+        let mut graph = ExactFactorGraph::new(vec![2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        graph.add_factor(vec![0], vec![
+            MaxCountValue::candidate(5, 4),
+            MaxCountValue::candidate(5, 2),
+        ]).unwrap();
+        graph.add_factor(vec![], vec![MaxCountValue::candidate(7, 9)]).unwrap();
+        let result = graph.evaluate_with_witness(&[0]).unwrap();
+        assert_eq!(result.value.optimum(), Some(MaxCountTerm { score: 12, count: 54 }));
+        assert_eq!(result.distinct_optimal_assignments, 2);
+        assert_eq!(graph.sample_optimal_assignment_by_multiplicity(&result, |_| 3).unwrap(), Some(vec![0]));
+        assert_eq!(graph.sample_optimal_assignment_by_multiplicity(&result, |_| 4).unwrap(), Some(vec![1]));
+    }
+
+    #[test]
+    fn exact_uniform_optimum_sampler_handles_infeasible_and_empty_assignment() {
+        let mut infeasible = ExactFactorGraph::new(vec![2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        infeasible.add_factor(vec![0], vec![MaxCountValue::zero(), MaxCountValue::zero()]).unwrap();
+        let result = infeasible.evaluate_with_witness(&[0]).unwrap();
+        assert_eq!(infeasible.sample_optimal_assignment(&result, |_| 0).unwrap(), None);
+
+        let empty = ExactFactorGraph::new(vec![], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        let empty_result = empty.evaluate_with_witness(&[]).unwrap();
+        assert_eq!(empty_result.distinct_optimal_assignments, 1);
+        assert_eq!(empty.sample_optimal_assignment(&empty_result, |_| 0).unwrap(), Some(vec![]));
+    }
+
+    #[test]
+    fn exact_uniform_optimum_sampler_multiplies_disconnected_component_supports() {
+        let mut graph = ExactFactorGraph::new(vec![2,3], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        graph.add_factor(vec![0], vec![
+            MaxCountValue::candidate(0, 2),
+            MaxCountValue::candidate(0, 3),
+        ]).unwrap();
+        graph.add_factor(vec![1], vec![
+            MaxCountValue::candidate(0, 1),
+            MaxCountValue::candidate(0, 4),
+            MaxCountValue::candidate(0, 5),
+        ]).unwrap();
+        let result = graph.evaluate_with_witness(&[0,1]).unwrap();
+        assert_eq!(result.value.optimum(), Some(MaxCountTerm { score: 0, count: 50 }));
+        assert_eq!(result.distinct_optimal_assignments, 6);
+        let first = graph.sample_optimal_assignment(&result, |_| 0).unwrap().unwrap();
+        let last = graph.sample_optimal_assignment(&result, |bound| bound - 1).unwrap().unwrap();
+        assert_ne!(first, last);
+        for assignment in [first, last] {
+            assert!(assignment[0] < 2 && assignment[1] < 3);
+        }
+    }
+
+    #[test]
+    fn max_count_dual_factor_tables_reject_scope_and_feasibility_misalignment() {
+        let weighted = vec![ExactFactor {
+            scope: vec![0],
+            values: vec![MaxCountValue::candidate(3, 1), MaxCountValue::zero()],
+        }];
+        let wrong_scope = vec![ExactFactor {
+            scope: vec![1],
+            values: vec![1u128, 0u128],
+        }];
+        assert!(validate_support_factor_alignment(&weighted, &wrong_scope).is_err());
+
+        let wrong_feasibility = vec![ExactFactor {
+            scope: vec![0],
+            values: vec![0u128, 0u128],
+        }];
+        assert!(validate_support_factor_alignment(&weighted, &wrong_feasibility).is_err());
+
+        let correct = vec![ExactFactor {
+            scope: vec![0],
+            values: vec![1u128, 0u128],
+        }];
+        assert!(validate_support_factor_alignment(&weighted, &correct).is_ok());
+    }
+
+    #[test]
+    fn max_count_support_count_overflow_fails_closed() {
+        let mut graph = ExactFactorGraph::new(vec![2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        graph.add_factor(vec![0], vec![
+            MaxCountValue::candidate(5, 1),
+            MaxCountValue::candidate(5, 1),
+        ]).unwrap();
+        let result = graph.evaluate_with_witness(&[0]).unwrap();
+        assert_eq!(result.distinct_optimal_assignments, 2);
+        let mut counter = u128::MAX;
+        assert!(matches!(
+            increment_u128(&mut counter, "support overflow test"),
+            Err(EliminationError::StatisticsOverflow { metric: "support overflow test" })
+        ));
+    }
+
+    #[test]
+    fn max_count_witness_rejects_missing_duplicate_orders_and_handles_infeasible_instance() {
+        let mut g = ExactFactorGraph::new(vec![2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        assert!(g.evaluate_with_witness(&[]).is_err());
+        assert!(g.evaluate_with_witness(&[0,0]).is_err());
+        g.add_factor(vec![0], vec![MaxCountValue::zero(), MaxCountValue::zero()]).unwrap();
+        let result = g.evaluate_with_witness(&[0]).unwrap();
+        assert_eq!(result.value.optimum(), None);
+        assert_eq!(result.witness, None);
+    }
 
     #[test]
     fn count_semiring_counts_triangle_independent_sets() {
@@ -639,6 +1767,11 @@ mod tests {
         assert_eq!(suggested_algebra(OutputContract::ExactCount), SuggestedAlgebra::NaturalCount);
         assert_eq!(suggested_algebra(OutputContract::WeightedPartitionFunction), SuggestedAlgebra::CommutativeQAlgebra);
         assert_eq!(suggested_algebra(OutputContract::OptimumWithMultiplicity), SuggestedAlgebra::MaxCount);
+        assert_eq!(suggested_algebra(OutputContract::OptimumWithWitnessAndMultiplicity), SuggestedAlgebra::MaxCount);
+        assert_eq!(
+            suggested_algebra(OutputContract::OptimumWithWitnessMultiplicityAndDistinctAssignmentCount),
+            SuggestedAlgebra::MaxCountWithDistinctSupport
+        );
         assert_eq!(suggested_algebra(OutputContract::FixedLexicographicOptimumWithMultiplicity), SuggestedAlgebra::MaxCount);
         assert_eq!(suggested_algebra(OutputContract::FullObjectiveProfile), SuggestedAlgebra::WeightProfile);
         assert_eq!(suggested_algebra(OutputContract::ParetoFrontierWithMultiplicity), SuggestedAlgebra::ParetoCount);

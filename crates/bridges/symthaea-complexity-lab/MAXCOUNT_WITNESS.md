@@ -1,0 +1,162 @@
+# ETH-018 — exact MaxCount witness and optimal-solution DAG
+
+**Status:** Rust witness/backpointer and two-measure sampling APIs are committed on draft PR #10215. Python exact references pass. Rust compilation, Lean proofs and hardware benchmarks remain open.
+
+## Why this is the next extension
+
+An optimum value alone is not operationally useful in many applications. A solver should return a concrete assignment, prove that it attains the optimum, report exact MaxCount multiplicity, and expose the structure of all optimum assignments without re-solving the instance once per variable.
+
+Existing work already certifies optimization. VeriPB is a general pseudo-Boolean proof format used by combinatorial solvers; formally verified checking for PB optimization is practically feasible in RoundingSat/Sat4j pipelines. Recent work also gives proof logging for state-of-the-art branch-and-bound MaxSAT and certifying Pareto-optimality for multi-objective MaxSAT. This project must not claim that proof-logging optimization or Pareto certification is new.
+
+References:
+- VeriPB, proof format and ecosystem: https://veripb.org/
+- Koops et al., *Practically Feasible Proof Logging for Pseudo-Boolean Optimization*, CP 2025: https://doi.org/10.4230/LIPIcs.CP.2025.21
+- Vandesande, Coll & Bogaerts, *Certified Branch-and-Bound MaxSAT Solving*, AAAI 2026: https://doi.org/10.1609/aaai.v40i17.38449
+- Jabs et al., *Certifying Pareto-Optimality in Multi-Objective Maximum Satisfiability*, TACAS 2025: https://doi.org/10.1007/978-3-031-90653-4_6
+- Ihalainen et al., *Certified MaxSAT Preprocessing*, IJCAR 2024: https://arxiv.org/abs/2404.17316
+
+The narrower hypothesis is to extend Symthaea's factor-elimination / MaxCount path with an exact, replayable witness interface, including tie-aware local decisions and an optimal-assignment DAG, while preserving the semiring's exact optimum and multiplicity. For overlapping MaxSAT/PB cases, benchmark interoperability with VeriPB rather than reinventing a proof language.
+
+## Algorithm
+
+When eliminating variable x with separator assignment y, evaluate every state a:
+
+```
+T_a(y) = product of factors in bucket(x), evaluated at (y,a)
+M_x(y) = max-plus-count sum over a of T_a(y)
+```
+
+Store the MaxCount output and **all** states attaining its maximum, together with each branch's local multiplicity. The backpointer table for each eliminated variable is indexed by its separator assignment.
+
+After forward elimination, reverse the order. The separator variables have already been assigned; select the smallest maximizing state to obtain a canonical witness. Branch over all stored maximizing states to enumerate the optimal-assignment support as an implicit decision DAG. Enumeration may itself be exponential in the number of witnesses; the DAG is the compact representation, not a promise that materializing every witness is cheap.
+
+## Important semantic distinction
+
+MaxCount's second component is the semiring multiplicity, not necessarily the number of distinct variable assignments. With unit local multiplicities, these coincide. If local factors encode weights/multiple derivations, a single assignment can contribute multiplicity greater than one.
+
+The exact witness DAG represents distinct variable assignments only. The dual-count extension also computes the distinct assignment total during elimination, rather than requiring DAG enumeration. The checker separately verifies:
+1. every local argmax set against the original bucket tables;
+2. every intermediate MaxCount message and tie multiplicity;
+3. the final optimum and total semiring multiplicity;
+4. the reconstructed canonical witness against the original factor system;
+5. the complete optimum-assignment support represented by the DAG on small exhaustive tests.
+
+Example: triangle MaxCut has optimum 2, multiplicity 6 and six distinct optimal assignments. A weighted mixed-cardinality example has optimum 6, semiring multiplicity 4, but only one distinct optimum assignment. Conflating these quantities would be incorrect.
+
+## Dual-count extension: multiplicity plus distinct assignment support
+
+The same elimination pass can compute a second count that must not be confused with MaxCount multiplicity:
+
+- The **multiplicity channel** multiplies factor multiplicities and sums them across score ties.
+- The **distinct-support channel** initializes each feasible original factor-table cell to support 1 and each infeasible cell to 0. During elimination, support counts multiply across factors whose eliminated-variable sets are disjoint, and add across tied values of the currently eliminated variable.
+
+This is valid for the current API because factors are created from original tables, where each table cell is one local assignment. It does not silently support pre-aggregated factors that encode overlapping hidden assignment sets; any future API admitting those must supply provenance or reject the distinct-support output contract.
+
+Rust additions in `semiring.rs`:
+- `MaxCountBackpointerRow.branch_assignment_counts` alongside `branch_multiplicities`;
+- `MaxCountWitnessResult.distinct_optimal_assignments`;
+- support-count operation counters with checked overflow;
+- `OutputContract::OptimumWithWitnessMultiplicityAndDistinctAssignmentCount` and `SuggestedAlgebra::MaxCountWithDistinctSupport`.
+
+The certificate format is now v2 dual-count. The independent checker recomputes each intermediate MaxCount table, each support table, the branch tie list and both final counts. It rejects rehashed false support values, not just bad hashes.
+
+## Executed Python reference
+
+- `reference/maxcount_witness_oracle.py`: producer, separate replay checker, direct assignment oracle, and backpointer-DAG enumerator.
+- `reference/maxcount_witness_results.json`: deterministic run output.
+
+Results (seed 20261103):
+- 240/240 randomized mixed-cardinality factor graphs: exact MaxCount result equals direct assignment enumeration;
+- 240/240: independently checked certificate accepted;
+- 240/240: backpointer DAG's distinct optimum-assignment support equals direct enumeration support;
+- 2/2 handcrafted cases, including triangle MaxCut and weighted multiplicity-versus-distinct-witness distinction;
+- 8/8 deliberately rehashed false/stale/mutated certificates rejected.
+
+All integer arithmetic uses Python arbitrary-precision integers. The checker has a separate replay implementation and recomputes local argmax sets; recomputing the certificate digest after mutation does not make a false trace acceptable.
+
+## Exact uniform sampling of optima
+
+The distinct-support counts permit exact uniform sampling without enumerating every optimum. At each reverse backpointer step, select a maximizing state with probability proportional to its branch-support count. The branch count is the product of distinct-support counts for disjoint child blocks in the bucket; prior backpointers then sample those child blocks conditionally. The probability products telescope to 1 / total distinct optimum support.
+
+Rust adds ExactFactorGraph<MaxCountValue>::sample_optimal_assignment. The caller supplies a uniform_below(bound) callback that must return an unbiased integer in [0,bound). This avoids a dependency on a specific RNG crate. The sampler validates the variable permutation, separator ordering, row encoding, parallel branch-array lengths, positive branch counts, root-support product, and the returned assignment's score. It trusts the supplied argmax/support contents; externally supplied results must be independently certificate-checked before sampling.
+
+The Python v2 reference checks 1,389 path probabilities exactly with fractions.Fraction: each tested optimum has probability exactly 1 / support_size; all six triangle MaxCut optima have probability 1/6. This is an exact finite probability check, not a runtime benchmark.
+
+### Exact probability argument
+
+For a reached backpointer row r, let B_r(a) be the distinct support count of the branch choosing state a, and let S_r = sum_a B_r(a) be that row's support. The sampler selects a with probability B_r(a)/S_r.
+
+Each B_r(a) is a product of support totals for the disjoint child factors in that bucket. When the algorithm later samples each child block, its conditional path probability contributes the reciprocal of that child's support total. Those child denominators cancel the corresponding factors in B_r(a). Repeating this over the elimination forest leaves one denominator per empty-separator root row. Distinct components have disjoint variable sets, so their root supports multiply to the global distinct optimum count N. Thus every complete optimal assignment has probability exactly 1/N.
+
+The proof depends on the disjoint hidden-variable-block invariant from the dual-count section. It is invalid for pre-aggregated factors with overlapping hidden assignment provenance. It is also conditional on the bounded-integer callback being unbiased; modulo-biased or adversarial draws do not give exact uniformity.
+
+## Two exact optimal-assignment sampling measures
+
+The same tie-aware backpointer rows support two different measures:
+
+1. **Distinct-uniform:** every distinct optimal assignment has probability exactly (1/N), where (N) is `distinct_optimal_assignments`.
+2. **Multiplicity-weighted:** an optimal assignment (a) has probability (M(a)/\sum_b M(b)), where (M(a)) is the product of its local MaxCount multiplicities.
+
+At each reverse step, select a maximizing state in proportion to its `branch_assignment_count` for distinct-uniform sampling, or its `branch_multiplicity` for multiplicity-weighted sampling. The products of conditional probabilities telescope along the elimination forest.
+
+**Constant scalar factors must cancel.** A zero-scope factor multiplies the multiplicity of every variable assignment equally. It changes the reported global MaxCount multiplicity but not the probability distribution over assignments. The Rust weighted sampler computes the scalar-factor multiplicity product and removes it from the global normalization before checking the product of empty-separator root masses.
+
+For a one-variable equal-score tie with local multiplicities `[4, 2]`, distinct-uniform probabilities are `[1/2, 1/2]`, whereas multiplicity-weighted probabilities are `[2/3, 1/3]`. These are intentionally different APIs: sampling configurations uniformly is not the same as sampling weighted derivations/microstates.
+
+Rust APIs:
+- `sample_optimal_assignment`: distinct-uniform over feasible optimal assignments;
+- `sample_optimal_assignment_by_multiplicity`: assignment probability proportional to its MaxCount multiplicity;
+- `sample_optimal_assignment_by_measure`: shared implementation selected by `MaxCountSamplingMeasure`.
+
+Both require a caller-supplied unbiased `uniform_below(bound)` callback. Modulo-biased or adversarial draws do not produce exact sampling. The sampler checks the backpointer structure, root normalization, callback range and final optimum score. As documented above, external result objects must be independently certificate-checked first; the sampling helper is not a substitute for replaying all argmax contents against the original factors.
+
+## Sampling research and prior art
+
+Projected enumeration/counting proof logging has advanced in 2026: McCreesh, Nordström, Oertel & Tan, *Proof Logging for Projected Enumeration (and Counting?) Problems in VeriPB*, CP 2026, develops formally verified enumerations and discusses extending the system toward counting. This reinforces the claim boundary: proof-logged enumeration is not novel. The narrower question here is exact sampling from a checked factor-elimination optimum support, with distinct-uniform and multiplicity-weighted measures made explicit. https://doi.org/10.4230/LIPIcs.CP.2026.43
+
+The extended Python reference checks exact rational path probabilities with `fractions.Fraction`: 1,389 assignment paths for distinct-uniform sampling and the same 1,389 for multiplicity-weighted sampling. The one-variable weighted-tie control confirms the `[2/3, 1/3]` multiplicity split; disconnected components and scalar factors are covered. These are exact finite probability checks, not a runtime benchmark.
+
+## Benchmarks and qualification targets
+
+Compare on identical frozen factor systems and budgets:
+- optimum-only MaxCount;
+- MaxCount plus one canonical witness via backpointers;
+- optimum-support DAG via backpointers;
+- repeated conditional self-reduction (one or more solver calls per variable/state);
+- plain max-sum/treewidth DP with unverified backpointers;
+- certified PB/MaxSAT baselines (VeriPB, MaxCDCL/MaxSAT) where input semantics match.
+
+Report separately: optimum correctness, multiplicity correctness, witness validity, optimal-support precision/recall, backpointer bytes, certificate bytes, solve time, backtrack time, independent-check time, peak RSS, and additional solver calls avoided. Include low/high treewidth graph/CSP families, tie-heavy and unique-optimum cases, weighted factors, negative scores, infeasible instances, and unconstrained variables.
+
+Aspirational gates (not achieved): 100% agreement with exhaustive support on tractable cases; zero accepted mutated certificates; no re-solving required for the canonical witness; exact multiplicity preserved; median backpointer overhead below 25% on a declared low-width slice; verified solve+check overhead below 2x against the same unverified elimination baseline; clear Pareto comparison with PB proof systems on overlapping MaxSAT cases.
+
+## Fair cross-system sampling comparison
+
+For a DPSampler/WAPS comparison, first compute the exact optimum score, then restrict the external SAT/PB instance to the optimum-score slice. The sampled object must remain the original assignment. Auxiliary variables must be projected away, or the encoding must be proved functional (exactly one auxiliary extension per original assignment); otherwise auxiliary multiplicity changes the sample distribution.
+
+Use unit weights for distinct-uniform sampling. For multiplicity-weighted sampling, compare only where the competitor supports exactly the same assignment-weight function. Arbitrary finite-domain local multiplicities that cannot be represented by the target literal/factor-weight language belong in a separate general-factor track. Counting systems such as PBCount2, DPMC and ADDMC can validate normalizers or projected support but must not be reported as samplers. On small shared instances, use exact rational path probabilities; on larger cases, empirical TVD is a diagnostic only.
+
+## Claim ceiling
+
+- Python finite reference != Rust implementation or Lean proof;
+- MaxCount multiplicity != distinct witness count in weighted encodings;
+- an optimal-solution DAG != a polynomial-size DAG for every instance;
+- proof-carrying backpointers != a new general proof system;
+- no hardware runtime, broad benchmark win or SOTA claim yet.
+
+
+## Rejection-sampled bounded draws and replayable randomness receipts
+
+The earlier sampler APIs accept an already-unbiased `uniform_below(bound)` callback. A new Rust adapter, `sample_optimal_assignment_with_words`, lowers the caller's obligation to supplying raw 128-bit words from its chosen random source. It uses bit-mask rejection:
+
+1. set (k=\lceil\log_2(bound)\rceil);
+2. mask each raw word to its low (k) bits;
+3. reject candidates outside ([0,bound));
+4. record every raw word, including rejected words, and the accepted bounded draw.
+
+This avoids modulo bias. The API returns a `MaxCountSamplingTranscript` recording the measure, per-step upper bounds, raw random words, accepted values and final assignment. `verify_sampling_transcript` replays the bounded choices against the same checked backpointer result and rejects an incorrect range, missing/extra words, false accepted value or assignment mismatch.
+
+The transcript proves **how** the raw words determined the sample. It does not prove that the raw-word source was unbiased, unpredictable or honestly seeded. Those remain explicit entropy-source assumptions. A cryptographic PRNG can provide a practical pseudorandom source; a public randomness beacon or committed seed could add provenance, but neither is magically an information-theoretic proof of entropy.
+
+The standalone exact Python oracle `reference/maxcount_bounded_draw_oracle.py` exhaustively checks all two-word paths for bounds 1–64 (149,797 paths), checks the full-width (u128) rejection case, confirms bound one consumes no randomness, and rejects three mutated transcripts. This is finite combinatorial evidence, not a cryptographic entropy analysis or measured solver benchmark.
+
