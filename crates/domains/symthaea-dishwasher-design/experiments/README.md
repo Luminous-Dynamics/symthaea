@@ -46,10 +46,10 @@ The CSV header is a data contract only; it does not authenticate the evidence re
 
 ## Phase-resolved detergent events
 
-The cycle-level `measurement-template.csv` records formulation identity, commanded/actual cycle-total detergent mass, dose-plan identity and the digest of a separate dose-event archive.
+The cycle-level `measurement-template.csv` records formulation identity/version, formulation-evidence digest, dose-plan identity/digest, commanded and actual cycle-total component mass, and the digest of a separate dose-event archive.
 
-Use `dose-events-template.csv` for **one row per physical component-release event**. Record the exact formulation/component batch, calibration, cycle phase, release time, phase temperature, commanded mass, measured actual mass (blank when not measured), delivery status, dispenser pressure/flow, interaction evidence and raw-event digest.
+Use `dose-events-template.csv` for **one row per physical component-release event**. Record the exact formulation/component batch, component calibration, cycle phase and phase window, release time and water temperature, commanded mass, measured actual mass (blank when not measured), delivery status, dispenser pressure/flow, interaction evidence and raw-event digest.
 
-Keep cycle rows and dose-event rows linked by `run_id`. Do not infer that a commanded dose was delivered. Actual mass should come from a calibrated mass/volume measurement with a batch-specific density or a directly measured mass change. A missing value is empty, not zero.
+Keep cycle rows and dose-event rows linked by `run_id`. Do not infer that a commanded dose was delivered. Actual mass should come from a calibrated mass/volume measurement with a batch-specific density or a directly measured mass change. A missing value is empty, not zero. Do not aggregate several component events into one row.
 
-The current Rust `chemistry::validate_dose_plan` validates a proposed schedule against a declared calibration profile; it does not measure delivery, choose a formulation, prove ingredient compatibility or establish cleaning. The compatibility and calibration hashes are provenance identifiers and must be independently audited against the original formulation-owner and laboratory records.
+The Rust `symthaea_dishwasher_design::chemistry::validate_dose_plan` validates a proposed schedule against a declared formulation calibration profile: component identity, soil/surface scope, phase ordering, stage-specific temperature, water hardness, per-event/per-cycle/total mass limits and evidence-backed inter-component timing. It does not measure delivery, select a formulation or dose, prove evidence authenticity, certify ingredient compatibility, or establish cleaning. The compatibility and calibration hashes are provenance identifiers and must be independently audited against the formulation owner's and laboratory's original records.
