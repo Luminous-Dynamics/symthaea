@@ -10,8 +10,8 @@ From the repository root:
 
 ```sh
 cargo fmt --check --manifest-path tools/pitb-graph-evidence/Cargo.toml
-cargo test --manifest-path tools/pitb-graph-evidence/Cargo.toml
-cargo run --manifest-path tools/pitb-graph-evidence/Cargo.toml -- \
+cargo test --locked --manifest-path tools/pitb-graph-evidence/Cargo.toml
+cargo run --locked --manifest-path tools/pitb-graph-evidence/Cargo.toml -- \
   --self-test \
   tools/pitb-graph-evidence/fixtures/graph-evidence.synthetic.json \
   tools/pitb-graph-evidence/fixtures/evidence
@@ -19,7 +19,7 @@ cargo run --manifest-path tools/pitb-graph-evidence/Cargo.toml -- \
   --verify path/to/graph.json path/to/evidence-root
 ```
 
-The synthetic fixture is contract-only. Its reviewer note and extractor receipts are deliberately synthetic and must never be mistaken for real Lean evidence or reviewer attestations.
+The crate includes Rust unit tests for path policy, relation/evidence mapping, confidence semantics, formal-vs-candidate roles and cycle policy. The synthetic fixture is also checked end-to-end by the CLI self-test. Its reviewer note and extractor receipts are deliberately synthetic and must never be mistaken for real Lean evidence or reviewer attestations.
 
 ## Edge ontology
 
