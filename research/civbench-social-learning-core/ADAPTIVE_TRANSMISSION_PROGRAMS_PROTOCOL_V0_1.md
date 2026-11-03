@@ -20,6 +20,28 @@ The paper is an in-silico result in a deterministic combinatorial task, not a de
 
 No score from this synthetic crate is directly comparable to the paper's 37% result.
 
+
+### Source-specific reference details (for a future reproduction adapter)
+
+The arXiv HTML methods describe Collective LittleAlchemy as 720 deterministic elements with four base elements (water, fire, earth, air). Each agent has a permanent inventory and a memory of attempted combinations represented as triples (input element 1, input element 2, result), where result records success or failure. A learner attempts one combination per synchronous step. After that attempt, a transmission protocol shares memories. Received memories make their involved elements available in a temporary social inventory for that step; only elements discovered by the recipient's own successful combination become permanent. Thus a recipient can use socially available elements without the shared result automatically becoming an individual discovery. The group objective is the number of unique outputs discovered by any agent, and each agent can discover at most one new element per step.
+
+The primary empowerment-agent model uses a softmax over action empowerment (temperature beta=0.05), an agent-specific noisy item-empowerment model and a fixed social bias: when social inventory is non-empty, probability 0.5 of restricting the candidate combination set to combinations involving at least one socially received element. Alternative agents are uniform stochastic combiners or Gemini 3.0 Flash LLM agents. The attention cap is 20 received memories per agent per step, with uniform subsampling when more are sent.
+
+Five baseline protocols are defined:
+- Asocial: no sharing.
+- Paired: fixed dyads, up to 10 random memories with 0.5 probability per step.
+- Dynamic: paired sharing plus periodic visits to other dyads.
+- Graph: sharing along an Erdős–Rényi graph with p=0.2.
+- Stochastic: each agent receives 20 randomly sampled memories from other agents per step, saturating the stated attention cap.
+
+The protocol interface is a stateful Python class whose share method observes agent states and emits sharing decisions. The stated design constraint is that protocols can observe state but cannot directly modify agent inventories and do not see the ground-truth recipe graph.
+
+The reported search uses five independent evolutionary runs. Each runs 200 iterations; the first 50 are warm-up candidate generation, then Thompson-sampled parent selection and prompts to improve or diversify. The model is Gemini 3.0 Flash. Candidate programs are executed in a short sandbox with up to three repair attempts. Fitness is mean collective performance across 30 simulations, with 10 empowerment agents over 150 steps. The authors also analyze 1,000 independently generated protocols.
+
+The main population generalization settings include 6 and 20 agents, stochastic and LLM agents, mixed populations, stronger empowerment bias and stronger social bias. Domain generalization includes depth-limited tasks (86 reachable elements), three-item starts (587–684 reachable), heterogeneous starts and item dropout (fewer than 300 reachable elements). The paper reports +33% average and +37% top-protocol gain at 150 steps, +32% average and +36% top-protocol gain at 300 steps, +49% for population size 20, and gains across the listed domain variants. These are paper-reported simulation results; not reproduced here.
+
+A faithful reproduction must recover the exact supplementary task generator, agent learning/update routines, schedule/budget semantics, baseline tie-breaking, memory lifecycle, program API and evaluator. The anonymized author-code URL is not yet machine-readable in the current environment. Do not recreate missing rules from a secondary summary and label them the official implementation.
+
 ## 2. Scientific question
 
 Under the same social graph, starting knowledge, individual-learning opportunities, transmission count and recipient attention budget:
