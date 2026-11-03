@@ -37,9 +37,15 @@ pub struct ModelResidualObservation {
     pub horizon_ms: u64,
     pub metric_id: String,
     pub metric_unit_id: String,
-    pub predicted_value: f64,
-    pub realized_value: f64,
+    /// Present when the predictor emitted a forecast at this horizon.
+    pub predicted_value: Option<f64>,
+    /// Present only when the reference outcome is fully observed.
+    pub realized_value: Option<f64>,
+    /// Present only for a fully observed reference outcome.
     pub prediction_set_contains_realized: Option<bool>,
+    /// Every expected scenario × actor × action-history × metric × horizon slot
+    /// must appear, including missing/censored/timed-out/unsupported outcomes.
+    pub reference_status: ReferenceOutcomeStatus,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -113,14 +119,20 @@ pub enum VehicleModelDiscrepancyError {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HorizonResidualSummary {
     pub horizon_ms: u64,
-    pub observation_count: usize,
+    /// Number of expected outcome rows supplied for this horizon.
+    pub outcome_count: usize,
+    pub observed_count: usize,
+    pub missing_count: usize,
+    pub censored_count: usize,
+    pub timed_out_count: usize,
+    pub unsupported_count: usize,
     pub failure_family_count: usize,
-    pub mean_signed_residual: f64,
-    pub median_signed_residual: f64,
-    pub median_absolute_residual: f64,
-    pub p90_absolute_residual: f64,
-    pub p95_absolute_residual: f64,
-    pub worst_family_p95_absolute_residual: f64,
+    pub mean_signed_residual: Option<f64>,
+    pub median_signed_residual: Option<f64>,
+    pub median_absolute_residual: Option<f64>,
+    pub p90_absolute_residual: Option<f64>,
+    pub p95_absolute_residual: Option<f64>,
+    pub worst_family_p95_absolute_residual: Option<f64>,
     pub prediction_set_membership_count: usize,
     pub prediction_set_covered_count: usize,
 }
@@ -129,9 +141,15 @@ pub struct HorizonResidualSummary {
 pub struct FamilyHorizonResidualSummary {
     pub horizon_ms: u64,
     pub failure_family_id: String,
-    pub observation_count: usize,
-    pub mean_signed_residual: f64,
-    pub p95_absolute_residual: f64,
+    /// Number of expected outcome rows supplied for this family/horizon.
+    pub outcome_count: usize,
+    pub observed_count: usize,
+    pub missing_count: usize,
+    pub censored_count: usize,
+    pub timed_out_count: usize,
+    pub unsupported_count: usize,
+    pub mean_signed_residual: Option<f64>,
+    pub p95_absolute_residual: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
