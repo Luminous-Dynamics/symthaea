@@ -95,3 +95,8 @@ A manually authored fixture with replay status not_run must not invent a checker
 For each supported contract/gate combination: exact agreement with exhaustive small oracles; zero false accepts on malformed and mutated artifacts; canonical round-trip identity; explicit proof-vs-test status; no hidden-witness multiplicity in PMC/PWMC; exact cancellation preservation; and recorded solver, proof, checker, arithmetic and end-to-end costs.
 
 This is a proposed v1 wire contract. It does not claim that the canonicalizer, Rust evaluator, SCPOG adapter or formal Symthaea proof checker has been implemented.
+
+
+## 9. Evidence endpoint binding
+
+Every proof or test evidence record is bound to both the input representation digest and output representation digest of the precise stage it addresses. A valid test-suite digest is not enough if it was produced for a different transformation or representation. The reference validator rejects endpoint mismatches. This binding establishes evidence association, not proof validity: proof_checked still requires an independently checked proof artifact, while tested_only remains test evidence.
