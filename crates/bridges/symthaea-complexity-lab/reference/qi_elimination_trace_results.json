@@ -1,0 +1,25 @@
+{
+  "all_passed": true,
+  "certificate_contract": "Input and output factors are content-addressed. Intermediate tables are not stored in the trace; the checker recomputes exact joins and sums.",
+  "claim_ceiling": "Finite exact Q(i) direct-enumeration comparison and deterministic replay certificate checks. Not Rust, Lean, production parser, formal proof, bounded-memory streaming, or performance advantage.",
+  "direct_vs_variable_elimination_checks": 480,
+  "negative_controls": [
+    "stale input digest",
+    "forged intermediate output digest",
+    "forged bucket membership",
+    "tampered exact result",
+    "unbound variable in elimination order",
+    "missing final scalar binding",
+    "forged joined scope"
+  ],
+  "orders_per_network": 4,
+  "random_networks": 120,
+  "seed": "0xE7022",
+  "separate_process_checker": {
+    "accepted_positive": 481,
+    "negative_total": 7,
+    "positive_total": 481,
+    "rejected_negative": 7
+  },
+  "suite": "ETH-022 deterministic Q(i) elimination replay certificates"
+}
