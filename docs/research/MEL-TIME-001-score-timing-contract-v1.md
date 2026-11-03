@@ -28,7 +28,7 @@ Windows may use:
 - **Beats:** absolute beat positions from the start of the Score.
 - **Seconds:** elapsed seconds from score start, converted using the Score's single constant tempo.
 
-A requirement result retains exact matching note indices. The report binds the schema, contract digest, exact serialized Score digest, tempo and duration. V1 serialization hashes are over the repository's `serde_json` representation; they are not claimed as a universal cross-language canonical JSON format.
+A requirement result retains exact matching note indices. Note indices are scoped to the exact serialized Score digest in the report; they are not persistent event IDs. The legacy Score has voice role and optional part identity but no instrument-identity field, so V1 cannot prove an instrument-specific entry/exit. The report binds the schema, contract digest, exact serialized Score digest, tempo and duration. V1 serialization hashes are over the repository's `serde_json` representation; they are not claimed as a universal cross-language canonical JSON format.
 
 ## Fail-closed behavior
 
