@@ -40,11 +40,6 @@ impl CurveScope {
                 return Err(CurveError::InvalidScope(name));
             }
         }
-        if self.water_hardness_ppm_as_caco3 > 1_000
-            || self.inlet_temperature_millic > 90_000
-        {
-            return Err(CurveError::InvalidWaterCondition);
-        }
         if self.dataset_sha256.len() != 64
             || !self.dataset_sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
         {
@@ -168,7 +163,6 @@ pub struct MeasuredOccupancyCurve {
 pub enum CurveError {
     InvalidScope(&'static str),
     InvalidDatasetDigest,
-    InvalidWaterCondition,
     InvalidReplicateId,
     DuplicateReplicateId {
         occupancy: usize,
@@ -441,19 +435,6 @@ mod tests {
                 vec![point(1, 0.2, 2.0, 900.0), blank],
             ),
             Err(CurveError::InvalidReplicateId)
-        ));
-    }
-
-    #[test]
-    fn invalid_water_conditions_are_rejected() {
-        let mut invalid = scope();
-        invalid.water_hardness_ppm_as_caco3 = 1_001;
-        assert!(matches!(
-            MeasuredOccupancyCurve::new(
-                invalid,
-                vec![point(1, 0.2, 2.0, 900.0), point(2, 0.24, 2.5, 1_000.0)],
-            ),
-            Err(CurveError::InvalidWaterCondition)
         ));
     }
 
