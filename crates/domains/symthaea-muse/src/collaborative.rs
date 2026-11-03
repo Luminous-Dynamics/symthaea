@@ -484,8 +484,8 @@ mod tests {
             .expect("valid test contribution");
         let state = composer.blend();
 
-        assert_eq!(state.valence, 0.0);
-        assert_eq!(state.arousal, 0.0);
+        assert_eq!(state.valence, 0.0); // MusicalState::default()
+        assert_eq!(state.arousal, 0.4); // MusicalState::default()
     }
 
     #[test]
