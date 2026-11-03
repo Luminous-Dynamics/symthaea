@@ -10,16 +10,17 @@
     "tampered exact result",
     "unbound variable in elimination order",
     "missing final scalar binding",
-    "forged joined scope"
+    "forged joined scope",
+    "reserved generated-factor ID collision"
   ],
   "orders_per_network": 4,
   "random_networks": 120,
   "seed": "0xE7022",
   "separate_process_checker": {
     "accepted_positive": 481,
-    "negative_total": 7,
+    "negative_total": 8,
     "positive_total": 481,
-    "rejected_negative": 7
+    "rejected_negative": 8
   },
   "suite": "ETH-022 deterministic Q(i) elimination replay certificates"
 }
