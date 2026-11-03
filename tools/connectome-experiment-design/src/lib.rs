@@ -241,7 +241,11 @@ impl fmt::Display for DesignError {
                 "utility for hypothesis {hypothesis_index}, action {action_index} is invalid: {value}"
             ),
             Self::EmptyParameterSet => write!(f, "Fisher design requires at least one parameter"),
-            Self::FisherPriorRowLengthMismatch { row, expected, actual } => write!(
+            Self::FisherPriorRowLengthMismatch {
+                row,
+                expected,
+                actual,
+            } => write!(
                 f,
                 "Fisher prior precision row {row} has {actual} values; expected {expected}"
             ),
@@ -249,7 +253,12 @@ impl fmt::Display for DesignError {
                 f,
                 "Fisher prior precision entry ({row},{column}) is invalid: {value}"
             ),
-            Self::NonSymmetricFisherPrior { row, column, left, right } => write!(
+            Self::NonSymmetricFisherPrior {
+                row,
+                column,
+                left,
+                right,
+            } => write!(
                 f,
                 "Fisher prior precision is not symmetric at ({row},{column}): {left} versus {right}"
             ),
@@ -261,14 +270,17 @@ impl fmt::Display for DesignError {
                 f,
                 "Fisher design has {actual} observation-variance entries; expected {expected} sensitivity rows"
             ),
-            Self::FisherSensitivityRowLengthMismatch { row, expected, actual } => write!(
+            Self::FisherSensitivityRowLengthMismatch {
+                row,
+                expected,
+                actual,
+            } => write!(
                 f,
                 "Fisher sensitivity row {row} has {actual} parameters; expected {expected}"
             ),
-            Self::InvalidFisherSensitivity { row, column, value } => write!(
-                f,
-                "Fisher sensitivity ({row},{column}) is invalid: {value}"
-            ),
+            Self::InvalidFisherSensitivity { row, column, value } => {
+                write!(f, "Fisher sensitivity ({row},{column}) is invalid: {value}")
+            }
             Self::InvalidObservationVariance { row, value } => write!(
                 f,
                 "observation variance {row} must be finite and positive, received {value}"
@@ -929,7 +941,11 @@ fn log_determinant_from_cholesky(lower: &[Vec<f64>]) -> Result<f64, DesignError>
         }
         result += 2.0 * diagonal.ln();
     }
-    if result.is_finite() { Ok(result) } else { Err(DesignError::NumericalInstability) }
+    if result.is_finite() {
+        Ok(result)
+    } else {
+        Err(DesignError::NumericalInstability)
+    }
 }
 
 fn solve_spd_from_cholesky(lower: &[Vec<f64>], rhs: &[f64]) -> Result<Vec<f64>, DesignError> {
@@ -1044,7 +1060,9 @@ fn validate_fisher_candidate(
         return Err(DesignError::EmptyExperimentId);
     }
     if !candidate.cost.is_finite() || candidate.cost <= 0.0 {
-        return Err(DesignError::InvalidExperimentCost { cost: candidate.cost });
+        return Err(DesignError::InvalidExperimentCost {
+            cost: candidate.cost,
+        });
     }
     if candidate.sensitivities_by_observation.len() != candidate.observation_variances.len() {
         return Err(DesignError::FisherSensitivityRowCountMismatch {
@@ -1071,7 +1089,10 @@ fn validate_fisher_candidate(
         }
         let variance = candidate.observation_variances[row_index];
         if !variance.is_finite() || variance <= 0.0 {
-            return Err(DesignError::InvalidObservationVariance { row: row_index, value: variance });
+            return Err(DesignError::InvalidObservationVariance {
+                row: row_index,
+                value: variance,
+            });
         }
     }
     Ok(())
@@ -1128,9 +1149,7 @@ pub fn evaluate_fisher_information_candidate(
     if d_optimal_gain_nats < 0.0 && d_optimal_gain_nats >= -ROUND_OFF_TOLERANCE {
         d_optimal_gain_nats = 0.0;
     }
-    if a_optimal_variance_reduction < 0.0
-        && a_optimal_variance_reduction >= -ROUND_OFF_TOLERANCE
-    {
+    if a_optimal_variance_reduction < 0.0 && a_optimal_variance_reduction >= -ROUND_OFF_TOLERANCE {
         a_optimal_variance_reduction = 0.0;
     }
     if !d_optimal_gain_nats.is_finite()
@@ -1142,9 +1161,7 @@ pub fn evaluate_fisher_information_candidate(
     }
     let d_optimal_gain_per_cost = d_optimal_gain_nats / candidate.cost;
     let a_optimal_variance_reduction_per_cost = a_optimal_variance_reduction / candidate.cost;
-    if !d_optimal_gain_per_cost.is_finite()
-        || !a_optimal_variance_reduction_per_cost.is_finite()
-    {
+    if !d_optimal_gain_per_cost.is_finite() || !a_optimal_variance_reduction_per_cost.is_finite() {
         return Err(DesignError::NumericalInstability);
     }
     Ok(FisherInformationScore {
@@ -1195,7 +1212,8 @@ pub fn rank_fisher_candidates(
                 right.score.a_optimal_variance_reduction,
             ),
         };
-        right_cost.total_cmp(&left_cost)
+        right_cost
+            .total_cmp(&left_cost)
             .then_with(|| right_raw.total_cmp(&left_raw))
             .then_with(|| left.experiment_id.cmp(&right.experiment_id))
     });
@@ -1248,7 +1266,8 @@ mod tests {
     fn fisher_known_answer_computes_d_and_a_optimal_gains() {
         let prior = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
         let experiment = fisher_experiment(
-            "balanced", 1.0,
+            "balanced",
+            1.0,
             vec![vec![1.0, 0.0], vec![0.0, 1.0]],
             vec![1.0, 1.0],
         );
@@ -1263,19 +1282,29 @@ mod tests {
     fn d_and_a_optimal_designs_can_choose_different_experiments() {
         let prior = vec![vec![100.0, 0.0], vec![0.0, 1.0]];
         let refine_known = fisher_experiment(
-            "refine-already-known-parameter", 1.0,
-            vec![vec![300.0_f64.sqrt(), 0.0]], vec![1.0],
+            "refine-already-known-parameter",
+            1.0,
+            vec![vec![300.0_f64.sqrt(), 0.0]],
+            vec![1.0],
         );
         let resolve_uncertain = fisher_experiment(
-            "resolve-uncertain-parameter", 1.0,
-            vec![vec![0.0, 1.0]], vec![1.0],
+            "resolve-uncertain-parameter",
+            1.0,
+            vec![vec![0.0, 1.0]],
+            vec![1.0],
         );
         let d_ranked = rank_fisher_candidates(
-            &prior, &[refine_known.clone(), resolve_uncertain.clone()], FisherObjective::DOptimal,
-        ).unwrap();
+            &prior,
+            &[refine_known.clone(), resolve_uncertain.clone()],
+            FisherObjective::DOptimal,
+        )
+        .unwrap();
         let a_ranked = rank_fisher_candidates(
-            &prior, &[refine_known, resolve_uncertain], FisherObjective::AOptimal,
-        ).unwrap();
+            &prior,
+            &[refine_known, resolve_uncertain],
+            FisherObjective::AOptimal,
+        )
+        .unwrap();
         assert_eq!(d_ranked[0].experiment_id, "refine-already-known-parameter");
         assert_eq!(a_ranked[0].experiment_id, "resolve-uncertain-parameter");
     }
@@ -1288,13 +1317,18 @@ mod tests {
         let precise_score = evaluate_fisher_information_candidate(&prior, &precise).unwrap();
         let noisy_score = evaluate_fisher_information_candidate(&prior, &noisy).unwrap();
         assert!(precise_score.d_optimal_gain_nats > noisy_score.d_optimal_gain_nats);
-        assert!(precise_score.a_optimal_variance_reduction > noisy_score.a_optimal_variance_reduction);
+        assert!(
+            precise_score.a_optimal_variance_reduction > noisy_score.a_optimal_variance_reduction
+        );
     }
 
     #[test]
     fn fisher_validation_rejects_empty_nonsymmetric_and_non_spd_priors() {
         let candidate = fisher_experiment("candidate", 1.0, vec![vec![1.0, 0.0]], vec![1.0]);
-        assert_eq!(evaluate_fisher_information_candidate(&[], &candidate), Err(DesignError::EmptyParameterSet));
+        assert_eq!(
+            evaluate_fisher_information_candidate(&[], &candidate),
+            Err(DesignError::EmptyParameterSet)
+        );
         assert!(matches!(
             evaluate_fisher_information_candidate(&[vec![1.0, 0.5], vec![0.0, 1.0]], &candidate),
             Err(DesignError::NonSymmetricFisherPrior { .. })
@@ -1335,7 +1369,8 @@ mod tests {
         let prior = vec![vec![1.0]];
         let expensive = fisher_experiment("expensive", 10.0, vec![vec![3.0]], vec![1.0]);
         let cheap = fisher_experiment("cheap", 1.0, vec![vec![1.0]], vec![1.0]);
-        let ranked = rank_fisher_candidates(&prior, &[expensive, cheap], FisherObjective::DOptimal).unwrap();
+        let ranked =
+            rank_fisher_candidates(&prior, &[expensive, cheap], FisherObjective::DOptimal).unwrap();
         assert_eq!(ranked[0].experiment_id, "cheap");
     }
 
@@ -1343,11 +1378,13 @@ mod tests {
         let x1 = f64::from(stimulus_mask & 1 != 0);
         let x2 = f64::from(stimulus_mask & 2 != 0);
         let x3 = f64::from(stimulus_mask & 4 != 0);
-        x1 + 2.0 * x2 + 3.0 * x3
-            + 0.5 * x1 * x2
-            - 0.25 * x1 * x3
+        x1 + 2.0 * x2 + 3.0 * x3 + 0.5 * x1 * x2 - 0.25 * x1 * x3
             + 0.75 * x2 * x3
-            + if state { interaction_gain * x1 * x2 * x3 } else { 0.0 }
+            + if state {
+                interaction_gain * x1 * x2 * x3
+            } else {
+                0.0
+            }
     }
 
     fn deterministic_pairwise_vs_triplet_experiment(
@@ -1369,7 +1406,10 @@ mod tests {
             CandidateExperiment {
                 id: id.to_owned(),
                 cost,
-                outcomes: vec!["pairwise_prediction".to_owned(), "triplet_prediction".to_owned()],
+                outcomes: vec![
+                    "pairwise_prediction".to_owned(),
+                    "triplet_prediction".to_owned(),
+                ],
                 likelihoods_by_hypothesis: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
             }
         }
@@ -1405,15 +1445,20 @@ mod tests {
     #[test]
     fn three_way_interaction_is_not_identifiable_outside_its_gating_state() {
         let priors = [0.5, 0.5];
-        let inactive = deterministic_pairwise_vs_triplet_experiment("triple-state-off", 0b111, false);
+        let inactive =
+            deterministic_pairwise_vs_triplet_experiment("triple-state-off", 0b111, false);
         let active = deterministic_pairwise_vs_triplet_experiment("triple-state-on", 0b111, true);
         close(
-            evaluate_candidate(&priors, &inactive).unwrap().information_gain_bits,
+            evaluate_candidate(&priors, &inactive)
+                .unwrap()
+                .information_gain_bits,
             0.0,
             1.0e-12,
         );
         close(
-            evaluate_candidate(&priors, &active).unwrap().information_gain_bits,
+            evaluate_candidate(&priors, &active)
+                .unwrap()
+                .information_gain_bits,
             1.0,
             1.0e-12,
         );
