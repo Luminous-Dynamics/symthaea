@@ -15,6 +15,7 @@ pub struct AttemptResources {
     pub upstream_hot_water_energy_kwh: f64,
     pub fresh_water_l: f64,
     pub detergent_g: f64,
+    pub rinse_aid_g: f64,
     pub active_operator_seconds: f64,
 }
 
@@ -25,6 +26,7 @@ impl AttemptResources {
             ("upstream_hot_water_energy_kwh", self.upstream_hot_water_energy_kwh),
             ("fresh_water_l", self.fresh_water_l),
             ("detergent_g", self.detergent_g),
+            ("rinse_aid_g", self.rinse_aid_g),
             ("active_operator_seconds", self.active_operator_seconds),
         ] {
             if !value.is_finite() || value < 0.0 {
@@ -40,6 +42,7 @@ impl AttemptResources {
             upstream_hot_water_energy_kwh: self.upstream_hot_water_energy_kwh + other.upstream_hot_water_energy_kwh,
             fresh_water_l: self.fresh_water_l + other.fresh_water_l,
             detergent_g: self.detergent_g + other.detergent_g,
+            rinse_aid_g: self.rinse_aid_g + other.rinse_aid_g,
             active_operator_seconds: self.active_operator_seconds + other.active_operator_seconds,
         };
         total.validate()?;
@@ -53,6 +56,7 @@ impl AttemptResources {
             upstream_hot_water_energy_kwh: self.upstream_hot_water_energy_kwh / d,
             fresh_water_l: self.fresh_water_l / d,
             detergent_g: self.detergent_g / d,
+            rinse_aid_g: self.rinse_aid_g / d,
             active_operator_seconds: self.active_operator_seconds / d,
         }
     }
@@ -376,6 +380,7 @@ mod tests {
             upstream_hot_water_energy_kwh: 0.1,
             fresh_water_l: water,
             detergent_g: 2.0,
+            rinse_aid_g: 0.5,
             active_operator_seconds: 15.0,
         }
     }
