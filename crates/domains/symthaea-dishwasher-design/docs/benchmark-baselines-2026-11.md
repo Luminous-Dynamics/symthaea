@@ -1,4 +1,4 @@
-# InstantClean benchmark baselines and target ladder (2026-11-02)
+# InstantClean benchmark baselines and target ladder (2026-11-03)
 
 This is a research ledger, not a certified comparison. Labelled eco-programme data are not interchangeable with short-cycle data. Always retain exact model, market, test standard, programme, load and measurement boundary.
 
@@ -61,6 +61,46 @@ The following are important incumbents, not novelty claims for InstantClean:
   - GE CleanSensor: https://products.geappliances.com/appliance/gea-support-search-content?contentId=22177
 
 Therefore, dual compartments and turbidity sensing alone are not InstantClean differentiators. The defensible wedge must be demonstrated on a matched basis: a genuine one-item / micro-batch cell, measured clean-and-rinse endpoints, per-successful-item resources, time-to-release, cross-contamination controls, repairability and robust fallback when sensors are degraded. Any patent novelty or freedom-to-operate claim requires a separate patent search and legal review.
+
+### Commercial rack / glasswasher frontier (2026 capture)
+
+Commercial undercounter machines are the relevant high-throughput reference for bars, cafés, restaurants and glass service. They are **not household place-setting comparators**. Their stated rack rates are upper-bound manufacturer capacities, and different vendors may use different rack sizes, load patterns, cycle definitions, incoming-water conditions and energy boundaries. Treat each result as a product-acquisition lead until independently replicated on a common load and endpoint protocol.
+
+| Exact product | Rack / basket | Manufacturer throughput declaration | Water declaration | Cycle / energy detail | Interpretation |
+|---|---|---:|---:|---|---|
+| Electrolux Professional NeoBlue Touch L, 400313 / 400303 | 500 × 500 mm | Up to 65 racks/h on Fast; programme families 65 / 40 / 36 / 24 / 15 racks/h; 55 / 90 / 100 / 150 / 240 s programme timings | 2.1 / 2.4 L per cycle depending programme; MyEco page declares 2.1 L/rack | MyEco is the tested comparison: manufacturer lists 0.26 kWh average energy, 2.1 L average water and two separately labelled time fields (Tc = 440 s; Tpr = 262 s); the source labels are preserved without assuming they mean the same interval. Fast throughput must not be combined with MyEco energy | Strong current commercial reference. Keep Fast and MyEco as separate services and preserve the exact source measurement fields |
+| Electrolux Professional NeoBlue S 402188 | 400 × 400 mm | Up to 40 racks/h; programme families 40 / 30 / 20 / 6 racks/h | 2.0 L/cycle | Selectable 90 / 120 / 180 / 540 s programmes; 12 L wash tank and 3 L boiler | Useful 400-mm rack and short-cycle comparator; do not assume 40 racks/h applies to its 540-s programme |
+| Smeg Professional SPG425S | 400 × 400 mm | Up to 60 baskets/h; vendor also lists up to 480 plates/h and 1,500 glasses/h | 2.0 L/cycle; minimum 1.8 L/cycle | 10 customizable programmes; published technical sheet gives wash 60–70 °C and rinse 65–85 °C | High-throughput glasswasher reference; item/h figures are supplier capacity declarations, not independently verified quality pass rates |
+
+Official sources:
+- Electrolux NeoBlue Touch L 400313 (full programme-family, MyEco and measured-use fields): https://www.electroluxprofessional.com/commercial-kitchen-equipment/dishwashing/descaling-chemicals/warewashing-neoblue-touch-undercounter-dw-l-with-pressure-boiler-rinse-aid%2Bdetergent-pumps-drain-pump-tank-filters-max-65-r-h-3ph-400313/
+- Electrolux NeoBlue Touch range comparison (260 Wh/rack, 2.1 L/rack, up to 65 racks/h Fast; comparison basis and prior-range comparator stated by Electrolux): https://www.electroluxprofessional.com/commercial-kitchen-equipment/dishwashing/undercounter-dishwashers-and-glasswashers/?page-prod=2
+- Electrolux NeoBlue S 402188: https://www.electroluxprofessional.com/commercial-kitchen-equipment/dishwashing/neoblue-glasswasher/warewashing-neoblue-s-small-single-skin-glasswasher-rinse-aid-and-detergent-pump-tank-filter-40r-h-402188/
+- Smeg Professional SPG425S: https://www.smeg-professional.com/products/SPG425S
+
+**Important reading of these specifications:** NeoBlue Touch's 65 racks/h is its Fast-cycle maximum; the 260 Wh/rack and 2.1 L/rack claims refer to MyEco. These are not a single 65-rack/h, 260-Wh/rack operating point. Vendor 'dishes per hour' depends on assumed rack packing and does not say how many dishes would pass an independent soil-removal, final-rinse-residue and cross-transfer protocol. Smeg's 60 baskets/h is also a maximum declared rate, not a verified released-clean rate. Do not convert rack rates into household place settings or compare them with QuickCell's one-item service.
+
+### Benchmark cohorts and the correct superiority claim
+
+Maintain three separate leaderboards:
+
+1. **Household full-load:** corrected IEC 60436:2025 method, capacity/place settings, eco energy/water/time, cleaning and drying indices, unit variation and noise.
+2. **Commercial rack/glasswasher:** exact rack dimension and load recipe; actual item count and item mix per rack; programme; initial fill, rinse-boiler, standby and per-cycle energy/water; service interval; operator handling; and independently assayed released-item count.
+3. **Single-item / micro-batch QuickCell:** fixed item geometry, soil family and age, ready-state versus cold-start, manual-wash comparator, time-to-first-release, successful items in 60/120 minutes and total energy/water/chemical/operator resources per verified item.
+
+For all three, publish **quality-qualified throughput** rather than only theoretical cycle capacity:
+
+- `verified_items_per_hour = independently_passed_items / elapsed_service_window_hours`;
+- `energy_per_verified_item = all_boundary_energy / independently_passed_items`;
+- `water_per_verified_item = all_fresh_water / independently_passed_items`;
+- `first_pass_yield = items passed on first attempt / items requested`;
+- `service_rework_ratio = physical rewash attempts / requested items`.
+
+Include every failed, interrupted, aborted, purged and rewashed run in the resource numerator and elapsed service window. An unverified item contributes zero to the release denominator. Count an item as released only when all required independent endpoints pass; a process proxy, timer completion or high-confidence prediction is not a ground-truth outcome. Keep microbiological efficacy and sanitization as separate protocols and claims.
+
+**Proposed competitive gate (aspirational, not achieved):** after exact-load matching and non-inferior independent cleaning/rinse/cross-transfer endpoints, aim for at least 10% more quality-qualified items per hour than the strongest relevant comparator, while not increasing total energy or fresh water per verified item. A stretch gate is at least 20% more quality-qualified throughput and at least 10% lower energy or fresh water per verified item, with no quality, reliability, maintenance or operator-time regression. Apply confidence intervals and repeat at held-out sites, operators, water conditions and consumable lots. If the comparator is a commercial rack machine, compare on its rack/task class; do not count single items as equivalent to a loaded rack.
+
+These gates should be judged on a pre-registered matched experiment, not on theoretical rack rate or a best-case cycle. A win that depends on excluding rewash, start-up, standby, initial fill, preheat or operator time is not a system-level win.
 
 ### 2026 announced camera-AI dishwasher incumbent
 
