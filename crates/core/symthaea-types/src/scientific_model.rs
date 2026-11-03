@@ -83,6 +83,219 @@ impl ScientificExpression {
         Ok(())
     }
 
+}
+
+/// A named physical quantity/field in the model.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScientificQuantity {
+    pub name: String,
+    pub physical_type: PhysicalType,
+    pub scalar_domain: ScalarDomain,
+    pub role: QuantityRole,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum QuantityRole {
+    Coordinate,
+    State,
+    Parameter,
+    Constant,
+    Observable,
+    Auxiliary,
+}
+
+impl ScientificQuantity {
+    pub fn validate(&self) -> Result<(), String> {
+        validate_identifier(&self.name)?;
+        self.physical_type
+            .validate()
+            .map_err(|error| format!("quantity {:?}: {}", self.name, error.reason))?;
+        if self.physical_type.scalar != self.scalar_domain {
+            return Err(format!(
+                "quantity {:?} has conflicting scalar domains",
+                self.name
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// An equation is semantic content, not a solver instruction.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScientificEquation {
+    pub name: String,
+    pub left: ScientificExpression,
+    pub right: ScientificExpression,
+}
+
+impl ScientificEquation {
+    pub fn validate(
+        &self,
+        symbols: &std::collections::BTreeSet<String>,
+    ) -> Result<(), String> {
+        validate_identifier(&self.name)?;
+        self.left.validate(symbols)?;
+        self.right.validate(symbols)?;
+        Ok(())
+    }
+}
+
+/// Explicit statement of a condition assumed by the model.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ModelAssumption {
+    pub id: String,
+    pub statement: String,
+}
+
+impl ModelAssumption {
+    pub fn validate(&self) -> Result<(), String> {
+        validate_identifier(&self.id)?;
+        if self.statement.trim().is_empty() {
+            return Err(format!("assumption {:?} has an empty statement", self.id));
+        }
+        Ok(())
+    }
+}
+
+/// Numerical intent is declarative. It does not assert that a requested
+/// property was achieved.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SolverIntent {
+    pub backend_family: Option<String>,
+    pub conservation_required: bool,
+    pub positivity_required: bool,
+    pub invariant_domain_required: bool,
+    pub monotonicity_required: bool,
+    pub target_accuracy_order: Option<u8>,
+}
+
+impl SolverIntent {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.target_accuracy_order == Some(0) {
+            return Err("solver target accuracy order must be greater than zero".into());
+        }
+        if let Some(backend) = &self.backend_family
+            && backend.trim().is_empty()
+        {
+            return Err("solver backend family cannot be empty when specified".into());
+        }
+        Ok(())
+    }
+}
+
+/// A requirement that must be discharged by a future formal, numerical, or
+/// empirical evaluator. Status is intentionally absent from the model itself.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ModelEvidenceRequirement {
+    pub id: String,
+    pub class: EvidenceClass,
+    pub statement: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EvidenceClass {
+    Formal,
+    Numerical,
+    Empirical,
+}
+
+impl ModelEvidenceRequirement {
+    pub fn validate(&self) -> Result<(), String> {
+        validate_identifier(&self.id)?;
+        if self.statement.trim().is_empty() {
+            return Err(format!(
+                "evidence requirement {:?} has an empty statement",
+                self.id
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// A deliberate non-claim prevents downstream code from interpreting model
+/// identity as a truth certificate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ModelNonClaim {
+    pub id: String,
+    pub statement: String,
+}
+
+impl ModelNonClaim {
+    pub fn validate(&self) -> Result<(), String> {
+        validate_identifier(&self.id)?;
+        if self.statement.trim().is_empty() {
+            return Err(format!("non-claim {:?} has an empty statement", self.id));
+        }
+        Ok(())
+    }
+}
+
+/// Solver-independent canonical scientific model.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScientificModel {
+    pub schema_revision: String,
+    pub model_id: String,
+    pub domain: String,
+    pub maturity: ModelMaturity,
+    pub quantities: Vec<ScientificQuantity>,
+    pub equations: Vec<ScientificEquation>,
+    pub assumptions: Vec<ModelAssumption>,
+    pub solver_intent: SolverIntent,
+    pub evidence_requirements: Vec<ModelEvidenceRequirement>,
+    pub non_claims: Vec<ModelNonClaim>,
+    pub provenance: Vec<String>,
+}
+
+impl ScientificModel {
+    // Preserve the stable constructor while callers migrate to staged builders.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        model_id: impl Into<String>,
+        domain: impl Into<String>,
+        maturity: ModelMaturity,
+        mut quantities: Vec<ScientificQuantity>,
+        mut equations: Vec<ScientificEquation>,
+        mut assumptions: Vec<ModelAssumption>,
+        solver_intent: SolverIntent,
+        mut evidence_requirements: Vec<ModelEvidenceRequirement>,
+        mut non_claims: Vec<ModelNonClaim>,
+        mut provenance: Vec<String>,
+    ) -> Result<Self, String> {
+        let model = Self {
+            schema_revision: SCIENTIFIC_MODEL_SCHEMA.into(),
+            model_id: model_id.into(),
+            domain: domain.into(),
+            maturity,
+            quantities: {
+                quantities.sort_by(|a, b| a.name.cmp(&b.name));
+                quantities
+            },
+            equations: {
+                equations.sort_by(|a, b| a.name.cmp(&b.name));
+                equations
+            },
+            assumptions: {
+                assumptions.sort_by(|a, b| a.id.cmp(&b.id));
+                assumptions
+            },
+            solver_intent,
+            evidence_requirements: {
+                evidence_requirements.sort_by(|a, b| a.id.cmp(&b.id));
+                evidence_requirements
+            },
+            non_claims: {
+                non_claims.sort_by(|a, b| a.id.cmp(&b.id));
+                non_claims
+            },
+            provenance: {
+                provenance.sort();
+                provenance
+            },
+        };
+        model.validate()?;
+        Ok(model)
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         if self.schema_revision != SCIENTIFIC_MODEL_SCHEMA {
             return Err("unsupported scientific-model schema revision".into());
