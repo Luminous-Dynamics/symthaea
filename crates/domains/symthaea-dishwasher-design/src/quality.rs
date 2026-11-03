@@ -65,6 +65,7 @@ pub struct EndpointCriterion {
     pub endpoint: Endpoint,
     pub criterion_id: String,
     pub metric_id: String,
+    pub method_id: String,
     pub unit: String,
     pub direction: LimitDirection,
     pub limit: f64,
@@ -273,6 +274,9 @@ pub fn qualify_pilot_evidence(
         if !canonical_non_empty(&criterion.metric_id) {
             return Err(QualityError::InvalidCriterion(criterion.endpoint, "metric_id"));
         }
+        if !canonical_non_empty(&criterion.method_id) {
+            return Err(QualityError::InvalidCriterion(criterion.endpoint, "method_id"));
+        }
         if !canonical_non_empty(&criterion.unit) {
             return Err(QualityError::InvalidCriterion(criterion.endpoint, "unit"));
         }
@@ -351,6 +355,9 @@ pub fn qualify_pilot_evidence(
         }
         if observation.unit != criterion.unit {
             return Err(QualityError::UnitMismatch(observation.endpoint));
+        }
+        if observation.method_id != criterion.method_id {
+            return Err(QualityError::MethodMismatch(observation.endpoint));
         }
         match method_by_endpoint.get(&observation.endpoint) {
             Some(method) if method != &observation.method_id => {
@@ -494,6 +501,7 @@ mod tests {
                 endpoint: Endpoint::SoilRemovalResidual,
                 criterion_id: "soil-residual-limit-v1".to_owned(),
                 metric_id: "residual_soil_area_fraction".to_owned(),
+                method_id: "fluorescence-assay-v1".to_owned(),
                 unit: "fraction".to_owned(),
                 direction: LimitDirection::AtMost,
                 limit: 0.05,
@@ -503,6 +511,7 @@ mod tests {
                 endpoint: Endpoint::FinalRinseResidue,
                 criterion_id: "rinse-residue-limit-v1".to_owned(),
                 metric_id: "final_rinse_residue".to_owned(),
+                method_id: "rinse-residue-assay-v1".to_owned(),
                 unit: "mg/L".to_owned(),
                 direction: LimitDirection::AtMost,
                 limit: 5.0,
@@ -512,6 +521,7 @@ mod tests {
                 endpoint: Endpoint::CrossContamination,
                 criterion_id: "cross-transfer-limit-v1".to_owned(),
                 metric_id: "marker_transfer_mass".to_owned(),
+                method_id: "witness-coupon-assay-v1".to_owned(),
                 unit: "mg".to_owned(),
                 direction: LimitDirection::AtMost,
                 limit: 0.01,
@@ -523,6 +533,7 @@ mod tests {
                 endpoint: Endpoint::DryingResidualMoisture,
                 criterion_id: "drying-moisture-limit-v1".to_owned(),
                 metric_id: "residual_moisture".to_owned(),
+                method_id: "gravimetric-moisture-v1".to_owned(),
                 unit: "g".to_owned(),
                 direction: LimitDirection::AtMost,
                 limit: 0.5,
@@ -534,6 +545,7 @@ mod tests {
                 endpoint: Endpoint::RelativeMicrobialReduction,
                 criterion_id: "relative-microbe-limit-v1".to_owned(),
                 metric_id: "log10_reduction".to_owned(),
+                method_id: "relative-microbiology-v1".to_owned(),
                 unit: "log10".to_owned(),
                 direction: LimitDirection::AtLeast,
                 limit: 2.0,
