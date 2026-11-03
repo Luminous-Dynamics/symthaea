@@ -85,7 +85,7 @@ impl RmiMusicalFeaturesV1 {
         issues
     }
 
-    fn changed_features(&self, other: &Self) -> Vec<RmiTargetFeatureV1> {
+    pub fn changed_features(&self, other: &Self) -> Vec<RmiTargetFeatureV1> {
         let mut changed = Vec::new();
         if self.motif_intervals != other.motif_intervals {
             changed.push(RmiTargetFeatureV1::Motif);
