@@ -1304,4 +1304,155 @@ mod tests {
         assert!(is_sha256(&digests.receipt));
         assert!(is_sha256(&digests.envelope));
     }
+    #[test]
+    fn receipt_check_set_must_exactly_match_task_contract() {
+        let task = serde_json::json!({
+            "acceptance": {
+                "checks": [
+                    {"check_id":"compile.clean","kind":"compile","authority":"task_spec","required":true},
+                    {"check_id":"tests.behavior","kind":"unit_test","authority":"independent_grader","required":true}
+                ]
+            }
+        });
+        let matching = serde_json::json!({
+            "checks": [
+                {"check_id":"compile.clean","kind":"compile","authority":"external_tool","required":true},
+                {"check_id":"tests.behavior","kind":"unit_test","authority":"independent_grader","required":true}
+            ]
+        });
+        assert!(validate_task_check_binding(&task, &matching).is_ok());
+
+        let omitted = serde_json::json!({
+            "checks": [
+                {"check_id":"compile.clean","kind":"compile","authority":"external_tool","required":true}
+            ]
+        });
+        assert!(validate_task_check_binding(&task, &omitted).is_err());
+
+        let undeclared = serde_json::json!({
+            "checks": [
+                {"check_id":"compile.clean","kind":"compile","authority":"external_tool","required":true},
+                {"check_id":"tests.behavior","kind":"unit_test","authority":"independent_grader","required":true},
+                {"check_id":"bonus.fake","kind":"unit_test","authority":"independent_grader","required":false}
+            ]
+        });
+        assert!(validate_task_check_binding(&task, &undeclared).is_err());
+
+        let wrong_kind = serde_json::json!({
+            "checks": [
+                {"check_id":"compile.clean","kind":"unit_test","authority":"external_tool","required":true},
+                {"check_id":"tests.behavior","kind":"unit_test","authority":"independent_grader","required":true}
+            ]
+        });
+        assert!(validate_task_check_binding(&task, &wrong_kind).is_err());
+
+        let wrong_authority = serde_json::json!({
+            "checks": [
+                {"check_id":"compile.clean","kind":"compile","authority":"external_tool","required":true},
+                {"check_id":"tests.behavior","kind":"unit_test","authority":"qualified_reviewer","required":true}
+            ]
+        });
+        assert!(validate_task_check_binding(&task, &wrong_authority).is_err());
+    }
+
+    #[test]
+    fn artifact_paths_are_confined_and_content_digests_are_recomputed() {
+        use std::fs;
+        let root = std::env::temp_dir().join(format!(
+            "ceb-receipt-verifier-{}-artifact-test",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("logs")).unwrap();
+        let patch = b"diff --git a/src/lib.rs b/src/lib.rs";
+        let log = b"independent test report with unique run evidence";
+        fs::write(root.join("candidate.patch"), patch).unwrap();
+        fs::write(root.join("logs/test.log"), log).unwrap();
+        let predicate = serde_json::json!({
+            "artifacts": [
+                {"artifact_id":"patch","path":"candidate.patch","role":"patch","sha256":sha256_hex(patch),"size_bytes":patch.len()},
+                {"artifact_id":"test-log","path":"logs/test.log","role":"test_log","sha256":sha256_hex(log),"size_bytes":log.len()}
+            ]
+        });
+        let evidence = validate_artifacts(&predicate, &root, &sha256_hex(patch)).unwrap();
+        assert!(evidence.contains(&sha256_hex(log)));
+
+        let wrong_patch_digest = "a".repeat(64);
+        assert!(validate_artifacts(&predicate, &root, &wrong_patch_digest).is_err());
+
+        let traversal = serde_json::json!({
+            "artifacts": [
+                {"artifact_id":"patch","path":"../candidate.patch","role":"patch","sha256":sha256_hex(patch),"size_bytes":patch.len()},
+                {"artifact_id":"test-log","path":"logs/test.log","role":"test_log","sha256":sha256_hex(log),"size_bytes":log.len()}
+            ]
+        });
+        assert!(validate_artifacts(&traversal, &root, &sha256_hex(patch)).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn budget_is_enforced_against_measured_usage() {
+        let task = serde_json::json!({
+            "budget": {
+                "wall_clock_seconds":10,
+                "max_turns":20,
+                "max_tool_calls":30,
+                "input_token_budget":1000,
+                "output_token_budget":500,
+                "cost_budget_usd":0.25
+            }
+        });
+        let within = serde_json::json!({
+            "resources": {
+                "wall_clock_ms":9000,
+                "turns":20,
+                "tool_calls":30,
+                "input_tokens":1000,
+                "output_tokens":500,
+                "cost_usd":0.25
+            }
+        });
+        assert!(check_budget(&task, &within).is_ok());
+        let over = serde_json::json!({
+            "resources": {
+                "wall_clock_ms":9000,
+                "turns":21,
+                "tool_calls":30,
+                "input_tokens":1000,
+                "output_tokens":500,
+                "cost_usd":0.25
+            }
+        });
+        assert!(check_budget(&task, &over).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn artifact_symlinks_are_rejected() {
+        use std::fs;
+        use std::os::unix::fs::symlink;
+        let root = std::env::temp_dir().join(format!(
+            "ceb-receipt-verifier-{}-symlink-test",
+            std::process::id()
+        ));
+        let outside = root.with_extension("outside");
+        let _ = fs::remove_dir_all(&root);
+        let _ = fs::remove_file(&outside);
+        fs::create_dir_all(&root).unwrap();
+        let patch = b"patch";
+        let log = b"evidence";
+        fs::write(&outside, log).unwrap();
+        fs::write(root.join("candidate.patch"), patch).unwrap();
+        symlink(&outside, root.join("outside.log")).unwrap();
+        let predicate = serde_json::json!({
+            "artifacts": [
+                {"artifact_id":"patch","path":"candidate.patch","role":"patch","sha256":sha256_hex(patch),"size_bytes":patch.len()},
+                {"artifact_id":"log","path":"outside.log","role":"test_log","sha256":sha256_hex(log),"size_bytes":log.len()}
+            ]
+        });
+        assert!(validate_artifacts(&predicate, &root, &sha256_hex(patch)).is_err());
+        fs::remove_dir_all(&root).unwrap();
+        fs::remove_file(outside).unwrap();
+    }
+
 }
