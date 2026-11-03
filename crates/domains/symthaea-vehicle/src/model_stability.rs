@@ -98,6 +98,7 @@ pub enum ModelStabilityError {
     DuplicateAction,
     DuplicateModelProfile,
     DuplicateModelAction,
+    DuplicateExecutionReceipt,
     MixedModelIdentity,
     MixedEvaluatorIdentity,
     MismatchedActionSets,
@@ -228,6 +229,7 @@ fn derive_finding(
     }
 
     let mut models: BTreeMap<&str, Vec<&ModelActionEvaluation>> = BTreeMap::new();
+    let mut execution_receipt_ids = BTreeSet::new();
     let mut action_commands: BTreeMap<&str, (String, VehicleCommand)> = BTreeMap::new();
     let mut action_ids = BTreeSet::new();
     for evaluation in &input.evaluations {
@@ -268,6 +270,9 @@ fn derive_finding(
         }
         if evaluation.execution_receipt_id.trim().is_empty() {
             return Err(ModelStabilityError::InvalidReceipt);
+        }
+        if !execution_receipt_ids.insert(evaluation.execution_receipt_id.as_str()) {
+            return Err(ModelStabilityError::DuplicateExecutionReceipt);
         }
         let expected_context = model_context_digest(input, evaluation);
         if evaluation.execution_context_digest != expected_context {
@@ -644,8 +649,10 @@ mod tests {
     fn recognizes_selected_action_best_in_every_model() {
         let mut sample = input();
         sample.evaluations[3].objective_value = 0.5;
+        let context_input = sample.clone();
         for evaluation in &mut sample.evaluations {
-            evaluation.execution_context_digest = model_context_digest(&sample, evaluation);
+            evaluation.execution_context_digest =
+                model_context_digest(&context_input, evaluation);
         }
         let report = evaluate_vehicle_model_stability(sample).unwrap();
         assert_eq!(
@@ -672,8 +679,10 @@ mod tests {
     fn selected_action_infeasible_in_one_model_is_not_hidden() {
         let mut sample = input();
         sample.evaluations[2].feasibility = ModelActionFeasibility::Infeasible;
+        let context_input = sample.clone();
         for evaluation in &mut sample.evaluations {
-            evaluation.execution_context_digest = model_context_digest(&sample, evaluation);
+            evaluation.execution_context_digest =
+                model_context_digest(&context_input, evaluation);
         }
         let report = evaluate_vehicle_model_stability(sample).unwrap();
         assert_eq!(
@@ -686,8 +695,10 @@ mod tests {
     fn unknown_feasibility_is_indeterminate() {
         let mut sample = input();
         sample.evaluations[2].feasibility = ModelActionFeasibility::Indeterminate;
+        let context_input = sample.clone();
         for evaluation in &mut sample.evaluations {
-            evaluation.execution_context_digest = model_context_digest(&sample, evaluation);
+            evaluation.execution_context_digest =
+                model_context_digest(&context_input, evaluation);
         }
         let report = evaluate_vehicle_model_stability(sample).unwrap();
         assert_eq!(report.finding.outcome, ModelStabilityOutcome::Indeterminate);
@@ -741,8 +752,10 @@ mod tests {
     fn model_profiles_must_be_unique_and_distinct() {
         let mut sample = input();
         sample.evaluations[2].model_profile_digest = sample.evaluations[0].model_profile_digest.clone();
+        let context_input = sample.clone();
         for evaluation in &mut sample.evaluations {
-            evaluation.execution_context_digest = model_context_digest(&sample, evaluation);
+            evaluation.execution_context_digest =
+                model_context_digest(&context_input, evaluation);
         }
         assert_eq!(
             evaluate_vehicle_model_stability(sample).unwrap_err(),
