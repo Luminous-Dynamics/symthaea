@@ -60,6 +60,8 @@ impl AttemptResources {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ItemEndpointOutcome {
+    /// Must equal the physical run ID of the containing attempt.
+    pub run_id: String,
     pub item_id: String,
     pub endpoint: Endpoint,
     /// Only independent outcome assays can qualify a successful item.
@@ -99,6 +101,7 @@ pub enum ServiceAccountingError {
     DuplicateItemInAttempt { attempt_id: String, item_id: String },
     ItemRepeatedAfterQualification { item_id: String, attempt_id: String },
     OutcomeForUnknownItem { attempt_id: String, item_id: String },
+    OutcomeRunMismatch { attempt_id: String, expected_run_id: String, observed_run_id: String },
     DuplicateOutcome { attempt_id: String, item_id: String, endpoint: Endpoint },
     ProcessProxyCannotQualify { attempt_id: String, item_id: String, endpoint: Endpoint },
 }
@@ -210,6 +213,16 @@ pub fn account_service(
 
         let mut decisions: HashMap<(&str, Endpoint), Decision> = HashMap::new();
         for outcome in &attempt.outcomes {
+            if !canonical_non_empty(&outcome.run_id) {
+                return Err(ServiceAccountingError::InvalidIdentity("outcome.run_id"));
+            }
+            if outcome.run_id != attempt.run_id {
+                return Err(ServiceAccountingError::OutcomeRunMismatch {
+                    attempt_id: attempt.attempt_id.clone(),
+                    expected_run_id: attempt.run_id.clone(),
+                    observed_run_id: outcome.run_id.clone(),
+                });
+            }
             if !items_in_attempt.contains(outcome.item_id.as_str()) {
                 return Err(ServiceAccountingError::OutcomeForUnknownItem {
                     attempt_id: attempt.attempt_id.clone(),
@@ -280,8 +293,9 @@ mod tests {
         Endpoint::CrossContamination,
     ];
 
-    fn outcomes(item_id: &str, decision: Decision) -> Vec<ItemEndpointOutcome> {
+    fn outcomes(run_id: &str, item_id: &str, decision: Decision) -> Vec<ItemEndpointOutcome> {
         REQUIRED.iter().map(|endpoint| ItemEndpointOutcome {
+            run_id: run_id.to_owned(),
             item_id: item_id.to_owned(),
             endpoint: *endpoint,
             evidence_kind: EvidenceKind::IndependentOutcomeAssay,
@@ -320,7 +334,7 @@ mod tests {
     fn qualifies_only_when_every_required_endpoint_passes() {
         let report = account_service(&[attempt(
             1, "attempt-1", "run-1", 0, 60, &["cup-1"], resources(0.05, 0.7),
-            outcomes("cup-1", Decision::Pass),
+            outcomes("run-1", "cup-1", Decision::Pass),
         )], &REQUIRED).unwrap();
         assert_eq!(report.verified_successful_item_ids, vec!["cup-1"]);
         assert_eq!(report.resources_per_verified_item.unwrap().fresh_water_l, 0.7);
@@ -330,9 +344,9 @@ mod tests {
     fn failed_attempt_resources_remain_after_successful_rewash() {
         let attempts = [
             attempt(1, "attempt-1", "run-1", 0, 90, &["cup-1"], resources(0.04, 0.8),
-                outcomes("cup-1", Decision::Fail)),
+                outcomes("run-1", "cup-1", Decision::Fail)),
             attempt(2, "attempt-2", "run-2", 100, 160, &["cup-1"], resources(0.05, 0.7),
-                outcomes("cup-1", Decision::Pass)),
+                outcomes("run-2", "cup-1", Decision::Pass)),
         ];
         let report = account_service(&attempts, &REQUIRED).unwrap();
         assert_eq!(report.unique_item_count, 1);
@@ -347,7 +361,7 @@ mod tests {
 
     #[test]
     fn missing_or_indeterminate_endpoint_never_becomes_a_pass() {
-        let mut evidence = outcomes("cup-1", Decision::Pass);
+        let mut evidence = outcomes("run-1", "cup-1", Decision::Pass);
         evidence.pop();
         evidence[0].decision = Decision::Indeterminate;
         let report = account_service(&[attempt(
@@ -360,8 +374,8 @@ mod tests {
 
     #[test]
     fn a_failed_item_does_not_hide_another_items_success() {
-        let mut evidence = outcomes("cup-pass", Decision::Pass);
-        evidence.extend(outcomes("cup-fail", Decision::Fail));
+        let mut evidence = outcomes("run-1", "cup-pass", Decision::Pass);
+        evidence.extend(outcomes("run-1", "cup-fail", Decision::Fail));
         let report = account_service(&[attempt(
             1, "attempt-1", "run-1", 0, 60, &["cup-pass", "cup-fail"],
             resources(0.1, 1.4), evidence,
@@ -375,7 +389,7 @@ mod tests {
     fn interrupted_attempt_consumes_resources_but_releases_nothing() {
         let mut interrupted = attempt(
             1, "attempt-1", "run-1", 0, 30, &["cup-1"], resources(0.03, 0.4),
-            outcomes("cup-1", Decision::Pass),
+            outcomes("run-1", "cup-1", Decision::Pass),
         );
         interrupted.interrupted = true;
         let report = account_service(&[interrupted], &REQUIRED).unwrap();
@@ -385,7 +399,7 @@ mod tests {
 
     #[test]
     fn process_proxy_cannot_qualify_an_item() {
-        let mut evidence = outcomes("cup-1", Decision::Pass);
+        let mut evidence = outcomes("run-1", "cup-1", Decision::Pass);
         evidence[0].evidence_kind = EvidenceKind::CalibratedProcessProxy;
         assert!(matches!(
             account_service(&[attempt(
@@ -395,9 +409,21 @@ mod tests {
         ));
     }
 
+
+    #[test]
+    fn rejects_outcome_from_a_different_physical_run() {
+        let evidence = outcomes("another-run", "cup-1", Decision::Pass);
+        assert!(matches!(
+            account_service(&[attempt(
+                1, "attempt-1", "run-1", 0, 60, &["cup-1"], resources(0.05, 0.7), evidence,
+            )], &REQUIRED),
+            Err(ServiceAccountingError::OutcomeRunMismatch { .. })
+        ));
+    }
+
     #[test]
     fn rejects_duplicate_outcomes_and_duplicate_physical_run_ids() {
-        let mut evidence = outcomes("cup-1", Decision::Pass);
+        let mut evidence = outcomes("run-1", "cup-1", Decision::Pass);
         evidence.push(evidence[0].clone());
         assert!(matches!(
             account_service(&[attempt(
@@ -419,7 +445,7 @@ mod tests {
     fn rejects_invalid_resources_and_non_increasing_sequence() {
         let invalid = attempt(
             1, "attempt-1", "run-1", 0, 60, &["cup-1"], resources(f64::NAN, 0.7),
-            outcomes("cup-1", Decision::Pass),
+            outcomes("run-1", "cup-1", Decision::Pass),
         );
         assert!(matches!(
             account_service(&[invalid], &REQUIRED),
@@ -437,9 +463,9 @@ mod tests {
     fn rejects_reattempt_after_an_item_was_already_qualified() {
         let attempts = [
             attempt(1, "attempt-1", "run-1", 0, 60, &["cup-1"], resources(0.05, 0.7),
-                outcomes("cup-1", Decision::Pass)),
+                outcomes("run-1", "cup-1", Decision::Pass)),
             attempt(2, "attempt-2", "run-2", 70, 130, &["cup-1"], resources(0.05, 0.7),
-                outcomes("cup-1", Decision::Pass)),
+                outcomes("run-1", "cup-1", Decision::Pass)),
         ];
         assert!(matches!(
             account_service(&attempts, &REQUIRED),
