@@ -694,3 +694,22 @@ Exact minimax over the supplied finite scenarios can still fail under an omitted
 The hidden track withholds true likelihoods and tests prior shift, omitted latent variables, missing device/build/environment modes, correlated or non-stationary outcomes, optimistic in-ensemble models, utility perturbation, externalities and cost/impact estimation errors. It reports in-ensemble optimality separately from out-of-ensemble realized regret, wrong-action rates and regret CVaR.
 
 The planner is not given held-out scenarios; it cannot optimize directly for them. The benchmark freezes declared priors/scenarios/utilities before revealing the hidden DGP. Proposed target: at least 20% lower p90 realized regret than point EIG on the preregistered misspecification corpus, with no increase in wrong-action rate or target impact. This remains a research goal, not a measured claim.
+
+
+## 14. Decision-aware experiment selection: optimize downstream engineering value
+
+The Rust investigator now has a decision-aware research branch and additive API tracked by [#10109](https://github.com/Luminous-Dynamics/symthaea/issues/10109). This follows the UAI 2026 work on robust Bayesian decision making under adversarial uncertainty: nominal entropy reduction can be high while downstream decisions remain fragile.
+
+Keep four quantities separate:
+- **EIG:** expected reduction in uncertainty about hypotheses.
+- **Scenario robust EIG:** sensitivity of that reduction to supplied alternative likelihood models.
+- **EVSI:** expected improvement in the best downstream decision under a declared utility model.
+- **Decision regret/stability:** how much value is lost when one shared decision policy must work across plausible likelihood scenarios.
+
+The additive decision API takes caller-owned utility matrices with explicit owner, scope, units and exclusions. It evaluates a shared outcome-to-decision policy, reports expected/worst/lower-tail policy EVSI and regret, and can enumerate a minimax-regret policy within an explicit combinatorial budget. Terminal decision impact is reported but never executed or authorized by this planner.
+
+Two research gaps remain independent of the implementation:
+- [#10207](https://github.com/Luminous-Dynamics/symthaea/issues/10207): independent likelihood calibration receipts, target-scoped reliability, effective sample size and drift expiry.
+- [#10208](https://github.com/Luminous-Dynamics/symthaea/issues/10208): utility-model uncertainty, Pareto dominance, hard non-compensable constraints and preference sensitivity.
+
+The machine-readable benchmark manifest contains a separate decision-aware value-of-information family. It compares point EIG, robust EIG, EVSI, lower-tail policy EVSI and minimax regret, with known-answer and misspecification tests. A target of 20% lower 90th-percentile decision regret versus point EIG is proposed, not measured.
