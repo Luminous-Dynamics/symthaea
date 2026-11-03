@@ -2193,7 +2193,7 @@ mod tests {
         patch_sha256: &str,
         artifact_root: &std::path::Path,
     ) -> Value {
-        let patch_bytes = b"diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1 +1 @@\n-pub fn verified() -> bool { false }\n+pub fn verified() -> bool { true }\n";
+        let patch_bytes = b"diff --git a/src/lib.rs b/src/lib.rs\nindex ad6d6a9032547659603975d296416597b0b9dcdd..0d4277526d6212248caef379f5af59c6908ff186 100644\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1 +1 @@\n-pub fn verified() -> bool { false }\n+pub fn verified() -> bool { true }\n";
         let log_bytes = format!("independent {stage} test evidence").into_bytes();
         let report_bytes = format!("signed {stage} run report").into_bytes();
         let patch_artifact = write_test_artifact(artifact_root, "candidate.patch", patch_bytes);
@@ -2431,7 +2431,7 @@ mod tests {
         let policy_digest = sha256_hex(&policy_bytes);
         let task_bytes = serde_json::to_vec(&build_test_task(&source_digest)).unwrap();
         let task_digest = sha256_hex(&task_bytes);
-        let patch = b"diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1 +1 @@\n-pub fn verified() -> bool { false }\n+pub fn verified() -> bool { true }\n".to_vec();
+        let patch = b"diff --git a/src/lib.rs b/src/lib.rs\nindex ad6d6a9032547659603975d296416597b0b9dcdd..0d4277526d6212248caef379f5af59c6908ff186 100644\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1 +1 @@\n-pub fn verified() -> bool { false }\n+pub fn verified() -> bool { true }\n".to_vec();
         let patch_digest = sha256_hex(&patch);
 
         let primary_statement = build_test_receipt(
@@ -2552,7 +2552,7 @@ mod tests {
             task_id: "CEB-RUST-001".to_string(),
             source_tree_dir: source_root.clone(),
             result_tree_dir: result_root.clone(),
-            patch: b"diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1 +1 @@\n-pub fn verified() -> bool { false }\n+pub fn verified() -> bool { true }\n".to_vec(),
+            patch: b"diff --git a/src/lib.rs b/src/lib.rs\nindex ad6d6a9032547659603975d296416597b0b9dcdd..0d4277526d6212248caef379f5af59c6908ff186 100644\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1 +1 @@\n-pub fn verified() -> bool { false }\n+pub fn verified() -> bool { true }\n".to_vec(),
             primary_envelope: primary_envelope.clone(),
             primary_artifacts_dir: primary_root.clone(),
             regrade_envelope: detached_envelope,
@@ -2644,7 +2644,7 @@ mod tests {
             task_id: "CEB-RUST-001".to_string(),
             source_tree_dir: source_root,
             result_tree_dir: result_root,
-            patch: b"diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1 +1 @@\n-pub fn verified() -> bool { false }\n+pub fn verified() -> bool { true }\n".to_vec(),
+            patch: b"diff --git a/src/lib.rs b/src/lib.rs\nindex ad6d6a9032547659603975d296416597b0b9dcdd..0d4277526d6212248caef379f5af59c6908ff186 100644\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1 +1 @@\n-pub fn verified() -> bool { false }\n+pub fn verified() -> bool { true }\n".to_vec(),
             primary_envelope,
             primary_artifacts_dir: primary_root,
             regrade_envelope: reused_envelope,
@@ -2757,12 +2757,12 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(source.join("src")).unwrap();
         fs::create_dir_all(result.join("src")).unwrap();
-        fs::write(source.join("src/lib.rs"), b"pub fn value() -> bool { false }\\n").unwrap();
-        fs::write(result.join("src/lib.rs"), b"pub fn value() -> bool { true }\\n").unwrap();
-        let valid_patch = b"diff --git a/src/lib.rs b/src/lib.rs\\n--- a/src/lib.rs\\n+++ b/src/lib.rs\\n@@ -1 +1 @@\\n-pub fn value() -> bool { false }\\n+pub fn value() -> bool { true }\\n";
+        fs::write(source.join("src/lib.rs"), b"pub fn value() -> bool { false }\n").unwrap();
+        fs::write(result.join("src/lib.rs"), b"pub fn value() -> bool { true }\n").unwrap();
+        let valid_patch = b"diff --git a/src/lib.rs b/src/lib.rs\nindex 575476c294fdbbd9ffe413a8fbeafcd7c99ca44b..c71daa58ee73eb23c573f5e03c22913fcc4926ad 100644\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1 +1 @@\n-pub fn value() -> bool { false }\n+pub fn value() -> bool { true }\n";
         assert!(verify_patch_reconstructs_result(&source, &result, valid_patch).is_ok());
 
-        let wrong_patch = b"diff --git a/src/lib.rs b/src/lib.rs\\n--- a/src/lib.rs\\n+++ b/src/lib.rs\\n@@ -1 +1 @@\\n-pub fn value() -> bool { false }\\n+pub fn value() -> bool { 2 }\\n";
+        let wrong_patch = b"diff --git a/src/lib.rs b/src/lib.rs\nindex 575476c294fdbbd9ffe413a8fbeafcd7c99ca44b..f3ae22713f0c94eeff65be6e3166d340f58df75a 100644\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1 +1 @@\n-pub fn value() -> bool { false }\n+pub fn value() -> bool { 2 }\n";
         assert!(verify_patch_reconstructs_result(&source, &result, wrong_patch).is_err());
         fs::remove_dir_all(root).unwrap();
     }
