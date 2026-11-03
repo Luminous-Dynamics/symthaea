@@ -851,6 +851,7 @@ mod tests {
                     disposition: MusicalTurnDispositionV1::Action {
                         action: MusicalTurnActionV1::Continue,
                         effect_frame: None,
+                        effect_at_ns: None,
                     },
                 },
                 MusicalTurnPredictionChunkV1 {
@@ -874,6 +875,7 @@ mod tests {
                     disposition: MusicalTurnDispositionV1::Action {
                         action: MusicalTurnActionV1::Wait,
                         effect_frame: None,
+                        effect_at_ns: None,
                     },
                 },
                 MusicalTurnPredictionChunkV1 {
@@ -885,6 +887,7 @@ mod tests {
                     disposition: MusicalTurnDispositionV1::Action {
                         action: MusicalTurnActionV1::Wait,
                         effect_frame: None,
+                        effect_at_ns: None,
                     },
                 },
             ],
@@ -911,9 +914,10 @@ mod tests {
         predicted.chunks[2].disposition = MusicalTurnDispositionV1::Action {
             action: MusicalTurnActionV1::Yield,
             effect_frame: Some(320),
+            effect_at_ns: Some(32_000_000),
         };
         let score = score_musical_turn_taking(&truth(), &predicted).unwrap();
-        assert_eq!(score.correct_actions, 3);
+        assert_eq!(score.correct_actions, 5);
         assert_eq!(score.premature_yield_count, 1);
         assert_eq!(score.confusion_matrix[2][3], 1);
     }
@@ -927,8 +931,8 @@ mod tests {
         };
         let score = score_musical_turn_taking(&truth(), &predicted).unwrap();
         assert_eq!(score.parse_failures, 1);
-        assert_eq!(score.parsed_chunks, 3);
-        assert_eq!(score.correct_actions, 3);
+        assert_eq!(score.parsed_chunks, 5);
+        assert_eq!(score.correct_actions, 5);
         assert_eq!(score.wait_false_activation_count, 0);
     }
 
@@ -995,6 +999,7 @@ mod tests {
         predicted.chunks[0].disposition = MusicalTurnDispositionV1::Action {
             action: MusicalTurnActionV1::Wait,
             effect_frame: Some(101),
+            effect_at_ns: Some(10_100_000),
         };
         assert!(validate_musical_turn_prediction(&predicted)
             .contains(&MusicalTurnTakingIssue::UntimedActionHasEffect { position: 0 }));
@@ -1005,7 +1010,7 @@ mod tests {
         let original =
             musical_turntaking_input_commitment_sha256(&truth(), &prediction()).unwrap();
         let mut changed = prediction();
-        changed.chunks[1].decision_frame = 205;
+        changed.chunks[1].decision_at_ns = 20_500_000;
         let changed_hash =
             musical_turntaking_input_commitment_sha256(&truth(), &changed).unwrap();
         assert_ne!(original, changed_hash);
