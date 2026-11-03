@@ -17,12 +17,28 @@ use std::fmt;
 pub const MAX_RECEIPT_BYTES: usize = 16 * 1024 * 1024;
 
 const TOP_LEVEL_KEYS: &[&str] = &[
-    "schema_version", "run_id", "generated_at", "evaluation_started_at",
-    "evaluation_completed_at", "benchmark", "system",
-    "target_scope", "runner", "comparison", "task_universe",
-    "eligible_task_set_sha256", "task_universe_sha256", "task_results",
-    "grading_mode", "accounting", "budget_caps", "actual_usage",
-    "unavailable_usage", "official_score", "derived_metrics", "provenance",
+    "schema_version",
+    "run_id",
+    "generated_at",
+    "evaluation_started_at",
+    "evaluation_completed_at",
+    "benchmark",
+    "system",
+    "target_scope",
+    "runner",
+    "comparison",
+    "task_universe",
+    "eligible_task_set_sha256",
+    "task_universe_sha256",
+    "task_results",
+    "grading_mode",
+    "accounting",
+    "budget_caps",
+    "actual_usage",
+    "unavailable_usage",
+    "official_score",
+    "derived_metrics",
+    "provenance",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,7 +60,10 @@ pub struct ReceiptError {
 
 impl ReceiptError {
     fn new(kind: ReceiptErrorKind, message: impl Into<String>) -> Self {
-        Self { kind, message: message.into() }
+        Self {
+            kind,
+            message: message.into(),
+        }
     }
 }
 
@@ -73,13 +92,19 @@ fn error(kind: ReceiptErrorKind, message: impl Into<String>) -> ReceiptError {
 
 fn obj<'a>(value: &'a Value, context: &str) -> Result<&'a Map<String, Value>, ReceiptError> {
     value.as_object().ok_or_else(|| {
-        error(ReceiptErrorKind::SchemaViolation, format!("{context} must be an object"))
+        error(
+            ReceiptErrorKind::SchemaViolation,
+            format!("{context} must be an object"),
+        )
     })
 }
 
 fn arr<'a>(value: &'a Value, context: &str) -> Result<&'a Vec<Value>, ReceiptError> {
     value.as_array().ok_or_else(|| {
-        error(ReceiptErrorKind::SchemaViolation, format!("{context} must be an array"))
+        error(
+            ReceiptErrorKind::SchemaViolation,
+            format!("{context} must be an array"),
+        )
     })
 }
 
@@ -89,7 +114,10 @@ fn required<'a>(
     context: &str,
 ) -> Result<&'a Value, ReceiptError> {
     map.get(key).ok_or_else(|| {
-        error(ReceiptErrorKind::SchemaViolation, format!("{context}.{key} is required"))
+        error(
+            ReceiptErrorKind::SchemaViolation,
+            format!("{context}.{key} is required"),
+        )
     })
 }
 
@@ -120,7 +148,10 @@ fn strict_keys(
 
 fn string<'a>(value: &'a Value, context: &str, allow_empty: bool) -> Result<&'a str, ReceiptError> {
     let value = value.as_str().ok_or_else(|| {
-        error(ReceiptErrorKind::SchemaViolation, format!("{context} must be a string"))
+        error(
+            ReceiptErrorKind::SchemaViolation,
+            format!("{context} must be a string"),
+        )
     })?;
     if !allow_empty && value.trim().is_empty() {
         return Err(error(
@@ -139,7 +170,10 @@ fn string<'a>(value: &'a Value, context: &str, allow_empty: bool) -> Result<&'a 
 
 fn bool_value(value: &Value, context: &str) -> Result<bool, ReceiptError> {
     value.as_bool().ok_or_else(|| {
-        error(ReceiptErrorKind::SchemaViolation, format!("{context} must be boolean"))
+        error(
+            ReceiptErrorKind::SchemaViolation,
+            format!("{context} must be boolean"),
+        )
     })
 }
 
@@ -170,8 +204,12 @@ fn validate_utc_timestamp<'a>(value: &'a Value, context: &str) -> Result<&'a str
         && bytes[13] == b':'
         && bytes[16] == b':'
         && bytes[19] == b'Z';
-    let digit_positions = [0usize,1,2,3,5,6,8,9,11,12,14,15,17,18];
-    if !separators_ok || digit_positions.iter().any(|index| !bytes[*index].is_ascii_digit()) {
+    let digit_positions = [0usize, 1, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18];
+    if !separators_ok
+        || digit_positions
+            .iter()
+            .any(|index| !bytes[*index].is_ascii_digit())
+    {
         return Err(error(
             ReceiptErrorKind::SchemaViolation,
             format!("{context} must be a UTC timestamp in YYYY-MM-DDTHH:MM:SSZ form"),
@@ -202,7 +240,9 @@ fn validate_utc_timestamp<'a>(value: &'a Value, context: &str) -> Result<&'a str
 
 fn is_sha256(value: &str) -> bool {
     value.len() == 64
-        && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 fn sha256_field<'a>(value: &'a Value, context: &str) -> Result<&'a str, ReceiptError> {
@@ -234,7 +274,9 @@ impl Serialize for EcmaJsonValue<'_> {
                     )
                 })?;
                 if !number.is_finite() {
-                    return Err(<S::Error as serde::ser::Error>::custom("JSON numbers must be finite"));
+                    return Err(<S::Error as serde::ser::Error>::custom(
+                        "JSON numbers must be finite",
+                    ));
                 }
                 serializer.serialize_f64(number)
             }
@@ -280,19 +322,36 @@ fn canonical_digest(value: &Value) -> Result<String, ReceiptError> {
     Ok(sha256_hex(&canonical_json_bytes(value)?))
 }
 
-fn validate_string_field(map: &Map<String, Value>, key: &str, context: &str) -> Result<(), ReceiptError> {
-    string(required(map, key, context)?, &format!("{context}.{key}"), false)?;
+fn validate_string_field(
+    map: &Map<String, Value>,
+    key: &str,
+    context: &str,
+) -> Result<(), ReceiptError> {
+    string(
+        required(map, key, context)?,
+        &format!("{context}.{key}"),
+        false,
+    )?;
     Ok(())
 }
 
-fn validate_hash_field(map: &Map<String, Value>, key: &str, context: &str) -> Result<(), ReceiptError> {
+fn validate_hash_field(
+    map: &Map<String, Value>,
+    key: &str,
+    context: &str,
+) -> Result<(), ReceiptError> {
     sha256_field(required(map, key, context)?, &format!("{context}.{key}"))?;
     Ok(())
 }
 
 fn validate_target_scope(value: &Value) -> Result<(), ReceiptError> {
     let map = obj(value, "target_scope")?;
-    strict_keys(map, &["platform", "os", "architecture", "cohort"], &[], "target_scope")?;
+    strict_keys(
+        map,
+        &["platform", "os", "architecture", "cohort"],
+        &[],
+        "target_scope",
+    )?;
     for key in ["platform", "os", "architecture", "cohort"] {
         validate_string_field(map, key, "target_scope")?;
     }
@@ -305,7 +364,10 @@ fn validate_task_universe(
 ) -> Result<(Vec<String>, Vec<Value>, u64, u64), ReceiptError> {
     let tasks = arr(value, "task_universe")?;
     if tasks.is_empty() {
-        return Err(error(ReceiptErrorKind::SchemaViolation, "task_universe must not be empty"));
+        return Err(error(
+            ReceiptErrorKind::SchemaViolation,
+            "task_universe must not be empty",
+        ));
     }
 
     let mut ids = HashSet::new();
@@ -317,7 +379,11 @@ fn validate_task_universe(
         let context = format!("task_universe[{index}]");
         let map = obj(task, &context)?;
         strict_keys(map, &["task_id", "eligibility", "exclusion"], &[], &context)?;
-        let id = string(required(map, "task_id", &context)?, &format!("{context}.task_id"), false)?;
+        let id = string(
+            required(map, "task_id", &context)?,
+            &format!("{context}.task_id"),
+            false,
+        )?;
         if !ids.insert(id.to_owned()) {
             return Err(error(
                 ReceiptErrorKind::AccountingMismatch,
@@ -325,7 +391,11 @@ fn validate_task_universe(
             ));
         }
 
-        let eligibility = string(required(map, "eligibility", &context)?, &format!("{context}.eligibility"), false)?;
+        let eligibility = string(
+            required(map, "eligibility", &context)?,
+            &format!("{context}.eligibility"),
+            false,
+        )?;
         let exclusion = required(map, "exclusion", &context)?;
         match eligibility {
             "eligible" => {
@@ -340,14 +410,26 @@ fn validate_task_universe(
             "excluded" => {
                 excluded_count += 1;
                 let ex = obj(exclusion, &format!("{context}.exclusion"))?;
-                strict_keys(ex, &["predeclared", "reason", "declared_at"], &[], &format!("{context}.exclusion"))?;
-                if !bool_value(required(ex, "predeclared", &context)?, &format!("{context}.exclusion.predeclared"))? {
+                strict_keys(
+                    ex,
+                    &["predeclared", "reason", "declared_at"],
+                    &[],
+                    &format!("{context}.exclusion"),
+                )?;
+                if !bool_value(
+                    required(ex, "predeclared", &context)?,
+                    &format!("{context}.exclusion.predeclared"),
+                )? {
                     return Err(error(
                         ReceiptErrorKind::AccountingMismatch,
                         format!("{context} was excluded without a predeclared exclusion"),
                     ));
                 }
-                string(required(ex, "reason", &context)?, &format!("{context}.exclusion.reason"), false)?;
+                string(
+                    required(ex, "reason", &context)?,
+                    &format!("{context}.exclusion.reason"),
+                    false,
+                )?;
                 let declared_at = validate_utc_timestamp(
                     required(ex, "declared_at", &context)?,
                     &format!("{context}.exclusion.declared_at"),
@@ -431,8 +513,17 @@ fn validate_grade(
     context: &str,
 ) -> Result<(), ReceiptError> {
     let map = obj(value, context)?;
-    strict_keys(map, &["kind", "value", "grader_version", "grader_output_sha256"], &[], context)?;
-    let kind = string(required(map, "kind", context)?, &format!("{context}.kind"), false)?;
+    strict_keys(
+        map,
+        &["kind", "value", "grader_version", "grader_output_sha256"],
+        &[],
+        context,
+    )?;
+    let kind = string(
+        required(map, "kind", context)?,
+        &format!("{context}.kind"),
+        false,
+    )?;
     if kind != grading_mode {
         return Err(error(
             ReceiptErrorKind::SchemaViolation,
@@ -445,9 +536,11 @@ fn validate_grade(
         "binary" => grade_value.is_boolean(),
         "numeric" => grade_value.as_f64().is_some_and(f64::is_finite),
         "categorical" => grade_value.as_str().is_some(),
-        "custom" => grade_value.is_boolean()
-            || grade_value.as_str().is_some()
-            || grade_value.as_f64().is_some_and(f64::is_finite),
+        "custom" => {
+            grade_value.is_boolean()
+                || grade_value.as_str().is_some()
+                || grade_value.as_f64().is_some_and(f64::is_finite)
+        }
         other => {
             return Err(error(
                 ReceiptErrorKind::SchemaViolation,
@@ -472,7 +565,10 @@ fn validate_grade(
             format!("{context}.grader_version does not match the benchmark grader version"),
         ));
     }
-    sha256_field(required(map, "grader_output_sha256", context)?, &format!("{context}.grader_output_sha256"))?;
+    sha256_field(
+        required(map, "grader_output_sha256", context)?,
+        &format!("{context}.grader_output_sha256"),
+    )?;
     Ok(())
 }
 
@@ -503,15 +599,26 @@ fn validate_task_results(
         strict_keys(
             map,
             &[
-                "task_id", "input_sha256", "attempt_state", "attempts",
-                "terminal_disposition", "grade", "tool_calls", "model_calls",
-                "wall_time_ms", "output_sha256",
+                "task_id",
+                "input_sha256",
+                "attempt_state",
+                "attempts",
+                "terminal_disposition",
+                "grade",
+                "tool_calls",
+                "model_calls",
+                "wall_time_ms",
+                "output_sha256",
             ],
             &[],
             &context,
         )?;
 
-        let id = string(required(map, "task_id", &context)?, &format!("{context}.task_id"), false)?;
+        let id = string(
+            required(map, "task_id", &context)?,
+            &format!("{context}.task_id"),
+            false,
+        )?;
         if !seen.insert(id.to_owned()) {
             return Err(error(
                 ReceiptErrorKind::AccountingMismatch,
@@ -525,28 +632,64 @@ fn validate_task_results(
             ));
         }
 
-        sha256_field(required(map, "input_sha256", &context)?, &format!("{context}.input_sha256"))?;
-        let state = string(required(map, "attempt_state", &context)?, &format!("{context}.attempt_state"), false)?;
-        let attempts = nonnegative_u64(required(map, "attempts", &context)?, &format!("{context}.attempts"))?;
+        sha256_field(
+            required(map, "input_sha256", &context)?,
+            &format!("{context}.input_sha256"),
+        )?;
+        let state = string(
+            required(map, "attempt_state", &context)?,
+            &format!("{context}.attempt_state"),
+            false,
+        )?;
+        let attempts = nonnegative_u64(
+            required(map, "attempts", &context)?,
+            &format!("{context}.attempts"),
+        )?;
         let disposition = required(map, "terminal_disposition", &context)?;
         let grade = required(map, "grade", &context)?;
-        let tool_calls = nonnegative_u64(required(map, "tool_calls", &context)?, &format!("{context}.tool_calls"))?;
-        let model_calls = nonnegative_u64(required(map, "model_calls", &context)?, &format!("{context}.model_calls"))?;
-        let _wall_time = nonnegative_u64(required(map, "wall_time_ms", &context)?, &format!("{context}.wall_time_ms"))?;
+        let tool_calls = nonnegative_u64(
+            required(map, "tool_calls", &context)?,
+            &format!("{context}.tool_calls"),
+        )?;
+        let model_calls = nonnegative_u64(
+            required(map, "model_calls", &context)?,
+            &format!("{context}.model_calls"),
+        )?;
+        let _wall_time = nonnegative_u64(
+            required(map, "wall_time_ms", &context)?,
+            &format!("{context}.wall_time_ms"),
+        )?;
         usage.tool_calls = usage.tool_calls.checked_add(tool_calls).ok_or_else(|| {
-            error(ReceiptErrorKind::AccountingMismatch, "per-task tool-call count overflow")
+            error(
+                ReceiptErrorKind::AccountingMismatch,
+                "per-task tool-call count overflow",
+            )
         })?;
         usage.model_calls = usage.model_calls.checked_add(model_calls).ok_or_else(|| {
-            error(ReceiptErrorKind::AccountingMismatch, "per-task model-call count overflow")
+            error(
+                ReceiptErrorKind::AccountingMismatch,
+                "per-task model-call count overflow",
+            )
         })?;
-        for (output_index, output) in arr(required(map, "output_sha256", &context)?, &format!("{context}.output_sha256"))?.iter().enumerate() {
+        for (output_index, output) in arr(
+            required(map, "output_sha256", &context)?,
+            &format!("{context}.output_sha256"),
+        )?
+        .iter()
+        .enumerate()
+        {
             sha256_field(output, &format!("{context}.output_sha256[{output_index}]"))?;
         }
 
         match state {
             "not_attempted" => {
                 counts.not_attempted += 1;
-                if attempts != 0 || !disposition.is_null() || !grade.is_null() || tool_calls != 0 || model_calls != 0 {
+                if attempts != 0
+                    || !disposition.is_null()
+                    || !grade.is_null()
+                    || tool_calls != 0
+                    || model_calls != 0
+                {
                     return Err(error(
                         ReceiptErrorKind::AccountingMismatch,
                         format!("{context} not_attempted row contains attempt activity"),
@@ -572,7 +715,11 @@ fn validate_task_results(
                         format!("{context} terminal row must have at least one attempt"),
                     ));
                 }
-                let outcome = string(disposition, &format!("{context}.terminal_disposition"), false)?;
+                let outcome = string(
+                    disposition,
+                    &format!("{context}.terminal_disposition"),
+                    false,
+                )?;
                 match outcome {
                     "passed" => counts.passed += 1,
                     "failed" => counts.failed += 1,
@@ -607,11 +754,16 @@ fn validate_task_results(
                         counts.graded += 1;
                         if grading_mode == "binary" {
                             let grade_map = obj(grade, &format!("{context}.grade"))?;
-                            let value = bool_value(required(grade_map, "value", &format!("{context}.grade"))?, &format!("{context}.grade.value"))?;
+                            let value = bool_value(
+                                required(grade_map, "value", &format!("{context}.grade"))?,
+                                &format!("{context}.grade.value"),
+                            )?;
                             if (outcome == "passed") != value {
                                 return Err(error(
                                     ReceiptErrorKind::AccountingMismatch,
-                                    format!("{context} binary grade contradicts terminal disposition"),
+                                    format!(
+                                        "{context} binary grade contradicts terminal disposition"
+                                    ),
                                 ));
                             }
                         }
@@ -635,26 +787,52 @@ fn validate_task_results(
     }
 
     if seen.len() != eligible.len() {
-        let missing: Vec<_> = eligible.iter().filter(|id| !seen.contains(**id)).copied().collect();
+        let missing: Vec<_> = eligible
+            .iter()
+            .filter(|id| !seen.contains(**id))
+            .copied()
+            .collect();
         return Err(error(
             ReceiptErrorKind::AccountingMismatch,
-            format!("task_results omit {} eligible tasks: {}", missing.len(), missing.join(", ")),
+            format!(
+                "task_results omit {} eligible tasks: {}",
+                missing.len(),
+                missing.join(", ")
+            ),
         ));
     }
     Ok((counts, usage))
 }
 
-fn validate_accounting(value: &Value, actual: Counts) -> Result<BTreeMap<String, u64>, ReceiptError> {
+fn validate_accounting(
+    value: &Value,
+    actual: Counts,
+) -> Result<BTreeMap<String, u64>, ReceiptError> {
     let map = obj(value, "accounting")?;
     let keys = [
-        "universe_count","eligible_count","excluded_count","attempted_count","not_attempted_count",
-        "in_progress_count","completed_count","graded_count","passed_count","failed_count",
-        "refused_count","abstained_count","unsupported_count","timed_out_count","tool_failed_count",
+        "universe_count",
+        "eligible_count",
+        "excluded_count",
+        "attempted_count",
+        "not_attempted_count",
+        "in_progress_count",
+        "completed_count",
+        "graded_count",
+        "passed_count",
+        "failed_count",
+        "refused_count",
+        "abstained_count",
+        "unsupported_count",
+        "timed_out_count",
+        "tool_failed_count",
         "ungraded_count",
     ];
     strict_keys(map, &keys, &[], "accounting")?;
     for (key, expected) in actual.as_map() {
-        let supplied = nonnegative_u64(required(map, &key, "accounting")?, &format!("accounting.{key}"))?;
+        let supplied = nonnegative_u64(
+            required(map, &key, "accounting")?,
+            &format!("accounting.{key}"),
+        )?;
         if supplied != expected {
             return Err(error(
                 ReceiptErrorKind::AccountingMismatch,
@@ -663,21 +841,43 @@ fn validate_accounting(value: &Value, actual: Counts) -> Result<BTreeMap<String,
         }
     }
     if actual.universe != actual.eligible + actual.excluded {
-        return Err(error(ReceiptErrorKind::AccountingMismatch, "universe_count != eligible_count + excluded_count"));
+        return Err(error(
+            ReceiptErrorKind::AccountingMismatch,
+            "universe_count != eligible_count + excluded_count",
+        ));
     }
     if actual.eligible != actual.attempted + actual.not_attempted {
-        return Err(error(ReceiptErrorKind::AccountingMismatch, "eligible_count != attempted_count + not_attempted_count"));
+        return Err(error(
+            ReceiptErrorKind::AccountingMismatch,
+            "eligible_count != attempted_count + not_attempted_count",
+        ));
     }
     if actual.attempted != actual.in_progress + actual.completed {
-        return Err(error(ReceiptErrorKind::AccountingMismatch, "attempted_count != in_progress_count + completed_count"));
+        return Err(error(
+            ReceiptErrorKind::AccountingMismatch,
+            "attempted_count != in_progress_count + completed_count",
+        ));
     }
-    if actual.completed != actual.passed + actual.failed + actual.refused + actual.abstained
-        + actual.unsupported + actual.timed_out + actual.tool_failed + actual.ungraded
+    if actual.completed
+        != actual.passed
+            + actual.failed
+            + actual.refused
+            + actual.abstained
+            + actual.unsupported
+            + actual.timed_out
+            + actual.tool_failed
+            + actual.ungraded
     {
-        return Err(error(ReceiptErrorKind::AccountingMismatch, "completed_count != sum of terminal dispositions"));
+        return Err(error(
+            ReceiptErrorKind::AccountingMismatch,
+            "completed_count != sum of terminal dispositions",
+        ));
     }
     if actual.graded != actual.passed + actual.failed {
-        return Err(error(ReceiptErrorKind::AccountingMismatch, "graded_count != passed_count + failed_count"));
+        return Err(error(
+            ReceiptErrorKind::AccountingMismatch,
+            "graded_count != passed_count + failed_count",
+        ));
     }
     Ok(actual.as_map())
 }
@@ -689,7 +889,13 @@ fn validate_resource_objects(
     task_usage: TaskUsage,
 ) -> Result<(), ReceiptError> {
     let fields = [
-        "wall_time_ms","cpu_time_ms","peak_memory_bytes","model_calls","input_tokens","output_tokens","tool_calls",
+        "wall_time_ms",
+        "cpu_time_ms",
+        "peak_memory_bytes",
+        "model_calls",
+        "input_tokens",
+        "output_tokens",
+        "tool_calls",
     ];
     let caps = obj(caps_value, "budget_caps")?;
     let actual = obj(actual_value, "actual_usage")?;
@@ -742,7 +948,8 @@ fn validate_resource_objects(
     }
     let measured_model_calls = required(actual, "model_calls", "actual_usage")?;
     if !measured_model_calls.is_null()
-        && nonnegative_u64(measured_model_calls, "actual_usage.model_calls")? < task_usage.model_calls
+        && nonnegative_u64(measured_model_calls, "actual_usage.model_calls")?
+            < task_usage.model_calls
     {
         return Err(error(
             ReceiptErrorKind::AccountingMismatch,
@@ -762,47 +969,136 @@ fn validate_resource_objects(
 
 fn validate_official_and_derived(value: &Value, derived: &Value) -> Result<(), ReceiptError> {
     let score = obj(value, "official_score")?;
-    strict_keys(score, &["metric_id","formula_version","value","unit","numerator","denominator","is_official","source_output_sha256","unavailable_reason"], &[], "official_score")?;
-    string(required(score, "metric_id", "official_score")?, "official_score.metric_id", false)?;
-    string(required(score, "formula_version", "official_score")?, "official_score.formula_version", false)?;
-    string(required(score, "unit", "official_score")?, "official_score.unit", false)?;
-    if !bool_value(required(score, "is_official", "official_score")?, "official_score.is_official")? {
-        return Err(error(ReceiptErrorKind::SchemaViolation, "official_score.is_official must be true"));
+    strict_keys(
+        score,
+        &[
+            "metric_id",
+            "formula_version",
+            "value",
+            "unit",
+            "numerator",
+            "denominator",
+            "is_official",
+            "source_output_sha256",
+            "unavailable_reason",
+        ],
+        &[],
+        "official_score",
+    )?;
+    string(
+        required(score, "metric_id", "official_score")?,
+        "official_score.metric_id",
+        false,
+    )?;
+    string(
+        required(score, "formula_version", "official_score")?,
+        "official_score.formula_version",
+        false,
+    )?;
+    string(
+        required(score, "unit", "official_score")?,
+        "official_score.unit",
+        false,
+    )?;
+    if !bool_value(
+        required(score, "is_official", "official_score")?,
+        "official_score.is_official",
+    )? {
+        return Err(error(
+            ReceiptErrorKind::SchemaViolation,
+            "official_score.is_official must be true",
+        ));
     }
-    sha256_field(required(score, "source_output_sha256", "official_score")?, "official_score.source_output_sha256")?;
+    sha256_field(
+        required(score, "source_output_sha256", "official_score")?,
+        "official_score.source_output_sha256",
+    )?;
     let score_value = required(score, "value", "official_score")?;
     let numerator = required(score, "numerator", "official_score")?;
     let denominator = required(score, "denominator", "official_score")?;
     let unavailable_reason = required(score, "unavailable_reason", "official_score")?;
     if score_value.is_null() {
         if !numerator.is_null() || !denominator.is_null() {
-            return Err(error(ReceiptErrorKind::SchemaViolation, "unavailable official score requires null numerator and denominator"));
+            return Err(error(
+                ReceiptErrorKind::SchemaViolation,
+                "unavailable official score requires null numerator and denominator",
+            ));
         }
-        string(unavailable_reason, "official_score.unavailable_reason", false)?;
+        string(
+            unavailable_reason,
+            "official_score.unavailable_reason",
+            false,
+        )?;
     } else {
         if score_value.as_f64().is_none_or(|n| !n.is_finite()) {
-            return Err(error(ReceiptErrorKind::SchemaViolation, "official_score.value must be finite or null"));
+            return Err(error(
+                ReceiptErrorKind::SchemaViolation,
+                "official_score.value must be finite or null",
+            ));
         }
-        if denominator.is_null() || denominator.as_f64().is_none_or(|n| !n.is_finite() || n <= 0.0) {
-            return Err(error(ReceiptErrorKind::SchemaViolation, "official_score.denominator must be positive and finite for a reported score"));
+        if denominator.is_null()
+            || denominator
+                .as_f64()
+                .is_none_or(|n| !n.is_finite() || n <= 0.0)
+        {
+            return Err(error(
+                ReceiptErrorKind::SchemaViolation,
+                "official_score.denominator must be positive and finite for a reported score",
+            ));
         }
         if !numerator.is_null() && numerator.as_f64().is_none_or(|n| !n.is_finite()) {
-            return Err(error(ReceiptErrorKind::SchemaViolation, "official_score.numerator must be finite or null"));
+            return Err(error(
+                ReceiptErrorKind::SchemaViolation,
+                "official_score.numerator must be finite or null",
+            ));
         }
         if !unavailable_reason.is_null() {
-            return Err(error(ReceiptErrorKind::SchemaViolation, "official_score.unavailable_reason must be null for a reported score"));
+            return Err(error(
+                ReceiptErrorKind::SchemaViolation,
+                "official_score.unavailable_reason must be null for a reported score",
+            ));
         }
     }
 
     for (index, item) in arr(derived, "derived_metrics")?.iter().enumerate() {
         let context = format!("derived_metrics[{index}]");
         let map = obj(item, &context)?;
-        strict_keys(map, &["metric_id","value","unit","formula","is_official","unavailable_reason"], &[], &context)?;
-        string(required(map, "metric_id", &context)?, &format!("{context}.metric_id"), false)?;
-        string(required(map, "unit", &context)?, &format!("{context}.unit"), false)?;
-        string(required(map, "formula", &context)?, &format!("{context}.formula"), false)?;
-        if bool_value(required(map, "is_official", &context)?, &format!("{context}.is_official"))? {
-            return Err(error(ReceiptErrorKind::SchemaViolation, format!("{context}.is_official must be false")));
+        strict_keys(
+            map,
+            &[
+                "metric_id",
+                "value",
+                "unit",
+                "formula",
+                "is_official",
+                "unavailable_reason",
+            ],
+            &[],
+            &context,
+        )?;
+        string(
+            required(map, "metric_id", &context)?,
+            &format!("{context}.metric_id"),
+            false,
+        )?;
+        string(
+            required(map, "unit", &context)?,
+            &format!("{context}.unit"),
+            false,
+        )?;
+        string(
+            required(map, "formula", &context)?,
+            &format!("{context}.formula"),
+            false,
+        )?;
+        if bool_value(
+            required(map, "is_official", &context)?,
+            &format!("{context}.is_official"),
+        )? {
+            return Err(error(
+                ReceiptErrorKind::SchemaViolation,
+                format!("{context}.is_official must be false"),
+            ));
         }
         let metric_value = required(map, "value", &context)?;
         let reason = required(map, "unavailable_reason", &context)?;
@@ -810,10 +1106,16 @@ fn validate_official_and_derived(value: &Value, derived: &Value) -> Result<(), R
             string(reason, &format!("{context}.unavailable_reason"), false)?;
         } else {
             if metric_value.as_f64().is_none_or(|n| !n.is_finite()) {
-                return Err(error(ReceiptErrorKind::SchemaViolation, format!("{context}.value must be finite or null")));
+                return Err(error(
+                    ReceiptErrorKind::SchemaViolation,
+                    format!("{context}.value must be finite or null"),
+                ));
             }
             if !reason.is_null() {
-                return Err(error(ReceiptErrorKind::SchemaViolation, format!("{context}.unavailable_reason must be null for measured values")));
+                return Err(error(
+                    ReceiptErrorKind::SchemaViolation,
+                    format!("{context}.unavailable_reason must be null for measured values"),
+                ));
             }
         }
     }
@@ -824,10 +1126,16 @@ fn validate_official_and_derived(value: &Value, derived: &Value) -> Result<(), R
 pub fn verify_receipt_value(value: &Value) -> Result<VerifiedReceipt, ReceiptError> {
     let top = obj(value, "receipt")?;
     strict_keys(top, TOP_LEVEL_KEYS, &[], "receipt")?;
-    if string(required(top, "schema_version", "receipt")?, "schema_version", false)?
-        != "luminous.benchmark-run-receipt.v1"
+    if string(
+        required(top, "schema_version", "receipt")?,
+        "schema_version",
+        false,
+    )? != "luminous.benchmark-run-receipt.v1"
     {
-        return Err(error(ReceiptErrorKind::SchemaViolation, "unsupported schema_version"));
+        return Err(error(
+            ReceiptErrorKind::SchemaViolation,
+            "unsupported schema_version",
+        ));
     }
     let run_id = string(required(top, "run_id", "receipt")?, "run_id", false)?.to_owned();
     let evaluation_started_at = validate_utc_timestamp(
@@ -838,10 +1146,8 @@ pub fn verify_receipt_value(value: &Value) -> Result<VerifiedReceipt, ReceiptErr
         required(top, "evaluation_completed_at", "receipt")?,
         "evaluation_completed_at",
     )?;
-    let generated_at = validate_utc_timestamp(
-        required(top, "generated_at", "receipt")?,
-        "generated_at",
-    )?;
+    let generated_at =
+        validate_utc_timestamp(required(top, "generated_at", "receipt")?, "generated_at")?;
     if evaluation_started_at > evaluation_completed_at || evaluation_completed_at > generated_at {
         return Err(error(
             ReceiptErrorKind::AccountingMismatch,
@@ -852,37 +1158,80 @@ pub fn verify_receipt_value(value: &Value) -> Result<VerifiedReceipt, ReceiptErr
     let benchmark = obj(required(top, "benchmark", "receipt")?, "benchmark")?;
     strict_keys(
         benchmark,
-        &["id","version","revision","dataset_manifest_sha256","access_class","scoring_formula_id","grader_version","grader_output_sha256"],
+        &[
+            "id",
+            "version",
+            "revision",
+            "dataset_manifest_sha256",
+            "access_class",
+            "scoring_formula_id",
+            "grader_version",
+            "grader_output_sha256",
+        ],
         &[],
         "benchmark",
     )?;
-    for key in ["id","version","revision","scoring_formula_id","grader_version"] {
+    for key in [
+        "id",
+        "version",
+        "revision",
+        "scoring_formula_id",
+        "grader_version",
+    ] {
         validate_string_field(benchmark, key, "benchmark")?;
     }
-    for key in ["dataset_manifest_sha256","grader_output_sha256"] {
+    for key in ["dataset_manifest_sha256", "grader_output_sha256"] {
         validate_hash_field(benchmark, key, "benchmark")?;
     }
-    let access = string(required(benchmark, "access_class", "benchmark")?, "benchmark.access_class", false)?;
-    if !["public","authorized_private","synthetic","internal"].contains(&access) {
-        return Err(error(ReceiptErrorKind::SchemaViolation, "benchmark.access_class is unsupported"));
+    let access = string(
+        required(benchmark, "access_class", "benchmark")?,
+        "benchmark.access_class",
+        false,
+    )?;
+    if !["public", "authorized_private", "synthetic", "internal"].contains(&access) {
+        return Err(error(
+            ReceiptErrorKind::SchemaViolation,
+            "benchmark.access_class is unsupported",
+        ));
     }
 
     let system = obj(required(top, "system", "receipt")?, "system")?;
     strict_keys(
         system,
-        &["arm","name","version","source_revision","executable_sha256","model_id","config_sha256","prompt_sha256"],
+        &[
+            "arm",
+            "name",
+            "version",
+            "source_revision",
+            "executable_sha256",
+            "model_id",
+            "config_sha256",
+            "prompt_sha256",
+        ],
         &[],
         "system",
     )?;
-    for key in ["name","version","source_revision"] {
+    for key in ["name", "version", "source_revision"] {
         validate_string_field(system, key, "system")?;
     }
-    for key in ["executable_sha256","config_sha256","prompt_sha256"] {
+    for key in ["executable_sha256", "config_sha256", "prompt_sha256"] {
         validate_hash_field(system, key, "system")?;
     }
     let arm = string(required(system, "arm", "system")?, "system.arm", false)?;
-    if !["REA_only","Symthaea_only","REA_plus_Symthaea","specialist_tools","combined_stack","human"].contains(&arm) {
-        return Err(error(ReceiptErrorKind::SchemaViolation, "system.arm is unsupported"));
+    if ![
+        "REA_only",
+        "Symthaea_only",
+        "REA_plus_Symthaea",
+        "specialist_tools",
+        "combined_stack",
+        "human",
+    ]
+    .contains(&arm)
+    {
+        return Err(error(
+            ReceiptErrorKind::SchemaViolation,
+            "system.arm is unsupported",
+        ));
     }
     let model_id = required(system, "model_id", "system")?;
     if !model_id.is_null() {
@@ -891,36 +1240,81 @@ pub fn verify_receipt_value(value: &Value) -> Result<VerifiedReceipt, ReceiptErr
 
     validate_target_scope(required(top, "target_scope", "receipt")?)?;
     let runner = obj(required(top, "runner", "receipt")?, "runner")?;
-    strict_keys(runner, &["image_sha256","host_os","host_architecture","network_policy"], &[], "runner")?;
+    strict_keys(
+        runner,
+        &[
+            "image_sha256",
+            "host_os",
+            "host_architecture",
+            "network_policy",
+        ],
+        &[],
+        "runner",
+    )?;
     validate_hash_field(runner, "image_sha256", "runner")?;
     validate_string_field(runner, "host_os", "runner")?;
     validate_string_field(runner, "host_architecture", "runner")?;
-    let network = string(required(runner, "network_policy", "runner")?, "runner.network_policy", false)?;
-    if !["disabled","allowlisted","unrestricted","benchmark_managed"].contains(&network) {
-        return Err(error(ReceiptErrorKind::SchemaViolation, "runner.network_policy is unsupported"));
+    let network = string(
+        required(runner, "network_policy", "runner")?,
+        "runner.network_policy",
+        false,
+    )?;
+    if ![
+        "disabled",
+        "allowlisted",
+        "unrestricted",
+        "benchmark_managed",
+    ]
+    .contains(&network)
+    {
+        return Err(error(
+            ReceiptErrorKind::SchemaViolation,
+            "runner.network_policy is unsupported",
+        ));
     }
 
-    let eligible_task_set_sha = sha256_field(required(top, "eligible_task_set_sha256", "receipt")?, "eligible_task_set_sha256")?;
-    let task_universe_sha = sha256_field(required(top, "task_universe_sha256", "receipt")?, "task_universe_sha256")?;
-    let (eligible_ids, canonical_rows, universe_count, excluded_count) =
-        validate_task_universe(
-            required(top, "task_universe", "receipt")?,
-            evaluation_started_at,
-        )?;
+    let eligible_task_set_sha = sha256_field(
+        required(top, "eligible_task_set_sha256", "receipt")?,
+        "eligible_task_set_sha256",
+    )?;
+    let task_universe_sha = sha256_field(
+        required(top, "task_universe_sha256", "receipt")?,
+        "task_universe_sha256",
+    )?;
+    let (eligible_ids, canonical_rows, universe_count, excluded_count) = validate_task_universe(
+        required(top, "task_universe", "receipt")?,
+        evaluation_started_at,
+    )?;
     if eligible_ids.is_empty() {
-        return Err(error(ReceiptErrorKind::SchemaViolation, "receipt must contain at least one eligible task"));
+        return Err(error(
+            ReceiptErrorKind::SchemaViolation,
+            "receipt must contain at least one eligible task",
+        ));
     }
     let eligible_value = Value::Array(eligible_ids.iter().cloned().map(Value::String).collect());
     if canonical_digest(&eligible_value)? != eligible_task_set_sha {
-        return Err(error(ReceiptErrorKind::DigestMismatch, "eligible_task_set_sha256 does not match sorted eligible task IDs"));
+        return Err(error(
+            ReceiptErrorKind::DigestMismatch,
+            "eligible_task_set_sha256 does not match sorted eligible task IDs",
+        ));
     }
     if canonical_digest(&Value::Array(canonical_rows))? != task_universe_sha {
-        return Err(error(ReceiptErrorKind::DigestMismatch, "task_universe_sha256 does not match sorted task-universe rows"));
+        return Err(error(
+            ReceiptErrorKind::DigestMismatch,
+            "task_universe_sha256 does not match sorted task-universe rows",
+        ));
     }
 
-    let grading_mode = string(required(top, "grading_mode", "receipt")?, "grading_mode", false)?;
-    if !["binary","numeric","categorical","custom"].contains(&grading_mode) {
-        return Err(error(ReceiptErrorKind::SchemaViolation, "grading_mode is unsupported"));
+    let grading_mode = string(
+        required(top, "grading_mode", "receipt")?,
+        "grading_mode",
+        false,
+    )?;
+    if !["binary", "numeric", "categorical", "custom"].contains(&grading_mode) {
+        return Err(error(
+            ReceiptErrorKind::SchemaViolation,
+            "grading_mode is unsupported",
+        ));
     }
     let grader_version = string(
         required(benchmark, "grader_version", "benchmark")?,
@@ -940,12 +1334,30 @@ pub fn verify_receipt_value(value: &Value) -> Result<VerifiedReceipt, ReceiptErr
     let comparison = required(top, "comparison", "receipt")?;
     if !comparison.is_null() {
         let map = obj(comparison, "comparison")?;
-        strict_keys(map, &["group_id","protocol_sha256","eligible_task_set_sha256"], &[], "comparison")?;
-        string(required(map, "group_id", "comparison")?, "comparison.group_id", false)?;
-        sha256_field(required(map, "protocol_sha256", "comparison")?, "comparison.protocol_sha256")?;
-        let linked = sha256_field(required(map, "eligible_task_set_sha256", "comparison")?, "comparison.eligible_task_set_sha256")?;
+        strict_keys(
+            map,
+            &["group_id", "protocol_sha256", "eligible_task_set_sha256"],
+            &[],
+            "comparison",
+        )?;
+        string(
+            required(map, "group_id", "comparison")?,
+            "comparison.group_id",
+            false,
+        )?;
+        sha256_field(
+            required(map, "protocol_sha256", "comparison")?,
+            "comparison.protocol_sha256",
+        )?;
+        let linked = sha256_field(
+            required(map, "eligible_task_set_sha256", "comparison")?,
+            "comparison.eligible_task_set_sha256",
+        )?;
         if linked != eligible_task_set_sha {
-            return Err(error(ReceiptErrorKind::NonComparable, "comparison eligible-task digest does not match this receipt"));
+            return Err(error(
+                ReceiptErrorKind::NonComparable,
+                "comparison eligible-task digest does not match this receipt",
+            ));
         }
     }
 
@@ -961,8 +1373,21 @@ pub fn verify_receipt_value(value: &Value) -> Result<VerifiedReceipt, ReceiptErr
     )?;
 
     let provenance = obj(required(top, "provenance", "receipt")?, "provenance")?;
-    strict_keys(provenance, &["input_manifest_sha256","output_manifest_sha256","transcript_sha256"], &[], "provenance")?;
-    for key in ["input_manifest_sha256","output_manifest_sha256","transcript_sha256"] {
+    strict_keys(
+        provenance,
+        &[
+            "input_manifest_sha256",
+            "output_manifest_sha256",
+            "transcript_sha256",
+        ],
+        &[],
+        "provenance",
+    )?;
+    for key in [
+        "input_manifest_sha256",
+        "output_manifest_sha256",
+        "transcript_sha256",
+    ] {
         validate_hash_field(provenance, key, "provenance")?;
     }
 
@@ -979,13 +1404,19 @@ pub fn verify_receipt_value(value: &Value) -> Result<VerifiedReceipt, ReceiptErr
 /// eligible-task universe across two or more comparison-arm receipts.
 pub fn validate_comparable_arms(receipts: &[VerifiedReceipt]) -> Result<(), ReceiptError> {
     if receipts.len() < 2 {
-        return Err(error(ReceiptErrorKind::NonComparable, "at least two receipts are required"));
+        return Err(error(
+            ReceiptErrorKind::NonComparable,
+            "at least two receipts are required",
+        ));
     }
     let first = &receipts[0].value;
     let first_top = obj(first, "receipt")?;
     let first_comparison = required(first_top, "comparison", "receipt")?;
     if first_comparison.is_null() {
-        return Err(error(ReceiptErrorKind::NonComparable, "comparison metadata is null"));
+        return Err(error(
+            ReceiptErrorKind::NonComparable,
+            "comparison metadata is null",
+        ));
     }
     let first_benchmark = obj(required(first_top, "benchmark", "receipt")?, "benchmark")?;
     let first_grading_mode = required(first_top, "grading_mode", "receipt")?;
@@ -993,19 +1424,43 @@ pub fn validate_comparable_arms(receipts: &[VerifiedReceipt]) -> Result<(), Rece
     for receipt in receipts.iter().skip(1) {
         let top = obj(&receipt.value, "receipt")?;
         let benchmark = obj(required(top, "benchmark", "receipt")?, "benchmark")?;
-        for field in ["id","version","revision","dataset_manifest_sha256","access_class","scoring_formula_id","grader_version"] {
-            if required(benchmark, field, "benchmark")? != required(first_benchmark, field, "benchmark")? {
+        for field in [
+            "id",
+            "version",
+            "revision",
+            "dataset_manifest_sha256",
+            "access_class",
+            "scoring_formula_id",
+            "grader_version",
+        ] {
+            if required(benchmark, field, "benchmark")?
+                != required(first_benchmark, field, "benchmark")?
+            {
                 return Err(error(
                     ReceiptErrorKind::NonComparable,
-                    format!("run '{}' differs in benchmark field '{field}'", receipt.run_id),
+                    format!(
+                        "run '{}' differs in benchmark field '{field}'",
+                        receipt.run_id
+                    ),
                 ));
             }
         }
-        for field in ["target_scope","runner","budget_caps","eligible_task_set_sha256","task_universe_sha256","comparison","grading_mode"] {
+        for field in [
+            "target_scope",
+            "runner",
+            "budget_caps",
+            "eligible_task_set_sha256",
+            "task_universe_sha256",
+            "comparison",
+            "grading_mode",
+        ] {
             if required(top, field, "receipt")? != required(first_top, field, "receipt")? {
                 return Err(error(
                     ReceiptErrorKind::NonComparable,
-                    format!("run '{}' differs in comparison field '{field}'", receipt.run_id),
+                    format!(
+                        "run '{}' differs in comparison field '{field}'",
+                        receipt.run_id
+                    ),
                 ));
             }
         }
@@ -1018,7 +1473,10 @@ pub fn validate_comparable_arms(receipts: &[VerifiedReceipt]) -> Result<(), Rece
         if task_input_digests(top)? != first_task_inputs {
             return Err(error(
                 ReceiptErrorKind::NonComparable,
-                format!("run '{}' does not use the same task input digests", receipt.run_id),
+                format!(
+                    "run '{}' does not use the same task input digests",
+                    receipt.run_id
+                ),
             ));
         }
     }
@@ -1031,8 +1489,17 @@ fn task_input_digests(top: &Map<String, Value>) -> Result<BTreeMap<String, Strin
     for (index, row) in rows.iter().enumerate() {
         let context = format!("task_results[{index}]");
         let map = obj(row, &context)?;
-        let id = string(required(map, "task_id", &context)?, &format!("{context}.task_id"), false)?.to_owned();
-        let digest = sha256_field(required(map, "input_sha256", &context)?, &format!("{context}.input_sha256"))?.to_owned();
+        let id = string(
+            required(map, "task_id", &context)?,
+            &format!("{context}.task_id"),
+            false,
+        )?
+        .to_owned();
+        let digest = sha256_field(
+            required(map, "input_sha256", &context)?,
+            &format!("{context}.input_sha256"),
+        )?
+        .to_owned();
         if inputs.insert(id.clone(), digest).is_some() {
             return Err(error(
                 ReceiptErrorKind::AccountingMismatch,
@@ -1049,14 +1516,26 @@ pub fn verify_receipt_json(input: &[u8]) -> Result<VerifiedReceipt, ReceiptError
     if input.len() > MAX_RECEIPT_BYTES {
         return Err(error(
             ReceiptErrorKind::InputTooLarge,
-            format!("receipt is {} bytes; maximum is {}", input.len(), MAX_RECEIPT_BYTES),
+            format!(
+                "receipt is {} bytes; maximum is {}",
+                input.len(),
+                MAX_RECEIPT_BYTES
+            ),
         ));
     }
     let mut de = serde_json::Deserializer::from_slice(input);
     let parsed = StrictJsonValue::deserialize(&mut de).map_err(|e| {
-        error(ReceiptErrorKind::InvalidJson, format!("receipt JSON parse failed: {e}"))
+        error(
+            ReceiptErrorKind::InvalidJson,
+            format!("receipt JSON parse failed: {e}"),
+        )
     })?;
-    de.end().map_err(|e| error(ReceiptErrorKind::InvalidJson, format!("receipt JSON has trailing data: {e}")))?;
+    de.end().map_err(|e| {
+        error(
+            ReceiptErrorKind::InvalidJson,
+            format!("receipt JSON has trailing data: {e}"),
+        )
+    })?;
     let raw_hash = sha256_hex(input);
     let mut verified = verify_receipt_value(&parsed.0)?;
     verified.raw_file_sha256 = raw_hash;
@@ -1115,7 +1594,8 @@ impl<'de> Visitor<'de> for StrictJsonVisitor {
     where
         E: serde::de::Error,
     {
-        let number = Number::from_f64(value).ok_or_else(|| E::custom("JSON numbers must be finite"))?;
+        let number =
+            Number::from_f64(value).ok_or_else(|| E::custom("JSON numbers must be finite"))?;
         Ok(StrictJsonValue(Value::Number(number)))
     }
 
@@ -1152,7 +1632,9 @@ impl<'de> Visitor<'de> for StrictJsonVisitor {
         let mut seen = HashSet::new();
         while let Some((key, value)) = map.next_entry::<String, StrictJsonValue>()? {
             if !seen.insert(key.clone()) {
-                return Err(serde::de::Error::custom(format!("duplicate JSON object key '{key}'")));
+                return Err(serde::de::Error::custom(format!(
+                    "duplicate JSON object key '{key}'"
+                )));
             }
             values.insert(key, value.0);
         }
@@ -1177,7 +1659,7 @@ mod tests {
                 "predeclared":true,"reason":"not a mobile cohort fixture","declared_at":"2026-11-01T00:00:00Z"
             }}
         ]);
-        let eligible = json!(["task-a","task-b"]);
+        let eligible = json!(["task-a", "task-b"]);
         let universe_digest = canonical_digest(&json!([
             {"task_id":"task-a","eligibility":"eligible","exclusion":null},
             {"task_id":"task-b","eligibility":"eligible","exclusion":null},
@@ -1235,14 +1717,15 @@ mod tests {
 
     fn refresh_task_digests(value: &mut Value) {
         let tasks = value["task_universe"].as_array().unwrap();
-        let mut eligible: Vec<String> = tasks.iter()
+        let mut eligible: Vec<String> = tasks
+            .iter()
             .filter(|t| t["eligibility"] == "eligible")
             .map(|t| t["task_id"].as_str().unwrap().to_owned())
             .collect();
         eligible.sort();
         value["eligible_task_set_sha256"] = json!(canonical_digest(&json!(eligible)).unwrap());
         let mut sorted = tasks.clone();
-        sorted.sort_by(|a,b| a["task_id"].as_str().cmp(&b["task_id"].as_str()));
+        sorted.sort_by(|a, b| a["task_id"].as_str().cmp(&b["task_id"].as_str()));
         value["task_universe_sha256"] = json!(canonical_digest(&Value::Array(sorted)).unwrap());
         value["comparison"]["eligible_task_set_sha256"] = value["eligible_task_set_sha256"].clone();
     }
@@ -1261,15 +1744,24 @@ mod tests {
     fn rejects_hidden_eligible_task_without_result_row() {
         let mut receipt = base_receipt();
         receipt["task_results"].as_array_mut().unwrap().pop();
-        assert_eq!(verify_receipt_value(&receipt).unwrap_err().kind, ReceiptErrorKind::AccountingMismatch);
+        assert_eq!(
+            verify_receipt_value(&receipt).unwrap_err().kind,
+            ReceiptErrorKind::AccountingMismatch
+        );
     }
 
     #[test]
     fn rejects_duplicate_task_universe_ids() {
         let mut receipt = base_receipt();
         let duplicate = receipt["task_universe"][0].clone();
-        receipt["task_universe"].as_array_mut().unwrap().push(duplicate);
-        assert_eq!(verify_receipt_value(&receipt).unwrap_err().kind, ReceiptErrorKind::AccountingMismatch);
+        receipt["task_universe"]
+            .as_array_mut()
+            .unwrap()
+            .push(duplicate);
+        assert_eq!(
+            verify_receipt_value(&receipt).unwrap_err().kind,
+            ReceiptErrorKind::AccountingMismatch
+        );
     }
 
     #[test]
@@ -1277,14 +1769,20 @@ mod tests {
         let mut receipt = base_receipt();
         receipt["task_universe"][2]["exclusion"]["predeclared"] = json!(false);
         refresh_task_digests(&mut receipt);
-        assert_eq!(verify_receipt_value(&receipt).unwrap_err().kind, ReceiptErrorKind::AccountingMismatch);
+        assert_eq!(
+            verify_receipt_value(&receipt).unwrap_err().kind,
+            ReceiptErrorKind::AccountingMismatch
+        );
     }
 
     #[test]
     fn rejects_accounting_denominator_laundering() {
         let mut receipt = base_receipt();
         receipt["accounting"]["eligible_count"] = json!(1);
-        assert_eq!(verify_receipt_value(&receipt).unwrap_err().kind, ReceiptErrorKind::AccountingMismatch);
+        assert_eq!(
+            verify_receipt_value(&receipt).unwrap_err().kind,
+            ReceiptErrorKind::AccountingMismatch
+        );
     }
 
     #[test]
@@ -1293,28 +1791,40 @@ mod tests {
         let mut wrong = receipt["task_results"][0].clone();
         wrong["task_id"] = json!("task-excluded");
         receipt["task_results"][0] = wrong;
-        assert_eq!(verify_receipt_value(&receipt).unwrap_err().kind, ReceiptErrorKind::AccountingMismatch);
+        assert_eq!(
+            verify_receipt_value(&receipt).unwrap_err().kind,
+            ReceiptErrorKind::AccountingMismatch
+        );
     }
 
     #[test]
     fn rejects_binary_grade_conflicting_with_pass_label() {
         let mut receipt = base_receipt();
         receipt["task_results"][0]["grade"]["value"] = json!(false);
-        assert_eq!(verify_receipt_value(&receipt).unwrap_err().kind, ReceiptErrorKind::AccountingMismatch);
+        assert_eq!(
+            verify_receipt_value(&receipt).unwrap_err().kind,
+            ReceiptErrorKind::AccountingMismatch
+        );
     }
 
     #[test]
     fn rejects_actual_usage_over_budget() {
         let mut receipt = base_receipt();
         receipt["actual_usage"]["tool_calls"] = json!(21);
-        assert_eq!(verify_receipt_value(&receipt).unwrap_err().kind, ReceiptErrorKind::BudgetExceeded);
+        assert_eq!(
+            verify_receipt_value(&receipt).unwrap_err().kind,
+            ReceiptErrorKind::BudgetExceeded
+        );
     }
 
     #[test]
     fn requires_reason_for_unavailable_usage() {
         let mut receipt = base_receipt();
         receipt["actual_usage"]["cpu_time_ms"] = Value::Null;
-        assert_eq!(verify_receipt_value(&receipt).unwrap_err().kind, ReceiptErrorKind::SchemaViolation);
+        assert_eq!(
+            verify_receipt_value(&receipt).unwrap_err().kind,
+            ReceiptErrorKind::SchemaViolation
+        );
     }
 
     #[test]
@@ -1331,7 +1841,8 @@ mod tests {
         receipt["official_score"]["value"] = Value::Null;
         receipt["official_score"]["numerator"] = Value::Null;
         receipt["official_score"]["denominator"] = Value::Null;
-        receipt["official_score"]["unavailable_reason"] = json!("no tasks reached the benchmark grader");
+        receipt["official_score"]["unavailable_reason"] =
+            json!("no tasks reached the benchmark grader");
         assert!(verify_receipt_value(&receipt).is_ok());
     }
 
@@ -1339,14 +1850,20 @@ mod tests {
     fn rejects_official_score_flag_on_derived_metric() {
         let mut receipt = base_receipt();
         receipt["derived_metrics"][0]["is_official"] = json!(true);
-        assert_eq!(verify_receipt_value(&receipt).unwrap_err().kind, ReceiptErrorKind::SchemaViolation);
+        assert_eq!(
+            verify_receipt_value(&receipt).unwrap_err().kind,
+            ReceiptErrorKind::SchemaViolation
+        );
     }
 
     #[test]
     fn rejects_unknown_top_level_fields() {
         let mut receipt = base_receipt();
         receipt["unreviewed"] = json!(true);
-        assert_eq!(verify_receipt_value(&receipt).unwrap_err().kind, ReceiptErrorKind::SchemaViolation);
+        assert_eq!(
+            verify_receipt_value(&receipt).unwrap_err().kind,
+            ReceiptErrorKind::SchemaViolation
+        );
     }
 
     #[test]
@@ -1359,14 +1876,20 @@ mod tests {
     fn rejects_comparison_protocol_with_different_task_set() {
         let mut receipt = base_receipt();
         receipt["comparison"]["eligible_task_set_sha256"] = json!(A);
-        assert_eq!(verify_receipt_value(&receipt).unwrap_err().kind, ReceiptErrorKind::NonComparable);
+        assert_eq!(
+            verify_receipt_value(&receipt).unwrap_err().kind,
+            ReceiptErrorKind::NonComparable
+        );
     }
 
     #[test]
     fn rejects_invalid_canonical_task_set_digest() {
         let mut receipt = base_receipt();
         receipt["eligible_task_set_sha256"] = json!(A);
-        assert_eq!(verify_receipt_value(&receipt).unwrap_err().kind, ReceiptErrorKind::DigestMismatch);
+        assert_eq!(
+            verify_receipt_value(&receipt).unwrap_err().kind,
+            ReceiptErrorKind::DigestMismatch
+        );
     }
 
     #[test]
@@ -1380,7 +1903,10 @@ mod tests {
 
         second_value["budget_caps"]["tool_calls"] = json!(21);
         let third = verify_receipt_value(&second_value).unwrap();
-        assert_eq!(validate_comparable_arms(&[first, third]).unwrap_err().kind, ReceiptErrorKind::NonComparable);
+        assert_eq!(
+            validate_comparable_arms(&[first, third]).unwrap_err().kind,
+            ReceiptErrorKind::NonComparable
+        );
     }
 
     #[test]
@@ -1422,6 +1948,9 @@ mod tests {
         let mut receipt = base_receipt();
         receipt["task_universe"][2]["exclusion"]["reason"] = Value::Null;
         refresh_task_digests(&mut receipt);
-        assert_eq!(verify_receipt_value(&receipt).unwrap_err().kind, ReceiptErrorKind::SchemaViolation);
+        assert_eq!(
+            verify_receipt_value(&receipt).unwrap_err().kind,
+            ReceiptErrorKind::SchemaViolation
+        );
     }
 }
