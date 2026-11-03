@@ -175,8 +175,13 @@ impl VehicleModelStabilityReport {
 /// identities only; they do not prove independent physics or common-cause
 /// separation.
 pub fn evaluate_vehicle_model_stability(
-    input: VehicleModelStabilityInput,
+    mut input: VehicleModelStabilityInput,
 ) -> Result<VehicleModelStabilityReport, ModelStabilityError> {
+    input.evaluations.sort_by(|left, right| {
+        left.model_id
+            .cmp(&right.model_id)
+            .then_with(|| left.action_id.cmp(&right.action_id))
+    });
     let finding = derive_finding(&input)?;
     let mut report = VehicleModelStabilityReport {
         schema_version: VEHICLE_MODEL_STABILITY_SCHEMA.into(),
@@ -615,8 +620,10 @@ mod tests {
                 ),
             ],
         };
+        let context_input = input.clone();
         for evaluation in &mut input.evaluations {
-            evaluation.execution_context_digest = model_context_digest(&input, evaluation);
+            evaluation.execution_context_digest =
+                model_context_digest(&context_input, evaluation);
         }
         input
     }
@@ -711,8 +718,10 @@ mod tests {
         let mut sample = input();
         let first = evaluate_vehicle_model_stability(sample.clone()).unwrap();
         sample.evaluations.reverse();
+        let context_input = sample.clone();
         for evaluation in &mut sample.evaluations {
-            evaluation.execution_context_digest = model_context_digest(&sample, evaluation);
+            evaluation.execution_context_digest =
+                model_context_digest(&context_input, evaluation);
         }
         let second = evaluate_vehicle_model_stability(sample).unwrap();
         assert_eq!(first.report_digest, second.report_digest);
