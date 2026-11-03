@@ -216,7 +216,7 @@ pub fn evaluate(
     let mut confidence_observations = Vec::new();
     let mut confidence_categories = BTreeSet::new();
 
-    for (row, is_signal) in candidate.trials.iter().zip(truth.event_present.iter().copied()) {
+    for (index, (row, is_signal)) in candidate.trials.iter().zip(truth.event_present.iter().copied()).enumerate() {
         let Some(decision_yes) = row.decision_yes else {
             continue;
         };
@@ -233,7 +233,7 @@ pub fn evaluate(
             confidence_trials += 1;
             let score = confidence_score(decision_yes, level, profile.confidence_levels);
             confidence_categories.insert(score);
-            confidence_scores_by_index[candidate.trials.iter().position(|trial| trial.trial_id == row.trial_id).ok_or(ObservationError::MisalignedTruth)?] = Some(score);
+            confidence_scores_by_index[index] = Some(score);
             confidence_observations.push(RocObservation {
                 score: score as f64,
                 is_signal,
