@@ -74,6 +74,8 @@ pub struct AssayArtifact {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResourceMeasurement {
+    /// Physical wash run whose resource increment this row measures.
+    pub source_run_id: String,
     pub measurement_id: String,
     pub kind: ResourceKind,
     pub value: f64,
@@ -156,6 +158,7 @@ pub enum EvidenceBundleError {
     AssayProtocolMismatch(String),
     AssayArchiveReferenceMismatch(String),
     AssayCalibrationDigestMismatch(String),
+    InvalidAssayMeasurement(String),
     InvalidResourceInterval(String),
     ResourceOutsideRun(String),
     InvalidResourceValue(String),
@@ -417,6 +420,27 @@ pub fn validate_physical_run_bundle(
         if assay.observation.protocol_id != bundle.protocol_id {
             return Err(EvidenceBundleError::AssayProtocolMismatch(assay.record_id.clone()));
         }
+        for (field, value) in [
+            ("assay.criterion_id", assay.observation.criterion_id.as_str()),
+            ("assay.metric_id", assay.observation.metric_id.as_str()),
+            ("assay.method_id", assay.observation.method_id.as_str()),
+            ("assay.unit", assay.observation.unit.as_str()),
+        ] {
+            if !non_empty(value) {
+                return Err(EvidenceBundleError::InvalidIdentity(field));
+            }
+        }
+        let measurement = assay.observation.measured_value;
+        let uncertainty = assay.observation.expanded_uncertainty;
+        if !measurement.is_finite()
+            || measurement < 0.0
+            || !uncertainty.is_finite()
+            || uncertainty < 0.0
+            || !(measurement - uncertainty).is_finite()
+            || !(measurement + uncertainty).is_finite()
+        {
+            return Err(EvidenceBundleError::InvalidAssayMeasurement(assay.record_id.clone()));
+        }
         if assay.observation.evidence_ref != assay.archive_uri {
             return Err(EvidenceBundleError::AssayArchiveReferenceMismatch(assay.record_id.clone()));
         }
@@ -460,6 +484,12 @@ pub fn validate_physical_run_bundle(
     let mut instrument_intervals: BTreeMap<(ResourceKind, String), Vec<(u64, u64, String)>> =
         BTreeMap::new();
     for resource in &bundle.resources {
+        if resource.source_run_id != bundle.run.run_id {
+            return Err(EvidenceBundleError::InvalidAssayRun {
+                record_id: resource.measurement_id.clone(),
+                observed_run_id: resource.source_run_id.clone(),
+            });
+        }
         if !non_empty(&resource.measurement_id) {
             return Err(EvidenceBundleError::InvalidIdentity("resource_measurement_id"));
         }
@@ -673,6 +703,7 @@ mod tests {
             ],
             resources: vec![
                 ResourceMeasurement {
+                    source_run_id: "run-001".to_owned(),
                     measurement_id: "wall-kwh-01".to_owned(),
                     kind: ResourceKind::ApplianceWallElectricity,
                     value: 0.05,
@@ -686,6 +717,7 @@ mod tests {
                     evidence_sha256: digest('2'),
                 },
                 ResourceMeasurement {
+                    source_run_id: "run-001".to_owned(),
                     measurement_id: "water-l-01".to_owned(),
                     kind: ResourceKind::FreshWater,
                     value: 0.6,
@@ -699,6 +731,7 @@ mod tests {
                     evidence_sha256: digest('3'),
                 },
                 ResourceMeasurement {
+                    source_run_id: "run-001".to_owned(),
                     measurement_id: "operator-s-01".to_owned(),
                     kind: ResourceKind::ActiveOperatorTime,
                     value: 30.0,
@@ -915,6 +948,29 @@ mod tests {
             &bundle,
             &[ResourceKind::ApplianceWallElectricity],
         ).is_ok());
+    }
+
+    #[test]
+    fn rejects_resource_measurement_linked_to_another_physical_run() {
+        let mut bundle = valid_bundle();
+        bundle.resources[0].source_run_id = "other-run".to_owned();
+        assert!(matches!(
+            validate_physical_run_bundle(&bundle, &[ResourceKind::ApplianceWallElectricity]),
+            Err(EvidenceBundleError::InvalidAssayRun {
+                record_id,
+                observed_run_id,
+            }) if record_id == "wall-kwh-01" && observed_run_id == "other-run"
+        ));
+    }
+
+    #[test]
+    fn rejects_invalid_assay_measurement_uncertainty() {
+        let mut bundle = valid_bundle();
+        bundle.assays[0].observation.expanded_uncertainty = f64::NAN;
+        assert!(matches!(
+            validate_physical_run_bundle(&bundle, &[ResourceKind::FreshWater]),
+            Err(EvidenceBundleError::InvalidAssayMeasurement(_))
+        ));
     }
 
     #[test]
