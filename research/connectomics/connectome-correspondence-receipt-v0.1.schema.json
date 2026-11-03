@@ -151,7 +151,7 @@
       "additionalProperties": false,
       "required": [
         "mapping_count",
-        "verified_count",
+        "claimed_verified_count",
         "ambiguous_count",
         "not_estimable_count",
         "rejected_count",
@@ -165,10 +165,6 @@
       ],
       "properties": {
         "mapping_count": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "verified_count": {
           "type": "integer",
           "minimum": 0
         },
@@ -209,6 +205,10 @@
           "minimum": 0
         },
         "query_not_estimable_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "claimed_verified_count": {
           "type": "integer",
           "minimum": 0
         }
@@ -486,7 +486,7 @@
         },
         "support_status": {
           "enum": [
-            "VERIFIED",
+            "CLAIMED_VERIFIED",
             "AMBIGUOUS",
             "NOT_ESTIMABLE",
             "REJECTED"
