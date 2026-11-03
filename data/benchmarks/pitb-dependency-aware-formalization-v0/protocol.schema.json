@@ -1,0 +1,457 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/dependency-aware-formalization-protocol-v0.schema.json",
+  "title": "PITB dependency-aware formalization preregistration v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "status",
+    "benchmark",
+    "observed_workload",
+    "arms",
+    "controls",
+    "inference",
+    "primary_endpoint",
+    "qualification_gates",
+    "evidence_status"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.dependency-aware-formalization-protocol.v0"
+    },
+    "protocol_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "design",
+        "frozen",
+        "executed",
+        "superseded"
+      ]
+    },
+    "benchmark": {
+      "$ref": "#/$defs/benchmark"
+    },
+    "observed_workload": {
+      "$ref": "#/$defs/workload"
+    },
+    "arms": {
+      "type": "array",
+      "minItems": 7,
+      "items": {
+        "$ref": "#/$defs/arm"
+      }
+    },
+    "controls": {
+      "$ref": "#/$defs/controls"
+    },
+    "inference": {
+      "$ref": "#/$defs/inference"
+    },
+    "primary_endpoint": {
+      "$ref": "#/$defs/endpoint"
+    },
+    "qualification_gates": {
+      "$ref": "#/$defs/gates"
+    },
+    "evidence_status": {
+      "$ref": "#/$defs/evidence_status"
+    }
+  },
+  "$defs": {
+    "sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "repository",
+        "release_commit",
+        "tasks",
+        "source_groups",
+        "graded_declarations",
+        "task_level_data_only"
+      ],
+      "properties": {
+        "name": {
+          "const": "AutoformBench"
+        },
+        "repository": {
+          "const": "facebookresearch/autoformbench"
+        },
+        "release_commit": {
+          "$ref": "#/$defs/sha1"
+        },
+        "tasks": {
+          "const": 341
+        },
+        "source_groups": {
+          "const": 24
+        },
+        "graded_declarations": {
+          "const": 1155
+        },
+        "task_level_data_only": {
+          "const": true
+        }
+      }
+    },
+    "model_stratum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "single",
+        "two_to_four",
+        "five_plus"
+      ],
+      "properties": {
+        "model": {
+          "enum": [
+            "gpt-6-astra",
+            "opus-5",
+            "gpt-5.6-sol",
+            "deepseek-v4.1-flash"
+          ]
+        },
+        "single": {
+          "$ref": "#/$defs/outcome"
+        },
+        "two_to_four": {
+          "$ref": "#/$defs/outcome"
+        },
+        "five_plus": {
+          "$ref": "#/$defs/outcome"
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tasks",
+        "solved"
+      ],
+      "properties": {
+        "tasks": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "solved": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "workload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proxy_field",
+        "proxy_limitation",
+        "strata",
+        "published_models",
+        "within_source_comparison"
+      ],
+      "properties": {
+        "proxy_field": {
+          "const": "target_count"
+        },
+        "proxy_limitation": {
+          "type": "string",
+          "minLength": 20
+        },
+        "strata": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "tasks"
+            ],
+            "properties": {
+              "id": {
+                "enum": [
+                  "single",
+                  "two_to_four",
+                  "five_plus"
+                ]
+              },
+              "tasks": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "published_models": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/model_stratum"
+          }
+        },
+        "within_source_comparison": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "model",
+            "overlapping_source_groups",
+            "high_tasks",
+            "high_unresolved",
+            "under_five_tasks",
+            "under_five_unresolved",
+            "risk_difference",
+            "risk_ratio",
+            "bootstrap_replicates",
+            "seed"
+          ],
+          "properties": {
+            "model": {
+              "const": "gpt-6-astra"
+            },
+            "overlapping_source_groups": {
+              "const": 13
+            },
+            "high_tasks": {
+              "const": 58
+            },
+            "high_unresolved": {
+              "const": 26
+            },
+            "under_five_tasks": {
+              "const": 191
+            },
+            "under_five_unresolved": {
+              "const": 29
+            },
+            "risk_difference": {
+              "type": "number"
+            },
+            "risk_ratio": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "bootstrap_replicates": {
+              "const": 50000
+            },
+            "seed": {
+              "const": "8badf00d"
+            }
+          }
+        }
+      }
+    },
+    "arm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "stack",
+        "isolation_question"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "F0",
+            "F1",
+            "F2",
+            "F3a",
+            "F3b",
+            "F4",
+            "F5",
+            "F6"
+          ]
+        },
+        "stack": {
+          "type": "string",
+          "minLength": 5
+        },
+        "isolation_question": {
+          "type": "string",
+          "minLength": 5
+        }
+      }
+    },
+    "controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "same_base_prover",
+        "same_task_and_budget",
+        "exact_target",
+        "environment_pinned",
+        "independent_replay",
+        "no_test_tuning",
+        "complete_denominator"
+      ],
+      "properties": {
+        "same_base_prover": {
+          "const": true
+        },
+        "same_task_and_budget": {
+          "const": true
+        },
+        "exact_target": {
+          "const": true
+        },
+        "environment_pinned": {
+          "const": true
+        },
+        "independent_replay": {
+          "const": true
+        },
+        "no_test_tuning": {
+          "const": true
+        },
+        "complete_denominator": {
+          "const": true
+        }
+      }
+    },
+    "inference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cluster_unit",
+        "cluster_count",
+        "paired",
+        "multiple_comparison_correction",
+        "small_cluster_caveat",
+        "public_cohort_role"
+      ],
+      "properties": {
+        "cluster_unit": {
+          "const": "source_group"
+        },
+        "cluster_count": {
+          "const": 24
+        },
+        "paired": {
+          "const": true
+        },
+        "multiple_comparison_correction": {
+          "const": "holm"
+        },
+        "small_cluster_caveat": {
+          "const": true
+        },
+        "public_cohort_role": {
+          "const": "development_and_external_reference_not_blind_confirmation"
+        }
+      }
+    },
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "fixed_denominator",
+        "kernel_replay_required",
+        "semantic_target_gate_required"
+      ],
+      "properties": {
+        "name": {
+          "const": "verified_exact_target_completion_rate"
+        },
+        "fixed_denominator": {
+          "const": true
+        },
+        "kernel_replay_required": {
+          "const": true
+        },
+        "semantic_target_gate_required": {
+          "const": true
+        }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "published_baseline_solved",
+        "overall_competitive_solved",
+        "overall_stretch_solved",
+        "hard_tail_minimum_risk_difference",
+        "simple_task_max_regression_pp",
+        "cost_per_verified_task_reduction",
+        "reliability"
+      ],
+      "properties": {
+        "published_baseline_solved": {
+          "const": 281
+        },
+        "overall_competitive_solved": {
+          "const": 299
+        },
+        "overall_stretch_solved": {
+          "const": 316
+        },
+        "hard_tail_minimum_risk_difference": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "simple_task_max_regression_pp": {
+          "const": 1
+        },
+        "cost_per_verified_task_reduction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "reliability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "zero_false_accepts",
+            "all_counted_successes_independently_replayed"
+          ],
+          "properties": {
+            "zero_false_accepts": {
+              "const": true
+            },
+            "all_counted_successes_independently_replayed": {
+              "const": true
+            }
+          }
+        }
+      }
+    },
+    "evidence_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pitb_runs",
+        "sota_gain_claimed",
+        "interpretation"
+      ],
+      "properties": {
+        "pitb_runs": {
+          "const": false
+        },
+        "sota_gain_claimed": {
+          "const": false
+        },
+        "interpretation": {
+          "const": "preregistered_experiment_design_only"
+        }
+      }
+    }
+  }
+}
