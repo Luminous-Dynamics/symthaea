@@ -28,7 +28,15 @@ The derivation assumes every input factor cell represents one local assignment a
 
 Rust keeps a parallel u128 support table and checks that weighted and support factors have identical counts, scopes, cell lengths, and zero/nonzero feasibility. Support addition and multiplication are checked; overflow is an error.
 
-### Lean proof obligations
+### Exact uniform sampling
+
+At each backpointer row, choose a maximizing state with probability equal to its branch-support count divided by the row support total. The branch support is the product of support counts in the disjoint child factors. Earlier backpointer nodes then sample those child blocks conditionally. The product of conditional probabilities telescopes, so every full optimal assignment has probability exactly the reciprocal of the final distinct-support count.
+
+Rust's sampler takes a callback that must return an unbiased integer in `[0, bound)`. It checks structure, root-support product and the returned assignment's score; it trusts backpointer argmax/support contents, so externally supplied results must be independently certificate-checked before use.
+
+The Python v2 certificate reference checks 1,383 assignment-path probabilities exactly with `fractions.Fraction`; every probability is `1 / support_size`, including all six triangle MaxCut optima at 1/6 each.
+
+## Lean proof obligations
 
 1. Prove the triple algebra's identities, commutativity, associativity and distributivity.
 2. Define the original input-factor lift.
