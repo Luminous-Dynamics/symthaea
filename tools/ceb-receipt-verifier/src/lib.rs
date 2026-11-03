@@ -2437,4 +2437,40 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
 
+    #[test]
+    fn git_patch_paths_are_safe_unique_and_match_tree_change_set() {
+        let patch = b"diff --git a/src/lib.rs b/src/lib.rs\\nindex 123..456 100644\\n--- a/src/lib.rs\\n+++ b/src/lib.rs\\n@@ -1 +1 @@\\n-false\\n+true\\n";
+        assert_eq!(git_patch_paths(patch).unwrap(), vec!["src/lib.rs".to_string()]);
+        let unsafe_patch = b"diff --git a/../escape b/../escape\\n";
+        assert!(git_patch_paths(unsafe_patch).is_err());
+        let empty = b"no file diff headers";
+        assert!(git_patch_paths(empty).is_err());
+        let ambiguous = b"diff --git \"a/file name\" \"b/file name\"\\n";
+        assert!(git_patch_paths(ambiguous).is_err());
+    }
+
+    #[test]
+    fn changed_tree_paths_include_additions_deletions_and_content_changes() {
+        use std::fs;
+        let root = std::env::temp_dir().join(format!("ceb-tree-diff-{}", std::process::id()));
+        let before = root.join("before");
+        let after = root.join("after");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(before.join("src")).unwrap();
+        fs::create_dir_all(after.join("src")).unwrap();
+        fs::write(before.join("src/changed.rs"), b"before").unwrap();
+        fs::write(before.join("src/deleted.rs"), b"gone").unwrap();
+        fs::write(after.join("src/changed.rs"), b"after").unwrap();
+        fs::write(after.join("src/added.rs"), b"new").unwrap();
+        assert_eq!(
+            changed_tree_paths(&before, &after).unwrap(),
+            vec![
+                "src/added.rs".to_string(),
+                "src/changed.rs".to_string(),
+                "src/deleted.rs".to_string()
+            ]
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
 }
