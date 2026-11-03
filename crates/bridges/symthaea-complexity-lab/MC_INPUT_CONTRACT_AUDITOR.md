@@ -52,17 +52,11 @@ Effective weight rules:
 - An AMC variable with no weights defaults to 1+0i for each polarity; if one polarity is supplied, the other is required.
 - Weights declared for non-projection variables under PWMC produce a warning per the format profile.
 
-## 4. Executed finite tests
+## 4. Prepared finite parser test plan — execution pending
 
-Deterministic seed: 0xE7023.
+Committed file: reference/mc_input_contract_auditor.py
 
-- 34/34 fixture expectations passed.
-- 2,000 random malformed/mixed-input strings were audited without an uncaught exception.
-- Strict, mccomp_v1_2 and ganak_2026_compat profiles exercised.
-- Mutation cases include duplicate/conflicting headers, header order, unsupported directives, invalid literals/variables, wrong clause counts, malformed rational/complex weights, polarity-pair rules and mode/directive contradictions.
-- Effective-weight checks verify exact 1/4 -> 3/4 complement inference, all-one WMC defaults and complex AMC defaults.
-
-These are reference parser tests, not a complete official format parser, official fixture match, Ganak differential run, Rust implementation, solver, or performance result.
+The source includes 34 deterministic fixture expectations, a planned 2,000-case malformed-input fuzz loop, three semantic profiles and targeted effective-output-contract cases. These are test definitions/parameters, not executed test results. The Python parser and fixture harness were not run in this session. The independent JavaScript check previously exercised the expected effective-output mappings, but it did not execute or validate this Python parser.
 
 ## 5. Industry benchmark and acceptance plan
 
