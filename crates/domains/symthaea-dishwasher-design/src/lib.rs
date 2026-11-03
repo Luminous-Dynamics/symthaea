@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+pub mod chemistry;
+
 //! First-principles engineering primitives for the InstantClean dishwasher
 //! research programme.
 //!
