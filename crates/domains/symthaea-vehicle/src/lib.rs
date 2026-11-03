@@ -76,6 +76,7 @@
 #![allow(clippy::needless_range_loop)]
 
 pub mod classical_baselines;
+pub mod counterfactual_decision;
 pub mod controller;
 pub mod embodiment;
 pub mod encoder;
@@ -108,6 +109,12 @@ pub use rule_compliance::{
     RuleTrajectorySample, TRAFFIC_RULE_COMPLIANCE_SCHEMA, TrafficRuleComplianceReport,
     TrafficRuleEvidence, TrafficRuleEvidenceStatus, TrafficRuleKind, TrafficRuleRequirement,
     evaluate_traffic_rules,
+};
+pub use counterfactual_decision::{
+    COUNTERFACTUAL_DECISION_SCHEMA, CounterfactualActionEvaluation,
+    CounterfactualDecisionError, CounterfactualDecisionFinding, CounterfactualDecisionInput,
+    CounterfactualDecisionOutcome, CounterfactualDecisionReason, CounterfactualDecisionReport,
+    CounterfactualFeasibility, CounterfactualMetricDirection, evaluate_counterfactual_decision,
 };
 pub use controller::VehicleController;
 pub use encoder::VehicleHdcEncoder;
