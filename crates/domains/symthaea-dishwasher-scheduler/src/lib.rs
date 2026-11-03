@@ -14,7 +14,9 @@ pub mod resource_curve;
 
 use std::collections::HashSet;
 
-use symthaea_dishwasher_design::quality::{Endpoint, PilotEvidenceEnvelope};
+use symthaea_dishwasher_design::quality::{
+    Endpoint, EndpointCriterion, PilotEvidenceEnvelope,
+};
 
 const ALL_SOILS_MASK: u8 = 0b0001_1111;
 
@@ -132,6 +134,7 @@ pub enum EvidenceBoundModeError {
     MissingRequiredEndpoint(Endpoint),
     InsufficientPilotRuns,
     InconsistentPhysicalScope,
+    InconsistentAcceptanceCriteria { soil: SoilClass },
     DuplicateSoilOccupancy {
         soil: SoilClass,
         occupancy: usize,
@@ -188,6 +191,10 @@ impl EvidenceBoundMode {
         ];
         let mut supported_soils = 0_u8;
         let mut soil_occupancies = HashSet::new();
+        let mut acceptance_by_soil: HashMap<
+            SoilClass,
+            (Vec<EndpointCriterion>, Vec<(Endpoint, String)>),
+        > = HashMap::new();
 
         for envelope in &pilot_evidence {
             let scope = envelope.scope();
@@ -210,6 +217,21 @@ impl EvidenceBoundMode {
                 .ok_or_else(|| EvidenceBoundModeError::UnsupportedSoilClass(
                     scope.soil_class.clone(),
                 ))?;
+            let acceptance_identity = (
+                envelope.criteria().to_vec(),
+                envelope.method_ids().to_vec(),
+            );
+            match acceptance_by_soil.get(&soil) {
+                Some(existing) if existing != &acceptance_identity => {
+                    return Err(EvidenceBoundModeError::InconsistentAcceptanceCriteria {
+                        soil,
+                    });
+                }
+                None => {
+                    acceptance_by_soil.insert(soil, acceptance_identity);
+                }
+                _ => {}
+            }
             let occupancy = scope.item_ids.len();
             if occupancy == 0 || occupancy > profile.capacity {
                 return Err(EvidenceBoundModeError::InvalidCapacity);
