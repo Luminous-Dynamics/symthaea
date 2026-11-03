@@ -1323,8 +1323,8 @@ fn verify_one_receipt(
     let subjects = field(&statement, "subject", "statement")?
         .as_array()
         .ok_or_else(|| Failure::protocol("statement.subject must be an array"))?;
-    if subjects.len() != 2 {
-        return Err(Failure::protocol("CEB statement must contain exactly the patch and source-tree subjects"));
+    if subjects.len() != 3 {
+        return Err(Failure::protocol("CEB statement must contain exactly the patch, source-tree and result-tree subjects"));
     }
     let mut subject_names = HashSet::new();
     for subject in subjects {
@@ -1337,14 +1337,18 @@ fn verify_one_receipt(
         match name.as_str() {
             "ceb/candidate.patch" if digest == patch_sha256 => {}
             "ceb/source.tree" if digest == source_tree_sha256 => {}
-            "ceb/candidate.patch" | "ceb/source.tree" => {
+            "ceb/result.tree" if digest == result_tree_sha256 => {}
+            "ceb/candidate.patch" | "ceb/source.tree" | "ceb/result.tree" => {
                 return Err(Failure::protocol(format!("in-toto subject digest mismatch for {name}")));
             }
             _ => return Err(Failure::protocol(format!("unexpected in-toto subject: {name}"))),
         }
     }
-    if !subject_names.contains("ceb/candidate.patch") || !subject_names.contains("ceb/source.tree") {
-        return Err(Failure::protocol("required in-toto subjects are absent"));
+    if !subject_names.contains("ceb/candidate.patch")
+        || !subject_names.contains("ceb/source.tree")
+        || !subject_names.contains("ceb/result.tree")
+    {
+        return Err(Failure::protocol("required in-toto patch/source/result subjects are absent"));
     }
 
     let agent = field(predicate, "agent", "predicate")?;
@@ -2044,7 +2048,8 @@ mod tests {
             "_type": STATEMENT_TYPE,
             "subject": [
                 {"name":"ceb/candidate.patch","digest":{"sha256":patch_sha256}},
-                {"name":"ceb/source.tree","digest":{"sha256":source_tree_sha256}}
+                {"name":"ceb/source.tree","digest":{"sha256":source_tree_sha256}},
+                {"name":"ceb/result.tree","digest":{"sha256":result_tree_sha256}}
             ],
             "predicateType": PREDICATE_TYPE,
             "predicate": {
