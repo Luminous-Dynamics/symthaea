@@ -38,8 +38,9 @@ This API is separate from the illustrative linear `ModeProfile` coefficients. It
 ## Critical evidence boundary
 
 The included `illustrative_profiles()` values are hypothetical design inputs only:
-- QuickCell: 5 minutes, 0.05 kWh and 0.7 L per item.
+- QuickCell: 5 minutes, 0.05 kWh and 0.7 L per item. This is a simulation fixture, not a declared soil capability or a claim for normally/heavily soiled items. The separate engineering target ladder limits the <=4-minute aspiration to lightly soiled glassware and treats <=15 minutes for normally soiled single items as a stretch hypothesis.
 - FullLoad: 14-item capacity, 120 minutes, 0.39 kWh and 6.7 L at full capacity.
+- These profiles have permissive eligibility flags so scheduling mechanics can be exercised; they do not prove cleaning, rinsing or sanitization for any soil/material class.
 
 They are not measured product performance and are not pulled from an industry label. The linear base-plus-per-item model is a sensitivity scaffold; it must be replaced with measured partial-load and full-load resource curves before product decisions.
 
