@@ -239,10 +239,10 @@
       "mapping_id": "map-segmentation-artifact",
       "relation_type": "ARTIFACT_IDENTITY",
       "source_object_ids": [
-        "segmentation-v1"
+        "skeleton-artifact-shared"
       ],
       "target_object_ids": [
-        "segmentation-v2"
+        "skeleton-artifact-shared"
       ],
       "cardinality": "ONE_TO_ONE",
       "support_status": "CLAIMED_VERIFIED",
@@ -251,12 +251,12 @@
         {
           "evidence_id": "evidence-artifact-release",
           "kind": "SOURCE_ANCHOR",
-          "artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "locator": "releases/segmentation",
+          "artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "locator": "artifacts/shared-skeleton",
           "authority": "SOURCE_DERIVED"
         }
       ],
-      "rationale_code": "RELEASE_ARTIFACT_LINK"
+      "rationale_code": "EXACT_SAME_SKELETON_BYTES"
     }
   ],
   "query_comparisons": [
