@@ -37,7 +37,7 @@ The advanced controller digest is caller-supplied. The baseline digest binds the
 The current vehicle project already contains a road-relative PD controller used as the imitation/training teacher. Creating a second PD or Stanley implementation before measuring the existing one would make the first comparison harder to interpret.
 
 The PD teacher is therefore the first reference baseline. It is not claimed to be industry-best, independently safety-qualified, or architecturally independent from the training setup. Future comparison tracks should add:
-- a versioned Stanley-style road-tracking baseline is now available in `classical_baselines.rs`, with fixed gains and a deterministic policy-parameter digest;
+- a versioned Stanley-style road-tracking baseline and a versioned Pure Pursuit baseline are now available in `classical_baselines.rs`, each with fixed parameters and a deterministic policy digest;
 - a documented constrained MPC controller with fixed horizon, model, solver budget and infeasibility semantics remains the next classical baseline.
 - frozen HDC-LTC without RTA;
 - the same frozen HDC-LTC with RTA applied in shadow mode.
@@ -67,7 +67,7 @@ A passing test would establish only that the proposal-comparison primitive recor
 
 ## Paired closed-loop implementation update
 
-The follow-on module `symthaea_vehicle::paired_rollout` now supplies the first paired closed-loop lane-keeping runner for the existing bicycle-model simulator. It clones the same initial simulator into independent advanced and classical plants, supports either the existing PD teacher or a versioned Stanley-style baseline, applies the same external perturbation schedule, evolves each plant on its own state, and retains both complete frame traces. Its profile binds actual resolved road geometry, simulator/dynamics profile, initial state, controller identities, perturbation schedule, target speed, timestep and step budget; its output digest binds the trace and summaries.
+The follow-on module `symthaea_vehicle::paired_rollout` now supplies the first paired closed-loop lane-keeping runner for the existing bicycle-model simulator. It clones the same initial simulator into independent advanced and classical plants, supports the existing PD teacher, a versioned Stanley-style baseline or a versioned Pure Pursuit baseline, applies the same external perturbation schedule, evolves each plant on its own state, and retains both complete frame traces. Its profile binds actual resolved road geometry, simulator/dynamics profile, initial state, controller identities, perturbation schedule, target speed, timestep and step budget; its output digest binds the trace and summaries.
 
 The runner checks command ranges, finite states before/after each step, simulator profile validity and expected simulation-clock increments. It remains a lane-keeping test harness only. The bicycle model has no pedestrian, cyclist, general traffic actors or intersection collision observable, so this does not execute or score the intersection candidate generator.
 
