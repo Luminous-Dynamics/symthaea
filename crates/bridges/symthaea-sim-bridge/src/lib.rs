@@ -847,6 +847,9 @@ impl SimulationResult {
             name: name.into(),
             value,
             unit: unit.into(),
+            // The legacy free-form unit string is not enough to infer a
+            // trustworthy canonical PhysicalType.
+            physical_type: None,
             uncertainty: None,
         });
         self
