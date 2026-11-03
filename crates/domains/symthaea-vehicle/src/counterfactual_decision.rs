@@ -520,6 +520,10 @@ mod tests {
             CounterfactualFeasibility::Feasible,
             1.0,
         ));
+        let context_digest = execution_context_digest(&sample);
+        for candidate in &mut sample.actions {
+            candidate.execution_context_digest = context_digest.clone();
+        }
         let first = evaluate_counterfactual_decision(sample.clone()).unwrap();
         sample.actions.reverse();
         let second = evaluate_counterfactual_decision(sample).unwrap();
