@@ -1,0 +1,316 @@
+{
+  "schema_version": "1.0.0",
+  "evidence_class": "synthetic_known_answer",
+  "claim_ceiling": "SYNTHETIC_ONLY",
+  "units": "bits",
+  "cases": [
+    {
+      "id": "uninformative_binary",
+      "priors": [
+        0.5,
+        0.5
+      ],
+      "likelihoods_by_hypothesis": [
+        [
+          0.5,
+          0.5
+        ],
+        [
+          0.5,
+          0.5
+        ]
+      ],
+      "expected_prior_entropy": 1,
+      "expected_posterior_entropy": 1,
+      "expected_eig": 0
+    },
+    {
+      "id": "perfect_uniform_binary",
+      "priors": [
+        0.5,
+        0.5
+      ],
+      "likelihoods_by_hypothesis": [
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "expected_prior_entropy": 1,
+      "expected_posterior_entropy": 0,
+      "expected_eig": 1
+    },
+    {
+      "id": "noisy_90_10_binary",
+      "priors": [
+        0.5,
+        0.5
+      ],
+      "likelihoods_by_hypothesis": [
+        [
+          0.9,
+          0.1
+        ],
+        [
+          0.1,
+          0.9
+        ]
+      ],
+      "expected_prior_entropy": 1,
+      "expected_posterior_entropy": 0.4689955935892812,
+      "expected_eig": 0.5310044064107188
+    },
+    {
+      "id": "perfect_asymmetric_binary",
+      "priors": [
+        0.8,
+        0.2
+      ],
+      "likelihoods_by_hypothesis": [
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "expected_prior_entropy": 0.7219280948873623,
+      "expected_posterior_entropy": 0,
+      "expected_eig": 0.7219280948873623
+    }
+  ],
+  "cost_ranking_case": {
+    "priors": [
+      0.5,
+      0.5
+    ],
+    "candidates": [
+      {
+        "id": "expensive_high_raw_eig",
+        "cost": 5,
+        "eig_bits": 0.5310044064107188,
+        "eig_bits_per_cost": 0.10620088128214375
+      },
+      {
+        "id": "cheap_moderate_raw_eig",
+        "cost": 1,
+        "eig_bits": 0.2780719051126377,
+        "eig_bits_per_cost": 0.2780719051126377
+      }
+    ],
+    "expected_first": "cheap_moderate_raw_eig"
+  },
+  "notes": "Analytic finite-outcome cases only. Likelihoods are stipulated, not measured or calibrated from biological data.",
+  "decision_value_case": {
+    "evidence_class": "synthetic_known_answer",
+    "claim_ceiling": "SYNTHETIC_ONLY",
+    "priors": [
+      0.25,
+      0.25,
+      0.25,
+      0.25
+    ],
+    "actions": [
+      "choose_group_a",
+      "choose_group_b"
+    ],
+    "utilities_by_hypothesis": [
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "candidates": [
+      {
+        "id": "within_group_identity",
+        "outcomes": [
+          "member_0",
+          "member_1"
+        ],
+        "likelihoods_by_hypothesis": [
+          [
+            1,
+            0
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "expected_eig_bits": 1,
+        "expected_evsi_utility": 0
+      },
+      {
+        "id": "decision_relevant_group",
+        "outcomes": [
+          "group_a",
+          "group_b"
+        ],
+        "likelihoods_by_hypothesis": [
+          [
+            0.8,
+            0.2
+          ],
+          [
+            0.8,
+            0.2
+          ],
+          [
+            0.2,
+            0.8
+          ],
+          [
+            0.2,
+            0.8
+          ]
+        ],
+        "expected_eig_bits": 0.2780719051126377,
+        "prior_best_expected_utility": 0.5,
+        "expected_best_utility_after_experiment": 0.8,
+        "expected_evsi_utility": 0.3
+      }
+    ],
+    "expected_rank_by_eig": "within_group_identity",
+    "expected_rank_by_evsi": "decision_relevant_group",
+    "expected_evsi_regret_if_within_group_selected": 0.3
+  },
+  "parameter_identification_case": {
+    "evidence_class": "synthetic_known_answer",
+    "claim_ceiling": "SYNTHETIC_ONLY",
+    "units": {
+      "d_optimal_gain": "nats",
+      "a_optimal_variance_reduction": "parameter-variance units"
+    },
+    "prior_precision": [
+      [
+        100,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "candidates": [
+      {
+        "id": "refine_already_known_parameter",
+        "sensitivities_by_observation": [
+          [
+            17.320508075688775,
+            0
+          ]
+        ],
+        "observation_variances": [
+          1
+        ],
+        "expected_d_optimal_gain_nats": 0.6931471805599453,
+        "expected_a_optimal_variance_reduction": 0.0075
+      },
+      {
+        "id": "resolve_uncertain_parameter",
+        "sensitivities_by_observation": [
+          [
+            0,
+            1
+          ]
+        ],
+        "observation_variances": [
+          1
+        ],
+        "expected_d_optimal_gain_nats": 0.34657359027997264,
+        "expected_a_optimal_variance_reduction": 0.5
+      }
+    ],
+    "expected_rank_by_d_optimal": "refine_already_known_parameter",
+    "expected_rank_by_a_optimal": "resolve_uncertain_parameter",
+    "interpretation": "D-optimal design prefers greater joint parameter-volume shrinkage, while A-optimal design prefers the reduction in total marginal variance. A single scalar leaderboard would hide this declared objective trade-off."
+  },
+  "higher_order_recovery_case": {
+    "evidence_class": "synthetic_known_answer",
+    "claim_ceiling": "SYNTHETIC_ONLY",
+    "hypotheses": [
+      "pairwise_additive",
+      "pairwise_plus_three_way_interaction"
+    ],
+    "response_rule": "x1 + 2*x2 + 3*x3 + 0.5*x1*x2 - 0.25*x1*x3 + 0.75*x2*x3 + 2*state*x1*x2*x3",
+    "pairwise_marginals": [
+      {
+        "stimulus_mask": "001",
+        "pairwise_response": 1,
+        "triplet_response": 1,
+        "expected_eig_bits": 0
+      },
+      {
+        "stimulus_mask": "010",
+        "pairwise_response": 2,
+        "triplet_response": 2,
+        "expected_eig_bits": 0
+      },
+      {
+        "stimulus_mask": "100",
+        "pairwise_response": 3,
+        "triplet_response": 3,
+        "expected_eig_bits": 0
+      },
+      {
+        "stimulus_mask": "011",
+        "pairwise_response": 5.75,
+        "triplet_response": 5.75,
+        "expected_eig_bits": 0
+      },
+      {
+        "stimulus_mask": "101",
+        "pairwise_response": 3.75,
+        "triplet_response": 3.75,
+        "expected_eig_bits": 0
+      },
+      {
+        "stimulus_mask": "110",
+        "pairwise_response": 3.5,
+        "triplet_response": 3.5,
+        "expected_eig_bits": 0
+      }
+    ],
+    "triple_intervention": {
+      "stimulus_mask": "111",
+      "state": 1,
+      "pairwise_response": 7,
+      "triplet_response": 9,
+      "expected_eig_bits": 1
+    },
+    "state_gate_control": {
+      "stimulus_mask": "111",
+      "state": 0,
+      "pairwise_response": 7,
+      "triplet_response": 7,
+      "expected_eig_bits": 0
+    },
+    "interpretation": "Every single-target and pairwise response is identical under the two hypotheses; only a feasible three-target intervention in the active state identifies the pure three-way interaction. This is a synthetic identifiability oracle, not a biological interaction claim."
+  }
+}
