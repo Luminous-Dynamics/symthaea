@@ -446,6 +446,11 @@ fn evaluate_requirement(
                 sample.route_progress_m > *stop_line_progress_m + *progress_tolerance_m
             });
             let Some(crossing_index) = crossing_index else {
+                if trajectory.first().is_some_and(|first| {
+                    first.route_progress_m > requirement.active_start_progress_m
+                }) {
+                    return indeterminate(RuleComplianceReason::TrajectoryCoverageInsufficient);
+                }
                 let active_zone_end = *stop_line_progress_m + *progress_tolerance_m;
                 let overlaps_control_zone = trajectory.last().is_some_and(|last| {
                     last.route_progress_m >= requirement.active_start_progress_m
@@ -475,11 +480,6 @@ fn evaluate_requirement(
                     None,
                 );
             };
-            if trajectory.first().is_some_and(|first| {
-                first.route_progress_m > *stop_line_progress_m + *progress_tolerance_m
-            }) {
-                return indeterminate(RuleComplianceReason::TrajectoryCoverageInsufficient);
-            }
             if trajectory.first().is_some_and(|first| {
                 first.route_progress_m > requirement.active_start_progress_m
             }) {
@@ -1011,7 +1011,7 @@ mod tests {
     fn stop_line_large_sample_gap_does_not_claim_continuous_dwell() {
         let rule = TrafficRuleRequirement {
             rule_id: "stop-line-gap".into(),
-            active_start_progress_m: 0.0,
+            active_start_progress_m: 8.0,
             active_end_progress_m: 20.0,
             kind: TrafficRuleKind::StopBeforeLine {
                 stop_line_progress_m: 10.0,
@@ -1040,7 +1040,7 @@ mod tests {
     fn post_stop_acceleration_gap_is_not_counted_as_stationary_dwell() {
         let rule = TrafficRuleRequirement {
             rule_id: "stop-line-acceleration-gap".into(),
-            active_start_progress_m: 0.0,
+            active_start_progress_m: 8.0,
             active_end_progress_m: 20.0,
             kind: TrafficRuleKind::StopBeforeLine {
                 stop_line_progress_m: 10.0,
@@ -1065,7 +1065,7 @@ mod tests {
     fn stop_line_stationary_speed_with_impossible_progress_motion_is_rejected() {
         let rule = TrafficRuleRequirement {
             rule_id: "stop-line-motion".into(),
-            active_start_progress_m: 0.0,
+            active_start_progress_m: 8.0,
             active_end_progress_m: 20.0,
             kind: TrafficRuleKind::StopBeforeLine {
                 stop_line_progress_m: 10.0,
@@ -1083,7 +1083,11 @@ mod tests {
             sample(1.5, 10.2, 1.0, 0.0),
         ];
         let report = evaluate_traffic_rules(&[rule], &trajectory).unwrap();
-        assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::Violation);
+        assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::Indeterminate);
+        assert_eq!(
+            report.findings[0].reason,
+            RuleComplianceReason::TrajectoryKinematicInconsistency
+        );
     }
 
     #[test]
@@ -1142,7 +1146,7 @@ mod tests {
     fn stop_line_episode_ending_inside_control_zone_is_pending() {
         let rule = TrafficRuleRequirement {
             rule_id: "stop-line-pending".into(),
-            active_start_progress_m: 0.0,
+            active_start_progress_m: 8.0,
             active_end_progress_m: 20.0,
             kind: TrafficRuleKind::StopBeforeLine {
                 stop_line_progress_m: 10.0,
