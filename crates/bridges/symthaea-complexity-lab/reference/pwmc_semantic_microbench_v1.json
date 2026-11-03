@@ -1,0 +1,752 @@
+{
+  "format": "symthaea.pwmc-semantic-microbench",
+  "version": 1,
+  "semantics": "sum over distinct visible assignments satisfying exists hidden witnesses; hidden witness multiplicity is not weighted",
+  "literal_encoding": "DIMACS signed one-based integers",
+  "cases": [
+    {
+      "id": "single-hidden-witness-scope",
+      "variables": [
+        "d",
+        "h"
+      ],
+      "visible": [
+        "d"
+      ],
+      "hidden": [
+        "h"
+      ],
+      "clauses": [
+        [
+          1
+        ]
+      ],
+      "weights": {
+        "d": {
+          "false": "1/3",
+          "true": "2/3"
+        }
+      },
+      "expected": {
+        "full_model_count": "2",
+        "projected_support": [
+          "1"
+        ],
+        "witness_counts": {
+          "1": "2"
+        },
+        "pwmc": "2/3"
+      }
+    },
+    {
+      "id": "twelve-hidden-free-witnesses",
+      "variables": [
+        "d",
+        "h0",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "h7",
+        "h8",
+        "h9",
+        "h10",
+        "h11"
+      ],
+      "visible": [
+        "d"
+      ],
+      "hidden": [
+        "h0",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "h7",
+        "h8",
+        "h9",
+        "h10",
+        "h11"
+      ],
+      "clauses": [
+        [
+          1
+        ]
+      ],
+      "weights": {
+        "d": {
+          "false": "1/3",
+          "true": "2/3"
+        }
+      },
+      "expected": {
+        "full_model_count": "4096",
+        "projected_support": [
+          "1"
+        ],
+        "witness_counts": {
+          "1": "4096"
+        },
+        "pwmc": "2/3"
+      }
+    },
+    {
+      "id": "asymmetric-hidden-witness-multiplicity",
+      "variables": [
+        "d",
+        "h"
+      ],
+      "visible": [
+        "d"
+      ],
+      "hidden": [
+        "h"
+      ],
+      "clauses": [
+        [
+          1,
+          2
+        ]
+      ],
+      "weights": {
+        "d": {
+          "false": "1/3",
+          "true": "2/3"
+        }
+      },
+      "expected": {
+        "full_model_count": "3",
+        "projected_support": [
+          "0",
+          "1"
+        ],
+        "witness_counts": {
+          "0": "1",
+          "1": "2"
+        },
+        "pwmc": "1/1"
+      }
+    },
+    {
+      "id": "free-visible-scope-completion",
+      "variables": [
+        "d",
+        "u",
+        "h"
+      ],
+      "visible": [
+        "d",
+        "u"
+      ],
+      "hidden": [
+        "h"
+      ],
+      "clauses": [
+        [
+          1
+        ]
+      ],
+      "weights": {
+        "d": {
+          "false": "1/3",
+          "true": "2/3"
+        },
+        "u": {
+          "false": "1/4",
+          "true": "3/4"
+        }
+      },
+      "expected": {
+        "full_model_count": "4",
+        "projected_support": [
+          "10",
+          "11"
+        ],
+        "witness_counts": {
+          "10": "2",
+          "11": "2"
+        },
+        "pwmc": "2/3"
+      }
+    },
+    {
+      "id": "nonempty-support-exact-cancellation",
+      "variables": [
+        "d",
+        "h"
+      ],
+      "visible": [
+        "d"
+      ],
+      "hidden": [
+        "h"
+      ],
+      "clauses": [],
+      "weights": {
+        "d": {
+          "false": "1/1",
+          "true": "-1/1"
+        }
+      },
+      "expected": {
+        "full_model_count": "4",
+        "projected_support": [
+          "0",
+          "1"
+        ],
+        "witness_counts": {
+          "0": "2",
+          "1": "2"
+        },
+        "pwmc": "0/1"
+      }
+    },
+    {
+      "id": "signed-fractional-weights",
+      "variables": [
+        "d"
+      ],
+      "visible": [
+        "d"
+      ],
+      "hidden": [],
+      "clauses": [],
+      "weights": {
+        "d": {
+          "false": "-1/2",
+          "true": "2/3"
+        }
+      },
+      "expected": {
+        "full_model_count": "2",
+        "projected_support": [
+          "0",
+          "1"
+        ],
+        "witness_counts": {
+          "0": "1",
+          "1": "1"
+        },
+        "pwmc": "1/6"
+      }
+    },
+    {
+      "id": "empty-projected-support",
+      "variables": [
+        "d",
+        "h"
+      ],
+      "visible": [
+        "d"
+      ],
+      "hidden": [
+        "h"
+      ],
+      "clauses": [
+        [
+          1
+        ],
+        [
+          -1
+        ]
+      ],
+      "weights": {
+        "d": {
+          "false": "1/3",
+          "true": "2/3"
+        }
+      },
+      "expected": {
+        "full_model_count": "0",
+        "projected_support": [],
+        "witness_counts": {},
+        "pwmc": "0/1"
+      }
+    }
+  ],
+  "reusable_projection": {
+    "id": "single-projection-many-visible-weight-maps",
+    "variables": [
+      "d",
+      "u",
+      "h"
+    ],
+    "visible": [
+      "d",
+      "u"
+    ],
+    "hidden": [
+      "h"
+    ],
+    "clauses": [
+      [
+        1,
+        2
+      ]
+    ],
+    "expected_projected_support": [
+      "01",
+      "10",
+      "11"
+    ],
+    "expected_witness_counts": {
+      "10": "2",
+      "11": "2",
+      "01": "2"
+    },
+    "weight_maps": [
+      {
+        "id": "map-00",
+        "weights": {
+          "d": {
+            "false": "1/3",
+            "true": "2/3"
+          },
+          "u": {
+            "false": "3/5",
+            "true": "-4/5"
+          }
+        },
+        "expected_pwmc": "-2/5"
+      },
+      {
+        "id": "map-01",
+        "weights": {
+          "d": {
+            "false": "-1/2",
+            "true": "3/4"
+          },
+          "u": {
+            "false": "2/3",
+            "true": "5/6"
+          }
+        },
+        "expected_pwmc": "17/24"
+      },
+      {
+        "id": "map-02",
+        "weights": {
+          "d": {
+            "false": "3/5",
+            "true": "4/5"
+          },
+          "u": {
+            "false": "5/7",
+            "true": "-6/7"
+          }
+        },
+        "expected_pwmc": "-22/35"
+      },
+      {
+        "id": "map-03",
+        "weights": {
+          "d": {
+            "false": "-2/3",
+            "true": "5/6"
+          },
+          "u": {
+            "false": "3/4",
+            "true": "7/8"
+          }
+        },
+        "expected_pwmc": "37/48"
+      },
+      {
+        "id": "map-04",
+        "weights": {
+          "d": {
+            "false": "5/7",
+            "true": "6/7"
+          },
+          "u": {
+            "false": "7/9",
+            "true": "-8/9"
+          }
+        },
+        "expected_pwmc": "-46/63"
+      },
+      {
+        "id": "map-05",
+        "weights": {
+          "d": {
+            "false": "-3/4",
+            "true": "7/8"
+          },
+          "u": {
+            "false": "4/5",
+            "true": "9/10"
+          }
+        },
+        "expected_pwmc": "13/16"
+      },
+      {
+        "id": "map-06",
+        "weights": {
+          "d": {
+            "false": "7/9",
+            "true": "8/9"
+          },
+          "u": {
+            "false": "9/11",
+            "true": "-10/11"
+          }
+        },
+        "expected_pwmc": "-26/33"
+      },
+      {
+        "id": "map-07",
+        "weights": {
+          "d": {
+            "false": "-4/5",
+            "true": "9/10"
+          },
+          "u": {
+            "false": "5/6",
+            "true": "11/12"
+          }
+        },
+        "expected_pwmc": "101/120"
+      },
+      {
+        "id": "map-08",
+        "weights": {
+          "d": {
+            "false": "9/11",
+            "true": "10/11"
+          },
+          "u": {
+            "false": "11/13",
+            "true": "-12/13"
+          }
+        },
+        "expected_pwmc": "-118/143"
+      },
+      {
+        "id": "map-09",
+        "weights": {
+          "d": {
+            "false": "-5/6",
+            "true": "11/12"
+          },
+          "u": {
+            "false": "6/7",
+            "true": "13/14"
+          }
+        },
+        "expected_pwmc": "145/168"
+      },
+      {
+        "id": "map-10",
+        "weights": {
+          "d": {
+            "false": "11/13",
+            "true": "12/13"
+          },
+          "u": {
+            "false": "13/15",
+            "true": "-14/15"
+          }
+        },
+        "expected_pwmc": "-166/195"
+      },
+      {
+        "id": "map-11",
+        "weights": {
+          "d": {
+            "false": "-6/7",
+            "true": "13/14"
+          },
+          "u": {
+            "false": "7/8",
+            "true": "15/16"
+          }
+        },
+        "expected_pwmc": "197/224"
+      },
+      {
+        "id": "map-12",
+        "weights": {
+          "d": {
+            "false": "13/15",
+            "true": "14/15"
+          },
+          "u": {
+            "false": "15/17",
+            "true": "-16/17"
+          }
+        },
+        "expected_pwmc": "-74/85"
+      },
+      {
+        "id": "map-13",
+        "weights": {
+          "d": {
+            "false": "-7/8",
+            "true": "15/16"
+          },
+          "u": {
+            "false": "8/9",
+            "true": "17/18"
+          }
+        },
+        "expected_pwmc": "257/288"
+      },
+      {
+        "id": "map-14",
+        "weights": {
+          "d": {
+            "false": "15/17",
+            "true": "16/17"
+          },
+          "u": {
+            "false": "17/19",
+            "true": "-18/19"
+          }
+        },
+        "expected_pwmc": "-286/323"
+      },
+      {
+        "id": "map-15",
+        "weights": {
+          "d": {
+            "false": "-8/9",
+            "true": "17/18"
+          },
+          "u": {
+            "false": "9/10",
+            "true": "19/20"
+          }
+        },
+        "expected_pwmc": "65/72"
+      },
+      {
+        "id": "map-16",
+        "weights": {
+          "d": {
+            "false": "17/19",
+            "true": "18/19"
+          },
+          "u": {
+            "false": "19/21",
+            "true": "-20/21"
+          }
+        },
+        "expected_pwmc": "-358/399"
+      },
+      {
+        "id": "map-17",
+        "weights": {
+          "d": {
+            "false": "-9/10",
+            "true": "19/20"
+          },
+          "u": {
+            "false": "10/11",
+            "true": "21/22"
+          }
+        },
+        "expected_pwmc": "401/440"
+      },
+      {
+        "id": "map-18",
+        "weights": {
+          "d": {
+            "false": "19/21",
+            "true": "20/21"
+          },
+          "u": {
+            "false": "21/23",
+            "true": "-22/23"
+          }
+        },
+        "expected_pwmc": "-146/161"
+      },
+      {
+        "id": "map-19",
+        "weights": {
+          "d": {
+            "false": "-10/11",
+            "true": "21/22"
+          },
+          "u": {
+            "false": "11/12",
+            "true": "23/24"
+          }
+        },
+        "expected_pwmc": "485/528"
+      },
+      {
+        "id": "map-20",
+        "weights": {
+          "d": {
+            "false": "21/23",
+            "true": "22/23"
+          },
+          "u": {
+            "false": "23/25",
+            "true": "-24/25"
+          }
+        },
+        "expected_pwmc": "-526/575"
+      },
+      {
+        "id": "map-21",
+        "weights": {
+          "d": {
+            "false": "-11/12",
+            "true": "23/24"
+          },
+          "u": {
+            "false": "12/13",
+            "true": "25/26"
+          }
+        },
+        "expected_pwmc": "577/624"
+      },
+      {
+        "id": "map-22",
+        "weights": {
+          "d": {
+            "false": "23/25",
+            "true": "24/25"
+          },
+          "u": {
+            "false": "25/27",
+            "true": "-26/27"
+          }
+        },
+        "expected_pwmc": "-622/675"
+      },
+      {
+        "id": "map-23",
+        "weights": {
+          "d": {
+            "false": "-12/13",
+            "true": "25/26"
+          },
+          "u": {
+            "false": "13/14",
+            "true": "27/28"
+          }
+        },
+        "expected_pwmc": "677/728"
+      },
+      {
+        "id": "map-24",
+        "weights": {
+          "d": {
+            "false": "25/27",
+            "true": "26/27"
+          },
+          "u": {
+            "false": "27/29",
+            "true": "-28/29"
+          }
+        },
+        "expected_pwmc": "-242/261"
+      },
+      {
+        "id": "map-25",
+        "weights": {
+          "d": {
+            "false": "-13/14",
+            "true": "27/28"
+          },
+          "u": {
+            "false": "14/15",
+            "true": "29/30"
+          }
+        },
+        "expected_pwmc": "157/168"
+      },
+      {
+        "id": "map-26",
+        "weights": {
+          "d": {
+            "false": "27/29",
+            "true": "28/29"
+          },
+          "u": {
+            "false": "29/31",
+            "true": "-30/31"
+          }
+        },
+        "expected_pwmc": "-838/899"
+      },
+      {
+        "id": "map-27",
+        "weights": {
+          "d": {
+            "false": "-14/15",
+            "true": "29/30"
+          },
+          "u": {
+            "false": "15/16",
+            "true": "31/32"
+          }
+        },
+        "expected_pwmc": "901/960"
+      },
+      {
+        "id": "map-28",
+        "weights": {
+          "d": {
+            "false": "29/31",
+            "true": "30/31"
+          },
+          "u": {
+            "false": "31/33",
+            "true": "-32/33"
+          }
+        },
+        "expected_pwmc": "-958/1023"
+      },
+      {
+        "id": "map-29",
+        "weights": {
+          "d": {
+            "false": "-15/16",
+            "true": "31/32"
+          },
+          "u": {
+            "false": "16/17",
+            "true": "33/34"
+          }
+        },
+        "expected_pwmc": "1025/1088"
+      },
+      {
+        "id": "map-30",
+        "weights": {
+          "d": {
+            "false": "31/33",
+            "true": "32/33"
+          },
+          "u": {
+            "false": "33/35",
+            "true": "-34/35"
+          }
+        },
+        "expected_pwmc": "-362/385"
+      },
+      {
+        "id": "map-31",
+        "weights": {
+          "d": {
+            "false": "-16/17",
+            "true": "33/34"
+          },
+          "u": {
+            "false": "17/18",
+            "true": "35/36"
+          }
+        },
+        "expected_pwmc": "1157/1224"
+      }
+    ]
+  }
+}
