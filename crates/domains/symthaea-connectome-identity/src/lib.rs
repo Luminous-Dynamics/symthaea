@@ -126,18 +126,42 @@ pub struct IdentityJoin {
 }
 
 impl IdentityJoin {
-    pub fn schema_version(&self) -> &str { &self.schema_version }
-    pub fn artifact(&self) -> &ArtifactIdentity { &self.artifact }
-    pub fn orientation(&self) -> MatrixOrientation { self.orientation }
-    pub fn canonical_ids(&self) -> &[String] { &self.canonical_ids }
-    pub fn row_to_canonical(&self) -> &[usize] { &self.row_to_canonical }
-    pub fn column_to_canonical(&self) -> &[usize] { &self.column_to_canonical }
-    pub fn annotation_to_canonical(&self) -> &[usize] { &self.annotation_to_canonical }
-    pub fn canonical_to_row(&self) -> &[usize] { &self.canonical_to_row }
-    pub fn canonical_to_column(&self) -> &[usize] { &self.canonical_to_column }
-    pub fn canonical_to_annotation(&self) -> &[usize] { &self.canonical_to_annotation }
-    pub fn canonical_identity_sha256(&self) -> &str { &self.canonical_identity_sha256 }
-    pub fn source_binding_sha256(&self) -> &str { &self.source_binding_sha256 }
+    pub fn schema_version(&self) -> &str {
+        &self.schema_version
+    }
+    pub fn artifact(&self) -> &ArtifactIdentity {
+        &self.artifact
+    }
+    pub fn orientation(&self) -> MatrixOrientation {
+        self.orientation
+    }
+    pub fn canonical_ids(&self) -> &[String] {
+        &self.canonical_ids
+    }
+    pub fn row_to_canonical(&self) -> &[usize] {
+        &self.row_to_canonical
+    }
+    pub fn column_to_canonical(&self) -> &[usize] {
+        &self.column_to_canonical
+    }
+    pub fn annotation_to_canonical(&self) -> &[usize] {
+        &self.annotation_to_canonical
+    }
+    pub fn canonical_to_row(&self) -> &[usize] {
+        &self.canonical_to_row
+    }
+    pub fn canonical_to_column(&self) -> &[usize] {
+        &self.canonical_to_column
+    }
+    pub fn canonical_to_annotation(&self) -> &[usize] {
+        &self.canonical_to_annotation
+    }
+    pub fn canonical_identity_sha256(&self) -> &str {
+        &self.canonical_identity_sha256
+    }
+    pub fn source_binding_sha256(&self) -> &str {
+        &self.source_binding_sha256
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -147,8 +171,12 @@ pub struct ResolvedTargets {
 }
 
 impl ResolvedTargets {
-    pub fn ids(&self) -> &[String] { &self.ids }
-    pub fn canonical_indices(&self) -> &[usize] { &self.canonical_indices }
+    pub fn ids(&self) -> &[String] {
+        &self.ids
+    }
+    pub fn canonical_indices(&self) -> &[usize] {
+        &self.canonical_indices
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -158,8 +186,12 @@ pub struct ResolvedSelection {
 }
 
 impl ResolvedSelection {
-    pub fn keep(&self) -> Option<&ResolvedTargets> { self.keep.as_ref() }
-    pub fn remove(&self) -> &ResolvedTargets { &self.remove }
+    pub fn keep(&self) -> Option<&ResolvedTargets> {
+        self.keep.as_ref()
+    }
+    pub fn remove(&self) -> &ResolvedTargets {
+        &self.remove
+    }
 }
 
 fn valid_identifier(value: &str) -> bool {
@@ -292,16 +324,30 @@ fn inverse_positions(source_to_canonical: &[usize], count: usize) -> Vec<usize> 
 
 /// Validates that matrix row IDs, column IDs and annotation IDs form one unique
 /// neuron universe. Reordered inputs are accepted only with explicit bijections.
-pub fn validate_identity_join(
-    input: &MatrixAxisInput,
-) -> Result<IdentityJoin, ValidationFailure> {
+pub fn validate_identity_join(input: &MatrixAxisInput) -> Result<IdentityJoin, ValidationFailure> {
     let mut reasons = Vec::new();
 
     for (value, empty, invalid) in [
-        (&input.artifact.dataset_id, ReasonCode::EmptyDatasetId, ReasonCode::InvalidDatasetId),
-        (&input.artifact.release_id, ReasonCode::EmptyReleaseId, ReasonCode::InvalidReleaseId),
-        (&input.artifact.taxon_id, ReasonCode::EmptyTaxonId, ReasonCode::InvalidTaxonId),
-        (&input.artifact.life_stage_id, ReasonCode::EmptyLifeStageId, ReasonCode::InvalidLifeStageId),
+        (
+            &input.artifact.dataset_id,
+            ReasonCode::EmptyDatasetId,
+            ReasonCode::InvalidDatasetId,
+        ),
+        (
+            &input.artifact.release_id,
+            ReasonCode::EmptyReleaseId,
+            ReasonCode::InvalidReleaseId,
+        ),
+        (
+            &input.artifact.taxon_id,
+            ReasonCode::EmptyTaxonId,
+            ReasonCode::InvalidTaxonId,
+        ),
+        (
+            &input.artifact.life_stage_id,
+            ReasonCode::EmptyLifeStageId,
+            ReasonCode::InvalidLifeStageId,
+        ),
     ] {
         push_identifier_error(value, empty, invalid, &mut reasons);
     }
@@ -523,7 +569,9 @@ pub fn resolve_selection(
     if let Some(keep_targets) = &keep {
         let keep_set: BTreeSet<&str> = keep_targets.ids.iter().map(String::as_str).collect();
         if remove.ids.iter().any(|id| keep_set.contains(id.as_str())) {
-            return Err(ValidationFailure::from_reasons(vec![ReasonCode::KeepRemoveConflict]));
+            return Err(ValidationFailure::from_reasons(vec![
+                ReasonCode::KeepRemoveConflict,
+            ]));
         }
     }
     Ok(ResolvedSelection { keep, remove })
@@ -598,8 +646,14 @@ mod tests {
         source.artifact.matrix_sha256 = digest('d');
         source.artifact.annotation_sha256 = digest('e');
         let second = validate_identity_join(&source).expect("permuted join");
-        assert_eq!(first.canonical_identity_sha256(), second.canonical_identity_sha256());
-        assert_ne!(first.source_binding_sha256(), second.source_binding_sha256());
+        assert_eq!(
+            first.canonical_identity_sha256(),
+            second.canonical_identity_sha256()
+        );
+        assert_ne!(
+            first.source_binding_sha256(),
+            second.source_binding_sha256()
+        );
     }
     #[test]
     fn leading_zero_ids_are_not_coerced() {
@@ -616,7 +670,10 @@ mod tests {
     fn missing_orientation_rejects() {
         let mut source = input();
         source.orientation = None;
-        assert_reason(validate_identity_join(&source), ReasonCode::MissingOrientation);
+        assert_reason(
+            validate_identity_join(&source),
+            ReasonCode::MissingOrientation,
+        );
     }
 
     #[test]
@@ -701,13 +758,12 @@ mod tests {
         source.column_ids = vec!["200".to_string(), "300".to_string(), "100".to_string()];
         source.annotation_ids = vec!["100".to_string(), "300".to_string(), "200".to_string()];
         let join = validate_identity_join(&source).expect("join");
-        let matrix = vec![
-            vec![1, 2, 0],
-            vec![11, 12, 10],
-            vec![21, 22, 20],
-        ];
+        let matrix = vec![vec![1, 2, 0], vec![11, 12, 10], vec![21, 22, 20]];
         let canonical = canonicalize_matrix(&matrix, &join).expect("canonical matrix");
-        assert_eq!(canonical, vec![vec![10, 11, 12], vec![20, 21, 22], vec![0, 1, 2]]);
+        assert_eq!(
+            canonical,
+            vec![vec![10, 11, 12], vec![20, 21, 22], vec![0, 1, 2]]
+        );
     }
 
     #[test]
@@ -744,11 +800,8 @@ mod tests {
         source.column_ids.rotate_left(1);
         source.annotation_ids.reverse();
         let join = validate_identity_join(&source).expect("join");
-        let resolved = resolve_targets(
-            &join,
-            &["300".to_string(), "100".to_string()],
-        )
-        .expect("stable target resolution");
+        let resolved = resolve_targets(&join, &["300".to_string(), "100".to_string()])
+            .expect("stable target resolution");
         assert_eq!(resolved.ids(), vec!["100", "300"]);
         assert_eq!(resolved.canonical_indices(), vec![0, 2]);
     }
@@ -775,7 +828,10 @@ mod tests {
         let mut source = input();
         source.orientation = Some(MatrixOrientation::RowsPostsynapticColumnsPresynaptic);
         let second = validate_identity_join(&source).expect("second orientation");
-        assert_ne!(first.canonical_identity_sha256(), second.canonical_identity_sha256());
+        assert_ne!(
+            first.canonical_identity_sha256(),
+            second.canonical_identity_sha256()
+        );
     }
 
     #[test]
@@ -816,11 +872,8 @@ mod tests {
     #[test]
     fn duplicate_target_id_rejects() {
         let join = validate_identity_join(&input()).expect("join");
-        let error = resolve_targets(
-            &join,
-            &["100".to_string(), "100".to_string()],
-        )
-        .expect_err("duplicate stable ID must reject");
+        let error = resolve_targets(&join, &["100".to_string(), "100".to_string()])
+            .expect_err("duplicate stable ID must reject");
         assert!(error.contains(ReasonCode::DuplicateTargetId));
     }
 
@@ -840,7 +893,10 @@ mod tests {
         let keep = vec!["300".to_string(), "100".to_string()];
         let remove = vec!["200".to_string()];
         let result = resolve_selection(&join, Some(&keep), &remove).expect("disjoint selection");
-        assert_eq!(result.keep().expect("keep set").canonical_indices(), vec![0, 2]);
+        assert_eq!(
+            result.keep().expect("keep set").canonical_indices(),
+            vec![0, 2]
+        );
         assert_eq!(result.remove().canonical_indices(), vec![1]);
     }
 
