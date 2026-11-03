@@ -133,3 +133,18 @@ For from-scratch firmware tasks, use the phase receipt extension from #10298: CV
 ### Independent schema audit environment
 
 The CI structural validator runs Python `jsonschema` 4.26.0 with all direct and transitive dependencies pinned in `tools/benchmark-run-receipt-harness/requirements-ci.txt`. The schema uses `date-time`; the pinned `rfc3339-validator` dependency is installed so `FormatChecker` validates timestamps rather than silently skipping that optional format. The Python audit rejects duplicate object keys and disallows external schema references. The Rust validator remains the semantic/accounting authority.
+
+
+## Synthetic example and official-score semantics
+
+The committed synthetic example contains exactly five eligible tasks:
+- 2 passed and independently graded within the synthetic fixture;
+- 1 refused;
+- 1 unsupported because a required provider was unavailable;
+- 1 not attempted because the budget was exhausted.
+
+This yields 4/5 attempted coverage, 2/5 graded coverage, 2/5 coverage-adjusted task yield, and 2/2 conditional success. The refusal and unsupported task remain in the eligible denominator.
+
+The fixture has **no benchmark-owner official score**. Its `official_score.is_official` is false, the value/numerator/denominator and official output digest are null, and a reason explains why. The JSON Schema and Rust validator reject a synthetic-access receipt that claims an official score. A synthetic grader result may validate the fixture's test cases; it must not be relabelled as an official leaderboard score.
+
+The Rust validator also recomputes the four recognized derived metrics—eligible coverage, graded coverage, coverage-adjusted task yield and conditional success—from the validated task accounting. It rejects duplicate derived metric IDs, incorrect values, wrong formulas/units, and non-null values when their denominator is zero. Other derived metric identifiers remain explicitly non-official declarations; this generic v1 validator does not claim to independently reproduce every benchmark-specific metric.
