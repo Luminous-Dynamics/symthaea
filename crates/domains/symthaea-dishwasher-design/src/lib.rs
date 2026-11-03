@@ -9,6 +9,7 @@
 //! breakup or CFD. Those require calibrated experiments and validated solvers.
 
 pub mod chemistry;
+pub mod quality;
 
 pub mod energy {
     pub const WATER_CP_KJ_PER_KG_K: f64 = 4.186;
