@@ -39,7 +39,7 @@
       }
     },
     {
-      "id": "twelve-hidden-free-witnesses",
+      "id": "twenty-hidden-free-witnesses",
       "variables": [
         "d",
         "h0",
@@ -53,7 +53,15 @@
         "h8",
         "h9",
         "h10",
-        "h11"
+        "h11",
+        "h12",
+        "h13",
+        "h14",
+        "h15",
+        "h16",
+        "h17",
+        "h18",
+        "h19"
       ],
       "visible": [
         "d"
@@ -70,7 +78,15 @@
         "h8",
         "h9",
         "h10",
-        "h11"
+        "h11",
+        "h12",
+        "h13",
+        "h14",
+        "h15",
+        "h16",
+        "h17",
+        "h18",
+        "h19"
       ],
       "clauses": [
         [
@@ -84,12 +100,12 @@
         }
       },
       "expected": {
-        "full_model_count": "4096",
+        "full_model_count": "1048576",
         "projected_support": [
           "1"
         ],
         "witness_counts": {
-          "1": "4096"
+          "1": "1048576"
         },
         "pwmc": "2/3"
       }
