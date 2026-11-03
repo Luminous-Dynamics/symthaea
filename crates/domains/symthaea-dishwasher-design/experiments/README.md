@@ -53,3 +53,16 @@ Use `dose-events-template.csv` for **one row per physical component-release even
 Keep cycle rows and dose-event rows linked by `run_id`. Do not infer that a commanded dose was delivered. Actual mass should come from a calibrated gravimetric measurement or calibrated volume plus batch-specific density. A missing value is empty, not zero. Do not aggregate several component events into one row. Cycle-level aggregate mass remains in grams; the per-event archive uses integer milligrams.
 
 The Rust `symthaea_dishwasher_design::chemistry::validate_dose_plan` validates a proposed schedule against a caller-supplied `FormulationCalibrationProfile`: component identity, soil/surface scope, phase ordering, release start and full duration, stage-specific temperature, water hardness, integer-milligram per-event/per-component-cycle/total mass limits using checked arithmetic, and evidence-backed separation between complete dispense intervals. The separate `check_reported_dose_delivery` compares reported actual milligrams and timing with a caller-supplied dispenser tolerance using integer basis-point arithmetic. It binds the report to the commanded event ID, exact component ID, physical dispenser channel and delivery-calibration ID; the event CSV captures commanded versus actual start/duration and those calibration/tolerance fields. It does not authenticate the underlying telemetry, prove evidence truth, select a formulation or dose, certify ingredient compatibility, or establish cleaning success. Calibration and measurement hashes are provenance identifiers and must be independently audited against the formulation owner's and laboratory's original records.
+
+## Independent per-item outcome evidence
+
+Use `outcome-evidence-template.csv` for one item × endpoint × physical run measurement. Every observation binds to:
+- exact run and item ID;
+- endpoint, criterion ID and metric ID;
+- independent assay method and protocol;
+- measured value, expanded uncertainty and unit;
+- evidence reference and calibration bundle digest.
+
+Use `endpoint-criteria-template.csv` for preregistered threshold, unit and comparison direction. Freeze the criteria before collecting the test series. Thresholds must be sourced from the licensed method/standard or a documented independent research protocol; this software only checks the recorded criterion identity/digest shape and does not certify that the threshold is scientifically or legally appropriate.
+
+The Rust `quality::qualify_pilot_evidence` gate computes pass/fail/indeterminate using expanded uncertainty. Soil residual, final-rinse residue and cross-contamination are mandatory. Drying and relative microbiology are separate opt-in endpoints. Calibrated process proxies (turbidity, conductivity, camera confidence, pump current, temperature and commanded detergent mass) cannot substitute for independent outcome assays in this pilot qualification path. Five independent runs is a pilot floor only, not a confirmatory sample size. See `docs/outcome-evidence-and-stop-rule.md` and issue #10225.
