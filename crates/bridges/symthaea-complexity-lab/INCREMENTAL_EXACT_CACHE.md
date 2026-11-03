@@ -43,7 +43,7 @@ HMAC authenticates stored bytes; it does not prove the checker was sound or the 
 ## Executed reference
 
 Files:
-- `reference/incremental_exact_cache.py`: producer, separate bucket checker, content-addressed cache, receipt validation, two exact algebras, direct assignment oracle and mutation suite.
+- `reference/incremental_exact_cache.py`: standalone producer, separate bucket checker, content-addressed cache, receipt validation, two exact algebras, direct assignment oracle and mutation suite. Run with `python3 reference/incremental_exact_cache.py`.
 - `reference/incremental_exact_cache_results.json`: deterministic results.
 
 Seed: `20261103`.
@@ -59,10 +59,10 @@ Seed: `20261103`.
 | Cache copied under wrong auth key | Entries rejected and recomputed |
 | Cross-algebra cache namespace | 0 cross-algebra hits |
 | Randomized mixed-cardinality updates | 64 graphs × 2 algebras = 128/128 exact matches |
-| Randomized edits: cache hits / misses | 515 / 253 |
+| Randomized edits: cache hits / misses | 509 / 259 |
 | Randomized edits: invalidated message steps | 253 |
 
-Across the 128 randomized edits, the cached producer executed 2,170 additions and 4,858 multiplications versus 7,168 additions and 16,384 multiplications for cold recomputation. This is a reduction of roughly 69.7% and 70.4% in **producer operation counts** on this specific fixture/seed. It is not wall-time speedup: Python object/digest/HMAC costs, fresh-message checker replay, serialization, cache memory and public benchmark behaviour are not included in that comparison.
+Across the 128 randomized edits, the cached producer executed 2,182 additions and 4,870 multiplications versus 7,168 additions and 16,384 multiplications for cold recomputation. This is a reduction of roughly 69.6% and 70.3% in **producer operation counts** on this specific fixture/seed. It is not wall-time speedup: Python object/digest/HMAC costs, fresh-message checker replay, serialization, cache memory and public benchmark behaviour are not included in that comparison.
 
 The checker is a separate implementation path in the same Python reference file, not yet a separately compiled/audited binary. The finite suite is not a Lean proof.
 
