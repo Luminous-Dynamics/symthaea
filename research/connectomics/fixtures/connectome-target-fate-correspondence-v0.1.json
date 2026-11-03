@@ -1,0 +1,39 @@
+{
+  "schema_version": "0.1.0",
+  "receipt_id": "synthetic-correspondence-release-2",
+  "target_world": {
+    "world_id": "target-world-fate-demo",
+    "source_dataset_id": "synthetic-dataset",
+    "source_volume_id": "synthetic-volume",
+    "release_id": "release-2"
+  },
+  "mappings": [
+    {
+      "mapping_id": "map-segment-1",
+      "relation_type": "SEGMENT_LINEAGE",
+      "source_object_ids": ["segment-source-1"],
+      "target_object_ids": ["segment-1"],
+      "support_status": "CLAIMED_VERIFIED",
+      "alternative_set_id": null,
+      "evidence": [{"evidence_id": "ev-segment-lineage-1"}]
+    },
+    {
+      "mapping_id": "map-neuron-5-a",
+      "relation_type": "NEURON_CORRESPONDENCE",
+      "source_object_ids": ["neuron-source-5"],
+      "target_object_ids": ["neuron-5-candidate-a"],
+      "support_status": "AMBIGUOUS",
+      "alternative_set_id": "neuron-5-candidates-v1",
+      "evidence": [{"evidence_id": "ev-neuron-morphology-a"}]
+    },
+    {
+      "mapping_id": "map-neuron-5-b",
+      "relation_type": "NEURON_CORRESPONDENCE",
+      "source_object_ids": ["neuron-source-5"],
+      "target_object_ids": ["neuron-5-candidate-b"],
+      "support_status": "AMBIGUOUS",
+      "alternative_set_id": "neuron-5-candidates-v1",
+      "evidence": [{"evidence_id": "ev-neuron-morphology-b"}]
+    }
+  ]
+}
