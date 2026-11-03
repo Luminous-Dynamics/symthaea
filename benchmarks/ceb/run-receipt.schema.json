@@ -88,7 +88,8 @@
             "task_id",
             "task_contract_sha256",
             "source_tree_sha256",
-            "fixture_revision"
+            "fixture_revision",
+            "source_tree_digest_algorithm"
           ],
           "properties": {
             "task_id": {
@@ -106,6 +107,9 @@
             "fixture_revision": {
               "type": "string",
               "minLength": 1
+            },
+            "source_tree_digest_algorithm": {
+              "const": "ceb-tree-v1"
             }
           }
         },
