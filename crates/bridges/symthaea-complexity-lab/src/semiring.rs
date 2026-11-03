@@ -504,8 +504,13 @@ impl ExactFactorGraph<MaxCountValue> {
                         reason: "backpointer separator was not assigned during reverse traversal"
                     }))
                     .collect::<Result<_, _>>()?;
-                let row = backpointer.rows.iter().find(|row| row.separator_assignment == key)
+                let row_index = backpointer.separator.iter().zip(key.iter())
+                    .fold(0usize, |index, (&v, &state)| index * self.cardinalities[v] + state);
+                let row = backpointer.rows.get(row_index)
                     .ok_or(EliminationError::InvalidEliminationOrder { reason: "missing backpointer row" })?;
+                if row.separator_assignment != key {
+                    return Err(EliminationError::InvalidEliminationOrder { reason: "backpointer row encoding mismatch" });
+                }
                 let state = *row.maximizing_states.first()
                     .ok_or(EliminationError::InvalidEliminationOrder { reason: "empty backpointer for feasible optimum" })?;
                 chosen[backpointer.variable] = Some(state);
