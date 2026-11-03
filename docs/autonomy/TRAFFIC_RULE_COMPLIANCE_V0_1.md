@@ -50,7 +50,7 @@ Non-finite numeric input is rejected explicitly because it cannot be represented
 
 ## Stop-line sampling conditions
 
-A stop is not inferred from one low-speed point or from widely separated samples. A qualifying stopped interval requires:
+A stop is not inferred from one low-speed point or from widely separated samples. A crossing result also requires at least two samples inside the declared approach zone; skipped spatial coverage is indeterminate even when the time gap is short. A qualifying stopped interval requires:
 - each consecutive low-speed sample gap no larger than the declared maximum;
 - route progress remains before the line within the declared tolerance;
 - sampled progress displacement remains compatible with the speed threshold and tolerance;
@@ -58,7 +58,7 @@ A stop is not inferred from one low-speed point or from widely separated samples
 - total observed sampled dwell between qualifying low-speed samples reaches the required duration before line crossing;
 - the final low-speed-sample-to-crossing gap is within the declared maximum but is not counted as stopped dwell.
 
-A large gap or speed/route-progress inconsistency that prevents determining the stop sequence yields `Indeterminate`, not `Violation`. A trace that starts after the approach-zone boundary is also indeterminate because the earlier stop history is missing.
+A large gap or speed/route-progress inconsistency that prevents determining the stop sequence yields `Indeterminate`, not `Violation`. A trace that starts after the approach-zone boundary is also indeterminate because the earlier stop history is missing. A trace with fewer than two in-zone samples, or one that skips the whole approach segment between samples, cannot support a violation finding.
 
 This is a discrete trajectory check, not proof of continuous physical standstill. The maximum sample gap and position tolerance are part of the rule profile and must be calibrated to the data source.
 
