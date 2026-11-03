@@ -1,0 +1,1600 @@
+{
+  "schema_version": "0.1",
+  "synthetic_only": true,
+  "cases": [
+    {
+      "case_id": "eighteen_trajectories_abstains_at_95_percent",
+      "input": {
+        "profile_id": "profile-v1",
+        "calibration_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "group_disjointness_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "query_id": "pathway-strength",
+        "query_definition_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "analysis_code_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "metric_id": "pathway-strength",
+        "unit_id": "normalized-strength",
+        "calibration_stratum_id": "mouse-volume-workflow-v1",
+        "materiality_threshold": 0.05,
+        "future_horizon_edits": 100,
+        "alpha": 0.05,
+        "target_source_volume_id": "target-volume",
+        "target_independence_cluster_id": "target-cluster",
+        "target_is_disjoint_from_calibration": true,
+        "target_observed_max_drift_ratio": 0.2,
+        "target_current_uncertainty_width_ratio": 0.3,
+        "calibration_trajectories": [
+          {
+            "trajectory_id": "trajectory-0",
+            "source_volume_id": "volume-0",
+            "independence_cluster_id": "cluster-0",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-1",
+            "source_volume_id": "volume-1",
+            "independence_cluster_id": "cluster-1",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-2",
+            "source_volume_id": "volume-2",
+            "independence_cluster_id": "cluster-2",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-3",
+            "source_volume_id": "volume-3",
+            "independence_cluster_id": "cluster-3",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-4",
+            "source_volume_id": "volume-4",
+            "independence_cluster_id": "cluster-4",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-5",
+            "source_volume_id": "volume-5",
+            "independence_cluster_id": "cluster-5",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-6",
+            "source_volume_id": "volume-6",
+            "independence_cluster_id": "cluster-6",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-7",
+            "source_volume_id": "volume-7",
+            "independence_cluster_id": "cluster-7",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-8",
+            "source_volume_id": "volume-8",
+            "independence_cluster_id": "cluster-8",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-9",
+            "source_volume_id": "volume-9",
+            "independence_cluster_id": "cluster-9",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-10",
+            "source_volume_id": "volume-10",
+            "independence_cluster_id": "cluster-10",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-11",
+            "source_volume_id": "volume-11",
+            "independence_cluster_id": "cluster-11",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-12",
+            "source_volume_id": "volume-12",
+            "independence_cluster_id": "cluster-12",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-13",
+            "source_volume_id": "volume-13",
+            "independence_cluster_id": "cluster-13",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-14",
+            "source_volume_id": "volume-14",
+            "independence_cluster_id": "cluster-14",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-15",
+            "source_volume_id": "volume-15",
+            "independence_cluster_id": "cluster-15",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-16",
+            "source_volume_id": "volume-16",
+            "independence_cluster_id": "cluster-16",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-17",
+            "source_volume_id": "volume-17",
+            "independence_cluster_id": "cluster-17",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          }
+        ],
+        "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "expected_report": {
+        "report_version": "0.1",
+        "profile_id": "profile-v1",
+        "calibration_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "group_disjointness_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "query_id": "pathway-strength",
+        "query_definition_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "analysis_code_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "metric_id": "pathway-strength",
+        "unit_id": "normalized-strength",
+        "calibration_stratum_id": "mouse-volume-workflow-v1",
+        "future_horizon_edits": 100,
+        "alpha": 0.05,
+        "target_source_volume_id": "target-volume",
+        "calibration_trajectory_count": 18,
+        "order_statistic_rank": 19,
+        "residual_quantile_ratio": null,
+        "target_observed_max_drift_ratio": 0.2,
+        "target_current_uncertainty_width_ratio": 0.3,
+        "projected_future_drift_upper_ratio": null,
+        "status": "InsufficientCalibration",
+        "universal_connectome_completeness_claimed": false,
+        "all_future_edits_certified": false,
+        "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "materiality_threshold": 0.05
+      }
+    },
+    {
+      "case_id": "nineteen_trajectories_yield_finite_stable_bound",
+      "input": {
+        "profile_id": "profile-v1",
+        "calibration_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "group_disjointness_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "query_id": "pathway-strength",
+        "query_definition_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "analysis_code_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "metric_id": "pathway-strength",
+        "unit_id": "normalized-strength",
+        "calibration_stratum_id": "mouse-volume-workflow-v1",
+        "materiality_threshold": 0.05,
+        "future_horizon_edits": 100,
+        "alpha": 0.05,
+        "target_source_volume_id": "target-volume",
+        "target_independence_cluster_id": "target-cluster",
+        "target_is_disjoint_from_calibration": true,
+        "target_observed_max_drift_ratio": 0.2,
+        "target_current_uncertainty_width_ratio": 0.3,
+        "calibration_trajectories": [
+          {
+            "trajectory_id": "trajectory-0",
+            "source_volume_id": "volume-0",
+            "independence_cluster_id": "cluster-0",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-1",
+            "source_volume_id": "volume-1",
+            "independence_cluster_id": "cluster-1",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-2",
+            "source_volume_id": "volume-2",
+            "independence_cluster_id": "cluster-2",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-3",
+            "source_volume_id": "volume-3",
+            "independence_cluster_id": "cluster-3",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-4",
+            "source_volume_id": "volume-4",
+            "independence_cluster_id": "cluster-4",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-5",
+            "source_volume_id": "volume-5",
+            "independence_cluster_id": "cluster-5",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-6",
+            "source_volume_id": "volume-6",
+            "independence_cluster_id": "cluster-6",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-7",
+            "source_volume_id": "volume-7",
+            "independence_cluster_id": "cluster-7",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-8",
+            "source_volume_id": "volume-8",
+            "independence_cluster_id": "cluster-8",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-9",
+            "source_volume_id": "volume-9",
+            "independence_cluster_id": "cluster-9",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-10",
+            "source_volume_id": "volume-10",
+            "independence_cluster_id": "cluster-10",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-11",
+            "source_volume_id": "volume-11",
+            "independence_cluster_id": "cluster-11",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-12",
+            "source_volume_id": "volume-12",
+            "independence_cluster_id": "cluster-12",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-13",
+            "source_volume_id": "volume-13",
+            "independence_cluster_id": "cluster-13",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-14",
+            "source_volume_id": "volume-14",
+            "independence_cluster_id": "cluster-14",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-15",
+            "source_volume_id": "volume-15",
+            "independence_cluster_id": "cluster-15",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-16",
+            "source_volume_id": "volume-16",
+            "independence_cluster_id": "cluster-16",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-17",
+            "source_volume_id": "volume-17",
+            "independence_cluster_id": "cluster-17",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-18",
+            "source_volume_id": "volume-18",
+            "independence_cluster_id": "cluster-18",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          }
+        ],
+        "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "expected_report": {
+        "report_version": "0.1",
+        "profile_id": "profile-v1",
+        "calibration_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "group_disjointness_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "query_id": "pathway-strength",
+        "query_definition_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "analysis_code_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "metric_id": "pathway-strength",
+        "unit_id": "normalized-strength",
+        "calibration_stratum_id": "mouse-volume-workflow-v1",
+        "future_horizon_edits": 100,
+        "alpha": 0.05,
+        "target_source_volume_id": "target-volume",
+        "calibration_trajectory_count": 19,
+        "order_statistic_rank": 19,
+        "residual_quantile_ratio": 0.1,
+        "target_observed_max_drift_ratio": 0.2,
+        "target_current_uncertainty_width_ratio": 0.3,
+        "projected_future_drift_upper_ratio": 0.3,
+        "status": "ProjectedStableWithinHorizon",
+        "universal_connectome_completeness_claimed": false,
+        "all_future_edits_certified": false,
+        "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "materiality_threshold": 0.05
+      }
+    },
+    {
+      "case_id": "large_future_drift_blocks_stopping",
+      "input": {
+        "profile_id": "profile-v1",
+        "calibration_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "group_disjointness_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "query_id": "pathway-strength",
+        "query_definition_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "analysis_code_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "metric_id": "pathway-strength",
+        "unit_id": "normalized-strength",
+        "calibration_stratum_id": "mouse-volume-workflow-v1",
+        "materiality_threshold": 0.05,
+        "future_horizon_edits": 100,
+        "alpha": 0.05,
+        "target_source_volume_id": "target-volume",
+        "target_independence_cluster_id": "target-cluster",
+        "target_is_disjoint_from_calibration": true,
+        "target_observed_max_drift_ratio": 0.2,
+        "target_current_uncertainty_width_ratio": 0.3,
+        "calibration_trajectories": [
+          {
+            "trajectory_id": "trajectory-0",
+            "source_volume_id": "volume-0",
+            "independence_cluster_id": "cluster-0",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 1
+          },
+          {
+            "trajectory_id": "trajectory-1",
+            "source_volume_id": "volume-1",
+            "independence_cluster_id": "cluster-1",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 1
+          },
+          {
+            "trajectory_id": "trajectory-2",
+            "source_volume_id": "volume-2",
+            "independence_cluster_id": "cluster-2",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 1
+          },
+          {
+            "trajectory_id": "trajectory-3",
+            "source_volume_id": "volume-3",
+            "independence_cluster_id": "cluster-3",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 1
+          },
+          {
+            "trajectory_id": "trajectory-4",
+            "source_volume_id": "volume-4",
+            "independence_cluster_id": "cluster-4",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 1
+          },
+          {
+            "trajectory_id": "trajectory-5",
+            "source_volume_id": "volume-5",
+            "independence_cluster_id": "cluster-5",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 1
+          },
+          {
+            "trajectory_id": "trajectory-6",
+            "source_volume_id": "volume-6",
+            "independence_cluster_id": "cluster-6",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 1
+          },
+          {
+            "trajectory_id": "trajectory-7",
+            "source_volume_id": "volume-7",
+            "independence_cluster_id": "cluster-7",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 1
+          },
+          {
+            "trajectory_id": "trajectory-8",
+            "source_volume_id": "volume-8",
+            "independence_cluster_id": "cluster-8",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 1
+          },
+          {
+            "trajectory_id": "trajectory-9",
+            "source_volume_id": "volume-9",
+            "independence_cluster_id": "cluster-9",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 1
+          },
+          {
+            "trajectory_id": "trajectory-10",
+            "source_volume_id": "volume-10",
+            "independence_cluster_id": "cluster-10",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 1
+          },
+          {
+            "trajectory_id": "trajectory-11",
+            "source_volume_id": "volume-11",
+            "independence_cluster_id": "cluster-11",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 1
+          },
+          {
+            "trajectory_id": "trajectory-12",
+            "source_volume_id": "volume-12",
+            "independence_cluster_id": "cluster-12",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 1
+          },
+          {
+            "trajectory_id": "trajectory-13",
+            "source_volume_id": "volume-13",
+            "independence_cluster_id": "cluster-13",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 1
+          },
+          {
+            "trajectory_id": "trajectory-14",
+            "source_volume_id": "volume-14",
+            "independence_cluster_id": "cluster-14",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 1
+          },
+          {
+            "trajectory_id": "trajectory-15",
+            "source_volume_id": "volume-15",
+            "independence_cluster_id": "cluster-15",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 1
+          },
+          {
+            "trajectory_id": "trajectory-16",
+            "source_volume_id": "volume-16",
+            "independence_cluster_id": "cluster-16",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 1
+          },
+          {
+            "trajectory_id": "trajectory-17",
+            "source_volume_id": "volume-17",
+            "independence_cluster_id": "cluster-17",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 1
+          },
+          {
+            "trajectory_id": "trajectory-18",
+            "source_volume_id": "volume-18",
+            "independence_cluster_id": "cluster-18",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 1
+          }
+        ],
+        "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "expected_report": {
+        "report_version": "0.1",
+        "profile_id": "profile-v1",
+        "calibration_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "group_disjointness_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "query_id": "pathway-strength",
+        "query_definition_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "analysis_code_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "metric_id": "pathway-strength",
+        "unit_id": "normalized-strength",
+        "calibration_stratum_id": "mouse-volume-workflow-v1",
+        "future_horizon_edits": 100,
+        "alpha": 0.05,
+        "target_source_volume_id": "target-volume",
+        "calibration_trajectory_count": 19,
+        "order_statistic_rank": 19,
+        "residual_quantile_ratio": 0.9,
+        "target_observed_max_drift_ratio": 0.2,
+        "target_current_uncertainty_width_ratio": 0.3,
+        "projected_future_drift_upper_ratio": 1.1,
+        "status": "ProjectedUnstableWithinHorizon",
+        "universal_connectome_completeness_claimed": false,
+        "all_future_edits_certified": false,
+        "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "materiality_threshold": 0.05
+      }
+    },
+    {
+      "case_id": "wide_current_identified_set_blocks_stopping",
+      "input": {
+        "profile_id": "profile-v1",
+        "calibration_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "group_disjointness_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "query_id": "pathway-strength",
+        "query_definition_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "analysis_code_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "metric_id": "pathway-strength",
+        "unit_id": "normalized-strength",
+        "calibration_stratum_id": "mouse-volume-workflow-v1",
+        "materiality_threshold": 0.05,
+        "future_horizon_edits": 100,
+        "alpha": 0.05,
+        "target_source_volume_id": "target-volume",
+        "target_independence_cluster_id": "target-cluster",
+        "target_is_disjoint_from_calibration": true,
+        "target_observed_max_drift_ratio": 0.2,
+        "target_current_uncertainty_width_ratio": 1.01,
+        "calibration_trajectories": [
+          {
+            "trajectory_id": "trajectory-0",
+            "source_volume_id": "volume-0",
+            "independence_cluster_id": "cluster-0",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.1
+          },
+          {
+            "trajectory_id": "trajectory-1",
+            "source_volume_id": "volume-1",
+            "independence_cluster_id": "cluster-1",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.1
+          },
+          {
+            "trajectory_id": "trajectory-2",
+            "source_volume_id": "volume-2",
+            "independence_cluster_id": "cluster-2",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.1
+          },
+          {
+            "trajectory_id": "trajectory-3",
+            "source_volume_id": "volume-3",
+            "independence_cluster_id": "cluster-3",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.1
+          },
+          {
+            "trajectory_id": "trajectory-4",
+            "source_volume_id": "volume-4",
+            "independence_cluster_id": "cluster-4",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.1
+          },
+          {
+            "trajectory_id": "trajectory-5",
+            "source_volume_id": "volume-5",
+            "independence_cluster_id": "cluster-5",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.1
+          },
+          {
+            "trajectory_id": "trajectory-6",
+            "source_volume_id": "volume-6",
+            "independence_cluster_id": "cluster-6",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.1
+          },
+          {
+            "trajectory_id": "trajectory-7",
+            "source_volume_id": "volume-7",
+            "independence_cluster_id": "cluster-7",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.1
+          },
+          {
+            "trajectory_id": "trajectory-8",
+            "source_volume_id": "volume-8",
+            "independence_cluster_id": "cluster-8",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.1
+          },
+          {
+            "trajectory_id": "trajectory-9",
+            "source_volume_id": "volume-9",
+            "independence_cluster_id": "cluster-9",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.1
+          },
+          {
+            "trajectory_id": "trajectory-10",
+            "source_volume_id": "volume-10",
+            "independence_cluster_id": "cluster-10",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.1
+          },
+          {
+            "trajectory_id": "trajectory-11",
+            "source_volume_id": "volume-11",
+            "independence_cluster_id": "cluster-11",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.1
+          },
+          {
+            "trajectory_id": "trajectory-12",
+            "source_volume_id": "volume-12",
+            "independence_cluster_id": "cluster-12",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.1
+          },
+          {
+            "trajectory_id": "trajectory-13",
+            "source_volume_id": "volume-13",
+            "independence_cluster_id": "cluster-13",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.1
+          },
+          {
+            "trajectory_id": "trajectory-14",
+            "source_volume_id": "volume-14",
+            "independence_cluster_id": "cluster-14",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.1
+          },
+          {
+            "trajectory_id": "trajectory-15",
+            "source_volume_id": "volume-15",
+            "independence_cluster_id": "cluster-15",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.1
+          },
+          {
+            "trajectory_id": "trajectory-16",
+            "source_volume_id": "volume-16",
+            "independence_cluster_id": "cluster-16",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.1
+          },
+          {
+            "trajectory_id": "trajectory-17",
+            "source_volume_id": "volume-17",
+            "independence_cluster_id": "cluster-17",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.1
+          },
+          {
+            "trajectory_id": "trajectory-18",
+            "source_volume_id": "volume-18",
+            "independence_cluster_id": "cluster-18",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.1
+          }
+        ],
+        "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "expected_report": {
+        "report_version": "0.1",
+        "profile_id": "profile-v1",
+        "calibration_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "group_disjointness_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "query_id": "pathway-strength",
+        "query_definition_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "analysis_code_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "metric_id": "pathway-strength",
+        "unit_id": "normalized-strength",
+        "calibration_stratum_id": "mouse-volume-workflow-v1",
+        "future_horizon_edits": 100,
+        "alpha": 0.05,
+        "target_source_volume_id": "target-volume",
+        "calibration_trajectory_count": 19,
+        "order_statistic_rank": 19,
+        "residual_quantile_ratio": 0,
+        "target_observed_max_drift_ratio": 0.2,
+        "target_current_uncertainty_width_ratio": 1.01,
+        "projected_future_drift_upper_ratio": 0.2,
+        "status": "ProjectedUnstableWithinHorizon",
+        "universal_connectome_completeness_claimed": false,
+        "all_future_edits_certified": false,
+        "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "materiality_threshold": 0.05
+      }
+    },
+    {
+      "case_id": "overlapping_group_audit_blocks_calibration",
+      "input": {
+        "profile_id": "profile-v1",
+        "calibration_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "group_disjointness_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "query_id": "pathway-strength",
+        "query_definition_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "analysis_code_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "metric_id": "pathway-strength",
+        "unit_id": "normalized-strength",
+        "calibration_stratum_id": "mouse-volume-workflow-v1",
+        "materiality_threshold": 0.05,
+        "future_horizon_edits": 100,
+        "alpha": 0.05,
+        "target_source_volume_id": "target-volume",
+        "target_independence_cluster_id": "target-cluster",
+        "target_is_disjoint_from_calibration": false,
+        "target_observed_max_drift_ratio": 0.2,
+        "target_current_uncertainty_width_ratio": 0.3,
+        "calibration_trajectories": [
+          {
+            "trajectory_id": "trajectory-0",
+            "source_volume_id": "volume-0",
+            "independence_cluster_id": "cluster-0",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-1",
+            "source_volume_id": "volume-1",
+            "independence_cluster_id": "cluster-1",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-2",
+            "source_volume_id": "volume-2",
+            "independence_cluster_id": "cluster-2",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-3",
+            "source_volume_id": "volume-3",
+            "independence_cluster_id": "cluster-3",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-4",
+            "source_volume_id": "volume-4",
+            "independence_cluster_id": "cluster-4",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-5",
+            "source_volume_id": "volume-5",
+            "independence_cluster_id": "cluster-5",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-6",
+            "source_volume_id": "volume-6",
+            "independence_cluster_id": "cluster-6",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-7",
+            "source_volume_id": "volume-7",
+            "independence_cluster_id": "cluster-7",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-8",
+            "source_volume_id": "volume-8",
+            "independence_cluster_id": "cluster-8",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-9",
+            "source_volume_id": "volume-9",
+            "independence_cluster_id": "cluster-9",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-10",
+            "source_volume_id": "volume-10",
+            "independence_cluster_id": "cluster-10",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-11",
+            "source_volume_id": "volume-11",
+            "independence_cluster_id": "cluster-11",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-12",
+            "source_volume_id": "volume-12",
+            "independence_cluster_id": "cluster-12",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-13",
+            "source_volume_id": "volume-13",
+            "independence_cluster_id": "cluster-13",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-14",
+            "source_volume_id": "volume-14",
+            "independence_cluster_id": "cluster-14",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-15",
+            "source_volume_id": "volume-15",
+            "independence_cluster_id": "cluster-15",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-16",
+            "source_volume_id": "volume-16",
+            "independence_cluster_id": "cluster-16",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-17",
+            "source_volume_id": "volume-17",
+            "independence_cluster_id": "cluster-17",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-18",
+            "source_volume_id": "volume-18",
+            "independence_cluster_id": "cluster-18",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          }
+        ],
+        "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "expected_report": {
+        "report_version": "0.1",
+        "profile_id": "profile-v1",
+        "calibration_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "group_disjointness_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "query_id": "pathway-strength",
+        "query_definition_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "analysis_code_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "metric_id": "pathway-strength",
+        "unit_id": "normalized-strength",
+        "calibration_stratum_id": "mouse-volume-workflow-v1",
+        "future_horizon_edits": 100,
+        "alpha": 0.05,
+        "target_source_volume_id": "target-volume",
+        "calibration_trajectory_count": 19,
+        "order_statistic_rank": 19,
+        "residual_quantile_ratio": null,
+        "target_observed_max_drift_ratio": 0.2,
+        "target_current_uncertainty_width_ratio": 0.3,
+        "projected_future_drift_upper_ratio": null,
+        "status": "NotCalibratedGroupOverlap",
+        "universal_connectome_completeness_claimed": false,
+        "all_future_edits_certified": false,
+        "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "materiality_threshold": 0.05
+      }
+    },
+    {
+      "case_id": "target_independence_cluster_overlap_rejected",
+      "input": {
+        "profile_id": "profile-v1",
+        "calibration_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "group_disjointness_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "query_id": "pathway-strength",
+        "query_definition_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "analysis_code_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "metric_id": "pathway-strength",
+        "unit_id": "normalized-strength",
+        "calibration_stratum_id": "mouse-volume-workflow-v1",
+        "materiality_threshold": 0.05,
+        "future_horizon_edits": 100,
+        "alpha": 0.05,
+        "target_source_volume_id": "target-volume",
+        "target_independence_cluster_id": "target-cluster",
+        "target_is_disjoint_from_calibration": true,
+        "target_observed_max_drift_ratio": 0.2,
+        "target_current_uncertainty_width_ratio": 0.3,
+        "calibration_trajectories": [
+          {
+            "trajectory_id": "trajectory-0",
+            "source_volume_id": "volume-0",
+            "independence_cluster_id": "target-cluster",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-1",
+            "source_volume_id": "volume-1",
+            "independence_cluster_id": "cluster-1",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-2",
+            "source_volume_id": "volume-2",
+            "independence_cluster_id": "cluster-2",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-3",
+            "source_volume_id": "volume-3",
+            "independence_cluster_id": "cluster-3",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-4",
+            "source_volume_id": "volume-4",
+            "independence_cluster_id": "cluster-4",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-5",
+            "source_volume_id": "volume-5",
+            "independence_cluster_id": "cluster-5",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-6",
+            "source_volume_id": "volume-6",
+            "independence_cluster_id": "cluster-6",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-7",
+            "source_volume_id": "volume-7",
+            "independence_cluster_id": "cluster-7",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-8",
+            "source_volume_id": "volume-8",
+            "independence_cluster_id": "cluster-8",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-9",
+            "source_volume_id": "volume-9",
+            "independence_cluster_id": "cluster-9",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-10",
+            "source_volume_id": "volume-10",
+            "independence_cluster_id": "cluster-10",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-11",
+            "source_volume_id": "volume-11",
+            "independence_cluster_id": "cluster-11",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-12",
+            "source_volume_id": "volume-12",
+            "independence_cluster_id": "cluster-12",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-13",
+            "source_volume_id": "volume-13",
+            "independence_cluster_id": "cluster-13",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-14",
+            "source_volume_id": "volume-14",
+            "independence_cluster_id": "cluster-14",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-15",
+            "source_volume_id": "volume-15",
+            "independence_cluster_id": "cluster-15",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-16",
+            "source_volume_id": "volume-16",
+            "independence_cluster_id": "cluster-16",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-17",
+            "source_volume_id": "volume-17",
+            "independence_cluster_id": "cluster-17",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-18",
+            "source_volume_id": "volume-18",
+            "independence_cluster_id": "cluster-18",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          }
+        ],
+        "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "expected_error": "TargetClusterAppearsInCalibration"
+    },
+    {
+      "case_id": "duplicate_independence_cluster_rejected",
+      "input": {
+        "profile_id": "profile-v1",
+        "calibration_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "group_disjointness_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "query_id": "pathway-strength",
+        "query_definition_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "analysis_code_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "metric_id": "pathway-strength",
+        "unit_id": "normalized-strength",
+        "calibration_stratum_id": "mouse-volume-workflow-v1",
+        "materiality_threshold": 0.05,
+        "future_horizon_edits": 100,
+        "alpha": 0.05,
+        "target_source_volume_id": "target-volume",
+        "target_independence_cluster_id": "target-cluster",
+        "target_is_disjoint_from_calibration": true,
+        "target_observed_max_drift_ratio": 0.2,
+        "target_current_uncertainty_width_ratio": 0.3,
+        "calibration_trajectories": [
+          {
+            "trajectory_id": "trajectory-0",
+            "source_volume_id": "volume-0",
+            "independence_cluster_id": "cluster-0",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-1",
+            "source_volume_id": "volume-1",
+            "independence_cluster_id": "cluster-0",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-2",
+            "source_volume_id": "volume-2",
+            "independence_cluster_id": "cluster-2",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-3",
+            "source_volume_id": "volume-3",
+            "independence_cluster_id": "cluster-3",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-4",
+            "source_volume_id": "volume-4",
+            "independence_cluster_id": "cluster-4",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-5",
+            "source_volume_id": "volume-5",
+            "independence_cluster_id": "cluster-5",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-6",
+            "source_volume_id": "volume-6",
+            "independence_cluster_id": "cluster-6",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-7",
+            "source_volume_id": "volume-7",
+            "independence_cluster_id": "cluster-7",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-8",
+            "source_volume_id": "volume-8",
+            "independence_cluster_id": "cluster-8",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-9",
+            "source_volume_id": "volume-9",
+            "independence_cluster_id": "cluster-9",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-10",
+            "source_volume_id": "volume-10",
+            "independence_cluster_id": "cluster-10",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-11",
+            "source_volume_id": "volume-11",
+            "independence_cluster_id": "cluster-11",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-12",
+            "source_volume_id": "volume-12",
+            "independence_cluster_id": "cluster-12",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-13",
+            "source_volume_id": "volume-13",
+            "independence_cluster_id": "cluster-13",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-14",
+            "source_volume_id": "volume-14",
+            "independence_cluster_id": "cluster-14",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-15",
+            "source_volume_id": "volume-15",
+            "independence_cluster_id": "cluster-15",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-16",
+            "source_volume_id": "volume-16",
+            "independence_cluster_id": "cluster-16",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-17",
+            "source_volume_id": "volume-17",
+            "independence_cluster_id": "cluster-17",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-18",
+            "source_volume_id": "volume-18",
+            "independence_cluster_id": "cluster-18",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          }
+        ],
+        "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "target_exchangeability_supported": true,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "expected_error": "DuplicateIndependenceCluster"
+    },
+    {
+      "case_id": "unsupported_exchangeability_abstains",
+      "input": {
+        "profile_id": "profile-v1",
+        "calibration_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "group_disjointness_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "query_id": "pathway-strength",
+        "query_definition_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "analysis_code_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "metric_id": "pathway-strength",
+        "unit_id": "normalized-strength",
+        "calibration_stratum_id": "mouse-volume-workflow-v1",
+        "materiality_threshold": 0.05,
+        "future_horizon_edits": 100,
+        "alpha": 0.05,
+        "target_source_volume_id": "target-volume",
+        "target_independence_cluster_id": "target-cluster",
+        "target_is_disjoint_from_calibration": true,
+        "target_observed_max_drift_ratio": 0.2,
+        "target_current_uncertainty_width_ratio": 0.3,
+        "calibration_trajectories": [
+          {
+            "trajectory_id": "trajectory-0",
+            "source_volume_id": "volume-0",
+            "independence_cluster_id": "cluster-0",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-1",
+            "source_volume_id": "volume-1",
+            "independence_cluster_id": "cluster-1",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-2",
+            "source_volume_id": "volume-2",
+            "independence_cluster_id": "cluster-2",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-3",
+            "source_volume_id": "volume-3",
+            "independence_cluster_id": "cluster-3",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-4",
+            "source_volume_id": "volume-4",
+            "independence_cluster_id": "cluster-4",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-5",
+            "source_volume_id": "volume-5",
+            "independence_cluster_id": "cluster-5",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-6",
+            "source_volume_id": "volume-6",
+            "independence_cluster_id": "cluster-6",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-7",
+            "source_volume_id": "volume-7",
+            "independence_cluster_id": "cluster-7",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-8",
+            "source_volume_id": "volume-8",
+            "independence_cluster_id": "cluster-8",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-9",
+            "source_volume_id": "volume-9",
+            "independence_cluster_id": "cluster-9",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-10",
+            "source_volume_id": "volume-10",
+            "independence_cluster_id": "cluster-10",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-11",
+            "source_volume_id": "volume-11",
+            "independence_cluster_id": "cluster-11",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-12",
+            "source_volume_id": "volume-12",
+            "independence_cluster_id": "cluster-12",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-13",
+            "source_volume_id": "volume-13",
+            "independence_cluster_id": "cluster-13",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-14",
+            "source_volume_id": "volume-14",
+            "independence_cluster_id": "cluster-14",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-15",
+            "source_volume_id": "volume-15",
+            "independence_cluster_id": "cluster-15",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-16",
+            "source_volume_id": "volume-16",
+            "independence_cluster_id": "cluster-16",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-17",
+            "source_volume_id": "volume-17",
+            "independence_cluster_id": "cluster-17",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          },
+          {
+            "trajectory_id": "trajectory-18",
+            "source_volume_id": "volume-18",
+            "independence_cluster_id": "cluster-18",
+            "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "observed_max_drift_ratio": 0.1,
+            "future_max_drift_ratio": 0.2
+          }
+        ],
+        "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "target_exchangeability_supported": false,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "expected_report": {
+        "report_version": "0.1",
+        "profile_id": "profile-v1",
+        "calibration_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "group_disjointness_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "query_id": "pathway-strength",
+        "query_definition_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "analysis_code_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "metric_id": "pathway-strength",
+        "unit_id": "normalized-strength",
+        "calibration_stratum_id": "mouse-volume-workflow-v1",
+        "future_horizon_edits": 100,
+        "alpha": 0.05,
+        "target_source_volume_id": "target-volume",
+        "calibration_trajectory_count": 19,
+        "order_statistic_rank": 19,
+        "residual_quantile_ratio": null,
+        "target_observed_max_drift_ratio": 0.2,
+        "target_current_uncertainty_width_ratio": 0.3,
+        "projected_future_drift_upper_ratio": null,
+        "status": "NotCalibratedExchangeability",
+        "universal_connectome_completeness_claimed": false,
+        "all_future_edits_certified": false,
+        "exchangeability_assessment_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "target_exchangeability_supported": false,
+        "calibration_trajectory_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "materiality_threshold": 0.05
+      }
+    }
+  ]
+}
