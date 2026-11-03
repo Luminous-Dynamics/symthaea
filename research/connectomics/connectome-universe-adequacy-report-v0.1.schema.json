@@ -247,7 +247,8 @@
         "not_estimable_count",
         "false_ambiguity_count",
         "candidate_duplicate_structure_group_count",
-        "reference_duplicate_structure_group_count"
+        "reference_duplicate_structure_group_count",
+        "candidate_not_estimable_count"
       ],
       "properties": {
         "candidate_world_count": {
@@ -305,6 +306,10 @@
         "reference_duplicate_structure_group_count": {
           "type": "integer",
           "minimum": 0
+        },
+        "candidate_not_estimable_count": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
@@ -321,7 +326,8 @@
           "omitted_query_flipping_count",
           "false_invariance_count",
           "not_estimable_count",
-          "false_ambiguity_count"
+          "false_ambiguity_count",
+          "candidate_not_estimable_count"
         ],
         "properties": {
           "error_family": {
@@ -353,6 +359,10 @@
             "minimum": 0
           },
           "false_ambiguity_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "candidate_not_estimable_count": {
             "type": "integer",
             "minimum": 0
           }
