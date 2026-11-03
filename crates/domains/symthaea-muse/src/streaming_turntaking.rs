@@ -103,8 +103,11 @@ pub enum MusicalTurnDispositionV1 {
         action: MusicalTurnActionV1,
         /// For Respond: actual/scheduled response onset. For Yield: actual/
         /// scheduled output-stop boundary. None means the action had no
-        /// observable effect timestamp.
+        /// observable musical event timestamp in the session sample-frame clock.
         effect_frame: Option<u64>,
+        /// Monotonic runner-clock time when the effect was actually emitted.
+        /// Must be paired with effect_frame.
+        effect_at_ns: Option<u64>,
     },
     Unparseable {
         raw_output_sha256: String,
