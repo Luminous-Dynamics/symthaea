@@ -1180,5 +1180,40 @@ mod tests {
             "ADEQUACY_NOT_ESTIMABLE"
         );
     }
+    #[test]
+    fn withholds_adequacy_promotion_without_authenticated_external_receipts() {
+        let mut report: Value =
+            serde_json::from_str(FALSE_AMBIGUITY_REPORT).expect("valid report fixture");
+        report["candidate_worlds"][1]["query_state"] =
+            Value::String("BELOW_THRESHOLD".to_owned());
+        report["summary"]["false_ambiguity_count"] = Value::from(0);
+        for family in report["family_summaries"]
+            .as_array_mut()
+            .expect("family summaries")
+        {
+            family["false_ambiguity_count"] = Value::from(0);
+        }
+        report["dispositions"]["universe_adequacy"] =
+            Value::String("ADEQUACY_NOT_ESTIMABLE".to_owned());
+
+        let report_bytes = serde_json::to_vec(&report).expect("serialized report");
+        let result = validate_report(
+            &report_bytes,
+            FALSE_AMBIGUITY_CANDIDATE.as_bytes(),
+            FALSE_AMBIGUITY_REFERENCE.as_bytes(),
+        )
+        .expect("stable, internally consistent supplied challenge should recompute");
+        assert_eq!(result["status"], "COUNTERS_RECOMPUTED");
+        assert_eq!(result["trusted_promotion"], false);
+        assert_eq!(
+            result["dispositions"]["worldset_closure_validation"],
+            "NOT_PERFORMED_BY_THIS_TOOL"
+        );
+        assert_eq!(
+            result["dispositions"]["universe_adequacy_against_supplied_challenge"],
+            "ADEQUACY_NOT_ESTIMABLE"
+        );
+    }
+
 
 }
