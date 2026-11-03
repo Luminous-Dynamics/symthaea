@@ -190,7 +190,8 @@
             "network_policy",
             "started_at_utc",
             "finished_at_utc",
-            "regrade_of_receipt_sha256"
+            "regrade_of_receipt_sha256",
+            "toolchain_lock_sha256"
           ],
           "properties": {
             "run_id": {
@@ -238,6 +239,13 @@
               "format": "date-time"
             },
             "regrade_of_receipt_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "toolchain_lock_sha256": {
               "type": [
                 "string",
                 "null"
