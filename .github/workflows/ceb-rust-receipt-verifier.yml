@@ -37,7 +37,13 @@ jobs:
       - name: Install repository-pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
-          components: clippy
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --manifest-path tools/ceb-receipt-verifier/Cargo.toml -- --check
 
       - name: Run offline verifier unit tests
         shell: bash
