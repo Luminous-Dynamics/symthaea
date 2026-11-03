@@ -750,6 +750,29 @@ fn fixed_ring_pairs(population_size: usize) -> Vec<(usize, usize)> {
         .collect()
 }
 
+/// Shuffle selected payloads only among the same sender's scheduled
+/// recipients. Sender/receiver action order, message count and each sender's
+/// payload multiset remain unchanged.
+fn shuffle_sender_payloads(actions: &mut [TransmissionAction], rng: &mut Rng) {
+    let mut action_positions_by_sender: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    for (position, action) in actions.iter().enumerate() {
+        action_positions_by_sender
+            .entry(action.sender)
+            .or_default()
+            .push(position);
+    }
+    for positions in action_positions_by_sender.values() {
+        let mut payloads: Vec<u16> = positions
+            .iter()
+            .map(|&position| actions[position].recipe_id)
+            .collect();
+        rng.shuffle(&mut payloads);
+        for (&position, recipe_id) in positions.iter().zip(payloads) {
+            actions[position].recipe_id = recipe_id;
+        }
+    }
+}
+
 fn build_schedule(
     policy: TransmissionPolicy,
     task: &InnovationTask,
@@ -763,27 +786,7 @@ fn build_schedule(
         TransmissionPolicy::StateAwareFrontier => state_aware_schedule(task, graph, agents, config),
         TransmissionPolicy::StateAwareContentShuffled => {
             let mut actions = state_aware_schedule(task, graph, agents, config);
-
-            // Preserve the exact sender/receiver schedule and the multiset of
-            // recipes each sender intended to transmit. Shuffle only which of
-            // that sender's selected recipes goes to which scheduled recipient.
-            let mut action_positions_by_sender: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
-            for (position, action) in actions.iter().enumerate() {
-                action_positions_by_sender
-                    .entry(action.sender)
-                    .or_default()
-                    .push(position);
-            }
-            for positions in action_positions_by_sender.values() {
-                let mut payloads: Vec<u16> = positions
-                    .iter()
-                    .map(|&position| actions[position].recipe_id)
-                    .collect();
-                rng.shuffle(&mut payloads);
-                for (&position, recipe_id) in positions.iter().zip(payloads) {
-                    actions[position].recipe_id = recipe_id;
-                }
-            }
+            shuffle_sender_payloads(&mut actions, rng);
             actions
         }
         TransmissionPolicy::FixedRing | TransmissionPolicy::FixedRingContentShuffled => {
@@ -1038,6 +1041,42 @@ mod tests {
         assert_eq!(agent.apply_closure(&task), 1);
         assert!(agent.known_elements.contains(&6));
         assert!(!agent.known_elements.contains(&11));
+    }
+
+    #[test]
+    fn sender_local_shuffle_changes_recipient_mapping_without_changing_payload_set() {
+        let mut actions = vec![
+            TransmissionAction { sender: 0, receiver: 1, recipe_id: 3 },
+            TransmissionAction { sender: 0, receiver: 2, recipe_id: 7 },
+            TransmissionAction { sender: 1, receiver: 2, recipe_id: 9 },
+        ];
+        let original_pairs: Vec<_> = actions.iter()
+            .map(|action| (action.sender, action.receiver))
+            .collect();
+        let original_payloads: Vec<_> = actions.iter()
+            .map(|action| (action.sender, action.recipe_id))
+            .collect();
+        let mut rng = Rng::new(77);
+        shuffle_sender_payloads(&mut actions, &mut rng);
+
+        let shuffled_pairs: Vec<_> = actions.iter()
+            .map(|action| (action.sender, action.receiver))
+            .collect();
+        let shuffled_payloads: Vec<_> = actions.iter()
+            .map(|action| (action.sender, action.recipe_id))
+            .collect();
+        assert_eq!(original_pairs, shuffled_pairs);
+
+        let mut before = original_payloads;
+        let mut after = shuffled_payloads;
+        before.sort_unstable();
+        after.sort_unstable();
+        assert_eq!(before, after);
+
+        // The fixed seed swaps the two payloads sent by agent 0.
+        assert_ne!(actions[0].recipe_id, 3);
+        assert_ne!(actions[1].recipe_id, 7);
+        assert_eq!(actions[2].recipe_id, 9);
     }
 
     #[test]
