@@ -112,6 +112,7 @@ pub enum RuleEvaluationError {
     EmptyTrajectory,
     DuplicateRuleId,
     EmptyRuleId,
+    NonFiniteInput,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -188,6 +189,14 @@ pub fn evaluate_traffic_rules(
 ) -> Result<TrafficRuleComplianceReport, RuleEvaluationError> {
     if trajectory.is_empty() {
         return Err(RuleEvaluationError::EmptyTrajectory);
+    }
+    if trajectory.iter().any(|sample| {
+        !sample.timestamp_s.is_finite()
+            || !sample.route_progress_m.is_finite()
+            || !sample.speed_mps.is_finite()
+            || !sample.heading_rad.is_finite()
+    }) || requirements.iter().any(|requirement| !requirement_numeric_fields_are_finite(requirement)) {
+        return Err(RuleEvaluationError::NonFiniteInput);
     }
 
     let mut rule_ids = BTreeSet::new();
@@ -475,6 +484,39 @@ fn not_encountered(requirement: &TrafficRuleRequirement) -> RuleComplianceFindin
     )
 }
 
+fn requirement_numeric_fields_are_finite(requirement: &TrafficRuleRequirement) -> bool {
+    if !requirement.active_start_progress_m.is_finite()
+        || !requirement.active_end_progress_m.is_finite()
+    {
+        return false;
+    }
+    match &requirement.kind {
+        TrafficRuleKind::SpeedLimit {
+            maximum_speed_mps,
+            tolerance_mps,
+        } => maximum_speed_mps.is_finite() && tolerance_mps.is_finite(),
+        TrafficRuleKind::MandatoryDirection {
+            required_heading_rad,
+            maximum_heading_error_rad,
+        } => required_heading_rad.is_finite() && maximum_heading_error_rad.is_finite(),
+        TrafficRuleKind::StopBeforeLine {
+            stop_line_progress_m,
+            stop_speed_threshold_mps,
+            required_stationary_duration_s,
+            maximum_sample_gap_s,
+            progress_tolerance_m,
+        } => [
+            stop_line_progress_m,
+            stop_speed_threshold_mps,
+            required_stationary_duration_s,
+            maximum_sample_gap_s,
+            progress_tolerance_m,
+        ]
+        .iter()
+        .all(|value| value.is_finite()),
+    }
+}
+
 fn evidence_is_well_formed(evidence: &TrafficRuleEvidence) -> bool {
     !evidence.evidence_id.trim().is_empty()
         && !evidence.source_id.trim().is_empty()
@@ -738,7 +780,7 @@ mod tests {
     }
 
     #[test]
-    fn nonmonotonic_or_nonfinite_trajectory_is_indeterminate() {
+    fn nonmonotonic_trajectory_is_indeterminate_and_replayable() {
         let rule = TrafficRuleRequirement {
             rule_id: "speed-30".into(),
             active_start_progress_m: 0.0,
@@ -753,6 +795,38 @@ mod tests {
         let report = evaluate_traffic_rules(&[rule], &invalid).unwrap();
         assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::Indeterminate);
         assert!(report.identity_is_valid());
+    }
+
+    #[test]
+    fn nonfinite_trajectory_and_rule_parameters_are_rejected_explicitly() {
+        let rule = TrafficRuleRequirement {
+            rule_id: "speed-30".into(),
+            active_start_progress_m: 0.0,
+            active_end_progress_m: 100.0,
+            kind: TrafficRuleKind::SpeedLimit {
+                maximum_speed_mps: 13.4,
+                tolerance_mps: 0.2,
+            },
+            evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
+        };
+        assert_eq!(
+            evaluate_traffic_rules(
+                &[rule.clone()],
+                &[sample(0.0, 1.0, f64::NAN, 0.0)]
+            )
+            .unwrap_err(),
+            RuleEvaluationError::NonFiniteInput
+        );
+        let mut malformed_rule = rule;
+        malformed_rule.active_end_progress_m = f64::INFINITY;
+        assert_eq!(
+            evaluate_traffic_rules(
+                &[malformed_rule],
+                &[sample(0.0, 1.0, 1.0, 0.0)]
+            )
+            .unwrap_err(),
+            RuleEvaluationError::NonFiniteInput
+        );
     }
 
     #[test]
