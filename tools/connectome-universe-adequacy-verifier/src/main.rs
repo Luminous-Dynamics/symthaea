@@ -1096,4 +1096,18 @@ mod tests {
         )
         .is_err());
     }
+    #[test]
+    fn rejects_unpinned_rules_protocol_digest() {
+        let mut report: Value = serde_json::from_str(OMITTED_REPORT).expect("valid fixture");
+        report["provenance"]["rules_sha256"] =
+            Value::String("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned());
+        let report_bytes = serde_json::to_vec(&report).expect("serialized report");
+        assert!(validate_report(
+            &report_bytes,
+            OMITTED_CANDIDATE.as_bytes(),
+            OMITTED_REFERENCE.as_bytes()
+        )
+        .is_err());
+    }
+
 }
