@@ -72,6 +72,29 @@ jobs:
               raise SystemExit("leading-model unresolved cost share differs from registered audit")
           if leading["unresolved_end_reasons"] != {"budget_consumed": 21, "model_gave_up": 39}:
               raise SystemExit("leading-model failure-reason counts differ from registered audit")
+          complexity = report["gpt_6_astra_target_count_complexity_analysis"]
+          strata = {row["stratum"]: row for row in complexity["task_strata"]}
+          expected_strata = {
+              "one_declaration": (230, 208),
+              "two_to_four_declarations": (53, 41),
+              "five_or_more_declarations": (58, 32),
+          }
+          for name, expected in expected_strata.items():
+              row = strata[name]
+              if (row["tasks"], row["solved"]) != expected:
+                  raise SystemExit(f"target-count stratum changed: {name}: {row}")
+          contrast = complexity["five_plus_vs_under_five_within_source_groups"]
+          if contrast["source_groups_with_both_strata"] != 13:
+              raise SystemExit("within-source complexity comparison has the wrong source-group count")
+          if (contrast["high"]["tasks"], contrast["high"]["unresolved"]) != (58, 26):
+              raise SystemExit("five-plus target-count comparison denominator changed")
+          if (contrast["under_five"]["tasks"], contrast["under_five"]["unresolved"]) != (191, 29):
+              raise SystemExit("under-five target-count comparison denominator changed")
+          bootstrap = contrast["cluster_bootstrap"]
+          if bootstrap["resampling_unit"] != "source_group" or bootstrap["replicates"] != 50000 or bootstrap["seed_hex"] != "8badf00d":
+              raise SystemExit("source-group complexity bootstrap configuration changed")
+          if bootstrap["risk_difference_ci95"][0] <= 0 or bootstrap["risk_ratio_ci95"][0] <= 1:
+              raise SystemExit("exploratory within-source complexity interval no longer excludes the null")
           print("PITB_AUTOFORMBENCH_FROZEN_AUDIT_PASS: pinned commit, 341 tasks, 24 source groups, 1,155 declarations, four model CSVs")
           print(f"GPT-6 Astra unresolved spend share: {leading['unresolved_cost_share']:.6%}")
           PY
