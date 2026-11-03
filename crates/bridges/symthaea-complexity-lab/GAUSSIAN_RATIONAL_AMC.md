@@ -49,21 +49,15 @@ The reference compares direct enumeration with bucket variable elimination over 
 
 Exact cancellation fixtures verify both real and imaginary cancellation to Z=0.
 
-## 4. Executed reference experiment
+## 4. Prepared finite reference test plan — execution pending
 
-Files:
+Committed files:
 - reference/gaussian_rational_amc.py
 - reference/gaussian_rational_amc_results.json
 
-Executed locally using Python standard-library Fraction arithmetic:
-- 1,200 deterministic Gaussian-rational triples;
-- 10,800 exact ring / conjugation / norm property checks;
-- 180 random finite factor networks;
-- 720 direct-summation versus variable-elimination checks, with four orders per network (forward, reverse, degree-like, random);
-- 2 exact-zero cancellation fixtures;
-- 5 malformed rational-encoding rejection controls.
+The intended suite specifies 1,200 Gaussian-rational triples, 10,800 arithmetic/property assertions, 180 factor networks with four elimination orders (720 planned direct-versus-VE comparisons), two exact-cancellation fixtures and five malformed coefficient encodings. These figures describe the source's planned corpus; the Python script was not executed in this session. No pass count or semantic agreement is established yet.
 
-These are finite reference tests, not a complexity or runtime result. The script is a small exact oracle, not a production WMC parser or competition solver.
+Q(i) remains a narrow exact reference coefficient domain. Ganak already has exact complex-rational support, so this branch's research value must come from a qualified integration and certificate/verification comparison, not from introducing Q(i) arithmetic alone.
 
 ## 5. Baseline correction: Q(i) is established capability
 
