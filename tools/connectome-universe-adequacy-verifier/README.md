@@ -23,11 +23,13 @@ Exit status:
 - `64`: usage error;
 - `66`: input file could not be read.
 
-The output is deterministic JSON with `status=COUNTERS_RECOMPUTED` and `trusted_promotion=false`.
+The output is deterministic JSON with `status=COUNTERS_RECOMPUTED`, `source_report_sha256`, and `trusted_promotion=false`. The report's `evaluator_protocol_sha256`, `rules_sha256` and `canonicalizer_sha256` must match the pinned protocol identifiers compiled into this verifier; these are protocol identity hashes, not a source-binary/build attestation.
 
 ## What is independently recomputed
 
-- SHA-256 over exact candidate/reference sidecar bytes against the report's manifest digests.
+- SHA-256 over exact candidate/reference sidecar bytes against the report's manifest digests;
+- exact evaluator-protocol, adequacy-rules-protocol and canonicalizer-protocol identity digests;
+- SHA-256 of the exact input report bytes in the verifier output (the report does not contain a self-referential report digest).
 - Structural graph SHA-256 from canonical directed nodes/edges, with node and edge array order normalized.
 - Sidecar/report world-ID set equality and uniqueness.
 - Candidate/reference structural inclusion using recomputed graph hashes, not world-ID string equality.
