@@ -1884,8 +1884,8 @@ mod tests {
             primary_artifacts_dir: primary_root.clone(),
             regrade_envelope: regrade_envelope.clone(),
             regrade_artifacts_dir: regrade_root.clone(),
-            trust_policy: policy_bytes,
-            expected_trust_policy_sha256: policy_digest,
+            trust_policy: policy_bytes.clone(),
+            expected_trust_policy_sha256: policy_digest.clone(),
         });
         assert!(report.accepted, "unexpected verifier rejection: {:?}", report.reasons);
         assert_eq!(report.status, "accepted");
