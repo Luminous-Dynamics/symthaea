@@ -67,7 +67,9 @@
             "suite_id": "eth027-semantic-envelope-v1",
             "artifact_digest": "sha256:9d59da164404dafb2be68672f3735bc4d7cff14fc33370c382d00a1a3984abcc",
             "case_count": 1,
-            "claim_ceiling": "finite_test_evidence"
+            "claim_ceiling": "finite_test_evidence",
+            "input_representation_digest": "sha256:6a43e1ffb6566b3ccbdcc57f8bd5638294ac56b615fe617c58ded6ee6374b333",
+            "output_representation_digest": "sha256:74861f0fb6965f2c22004a2281418a63f5722ab6372d71068386c46354cc33d9"
           },
           "note": "Illustrative only; no SCPOG compiler or checker was executed."
         },
@@ -79,7 +81,9 @@
             "suite_id": "eth027-semantic-envelope-v1",
             "artifact_digest": "sha256:9d59da164404dafb2be68672f3735bc4d7cff14fc33370c382d00a1a3984abcc",
             "case_count": 1,
-            "claim_ceiling": "finite_test_evidence"
+            "claim_ceiling": "finite_test_evidence",
+            "input_representation_digest": "sha256:6a43e1ffb6566b3ccbdcc57f8bd5638294ac56b615fe617c58ded6ee6374b333",
+            "output_representation_digest": "sha256:74861f0fb6965f2c22004a2281418a63f5722ab6372d71068386c46354cc33d9"
           },
           "note": "Structural placeholder; not a certified d-DNNF claim."
         }
@@ -108,7 +112,9 @@
             "suite_id": "eth027-semantic-envelope-v1",
             "artifact_digest": "sha256:9d59da164404dafb2be68672f3735bc4d7cff14fc33370c382d00a1a3984abcc",
             "case_count": 1,
-            "claim_ceiling": "finite_test_evidence"
+            "claim_ceiling": "finite_test_evidence",
+            "input_representation_digest": "sha256:74861f0fb6965f2c22004a2281418a63f5722ab6372d71068386c46354cc33d9",
+            "output_representation_digest": "sha256:017fd896f8fd954a112cf80bcb03a847e3caa50f0bb8535dd0cb23a3921b13bf"
           },
           "note": "Projected support contains d=true; hidden h is deliberately omitted from the PWMC weight map."
         },
@@ -120,7 +126,9 @@
             "suite_id": "eth027-semantic-envelope-v1",
             "artifact_digest": "sha256:9d59da164404dafb2be68672f3735bc4d7cff14fc33370c382d00a1a3984abcc",
             "case_count": 1,
-            "claim_ceiling": "finite_test_evidence"
+            "claim_ceiling": "finite_test_evidence",
+            "input_representation_digest": "sha256:74861f0fb6965f2c22004a2281418a63f5722ab6372d71068386c46354cc33d9",
+            "output_representation_digest": "sha256:017fd896f8fd954a112cf80bcb03a847e3caa50f0bb8535dd0cb23a3921b13bf"
           },
           "note": "Support cardinality and arithmetic value are distinct fields."
         }
