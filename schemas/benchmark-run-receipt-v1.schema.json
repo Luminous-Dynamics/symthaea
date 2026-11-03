@@ -806,7 +806,8 @@
             "string",
             "null"
           ],
-          "pattern": "^[a-f0-9]{64}$"
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 of the official grader output; must exactly match benchmark.grader_output_sha256 when is_official is true (semantic equality enforced by the Rust validator)."
         },
         "unavailable_reason": {
           "type": [
