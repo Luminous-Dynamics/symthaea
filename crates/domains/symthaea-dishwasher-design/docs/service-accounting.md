@@ -41,7 +41,7 @@ Attempt timestamps use one monotonic clock. The service makespan is maximum fini
 - One physical run ID per attempt; rewashes require new run IDs.
 - Sequence numbers are strictly increasing in the order supplied to the accounting function.
 - Item IDs identify one requested service, not a reusable item category such as glass or plate.
-- Every outcome record is bound externally to the exact run, item, criterion, method and protocol.
+- Every outcome record carries a `run_id` that must exactly match the containing attempt, plus an item and endpoint identity. Criterion, method, protocol and evidence-reference binding must be validated upstream against the qualified outcome-evidence record.
 - Only IndependentOutcomeAssay is accepted. Turbidity, conductivity, camera confidence, temperature, commanded dosing and model predictions must not be submitted as outcome decisions.
 - The module checks that a required endpoint has a PASS record; it does not authenticate the assay, validate its uncertainty, prove physical independence or verify the scientific quality of the evidence. Perform the existing outcome qualification and run/derived-record lineage audits before constructing an accepted ledger.
 - An interrupted run never releases an item, even where partial observations look favourable.
