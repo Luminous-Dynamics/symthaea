@@ -142,10 +142,11 @@ pub struct ObserverBenchmarkReport {
     pub points: Vec<ObserverThresholdMetrics>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct PreparedRun {
     truth: RunTruth,
     minimum_endpoint_probability: f64,
+    endpoint_truth: BTreeMap<Endpoint, RunTruth>,
 }
 
 fn canonical_non_empty(value: &str) -> bool {
@@ -420,18 +421,31 @@ pub fn evaluate_observer_risk_coverage(
 
         let minimum_endpoint_probability = predictions.values().copied()
             .fold(f64::INFINITY, f64::min);
-        let mut any_fail = false;
-        let mut any_indeterminate = false;
-        for decision in outcomes.values() {
-            match decision {
-                Decision::Pass => {}
-                Decision::Fail => any_fail = true,
-                Decision::Indeterminate => any_indeterminate = true,
+        let mut endpoint_truth = BTreeMap::new();
+        for endpoint in &required {
+            let mut endpoint_failed = false;
+            let mut endpoint_indeterminate = false;
+            for ((_, observed_endpoint), decision) in &outcomes {
+                if observed_endpoint == endpoint {
+                    match decision {
+                        Decision::Pass => {}
+                        Decision::Fail => endpoint_failed = true,
+                        Decision::Indeterminate => endpoint_indeterminate = true,
+                    }
+                }
             }
+            let endpoint_status = if endpoint_failed {
+                RunTruth::Nonconforming
+            } else if endpoint_indeterminate {
+                RunTruth::Unresolved
+            } else {
+                RunTruth::Conforming
+            };
+            endpoint_truth.insert(*endpoint, endpoint_status);
         }
-        let truth = if any_fail {
+        let truth = if endpoint_truth.values().any(|status| *status == RunTruth::Nonconforming) {
             RunTruth::Nonconforming
-        } else if any_indeterminate {
+        } else if endpoint_truth.values().any(|status| *status == RunTruth::Unresolved) {
             RunTruth::Unresolved
         } else {
             RunTruth::Conforming
@@ -439,6 +453,7 @@ pub fn evaluate_observer_risk_coverage(
         prepared.push(PreparedRun {
             truth,
             minimum_endpoint_probability,
+            endpoint_truth,
         });
     }
 
@@ -550,18 +565,32 @@ fn endpoint_metrics(
     required: &BTreeSet<Endpoint>,
     threshold: f64,
 ) -> Vec<EndpointThresholdMetrics> {
-    // Endpoint-specific truth is retained separately during preparation by
-    // aggregating all item outcomes. The current summary type therefore derives
-    // endpoint metrics from the run-level false-accept state only in later
-    // schema versions; this version reports the run-level gate authoritatively.
     required.iter().map(|endpoint| {
-        let _ = endpoint;
+        let mut nonconforming_run_count = 0_usize;
+        let mut false_accept_run_count = 0_usize;
+        let mut unresolved_run_count = 0_usize;
+        for run in runs {
+            match run.endpoint_truth.get(endpoint).copied() {
+                Some(RunTruth::Nonconforming) => {
+                    nonconforming_run_count += 1;
+                    if run.minimum_endpoint_probability >= threshold {
+                        false_accept_run_count += 1;
+                    }
+                }
+                Some(RunTruth::Unresolved) => unresolved_run_count += 1,
+                Some(RunTruth::Conforming) => {}
+                None => unresolved_run_count += 1,
+            }
+        }
         EndpointThresholdMetrics {
             endpoint: *endpoint,
-            nonconforming_run_count: 0,
-            false_accept_run_count: 0,
-            unresolved_run_count: 0,
-            challenge_false_accept_rate: None,
+            nonconforming_run_count,
+            false_accept_run_count,
+            unresolved_run_count,
+            challenge_false_accept_rate: ratio(
+                false_accept_run_count,
+                nonconforming_run_count,
+            ),
         }
     }).collect()
 }
