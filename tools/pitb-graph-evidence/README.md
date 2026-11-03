@@ -35,7 +35,7 @@ All edges have a source and target. The relation determines the direction semant
 | `informal_candidate_dependency` | `informal_extractor` | Candidate retrieval hint | No |
 | `cross_formality_match` | `llm_alignment` | Candidate retrieval hint | No |
 
-The verifier requires relation/evidence-class compatibility, compatible node kinds, resolvable node/artifact IDs, unique edge identities, and acyclic formal dependency observations. It rejects malformed confidence values, unsupported status/relation combinations, missing review artifacts for `human_reviewed` edges, unknown fields, unsafe paths, symlink traversal, digest mismatches, duplicate paths and unreferenced artifacts.
+The verifier requires relation/evidence-class compatibility, compatible node kinds, resolvable node/artifact IDs, unique edge identities, and an acyclic module/environment dependency graph. It deliberately permits cycles among observed type/proof/instance declaration references because Lean mutual declarations can produce valid strongly connected components; those observations must not be confused with the separate acyclic helper-plan DAG used by the scheduler. It rejects malformed confidence values, unsupported status/relation combinations, missing review artifacts for `human_reviewed` edges, unknown fields, unsafe paths, symlink traversal, digest mismatches, duplicate paths and unreferenced artifacts.
 
 ## Trust boundaries
 
