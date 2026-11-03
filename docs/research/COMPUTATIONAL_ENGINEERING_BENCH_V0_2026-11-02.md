@@ -180,9 +180,15 @@ Accordingly:
 - Add CEB-VER-001 plus rotating verifier attacks. Report false accepts and false rejects separately, by attack family, with one-sided confidence bounds and task-level evidence.
 - Prefer a corrected/pinned future release only after independently rechecking its verifier changes; a version bump alone is not proof of validity.
 
-### Current external score context (2026-11-02)
+### Current external score context (2026-11-03)
 
-The official Terminal-Bench 4.0 page accessed 2026-11-02 currently renders no populated score rows, although it describes 95% confidence-interval whiskers. A separate Vals AI Mini-SWE-agent evaluation, updated 2026-10-29, reports Opus 5.5 at 65.15%, Sonnet 5.5 at 64.14%, Kimi K3.1 Pro at 63.64%, Gemini 4 Carbon at 63.13%, and GPT-6 Astra at 59.60%. Vals reports three full benchmark runs (avg@3), pass@1 per task, Mini-SWE-agent for all models, and an eight-hour task limit per task; these results are not official maintainer-board scores. Do not pool the two sources or interpret different harnesses as matched comparisons. The Epoch AI defect audit applies to the benchmark release itself, not to a claim that every run exploited a flaw.
+Scale's SWE-Bench Pro V2 page reports a 642-task, 11-repository refreshed split after removing 89 invalid tasks. It reports reference-patch/empty-patch two-sided qualification, blind expert resolution of instruction/test contradictions, web-disabled agent execution, and pristine-image regrading. Its displayed frontier scores are Opus 5 + Claude Code 99.40±0.40%, Gemini 4 Argon + mini-swe-agent 99.22±0.45%, Fable 5.1 + Claude Code 99.10±0.50%, and GPT-6 Astra + Codex 96.90±1.10%. The benchmark is highly saturated at the top; a 99% result there alone cannot establish general engineering competence.
+
+The current SWE-rebench leaderboard snapshot displays Fable 5 at 64.5±1.41% ($4.40/problem), Grok 4.5 at 63.8±0.60% ($1.47/problem), Opus 5 at 63.4±1.35% ($3.47/problem), GLM-5.2 at 62.9±1.19% ($1.40/problem), and GPT-5.6 Sol at 62.3±1.83% ($0.85/problem). Its model rows also expose pass@5 and token totals. Treat this as a separate live collection snapshot: record the access date, dataset revision, evaluation window, scaffold and budgets whenever reproducing it. Do not pool it with SWE-Bench Pro V2.
+
+Epoch AI's September 4 review labels Terminal-Bench 4.0.0 flawed and reports publicly documented scoring defects in 30/66 tasks (45.5%). Treat it as an attack-rich diagnostic benchmark with a task-by-task audit, not as an unquestioned leaderboard target. A raw leaderboard score and an independently adjudicated clean-subset score are separate statistics.
+
+These are external reference points, not Symthaea results. No CEB task has been run, no Symthaea-vs-industry comparison has been executed, and no SOTA or superiority claim is justified.
 
 ## 13. External references
 
@@ -213,3 +219,26 @@ The CEB contract workflow now audits the static repository-twin fixture without 
 Negative controls inject a dangling edge, duplicate edge, invalid source line, anchor-text mismatch, unsafe path, semantic-authority inflation, forged edge count, unknown mutation impact and duplicate mutation ID. These controls are CI-authored and have not yet been run. They are checks on the gold artifact itself, not evidence that an agent has constructed the graph correctly.
 
 The workflow reports an authored negative-control count and runs only JSON/schema/static-file validation. It does not compile the synthetic workspace, execute tests/build scripts, or qualify the runner. The task remains design-only.
+
+
+## 17. 2026-11-03 verifier and benchmark direction update
+
+The receipt contract now has exactly three in-toto subjects: candidate patch, source tree and result tree. Task contracts declare the CEB-TREE-V1 digest algorithm. The Rust verifier draft independently hashes clean source/result snapshots, checks that receipt changed_paths equal the computed tree delta, and checks that unquoted Git diff file headers name exactly that changed-path set. This is stronger than trusting a runner's claimed result-tree digest, but it is not yet proof that applying the submitted patch to the source produces the result. A safe, independent patch reconstruction/apply stage remains an explicit gate.
+
+### Where to compete, and where not to overfit
+
+- **SWE-Bench Pro V2:** use the locked 642-task protocol as an external software-repair reference. Its top end is near saturation (99.4%); do not optimize solely for that score. Reproduce the same model/harness, task split and limits, and report per-task paired differences. Its pristine regrade and two-sided task gate are practices CEB should inherit.
+- **SWE-rebench:** use it to track generalization on a changing task stream and the accuracy/cost frontier. Pin the data snapshot and access date. Its current leading scores around 63–65% are not directly comparable with Pro V2.
+- **Terminal-Bench:** use only with independent verifier review and explicit attack-family adjudication. Its 4.0.0 release has a material known defect record; keep official and third-party harnesses separate.
+- **CEB:** the differentiator is complete engineering evidence across Rust/Nix/Linux/distributed/security/performance/repository-intelligence work, not only resolving source issues. Require all tasks to pass the same source pin, sealed grader, runner, evidence and regrade contract before a score is published.
+- **Repository twin:** measure syntax entities separately from compiler-resolved relations and inferred semantics. Proposed targets remain syntax P/R ≥0.95, supported compiler-resolved relation P/R ≥0.90, impact recall ≥0.95 / precision ≥0.80, and zero stale facts after completed invalidation. Compiler/Rust-Analyzer gold must be independently generated and pinned before using semantic edges as truth.
+- **Verifier lane:** aim for zero false accepts in ≥1,000 varied negative controls and zero false rejects in ≥100 independent positive controls, with exact one-sided confidence bounds and attack-family coverage. Those are prospective gates, not results.
+- **System-level outcome:** target a Pareto improvement over matched foundation-model baselines in accepted-task rate, cost per independently accepted task, latency and human review time. A reasonable stretch target is at least equal accepted-task quality at 50% lower cost, but it must be earned on paired, frozen tasks; it is not a forecast or an industry-reported benchmark.
+
+### Comparison protocol
+
+For each frozen task family, run (1) a foundation model with a minimal harness, (2) the same model with a strong general coding scaffold, (3) that same model plus Symthaea repository intelligence/memory/evidence workflow, and (4) Symthaea native generation where applicable. Match model revision, prompt, tools, context, network, budgets, runner image and grader. Randomize task order and run repeated trials. Report paired differences with task-family confidence intervals, pass@1 and pass@k separately, cost and token distributions, timeouts, abstentions, safety failures, false accepts/rejects, and human review effort.
+
+Do not claim Symthaea caused a gain unless the same underlying model/scaffold without Symthaea is a matched control. Do not compare Symthaea's native path to a larger hosted model and attribute the entire difference to architecture. Report the architecture's incremental contribution separately.
+
+**Current claim ceiling:** schemas, fixture files, verifier source and authored tests are research artifacts. The Rust tests and schema workflow have not been run, no runner has been qualified, the ten catalog tasks remain design_only, and no performance result exists.
