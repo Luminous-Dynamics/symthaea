@@ -364,7 +364,7 @@ mod tests {
         let mut state = VehicleState::cruising(10.0);
         state.heading = -0.1;
         state.curvature_ahead = 0.02;
-        let command = policy.command(&state, 0.0, 10.0, &chassis()).unwrap();
+        let command = policy.command(&state, &Road::straight(), 10.0, &chassis()).unwrap();
         assert!(command.steering > 0.0);
     }
 
