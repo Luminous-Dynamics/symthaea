@@ -821,6 +821,7 @@ mod tests {
             kind: TrafficRuleKind::SpeedLimit {
                 maximum_speed_mps: 13.4,
                 tolerance_mps: 0.2,
+                maximum_sample_gap_s: 0.25,
             },
             evidence: invalid_evidence,
         };
@@ -1065,6 +1066,7 @@ mod tests {
             kind: TrafficRuleKind::SpeedLimit {
                 maximum_speed_mps: 13.4,
                 tolerance_mps: 0.2,
+                maximum_sample_gap_s: 0.25,
             },
             evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
         };
@@ -1083,6 +1085,7 @@ mod tests {
             kind: TrafficRuleKind::SpeedLimit {
                 maximum_speed_mps: 13.4,
                 tolerance_mps: 0.2,
+                maximum_sample_gap_s: 0.25,
             },
             evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
         };
@@ -1116,7 +1119,6 @@ mod tests {
                 maximum_speed_mps: 10.0,
                 tolerance_mps: 0.0,
                 maximum_sample_gap_s: 0.25,
-                maximum_sample_gap_s: 0.25,
             },
             evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
         };
@@ -1136,6 +1138,7 @@ mod tests {
             kind: TrafficRuleKind::SpeedLimit {
                 maximum_speed_mps: 10.0,
                 tolerance_mps: 0.0,
+                maximum_sample_gap_s: 0.25,
             },
             evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
         };
@@ -1183,6 +1186,7 @@ mod tests {
             kind: TrafficRuleKind::SpeedLimit {
                 maximum_speed_mps: 10.0,
                 tolerance_mps: 0.0,
+                maximum_sample_gap_s: 0.25,
             },
             evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
         };
