@@ -404,6 +404,16 @@ fn validate_family_summaries(
                 ));
             }
         }
+        if expected.compatible_estimable_reference_count
+            + expected.compatible_query_not_estimable_reference_count
+            != expected.compatible_reference_count
+            || expected.structurally_included_count > expected.compatible_reference_count
+            || expected.query_flipping_reference_count > expected.compatible_estimable_reference_count
+            || expected.omitted_query_flipping_count > expected.query_flipping_reference_count
+            || expected.false_invariance_count > expected.compatible_estimable_reference_count
+        {
+            return Err(format!("family_summaries[{family}] violates an eligible-denominator invariant"));
+        }
     }
 
     if &seen != required_families {
@@ -1026,11 +1036,18 @@ fn validate_report(
     {
         return Err("compatible query-estimability counts do not reconcile to compatible_reference_count".to_owned());
     }
+    let candidate_estimable_denominator = summary
+        .candidate_world_count
+        .checked_sub(summary.candidate_not_estimable_count)
+        .ok_or_else(|| "candidate_not_estimable_count exceeds candidate_world_count".to_owned())?;
     if summary.structurally_included_count > summary.compatible_reference_count
         || summary.query_state_covered_count > summary.compatible_estimable_reference_count
         || summary.query_flipping_reference_count > summary.compatible_estimable_reference_count
         || summary.omitted_query_flipping_count > summary.query_flipping_reference_count
         || summary.false_invariance_count > summary.compatible_estimable_reference_count
+        || summary.false_ambiguity_count > candidate_estimable_denominator
+        || summary.candidate_duplicate_structure_group_count > summary.candidate_world_count / 2
+        || summary.reference_duplicate_structure_group_count > summary.reference_world_count / 2
     {
         return Err("one or more adequacy numerators exceed their eligible denominators".to_owned());
     }
