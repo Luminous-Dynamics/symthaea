@@ -747,6 +747,7 @@ fn verify_snapshot_attestation(
         return Err("unsupported graph snapshot attestation or canonicalization version".into());
     }
 
+    let actual_manifest_sha256 = sha256_bytes(manifest_bytes);
     let expected_bindings = [
         ("snapshot_id", graph.snapshot.snapshot_id.as_str()),
         ("repository_commit", graph.snapshot.repository_commit.as_str()),
@@ -757,7 +758,7 @@ fn verify_snapshot_attestation(
             "extractor_config_sha256",
             graph.snapshot.extractor_config_sha256.as_str(),
         ),
-        ("graph_manifest_sha256", sha256_bytes(manifest_bytes).as_str()),
+        ("graph_manifest_sha256", actual_manifest_sha256.as_str()),
     ];
     for (field, expected) in expected_bindings {
         let observed = value_string(&attestation[field], &format!("attestation.{field}"))?;
@@ -863,12 +864,12 @@ fn synthetic_signature_controls(manifest_bytes: &[u8], graph: &Graph) -> Result<
         "signer_id": "synthetic-test-extractor",
         "key_id": "synthetic-test-key-1",
         "graph_manifest_sha256": sha256_bytes(manifest_bytes),
-        "snapshot_id": graph.snapshot.snapshot_id,
-        "repository_commit": graph.snapshot.repository_commit,
-        "environment_sha256": graph.snapshot.environment_sha256,
-        "extractor_id": graph.snapshot.extractor_id,
-        "extractor_version": graph.snapshot.extractor_version,
-        "extractor_config_sha256": graph.snapshot.extractor_config_sha256,
+        "snapshot_id": graph.snapshot.snapshot_id.clone(),
+        "repository_commit": graph.snapshot.repository_commit.clone(),
+        "environment_sha256": graph.snapshot.environment_sha256.clone(),
+        "extractor_id": graph.snapshot.extractor_id.clone(),
+        "extractor_version": graph.snapshot.extractor_version.clone(),
+        "extractor_config_sha256": graph.snapshot.extractor_config_sha256.clone(),
         "signature_ed25519_hex": ""
     });
     let mut payload = attestation.clone();
@@ -997,6 +998,7 @@ fn self_test(manifest_path: &Path, evidence_root: &Path) -> Result<(), String> {
         .map_err(|error| format!("fixture JSON is invalid: {error}"))?;
     let (graph, summary) = validate_value(&value)?;
     verify_artifact_bytes(&graph, evidence_root)?;
+    synthetic_signature_controls(&bytes, &graph)?;
     if summary.node_count != 7
         || summary.edge_count != 12
         || summary.formal_dependency_edge_count != 8
@@ -1108,9 +1110,13 @@ fn self_test(manifest_path: &Path, evidence_root: &Path) -> Result<(), String> {
 
 fn execute() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
-    if args.len() != 4 || !matches!(args[1].as_str(), "--verify" | "--self-test") {
+    let mode = args.get(1).map(String::as_str).unwrap_or("");
+    let expected_len = if mode == "--verify-attested" { 7 } else { 4 };
+    if args.len() != expected_len
+        || !matches!(mode, "--verify" | "--self-test" | "--verify-attested")
+    {
         return Err(format!(
-            "usage: {} --verify|--self-test <graph.json> <evidence-root>",
+            "usage: {} --verify|--self-test <graph.json> <evidence-root> OR --verify-attested <graph.json> <evidence-root> <attestation.json> <key-registry.json> <pinned-registry-sha256>",
             args.first().map(String::as_str).unwrap_or("pitb-graph-evidence")
         ));
     }
@@ -1120,18 +1126,33 @@ fn execute() -> Result<(), String> {
         .map_err(|error| format!("cannot read graph manifest: {error}"))?;
     let value: Value = serde_json::from_slice(&bytes)
         .map_err(|error| format!("graph JSON is invalid: {error}"))?;
-    let (graph, summary) = validate_value(&value)?;
+    let (graph, mut summary) = validate_value(&value)?;
     verify_artifact_bytes(&graph, evidence_root)?;
-    if args[1] == "--self-test" {
+
+    if mode == "--self-test" {
         self_test(manifest_path, evidence_root)?;
-    } else {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&summary)
-                .map_err(|error| format!("cannot serialize summary: {error}"))?
-        );
-        println!("PITB_GRAPH_EVIDENCE_INTEGRITY_OK");
+    } else if mode == "--verify-attested" {
+        let attestation_bytes = fs::read(&args[4])
+            .map_err(|error| format!("cannot read graph snapshot attestation: {error}"))?;
+        let registry_bytes = fs::read(&args[5])
+            .map_err(|error| format!("cannot read graph signer key registry: {error}"))?;
+        verify_snapshot_attestation(
+            &bytes,
+            &attestation_bytes,
+            &registry_bytes,
+            &args[6],
+            &graph,
+        )?;
+        summary.snapshot_signature_verified = true;
+        println!("PITB_GRAPH_SNAPSHOT_SIGNATURE_OK");
     }
+
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&summary)
+            .map_err(|error| format!("cannot serialize summary: {error}"))?
+    );
+    println!("PITB_GRAPH_EVIDENCE_INTEGRITY_OK");
     Ok(())
 }
 
