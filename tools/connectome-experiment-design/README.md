@@ -1,8 +1,8 @@
-# Connectome experiment design: finite-hypothesis EIG
+# Connectome experiment design: EIG, EVSI and Fisher information
 
-A standalone, dependency-free Rust 2024 reference crate for ranking candidate experiments by expected information gain (EIG) over a finite set of competing hypotheses.
+A standalone, dependency-free Rust 2024 reference crate for three non-interchangeable experiment-design objectives: expected information gain (EIG) over competing hypotheses, expected value of sample information (EVSI) for a declared decision, and local Fisher-information gains for parameter identification.
 
-This crate is a small mathematical utility, **not** a neural simulator, causal estimator, continuous control-input optimizer, or biological model. The caller must provide the hypotheses, prior probabilities, conditional outcome likelihoods, and experiment costs. It does not infer or calibrate any of them. In particular, it complements rather than reproduces recent control-theoretic work on designing continuous perturbation waveforms for system identification: this implementation ranks a finite list of discrete candidate experiments under caller-supplied hypothesis likelihoods.
+This crate is a mathematical utility, **not** a neural simulator, causal estimator, continuous control-input optimizer, or biological model. EIG/EVSI callers supply hypotheses, priors, outcome likelihoods, utilities and costs. Fisher-design callers supply a prior precision matrix, local output-sensitivity Jacobian rows, observation variances and costs. Nothing is inferred or calibrated from biological data. The Fisher API is a local linearized parameter-identification comparator; it does not reproduce the continuous waveform optimizer in Ogino et al. (eLife, 2026).
 
 ## Run
 
@@ -33,6 +33,8 @@ The likelihood matrix is indexed as:
 The prior vector must sum to one, and every hypothesis likelihood row must independently sum to one. Invalid probability mass is rejected; the crate never silently renormalizes malformed inputs.
 
 ## API
+
+### Hypothesis discrimination (EIG)
 
 - `evaluate_candidate(priors, candidate)`: calculates prior entropy, expected posterior entropy, EIG, and EIG/cost.
 - `outcome_probability(priors, candidate, outcome_index)`: calculates the marginal probability of an outcome.
@@ -77,6 +79,18 @@ The crate now also exposes a separate, caller-utility-aware objective:
 - `decision_selection_regret(...)` reports the opportunity gap relative to the best candidate in the declared pool under EVSI/cost.
 
 EVSI is reported in caller-defined utility units, not bits. It is not the same as EIG, EIG/cost, a parameter-identification objective, or realized biological utility.
+
+### Parameter identification (Fisher information)
+
+- `FisherInformationExperiment` declares local per-observation parameter sensitivities, independent observation variances and experiment cost.
+- `evaluate_fisher_information_candidate(prior_precision, candidate)` constructs `F = Jᵀ R⁻¹ J`, adds it to the prior precision, and reports:
+  - D-optimal gain: `0.5 * ln(det(P_post) / det(P_prior))` in nats, corresponding to Gaussian parameter-volume reduction.
+  - A-optimal gain: `tr(P_prior⁻¹) - tr(P_post⁻¹)`, the reduction in total marginal parameter variance.
+- `rank_fisher_candidates(..., FisherObjective::DOptimal)` and `rank_fisher_candidates(..., FisherObjective::AOptimal)` rank by the selected gain per cost, then raw gain, then stable ID.
+
+The Fisher matrix assumes locally linearized output sensitivities and independent Gaussian observation noise. Correlated observations must be whitened by the caller. The prior precision must be symmetric positive definite. These are design-point approximations; the crate does not propagate nonlinear parameter uncertainty or synthesize continuous stimulation waveforms.
+
+**EIG, EVSI, D-optimal and A-optimal design are four different questions.** EIG asks which experiment best discriminates the declared hypotheses; EVSI asks which experiment most improves a declared decision; D-optimal design shrinks the joint parameter uncertainty volume; A-optimal design reduces the sum of marginal parameter variances. Their rankings can legitimately disagree.
 
 A frozen four-hypothesis control demonstrates the distinction:
 - Hypotheses H0/H1 support action A; H2/H3 support action B.
