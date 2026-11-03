@@ -29,6 +29,9 @@ exclude = [
     # Keep it tracked for future design, but do not present it as a buildable
     # workspace package until the contract and integration exist.
     "crates/core/symthaea-observation-attestation",
+    # Test-only directory under the core glob; it contains harnesses/fixtures,
+    # not a Cargo package. Its tests are owned by their executable harnesses.
+    "crates/core/symthaea-iit",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
