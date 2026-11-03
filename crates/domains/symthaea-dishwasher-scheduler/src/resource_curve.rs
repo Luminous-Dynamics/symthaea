@@ -497,13 +497,9 @@ mod tests {
     fn point(occupancy: usize, energy: f64, water: f64, duration: f64) -> OccupancyObservation {
         OccupancyObservation {
             occupancy,
-            replicate_ids: vec![
-                "run-01".to_owned(),
-                "run-02".to_owned(),
-                "run-03".to_owned(),
-                "run-04".to_owned(),
-                "run-05".to_owned(),
-            ],
+            replicate_ids: (0..5)
+                .map(|index| format!("run-{occupancy}-{index:02}"))
+                .collect(),
             cleaning_failures: 0,
             rinse_failures: 0,
             energy_kwh: ObservedBand {
@@ -673,6 +669,19 @@ mod tests {
             vec![point(1, 0.2, 2.0, 900.0), underpowered],
         );
         assert!(matches!(result, Err(CurveError::InsufficientReplicates { .. })));
+    }
+
+    #[test]
+    fn invalid_ambient_humidity_is_rejected() {
+        let mut invalid_scope = scope();
+        invalid_scope.ambient_relative_humidity_permille = 1_001;
+        assert!(matches!(
+            MeasuredOccupancyCurve::new(
+                invalid_scope,
+                vec![point(1, 0.2, 2.0, 900.0), point(2, 0.24, 2.5, 1_000.0)],
+            ),
+            Err(CurveError::InvalidAmbientHumidity)
+        ));
     }
 
     #[test]
