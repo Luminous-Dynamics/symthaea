@@ -105,13 +105,40 @@
         "coordinate_frame_policy_sha256": {
           "$ref": "#/$defs/sha256"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "VERIFIED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "max_residual_nm": {
+                "type": "number",
+                "minimum": 0
+              },
+              "uncertainty_bound_nm": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      ]
     },
     "mappings": {
       "type": "array",
       "items": {
         "$ref": "#/$defs/mapping"
-      }
+      },
+      "minItems": 1
     },
     "query_comparisons": {
       "type": "array",
@@ -471,7 +498,120 @@
           "type": "string",
           "minLength": 1
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "cardinality": {
+                "const": "ONE_TO_ONE"
+              }
+            },
+            "required": [
+              "cardinality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_object_ids": {
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "target_object_ids": {
+                "minItems": 1,
+                "maxItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "cardinality": {
+                "const": "ONE_TO_MANY"
+              }
+            },
+            "required": [
+              "cardinality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_object_ids": {
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "target_object_ids": {
+                "minItems": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "cardinality": {
+                "const": "MANY_TO_ONE"
+              }
+            },
+            "required": [
+              "cardinality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_object_ids": {
+                "minItems": 2
+              },
+              "target_object_ids": {
+                "minItems": 1,
+                "maxItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "cardinality": {
+                "const": "MANY_TO_MANY"
+              }
+            },
+            "required": [
+              "cardinality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_object_ids": {
+                "minItems": 2
+              },
+              "target_object_ids": {
+                "minItems": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "cardinality": {
+                "const": "UNMAPPED"
+              }
+            },
+            "required": [
+              "cardinality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "target_object_ids": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
     },
     "queryComparison": {
       "type": "object",
