@@ -43,8 +43,12 @@ pub struct VerificationReport {
     pub regrade_envelope_sha256: Option<String>,
     pub primary_run_id: Option<String>,
     pub regrade_run_id: Option<String>,
+    pub primary_signer_ids: Vec<String>,
+    pub regrade_signer_ids: Vec<String>,
     pub primary_signer_domains: Vec<String>,
     pub regrade_signer_domains: Vec<String>,
+    pub primary_check_evidence_sha256: Vec<String>,
+    pub regrade_check_evidence_sha256: Vec<String>,
     pub primary_artifact_evidence_sha256: Vec<String>,
     pub regrade_artifact_evidence_sha256: Vec<String>,
     pub trust_policy_sha256: Option<String>,
@@ -1088,8 +1092,12 @@ fn base_report(status: &str, reason: String) -> VerificationReport {
         regrade_envelope_sha256: None,
         primary_run_id: None,
         regrade_run_id: None,
+        primary_signer_ids: Vec::new(),
+        regrade_signer_ids: Vec::new(),
         primary_signer_domains: Vec::new(),
         regrade_signer_domains: Vec::new(),
+        primary_check_evidence_sha256: Vec::new(),
+        regrade_check_evidence_sha256: Vec::new(),
         primary_artifact_evidence_sha256: Vec::new(),
         regrade_artifact_evidence_sha256: Vec::new(),
         trust_policy_sha256: None,
@@ -1189,8 +1197,12 @@ fn verify_pair_inner(inputs: &PairInputs) -> Result<VerificationReport, Failure>
         regrade_envelope_sha256: Some(regrade.envelope_sha256),
         primary_run_id: Some(primary.run_id),
         regrade_run_id: Some(regrade.run_id),
+        primary_signer_ids: primary.signer_ids.into_iter().collect(),
+        regrade_signer_ids: regrade.signer_ids.into_iter().collect(),
         primary_signer_domains: primary.signer_domains.into_iter().collect(),
         regrade_signer_domains: regrade.signer_domains.into_iter().collect(),
+        primary_check_evidence_sha256: primary.check_evidence.into_iter().collect(),
+        regrade_check_evidence_sha256: regrade.check_evidence.into_iter().collect(),
         primary_artifact_evidence_sha256: primary.artifact_evidence.into_iter().collect(),
         regrade_artifact_evidence_sha256: regrade.artifact_evidence.into_iter().collect(),
         trust_policy_sha256: Some(sha256_hex(&inputs.trust_policy)),
@@ -1881,6 +1893,10 @@ mod tests {
         assert_eq!(report.regrade_run_id.as_deref(), Some("regrade-run-0002"));
         assert_ne!(report.primary_envelope_sha256, report.regrade_envelope_sha256);
         assert_ne!(report.primary_artifact_evidence_sha256, report.regrade_artifact_evidence_sha256);
+        assert_eq!(report.primary_signer_ids, vec!["primary-test-key".to_string()]);
+        assert_eq!(report.regrade_signer_ids, vec!["regrade-test-key".to_string()]);
+        assert_eq!(report.primary_check_evidence_sha256.len(), 2);
+        assert_eq!(report.regrade_check_evidence_sha256.len(), 2);
 
         // Re-signing a regrade that does not link the exact primary envelope must fail.
         let mut detached = regrade_statement.clone();
