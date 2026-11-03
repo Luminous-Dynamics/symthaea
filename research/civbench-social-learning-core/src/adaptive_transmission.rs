@@ -333,7 +333,8 @@ pub enum TransmissionPolicy {
     FixedRingContentShuffled,
     RandomNetworkContent,
     StateAwareFrontier,
-    StateAwareContentShuffled,
+    StateAwareRandomContent,
+    StateAwareRecipientShuffled,
 }
 
 impl TransmissionPolicy {
@@ -344,7 +345,8 @@ impl TransmissionPolicy {
             Self::FixedRingContentShuffled => "fixed_ring_content_shuffled",
             Self::RandomNetworkContent => "random_network_content",
             Self::StateAwareFrontier => "state_aware_frontier",
-            Self::StateAwareContentShuffled => "state_aware_content_shuffled",
+            Self::StateAwareRandomContent => "state_aware_random_content",
+            Self::StateAwareRecipientShuffled => "state_aware_recipient_shuffled",
         }
     }
 }
@@ -784,8 +786,29 @@ fn build_schedule(
     match policy {
         TransmissionPolicy::NoSocial => Vec::new(),
         TransmissionPolicy::StateAwareFrontier => state_aware_schedule(task, graph, agents, config),
-        TransmissionPolicy::StateAwareContentShuffled => {
+        TransmissionPolicy::StateAwareRandomContent => {
             let mut actions = state_aware_schedule(task, graph, agents, config);
+            // Preserve the sender/receiver schedule, timing and message count,
+            // but choose random content from each sender's current inventory.
+            // This approximates the paper's schedule-preserving random-memory
+            // ablation; it does not preserve the selected-content multiset.
+            for action in &mut actions {
+                let candidates: Vec<u16> = agents[action.sender]
+                    .known_recipes
+                    .iter()
+                    .copied()
+                    .collect();
+                if !candidates.is_empty() {
+                    action.recipe_id = candidates[rng.index(candidates.len())];
+                }
+            }
+            actions
+        }
+        TransmissionPolicy::StateAwareRecipientShuffled => {
+            let mut actions = state_aware_schedule(task, graph, agents, config);
+            // A stricter control: hold each sender's selected payload multiset
+            // fixed, but shuffle those payloads among that sender's scheduled
+            // recipients. This isolates recipient matching specifically.
             shuffle_sender_payloads(&mut actions, rng);
             actions
         }
@@ -1080,7 +1103,7 @@ mod tests {
     }
 
     #[test]
-    fn state_aware_ablation_preserves_schedule_and_per_sender_content_multiset() {
+    fn recipient_shuffle_preserves_schedule_and_per_sender_content_multiset() {
         let task = InnovationTask::family_task(TaskFamily::Layered);
         let config = deterministic_config(TransmissionPolicy::StateAwareFrontier);
         let mut rng_a = Rng::new(77);
@@ -1089,7 +1112,7 @@ mod tests {
         let mut rng_pairs = Rng::new(91);
         let state_aware = state_aware_schedule(&task, &graph, &agents, config);
         let shuffled = build_schedule(
-            TransmissionPolicy::StateAwareContentShuffled,
+            TransmissionPolicy::StateAwareRecipientShuffled,
             &task,
             &graph,
             &agents,
@@ -1116,6 +1139,36 @@ mod tests {
             payloads.sort_unstable();
         }
         assert_eq!(payloads_by_sender_a, payloads_by_sender_b);
+    }
+
+    #[test]
+    fn random_content_ablation_preserves_state_aware_schedule_and_count() {
+        let task = InnovationTask::family_task(TaskFamily::Branching);
+        let config = deterministic_config(TransmissionPolicy::StateAwareFrontier);
+        let mut graph_rng = Rng::new(31);
+        let graph = SocialGraph::generate(config.population_size, 0.0, &mut graph_rng);
+        let agents = simulate(&task, Config { steps: 1, ..config }, 51).unwrap().agents;
+        let state_aware = state_aware_schedule(&task, &graph, &agents, config);
+        let mut content_rng = Rng::new(52);
+        let randomized = build_schedule(
+            TransmissionPolicy::StateAwareRandomContent,
+            &task,
+            &graph,
+            &agents,
+            config,
+            &mut content_rng,
+        );
+        let pairs_a: Vec<_> = state_aware.iter()
+            .map(|action| (action.sender, action.receiver))
+            .collect();
+        let pairs_b: Vec<_> = randomized.iter()
+            .map(|action| (action.sender, action.receiver))
+            .collect();
+        assert_eq!(pairs_a, pairs_b);
+        assert_eq!(state_aware.len(), randomized.len());
+        assert!(randomized.iter().all(|action| {
+            agents[action.sender].known_recipes.contains(&action.recipe_id)
+        }));
     }
 
     #[test]
