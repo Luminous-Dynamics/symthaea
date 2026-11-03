@@ -11,6 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::classical_baselines::VehicleClassicalBaseline;
 use crate::controller::VehicleController;
 use crate::encoder::VehicleHdcEncoder;
 use crate::perturbations::{PerturbationSchedule, VehiclePerturbation};
@@ -19,7 +20,6 @@ use crate::simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
 use crate::types::{
     VehicleCommand, VehicleState, pd_cruise_baseline_with_road,
 };
-use crate::shadow_evaluation::pd_road_baseline_digest;
 
 pub const VEHICLE_PAIRED_ROLLOUT_SCHEMA: &str = "symthaea.vehicle.paired-rollout.v0.1";
 pub const MAX_PAIRED_ROLLOUT_STEPS: usize = 100_000;
@@ -31,6 +31,7 @@ pub enum VehiclePairedRolloutError {
     InvalidRoadProfile,
     InvalidStateDuringRollout,
     InvalidAdvancedControllerDigest,
+    InvalidBaselinePolicy,
     ControllerIdentityAliased,
     InvalidTargetSpeed,
     InvalidTimestep,
@@ -206,10 +207,43 @@ pub fn run_paired_lane_keep_rollout(
     advanced_controller: &mut VehicleController,
     encoder: &mut VehicleHdcEncoder,
 ) -> Result<VehiclePairedRolloutResult, VehiclePairedRolloutError> {
+    run_paired_lane_keep_rollout_with_baseline(
+        candidate_id,
+        road_profile_id,
+        advanced_controller_digest,
+        initial_simulator,
+        road,
+        perturbations,
+        target_speed_mps,
+        timestep_s,
+        steps,
+        &VehicleClassicalBaseline::PdRoadTeacher,
+        advanced_controller,
+        encoder,
+    )
+}
+
+/// Run the same paired experiment against a selectable, versioned classical baseline.
+pub fn run_paired_lane_keep_rollout_with_baseline(
+    candidate_id: impl Into<String>,
+    road_profile_id: impl Into<String>,
+    advanced_controller_digest: impl Into<String>,
+    initial_simulator: &BicycleModelSimulator,
+    road: &Road,
+    perturbations: &PerturbationSchedule,
+    target_speed_mps: f64,
+    timestep_s: f64,
+    steps: usize,
+    baseline_policy: &VehicleClassicalBaseline,
+    advanced_controller: &mut VehicleController,
+    encoder: &mut VehicleHdcEncoder,
+) -> Result<VehiclePairedRolloutResult, VehiclePairedRolloutError> {
     let candidate_id = candidate_id.into();
     let road_profile_id = road_profile_id.into();
     let advanced_controller_digest = advanced_controller_digest.into();
-    let baseline_controller_digest = pd_road_baseline_digest();
+    let baseline_controller_digest = baseline_policy
+        .controller_digest()
+        .ok_or(VehiclePairedRolloutError::InvalidBaselinePolicy)?;
 
     if candidate_id.trim().is_empty() {
         return Err(VehiclePairedRolloutError::EmptyCandidateId);
@@ -257,7 +291,7 @@ pub fn run_paired_lane_keep_rollout(
         road_profile_id,
         road_geometry_digest,
         advanced_controller_digest,
-        baseline_policy_id: crate::shadow_evaluation::PD_ROAD_BASELINE_POLICY_ID.into(),
+        baseline_policy_id: baseline_policy.policy_id().into(),
         baseline_controller_digest,
         simulator_profile_digest: initial_simulator.dynamics_profile_digest(),
         initial_state_digest,
@@ -311,11 +345,14 @@ pub fn run_paired_lane_keep_rollout(
         if !command_is_valid(&advanced_command) {
             return Err(VehiclePairedRolloutError::AdvancedCommandInvalid);
         }
-        let baseline_command = pd_cruise_baseline_with_road(
-            &baseline_observation,
-            target_speed_mps,
-            baseline_projection.road_heading,
-        );
+        let baseline_command = baseline_policy
+            .command(
+                &baseline_observation,
+                baseline_projection.road_heading,
+                target_speed_mps,
+                initial_simulator.params(),
+            )
+            .ok_or(VehiclePairedRolloutError::BaselineCommandInvalid)?;
         if !command_is_valid(&baseline_command) {
             return Err(VehiclePairedRolloutError::BaselineCommandInvalid);
         }
@@ -655,6 +692,36 @@ mod tests {
                 .to_hex()
                 .to_string()
         );
+    }
+
+    #[test]
+    fn paired_rollout_binds_stanley_baseline_policy_and_digest() {
+        let (sim, road, perturbations, mut controller, mut encoder) = setup();
+        let baseline = VehicleClassicalBaseline::StanleyRoad(
+            crate::classical_baselines::StanleyRoadConfig::default(),
+        );
+        let result = run_paired_lane_keep_rollout_with_baseline(
+            "lane-keep-stanley-001",
+            "straight-road-v1",
+            "8".repeat(64),
+            &sim,
+            &road,
+            &perturbations,
+            10.0,
+            0.005,
+            4,
+            &baseline,
+            &mut controller,
+            &mut encoder,
+        )
+        .unwrap();
+        assert_eq!(result.profile.baseline_policy_id, baseline.policy_id());
+        assert_eq!(
+            result.profile.baseline_controller_digest,
+            baseline.controller_digest().unwrap()
+        );
+        assert_eq!(result.frames.len(), 4);
+        assert!(result.output_identity_is_valid());
     }
 
     #[test]
