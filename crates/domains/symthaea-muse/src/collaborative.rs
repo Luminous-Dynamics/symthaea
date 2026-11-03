@@ -298,7 +298,9 @@ mod tests {
     #[test]
     fn single_participant_is_identity() {
         let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
-        composer.contribute(make_contribution(1, 0.8, [0.5; 8])).expect("valid test contribution");
+        composer
+            .contribute(make_contribution(1, 0.8, [0.5; 8]))
+            .expect("valid test contribution");
         let state = composer.blend();
         // With EMA smoothing from default [0.3; 8], won't be exactly [0.5; 8]
         // but should move toward it
@@ -309,9 +311,13 @@ mod tests {
     fn phi_weighted_favors_high_phi() {
         let mut composer = CollaborativeComposer::new(BlendStrategy::PhiWeighted);
         // High-phi participant with high harmonies
-        composer.contribute(make_contribution(1, 0.9, [0.8; 8])).expect("valid test contribution");
+        composer
+            .contribute(make_contribution(1, 0.9, [0.8; 8]))
+            .expect("valid test contribution");
         // Low-phi participant with low harmonies
-        composer.contribute(make_contribution(2, 0.1, [0.2; 8])).expect("valid test contribution");
+        composer
+            .contribute(make_contribution(2, 0.1, [0.2; 8]))
+            .expect("valid test contribution");
         let state = composer.blend();
 
         // Should be closer to high-phi participant
@@ -442,8 +448,12 @@ mod tests {
     #[test]
     fn contribution_divergence_tracks_harmony_vector_spread() {
         let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
-        composer.contribute(make_contribution(1, 0.5, [0.1; 8])).expect("valid test contribution");
-        composer.contribute(make_contribution(2, 0.5, [0.9; 8])).expect("valid test contribution");
+        composer
+            .contribute(make_contribution(1, 0.5, [0.1; 8]))
+            .expect("valid test contribution");
+        composer
+            .contribute(make_contribution(2, 0.5, [0.9; 8]))
+            .expect("valid test contribution");
 
         assert!(
             (composer.contribution_divergence() - 0.8).abs() < 1e-6,
@@ -454,8 +464,12 @@ mod tests {
     #[test]
     fn phi_difference_does_not_change_contribution_divergence() {
         let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
-        composer.contribute(make_contribution(1, 0.1, [0.5; 8])).expect("valid test contribution");
-        composer.contribute(make_contribution(2, 0.9, [0.5; 8])).expect("valid test contribution");
+        composer
+            .contribute(make_contribution(1, 0.1, [0.5; 8]))
+            .expect("valid test contribution");
+        composer
+            .contribute(make_contribution(2, 0.9, [0.5; 8]))
+            .expect("valid test contribution");
 
         assert_eq!(composer.contribution_divergence(), 0.0);
     }
@@ -463,8 +477,12 @@ mod tests {
     #[test]
     fn missing_affect_inputs_remain_neutral() {
         let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
-        composer.contribute(make_contribution(1, 0.1, [0.5; 8])).expect("valid test contribution");
-        composer.contribute(make_contribution(2, 0.9, [0.5; 8])).expect("valid test contribution");
+        composer
+            .contribute(make_contribution(1, 0.1, [0.5; 8]))
+            .expect("valid test contribution");
+        composer
+            .contribute(make_contribution(2, 0.9, [0.5; 8]))
+            .expect("valid test contribution");
         let state = composer.blend();
 
         assert_eq!(state.valence, 0.0);
@@ -474,8 +492,12 @@ mod tests {
     #[test]
     fn remove_participant() {
         let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
-        composer.contribute(make_contribution(1, 0.5, [0.5; 8])).expect("valid test contribution");
-        composer.contribute(make_contribution(2, 0.5, [0.5; 8])).expect("valid test contribution");
+        composer
+            .contribute(make_contribution(1, 0.5, [0.5; 8]))
+            .expect("valid test contribution");
+        composer
+            .contribute(make_contribution(2, 0.5, [0.5; 8]))
+            .expect("valid test contribution");
         assert_eq!(composer.participant_count(), 2);
 
         composer.remove_participant(1);
@@ -492,8 +514,12 @@ mod tests {
     #[test]
     fn update_replaces_existing() {
         let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
-        composer.contribute(make_contribution(1, 0.3, [0.3; 8])).expect("valid test contribution");
-        composer.contribute(make_contribution(1, 0.8, [0.8; 8])).expect("valid test contribution"); // update, not add
+        composer
+            .contribute(make_contribution(1, 0.3, [0.3; 8]))
+            .expect("valid test contribution");
+        composer
+            .contribute(make_contribution(1, 0.8, [0.8; 8]))
+            .expect("valid test contribution"); // update, not add
         assert_eq!(composer.participant_count(), 1);
     }
 }
