@@ -1011,8 +1011,8 @@ fn verify_one_receipt(
     validate_task_check_binding(task, predicate)?;
     let check_evidence = validate_check_aggregates(predicate)?;
     let artifact_sets = validate_artifacts(predicate, artifact_root, patch_sha256, expected_stage)?;
-    if !check_evidence.is_subset(&artifact_sets.evidence_digests) {
-        return Err(Failure::protocol("one or more check evidence digests are not present in the retained artifacts"));
+    if !check_evidence.is_subset(&artifact_sets.execution_digests) {
+        return Err(Failure::protocol("one or more check evidence digests are not present in retained run-generated execution artifacts"));
     }
     check_budget(task, predicate)?;
 
