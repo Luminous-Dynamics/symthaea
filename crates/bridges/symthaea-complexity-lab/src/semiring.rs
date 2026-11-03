@@ -903,6 +903,22 @@ mod tests {
     }
 
     #[test]
+    fn max_count_weighted_ties_separate_multiplicity_from_distinct_support() {
+        let mut graph = ExactFactorGraph::new(vec![2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        graph.add_factor(vec![0], vec![
+            MaxCountValue::candidate(5, 4),
+            MaxCountValue::candidate(5, 2),
+        ]).unwrap();
+        let result = graph.evaluate_with_witness(&[0]).unwrap();
+        assert_eq!(result.value.optimum(), Some(MaxCountTerm { score: 5, count: 6 }));
+        assert_eq!(result.distinct_optimal_assignments, 2);
+        assert_eq!(result.witness, Some(vec![0]));
+        assert_eq!(result.backpointers[0].rows[0].maximizing_states, vec![0, 1]);
+        assert_eq!(result.backpointers[0].rows[0].branch_multiplicities, vec![4, 2]);
+        assert_eq!(result.backpointers[0].rows[0].branch_assignment_counts, vec![1, 1]);
+    }
+
+    #[test]
     fn max_count_support_count_overflow_fails_closed() {
         let mut graph = ExactFactorGraph::new(vec![2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
         graph.add_factor(vec![0], vec![
