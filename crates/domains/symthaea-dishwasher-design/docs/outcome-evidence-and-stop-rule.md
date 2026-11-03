@@ -99,6 +99,12 @@ A PilotEvidenceEnvelope is:
 
 It may be used as input to the next controlled scheduler/process-envelope stage. It must not be conflated with a production release permit.
 
+### Scheduler adapter boundary
+
+The scheduler exposes an evidence-bound research adapter: `EvidenceBoundMode::from_pilot_evidence` consumes the pilot envelopes and derives the supported soil mask. For each advertised soil it requires independent outcome evidence at every occupancy from 1 through the mode's declared capacity, all from the same machine, programme, material, chemistry batch, water batch/hardness and operating conditions. `simulate_with_pilot_evidence` uses these derived mode profiles. It cannot authorize sanitization claims and does not derive energy/water coefficients; use measured occupancy curves separately.
+
+The older `simulate` entry point remains for synthetic/offline policy comparison. Its cleaning/rinse boolean is a caller assumption only, not evidence. Neither simulation API certifies a product or authorizes production release.
+
 ## Data templates
 
 - outcome-evidence-template.csv: one item × endpoint × run measurement.
