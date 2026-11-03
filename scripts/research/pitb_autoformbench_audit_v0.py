@@ -179,6 +179,144 @@ def residual_by_group(rows: dict[str, dict[str, str]]) -> list[dict[str, object]
     return sorted(output, key=lambda x: (-int(x["unresolved"]), str(x["source_group"])))
 
 
+def target_complexity_analysis(
+    manifest: dict[str, dict[str, str]],
+    primary: dict[str, dict[str, str]],
+    bootstrap_replicates: int = 50_000,
+) -> dict[str, object]:
+    """Describe task-size strata and a source-group-clustered high/low contrast.
+
+    target_count is the count of graded declarations, not a direct count of all
+    required helper lemmas. It is used only as a workload proxy.
+    """
+    if bootstrap_replicates < 200:
+        raise AuditError("complexity bootstrap needs at least 200 replicates")
+
+    buckets = [
+        ("one_declaration", lambda n: n == 1),
+        ("two_to_four_declarations", lambda n: 2 <= n <= 4),
+        ("five_or_more_declarations", lambda n: n >= 5),
+    ]
+    bucket_reports = []
+    for label, predicate in buckets:
+        subset = [
+            (manifest[task_id], row)
+            for task_id, row in primary.items()
+            if predicate(int(manifest[task_id]["target_count"]))
+        ]
+        if not subset:
+            raise AuditError(f"no tasks in target-count stratum {label}")
+        solved = sum(row["passed"] == "true" for _, row in subset)
+        costs = [number(row, "cost_usd", label) for _, row in subset]
+        tokens = [number(row, "input_tokens", label) for _, row in subset]
+        turns = [number(row, "turns", label) for _, row in subset]
+        code_loc = [number(row, "added_code_loc", label) for _, row in subset]
+        bucket_reports.append({
+            "stratum": label,
+            "tasks": len(subset),
+            "solved": solved,
+            "unresolved": len(subset) - solved,
+            "solve_rate": solved / len(subset),
+            "mean_recorded_cost_usd": sum(costs) / len(costs),
+            "median_recorded_cost_usd": median(costs),
+            "mean_input_tokens": sum(tokens) / len(tokens),
+            "mean_turns": sum(turns) / len(turns),
+            "mean_added_code_loc": sum(code_loc) / len(code_loc),
+        })
+
+    per_group: dict[str, dict[str, int]] = defaultdict(
+        lambda: {"five_plus_tasks": 0, "five_plus_unresolved": 0,
+                 "under_five_tasks": 0, "under_five_unresolved": 0}
+    )
+    for task_id, manifest_row in manifest.items():
+        if task_id not in primary:
+            raise AuditError(f"primary result missing task {task_id}")
+        high = int(manifest_row["target_count"]) >= 5
+        failed = primary[task_id]["passed"] == "false"
+        stats = per_group[manifest_row["book"]]
+        if high:
+            stats["five_plus_tasks"] += 1
+            stats["five_plus_unresolved"] += int(failed)
+        else:
+            stats["under_five_tasks"] += 1
+            stats["under_five_unresolved"] += int(failed)
+
+    overlap = [
+        row for row in per_group.values()
+        if row["five_plus_tasks"] > 0 and row["under_five_tasks"] > 0
+    ]
+    if len(overlap) < 2:
+        raise AuditError("fewer than two source groups contain both target-count strata")
+
+    def pooled(groups: list[dict[str, int]]) -> tuple[int, int, int, int]:
+        high_n = sum(x["five_plus_tasks"] for x in groups)
+        high_f = sum(x["five_plus_unresolved"] for x in groups)
+        low_n = sum(x["under_five_tasks"] for x in groups)
+        low_f = sum(x["under_five_unresolved"] for x in groups)
+        return high_n, high_f, low_n, low_f
+
+    high_n, high_f, low_n, low_f = pooled(overlap)
+    high_rate, low_rate = high_f / high_n, low_f / low_n
+    observed_difference = high_rate - low_rate
+    observed_ratio = high_rate / low_rate if low_rate > 0 else None
+
+    # Deterministic xorshift32 cluster bootstrap. Resample source groups, not
+    # individual tasks, and retain only groups with both strata for this
+    # within-source comparison.
+    state = 0x8BADF00D
+
+    def next_index(limit: int) -> int:
+        nonlocal state
+        state ^= (state << 13) & 0xFFFFFFFF
+        state &= 0xFFFFFFFF
+        state ^= state >> 17
+        state &= 0xFFFFFFFF
+        state ^= (state << 5) & 0xFFFFFFFF
+        state &= 0xFFFFFFFF
+        return min(limit - 1, int((state / 4294967296.0) * limit))
+
+    differences: list[float] = []
+    ratios: list[float] = []
+    for _ in range(bootstrap_replicates):
+        sample = [overlap[next_index(len(overlap))] for _ in range(len(overlap))]
+        b_high_n, b_high_f, b_low_n, b_low_f = pooled(sample)
+        b_high_rate, b_low_rate = b_high_f / b_high_n, b_low_f / b_low_n
+        differences.append(b_high_rate - b_low_rate)
+        if b_low_rate > 0:
+            ratios.append(b_high_rate / b_low_rate)
+
+    def percentile(values: list[float], q: float) -> float:
+        if not values:
+            raise AuditError("bootstrap produced no valid replicates for a required interval")
+        ordered = sorted(values)
+        return ordered[int((len(ordered) - 1) * q)]
+
+    return {
+        "workload_proxy": "manifest graded-declaration count; not a complete measure of formalization complexity",
+        "task_strata": bucket_reports,
+        "five_plus_vs_under_five_within_source_groups": {
+            "source_groups_with_both_strata": len(overlap),
+            "high": {"tasks": high_n, "unresolved": high_f, "failure_rate": high_rate},
+            "under_five": {"tasks": low_n, "unresolved": low_f, "failure_rate": low_rate},
+            "risk_difference_high_minus_low": observed_difference,
+            "risk_ratio_high_over_low": observed_ratio,
+            "cluster_bootstrap": {
+                "resampling_unit": "source_group",
+                "groups_per_replicate": len(overlap),
+                "replicates": bootstrap_replicates,
+                "seed_hex": "8badf00d",
+                "risk_difference_ci95": [
+                    percentile(differences, 0.025), percentile(differences, 0.975)
+                ],
+                "risk_ratio_ci95": [
+                    percentile(ratios, 0.025), percentile(ratios, 0.975)
+                ],
+                "valid_risk_ratio_replicates": len(ratios),
+            },
+        },
+    }
+
+
 def paired(reference, other):
     ref_only = sum(reference[k]["passed"] == "true" and other[k]["passed"] == "false" for k in reference)
     other_only = sum(reference[k]["passed"] == "false" and other[k]["passed"] == "true" for k in reference)
@@ -198,7 +336,7 @@ def audit(repo: Path) -> dict[str, object]:
     raw_files, observed = {}, {}
     for path, expected in FILES.items():
         raw = read_git_file(repo, path)
-        digest = hashlib.sha1(f"blob {len(raw)}\0".encode("ascii") + raw).hexdigest()
+        digest = git_blob_sha1(raw)
         if digest != expected:
             raise AuditError(f"Git blob mismatch for {path}: {digest}")
         raw_files[path], observed[path] = raw, digest
@@ -209,6 +347,7 @@ def audit(repo: Path) -> dict[str, object]:
         models[name] = index_model(parse_csv(raw_files[path], path), manifest, name)
     primary = models["gpt-6-astra"]
     residual = residual_by_group(primary)
+    complexity = target_complexity_analysis(manifest, primary)
     n_failed = sum(int(x["unresolved"]) for x in residual)
     top6 = sum(int(x["unresolved"]) for x in residual[:6])
     return {
@@ -223,6 +362,7 @@ def audit(repo: Path) -> dict[str, object]:
             k: paired(primary, v) for k, v in models.items() if k != "gpt-6-astra"
         },
         "gpt_6_astra_residuals_by_source_group": residual,
+        "gpt_6_astra_target_count_complexity_analysis": complexity,
         "residual_concentration": {"unresolved_tasks": n_failed, "top_six_groups_unresolved": top6,
                                    "top_six_share": top6 / n_failed if n_failed else 0},
         "warning": "Cross-model outcome and cost differences are descriptive, not causal or matched-budget comparisons.",
@@ -239,6 +379,21 @@ def self_test():
         row["textbook"] = "one" if row["id"] != "c" else "two"
     assert git_blob_sha1(b"abc") == "f2ba8f84ab5c1bce84a7b441cb1959cfc7093b7f"
     assert median([1.0, 3.0]) == 2.0 and median([1.0, 2.0, 3.0]) == 2.0
+    toy_manifest = {
+        "a-low": {"book": "alpha", "target_count": "1"},
+        "a-high": {"book": "alpha", "target_count": "5"},
+        "b-low": {"book": "beta", "target_count": "2"},
+        "b-high": {"book": "beta", "target_count": "7"},
+    }
+    toy_primary = {
+        "a-low": {"passed": "true"}, "a-high": {"passed": "false"},
+        "b-low": {"passed": "false"}, "b-high": {"passed": "false"},
+    }
+    complexity = target_complexity_analysis(toy_manifest, toy_primary, bootstrap_replicates=500)
+    contrast = complexity["five_plus_vs_under_five_within_source_groups"]
+    assert contrast["source_groups_with_both_strata"] == 2
+    assert contrast["risk_difference_high_minus_low"] == 0.5
+    assert contrast["risk_ratio_high_over_low"] == 2.0
     result = summarize({r["id"]: r for r in sample})
     assert result["solved"] == 1 and result["unresolved"] == 2
     assert math.isclose(result["unresolved_cost_share"], 60 / 70)
