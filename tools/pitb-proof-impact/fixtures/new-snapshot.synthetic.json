@@ -1,0 +1,107 @@
+{
+  "schema_version": "pitb.proof-impact-snapshot.v0",
+  "snapshot_id": "cipm-synthetic-child-v0",
+  "repository_commit": "2222222222222222222222222222222222222222",
+  "environment_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "dependency_inventory_complete": true,
+  "nodes": [
+    {
+      "node_id": "helper",
+      "kind": "formal_declaration",
+      "declaration_kind": "theorem",
+      "reducibility": "opaque",
+      "statement_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "body_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "proof_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "axiom_manifest_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+    },
+    {
+      "node_id": "root",
+      "kind": "formal_declaration",
+      "declaration_kind": "theorem",
+      "reducibility": "opaque",
+      "statement_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "body_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "proof_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "axiom_manifest_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "node_id": "consumer",
+      "kind": "formal_declaration",
+      "declaration_kind": "theorem",
+      "reducibility": "opaque",
+      "statement_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "body_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "proof_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "axiom_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "source_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "node_id": "transparent",
+      "kind": "formal_declaration",
+      "declaration_kind": "definition",
+      "reducibility": "transparent",
+      "statement_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "body_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "proof_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "axiom_manifest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "source_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    {
+      "node_id": "doc",
+      "kind": "document",
+      "declaration_kind": "document",
+      "reducibility": "not_applicable",
+      "statement_sha256": null,
+      "body_sha256": null,
+      "proof_sha256": null,
+      "axiom_manifest_sha256": null,
+      "source_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+    },
+    {
+      "node_id": "module-root",
+      "kind": "module",
+      "declaration_kind": "module",
+      "reducibility": "not_applicable",
+      "statement_sha256": null,
+      "body_sha256": null,
+      "proof_sha256": null,
+      "axiom_manifest_sha256": null,
+      "source_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+    }
+  ],
+  "edges": [
+    {
+      "edge_id": "e-root-helper",
+      "source_node_id": "root",
+      "target_node_id": "helper",
+      "relation": "signature_reference"
+    },
+    {
+      "edge_id": "e-consumer-root",
+      "source_node_id": "consumer",
+      "target_node_id": "root",
+      "relation": "proof_term_reference"
+    },
+    {
+      "edge_id": "e-root-transparent",
+      "source_node_id": "root",
+      "target_node_id": "transparent",
+      "relation": "definition_body_reference"
+    },
+    {
+      "edge_id": "e-root-doc",
+      "source_node_id": "root",
+      "target_node_id": "doc",
+      "relation": "documentation_reference"
+    },
+    {
+      "edge_id": "e-root-module",
+      "source_node_id": "root",
+      "target_node_id": "module-root",
+      "relation": "module_environment_dependency"
+    }
+  ]
+}
