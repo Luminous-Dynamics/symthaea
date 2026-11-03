@@ -148,10 +148,10 @@ pub fn make_rmi_track_a_fixture_v1(
     seed_root: u64,
 ) -> Result<RmiInterventionPairV1, String> {
     let target_seed = target_index_v1(target)
-        .checked_mul(0x9E37_79B9_7F4A_7C15)
+        .checked_mul(0x9E37_79B9)
         .ok_or_else(|| "target seed overflow".to_owned())?;
     let trial_seed = (trial_index as u64)
-        .checked_mul(0xD1B5_4A32_D192_ED03)
+        .checked_mul(0xD1B5_4A32)
         .ok_or_else(|| "trial seed overflow".to_owned())?;
     let seed = seed_root
         .wrapping_add(target_seed)
@@ -298,11 +298,17 @@ pub fn run_rmi_track_a_suite_v1(
         agent_policy_ids: vec![
             "fixed-response-agent-v1".into(),
             "imitation-only-agent-v1".into(),
-            "synthetic-contingent-agent-v1".into(),
+            "synthetic-contingent-agent-motif".into(),
+            "synthetic-contingent-agent-rhythm".into(),
+            "synthetic-contingent-agent-tempo".into(),
+            "synthetic-contingent-agent-role".into(),
         ],
         partner_policy_ids: vec![
             "fixed-response-partner-v1".into(),
-            "synthetic-responsive-partner-v1".into(),
+            "synthetic-responsive-partner-motif".into(),
+            "synthetic-responsive-partner-rhythm".into(),
+            "synthetic-responsive-partner-tempo".into(),
+            "synthetic-responsive-partner-role".into(),
         ],
         claim_boundary: "Synthetic evaluator qualification only; not a Melothaea performance, musical-quality, human-influence, collaboration-value, authorship, or consciousness result.".into(),
     };
