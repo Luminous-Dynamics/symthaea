@@ -1,0 +1,11 @@
+[package]
+name = "connectome-query-impact"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+description = "Scenario-aware interval analysis of proofreading corrections on scientific query outcomes"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
