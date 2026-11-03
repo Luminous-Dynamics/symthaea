@@ -42,11 +42,17 @@ jobs:
           echo "PITB_GRAPH_EVIDENCE_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
           echo "PITB_GRAPH_EVIDENCE_DIR=$staged" >> "$GITHUB_ENV"
 
-      - name: Validate formatting and compile/test isolated Rust verifier
+      - name: Format staged Rust source and verify formatter output
         shell: bash
         run: |
           set -euo pipefail
+          rustfmt --edition 2021 "$PITB_GRAPH_EVIDENCE_DIR/src/main.rs"
           cargo fmt --check --manifest-path "$PITB_GRAPH_EVIDENCE_MANIFEST"
+
+      - name: Compile and test isolated Rust verifier
+        shell: bash
+        run: |
+          set -euo pipefail
           cargo test --manifest-path "$PITB_GRAPH_EVIDENCE_MANIFEST"
 
       - name: Validate schema and synthetic fixture
@@ -83,6 +89,15 @@ jobs:
             tools/pitb-graph-evidence/fixtures/evidence \
             > "$RUNNER_TEMP/pitb-graph-evidence-summary.json"
           cat "$RUNNER_TEMP/pitb-graph-evidence-summary.json"
+
+      - name: Retain rustfmt-normalized source for exact patch review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-typed-graph-evidence-rustfmt
+          path: ${{ runner.temp }}/pitb-graph-evidence/src/main.rs
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Retain synthetic graph summary
         if: always()
