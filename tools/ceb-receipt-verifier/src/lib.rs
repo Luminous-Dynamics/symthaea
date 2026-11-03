@@ -561,6 +561,9 @@ pub fn hash_source_tree(root: &Path) -> Result<String, String> {
 }
 
 fn hash_source_tree_inner(root: &Path) -> Result<String, Failure> {
+    if !cfg!(unix) {
+        return Err(Failure::unresolved("CEB-TREE-V1 requires Unix executable-bit semantics; run the verifier on a Linux/Unix host"));
+    }
     let canonical_root = root.canonicalize()
         .map_err(|error| Failure::protocol(format!("cannot resolve source-tree root {}: {error}", root.display())))?;
     if !canonical_root.is_dir() {
