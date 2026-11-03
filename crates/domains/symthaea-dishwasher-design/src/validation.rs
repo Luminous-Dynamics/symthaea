@@ -348,6 +348,9 @@ mod tests {
         session: &str,
         soil_batch: &str,
     ) -> RunPartitionRecord {
+        let configuration_token = session.bytes().fold(0_u64, |value, byte| {
+            value.wrapping_mul(131).wrapping_add(byte as u64)
+        });
         RunPartitionRecord {
             run_id: run_id.to_owned(),
             partition,
@@ -361,7 +364,7 @@ mod tests {
             test_site_id: format!("site-{session}"),
             service_request_id: format!("service-{run_id}"),
             compartment_id: format!("cell-{session}"),
-            compartment_configuration_sha256: format!("{:064x}", session.len()),
+            compartment_configuration_sha256: format!("{configuration_token:064x}"),
             utility_topology_id: format!("utility-{session}"),
         }
     }
