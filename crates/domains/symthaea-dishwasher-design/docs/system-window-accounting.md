@@ -12,7 +12,7 @@ This module therefore separates three things:
 2. **System-window operation:** `system_window::account_system_window` computes releases, request latency, queue wait, carry-in, right-censored requests and concurrency over one half-open wall-clock window.
 3. **System resource measurement:** resource rows measured at authoritative system boundaries provide the window's energy, water, chemical and operator-time totals. Request-level resource totals are not summed again.
 
-The system window uses one declared monotonic clock domain. Every request and release event must use that clock. The interval is `[start_at_s, end_at_s)`; events exactly at the end belong to the next window.
+The system window uses one declared monotonic clock domain. Every request, release event and resource-meter interval must use that clock. The interval is `[start_at_s, end_at_s)`; events exactly at the end belong to the next window. Meter instrument IDs identify independently calibrated measurement streams, not a multi-channel data-acquisition chassis; distinct channels need distinct stream identities in this schema.
 
 ## Definitions
 
@@ -34,7 +34,7 @@ The system window uses one declared monotonic clock domain. Every request and re
 - Request latency p50/p95 and queue-wait p50/p95, using nearest-rank percentiles over completed/started requests accepted during the window. Right-censored requests are reported separately and are not imputed into percentiles.
 - First-pass yield: first-attempt verified items divided by requested items in completed requests accepted during the window. The service ledger reports first-pass IDs; an item first qualified after a re-wash is not first-pass.
 - Unqualified items reported by the service ledgers, active request seconds and maximum concurrency.
-- System-level resource totals by canonical unit, plus window resource totals per release when at least one item was released.
+- System-level resource totals by canonical unit, plus window resource totals per verified release when at least one item was released. The field is a window-intensity ratio, not the full lifecycle resource cost for one service request.
 
 A release count is event-based. An item qualified in a service report but not released in the scored window is not counted as a release in that window. A request accepted before the window can still contribute a release during it; this is why carry-in is surfaced.
 
