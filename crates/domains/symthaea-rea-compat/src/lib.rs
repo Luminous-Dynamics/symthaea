@@ -21,6 +21,10 @@ extern crate self as symthaea_rea_compat;
 #[path = "../../../../src/mobile_tool_policy.rs"]
 mod root_mobile_tool_policy_facade;
 
+#[cfg(test)]
+#[path = "../../../../src/mobile_invocation_policy.rs"]
+mod root_mobile_invocation_policy_facade;
+
 use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Deserialize, Deserializer, Serialize};
