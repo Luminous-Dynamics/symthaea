@@ -48,7 +48,8 @@
       "network_policy": "unrestricted_not_qualifying",
       "started_at_utc": "2026-11-02T00:00:00Z",
       "finished_at_utc": "2026-11-02T00:00:00Z",
-      "regrade_of_receipt_sha256": null
+      "regrade_of_receipt_sha256": null,
+      "toolchain_lock_sha256": null
     },
     "grader": {
       "grader_id": "not-provisioned",
