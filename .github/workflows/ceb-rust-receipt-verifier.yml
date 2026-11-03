@@ -1,0 +1,58 @@
+name: CEB Rust Receipt Verifier
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/ceb-receipt-verifier/**"
+      - "benchmarks/ceb/**"
+      - ".github/workflows/ceb-rust-receipt-verifier.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/ceb-receipt-verifier/**"
+      - "benchmarks/ceb/**"
+      - ".github/workflows/ceb-rust-receipt-verifier.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ceb-rust-receipt-verifier-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-verifier:
+    name: Build, test and lint standalone verifier
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact event revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install repository-pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --manifest-path tools/ceb-receipt-verifier/Cargo.toml -- --check
+
+      - name: Run offline verifier unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --manifest-path tools/ceb-receipt-verifier/Cargo.toml --all-targets
+
+      - name: Run Clippy with warnings denied
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy --manifest-path tools/ceb-receipt-verifier/Cargo.toml --all-targets -- -D warnings
