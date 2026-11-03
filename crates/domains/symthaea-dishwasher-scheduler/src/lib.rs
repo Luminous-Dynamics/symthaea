@@ -135,6 +135,7 @@ pub enum EvidenceBoundModeError {
     InsufficientPilotRuns,
     InconsistentPhysicalScope,
     InconsistentAcceptanceCriteria { soil: SoilClass },
+    InconsistentSoilPreparation { soil: SoilClass },
     DuplicateSoilOccupancy {
         soil: SoilClass,
         occupancy: usize,
@@ -193,7 +194,7 @@ impl EvidenceBoundMode {
         let mut soil_occupancies = HashSet::new();
         let mut acceptance_by_soil: HashMap<
             SoilClass,
-            (Vec<EndpointCriterion>, Vec<(Endpoint, String)>),
+            (String, u64, Vec<EndpointCriterion>, Vec<(Endpoint, String)>),
         > = HashMap::new();
 
         for envelope in &pilot_evidence {
@@ -218,14 +219,21 @@ impl EvidenceBoundMode {
                     scope.soil_class.clone(),
                 ))?;
             let acceptance_identity = (
+                scope.soil_batch_id.clone(),
+                scope.soil_age_s,
                 envelope.criteria().to_vec(),
                 envelope.method_ids().to_vec(),
             );
             match acceptance_by_soil.get(&soil) {
-                Some(existing) if existing != &acceptance_identity => {
-                    return Err(EvidenceBoundModeError::InconsistentAcceptanceCriteria {
-                        soil,
-                    });
+                Some(existing) if existing.0 != acceptance_identity.0
+                    || existing.1 != acceptance_identity.1 =>
+                {
+                    return Err(EvidenceBoundModeError::InconsistentSoilPreparation { soil });
+                }
+                Some(existing) if existing.2 != acceptance_identity.2
+                    || existing.3 != acceptance_identity.3 =>
+                {
+                    return Err(EvidenceBoundModeError::InconsistentAcceptanceCriteria { soil });
                 }
                 None => {
                     acceptance_by_soil.insert(soil, acceptance_identity);
@@ -1240,6 +1248,8 @@ mod evidence_bound_mode_tests {
             surface_material: "ceramic".to_owned(),
             item_set_id: format!("{}-{occupancy}-item-set", soil.as_label()),
             item_ids: item_ids.clone(),
+            soil_batch_id: format!("{}-soil-batch-1", soil.as_label()),
+            soil_age_s: 21_600,
             detergent_batch_id: detergent_batch.to_owned(),
             water_batch_id: "water-lot-1".to_owned(),
             water_hardness_ppm_as_caco3: 75,
@@ -1404,6 +1414,78 @@ mod evidence_bound_mode_tests {
             ],
         );
         assert_eq!(result, Err(EvidenceBoundModeError::InconsistentPhysicalScope));
+    }
+
+    #[test]
+    fn soil_batch_and_age_must_match_across_each_soil_occupancy_ladder() {
+        let make = |occupancy, batch: &str, age| {
+            let mut pilot = envelope(
+                "full-load-v1",
+                SoilClass::Starch,
+                occupancy,
+                "prototype-a",
+                "detergent-1",
+            );
+            // Pilot evidence owns its scope, so this test constructs alternate
+            // qualification envelopes with otherwise identical item/endpoint data.
+            let mut scope = pilot.scope().clone();
+            scope.soil_batch_id = batch.to_owned();
+            scope.soil_age_s = age;
+            let policy = PilotPolicy {
+                minimum_independent_runs: 5,
+                require_drying_endpoint: false,
+                require_relative_microbiology_endpoint: false,
+            };
+            let criteria = pilot.criteria().to_vec();
+            let observations = {
+                let mut values = Vec::new();
+                for run in 1..=5 {
+                    for item_id in &scope.item_ids {
+                        for (endpoint, method) in pilot.method_ids() {
+                            let criterion = criteria.iter().find(|c| c.endpoint == *endpoint).unwrap();
+                            let (metric, unit, value, uncertainty) = match endpoint {
+                                Endpoint::SoilRemovalResidual => ("residual_soil_area_fraction", "fraction", 0.02, 0.005),
+                                Endpoint::FinalRinseResidue => ("final_rinse_residue", "mg/L", 2.0, 0.5),
+                                Endpoint::CrossContamination => ("marker_transfer_mass", "mg", 0.003, 0.001),
+                                _ => unreachable!(),
+                            };
+                            values.push(OutcomeObservation {
+                                run_id: format!("run-{run:02}"),
+                                item_id: item_id.clone(),
+                                endpoint: *endpoint,
+                                criterion_id: criterion.criterion_id.clone(),
+                                metric_id: metric.to_owned(),
+                                evidence_kind: EvidenceKind::IndependentOutcomeAssay,
+                                method_id: method.clone(),
+                                protocol_id: "pilot-protocol-v1".to_owned(),
+                                measured_value: value,
+                                expanded_uncertainty: uncertainty,
+                                unit: unit.to_owned(),
+                                evidence_ref: format!("evidence-{run}-{item_id}-{endpoint:?}"),
+                                calibration_bundle_sha256: "1".repeat(64),
+                            });
+                        }
+                    }
+                }
+                values
+            };
+            // Criteria refer to fixed method identities; this envelope deliberately
+            // uses the same soil scope except for the batch/age dimensions.
+            qualify_pilot_evidence(scope, policy, criteria, observations).unwrap()
+        };
+        let result = EvidenceBoundMode::from_pilot_evidence(
+            mode_profile("full-load-v1", 2, false),
+            vec![
+                make(1, "starch-batch-a", 21_600),
+                make(2, "starch-batch-b", 21_600),
+            ],
+        );
+        assert_eq!(
+            result,
+            Err(EvidenceBoundModeError::InconsistentSoilPreparation {
+                soil: SoilClass::Starch
+            })
+        );
     }
 
     #[test]
