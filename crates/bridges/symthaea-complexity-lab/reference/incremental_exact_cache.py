@@ -186,15 +186,13 @@ class Cache:
     def evaluate(self,factors,order):
         order=tuple(order)
         if len(order)!=len(self.cards) or set(order)!=set(range(len(self.cards))):raise ValueError("bad order")
-        work=list(factors)
-        stats={"hits":0,"misses":0,"rejected":0,"adds":0,"muls":0,"invalidated":0}
+        work=list(factors);stats={"hits":0,"misses":0,"rejected":0,"adds":0,"muls":0,"invalidated":0}
         keys={}
         for v in order:
             raw_bucket=[f for f in work if v in f.scope]
             normalized=self.normalize(raw_bucket)
             if not self.check_normalization(raw_bucket,normalized):raise AssertionError("normalizer checker failed")
-            k,_=self.key_for(v,normalized)
-            msg,bad=self.lookup(k)
+            k,_=self.key_for(v,normalized);msg,bad=self.lookup(k)
             if msg is None:
                 stats["misses"]+=1;stats["rejected"]+=int(bad)
                 msg,a,m=self.produce(v,normalized);stats["adds"]+=a;stats["muls"]+=m
@@ -203,8 +201,7 @@ class Cache:
             if v in self.last and self.last[v]!=k:stats["invalidated"]+=1
             keys[v]=k
             ids={id(f) for f in raw_bucket};work=[f for f in work if id(f) not in ids];work.append(msg)
-        self.last=keys
-        result=self.A.one
+        self.last=keys;result=self.A.one
         for f in work:
             if f.scope:raise AssertionError("non-scalar output")
             result=self.A.mul(result,f.vals[0])
@@ -232,10 +229,16 @@ def main():
     pre=Cache(c2,A);rs,_=pre.evaluate([a,b],[0,1]);rm,ps=pre.evaluate([merged,unit],[0,1])
     assert rs==rm and ps["hits"]==2
     wrong=factor((0,1),[2,4,6,0],c2,A);assert not pre.check_normalization([a,b],[wrong])
+    MA=MaxCount();ma=factor((0,1),[(2,2),None,(1,3),(0,2)],c2,MA)
+    mb=factor((0,1),[(1,4),(0,1),None,(2,2)],c2,MA)
+    merged_vals=[MA.mul(x,y) for x,y in zip(ma.vals,mb.vals)]
+    mm=factor((0,1),merged_vals,c2,MA);unit_m=factor((0,),[MA.one,MA.one],c2,MA)
+    mp=Cache(c2,MA);msplit,_=mp.evaluate([ma,mb],[0,1]);mmerged,mps=mp.evaluate([mm,unit_m],[0,1])
+    assert msplit==mmerged and mps["hits"]==2
     scope=fs[:];scope[0]=factor((0,3),[1,0,1,0],cards,A)
-    rs,ss=e.evaluate(scope,order);assert A.enc(rs)==direct(cards,scope,A)
-    tam=Cache(cards,A);tam.evaluate(fs,order);k=next(iter(tam.entries));entry=tam.entries[k]
-    entry["out"]["values"][0]+=9;entry["digest"]=sha(entry["out"]);entry["receipt"]=tam.receipt(k,entry["digest"])
+    rscope,_=e.evaluate(scope,order);assert A.enc(rscope)==direct(cards,scope,A)
+    tam=Cache(cards,A);tam.evaluate(fs,order);key=next(iter(tam.entries));entry=tam.entries[key]
+    entry["out"]["values"][0]+=9;entry["digest"]=sha(entry["out"]);entry["receipt"]=tam.receipt(key,entry["digest"])
     _,st=tam.evaluate(fs,order);assert st["rejected"]>=1
     foreign=Cache(cards,A,key=b"wrong-key");foreign.entries=tam.entries.copy();_,sf=foreign.evaluate(fs,order);assert sf["rejected"]>=1
     matches=hits=misses=invalid=0;cold_add=cold_mul=inc_add=inc_mul=0
@@ -253,20 +256,20 @@ def main():
             cache=Cache(c,alg);cache.evaluate(base,order)
             target=base[:];idx=(case*7+3)%len(base);pos=(case*13+1)%len(target[idx].vals);old=target[idx].vals[pos]
             new=(1-old) if isinstance(alg,Count) else (None if old is not None else (case%5-2,case%3+1))
-            vals=list(target[idx].vals);vals[pos]=new;target[idx]=factor(target[idx].scope,vals,c,alg)
-            ir,is0=cache.evaluate(target,order);cold,cs=Cache(c,alg).evaluate(target,order)
-            assert alg.enc(ir)==alg.enc(cold)==direct(c,target,alg)
-            matches+=1;hits+=is0["hits"];misses+=is0["misses"];invalid+=is0["invalidated"]
-            cold_add+=cs["adds"];cold_mul+=cs["muls"];inc_add+=is0["adds"];inc_mul+=is0["muls"]
-    print(json.dumps({"suite":"ETH-019 content-normalized incremental exact cache",
+            values=list(target[idx].vals);values[pos]=new;target[idx]=factor(target[idx].scope,values,c,alg)
+            inc,stats=cache.evaluate(target,order);cold,cold_stats=Cache(c,alg).evaluate(target,order)
+            assert alg.enc(inc)==alg.enc(cold)==direct(c,target,alg)
+            matches+=1;hits+=stats["hits"];misses+=stats["misses"];invalid+=stats["invalidated"]
+            cold_add+=cold_stats["adds"];cold_mul+=cold_stats["muls"];inc_add+=stats["adds"];inc_mul+=stats["muls"]
+    print(json.dumps({"suite":"ETH-019 compact content-normalized incremental cache",
       "randomized_exact_matches":matches,"cache_hits":hits,"cache_misses":misses,"invalidated_steps":invalid,
       "cold_additions":cold_add,"cold_multiplications":cold_mul,"incremental_additions":inc_add,
       "incremental_multiplications":inc_mul,"single_edit_disconnected_hits":si["hits"],
       "single_edit_disconnected_misses":si["misses"],"factor_permutation_hits":sp["hits"],
       "same_scope_split_merge_hits":ps["hits"],"unit_factor_elision_hits":ps["hits"],
-      "normalization_mutant_rejected":True,"scope_edit_exact":True,
-      "tamper_rejected":st["rejected"],"wrong_key_rejected":sf["rejected"],
-      "claim_boundary":"Python finite reference only. No Rust/Lean/public benchmark or measured wall-time speedup."},
+      "maxcount_same_scope_split_merge_hits":mps["hits"],"normalization_mutant_rejected":True,
+      "scope_edit_exact":True,"tamper_rejected":st["rejected"],"wrong_key_rejected":sf["rejected"],
+      "claim_boundary":"Python finite reference only; no Rust/Lean/public benchmark or measured wall-time speedup."},
       indent=2,sort_keys=True))
 
 if __name__=="__main__":main()
