@@ -24,6 +24,7 @@ ETH-025 specializes this direction to typed, output-contract-aware transformatio
 Source:
 - reference/semantic_metamorphic.py
 - source Git blob: b305e44a4cb46aff44a1b6c0a5f91c7146caf31a
+- versioned relation contracts: reference/semantic_metamorphic_relations.json
 
 Result:
 - reference/semantic_metamorphic_results.json
