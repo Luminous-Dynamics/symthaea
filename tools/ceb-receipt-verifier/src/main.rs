@@ -21,9 +21,15 @@ enum Command {
         task_contract: PathBuf,
         #[arg(long)]
         task_id: String,
-        /// Expected source-tree SHA-256, lowercase hex without a prefix.
+        /// Out-of-band SHA-256 pin for the exact task-contract bytes.
         #[arg(long)]
-        source_tree_sha256: String,
+        expected_task_contract_sha256: String,
+        /// Clean source snapshot directory to hash with CEB-TREE-V1.
+        #[arg(long)]
+        source_tree_dir: PathBuf,
+        /// Candidate result snapshot directory to hash with CEB-TREE-V1.
+        #[arg(long)]
+        result_tree_dir: PathBuf,
         #[arg(long)]
         patch: PathBuf,
         #[arg(long)]
@@ -68,7 +74,9 @@ fn main() -> ExitCode {
     let Command::VerifyPair {
         task_contract,
         task_id,
-        source_tree_sha256,
+        expected_task_contract_sha256,
+        source_tree_dir,
+        result_tree_dir,
         patch,
         primary,
         primary_artifacts_dir,
@@ -81,8 +89,10 @@ fn main() -> ExitCode {
     let loaded = (|| -> Result<PairInputs, String> {
         Ok(PairInputs {
             task_contract: read_limited(&task_contract, 8 * 1024 * 1024)?,
+            expected_task_contract_sha256,
             task_id,
-            source_tree_sha256,
+            source_tree_dir,
+            result_tree_dir,
             patch: read_limited(&patch, 32 * 1024 * 1024)?,
             primary_envelope: read_limited(&primary, 8 * 1024 * 1024)?,
             primary_artifacts_dir,
