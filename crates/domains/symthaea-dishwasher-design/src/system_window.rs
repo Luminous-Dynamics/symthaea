@@ -37,11 +37,23 @@ impl SystemResourceKind {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum CancellationReason {
+    UserWithdrawal,
+    OperatorAbort,
+    SafetyInterlock,
+    EquipmentFault,
+    SensorFault,
+    UtilityFailure,
+    ProtocolDeviation,
+    Other,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WindowRequestState {
     Completed { closed_at_s: u64 },
     /// Terminal cancellation, either while queued or after physical work starts.
-    Cancelled { cancelled_at_s: u64 },
+    Cancelled { cancelled_at_s: u64, reason: CancellationReason },
     /// The observation is right-censored at the system-window boundary.
     Unresolved { observed_until_s: u64 },
 }
@@ -148,6 +160,7 @@ pub struct SystemWindowReport {
     pub requests_started_in_window: usize,
     pub requests_completed_in_window: usize,
     pub cancelled_requests_in_window: usize,
+    pub cancellation_reason_counts: Vec<(CancellationReason, usize)>,
     pub items_in_cancelled_accepted_requests: usize,
     pub unresolved_requests_at_window_end: usize,
     pub requested_items_in_accepted_cohort: usize,
@@ -161,6 +174,7 @@ pub struct SystemWindowReport {
     pub time_to_first_release_seconds: Option<u64>,
     pub active_request_seconds: u64,
     pub maximum_concurrent_requests: usize,
+    pub maximum_concurrent_compartments: usize,
     /// Percentiles use nearest-rank over completed requests accepted in-window.
     /// Right-censored requests are reported separately and never imputed.
     pub request_latency_p50_seconds: Option<u64>,
@@ -327,7 +341,7 @@ fn build_compartment_stats(
             }
             let service_end = match request.state {
                 WindowRequestState::Completed { closed_at_s } => closed_at_s,
-                WindowRequestState::Cancelled { cancelled_at_s } => cancelled_at_s,
+                WindowRequestState::Cancelled { cancelled_at_s, .. } => cancelled_at_s,
                 WindowRequestState::Unresolved { .. } => spec.end_at_s,
             };
             let start = started_at_s.max(spec.start_at_s);
@@ -348,7 +362,7 @@ fn build_compartment_stats(
                 stats.requests_completed_in_window = stats.requests_completed_in_window.checked_add(1)
                     .ok_or(SystemWindowError::CounterOverflow("compartment_completed_count"))?;
             }
-            WindowRequestState::Cancelled { cancelled_at_s }
+            WindowRequestState::Cancelled { cancelled_at_s, .. }
                 if cancelled_at_s >= spec.start_at_s && cancelled_at_s < spec.end_at_s =>
             {
                 stats.cancelled_requests_in_window = stats.cancelled_requests_in_window.checked_add(1)
@@ -594,7 +608,7 @@ fn validate_request(
             }
             validate_service_report(request, true)?;
         }
-        WindowRequestState::Cancelled { cancelled_at_s } => {
+        WindowRequestState::Cancelled { cancelled_at_s, .. } => {
             if cancelled_at_s < request.accepted_at_s {
                 return Err(SystemWindowError::CancelledRequestBeforeAcceptance(
                     request.service_request_id.clone(),
@@ -693,6 +707,7 @@ pub fn account_system_window(
     let mut reattempted_item_visits_total = 0_usize;
     let mut completed_count = 0_usize;
     let mut cancelled_count = 0_usize;
+    let mut cancellation_reason_counts: BTreeMap<CancellationReason, usize> = BTreeMap::new();
     let mut cancelled_item_count = 0_usize;
     let mut unresolved_count = 0_usize;
     let mut requested_item_count = 0_usize;
@@ -708,7 +723,7 @@ pub fn account_system_window(
     for request in requests {
         let request_end_at_s = match request.state {
             WindowRequestState::Completed { closed_at_s } => closed_at_s,
-            WindowRequestState::Cancelled { cancelled_at_s } => cancelled_at_s,
+            WindowRequestState::Cancelled { cancelled_at_s, .. } => cancelled_at_s,
             WindowRequestState::Unresolved { .. } => spec.end_at_s,
         };
         if request.accepted_at_s < spec.start_at_s && request_end_at_s >= spec.start_at_s {
@@ -735,7 +750,7 @@ pub fn account_system_window(
 
             let service_end = match request.state {
                 WindowRequestState::Completed { closed_at_s } => closed_at_s,
-                WindowRequestState::Cancelled { cancelled_at_s } => cancelled_at_s,
+                WindowRequestState::Cancelled { cancelled_at_s, .. } => cancelled_at_s,
                 WindowRequestState::Unresolved { .. } => spec.end_at_s,
             };
             let intersection_start = started_at_s.max(spec.start_at_s);
@@ -771,10 +786,13 @@ pub fn account_system_window(
                     ).ok_or(SystemWindowError::CounterOverflow("completed_cohort_item_count"))?;
                 }
             }
-            WindowRequestState::Cancelled { cancelled_at_s } => {
+            WindowRequestState::Cancelled { cancelled_at_s, reason } => {
                 if cancelled_at_s >= spec.start_at_s && cancelled_at_s < spec.end_at_s {
                     cancelled_count = cancelled_count.checked_add(1)
                         .ok_or(SystemWindowError::CounterOverflow("cancelled_requests"))?;
+                    let reason_count = cancellation_reason_counts.entry(reason).or_insert(0_usize);
+                    *reason_count = reason_count.checked_add(1)
+                        .ok_or(SystemWindowError::CounterOverflow("cancellation_reason_count"))?;
                 }
                 if accepted_in_window {
                     cancelled_item_count = cancelled_item_count.checked_add(request.requested_item_ids.len())
@@ -881,7 +899,7 @@ pub fn account_system_window(
                     item_id: release.item_id.clone(),
                 });
             }
-            WindowRequestState::Cancelled { cancelled_at_s }
+            WindowRequestState::Cancelled { cancelled_at_s, .. }
                 if release.released_at_s >= cancelled_at_s => {
                 return Err(SystemWindowError::ReleaseOutsideService {
                     request_id: release.service_request_id.clone(),
@@ -1116,6 +1134,7 @@ pub fn account_system_window(
         requests_started_in_window: started_count,
         requests_completed_in_window: completed_count,
         cancelled_requests_in_window: cancelled_count,
+        cancellation_reason_counts: cancellation_reason_counts.into_iter().collect(),
         items_in_cancelled_accepted_requests: cancelled_item_count,
         unresolved_requests_at_window_end: unresolved_count,
         requested_items_in_accepted_cohort: requested_item_count,
@@ -1425,7 +1444,7 @@ mod tests {
             "service-cancelled-queued",
             20,
             None,
-            WindowRequestState::Cancelled { cancelled_at_s: 40 },
+            WindowRequestState::Cancelled { cancelled_at_s: 40, reason: CancellationReason::UserWithdrawal },
             &["cup-not-started"],
             None,
         )];
@@ -1448,7 +1467,7 @@ mod tests {
             "service-cancelled-partial",
             5,
             Some(10),
-            WindowRequestState::Cancelled { cancelled_at_s: 50 },
+            WindowRequestState::Cancelled { cancelled_at_s: 50, reason: CancellationReason::SafetyInterlock },
             &["cup-passed", "cup-pending"],
             Some(report("service-cancelled-partial", &["cup-passed"], &["cup-pending"], &["cup-passed"])),
         )];
@@ -1472,7 +1491,7 @@ mod tests {
             "service-cancelled-late",
             5,
             Some(10),
-            WindowRequestState::Cancelled { cancelled_at_s: 50 },
+            WindowRequestState::Cancelled { cancelled_at_s: 50, reason: CancellationReason::EquipmentFault },
             &["cup-passed"],
             Some(report("service-cancelled-late", &["cup-passed"], &[], &["cup-passed"])),
         )];
