@@ -1044,11 +1044,19 @@ mod tests {
                 Some(report("new-arrival", &["cup-new"], &[], &["cup-new"])),
             ),
         ];
+        let mut window = spec(&REQUIRED);
+        window.start_at_s = 10;
+        window.end_at_s = 110;
+        let mut resource_rows = basic_resources();
+        for row in &mut resource_rows {
+            row.start_at_s = 10;
+            row.end_at_s = 110;
+        }
         let result = account_system_window(
-            &spec(&REQUIRED),
+            &window,
             &requests,
             &[release("carry-in", "cup-old", 35), release("new-arrival", "cup-new", 70)],
-            &basic_resources(),
+            &resource_rows,
         ).unwrap();
         assert_eq!(result.carry_in_requests_at_window_start, 1);
         assert_eq!(result.requests_accepted_in_window, 1);
