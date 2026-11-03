@@ -724,6 +724,81 @@ mod tests {
         }
     }
     #[test]
+    fn analytic_crossing_oracle_exposes_model_induced_action_ranking_reversal() {
+        let ego_start_m = 0.0_f64;
+        let conflict_x_m = 20.0_f64;
+        let ego_speed_mps = 10.0_f64;
+        let ego_length_m = 4.0_f64;
+        let pedestrian_width_m = 4.0_f64;
+        let pedestrian_speed_reference_mps = 1.4_f64;
+        let pedestrian_speed_predicted_mps = 8.0_f64 / 3.0;
+        let braking_magnitude_mps2 = 3.0_f64;
+        let restart_acceleration_mps2 = 2.0_f64;
+
+        let pedestrian_clear_s = pedestrian_width_m / pedestrian_speed_reference_mps;
+        let predicted_pedestrian_clear_s = pedestrian_width_m / pedestrian_speed_predicted_mps;
+        let continue_arrival_s = (conflict_x_m - ego_start_m) / ego_speed_mps;
+        let continue_occupancy = (
+            continue_arrival_s - ego_length_m / (2.0 * ego_speed_mps),
+            continue_arrival_s + ego_length_m / (2.0 * ego_speed_mps),
+        );
+        let continue_overlap =
+            continue_occupancy.0 < pedestrian_clear_s && continue_occupancy.1 > 0.0;
+
+        let stop_time_s = ego_speed_mps / braking_magnitude_mps2;
+        let stop_distance_m = ego_speed_mps.powi(2) / (2.0 * braking_magnitude_mps2);
+        let remaining_distance_m = conflict_x_m - stop_distance_m;
+        let accelerate_time_s = (2.0 * remaining_distance_m / restart_acceleration_mps2).sqrt();
+        let yield_arrival_s = stop_time_s.max(pedestrian_clear_s) + accelerate_time_s;
+        let yield_arrival_speed_mps = restart_acceleration_mps2 * accelerate_time_s;
+        let yield_occupancy_start_s =
+            yield_arrival_s - ego_length_m / (2.0 * yield_arrival_speed_mps);
+        let yield_overlap = yield_occupancy_start_s < pedestrian_clear_s;
+
+        assert!((pedestrian_clear_s - 2.857142857142857).abs() < 1e-12);
+        assert!((predicted_pedestrian_clear_s - 1.5).abs() < 1e-12);
+        assert!(continue_overlap);
+        assert!(!yield_overlap);
+        assert!((stop_distance_m - 16.666666666666668).abs() < 1e-12);
+        assert!((yield_arrival_s - 5.159075191683887).abs() < 1e-12);
+
+        let mut sample = input();
+        let mut one_second = residual(
+            1_000,
+            pedestrian_speed_predicted_mps,
+            pedestrian_speed_reference_mps,
+        );
+        let mut two_seconds = residual(
+            2_000,
+            pedestrian_speed_predicted_mps * 2.0,
+            pedestrian_speed_reference_mps * 2.0,
+        );
+        one_second.metric_id = "pedestrian-lateral-position".into();
+        two_seconds.metric_id = "pedestrian-lateral-position".into();
+        one_second.actor_policy_id = "analytic-constant-speed-crossing-v0".into();
+        two_seconds.actor_policy_id = "analytic-constant-speed-crossing-v0".into();
+        sample.decisions[0].actor_policy_id =
+            "analytic-constant-speed-crossing-v0".into();
+        sample.decisions[0].decision_context_digest =
+            model_discrepancy_decision_context_digest(&sample.decisions[0]).unwrap();
+        set_residual_schedule(&mut sample, vec![one_second, two_seconds]);
+
+        let report = summarize_vehicle_model_discrepancy(&sample).unwrap();
+        let decision = &report.decision_results[0];
+        assert_eq!(decision.selected_action_id, "continue");
+        assert_eq!(decision.predicted_best_action_id.as_deref(), Some("continue"));
+        assert_eq!(decision.realized_best_action_id.as_deref(), Some("yield"));
+        assert_eq!(decision.ranking_reversed, Some(true));
+        assert_eq!(decision.selected_action_regret, Some(6.0));
+        assert_eq!(decision.optimism_gap, Some(9.0));
+
+        let expected_growth = 2.0
+            * (pedestrian_speed_predicted_mps - pedestrian_speed_reference_mps);
+        assert_eq!(report.paired_horizon_growth.len(), 1);
+        assert!((report.paired_horizon_growth[0].absolute_residual_growth - expected_growth).abs() < 1e-12);
+    }
+
+    #[test]
     fn analytic_linear_motion_fixture_has_known_horizon_growth() {
         let mut sample = input();
         let speed_prediction = 5.0_f64;
