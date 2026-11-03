@@ -54,6 +54,7 @@ The unit tests cover:
 - a cost-aware ranking that selects a lower-raw-EIG but more efficient experiment;
 - deterministic tie-breaking and selection regret;
 - invalid priors, invalid likelihood mass, NaN, zero cost, duplicate outcomes/IDs, impossible outcomes, and missing selections;
+- pairwise-matched hypotheses that differ only under a three-target interaction, plus a state-gated triplet control;
 - exact Fisher-information D-/A-optimal known answers, an objective-ranking reversal, variance weighting, non-SPD/asymmetric priors, malformed sensitivities and costs.
 
 The analytical values are independently recorded in `fixtures/known-answers.json`.
