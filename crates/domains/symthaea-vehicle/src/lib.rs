@@ -98,7 +98,8 @@ pub mod training;
 pub mod types;
 
 pub use classical_baselines::{
-    STANLEY_ROAD_BASELINE_POLICY_ID, StanleyRoadConfig, VehicleClassicalBaseline,
+    PURE_PURSUIT_ROAD_BASELINE_POLICY_ID, STANLEY_ROAD_BASELINE_POLICY_ID,
+    PurePursuitRoadConfig, StanleyRoadConfig, VehicleClassicalBaseline,
 };
 pub use controller::VehicleController;
 pub use encoder::VehicleHdcEncoder;
