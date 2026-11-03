@@ -1,0 +1,354 @@
+{
+  "schema_version": "CONNECTOME-INTERVENTION-RUN-V1",
+  "run_id": "planned-drosophila-model-discrimination-v1",
+  "run_state": "incomplete",
+  "evidence_tier": "synthetic_known_answer",
+  "claim_ceiling": "synthetic_only",
+  "created_at_utc": "2026-11-02T00:00:00Z",
+  "parent_run_id": null,
+  "source": {
+    "source_kind": "synthetic",
+    "dataset_id": "UNMATERIALIZED_SYNTHETIC_FIXTURE_SET",
+    "dataset_version": null,
+    "immutable_reference": null,
+    "source_manifest_sha256": null,
+    "rights_state": "synthetic",
+    "permission_receipt_sha256": null,
+    "provenance_notes": "Planning placeholder only. No measured animal data or biological artifact is included."
+  },
+  "connectome": {
+    "taxon_id": null,
+    "taxon_name": null,
+    "connectome_id": null,
+    "reconstruction_version": null,
+    "neuron_id_namespace": null,
+    "row_axis_sha256": null,
+    "column_axis_sha256": null,
+    "canonical_identity_sha256": null,
+    "structural_edge_manifest_sha256": null,
+    "edge_semantics": "synthetic_graph",
+    "coverage_statement": "No connectome artifact is bound. Biological identity and edge coverage are not established.",
+    "source_artifacts": []
+  },
+  "observation_model": {
+    "observation_model_id": "synthetic-latent-uninstantiated",
+    "modality": "synthetic_latent",
+    "observation_kernel_id": null,
+    "observation_kernel_parameters_sha256": null,
+    "sampling_interval_seconds": null,
+    "time_origin": "synthetic fixture clock; not a measured biological clock",
+    "preprocessing_manifest_sha256": null,
+    "latent_observation_separation": true,
+    "units": [
+      "arbitrary synthetic state units"
+    ],
+    "indicator_or_sensor_id": null
+  },
+  "split": {
+    "split_id": "not-yet-materialized",
+    "split_strategy": "synthetic_known_answer",
+    "generalization_axes": [
+      "target_combination",
+      "intervention_schedule"
+    ],
+    "split_manifest_sha256": null,
+    "train_membership_sha256": null,
+    "validation_membership_sha256": null,
+    "test_membership_sha256": null,
+    "preprocessing_fit_on_train_only": null,
+    "feature_selection_fit_on_train_only": null,
+    "model_selection_blind_to_test": null,
+    "target_identity_split_before_preprocessing": null,
+    "overlap_audit_sha256": null,
+    "status": "not_qualified",
+    "grouping_keys": [],
+    "leakage_notes": "No partition has been materialized or audited.",
+    "unit_tokenization": {
+      "algorithm": "HMAC-SHA256",
+      "key_commitment_sha256": null,
+      "canonicalization_version": "UNIT-TOKEN-V1"
+    },
+    "train_unit_tokens": [],
+    "validation_unit_tokens": [],
+    "test_unit_tokens": []
+  },
+  "hypothesis_set": [
+    {
+      "hypothesis_id": "H_LINEAR_GRAPH",
+      "model_family": "graph_constrained_state_space",
+      "mechanistic_channels": [
+        "direct_anatomical",
+        "polysynaptic_anatomical"
+      ],
+      "prior_probability": null,
+      "prior_source": null,
+      "frozen_before_test": null,
+      "prediction_manifest_sha256": null,
+      "notes": "Declared candidate hypothesis; not implemented or calibrated by this manifest."
+    },
+    {
+      "hypothesis_id": "H_ANATOMY_LATENT",
+      "model_family": "anatomical_plus_latent",
+      "mechanistic_channels": [
+        "direct_anatomical",
+        "polysynaptic_anatomical",
+        "extrasynaptic_latent",
+        "shared_input",
+        "state_modulation"
+      ],
+      "prior_probability": null,
+      "prior_source": null,
+      "frozen_before_test": null,
+      "prediction_manifest_sha256": null,
+      "notes": "Distinct latent-channel candidate; no latent coupling may be written into structural graph evidence."
+    }
+  ],
+  "models": [
+    {
+      "model_id": "candidate_graph_constrained",
+      "role": "candidate",
+      "model_family": "graph_constrained_state_space",
+      "hypothesis_id": "H_LINEAR_GRAPH",
+      "code_commit_sha": null,
+      "config_sha256": null,
+      "parameter_count": null,
+      "training_data_scope_sha256": null,
+      "training_budget": {
+        "compute_units": null,
+        "wall_time_seconds": null,
+        "energy_joules": null,
+        "memory_bytes": null,
+        "training_samples": null,
+        "notes": "Not run."
+      },
+      "observation_model_id": "synthetic-latent-uninstantiated",
+      "structural_channel_sha256": null,
+      "latent_channel_sha256": null,
+      "model_artifact_sha256": null,
+      "training_seed": null,
+      "training_complete": null,
+      "notes": "Placeholder model identity; no model artifact exists."
+    },
+    {
+      "model_id": "baseline_activity_only",
+      "role": "baseline",
+      "model_family": "activity_only",
+      "hypothesis_id": null,
+      "code_commit_sha": null,
+      "config_sha256": null,
+      "parameter_count": null,
+      "training_data_scope_sha256": null,
+      "training_budget": {
+        "compute_units": null,
+        "wall_time_seconds": null,
+        "energy_joules": null,
+        "memory_bytes": null,
+        "training_samples": null,
+        "notes": "Not run."
+      },
+      "observation_model_id": "synthetic-latent-uninstantiated",
+      "structural_channel_sha256": null,
+      "latent_channel_sha256": null,
+      "model_artifact_sha256": null,
+      "training_seed": null,
+      "training_complete": null,
+      "notes": "Required non-connectome comparator; not implemented."
+    },
+    {
+      "model_id": "negative_control_degree_rewired",
+      "role": "negative_control",
+      "model_family": "degree_type_rewired",
+      "hypothesis_id": null,
+      "code_commit_sha": null,
+      "config_sha256": null,
+      "parameter_count": null,
+      "training_data_scope_sha256": null,
+      "training_budget": {
+        "compute_units": null,
+        "wall_time_seconds": null,
+        "energy_joules": null,
+        "memory_bytes": null,
+        "training_samples": null,
+        "notes": "Not run."
+      },
+      "observation_model_id": "synthetic-latent-uninstantiated",
+      "structural_channel_sha256": null,
+      "latent_channel_sha256": null,
+      "model_artifact_sha256": null,
+      "training_seed": null,
+      "training_complete": null,
+      "notes": "Negative-control slot; rewiring algorithm and realization digest are not materialized."
+    }
+  ],
+  "intervention_design": {
+    "candidate_pool_sha256": null,
+    "selector": "not_selected",
+    "selection_objective": "not_applicable",
+    "preregistered_before_test": null,
+    "experiment_budget": {
+      "compute_units": null,
+      "wall_time_seconds": null,
+      "energy_joules": null,
+      "memory_bytes": null,
+      "training_samples": null,
+      "notes": "No intervention budget declared."
+    },
+    "selected_interventions": [],
+    "required_controls": [
+      "sham",
+      "single_target",
+      "pairwise",
+      "combined_target",
+      "reversed_order",
+      "randomized_order",
+      "degree_matched",
+      "rewired_graph",
+      "activity_only",
+      "observation_kernel_only"
+    ],
+    "feasibility_audit_sha256": null,
+    "stopping_rule": null
+  },
+  "budgets": {
+    "comparison_mode": "not_comparable",
+    "training_budget_policy": "unknown",
+    "evaluation_budget_policy": "unknown",
+    "hardware": null,
+    "wall_time_seconds_limit": null,
+    "energy_joules_limit": null,
+    "memory_bytes_limit": null,
+    "budget_exception_rationale": "No training or inference runs have been performed."
+  },
+  "evaluation": {
+    "task_ids": [
+      "synthetic_pairwise_interaction",
+      "synthetic_heldout_target_combination",
+      "synthetic_observation_kernel_mismatch"
+    ],
+    "primary_metric_ids": [
+      "heldout_nlpd",
+      "predictive_interval_coverage",
+      "realized_eig_bits",
+      "decision_regret"
+    ],
+    "metrics": [
+      {
+        "metric_id": "heldout_nlpd",
+        "metric_family": "negative_log_predictive_density",
+        "definition_version": "planned-v1",
+        "unit": "nats per independent unit",
+        "direction": "lower_is_better",
+        "aggregation": "per_animal",
+        "primary": true,
+        "formula_reference": null
+      },
+      {
+        "metric_id": "predictive_interval_coverage",
+        "metric_family": "predictive_interval_coverage",
+        "definition_version": "planned-v1",
+        "unit": "proportion",
+        "direction": "target_range",
+        "aggregation": "per_animal",
+        "primary": true,
+        "formula_reference": null
+      },
+      {
+        "metric_id": "realized_eig_bits",
+        "metric_family": "realized_information_gain_bits",
+        "definition_version": "planned-v1",
+        "unit": "bits",
+        "direction": "higher_is_better",
+        "aggregation": "per_trial",
+        "primary": true,
+        "formula_reference": null
+      },
+      {
+        "metric_id": "decision_regret",
+        "metric_family": "decision_regret",
+        "definition_version": "planned-v1",
+        "unit": "utility units",
+        "direction": "lower_is_better",
+        "aggregation": "per_trial",
+        "primary": true,
+        "formula_reference": null
+      }
+    ],
+    "uncertainty": {
+      "method_id": "cluster_bootstrap_percentile",
+      "confidence_level": 0.95,
+      "resampling_unit": "intervention_block",
+      "cluster_keys": [
+        "animal_id",
+        "session_id",
+        "target_combination_id"
+      ],
+      "two_sided": true,
+      "minimum_independent_units": 10,
+      "seed": null
+    },
+    "strata": [
+      "overall",
+      "intervention_family",
+      "target_combination",
+      "state_context",
+      "animal",
+      "session"
+    ],
+    "promotion_targets": [
+      {
+        "metric_id": "heldout_nlpd",
+        "target_value": 0.1,
+        "comparison": "at_least",
+        "absolute_tolerance": null,
+        "status": "aspirational_not_measured"
+      },
+      {
+        "metric_id": "predictive_interval_coverage",
+        "target_value": 0.925,
+        "comparison": "within_abs_tolerance",
+        "absolute_tolerance": 0.025,
+        "status": "aspirational_not_measured"
+      }
+    ],
+    "baseline_matrix": {
+      "required_families": [
+        "activity_only",
+        "linear_lds_var_glm",
+        "pairwise_effective_response",
+        "graph_constrained_state_space",
+        "cell_type_mechanistic",
+        "anatomical_plus_latent",
+        "degree_type_rewired",
+        "spatial_rewired",
+        "pairwise_additive",
+        "nonlinear_higher_order"
+      ],
+      "unavailable_families": [],
+      "coverage_sha256": null
+    }
+  },
+  "results": {
+    "status": "not_run",
+    "observed_outcomes_sha256": null,
+    "heldout_prediction_sha256": null,
+    "scorecards": [],
+    "paired_comparisons": [],
+    "calibration": [],
+    "failures": []
+  },
+  "artifacts": {
+    "run_receipt_sha256": null,
+    "resolved_config_sha256": null,
+    "environment_sha256": null,
+    "raw_output_manifest_sha256": null,
+    "logs_manifest_sha256": null,
+    "artifact_references": []
+  },
+  "limitations": [
+    "This is an incomplete planning manifest, not a completed run.",
+    "No biological data, connectome artifact, intervention outcome or empirical score is present.",
+    "Synthetic known-answer fixtures can qualify code and metric semantics only.",
+    "Prior probabilities, model likelihoods and intervention feasibility must be calibrated or independently justified before any biological selection claim.",
+    "Run completion requires an independent semantic verifier in addition to JSON Schema validation."
+  ]
+}
