@@ -359,6 +359,7 @@ jobs:
               ("forged required-pass counter", lambda p: p["result"].update({"required_pass_count": 0})),
               ("duplicate check identity", lambda p: p["checks"].append(copy.deepcopy(p["checks"][0]))),
               ("candidate subject digest mismatch", lambda p: p["subject"][0]["digest"].update({"sha256": "8" * 64})),
+              ("result tree subject digest mismatch", lambda p: p["subject"][2]["digest"].update({"sha256": "6" * 64})),
               ("base tree provenance mismatch", lambda p: p["candidate"].update({"base_tree_sha256": "7" * 64})),
               ("execution finish precedes start", lambda p: p["execution"].update({"started_at_utc": "2026-11-03T00:00:00Z", "finished_at_utc": "2026-11-02T00:00:00Z"})),
               ("path traversal in changed paths", lambda p: p["candidate"].update({"changed_paths": ["../grader.sh"]})),
@@ -387,7 +388,7 @@ jobs:
           print(
               "CEB_CONTRACT_SCHEMA_PASS: "
               f"tasks={len(task_ids)} unique_tasks={len(set(task_ids))} "
-              "schemas=3 negative_controls=29"
+              "schemas=3 negative_controls=30"
           )
           print("CEB_CLAIM_BOUNDARY: schema validation is not DSSE signature verification or runner qualification")
           PY
