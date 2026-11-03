@@ -328,18 +328,22 @@ fn main() {
             BlendStrategy, CollaborativeComposer, HarmonyContribution,
         };
         let mut composer = CollaborativeComposer::new(BlendStrategy::PhiWeighted);
-        composer.contribute(HarmonyContribution {
+        composer
+            .contribute(HarmonyContribution {
             participant_id: 1,
             harmonies: [0.8; 8],
             phi: 0.9,
             cycle: 0,
-        }).expect("valid demo contribution");
-        composer.contribute(HarmonyContribution {
+            })
+            .expect("valid demo contribution");
+        composer
+            .contribute(HarmonyContribution {
             participant_id: 2,
             harmonies: [0.3; 8],
             phi: 0.3,
             cycle: 0,
-        }).expect("valid demo contribution");
+            })
+            .expect("valid demo contribution");
         let collective = composer.blend();
         check(
             &mut pass,
