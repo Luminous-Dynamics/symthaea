@@ -185,3 +185,25 @@ New experiments to prioritize:
 3. Test robustness to inflated claims, weak evidence, context shifts and rare high-benefit skills.
 4. Test whether teaching policies improve held-out cumulative utility over matched individual learning.
 5. Report capability, error adoption, knowledge diversity and learner autonomy as separate outcomes.
+
+
+## New external benchmark target: state-aware adaptive transmission (2026)
+
+Colas et al. (2026), *Discovering Adaptive Transmission Programs for Collective Innovation* (arXiv:2608.24545; CogSci 2026), formalizes transmission as executable state-aware programs that choose who shares what with whom. The authors report up to 37% higher collective performance than standard baselines in their Collective LittleAlchemy simulation and use a decisive ablation: preserve the exact sender/receiver schedule and timing but shuffle the message content. The paper also reports transfer across task/domain and population variations. These are the authors' simulation results, not CivBench results and not demonstrated human effects. The paper's centralized full-state observation is an important privacy/autonomy boundary.
+
+The branch now includes a new synthetic DAG baseline in `src/adaptive_transmission.rs` and a 324-condition, 128-seed sweep in `src/bin/adaptive_transmission_sweep.rs`. It compares NoSocial, FixedRing, FixedRingContentShuffled, RandomNetworkContent, StateAwareFrontier and StateAwareContentShuffled across Layered/Branching/Convergent DAGs, population sizes 8/16/32, shortcut rates 0/0.2 and attention capacities 1/2/4. Each task has six base elements and 14 synthetic recipes. This is a mechanism baseline, not the authors' 720-element task and not LLM-evolved program search.
+
+**Critical evaluation rule:** the state-aware content-shuffled condition must preserve sender/receiver pairs while changing only the content. This separates "who/when" scheduling from "what" is transmitted. Report collective result coverage, maximum depth, per-agent knowledge, individual discoveries, social acquisitions, redundancy, attention use and new results per transmission. Do not use a single adoption metric.
+
+Next stages:
+1. Pin and ingest the authors' actual task/runner/search code and license before a reproduction attempt.
+2. Replace the tiny synthetic DAG with a held-out task family and a train/validation/test split by recipe family, not just random seed.
+3. Add exact matched topology/schedule content-shuffle tests and common-random-number streams.
+4. Compare hand-coded frontier heuristics with bounded DSL policies and LLM/evolutionary search only after the baseline is reproducible.
+5. Test privacy-preserving local/consented state features against centralized full observability.
+6. Add dropout, corruption, delayed prerequisites, adversarial withholding, lineage concentration and alternative-route recovery.
+7. Make a held-out generalization claim only if state-aware routing beats the strongest matched static baseline on unseen DAG families/population sizes with pre-registered uncertainty and equal message/attention budgets.
+
+References:
+- Paper: https://arxiv.org/abs/2608.24545
+- Author publication record: https://www.cedriccolas.com/publications/
