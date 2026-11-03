@@ -235,3 +235,23 @@ Protocol: [INTENTIONAL_TEACHING_PROTOCOL_V0_1.md](INTENTIONAL_TEACHING_PROTOCOL_
 - No claim of psychological validity, cultural universality, human collective intelligence, or consciousness is made.
 
 Use this crate to establish simple baseline behaviour and regression fixtures before integrating Symthaea's HDC/cognitive components.
+
+
+## State-aware adaptive transmission over recipe DAGs
+
+The new `src/adaptive_transmission.rs` module implements a small deterministic recipe-DAG world. It separates an agent's possession of a rule from possession of its prerequisites and from successful execution of that rule. This supports delayed complementarity: an agent can learn a useful recipe now and execute it only after receiving the missing ingredients later.
+
+Six policies are compared: no social transmission, fixed-ring forwarding, fixed-ring with shuffled content, random network/content routing, state-aware frontier routing, and a state-aware content-shuffled ablation that preserves the state-aware sender/receiver schedule but changes which rule is sent. The state-aware heuristic prioritizes immediate executability, prerequisite match, collective novelty and downstream unlock potential.
+
+The `adaptive-transmission-sweep` binary runs 324 conditions (3 synthetic DAG families × 3 population sizes × 2 shortcut densities × 3 recipient-attention capacities × 6 policies), with 128 seeds per condition. It reports final result coverage, maximum discovered depth, mean results/recipes held per agent, individual discoveries, social acquisitions, new collective results, total/redundant transmissions and recipient-attention usage.
+
+This is a synthetic hand-coded reference baseline, not the 720-element Collective LittleAlchemy environment and not an LLM-evolved program. The 2026 paper's reported improvements (up to 37%) are not a score target or a result of this crate; tasks and score definitions differ. The central ablation to preserve is content shuffling under the same sender/receiver schedule.
+
+Protocol: [ADAPTIVE_TRANSMISSION_PROGRAMS_PROTOCOL_V0_1.md](ADAPTIVE_TRANSMISSION_PROGRAMS_PROTOCOL_V0_1.md).
+
+Run:
+```sh
+cargo test --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --all-targets
+cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin adaptive-transmission-sweep > adaptive-transmission-sweep.csv
+```
+
