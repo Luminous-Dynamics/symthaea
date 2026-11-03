@@ -198,6 +198,17 @@ pub fn prepare_mobile_invocation(
     {
         return Err(MobileInvocationError::ConsentExpired);
     }
+    if session.generation == 0 {
+        return Err(MobileInvocationError::SessionMismatch("zero session generation"));
+    }
+    let mut consented_tools = HashSet::new();
+    if consent.allowed_tools.is_empty()
+        || !consent.allowed_tools.iter().all(|tool| consented_tools.insert(*tool))
+    {
+        return Err(MobileInvocationError::ConsentScopeMismatch(
+            "empty or duplicate tool allowlist",
+        ));
+    }
 
     if request.issued_at_unix_ms > now_unix_ms.saturating_add(MOBILE_INVOCATION_MAX_CLOCK_SKEW_MS) {
         return Err(MobileInvocationError::InvalidTimestamp("issued_at_unix_ms is in the future"));
@@ -320,6 +331,13 @@ pub fn verify_mobile_invocation_receipt(
     receipt: &MobileInvocationReceipt,
 ) -> Result<(), MobileInvocationError> {
     validate_opaque_id(&receipt.invocation_id, "invocation_id", "inv_")?;
+    validate_opaque_id(&receipt.session_alias, "session_alias", "ds_")?;
+    validate_opaque_id(&receipt.consent_id, "consent_id", "consent_")?;
+    if receipt.caller_id.trim().is_empty() || receipt.consent_verifier_id.trim().is_empty()
+        || receipt.provider_id.trim().is_empty() || receipt.provider_revision.trim().is_empty()
+    {
+        return Err(MobileInvocationError::InvalidIdentifier("receipt principal/provider"));
+    }
     validate_sha256(&receipt.invocation_nonce_sha256, "invocation_nonce_sha256")?;
     validate_sha256(&receipt.session_nonce_sha256, "session_nonce_sha256")?;
     validate_sha256(&receipt.consent_receipt_sha256, "consent_receipt_sha256")?;
@@ -329,6 +347,9 @@ pub fn verify_mobile_invocation_receipt(
     validate_sha256(&receipt.policy_sha256, "policy_sha256")?;
     validate_sha256(&receipt.effect_sha256, "effect_sha256")?;
     validate_sha256(&receipt.receipt_sha256, "receipt_sha256")?;
+    if let Some(target_digest) = &receipt.target_scope_sha256 {
+        validate_sha256(target_digest, "target_scope_sha256")?;
+    }
     if receipt.schema != "luminous.mobile-invocation-receipt.v1" {
         return Err(MobileInvocationError::InvalidIdentifier("receipt schema"));
     }
@@ -474,7 +495,7 @@ mod tests {
         (session, consent)
     }
 
-    fn request(session: &MobileDeviceSessionSnapshot, consent: &MobileConsentGrant) -> MobileInvocationRequest {
+    fn build_request(session: &MobileDeviceSessionSnapshot, consent: &MobileConsentGrant) -> MobileInvocationRequest {
         MobileInvocationRequest {
             invocation_id: format!("inv_{}", "5".repeat(64)),
             invocation_nonce: format!("nonce_{}", "6".repeat(64)),
@@ -494,7 +515,7 @@ mod tests {
     #[test]
     fn prepares_exact_session_consent_provider_and_argument_bound_receipt() {
         let (session, consent) = aliases();
-        let request = request(&session, &consent);
+        let request = build_request(&session, &consent);
         let authorized = prepare_mobile_invocation(
             &request, &consent, &session, &report(),
             MOBILE_DEVICE_READ_ONLY_POLICY_ID,
@@ -518,7 +539,7 @@ mod tests {
     #[test]
     fn rejects_session_alias_generation_or_nonce_substitution() {
         let (session, consent) = aliases();
-        let mut request = request(&session, &consent);
+        let mut request = build_request(&session, &consent);
         request.session_alias = format!("ds_{}", "9".repeat(64));
         assert!(matches!(
             prepare_mobile_invocation(&request, &consent, &session, &report(),
@@ -526,7 +547,7 @@ mod tests {
             Err(MobileInvocationError::SessionMismatch("session_alias"))
         ));
 
-        let mut request = request(&session, &consent);
+        let mut request = build_request(&session, &consent);
         request.session_generation += 1;
         assert!(matches!(
             prepare_mobile_invocation(&request, &consent, &session, &report(),
@@ -534,7 +555,7 @@ mod tests {
             Err(MobileInvocationError::SessionMismatch("session_generation"))
         ));
 
-        let mut request = request(&session, &consent);
+        let mut request = build_request(&session, &consent);
         request.session_nonce = format!("session_{}", "9".repeat(64));
         assert!(matches!(
             prepare_mobile_invocation(&request, &consent, &session, &report(),
@@ -546,7 +567,7 @@ mod tests {
     #[test]
     fn rejects_expired_or_overlong_invocations_and_stale_consent() {
         let (session, consent) = aliases();
-        let mut request = request(&session, &consent);
+        let mut request = build_request(&session, &consent);
         request.expires_at_unix_ms = NOW;
         assert!(matches!(
             prepare_mobile_invocation(&request, &consent, &session, &report(),
@@ -554,7 +575,7 @@ mod tests {
             Err(MobileInvocationError::InvocationExpired)
         ));
 
-        let mut request = request(&session, &consent);
+        let mut request = build_request(&session, &consent);
         request.expires_at_unix_ms = request.issued_at_unix_ms + MOBILE_INVOCATION_MAX_TTL_MS + 1;
         assert!(matches!(
             prepare_mobile_invocation(&request, &consent, &session, &report(),
@@ -564,7 +585,7 @@ mod tests {
 
         let mut consent = consent.clone();
         consent.expires_at_unix_ms = NOW;
-        let request = request(&session, &consent);
+        let request = build_request(&session, &consent);
         assert!(matches!(
             prepare_mobile_invocation(&request, &consent, &session, &report(),
                 MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW),
@@ -575,7 +596,7 @@ mod tests {
     #[test]
     fn rejects_caller_consent_tool_and_argument_substitution() {
         let (session, consent) = aliases();
-        let mut request = request(&session, &consent);
+        let mut request = build_request(&session, &consent);
         request.caller_id = "different-caller".to_owned();
         assert!(matches!(
             prepare_mobile_invocation(&request, &consent, &session, &report(),
@@ -583,7 +604,7 @@ mod tests {
             Err(MobileInvocationError::ConsentScopeMismatch("caller_id"))
         ));
 
-        let mut request = request(&session, &consent);
+        let mut request = build_request(&session, &consent);
         request.tool_name = "pull_adb_package".to_owned();
         assert!(matches!(
             prepare_mobile_invocation(&request, &consent, &session, &report(),
@@ -591,7 +612,7 @@ mod tests {
             Err(MobileInvocationError::ToolNotConsented)
         ));
 
-        let mut request = request(&session, &consent);
+        let mut request = build_request(&session, &consent);
         request.arguments = json!([]);
         assert_eq!(
             prepare_mobile_invocation(&request, &consent, &session, &report(),
@@ -605,7 +626,7 @@ mod tests {
     fn rejects_tampered_portable_receipt() {
         let (session, consent) = aliases();
         let mut authorized = prepare_mobile_invocation(
-            &request(&session, &consent), &consent, &session, &report(),
+            &build_request(&session, &consent), &consent, &session, &report(),
             MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW,
         ).unwrap();
         authorized.receipt.arguments_sha256 = "9".repeat(64);
@@ -615,7 +636,7 @@ mod tests {
     #[test]
     fn replay_guard_consumes_only_valid_invocations_and_rejects_replay() {
         let (session, consent) = aliases();
-        let req = request(&session, &consent);
+        let req = build_request(&session, &consent);
         let mut guard = MobileInvocationReplayGuard::default();
 
         assert!(guard.prepare_once(
@@ -631,7 +652,7 @@ mod tests {
             Err(MobileInvocationError::Replay("invocation_id"))
         ));
 
-        let mut invalid = request(&session, &consent);
+        let mut invalid = build_request(&session, &consent);
         invalid.invocation_id = format!("inv_{}", "7".repeat(64));
         invalid.invocation_nonce = "bad".to_owned();
         assert!(guard.prepare_once(
