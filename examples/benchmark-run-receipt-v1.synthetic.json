@@ -1,0 +1,132 @@
+{
+  "schema_version": "luminous.benchmark-run-receipt.v1",
+  "run_id": "SYNTHETIC-NOT-AN-EXTERNAL-BENCHMARK-RESULT-001",
+  "generated_at": "2026-11-03T00:00:00Z",
+  "benchmark": {
+    "id": "synthetic-receipt-fixture",
+    "version": "1",
+    "revision": "fixture-only",
+    "dataset_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "access_class": "synthetic",
+    "scoring_formula_id": "single-task-binary-pass-v1",
+    "grader_version": "synthetic-grader-1",
+    "grader_output_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "system": {
+    "arm": "REA_plus_Symthaea",
+    "name": "synthetic-receipt-example",
+    "version": "0.0.0",
+    "source_revision": "not-a-production-build",
+    "executable_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "model_id": "synthetic-model",
+    "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "prompt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "target_scope": {
+    "platform": "android",
+    "os": "synthetic",
+    "architecture": "x86_64",
+    "cohort": "synthetic-fixture"
+  },
+  "runner": {
+    "image_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "host_os": "linux",
+    "host_architecture": "x86_64",
+    "network_policy": "disabled"
+  },
+  "comparison": null,
+  "task_universe": [
+    {
+      "task_id": "task-001",
+      "eligibility": "eligible",
+      "exclusion": null
+    }
+  ],
+  "eligible_task_set_sha256": "f803724cc7feb5f4f7af04973bcbe66383a0a24eb8e4aebe8b67794b7009ed90",
+  "task_universe_sha256": "891878899ff638035ab4332fb2aa15b093de0187cb8cf54da0a56a605d2edaa7",
+  "task_results": [
+    {
+      "task_id": "task-001",
+      "input_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "attempt_state": "terminal",
+      "attempts": 1,
+      "terminal_disposition": "passed",
+      "grade": {
+        "kind": "binary",
+        "value": true,
+        "grader_version": "synthetic-grader-1",
+        "grader_output_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "tool_calls": 2,
+      "model_calls": 1,
+      "wall_time_ms": 100,
+      "output_sha256": [
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      ]
+    }
+  ],
+  "grading_mode": "binary",
+  "accounting": {
+    "universe_count": 1,
+    "eligible_count": 1,
+    "excluded_count": 0,
+    "attempted_count": 1,
+    "not_attempted_count": 0,
+    "in_progress_count": 0,
+    "completed_count": 1,
+    "graded_count": 1,
+    "passed_count": 1,
+    "failed_count": 0,
+    "refused_count": 0,
+    "abstained_count": 0,
+    "unsupported_count": 0,
+    "timed_out_count": 0,
+    "tool_failed_count": 0,
+    "ungraded_count": 0
+  },
+  "budget_caps": {
+    "wall_time_ms": 1000,
+    "cpu_time_ms": 1000,
+    "peak_memory_bytes": 1000000,
+    "model_calls": 10,
+    "input_tokens": 10000,
+    "output_tokens": 10000,
+    "tool_calls": 10
+  },
+  "actual_usage": {
+    "wall_time_ms": 100,
+    "cpu_time_ms": 50,
+    "peak_memory_bytes": 10000,
+    "model_calls": 1,
+    "input_tokens": 100,
+    "output_tokens": 50,
+    "tool_calls": 2
+  },
+  "unavailable_usage": {},
+  "official_score": {
+    "metric_id": "single-task-binary-pass-rate",
+    "formula_version": "synthetic-v1",
+    "value": 1,
+    "unit": "fraction",
+    "numerator": 1,
+    "denominator": 1,
+    "is_official": true,
+    "source_output_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "unavailable_reason": null
+  },
+  "derived_metrics": [
+    {
+      "metric_id": "coverage-adjusted-task-yield",
+      "value": 1,
+      "unit": "fraction",
+      "formula": "passed_tasks / eligible_tasks",
+      "is_official": false,
+      "unavailable_reason": null
+    }
+  ],
+  "provenance": {
+    "input_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "output_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "transcript_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  }
+}
