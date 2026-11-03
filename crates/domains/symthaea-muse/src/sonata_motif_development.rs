@@ -394,7 +394,7 @@ pub fn generate_sonata_motif_development_v1(
 fn build_candidate(
     candidate_id: &str,
     strategy: SonataMotifDevelopmentStrategyV1,
-    transformation: Option<ReturnTransformation>,
+    transformation: Option<MotifDevelopmentTransformation>,
     score: Score,
     baseline: &Score,
     target_indices: &[usize],
@@ -489,7 +489,7 @@ fn apply_pitch_motif(
             },
         )?;
         let pitch = scale.degree_pitch(degree, 4);
-        if pitch_to_scale_degree(pitch, baseline.key) != Some(degree) {
+        if pitch_to_scale_degree(pitch, target_key) != Some(degree) {
             return Err(
                 SonataMotifDevelopmentErrorV1::GeneratedPitchOutsideRepresentableRange {
                     note_index: ordinal,
