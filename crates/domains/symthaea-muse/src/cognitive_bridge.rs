@@ -793,7 +793,7 @@ mod tests {
     fn motif_development_obligation_selects_develop_action_not_return_action() {
         let development = ObligationKind::DevelopMotif {
             motif_id: "sonata.primary".into(),
-            transformation: symthaea_music_theory::ReturnTransformation::Transposed,
+            transformation: symthaea_music_theory::MotifDevelopmentTransformation::DiatonicTransposition { degree_shift: 1 },
         };
         let returned = ObligationKind::ReturnMotif {
             motif_id: "sonata.primary".into(),
