@@ -246,8 +246,6 @@ pub trait RmiPolicyV1: Sized {
     fn snapshot_state(&self) -> Result<Self::Snapshot, String>;
     /// Restore an independent policy instance from an exact pre-trial snapshot.
     fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String>;
-        serde_json::from_slice(snapshot).map_err(|error| error.to_string())
-    }
     /// The evaluator passes an independently restored instance to each arm.
     fn respond(
         &mut self,
@@ -268,8 +266,6 @@ pub trait RmiPartnerPolicyV1: Sized {
     fn snapshot_state(&self) -> Result<Self::Snapshot, String>;
     /// Restore an independent partner instance from an exact pre-trial snapshot.
     fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String>;
-        serde_json::from_slice(snapshot).map_err(|error| error.to_string())
-    }
     fn respond(
         &mut self,
         history: &[RmiHistoryEventV1],
