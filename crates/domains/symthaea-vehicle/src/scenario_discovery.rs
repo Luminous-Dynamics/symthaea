@@ -15,7 +15,7 @@ pub const INTERSECTION_CANDIDATE_SCHEMA: &str =
     "symthaea.vehicle.intersection-candidate.v0.1";
 const STRATIFIED_GENERATOR_POLICY_ID: &str = "stratified-affine-lhs-v0.1";
 const RANDOM_GENERATOR_POLICY_ID: &str = "seeded-splitmix64-random-v0.1";
-const MINIMIZATION_GENERATOR_POLICY_ID: &str = "counterexample-coordinate-minimize-v0.1";
+const COUNTEREXAMPLE_MINIMIZATION_POLICY_ID: &str = "counterexample-coordinate-minimize-v0.1";
 pub const MAX_COUNTEREXAMPLE_MINIMIZATION_EVALUATIONS: u32 = 256;
 const MAX_COORDINATE_SHRINK_STEPS: u32 = 12;
 pub const MAX_INTERSECTION_CANDIDATES: u32 = 4096;
@@ -112,6 +112,31 @@ pub enum CounterexampleMinimizationTermination {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CounterexampleEvaluationReceipt {
+    pub candidate_id: String,
+    pub predicate_id: String,
+    pub evaluator_id: String,
+    pub execution_receipt_id: String,
+    pub execution_digest: String,
+    pub predicate_holds: bool,
+}
+
+impl CounterexampleEvaluationReceipt {
+    pub fn is_valid_for(
+        &self,
+        candidate: &IntersectionScenarioCandidate,
+        predicate_id: &str,
+    ) -> bool {
+        self.candidate_id == candidate.candidate_id
+            && self.predicate_id == predicate_id
+            && !self.evaluator_id.trim().is_empty()
+            && !self.execution_receipt_id.trim().is_empty()
+            && self.execution_digest.len() == 64
+            && self.execution_digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntersectionFactorChange {
     pub factor_name: String,
     pub original_value: f64,
@@ -122,8 +147,10 @@ pub struct IntersectionFactorChange {
 pub struct IntersectionCounterexampleMinimization {
     pub schema_version: String,
     pub parent_candidate_id: String,
+    pub parent_candidate: IntersectionScenarioCandidate,
     pub predicate_id: String,
     pub minimization_policy_id: String,
+    pub evaluation_receipts: Vec<CounterexampleEvaluationReceipt>,
     pub evaluation_budget: u32,
     pub evaluations: u32,
     pub failure_preserved: bool,
@@ -139,14 +166,40 @@ impl IntersectionCounterexampleMinimization {
         if self.schema_version != INTERSECTION_CANDIDATE_SCHEMA
             || self.parent_candidate_id.trim().is_empty()
             || self.predicate_id.trim().is_empty()
-            || self.minimization_policy_id != MINIMIZATION_GENERATOR_POLICY_ID
+            || self.minimization_policy_id != COUNTEREXAMPLE_MINIMIZATION_POLICY_ID
+            || self.parent_candidate.candidate_id != self.parent_candidate_id
+            || !self.parent_candidate.identity_is_valid()
+            || self.evaluation_receipts.len() != self.evaluations as usize
+            || self.evaluation_receipts.is_empty()
+            || self.evaluation_receipts[0].candidate_id != self.parent_candidate_id
+            || !self.evaluation_receipts[0].predicate_holds
+            || !self.evaluation_receipts.iter().all(|receipt| {
+                !receipt.evaluator_id.trim().is_empty()
+                    && !receipt.execution_receipt_id.trim().is_empty()
+                    && receipt.predicate_id == self.predicate_id
+                    && receipt.execution_digest.len() == 64
+                    && receipt.execution_digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+            })
+            || !self.evaluation_receipts.iter().any(|receipt| {
+                receipt.candidate_id == self.minimized_candidate.candidate_id
+                    && receipt.predicate_holds
+            })
+            || self.termination != if self.evaluations >= self.evaluation_budget {
+                CounterexampleMinimizationTermination::EvaluationBudgetExhausted
+            } else {
+                CounterexampleMinimizationTermination::CoordinatePassCompleted
+            }
+            || !factor_changes_are_consistent(
+                &self.parent_candidate,
+                &self.minimized_candidate,
+                &self.factor_changes,
+            )
             || self.evaluation_budget == 0
             || self.evaluation_budget > MAX_COUNTEREXAMPLE_MINIMIZATION_EVALUATIONS
             || self.evaluations == 0
             || self.evaluations > self.evaluation_budget
             || !self.failure_preserved
             || !self.minimized_candidate.identity_is_valid()
-            || self.minimized_candidate.generator_policy_id != self.minimization_policy_id
             || self.report_digest.len() != 64
             || !self.report_digest.bytes().all(|byte| byte.is_ascii_hexdigit())
         {
@@ -377,6 +430,35 @@ where
     Ok(report)
 }
 
+fn factor_changes_are_consistent(
+    parent: &IntersectionScenarioCandidate,
+    minimized: &IntersectionScenarioCandidate,
+    changes: &[IntersectionFactorChange],
+) -> bool {
+    let names = [
+        "ego_initial_speed_mps",
+        "actor_crossing_start_s",
+        "occlusion_fraction",
+        "sensor_delay_s",
+        "sensor_dropout_duration_s",
+        "localization_lateral_bias_m",
+        "brake_actuation_delay_s",
+    ];
+    let original = factor_values(parent);
+    let final_values = factor_values(minimized);
+    let expected = names
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| original[*index].to_bits() != final_values[*index].to_bits())
+        .collect::<Vec<_>>();
+    expected.len() == changes.len()
+        && expected.iter().zip(changes).all(|((index, name), change)| {
+            change.factor_name == **name
+                && change.original_value.to_bits() == original[*index].to_bits()
+                && change.minimized_value.to_bits() == final_values[*index].to_bits()
+        })
+}
+
 fn midpoint(bounds: (f64, f64)) -> f64 {
     (bounds.0 + bounds.1) * 0.5
 }
@@ -479,8 +561,7 @@ impl IntersectionScenarioCandidate {
             && self.generation_budget <= MAX_INTERSECTION_CANDIDATES
             && self.ordinal < self.generation_budget
             && (self.generator_policy_id == STRATIFIED_GENERATOR_POLICY_ID
-                || self.generator_policy_id == RANDOM_GENERATOR_POLICY_ID
-                || self.generator_policy_id == MINIMIZATION_GENERATOR_POLICY_ID)
+                || self.generator_policy_id == RANDOM_GENERATOR_POLICY_ID)
             && self.road_geometry_id == ROAD_GEOMETRY_ID
             && self.ego_spawn_x_m.to_bits() == EGO_SPAWN_X_M.to_bits()
             && self.ego_lane_center_y_m.to_bits() == EGO_LANE_CENTER_Y_M.to_bits()
