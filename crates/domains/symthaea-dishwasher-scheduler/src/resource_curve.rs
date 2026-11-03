@@ -17,9 +17,14 @@ pub struct CurveScope {
     pub soil_class: String,
     pub surface_material: String,
     pub load_set_id: String,
+    pub soil_batch_id: String,
     pub detergent_batch_id: String,
+    pub water_batch_id: String,
     pub water_hardness_ppm_as_caco3: u16,
     pub inlet_temperature_millic: u32,
+    pub ambient_temperature_millic: u32,
+    /// Relative humidity in permille (e.g. 500 = 50.0% RH).
+    pub ambient_relative_humidity_permille: u16,
     pub protocol_id: String,
     /// SHA-256 digest of the frozen raw-data bundle (64 hexadecimal characters).
     pub dataset_sha256: String,
@@ -33,12 +38,17 @@ impl CurveScope {
             ("soil_class", &self.soil_class),
             ("surface_material", &self.surface_material),
             ("load_set_id", &self.load_set_id),
+            ("soil_batch_id", &self.soil_batch_id),
             ("detergent_batch_id", &self.detergent_batch_id),
+            ("water_batch_id", &self.water_batch_id),
             ("protocol_id", &self.protocol_id),
         ] {
             if value.trim().is_empty() {
                 return Err(CurveError::InvalidScope(name));
             }
+        }
+        if self.ambient_relative_humidity_permille > 1_000 {
+            return Err(CurveError::InvalidAmbientHumidity);
         }
         if self.dataset_sha256.len() != 64
             || !self.dataset_sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
@@ -94,6 +104,12 @@ pub struct PhysicalRunMeasurement {
     pub energy_kwh: f64,
     pub fresh_water_l: f64,
     pub duration_s: f64,
+    /// Frozen ground-truth record for cleaning acceptance (coupon/assay/image).
+    pub cleaning_evidence_ref: String,
+    /// Frozen ground-truth record for final-rinse acceptance.
+    pub rinse_evidence_ref: String,
+    /// SHA-256 of the calibration certificates/configuration used for meters.
+    pub calibration_bundle_sha256: String,
 }
 
 fn observed_band_from_runs(
@@ -177,6 +193,28 @@ impl OccupancyObservation {
             }
             if !ids.insert(run.run_id.as_str()) {
                 return Err(CurveError::DuplicateReplicateId { occupancy });
+            }
+            for (field, value) in [
+                ("cleaning_evidence_ref", &run.cleaning_evidence_ref),
+                ("rinse_evidence_ref", &run.rinse_evidence_ref),
+            ] {
+                if value.trim().is_empty() {
+                    return Err(CurveError::InvalidRunProvenance {
+                        run_id: run.run_id.clone(),
+                        field,
+                    });
+                }
+            }
+            if run.calibration_bundle_sha256.len() != 64
+                || !run
+                    .calibration_bundle_sha256
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit())
+            {
+                return Err(CurveError::InvalidRunProvenance {
+                    run_id: run.run_id.clone(),
+                    field: "calibration_bundle_sha256",
+                });
             }
             if !run.energy_kwh.is_finite() || run.energy_kwh < 0.0 {
                 return Err(CurveError::InvalidRunMetric {
@@ -299,6 +337,11 @@ pub enum CurveError {
     InvalidScope(&'static str),
     InvalidDatasetDigest,
     InvalidReplicateId,
+    InvalidAmbientHumidity,
+    InvalidRunProvenance {
+        run_id: String,
+        field: &'static str,
+    },
     InvalidRunMetric {
         run_id: String,
         metric: &'static str,
@@ -428,9 +471,13 @@ mod tests {
             soil_class: "starch".to_owned(),
             surface_material: "ceramic".to_owned(),
             load_set_id: "standardized-ceramic-load-v1".to_owned(),
+            soil_batch_id: "soil-lot-2026-01".to_owned(),
             detergent_batch_id: "detergent-lot-2026-01".to_owned(),
+            water_batch_id: "water-lot-2026-01".to_owned(),
             water_hardness_ppm_as_caco3: 120,
             inlet_temperature_millic: 15_000,
+            ambient_temperature_millic: 20_000,
+            ambient_relative_humidity_permille: 500,
             protocol_id: "IEC60436-2025-COR1-test-protocol-v1".to_owned(),
             dataset_sha256: "a".repeat(64),
         }
@@ -487,6 +534,9 @@ mod tests {
                 energy_kwh: 0.10 + index as f64 * 0.01,
                 fresh_water_l: 2.0 + index as f64 * 0.1,
                 duration_s: 900.0 + index as f64 * 10.0,
+                cleaning_evidence_ref: format!("cleaning-assay-{occupancy}-{index}"),
+                rinse_evidence_ref: format!("rinse-assay-{occupancy}-{index}"),
+                calibration_bundle_sha256: "b".repeat(64),
             })
             .collect()
     }
@@ -501,6 +551,29 @@ mod tests {
         assert_eq!(observation.fresh_water_l.minimum, 2.0);
         assert!((observation.fresh_water_l.mean - 2.2).abs() < 1e-12);
         assert_eq!(observation.fresh_water_l.maximum, 2.4);
+    }
+
+    #[test]
+    fn missing_run_evidence_or_calibration_provenance_is_rejected() {
+        let mut missing_cleaning = raw_runs(2);
+        missing_cleaning[2].cleaning_evidence_ref.clear();
+        assert!(matches!(
+            OccupancyObservation::from_runs(2, missing_cleaning),
+            Err(CurveError::InvalidRunProvenance {
+                field: "cleaning_evidence_ref",
+                ..
+            })
+        ));
+
+        let mut bad_calibration = raw_runs(2);
+        bad_calibration[1].calibration_bundle_sha256 = "unknown".to_owned();
+        assert!(matches!(
+            OccupancyObservation::from_runs(2, bad_calibration),
+            Err(CurveError::InvalidRunProvenance {
+                field: "calibration_bundle_sha256",
+                ..
+            })
+        ));
     }
 
     #[test]
