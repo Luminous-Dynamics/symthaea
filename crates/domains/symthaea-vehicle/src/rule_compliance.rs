@@ -379,8 +379,12 @@ fn evaluate_requirement(
                 ),
             }
         }
-        TrafficRuleKind::Unsupported { .. } => {
-            indeterminate(RuleComplianceReason::RuleKindUnsupported)
+        TrafficRuleKind::Unsupported { rule_family } => {
+            if rule_family.trim().is_empty() {
+                indeterminate(RuleComplianceReason::RuleMalformed)
+            } else {
+                indeterminate(RuleComplianceReason::RuleKindUnsupported)
+            }
         }
         TrafficRuleKind::StopBeforeLine {
             stop_line_progress_m,
@@ -432,6 +436,7 @@ fn evaluate_requirement(
             let mut index = crossing_index;
             let mut later_timestamp = crossing_sample.timestamp_s;
             let mut later_stopped_progress: Option<f64> = None;
+            let mut latest_stopped_timestamp: Option<f64> = None;
             while index > 0 {
                 let previous = index - 1;
                 let sample = &trajectory[previous];
@@ -451,12 +456,16 @@ fn evaluate_requirement(
                     break;
                 }
                 stop_start = Some(previous);
+                if latest_stopped_timestamp.is_none() {
+                    latest_stopped_timestamp = Some(sample.timestamp_s);
+                }
                 later_timestamp = sample.timestamp_s;
                 later_stopped_progress = Some(sample.route_progress_m);
                 index = previous;
             }
             let observed_dwell = stop_start
-                .map(|start| crossing_sample.timestamp_s - trajectory[start].timestamp_s)
+                .zip(latest_stopped_timestamp)
+                .map(|(start, latest)| latest - trajectory[start].timestamp_s)
                 .unwrap_or(0.0);
             if stop_start.is_some()
                 && observed_dwell + 1e-9 >= *required_stationary_duration_s
@@ -794,6 +803,31 @@ mod tests {
             sample(0.5, 9.0, 0.0, 0.0),
             sample(2.0, 9.0, 0.0, 0.0),
             sample(2.1, 10.2, 1.0, 0.0),
+        ];
+        let report = evaluate_traffic_rules(&[rule], &trajectory).unwrap();
+        assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::Violation);
+    }
+
+    #[test]
+    fn post_stop_acceleration_gap_is_not_counted_as_stationary_dwell() {
+        let rule = TrafficRuleRequirement {
+            rule_id: "stop-line-acceleration-gap".into(),
+            active_start_progress_m: 0.0,
+            active_end_progress_m: 20.0,
+            kind: TrafficRuleKind::StopBeforeLine {
+                stop_line_progress_m: 10.0,
+                stop_speed_threshold_mps: 0.1,
+                required_stationary_duration_s: 1.0,
+                maximum_sample_gap_s: 1.5,
+                progress_tolerance_m: 0.05,
+            },
+            evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
+        };
+        let trajectory = vec![
+            sample(0.0, 8.0, 2.0, 0.0),
+            sample(0.5, 9.0, 0.0, 0.0),
+            sample(1.0, 9.0, 0.0, 0.0),
+            sample(2.0, 10.2, 2.0, 0.0),
         ];
         let report = evaluate_traffic_rules(&[rule], &trajectory).unwrap();
         assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::Violation);
