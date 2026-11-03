@@ -465,14 +465,17 @@ fn git_patch_paths(patch: &[u8]) -> Result<Vec<String>, Failure> {
     let text = std::str::from_utf8(patch)
         .map_err(|_| Failure::unresolved("CEB V0 patch path audit requires UTF-8 Git diff headers"))?;
     let mut paths = BTreeSet::new();
-    let mut current: Option<(String, String, Option<String>, Option<String>)> = None;
+    let mut current: Option<(String, String, Option<String>, Option<String>, bool, bool)> = None;
 
-    let finish_block = |block: (String, String, Option<String>, Option<String>),
+    let finish_block = |block: (String, String, Option<String>, Option<String>, bool, bool),
                         all_paths: &mut BTreeSet<String>|
      -> Result<(), Failure> {
-        let (old_header, new_header, old_marker, new_marker) = block;
-        if old_marker != Some(old_header.clone()) || new_marker != Some(new_header.clone()) {
-            return Err(Failure::protocol("Git patch ---/+++ file headers do not match the diff --git path pair"));
+        let (old_header, new_header, old_marker, new_marker, old_seen, new_seen) = block;
+        if !old_seen || !new_seen
+            || old_marker.as_ref().is_some_and(|path| path != &old_header)
+            || new_marker.as_ref().is_some_and(|path| path != &new_header)
+        {
+            return Err(Failure::protocol("Git patch ---/+++ file markers do not match the diff --git path pair"));
         }
         all_paths.insert(old_header);
         all_paths.insert(new_header);
@@ -496,11 +499,11 @@ fn git_patch_paths(patch: &[u8]) -> Result<Vec<String>, Failure> {
             if !safe_tree_relative_path(old_path) || !safe_tree_relative_path(new_path) {
                 return Err(Failure::protocol("Git diff header contains an unsafe source or destination path"));
             }
-            current = Some((old_path.to_owned(), new_path.to_owned(), None, None));
+            current = Some((old_path.to_owned(), new_path.to_owned(), None, None, false, false));
         } else if let Some(old) = line.strip_prefix("--- ") {
             let block = current.as_mut()
                 .ok_or_else(|| Failure::protocol("patch has a --- file marker before any diff --git header"))?;
-            if block.2.is_some() {
+            if block.4 {
                 return Err(Failure::protocol("duplicate --- file marker in one Git diff block"));
             }
             let old = old.split('\t').next().unwrap_or(old);
@@ -515,10 +518,11 @@ fn git_patch_paths(patch: &[u8]) -> Result<Vec<String>, Failure> {
                     .to_owned())
             };
             block.2 = path;
+            block.4 = true;
         } else if let Some(new) = line.strip_prefix("+++ ") {
             let block = current.as_mut()
                 .ok_or_else(|| Failure::protocol("patch has a +++ file marker before any diff --git header"))?;
-            if block.3.is_some() {
+            if block.5 {
                 return Err(Failure::protocol("duplicate +++ file marker in one Git diff block"));
             }
             let new = new.split('\t').next().unwrap_or(new);
@@ -533,6 +537,7 @@ fn git_patch_paths(patch: &[u8]) -> Result<Vec<String>, Failure> {
                     .to_owned())
             };
             block.3 = path;
+            block.5 = true;
         }
     }
     if let Some(block) = current {
