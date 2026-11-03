@@ -69,6 +69,38 @@ jobs:
           errors = sorted(Draft202012Validator(schema).iter_errors(fixture), key=lambda e: list(e.path))
           if errors:
               raise SystemExit("\n".join(f"{list(e.path)}: {e.message}" for e in errors))
+          import copy
+          def must_reject(label, mutate):
+              candidate = copy.deepcopy(fixture)
+              mutate(candidate)
+              if not list(Draft202012Validator(schema).iter_errors(candidate)):
+                  raise SystemExit(f"schema accepted invalid control: {label}")
+              print(f"SCHEMA_NEGATIVE_CONTROL_PASS {label}")
+
+          must_reject(
+              "formal declaration requires formal name",
+              lambda x: x["nodes"][0].update(formal_name=None),
+          )
+          must_reject(
+              "relation requires matching evidence class",
+              lambda x: x["edges"][0].update(evidence_class="llm_alignment"),
+          )
+          must_reject(
+              "observed status cannot label informal candidate edge",
+              lambda x: x["edges"][5].update(status="observed", confidence=None),
+          )
+          must_reject(
+              "candidate status cannot label formal type edge",
+              lambda x: x["edges"][0].update(status="candidate", confidence=0.8),
+          )
+          must_reject(
+              "human-reviewed edge requires review artifact and key",
+              lambda x: x["edges"][4].update(review_artifact_id=None, reviewer_key_id=None),
+          )
+          must_reject(
+              "candidate confidence must stay in [0,1]",
+              lambda x: x["edges"][5].update(confidence=1.01),
+          )
           print("PITB_GRAPH_EVIDENCE_SCHEMA_PASS")
           PY
 
