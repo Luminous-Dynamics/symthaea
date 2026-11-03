@@ -15,6 +15,9 @@ pub const INTERSECTION_CANDIDATE_SCHEMA: &str =
     "symthaea.vehicle.intersection-candidate.v0.1";
 const STRATIFIED_GENERATOR_POLICY_ID: &str = "stratified-affine-lhs-v0.1";
 const RANDOM_GENERATOR_POLICY_ID: &str = "seeded-splitmix64-random-v0.1";
+const MINIMIZATION_GENERATOR_POLICY_ID: &str = "counterexample-coordinate-minimize-v0.1";
+pub const MAX_COUNTEREXAMPLE_MINIMIZATION_EVALUATIONS: u32 = 256;
+const MAX_COORDINATE_SHRINK_STEPS: u32 = 12;
 pub const MAX_INTERSECTION_CANDIDATES: u32 = 4096;
 
 const ROAD_GEOMETRY_ID: &str = "two-approach-one-marked-crossing-synthetic-v0.1";
@@ -93,6 +96,73 @@ pub enum IntersectionGenerationError {
     BudgetTooLarge,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CounterexampleMinimizationError {
+    InvalidSourceCandidate,
+    EmptyPredicateId,
+    ZeroEvaluationBudget,
+    EvaluationBudgetTooLarge,
+    OriginalNotCounterexample,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CounterexampleMinimizationTermination {
+    CoordinatePassCompleted,
+    EvaluationBudgetExhausted,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IntersectionFactorChange {
+    pub factor_name: String,
+    pub original_value: f64,
+    pub minimized_value: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IntersectionCounterexampleMinimization {
+    pub schema_version: String,
+    pub parent_candidate_id: String,
+    pub predicate_id: String,
+    pub minimization_policy_id: String,
+    pub evaluation_budget: u32,
+    pub evaluations: u32,
+    pub failure_preserved: bool,
+    pub termination: CounterexampleMinimizationTermination,
+    pub factor_changes: Vec<IntersectionFactorChange>,
+    pub minimized_candidate: IntersectionScenarioCandidate,
+    /// BLAKE3 over the report with this field empty; not a signature.
+    pub report_digest: String,
+}
+
+impl IntersectionCounterexampleMinimization {
+    pub fn identity_is_valid(&self) -> bool {
+        if self.schema_version != INTERSECTION_CANDIDATE_SCHEMA
+            || self.parent_candidate_id.trim().is_empty()
+            || self.predicate_id.trim().is_empty()
+            || self.minimization_policy_id != MINIMIZATION_GENERATOR_POLICY_ID
+            || self.evaluation_budget == 0
+            || self.evaluation_budget > MAX_COUNTEREXAMPLE_MINIMIZATION_EVALUATIONS
+            || self.evaluations == 0
+            || self.evaluations > self.evaluation_budget
+            || !self.failure_preserved
+            || !self.minimized_candidate.identity_is_valid()
+            || self.minimized_candidate.generator_policy_id != self.minimization_policy_id
+            || self.report_digest.len() != 64
+            || !self.report_digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+        {
+            return false;
+        }
+
+        let mut report = self.clone();
+        let expected = report.report_digest.clone();
+        report.report_digest.clear();
+        serde_json::to_vec(&report)
+            .ok()
+            .map(|bytes| blake3::hash(&bytes).to_hex().to_string() == expected)
+            .unwrap_or(false)
+    }
+}
+
 /// Generate a deterministic Latin-hypercube-style candidate set.
 ///
 /// Each factor is independently stratified into `budget` bins, then assigned
@@ -157,6 +227,191 @@ pub fn generate_seeded_random_intersection_candidates(
         ));
     }
     Ok(candidates)
+}
+
+/// Minimize a scenario while preserving a caller-defined failure predicate.
+///
+/// The callback is the execution boundary: in the intended workflow it asks
+/// Symtropy to execute/replay the candidate and returns whether the exact
+/// registered failure predicate still holds. This function does not run
+/// physics or infer failure labels itself.
+///
+/// The deterministic coordinate shrinker moves each factor toward a declared
+/// nominal value. Where the target removes the failure, a bounded 12-step
+/// binary search finds a smaller value along that coordinate. This is a local
+/// shrinker, not a proof of global minimality; non-monotone predicates can
+/// contain disconnected failure regions.
+pub fn minimize_intersection_counterexample<F>(
+    source: &IntersectionScenarioCandidate,
+    predicate_id: impl Into<String>,
+    maximum_evaluations: u32,
+    mut preserves_failure: F,
+) -> Result<IntersectionCounterexampleMinimization, CounterexampleMinimizationError>
+where
+    F: FnMut(&IntersectionScenarioCandidate) -> bool,
+{
+    let predicate_id = predicate_id.into();
+    if !source.identity_is_valid() {
+        return Err(CounterexampleMinimizationError::InvalidSourceCandidate);
+    }
+    if predicate_id.trim().is_empty() {
+        return Err(CounterexampleMinimizationError::EmptyPredicateId);
+    }
+    if maximum_evaluations == 0 {
+        return Err(CounterexampleMinimizationError::ZeroEvaluationBudget);
+    }
+    if maximum_evaluations > MAX_COUNTEREXAMPLE_MINIMIZATION_EVALUATIONS {
+        return Err(CounterexampleMinimizationError::EvaluationBudgetTooLarge);
+    }
+    if !preserves_failure(source) {
+        return Err(CounterexampleMinimizationError::OriginalNotCounterexample);
+    }
+
+    let parent_candidate_id = source.candidate_id.clone();
+    let original_values = factor_values(source);
+    let targets = [
+        midpoint(EGO_SPEED_RANGE_MPS),
+        midpoint(CROSSING_START_RANGE_S),
+        OCCLUSION_RANGE.0,
+        SENSOR_DELAY_RANGE_S.0,
+        SENSOR_DROPOUT_RANGE_S.0,
+        midpoint(LOCALIZATION_BIAS_RANGE_M),
+        BRAKE_DELAY_RANGE_S.0,
+    ];
+    let names = [
+        "ego_initial_speed_mps",
+        "actor_crossing_start_s",
+        "occlusion_fraction",
+        "sensor_delay_s",
+        "sensor_dropout_duration_s",
+        "localization_lateral_bias_m",
+        "brake_actuation_delay_s",
+    ];
+
+    let mut minimized = source.clone();
+    minimized.generator_policy_id = MINIMIZATION_GENERATOR_POLICY_ID.into();
+    minimized.candidate_id = candidate_identity(&minimized);
+    let mut evaluations = 1_u32;
+
+    for dimension in 0..targets.len() {
+        if evaluations >= maximum_evaluations {
+            break;
+        }
+        let current_value = factor_value(&minimized, dimension);
+        let target_value = targets[dimension];
+        if current_value.to_bits() == target_value.to_bits() {
+            continue;
+        }
+
+        let mut target_candidate = minimized.clone();
+        set_factor_value(&mut target_candidate, dimension, target_value);
+        target_candidate.candidate_id = candidate_identity(&target_candidate);
+        evaluations += 1;
+
+        if preserves_failure(&target_candidate) {
+            minimized = target_candidate;
+            continue;
+        }
+
+        // Current value is known to preserve the predicate; target value does not.
+        let mut accepted = minimized;
+        let mut rejected = target_candidate;
+        for _ in 0..MAX_COORDINATE_SHRINK_STEPS {
+            if evaluations >= maximum_evaluations {
+                break;
+            }
+            let accepted_value = factor_value(&accepted, dimension);
+            let rejected_value = factor_value(&rejected, dimension);
+            let midpoint_value = (accepted_value + rejected_value) * 0.5;
+            let mut proposal = accepted.clone();
+            set_factor_value(&mut proposal, dimension, midpoint_value);
+            proposal.candidate_id = candidate_identity(&proposal);
+            evaluations += 1;
+
+            if preserves_failure(&proposal) {
+                accepted = proposal;
+            } else {
+                rejected = proposal;
+            }
+        }
+        minimized = accepted;
+    }
+
+    let final_values = factor_values(&minimized);
+    let factor_changes = names
+        .iter()
+        .enumerate()
+        .filter_map(|(index, name)| {
+            (original_values[index].to_bits() != final_values[index].to_bits()).then(|| {
+                IntersectionFactorChange {
+                    factor_name: (*name).into(),
+                    original_value: original_values[index],
+                    minimized_value: final_values[index],
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+
+    let termination = if evaluations >= maximum_evaluations {
+        CounterexampleMinimizationTermination::EvaluationBudgetExhausted
+    } else {
+        CounterexampleMinimizationTermination::CoordinatePassCompleted
+    };
+
+    let mut report = IntersectionCounterexampleMinimization {
+        schema_version: INTERSECTION_CANDIDATE_SCHEMA.into(),
+        parent_candidate_id,
+        predicate_id,
+        minimization_policy_id: MINIMIZATION_GENERATOR_POLICY_ID.into(),
+        evaluation_budget: maximum_evaluations,
+        evaluations,
+        failure_preserved: true,
+        termination,
+        factor_changes,
+        minimized_candidate: minimized,
+        report_digest: String::new(),
+    };
+    let report_bytes = serde_json::to_vec(&report)
+        .map_err(|_| CounterexampleMinimizationError::InvalidSourceCandidate)?;
+    report.report_digest = blake3::hash(&report_bytes).to_hex().to_string();
+    Ok(report)
+}
+
+fn midpoint(bounds: (f64, f64)) -> f64 {
+    (bounds.0 + bounds.1) * 0.5
+}
+
+fn factor_values(candidate: &IntersectionScenarioCandidate) -> [f64; 7] {
+    [
+        candidate.ego_initial_speed_mps,
+        candidate.actor_crossing_start_s,
+        candidate.occlusion_fraction,
+        candidate.sensor_delay_s,
+        candidate.sensor_dropout_duration_s,
+        candidate.localization_lateral_bias_m,
+        candidate.brake_actuation_delay_s,
+    ]
+}
+
+fn factor_value(candidate: &IntersectionScenarioCandidate, dimension: usize) -> f64 {
+    factor_values(candidate)[dimension]
+}
+
+fn set_factor_value(
+    candidate: &mut IntersectionScenarioCandidate,
+    dimension: usize,
+    value: f64,
+) {
+    match dimension {
+        0 => candidate.ego_initial_speed_mps = value,
+        1 => candidate.actor_crossing_start_s = value,
+        2 => candidate.occlusion_fraction = value,
+        3 => candidate.sensor_delay_s = value,
+        4 => candidate.sensor_dropout_duration_s = value,
+        5 => candidate.localization_lateral_bias_m = value,
+        6 => candidate.brake_actuation_delay_s = value,
+        _ => unreachable!("factor dimension is bounded by the seven-factor schema"),
+    }
 }
 
 fn validate_budget(budget: u32) -> Result<(), IntersectionGenerationError> {
@@ -224,7 +479,8 @@ impl IntersectionScenarioCandidate {
             && self.generation_budget <= MAX_INTERSECTION_CANDIDATES
             && self.ordinal < self.generation_budget
             && (self.generator_policy_id == STRATIFIED_GENERATOR_POLICY_ID
-                || self.generator_policy_id == RANDOM_GENERATOR_POLICY_ID)
+                || self.generator_policy_id == RANDOM_GENERATOR_POLICY_ID
+                || self.generator_policy_id == MINIMIZATION_GENERATOR_POLICY_ID)
             && self.road_geometry_id == ROAD_GEOMETRY_ID
             && self.ego_spawn_x_m.to_bits() == EGO_SPAWN_X_M.to_bits()
             && self.ego_lane_center_y_m.to_bits() == EGO_LANE_CENTER_Y_M.to_bits()
@@ -518,6 +774,105 @@ mod tests {
         let mut candidate = generate_stratified_intersection_candidates(9, 1).unwrap().remove(0);
         candidate.sensor_delay_s = (candidate.sensor_delay_s + 0.01).min(SENSOR_DELAY_RANGE_S.1);
         assert!(!candidate.identity_is_valid());
+    }
+
+    #[test]
+    fn counterexample_minimizer_shrinks_factors_and_preserves_parent_lineage() {
+        let source = candidate_from_factors(
+            23,
+            0,
+            1,
+            RANDOM_GENERATOR_POLICY_ID,
+            [20.0, 2.4, 0.8, 0.2, 0.2, 0.4, 0.3],
+        );
+        let report = minimize_intersection_counterexample(
+            &source,
+            "synthetic-crossing-conflict-predicate-v1",
+            128,
+            |candidate| {
+                candidate.ego_initial_speed_mps >= 16.0
+                    && candidate.occlusion_fraction >= 0.6
+                    && candidate.sensor_delay_s >= 0.1
+            },
+        )
+        .unwrap();
+
+        assert_eq!(report.parent_candidate_id, source.candidate_id);
+        assert_eq!(
+            report.minimized_candidate.generator_policy_id,
+            MINIMIZATION_GENERATOR_POLICY_ID
+        );
+        assert!(report.minimized_candidate.identity_is_valid());
+        assert!(report.failure_preserved);
+        assert!(report.evaluations <= 128);
+        assert!(report.minimized_candidate.ego_initial_speed_mps >= 16.0);
+        assert!(report.minimized_candidate.ego_initial_speed_mps - 16.0 < 0.01);
+        assert!(report.minimized_candidate.occlusion_fraction >= 0.6);
+        assert!(report.minimized_candidate.occlusion_fraction - 0.6 < 0.01);
+        assert!(report.minimized_candidate.sensor_delay_s >= 0.1);
+        assert!(report.minimized_candidate.sensor_delay_s - 0.1 < 0.01);
+        assert!(report.factor_changes.len() >= 3);
+        assert!(report.identity_is_valid());
+    }
+
+    #[test]
+    fn counterexample_minimizer_rejects_invalid_source_and_non_failure() {
+        let source = generate_stratified_intersection_candidates(4, 1).unwrap().remove(0);
+        assert_eq!(
+            minimize_intersection_counterexample(&source, "predicate-v1", 64, |_| false),
+            Err(CounterexampleMinimizationError::OriginalNotCounterexample)
+        );
+        let mut invalid = source;
+        invalid.candidate_id.push_str("-tampered");
+        assert_eq!(
+            minimize_intersection_counterexample(&invalid, "predicate-v1", 64, |_| true),
+            Err(CounterexampleMinimizationError::InvalidSourceCandidate)
+        );
+    }
+
+    #[test]
+    fn counterexample_minimizer_fails_closed_on_invalid_budgets_and_predicate_ids() {
+        let source = generate_stratified_intersection_candidates(5, 1).unwrap().remove(0);
+        assert_eq!(
+            minimize_intersection_counterexample(&source, "predicate-v1", 0, |_| true),
+            Err(CounterexampleMinimizationError::ZeroEvaluationBudget)
+        );
+        assert_eq!(
+            minimize_intersection_counterexample(
+                &source,
+                "predicate-v1",
+                MAX_COUNTEREXAMPLE_MINIMIZATION_EVALUATIONS + 1,
+                |_| true
+            ),
+            Err(CounterexampleMinimizationError::EvaluationBudgetTooLarge)
+        );
+        assert_eq!(
+            minimize_intersection_counterexample(&source, " ", 64, |_| true),
+            Err(CounterexampleMinimizationError::EmptyPredicateId)
+        );
+    }
+
+    #[test]
+    fn counterexample_minimizer_report_detects_recomputed_digest_tampering() {
+        let source = candidate_from_factors(
+            9,
+            0,
+            1,
+            RANDOM_GENERATOR_POLICY_ID,
+            [20.0, 2.4, 0.8, 0.2, 0.2, 0.4, 0.3],
+        );
+        let mut report = minimize_intersection_counterexample(
+            &source,
+            "crossing-conflict-v1",
+            64,
+            |candidate| candidate.ego_initial_speed_mps >= 16.0,
+        )
+        .unwrap();
+        report.evaluations += 1;
+        report.report_digest.clear();
+        let bytes = serde_json::to_vec(&report).unwrap();
+        report.report_digest = blake3::hash(&bytes).to_hex().to_string();
+        assert!(!report.identity_is_valid());
     }
 
     #[test]
