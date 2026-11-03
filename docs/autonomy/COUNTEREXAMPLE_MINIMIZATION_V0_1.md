@@ -41,7 +41,8 @@ Unit tests are authored for:
 - shrinking multiple factors while preserving a synthetic predicate;
 - parent lineage and candidate identity;
 - invalid source, empty predicate and invalid budget rejection;
-- rejection of an evaluator receipt bound to a different candidate;
+- rejection of an evaluator receipt bound to a different candidate, including a matching ID with mutated embedded scenario fields;
+- rejection of mixed evaluator identities within one minimization run;
 - report tampering even after recomputing the report digest.
 
 These tests are not compiled or executed in this session.
