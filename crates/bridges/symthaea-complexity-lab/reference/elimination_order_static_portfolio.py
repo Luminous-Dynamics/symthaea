@@ -4,8 +4,9 @@
 Unlike the oracle-best-of-pool score in elimination_order_planner.py, this
 selector chooses a candidate using only factor scopes and variable
 cardinalities, before evaluating any coefficient algebra or exact result.
-It then runs the chosen order through each exact algebra and independent
-certificate checker. This is still a tiny-synthetic reference experiment.
+It then runs the chosen order through each exact algebra and certificate
+checker. This is a tiny-synthetic reference experiment, not a production
+ordering heuristic.
 """
 from __future__ import annotations
 import json
@@ -23,7 +24,7 @@ KINDS = ("maxcount", "pareto", "poly")
 
 
 def structural_cost(cards, scopes, order):
-    """Return graph-only sum/peak of generated bucket assignment counts.
+    """Graph-only sum/peak of generated bucket assignment counts.
 
     Each step joins all current scopes containing the eliminated variable.
     The score does not inspect algebra values, polynomial support, Pareto
@@ -54,7 +55,12 @@ def regret(value, optimum):
 
 
 def run():
-    exhaustive = json.loads((HERE / "elimination_order_planner_results.json").read_text())
+    exhaustive_summary = json.loads(
+        (HERE / "elimination_order_planner_compact_baseline.json").read_text()
+    )
+    exhaustive = {
+        row["name"]: row for row in exhaustive_summary["scenarios"]
+    }
     rows = []
     all_exact = True
     for graph_name, scopes in SCENARIOS.items():
@@ -70,20 +76,23 @@ def run():
         selected_order = list(selected_tuple)
         min_fill_order = greedy_order(CARDS, scopes, "min_fill")
         min_bucket_order = greedy_order(CARDS, scopes, "min_bucket_work")
-        scenario_source = exhaustive["scenarios"][graph_name]
+        scenario_source = exhaustive[graph_name]
         for kind in KINDS:
             factors, algebra = make_problem(kind, scopes)
             metrics, result = order_metrics(CARDS, factors, algebra, kind, selected_order)
+            min_bucket_metrics, min_bucket_result = order_metrics(
+                CARDS, factors, algebra, kind, min_bucket_order
+            )
             oracle = direct_enumeration(CARDS, factors, algebra)
-            reference = scenario_source["algebras"][kind]
-            expected_best = reference["best_by_metric"]["algebra_work_units_proxy"]
-            optimum = expected_best["algebra_work_units_proxy"]
-            baseline = reference["heuristics"]["min_fill"]["algebra_work_units_proxy"]
-            min_bucket_baseline = reference["heuristics"]["min_bucket_work"]["algebra_work_units_proxy"]
-            all_exact = all_exact and result == algebra.encode(oracle)
+            reference = next(row for row in scenario_source["algebras"] if row["kind"] == kind)
+            optimum = reference["exhaustive_best_by_work"]["algebra_work_units_proxy"]
+            baseline = reference["min_fill"]["algebra_work_units_proxy"]
+            min_bucket_baseline = min_bucket_metrics["algebra_work_units_proxy"]
+            encoded_oracle = algebra.encode(oracle)
+            all_exact = all_exact and result == encoded_oracle and min_bucket_result == encoded_oracle
             certificate = build_certificate(CARDS, factors, algebra, selected_order)
             replay = verify_certificate(CARDS, factors, algebra, certificate)
-            if replay["result"] != algebra.encode(oracle):
+            if replay["result"] != encoded_oracle:
                 raise AssertionError(f"selected structural order certificate failed: {graph_name}/{kind}")
             rows.append({
                 "graph": graph_name,
@@ -101,7 +110,9 @@ def run():
                 "min_bucket_work_order": min_bucket_order,
                 "min_bucket_work_proxy": min_bucket_baseline,
                 "min_bucket_work_regret_percent": round(regret(min_bucket_baseline, optimum), 6),
-                "selected_certificate_bytes": len(json.dumps(certificate, sort_keys=True, separators=(",", ":")).encode("utf-8")),
+                "selected_certificate_bytes": len(
+                    json.dumps(certificate, sort_keys=True, separators=(",", ":")).encode("utf-8")
+                ),
                 "checker_replay_passed": True,
                 "direct_oracle_match": True,
             })
@@ -125,7 +136,10 @@ def run():
             "max": round(max(regret_values), 6),
             "exact_best_cases": sum(v == 0 for v in regret_values),
         },
-        "claim_boundary": "Graph/cardinality-only ranking; exact selected orders and certificates were evaluated in Python. Tiny synthetic instances only; not hardware runtime or SOTA evidence.",
+        "claim_boundary": (
+            "Graph/cardinality-only ranking; exact selected orders and certificates were evaluated "
+            "in Python. Tiny synthetic instances only; not hardware runtime or SOTA evidence."
+        ),
         "cases": rows,
     }
     path = HERE / "elimination_order_static_portfolio_results.json"
