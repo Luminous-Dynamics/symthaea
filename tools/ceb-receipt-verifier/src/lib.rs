@@ -287,7 +287,10 @@ const MAX_PATCH_RECONSTRUCTION_BYTES: u64 = 512 * 1024 * 1024;
 #[derive(Clone, Debug)]
 enum TreeEntryContent {
     File(PathBuf),
-    Symlink { path: PathBuf, target: Vec<u8> },
+    Symlink {
+        path: PathBuf,
+        target: Vec<u8>,
+    },
 }
 
 #[derive(Clone, Debug)]
