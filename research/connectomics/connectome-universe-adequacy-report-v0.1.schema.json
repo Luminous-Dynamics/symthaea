@@ -160,7 +160,8 @@
         "required": [
           "world_id",
           "query_state",
-          "canonical_structural_sha256"
+          "canonical_structural_sha256",
+          "error_family"
         ],
         "properties": {
           "world_id": {
@@ -172,6 +173,10 @@
           },
           "canonical_structural_sha256": {
             "$ref": "#/$defs/sha256"
+          },
+          "error_family": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
