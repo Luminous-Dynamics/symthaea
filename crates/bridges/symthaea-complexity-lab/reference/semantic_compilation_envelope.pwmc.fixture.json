@@ -41,6 +41,10 @@
           }
         }
       ]
+    },
+    "aggregation_plan": {
+      "projection": "exists",
+      "final": "weighted_sum"
     }
   },
   "stages": [
