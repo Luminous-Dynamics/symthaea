@@ -68,11 +68,11 @@ Checked invariants:
 
 The root can have a scope smaller than the full variable universe. Omitted variables remain free and are enumerated by the reference evaluator.
 
-## 4. Executed local experiment
+## 4. Executed local experiments
 
-The committed file was fetched from GitHub and its exact text was executed locally under Python 3.13.5. The Git blob SHA matches the executed source: \`1d22ecdc1a9d8ed5b174471ee204d9a8d6ac9350\`.
+The committed evaluator was fetched from GitHub and its exact text was executed locally under Python 3.13.5. Its Git blob SHA matches the executed source: `1d22ecdc1a9d8ed5b174471ee204d9a8d6ac9350`.
 
-8/8 fixtures passed:
+Eight targeted fixtures passed:
 1. #SAT with one hidden free variable: 2.
 2. PMC over the same circuit: 1 distinct projection.
 3. PWMC on that projection: exactly 2/3.
@@ -82,7 +82,18 @@ The committed file was fetched from GitHub and its exact text was executed local
 7. Reject a false determinism claim.
 8. Reject a Boolean support circuit mislabeled as complex AMC.
 
-The deterministic-sum assertion is checked extensionally on every assignment of its finite scope. This is a tiny reference validation, not a proof for all inputs.
+A separate property suite uses an independently computed assignment-set oracle and generates small deterministic/decomposable circuits:
+- 1,000 #SAT cases;
+- 1,000 WMC cases;
+- 1,000 PMC cases;
+- 1,000 PWMC cases;
+- 1,000 complex Q(i) AMC cases;
+- 5,000/5,000 exact output agreements;
+- 3/3 malformed circuit/domain negative controls rejected.
+
+The property-test source blob is pinned to `eda62e58be1fdd25287b161dc08431299e2abd01`, and the executed result is recorded in `reference/typed_circuit_ir_property_results.json`.
+
+The deterministic-sum assertion is checked extensionally on every assignment of its finite scope. These experiments cover only small finite circuits; they are not a proof for all inputs.
 
 ## 5. Adapter boundaries
 
