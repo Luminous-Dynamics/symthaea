@@ -115,6 +115,7 @@ pub enum CounterexampleMinimizationTermination {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CounterexampleEvaluationReceipt {
     pub candidate_id: String,
+    pub candidate: IntersectionScenarioCandidate,
     pub predicate_id: String,
     pub evaluator_id: String,
     pub execution_receipt_id: String,
@@ -177,6 +178,8 @@ impl IntersectionCounterexampleMinimization {
             || !self.evaluation_receipts.iter().all(|receipt| {
                 !receipt.evaluator_id.trim().is_empty()
                     && !receipt.execution_receipt_id.trim().is_empty()
+                    && receipt.candidate_id == receipt.candidate.candidate_id
+                    && receipt.candidate.identity_is_valid()
                     && receipt.predicate_id == self.predicate_id
                     && receipt.execution_digest.len() == 64
                     && receipt.execution_digest.bytes().all(|byte| byte.is_ascii_hexdigit())
@@ -750,6 +753,7 @@ mod tests {
         hasher.update(&[u8::from(predicate_holds)]);
         CounterexampleEvaluationReceipt {
             candidate_id: candidate.candidate_id.clone(),
+            candidate: candidate.clone(),
             predicate_id: predicate_id.into(),
             evaluator_id: "unit-test-synthetic-evaluator-v1".into(),
             execution_receipt_id: format!("test-execution-{}", candidate.candidate_id),
@@ -948,7 +952,11 @@ mod tests {
         assert_eq!(report.parent_candidate_id, source.candidate_id);
         assert_eq!(
             report.minimized_candidate.generator_policy_id,
-            MINIMIZATION_GENERATOR_POLICY_ID
+            source.generator_policy_id
+        );
+        assert_eq!(
+            report.minimization_policy_id,
+            COUNTEREXAMPLE_MINIMIZATION_POLICY_ID
         );
         assert!(report.minimized_candidate.identity_is_valid());
         assert!(report.failure_preserved);
