@@ -85,11 +85,11 @@ field, so the same immutable inputs produce byte-stable JSON.
   Base64 are rejected.
 - DSSE signatures cover the DSSE v1 PAE bytes, including payload type.
 - Primary and regrade receipts must bind the same task, task-contract digest,
-  fixture revision, source tree, patch, agent/harness configuration, grader,
-  image digest, toolchain lock, runner policy and task budget. The receipt runtime
+  fixture revision, source tree, result tree, patch, agent/harness configuration,
+  grader, image digest, toolchain lock, runner policy and task budget. The receipt runtime
   profile, network policy, image digest, toolchain digest and runner-policy digest
   must each equal the corresponding value pinned by the task contract.
-- The task contract hash and trust-policy hash are pinned out of band. The source snapshot must match the contract's tree digest; the result snapshot is hashed independently by the verifier. The custom tree algorithm sorts UTF-8 relative paths and commits each entry type, byte length, executable bit and content digest; symlink target bytes are hashed without following links. Empty directories are ignored; .git metadata, non-UTF-8 names and special files are rejected.
+- The task contract hash and trust-policy hash are pinned out of band by the host control plane. The source snapshot must match the contract's tree digest; the result snapshot is hashed independently by the verifier. The custom tree algorithm sorts UTF-8 relative paths and commits each entry type, byte length, executable bit and content digest; symlink target bytes are hashed without following links. Empty directories are ignored; .git metadata, non-UTF-8 names and special files are rejected.
 - The verifier computes the exact set of paths changed between source and result snapshots. The signed receipt's changed_paths and the Git patch's file headers must equal that set; quoted/space-containing patch paths are deliberately unsupported in V0.
 - The regrade links the SHA-256 of the exact primary envelope bytes; run IDs,
   receipt IDs, signer trust domains and check-evidence sets must be distinct.
@@ -116,7 +116,7 @@ build script, test, or agent-generated program.
 
 The code is a first implementation slice. It must still pass Rust compilation,
 the included unit tests, Clippy, formatting, schema conformance tests and the
-external negative-control corpus before it can be qualified for scored benchmark use.
+external negative-control corpus before it can be qualified for scored benchmark use. Direct dependency versions are exact-pinned, but no Cargo.lock has been generated yet; transitive dependency resolution is therefore not locked.
 
 
 ## Current implementation status (2026-11-03)
