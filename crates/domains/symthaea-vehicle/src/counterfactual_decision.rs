@@ -53,6 +53,8 @@ pub enum CounterfactualDecisionReason {
 pub struct CounterfactualActionEvaluation {
     pub action_id: String,
     pub command: VehicleCommand,
+    /// BLAKE3 over the exact serialized command payload.
+    pub action_digest: String,
     pub feasibility: CounterfactualFeasibility,
     /// One named scalar objective only; no implicit weighted composite.
     pub objective_value: f64,
@@ -92,6 +94,7 @@ pub enum CounterfactualDecisionError {
     DuplicateActionId,
     DuplicateExecutionReceipt,
     InvalidActionCommand,
+    InvalidActionDigest,
     InvalidObjectiveValue,
     InvalidExecutionReceipt,
     MixedEvaluatorIdentity,
@@ -225,6 +228,9 @@ fn derive_finding(
         {
             return Err(CounterfactualDecisionError::InvalidActionCommand);
         }
+        if action.action_digest != command_digest(&action.command) {
+            return Err(CounterfactualDecisionError::InvalidActionDigest);
+        }
         if !action.objective_value.is_finite() {
             return Err(CounterfactualDecisionError::InvalidObjectiveValue);
         }
@@ -344,6 +350,11 @@ fn derive_finding(
     })
 }
 
+fn command_digest(command: &VehicleCommand) -> String {
+    let bytes = serde_json::to_vec(command).unwrap_or_default();
+    blake3::hash(&bytes).to_hex().to_string()
+}
+
 fn digest_is_valid(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
@@ -358,16 +369,18 @@ mod tests {
         feasibility: CounterfactualFeasibility,
         objective: f64,
     ) -> CounterfactualActionEvaluation {
+        let command = VehicleCommand {
+            steering,
+            throttle: 0.2,
+            brake: 0.0,
+        };
         let mut hasher = blake3::Hasher::new();
         hasher.update(id.as_bytes());
         hasher.update(&objective.to_bits().to_le_bytes());
         CounterfactualActionEvaluation {
             action_id: id.into(),
-            command: VehicleCommand {
-                steering,
-                throttle: 0.2,
-                brake: 0.0,
-            },
+            action_digest: command_digest(&command),
+            command,
             feasibility,
             objective_value: objective,
             evaluator_id: "independent-bicycle-model-v1".into(),
@@ -522,6 +535,16 @@ mod tests {
         assert_eq!(
             evaluate_counterfactual_decision(aliased).unwrap_err(),
             CounterfactualDecisionError::ControllerEvaluatorIdentityAliased
+        );
+    }
+
+    #[test]
+    fn rejects_action_payload_mutation_even_when_action_id_is_unchanged() {
+        let mut sample = input();
+        sample.actions[0].command.steering = 0.5;
+        assert_eq!(
+            evaluate_counterfactual_decision(sample).unwrap_err(),
+            CounterfactualDecisionError::InvalidActionDigest
         );
     }
 
