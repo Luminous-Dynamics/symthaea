@@ -37,7 +37,7 @@ impl SystemResourceKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WindowRequestState {
     Completed { closed_at_s: u64 },
     /// The observation is right-censored at the system-window boundary.
@@ -483,7 +483,11 @@ pub fn account_system_window(
                 if accepted_in_window {
                     let latency = closed_at_s - request.accepted_at_s;
                     latency_values.push(latency);
-                    let report = request.service_report.as_ref().expect("validated completed request");
+                    let report = request.service_report.as_ref().ok_or_else(|| {
+                        SystemWindowError::CompletedRequestMissingServiceReport(
+                            request.service_request_id.clone()
+                        )
+                    })?;
                     first_pass_item_count = first_pass_item_count.checked_add(
                         report.first_pass_verified_item_count
                     ).ok_or(SystemWindowError::CounterOverflow("first_pass_item_count"))?;
