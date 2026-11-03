@@ -58,7 +58,7 @@
       "ego_stop_time_s": 3.3333333333333335,
       "ego_stop_distance_m": 16.666666666666668,
       "remaining_distance_m": 3.333333333333332,
-      "restart_time_s": 2.857142857142857,
+      "restart_time_s": 3.3333333333333335,
       "acceleration_duration_s": 1.8257418583505534,
       "arrival_at_conflict_s": 5.159075191683887,
       "arrival_speed_mps": 3.6514837167011067,
