@@ -1,7 +1,5 @@
 #![forbid(unsafe_code)]
 
-pub mod chemistry;
-
 //! First-principles engineering primitives for the InstantClean dishwasher
 //! research programme.
 //!
@@ -9,6 +7,8 @@ pub mod chemistry;
 //! electrical resource budgets, nozzle hydraulics and multi-objective candidate
 //! comparison. It does not predict soil removal, microbiological safety, spray
 //! breakup or CFD. Those require calibrated experiments and validated solvers.
+
+pub mod chemistry;
 
 pub mod energy {
     pub const WATER_CP_KJ_PER_KG_K: f64 = 4.186;
