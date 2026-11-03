@@ -290,14 +290,49 @@ fn derive_report(input: &VehicleModelDiscrepancyInput) -> Result<VehicleModelDis
         return Err(VehicleModelDiscrepancyError::InvalidDigest);
     }
     if input.residual_observations.is_empty() { return Err(VehicleModelDiscrepancyError::EmptyResidualSet); }
+    if input.expected_residual_slots.is_empty() {
+        return Err(VehicleModelDiscrepancyError::EmptyResidualSchedule);
+    }
 
     let mut canonical = input.clone();
+    canonical.expected_residual_slots.sort_by(|a,b| a.scenario_id.cmp(&b.scenario_id)
+        .then_with(|| a.actor_policy_id.cmp(&b.actor_policy_id))
+        .then_with(|| a.action_history_digest.cmp(&b.action_history_digest))
+        .then_with(|| a.metric_id.cmp(&b.metric_id)).then_with(|| a.horizon_ms.cmp(&b.horizon_ms)));
     canonical.residual_observations.sort_by(|a,b| a.scenario_id.cmp(&b.scenario_id)
         .then_with(|| a.actor_policy_id.cmp(&b.actor_policy_id))
         .then_with(|| a.action_history_digest.cmp(&b.action_history_digest))
         .then_with(|| a.metric_id.cmp(&b.metric_id)).then_with(|| a.horizon_ms.cmp(&b.horizon_ms)));
     canonical.decisions.sort_by(|a,b| a.decision_id.cmp(&b.decision_id));
     for d in &mut canonical.decisions { d.actions.sort_by(|a,b| a.action_id.cmp(&b.action_id)); }
+
+    let mut expected_contexts = BTreeMap::<(String,String,String,String,u64), String>::new();
+    for slot in &canonical.expected_residual_slots {
+        if [
+            slot.scenario_id.as_str(), slot.failure_family_id.as_str(),
+            slot.actor_policy_id.as_str(), slot.split_id.as_str(), slot.shift_regime_id.as_str(),
+            slot.metric_id.as_str(), slot.metric_unit_id.as_str(),
+        ].iter().any(|value| value.trim().is_empty()) {
+            return Err(VehicleModelDiscrepancyError::InvalidMetric);
+        }
+        if slot.horizon_ms == 0 {
+            return Err(VehicleModelDiscrepancyError::InvalidHorizon);
+        }
+        if [
+            slot.initial_state_digest.as_str(), slot.environment_digest.as_str(),
+            slot.dynamics_digest.as_str(), slot.action_history_digest.as_str(),
+            slot.observation_availability_digest.as_str(),
+        ].iter().any(|digest| !valid_digest(digest)) {
+            return Err(VehicleModelDiscrepancyError::InvalidDigest);
+        }
+        let key = (
+            slot.scenario_id.clone(), slot.actor_policy_id.clone(),
+            slot.action_history_digest.clone(), slot.metric_id.clone(), slot.horizon_ms,
+        );
+        if expected_contexts.insert(key, expected_slot_context_digest(slot)?).is_some() {
+            return Err(VehicleModelDiscrepancyError::DuplicateExpectedResidualSlot);
+        }
+    }
 
     let mut contexts = BTreeMap::<(String,String,String,String), String>::new();
     let mut residual_keys = BTreeSet::new();
@@ -333,7 +368,19 @@ fn derive_report(input: &VehicleModelDiscrepancyInput) -> Result<VehicleModelDis
         if let Some(old) = contexts.get(&key) {
             if old != &ctx { return Err(VehicleModelDiscrepancyError::MismatchedResidualContext); }
         } else { contexts.insert(key.clone(),ctx); }
-        if !residual_keys.insert((key.0,key.1,key.2,key.3,row.horizon_ms)) { return Err(VehicleModelDiscrepancyError::DuplicateResidualKey); }
+        let slot_key = (key.0.clone(), key.1.clone(), key.2.clone(), key.3.clone(), row.horizon_ms);
+        let expected_context = expected_contexts
+            .get(&slot_key)
+            .ok_or(VehicleModelDiscrepancyError::UnexpectedResidualOutcomeSlot)?;
+        if expected_context != &ctx {
+            return Err(VehicleModelDiscrepancyError::MismatchedResidualContext);
+        }
+        if !residual_keys.insert((key.0,key.1,key.2,key.3,row.horizon_ms)) {
+            return Err(VehicleModelDiscrepancyError::DuplicateResidualKey);
+        }
+    }
+    if expected_contexts.keys().any(|key| !residual_keys.contains(key)) {
+        return Err(VehicleModelDiscrepancyError::MissingResidualOutcomeSlot);
     }
 
     let mut horizons = BTreeMap::<u64,Vec<&ModelResidualObservation>>::new();
@@ -542,6 +589,16 @@ fn summarize_decisions(rows:&[DecisionAuditResult])->DecisionAuditSummary {
     }
 }
 
+fn expected_slot_context_digest(slot:&ExpectedResidualSlot)->Result<String,VehicleModelDiscrepancyError> {
+    hash_json(&(
+        slot.failure_family_id.as_str(), slot.actor_policy_id.as_str(),
+        slot.split_id.as_str(), slot.shift_regime_id.as_str(),
+        slot.initial_state_digest.as_str(), slot.environment_digest.as_str(),
+        slot.dynamics_digest.as_str(), slot.action_history_digest.as_str(),
+        slot.observation_availability_digest.as_str(), slot.forecast_issued_at_ms,
+        slot.metric_id.as_str(), slot.metric_unit_id.as_str(),
+    ))
+}
 fn residual_context_digest(r:&ModelResidualObservation)->Result<String,VehicleModelDiscrepancyError> {
     hash_json(&(r.failure_family_id.as_str(),r.actor_policy_id.as_str(),r.split_id.as_str(),r.shift_regime_id.as_str(),
         r.initial_state_digest.as_str(),r.environment_digest.as_str(),r.dynamics_digest.as_str(),r.action_history_digest.as_str(),
