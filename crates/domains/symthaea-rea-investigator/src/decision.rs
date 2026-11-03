@@ -128,6 +128,7 @@ pub struct DecisionRejectedExperiment {
 pub enum DecisionAbstentionReason {
     NoCompetingHypotheses,
     NoIndependentlyGroundedHypothesis,
+    NoCompetingHypotheses,
     NoEligibleExperiment,
     NoDecisionValue,
     DecisionUnstable,
@@ -221,8 +222,8 @@ pub struct DecisionInvestigationPlan {
     pub ranked_experiments: Vec<DecisionRankedExperiment>,
     pub rejected_experiments: Vec<DecisionRejectedExperiment>,
     pub abstention: Option<DecisionAbstentionReason>,
-    pub baseline_decision_id: String,
-    pub baseline_expected_utility: f64,
+    pub baseline_decision_id: Option<String>,
+    pub baseline_expected_utility: Option<f64>,
     pub prior_entropy_bits: f64,
     pub grounded_hypothesis_ids: Vec<String>,
     pub scenario_ids: Vec<String>,
@@ -841,8 +842,31 @@ pub fn plan_next_experiment_decision_aware(
     validate_scenario_set(scenarios, proposals)?;
 
     let catalog = validate_evidence_catalog(evidence)?;
+    let validation = validate_hypotheses(hypotheses, &catalog);
     let (priors, grounded_hypothesis_ids, support_evidence_ids, independent_root_evidence_ids) =
-        validate_hypotheses(hypotheses, &catalog)?;
+        match validation {
+            Ok(result) => result,
+            Err(error) if error.kind == PlannerErrorKind::UngroundedHypothesis => {
+                return Ok(DecisionInvestigationPlan {
+                    selected: None,
+                    ranked_experiments: Vec::new(),
+                    rejected_experiments: Vec::new(),
+                    abstention: Some(DecisionAbstentionReason::NoIndependentlyGroundedHypothesis),
+                    baseline_decision_id: None,
+                    baseline_expected_utility: None,
+                    prior_entropy_bits: 0.0,
+                    grounded_hypothesis_ids: Vec::new(),
+                    scenario_ids: scenarios.iter().map(|scenario| scenario.scenario_id.clone()).collect(),
+                    utility_model_id: utility_model.id.clone(),
+                    utility_model_owner: utility_model.owner.clone(),
+                    utility_model_scope: utility_model.scope.clone(),
+                    utility_model_units: utility_model.units.clone(),
+                    utility_model_exclusions: utility_model.declared_exclusions.clone(),
+                    claim_ceiling: DecisionClaimCeiling::default(),
+                });
+            }
+            Err(error) => return Err(error),
+        };
     let hypothesis_ids: Vec<&str> = priors.keys().copied().collect();
     let utilities = validate_decisions(decisions, &hypothesis_ids)?;
     let decision_ids: Vec<String> = utilities.keys().cloned().collect();
@@ -1059,8 +1083,8 @@ pub fn plan_next_experiment_decision_aware(
         ranked_experiments,
         rejected_experiments,
         abstention,
-        baseline_decision_id: decision_ids[baseline_index].clone(),
-        baseline_expected_utility,
+        baseline_decision_id: Some(decision_ids[baseline_index].clone()),
+        baseline_expected_utility: Some(baseline_expected_utility),
         prior_entropy_bits,
         grounded_hypothesis_ids,
         scenario_ids: scenarios.iter().map(|scenario| scenario.scenario_id.clone()).collect(),
