@@ -790,6 +790,26 @@ mod tests {
     }
 
     #[test]
+    fn motif_development_obligation_selects_develop_action_not_return_action() {
+        let development = ObligationKind::DevelopMotif {
+            motif_id: "sonata.primary".into(),
+            transformation: symthaea_music_theory::ReturnTransformation::Transposed,
+        };
+        let returned = ObligationKind::ReturnMotif {
+            motif_id: "sonata.primary".into(),
+            transformation: symthaea_music_theory::ReturnTransformation::Literal,
+        };
+        assert_eq!(
+            action_for_obligation(&development),
+            Some(SymbolicAction::DevelopMotif)
+        );
+        assert_eq!(
+            action_for_obligation(&returned),
+            Some(SymbolicAction::ReturnOpeningMaterial)
+        );
+    }
+
+    #[test]
     fn active_inference_maps_to_symbolic_action_with_invariants() {
         let trace =
             propose_symbolic_action(&inference(MusicAction::ChromaticExplore), observation(None));
