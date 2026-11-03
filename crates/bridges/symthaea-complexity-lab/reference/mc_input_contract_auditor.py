@@ -63,6 +63,7 @@ def parse_complex(text: str) -> tuple[Fraction, Fraction]:
 class AuditResult:
     status: str
     mode: Optional[str]
+    effective_output_contract: Optional[str]
     num_variables: Optional[int]
     num_clauses_declared: Optional[int]
     num_clauses_parsed: int
@@ -375,6 +376,29 @@ def audit_dimacs(text: str, profile: str = "strict") -> AuditResult:
         if positive == 0 or negative == 0:
             warnings.append(f"variable {variable} has a zero literal weight")
 
+    # Preserve the raw declared mode, but compute a separate effective output
+    # contract. This prevents a PMC declaration with no projection variables
+    # from being routed as projected counting under the v1.2 decision-query rule.
+    effective_output_contract: Optional[str] = None
+    if mode == "mc" or (mode is None and not raw_weights and not show_seen and not unresolved):
+        effective_output_contract = "model_count"
+    elif mode == "wmc":
+        effective_output_contract = "weighted_model_count"
+    elif mode == "pmc":
+        if show_seen:
+            effective_output_contract = (
+                "model_count" if n is not None and projection == set(range(1, n + 1))
+                else "projected_model_count"
+            )
+        elif profile == "mccomp_v1_2":
+            effective_output_contract = "sat_decision"
+        elif profile == "ganak_2026_compat":
+            effective_output_contract = "projected_model_count"
+    elif mode == "pwmc" and show_seen:
+        effective_output_contract = "projected_weighted_model_count"
+    elif mode == "amc-complex":
+        effective_output_contract = "complex_algebraic_model_count"
+
     if errors:
         status = "invalid"
     elif unresolved:
@@ -385,6 +409,7 @@ def audit_dimacs(text: str, profile: str = "strict") -> AuditResult:
     return AuditResult(
         status=status,
         mode=mode,
+        effective_output_contract=effective_output_contract,
         num_variables=n,
         num_clauses_declared=m,
         num_clauses_parsed=len(clauses),
@@ -451,6 +476,28 @@ def fixture_tests():
     }
 
 
+def effective_contract_checks():
+    strict = audit_dimacs("c t pmc\\np cnf 2 1\\n1 2 0\\n", "strict")
+    v12 = audit_dimacs("c t pmc\\np cnf 2 1\\n1 2 0\\n", "mccomp_v1_2")
+    ganak = audit_dimacs("c t pmc\\np cnf 2 1\\n1 2 0\\n", "ganak_2026_compat")
+    partial = audit_dimacs("c t pmc\\np cnf 2 0\\nc p show 1 0\\n", "strict")
+    all_vars = audit_dimacs("c t pmc\\np cnf 2 0\\nc p show 1 2 0\\n", "strict")
+    assert strict.status == "ambiguous" and strict.effective_output_contract is None
+    assert v12.status == "valid" and v12.effective_output_contract == "sat_decision"
+    assert ganak.status == "valid" and ganak.effective_output_contract == "projected_model_count"
+    assert ganak.projection == [1, 2]
+    assert partial.effective_output_contract == "projected_model_count"
+    assert all_vars.effective_output_contract == "model_count"
+    return {
+        "strict_no_show": {"status": strict.status, "output": strict.effective_output_contract},
+        "v1_2_no_show": {"status": v12.status, "output": v12.effective_output_contract},
+        "ganak_compat_no_show": {"status": ganak.status, "output": ganak.effective_output_contract,
+                                 "projection": ganak.projection},
+        "partial_projection": partial.effective_output_contract,
+        "all_variables_projection": all_vars.effective_output_contract,
+    }
+
+
 def effective_weight_checks():
     inferred = audit_dimacs(
         "c t wmc\np cnf 1 0\nc p weight 1 1/4 0\n", "strict"
@@ -470,4 +517,5 @@ def effective_weight_checks():
 if __name__ == "__main__":
     result = fixture_tests()
     result["effective_weight_checks"] = effective_weight_checks()
+    result["effective_contract_checks"] = effective_contract_checks()
     print(json.dumps(result, indent=2, sort_keys=True))
