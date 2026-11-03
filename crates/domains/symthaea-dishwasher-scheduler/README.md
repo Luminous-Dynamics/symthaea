@@ -90,7 +90,7 @@ The original `simulate` entry point remains appropriate for synthetic/offline di
 
 For a research simulation that should be gated by physical outcome data, construct `EvidenceBoundMode::from_pilot_evidence` and call `simulate_with_pilot_evidence`. The adapter:
 - derives the supported-soil mask from PilotEvidenceEnvelope objects; it does not trust the profile's requested soil mask;
-- preserves exact endpoint criteria, metric IDs, method identities and criterion evidence digests in each pilot envelope, and requires those identities to stay fixed across the occupancy ladder for a given soil;
+- preserves exact endpoint criteria, metric IDs, units, directions, limits, method IDs and criterion evidence digests in each pilot envelope, and requires those identities to stay fixed across the occupancy ladder for a given soil;
 - requires independent soil-residual, final-rinse-residue and cross-contamination evidence;
 - requires the same exact machine, programme, material, detergent/water batches, hardness and ambient/inlet conditions;
 - requires a complete occupancy ladder from 1 item through the declared mode capacity for every soil class advertised;
