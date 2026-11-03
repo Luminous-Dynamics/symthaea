@@ -58,4 +58,14 @@ The graph canonicalizer V1 is a synthetic directed-graph identity representation
 
 ## Validation status
 
-Fifteen Rust unit tests are authored, including the omitted-query-flip and false-ambiguity controls, sidecar byte mutation, structural digest mutation, array-order invariance, and inconsistent query-state rejection, plus an independent compatibility-versus-query-estimability fixture and a fail-closed stable-report control where no external closure/freeze receipts are authenticated, plus strict-schema rejection of unknown report fields malformed receipt digests, and report-schema digest mismatch. They have **not** been compiled or executed in this authoring environment because `cargo`, `rustc` and `rustfmt` are unavailable. No Rust test, formatting, Clippy or CI pass is claimed.
+Fifteen Rust unit tests are authored. They cover:
+- omitted query-flipping worlds and false ambiguity;
+- compatibility-versus-query-estimability separation;
+- sidecar-byte mutation, graph-digest mutation and schema/protocol digest mismatch;
+- node/edge array-order invariance, edge-direction / attribute sensitivity, duplicate node IDs and dangling endpoints;
+- inconsistent query states for one canonical structure;
+- candidate abstention and false-invariance suppression;
+- duplicate-structure group counting;
+- unknown report fields, malformed receipt digests and refusal to promote without external trust receipts.
+
+They have **not** been compiled or executed in this authoring environment because `cargo`, `rustc` and `rustfmt` are unavailable. No Rust test, formatting, Clippy or CI pass is claimed.
