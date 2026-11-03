@@ -208,6 +208,9 @@ fn validate_accounting(receipt: &Value) -> Result<(u64, u64, u64, u64, u64), Rec
         }
         if graded_flag {
             actual_graded += 1;
+            if !grader_result.is_object() {
+                return Err(err(ReceiptErrorKind::InvalidType, format!("{cx}: graded task requires a grader_result object")));
+            }
             digest_field(get(grader_result, "result_sha256", "grader_result")?, "grader_result.result_sha256")?;
             number(get(grader_result, "grade", "grader_result")?, "grader_result.grade")?;
         } else if !grader_result.is_null() {
