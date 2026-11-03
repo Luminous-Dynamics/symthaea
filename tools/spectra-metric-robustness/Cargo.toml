@@ -1,0 +1,15 @@
+[package]
+name = "spectra-metric-robustness"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Synthetic stress qualification for signal-detection metrics under assumption violations"
+
+[dependencies]
+symthaea-statistics = { path = "../../crates/domains/symthaea-statistics" }
+
+[[bin]]
+name = "run_sweep"
+path = "src/bin/run_sweep.rs"
+
+[workspace]
