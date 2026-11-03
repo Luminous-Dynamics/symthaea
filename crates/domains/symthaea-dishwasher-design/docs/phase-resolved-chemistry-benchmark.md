@@ -70,6 +70,8 @@ The proposed-plan validator now uses integer milligrams (`u64`) for commanded co
 
 Each release includes both a start time and delivery duration. The complete physical delivery must finish within the relevant phase window. Evidence-backed incompatibility separation is measured between the end of one component's release and the start of another, not merely between their start timestamps. A commanded schedule is still not proof that a dispenser delivered that mass; actual dose must be measured and archived separately.
 
+The separate `check_reported_dose_delivery` function compares a requested dose event against reported actual telemetry using a calibrated under/over-delivery tolerance (basis points), timing tolerance, and integer-milligram arithmetic. It binds the measurement to the command's event ID, component ID, physical dispenser-channel ID and delivery-calibration ID. It checks calibration/measurement digest shape only. It does not authenticate the sensor or source records, prove that the dispenser physically delivered the measured quantity, or establish cleaning. The per-event archive therefore records commanded and actual start/duration separately, actual mass, dispenser channel, delivery calibration, measurement-evidence digest and calibration-bundle digest.
+
 ## Competitive benchmark matrix
 
 Compare exact SKUs and exact programmes; capture market, label, detergent, options and firmware where available.
