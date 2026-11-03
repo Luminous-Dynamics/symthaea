@@ -15,8 +15,11 @@ cargo run --locked --manifest-path tools/pitb-graph-evidence/Cargo.toml -- \
   --self-test \
   tools/pitb-graph-evidence/fixtures/graph-evidence.synthetic.json \
   tools/pitb-graph-evidence/fixtures/evidence
-cargo run --manifest-path tools/pitb-graph-evidence/Cargo.toml -- \
+cargo run --locked --manifest-path tools/pitb-graph-evidence/Cargo.toml -- \
   --verify path/to/graph.json path/to/evidence-root
+cargo run --locked --manifest-path tools/pitb-graph-evidence/Cargo.toml -- \
+  --verify-attested path/to/graph.json path/to/evidence-root \
+  path/to/attestation.json path/to/key-registry.json EXPECTED_REGISTRY_SHA256
 ```
 
 The crate includes Rust unit tests for path policy, relation/evidence mapping, confidence semantics, formal-vs-candidate roles and cycle policy. The synthetic fixture is also checked end-to-end by the CLI self-test. Its reviewer note and extractor receipts are deliberately synthetic and must never be mistaken for real Lean evidence or reviewer attestations.
@@ -43,6 +46,12 @@ The verifier requires relation/evidence-class compatibility, compatible node kin
 
 ## Trust boundaries
 
+### Signed snapshot envelope
+
+The optional `--verify-attested` mode verifies an Ed25519 attestation over the SHA-256 of the exact graph-manifest bytes and binds it to the repository commit, environment digest, snapshot ID, extractor ID/version and extractor configuration digest. The attestation's signer and key IDs must resolve to an active entry in a strict registry whose SHA-256 is supplied separately on the command line. The attestation uses the versioned compact JSON canonicalization `serde-json-map-sorted-compact-v0`.
+
+A valid signature authenticates the issuer and the exact snapshot bytes; it does **not** prove that the extractor's semantic claims are true. The verifier still hard-codes `scheduler_admission: false`. Production use needs independently rerun Lean extraction and exact edge-set comparison under the pinned source and environment. The in-memory signature self-test uses a deterministic synthetic key only; never use its seed for real signing.
+
 A passing run means only:
 - the graph envelope matches the structural contract;
 - declared artifact paths stay inside the canonical evidence root and contain no symlink component;
@@ -50,10 +59,10 @@ A passing run means only:
 - edge evidence and review artifact bytes match their declared SHA-256 digests;
 - typed relations, endpoint kinds, status fields and reference joins are internally consistent.
 
-The graph manifest itself is also **not authenticated** by this CLI. An attacker who can replace the manifest and all referenced files can construct a different internally consistent snapshot. The caller must pin the manifest digest or verify an externally signed manifest envelope against an out-of-band key registry before relying on its claimed origin. The current CLI only verifies internal byte joins under the supplied root.
+In `--verify` mode, the graph manifest itself is not authenticated. `--verify-attested` adds an external-key-registry-bound signature check, but still authenticates only the issuer and exact manifest bytes, not the semantic truth of the extractor's claims.
 
 A passing run does **not**:
-- authenticate the graph manifest or prove that an extractor receipt truthfully describes a Lean elaboration event;
+- prove that an extractor receipt truthfully describes a Lean elaboration event;
 - prove source-to-statement or informal-to-formal semantic correspondence;
 - authenticate reviewer signatures or reviewer-key revocation;
 - prove that a proof-term dependency is logically necessary;

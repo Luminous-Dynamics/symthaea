@@ -54,7 +54,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo test --locked --manifest-path "$PITB_GRAPH_EVIDENCE_MANIFEST"
+          cargo test --manifest-path "$PITB_GRAPH_EVIDENCE_MANIFEST"
 
       - name: Validate schema and synthetic fixture
         run: |
@@ -64,12 +64,17 @@ jobs:
           from pathlib import Path
           from jsonschema import Draft202012Validator
 
-          schema = json.loads(Path("tools/pitb-graph-evidence/schema/proof-graph-evidence-v0.schema.json").read_text())
+          schema_path = Path("tools/pitb-graph-evidence/schema/proof-graph-evidence-v0.schema.json")
+          schema = json.loads(schema_path.read_text())
           fixture = json.loads(Path("tools/pitb-graph-evidence/fixtures/graph-evidence.synthetic.json").read_text())
           Draft202012Validator.check_schema(schema)
           errors = sorted(Draft202012Validator(schema).iter_errors(fixture), key=lambda e: list(e.path))
           if errors:
               raise SystemExit("\n".join(f"{list(e.path)}: {e.message}" for e in errors))
+          for name in ("graph-snapshot-attestation-v0.schema.json", "graph-signer-registry-v0.schema.json"):
+              signed_schema = json.loads((schema_path.parent / name).read_text())
+              Draft202012Validator.check_schema(signed_schema)
+          print("PITB_GRAPH_SIGNATURE_SCHEMAS_PASS")
           import copy
           def must_reject(label, mutate):
               candidate = copy.deepcopy(fixture)
@@ -108,7 +113,7 @@ jobs:
       - name: Run evidence-byte and adversarial self-tests
         run: |
           set -euo pipefail
-          cargo run --locked --manifest-path "$PITB_GRAPH_EVIDENCE_MANIFEST" -- \
+          cargo run --manifest-path "$PITB_GRAPH_EVIDENCE_MANIFEST" -- \
             --self-test \
             tools/pitb-graph-evidence/fixtures/graph-evidence.synthetic.json \
             tools/pitb-graph-evidence/fixtures/evidence

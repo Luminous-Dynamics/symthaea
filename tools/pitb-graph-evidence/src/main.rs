@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{
@@ -82,6 +83,7 @@ struct Summary {
     module_environment_edge_count: usize,
     retrieval_hint_edge_count: usize,
     rejected_edge_count: usize,
+    snapshot_signature_verified: bool,
     scheduler_admission: bool,
     scheduler_admission_note: String,
 }
@@ -575,8 +577,9 @@ fn validate_value(value: &Value) -> Result<(Graph, Summary), String> {
         module_environment_edge_count,
         retrieval_hint_edge_count,
         rejected_edge_count,
+        snapshot_signature_verified: false,
         scheduler_admission: false,
-        scheduler_admission_note: "v0 verifies typed graph structure and artifact byte identity only; no edge is admitted to the proof scheduler until an independent semantic receipt verifier authenticates extractor output and source correspondence".into(),
+        scheduler_admission_note: "graph structure, artifact bytes and optional issuer signature do not prove extractor semantics; scheduler admission still requires independent Lean re-extraction, exact source/environment comparison and semantic review".into(),
     };
     Ok((graph, summary))
 }
@@ -613,6 +616,347 @@ fn resolve_artifact(root: &Path, relative: &str) -> Result<PathBuf, String> {
         return Err(format!("artifact is not a regular file: {relative}"));
     }
     Ok(current)
+}
+
+
+
+fn sha256_bytes(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn encode_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut encoded = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        encoded.push(HEX[(byte >> 4) as usize] as char);
+        encoded.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    encoded
+}
+
+fn decode_hex_array<const N: usize>(value: &str, label: &str) -> Result<[u8; N], String> {
+    if !valid_hex(value, N * 2) {
+        return Err(format!("{label} must be exactly {} lowercase hex characters", N * 2));
+    }
+    let mut decoded = [0_u8; N];
+    for (index, output) in decoded.iter_mut().enumerate() {
+        let start = index * 2;
+        *output = u8::from_str_radix(&value[start..start + 2], 16)
+            .map_err(|error| format!("decode {label}: {error}"))?;
+    }
+    Ok(decoded)
+}
+
+fn require_exact_fields(value: &Value, allowed: &[&str], label: &str) -> Result<(), String> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| format!("{label} must be a JSON object"))?;
+    let allowed_set: BTreeSet<&str> = allowed.iter().copied().collect();
+    if object.len() != allowed_set.len()
+        || object.keys().any(|key| !allowed_set.contains(key.as_str()))
+    {
+        return Err(format!("{label} contains missing or unknown fields"));
+    }
+    Ok(())
+}
+
+fn verify_snapshot_attestation(
+    manifest_bytes: &[u8],
+    attestation_bytes: &[u8],
+    registry_bytes: &[u8],
+    externally_pinned_registry_sha256: &str,
+    graph: &Graph,
+) -> Result<(), String> {
+    if !valid_sha256(externally_pinned_registry_sha256) {
+        return Err("externally pinned key-registry SHA-256 is malformed".into());
+    }
+    let actual_registry_sha256 = sha256_bytes(registry_bytes);
+    if actual_registry_sha256 != externally_pinned_registry_sha256 {
+        return Err("key-registry bytes differ from the out-of-band pinned SHA-256".into());
+    }
+
+    let registry: Value = serde_json::from_slice(registry_bytes)
+        .map_err(|error| format!("parse graph signer key registry: {error}"))?;
+    require_exact_fields(&registry, &["schema_version", "registry_id", "keys"], "key registry")?;
+    if value_string(&registry["schema_version"], "registry.schema_version")?
+        != "pitb.graph-signer-registry.v0"
+        || !non_empty(value_string(&registry["registry_id"], "registry.registry_id")?)
+    {
+        return Err("unsupported or unnamed graph signer key registry".into());
+    }
+    let keys = registry["keys"]
+        .as_array()
+        .ok_or("registry.keys must be an array")?;
+    if keys.is_empty() {
+        return Err("graph signer key registry cannot be empty".into());
+    }
+
+    let mut previous_key_id: Option<&str> = None;
+    let mut matching_key: Option<&Value> = None;
+    for key in keys {
+        require_exact_fields(
+            key,
+            &["key_id", "signer_id", "public_key_ed25519_hex", "status"],
+            "graph signer key entry",
+        )?;
+        let key_id = value_string(&key["key_id"], "key.key_id")?;
+        let signer_id = value_string(&key["signer_id"], "key.signer_id")?;
+        let status = value_string(&key["status"], "key.status")?;
+        if !non_empty(key_id) || !non_empty(signer_id) {
+            return Err("key registry identifiers cannot be empty".into());
+        }
+        if previous_key_id.is_some_and(|previous| previous >= key_id) {
+            return Err("graph signer keys must be sorted and unique by key_id".into());
+        }
+        previous_key_id = Some(key_id);
+        if !matches!(status, "active" | "revoked") {
+            return Err("graph signer registry contains an unknown key status".into());
+        }
+        let public_key_hex =
+            value_string(&key["public_key_ed25519_hex"], "key.public_key_ed25519_hex")?;
+        if !valid_hex(public_key_hex, 64) {
+            return Err("graph signer public key must be 64 lowercase hex characters".into());
+        }
+    }
+
+    let attestation: Value = serde_json::from_slice(attestation_bytes)
+        .map_err(|error| format!("parse graph snapshot attestation: {error}"))?;
+    require_exact_fields(
+        &attestation,
+        &[
+            "schema_version",
+            "canonicalization",
+            "signer_id",
+            "key_id",
+            "graph_manifest_sha256",
+            "snapshot_id",
+            "repository_commit",
+            "environment_sha256",
+            "extractor_id",
+            "extractor_version",
+            "extractor_config_sha256",
+            "signature_ed25519_hex",
+        ],
+        "graph snapshot attestation",
+    )?;
+    if value_string(&attestation["schema_version"], "attestation.schema_version")?
+        != "pitb.graph-snapshot-attestation.v0"
+        || value_string(&attestation["canonicalization"], "attestation.canonicalization")?
+            != "serde-json-map-sorted-compact-v0"
+    {
+        return Err("unsupported graph snapshot attestation or canonicalization version".into());
+    }
+
+    let actual_manifest_sha256 = sha256_bytes(manifest_bytes);
+    let expected_bindings = [
+        ("snapshot_id", graph.snapshot.snapshot_id.as_str()),
+        ("repository_commit", graph.snapshot.repository_commit.as_str()),
+        ("environment_sha256", graph.snapshot.environment_sha256.as_str()),
+        ("extractor_id", graph.snapshot.extractor_id.as_str()),
+        ("extractor_version", graph.snapshot.extractor_version.as_str()),
+        (
+            "extractor_config_sha256",
+            graph.snapshot.extractor_config_sha256.as_str(),
+        ),
+        ("graph_manifest_sha256", actual_manifest_sha256.as_str()),
+    ];
+    for (field, expected) in expected_bindings {
+        let observed = value_string(&attestation[field], &format!("attestation.{field}"))?;
+        if observed != expected {
+            return Err(format!("graph snapshot attestation does not bind {field}"));
+        }
+    }
+
+    let signer_id = value_string(&attestation["signer_id"], "attestation.signer_id")?;
+    let key_id = value_string(&attestation["key_id"], "attestation.key_id")?;
+    if !non_empty(signer_id) || !non_empty(key_id) {
+        return Err("attestation signer_id and key_id cannot be empty".into());
+    }
+    for key in keys {
+        if value_string(&key["key_id"], "key.key_id")? == key_id {
+            matching_key = Some(key);
+            break;
+        }
+    }
+    let key = matching_key.ok_or("attestation key_id is not present in the pinned registry")?;
+    if value_string(&key["status"], "key.status")? != "active" {
+        return Err("graph snapshot signing key is revoked".into());
+    }
+    if value_string(&key["signer_id"], "key.signer_id")? != signer_id {
+        return Err("attestation signer identity does not match the pinned registry".into());
+    }
+
+    let public_key_hex =
+        value_string(&key["public_key_ed25519_hex"], "key.public_key_ed25519_hex")?;
+    let public_key_bytes =
+        decode_hex_array::<32>(public_key_hex, "graph snapshot Ed25519 public key")?;
+    let verifying_key = VerifyingKey::from_bytes(&public_key_bytes)
+        .map_err(|error| format!("parse graph snapshot Ed25519 key: {error}"))?;
+    let signature_hex = value_string(
+        &attestation["signature_ed25519_hex"],
+        "attestation.signature_ed25519_hex",
+    )?;
+    let signature_bytes =
+        decode_hex_array::<64>(signature_hex, "graph snapshot Ed25519 signature")?;
+    let signature = Signature::from_bytes(&signature_bytes);
+
+    let mut signed_payload = attestation.clone();
+    signed_payload
+        .as_object_mut()
+        .ok_or("graph snapshot attestation must be an object")?
+        .remove("signature_ed25519_hex");
+    // serde_json::Map uses lexical key order in this crate configuration;
+    // the compact encoding is part of the signed v0 protocol.
+    let canonical_payload = serde_json::to_vec(&signed_payload)
+        .map_err(|error| format!("canonicalize graph snapshot attestation: {error}"))?;
+    verifying_key
+        .verify(&canonical_payload, &signature)
+        .map_err(|error| format!("graph snapshot Ed25519 signature verification failed: {error}"))?;
+    Ok(())
+}
+
+fn signature_negative_control(
+    label: &str,
+    manifest_bytes: &[u8],
+    attestation_bytes: &[u8],
+    registry_bytes: &[u8],
+    pinned_registry_sha256: &str,
+    graph: &Graph,
+) -> Result<(), String> {
+    if verify_snapshot_attestation(
+        manifest_bytes,
+        attestation_bytes,
+        registry_bytes,
+        pinned_registry_sha256,
+        graph,
+    )
+    .is_ok()
+    {
+        return Err(format!("snapshot attestation accepted negative control: {label}"));
+    }
+    println!("SIGNATURE_NEGATIVE_CONTROL_PASS {label}");
+    Ok(())
+}
+
+fn synthetic_signature_controls(manifest_bytes: &[u8], graph: &Graph) -> Result<(), String> {
+    // Deterministic test-only seed. It is synthetic and never used as a
+    // production signer; the public fixture stores only the test public key.
+    let secret_seed = [0x42_u8; 32];
+    let signing_key = SigningKey::from_bytes(&secret_seed);
+    let public_key_hex = encode_hex(&signing_key.verifying_key().to_bytes());
+    let registry = serde_json::json!({
+        "schema_version": "pitb.graph-signer-registry.v0",
+        "registry_id": "synthetic-registry-only",
+        "keys": [{
+            "key_id": "synthetic-test-key-1",
+            "signer_id": "synthetic-test-extractor",
+            "public_key_ed25519_hex": public_key_hex,
+            "status": "active"
+        }]
+    });
+    let registry_bytes = serde_json::to_vec(&registry)
+        .map_err(|error| format!("serialize synthetic registry: {error}"))?;
+    let registry_sha256 = sha256_bytes(&registry_bytes);
+
+    let mut attestation = serde_json::json!({
+        "schema_version": "pitb.graph-snapshot-attestation.v0",
+        "canonicalization": "serde-json-map-sorted-compact-v0",
+        "signer_id": "synthetic-test-extractor",
+        "key_id": "synthetic-test-key-1",
+        "graph_manifest_sha256": sha256_bytes(manifest_bytes),
+        "snapshot_id": graph.snapshot.snapshot_id.clone(),
+        "repository_commit": graph.snapshot.repository_commit.clone(),
+        "environment_sha256": graph.snapshot.environment_sha256.clone(),
+        "extractor_id": graph.snapshot.extractor_id.clone(),
+        "extractor_version": graph.snapshot.extractor_version.clone(),
+        "extractor_config_sha256": graph.snapshot.extractor_config_sha256.clone(),
+        "signature_ed25519_hex": ""
+    });
+    let mut payload = attestation.clone();
+    payload
+        .as_object_mut()
+        .ok_or("synthetic attestation must be an object")?
+        .remove("signature_ed25519_hex");
+    let canonical_payload = serde_json::to_vec(&payload)
+        .map_err(|error| format!("serialize synthetic signed payload: {error}"))?;
+    let signature = signing_key.sign(&canonical_payload);
+    attestation["signature_ed25519_hex"] = Value::String(encode_hex(&signature.to_bytes()));
+    let attestation_bytes = serde_json::to_vec(&attestation)
+        .map_err(|error| format!("serialize synthetic signed attestation: {error}"))?;
+
+    verify_snapshot_attestation(
+        manifest_bytes,
+        &attestation_bytes,
+        &registry_bytes,
+        &registry_sha256,
+        graph,
+    )?;
+    println!("SNAPSHOT_SIGNATURE_PASS: exact manifest bytes and extractor identity are signed by an externally pinned key");
+
+    let mut wrong_registry_hash = "0".repeat(64);
+    if wrong_registry_hash == registry_sha256 {
+        wrong_registry_hash.replace_range(..1, "1");
+    }
+    signature_negative_control(
+        "wrong out-of-band registry digest",
+        manifest_bytes,
+        &attestation_bytes,
+        &registry_bytes,
+        &wrong_registry_hash,
+        graph,
+    )?;
+
+    let mut changed_manifest = manifest_bytes.to_vec();
+    changed_manifest.push(b' ');
+    signature_negative_control(
+        "manifest bytes changed after signing",
+        &changed_manifest,
+        &attestation_bytes,
+        &registry_bytes,
+        &registry_sha256,
+        graph,
+    )?;
+
+    let mut revoked_registry = registry.clone();
+    revoked_registry["keys"][0]["status"] = Value::String("revoked".into());
+    let revoked_bytes = serde_json::to_vec(&revoked_registry)
+        .map_err(|error| format!("serialize revoked registry: {error}"))?;
+    let revoked_sha256 = sha256_bytes(&revoked_bytes);
+    signature_negative_control(
+        "revoked signing key",
+        manifest_bytes,
+        &attestation_bytes,
+        &revoked_bytes,
+        &revoked_sha256,
+        graph,
+    )?;
+
+    let mut tampered_attestation = attestation.clone();
+    tampered_attestation["extractor_version"] = Value::String("9.9.9".into());
+    let tampered_bytes = serde_json::to_vec(&tampered_attestation)
+        .map_err(|error| format!("serialize tampered attestation: {error}"))?;
+    signature_negative_control(
+        "extractor identity changed without re-signing",
+        manifest_bytes,
+        &tampered_bytes,
+        &registry_bytes,
+        &registry_sha256,
+        graph,
+    )?;
+
+    let mut unknown = attestation;
+    unknown["unknown_field"] = Value::Bool(true);
+    let unknown_bytes = serde_json::to_vec(&unknown)
+        .map_err(|error| format!("serialize unknown-field attestation: {error}"))?;
+    signature_negative_control(
+        "unknown attestation field",
+        manifest_bytes,
+        &unknown_bytes,
+        &registry_bytes,
+        &registry_sha256,
+        graph,
+    )?;
+    Ok(())
 }
 
 fn verify_artifact_bytes(graph: &Graph, root: &Path) -> Result<(), String> {
@@ -654,6 +998,7 @@ fn self_test(manifest_path: &Path, evidence_root: &Path) -> Result<(), String> {
         .map_err(|error| format!("fixture JSON is invalid: {error}"))?;
     let (graph, summary) = validate_value(&value)?;
     verify_artifact_bytes(&graph, evidence_root)?;
+    synthetic_signature_controls(&bytes, &graph)?;
     if summary.node_count != 7
         || summary.edge_count != 12
         || summary.formal_dependency_edge_count != 8
@@ -765,9 +1110,13 @@ fn self_test(manifest_path: &Path, evidence_root: &Path) -> Result<(), String> {
 
 fn execute() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
-    if args.len() != 4 || !matches!(args[1].as_str(), "--verify" | "--self-test") {
+    let mode = args.get(1).map(String::as_str).unwrap_or("");
+    let expected_len = if mode == "--verify-attested" { 7 } else { 4 };
+    if args.len() != expected_len
+        || !matches!(mode, "--verify" | "--self-test" | "--verify-attested")
+    {
         return Err(format!(
-            "usage: {} --verify|--self-test <graph.json> <evidence-root>",
+            "usage: {} --verify|--self-test <graph.json> <evidence-root> OR --verify-attested <graph.json> <evidence-root> <attestation.json> <key-registry.json> <pinned-registry-sha256>",
             args.first().map(String::as_str).unwrap_or("pitb-graph-evidence")
         ));
     }
@@ -777,18 +1126,33 @@ fn execute() -> Result<(), String> {
         .map_err(|error| format!("cannot read graph manifest: {error}"))?;
     let value: Value = serde_json::from_slice(&bytes)
         .map_err(|error| format!("graph JSON is invalid: {error}"))?;
-    let (graph, summary) = validate_value(&value)?;
+    let (graph, mut summary) = validate_value(&value)?;
     verify_artifact_bytes(&graph, evidence_root)?;
-    if args[1] == "--self-test" {
+
+    if mode == "--self-test" {
         self_test(manifest_path, evidence_root)?;
-    } else {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&summary)
-                .map_err(|error| format!("cannot serialize summary: {error}"))?
-        );
-        println!("PITB_GRAPH_EVIDENCE_INTEGRITY_OK");
+    } else if mode == "--verify-attested" {
+        let attestation_bytes = fs::read(&args[4])
+            .map_err(|error| format!("cannot read graph snapshot attestation: {error}"))?;
+        let registry_bytes = fs::read(&args[5])
+            .map_err(|error| format!("cannot read graph signer key registry: {error}"))?;
+        verify_snapshot_attestation(
+            &bytes,
+            &attestation_bytes,
+            &registry_bytes,
+            &args[6],
+            &graph,
+        )?;
+        summary.snapshot_signature_verified = true;
+        println!("PITB_GRAPH_SNAPSHOT_SIGNATURE_OK");
     }
+
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&summary)
+            .map_err(|error| format!("cannot serialize summary: {error}"))?
+    );
+    println!("PITB_GRAPH_EVIDENCE_INTEGRITY_OK");
     Ok(())
 }
 
