@@ -100,3 +100,27 @@ This is a proposed v1 wire contract. It does not claim that the canonicalizer, R
 ## 9. Evidence endpoint binding
 
 Every proof or test evidence record is bound to both the input representation digest and output representation digest of the precise stage it addresses. A valid test-suite digest is not enough if it was produced for a different transformation or representation. The reference validator rejects endpoint mismatches. This binding establishes evidence association, not proof validity: proof_checked still requires an independently checked proof artifact, while tested_only remains test evidence.
+
+
+## 10. Explicit aggregation plan
+
+The wire contract requires an aggregation_plan with two typed operators:
+
+- projection: none or exists;
+- final: count or weighted_sum.
+
+The pair is fixed by the requested contract in v1:
+
+| Contract | projection | final |
+|---|---|---|
+| #SAT | none | count |
+| WMC | none | weighted_sum |
+| PMC | exists | count |
+| PWMC | exists | weighted_sum |
+| Complex AMC | none | weighted_sum |
+
+For v1, full-assignment contracts declare the entire universe as visible and have no hidden variables. Projected contracts declare disjoint visible and hidden sets. The schema and reference validator reject a contract whose aggregation pair disagrees with its quantifier and coefficient domain.
+
+This makes the most important distinction explicit: existential projection reduces a hidden witness fibre by Boolean existence, while weighted elimination adds the contributions of individual witnesses. PMC and PWMC use the former; WMC and AMC use the latter over the full declared assignment universe. The final operator then counts or weights the resulting assignments as declared.
+
+The aggregation plan is part of the semantic source contract and therefore must be included in canonical serialization and cache keys. It cannot be inferred from a solver executable, track name or target circuit.
