@@ -1,6 +1,6 @@
 # ETH-022: deterministic replay certificates for exact complex-weighted elimination
 
-**Status:** Finite Q(i) Python producer and independent replay checker committed. Rust, Lean, formal correctness and performance qualification remain open.
+**Status:** Q(i) trace producer and independent-checker source committed; the Python test suite was not executed in this session. Rust, Lean, formal correctness and performance qualification remain open.
 
 ## 1. Objective
 
