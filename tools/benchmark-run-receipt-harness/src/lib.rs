@@ -17,7 +17,8 @@ use std::fmt;
 pub const MAX_RECEIPT_BYTES: usize = 16 * 1024 * 1024;
 
 const TOP_LEVEL_KEYS: &[&str] = &[
-    "schema_version", "run_id", "generated_at", "benchmark", "system",
+    "schema_version", "run_id", "generated_at", "evaluation_started_at",
+    "evaluation_completed_at", "benchmark", "system",
     "target_scope", "runner", "comparison", "task_universe",
     "eligible_task_set_sha256", "task_universe_sha256", "task_results",
     "grading_mode", "accounting", "budget_caps", "actual_usage",
@@ -159,6 +160,46 @@ fn nonnegative_u64(value: &Value, context: &str) -> Result<u64, ReceiptError> {
     Ok(n)
 }
 
+fn validate_utc_timestamp<'a>(value: &'a Value, context: &str) -> Result<&'a str, ReceiptError> {
+    let timestamp = string(value, context, false)?;
+    let bytes = timestamp.as_bytes();
+    let separators_ok = bytes.len() == 20
+        && bytes[4] == b'-'
+        && bytes[7] == b'-'
+        && bytes[10] == b'T'
+        && bytes[13] == b':'
+        && bytes[16] == b':'
+        && bytes[19] == b'Z';
+    let digit_positions = [0usize,1,2,3,5,6,8,9,11,12,14,15,17,18];
+    if !separators_ok || digit_positions.iter().any(|index| !bytes[*index].is_ascii_digit()) {
+        return Err(error(
+            ReceiptErrorKind::SchemaViolation,
+            format!("{context} must be a UTC timestamp in YYYY-MM-DDTHH:MM:SSZ form"),
+        ));
+    }
+    let year = timestamp[0..4].parse::<u32>().unwrap_or(0);
+    let month = timestamp[5..7].parse::<u32>().unwrap_or(0);
+    let day = timestamp[8..10].parse::<u32>().unwrap_or(0);
+    let hour = timestamp[11..13].parse::<u32>().unwrap_or(99);
+    let minute = timestamp[14..16].parse::<u32>().unwrap_or(99);
+    let second = timestamp[17..19].parse::<u32>().unwrap_or(99);
+    let leap = year % 400 == 0 || (year % 4 == 0 && year % 100 != 0);
+    let month_days = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => 0,
+    };
+    if year == 0 || day == 0 || day > month_days || hour > 23 || minute > 59 || second > 59 {
+        return Err(error(
+            ReceiptErrorKind::SchemaViolation,
+            format!("{context} is not a valid UTC calendar timestamp"),
+        ));
+    }
+    Ok(timestamp)
+}
+
 fn is_sha256(value: &str) -> bool {
     value.len() == 64
         && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
@@ -258,7 +299,10 @@ fn validate_target_scope(value: &Value) -> Result<(), ReceiptError> {
     Ok(())
 }
 
-fn validate_task_universe(value: &Value) -> Result<(Vec<String>, Vec<Value>, u64, u64), ReceiptError> {
+fn validate_task_universe(
+    value: &Value,
+    evaluation_started_at: &str,
+) -> Result<(Vec<String>, Vec<Value>, u64, u64), ReceiptError> {
     let tasks = arr(value, "task_universe")?;
     if tasks.is_empty() {
         return Err(error(ReceiptErrorKind::SchemaViolation, "task_universe must not be empty"));
@@ -304,7 +348,16 @@ fn validate_task_universe(value: &Value) -> Result<(Vec<String>, Vec<Value>, u64
                     ));
                 }
                 string(required(ex, "reason", &context)?, &format!("{context}.exclusion.reason"), false)?;
-                string(required(ex, "declared_at", &context)?, &format!("{context}.exclusion.declared_at"), false)?;
+                let declared_at = validate_utc_timestamp(
+                    required(ex, "declared_at", &context)?,
+                    &format!("{context}.exclusion.declared_at"),
+                )?;
+                if declared_at > evaluation_started_at {
+                    return Err(error(
+                        ReceiptErrorKind::AccountingMismatch,
+                        format!("{context} exclusion was declared after evaluation started"),
+                    ));
+                }
             }
             other => {
                 return Err(error(
@@ -777,7 +830,24 @@ pub fn verify_receipt_value(value: &Value) -> Result<VerifiedReceipt, ReceiptErr
         return Err(error(ReceiptErrorKind::SchemaViolation, "unsupported schema_version"));
     }
     let run_id = string(required(top, "run_id", "receipt")?, "run_id", false)?.to_owned();
-    string(required(top, "generated_at", "receipt")?, "generated_at", false)?;
+    let evaluation_started_at = validate_utc_timestamp(
+        required(top, "evaluation_started_at", "receipt")?,
+        "evaluation_started_at",
+    )?;
+    let evaluation_completed_at = validate_utc_timestamp(
+        required(top, "evaluation_completed_at", "receipt")?,
+        "evaluation_completed_at",
+    )?;
+    let generated_at = validate_utc_timestamp(
+        required(top, "generated_at", "receipt")?,
+        "generated_at",
+    )?;
+    if evaluation_started_at > evaluation_completed_at || evaluation_completed_at > generated_at {
+        return Err(error(
+            ReceiptErrorKind::AccountingMismatch,
+            "timestamps must satisfy evaluation_started_at <= evaluation_completed_at <= generated_at",
+        ));
+    }
 
     let benchmark = obj(required(top, "benchmark", "receipt")?, "benchmark")?;
     strict_keys(
@@ -833,7 +903,10 @@ pub fn verify_receipt_value(value: &Value) -> Result<VerifiedReceipt, ReceiptErr
     let eligible_task_set_sha = sha256_field(required(top, "eligible_task_set_sha256", "receipt")?, "eligible_task_set_sha256")?;
     let task_universe_sha = sha256_field(required(top, "task_universe_sha256", "receipt")?, "task_universe_sha256")?;
     let (eligible_ids, canonical_rows, universe_count, excluded_count) =
-        validate_task_universe(required(top, "task_universe", "receipt")?)?;
+        validate_task_universe(
+            required(top, "task_universe", "receipt")?,
+            evaluation_started_at,
+        )?;
     if eligible_ids.is_empty() {
         return Err(error(ReceiptErrorKind::SchemaViolation, "receipt must contain at least one eligible task"));
     }
@@ -1115,7 +1188,10 @@ mod tests {
         let eligible_digest = canonical_digest(&eligible).unwrap();
         json!({
             "schema_version":"luminous.benchmark-run-receipt.v1",
-            "run_id":"synthetic-run-001","generated_at":"2026-11-03T00:00:00Z",
+            "run_id":"synthetic-run-001",
+            "generated_at":"2026-11-03T00:01:01Z",
+            "evaluation_started_at":"2026-11-03T00:00:00Z",
+            "evaluation_completed_at":"2026-11-03T00:01:00Z",
             "benchmark":{
                 "id":"synthetic-re-bench","version":"0.1","revision":"fixture-1",
                 "dataset_manifest_sha256":A,"access_class":"synthetic",
