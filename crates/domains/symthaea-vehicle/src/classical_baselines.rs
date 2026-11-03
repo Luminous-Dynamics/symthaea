@@ -239,9 +239,10 @@ impl VehicleClassicalBaseline {
                 }
 
                 let heading_error = wrap_angle(projection.road_heading - state.heading);
-                let cross_track_correction = (config.cross_track_gain * state.lateral_offset)
+                let cross_track_correction = (config.cross_track_gain * projection.lateral_offset)
                     .atan2(state.speed.max(0.0) + config.softening_speed_mps);
-                let curvature_feed_forward = (chassis.wheelbase * state.curvature_ahead
+                let road_curvature = road.curvature_at(projection.s + road.lookahead);
+                let curvature_feed_forward = (chassis.wheelbase * road_curvature
                     * config.curvature_feed_forward_gain)
                     .atan();
                 let steering_angle =
@@ -336,8 +337,10 @@ mod tests {
     fn stanley_turns_toward_center_from_positive_and_negative_offsets() {
         let policy = VehicleClassicalBaseline::StanleyRoad(StanleyRoadConfig::default());
         let mut left = VehicleState::cruising(10.0);
+        left.position_y = 1.0;
         left.lateral_offset = 1.0;
         let mut right = VehicleState::cruising(10.0);
+        right.position_y = -1.0;
         right.lateral_offset = -1.0;
 
         let road = Road::straight();
@@ -363,8 +366,13 @@ mod tests {
         let policy = VehicleClassicalBaseline::StanleyRoad(StanleyRoadConfig::default());
         let mut state = VehicleState::cruising(10.0);
         state.heading = -0.1;
-        state.curvature_ahead = 0.02;
-        let command = policy.command(&state, &Road::straight(), 10.0, &chassis()).unwrap();
+        let curved_road = Road::from_segments(&[
+            crate::road::RoadSegment::Arc {
+                radius: 50.0,
+                sweep_angle: 1.0,
+            },
+        ]);
+        let command = policy.command(&state, &curved_road, 10.0, &chassis()).unwrap();
         assert!(command.steering > 0.0);
     }
 
