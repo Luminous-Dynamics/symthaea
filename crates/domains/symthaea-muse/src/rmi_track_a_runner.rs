@@ -176,14 +176,14 @@ pub fn make_rmi_track_a_fixture_v1(
         trial_index
     );
     let history = vec![
-        crate::rmi_benchmark::RmiHistoryEventV1 {
+        RmiHistoryEventV1 {
             event_id: format!("{trial_id}-history-partner"),
-            actor: crate::rmi_benchmark::RmiHistoryActorV1::Partner,
+            actor: RmiHistoryActorV1::Partner,
             features: control.clone(),
         },
         crate::rmi_benchmark::RmiHistoryEventV1 {
             event_id: format!("{trial_id}-history-agent"),
-            actor: crate::rmi_benchmark::RmiHistoryActorV1::Agent,
+            actor: RmiHistoryActorV1::Agent,
             features: control.clone(),
         },
     ];
