@@ -38,6 +38,8 @@ pub struct VerificationReport {
     pub task_id: Option<String>,
     pub task_contract_sha256: Option<String>,
     pub source_tree_sha256: Option<String>,
+    pub result_tree_sha256: Option<String>,
+    pub tree_digest_algorithm: &'static str,
     pub patch_sha256: Option<String>,
     pub primary_envelope_sha256: Option<String>,
     pub regrade_envelope_sha256: Option<String>,
@@ -66,8 +68,11 @@ pub struct SchemaDigests {
 
 pub struct PairInputs {
     pub task_contract: Vec<u8>,
+    /// Out-of-band pin for the exact task contract bytes.
+    pub expected_task_contract_sha256: String,
     pub task_id: String,
-    pub source_tree_sha256: String,
+    pub source_tree_dir: PathBuf,
+    pub result_tree_dir: PathBuf,
     pub patch: Vec<u8>,
     pub primary_envelope: Vec<u8>,
     pub primary_artifacts_dir: PathBuf,
@@ -1066,6 +1071,7 @@ fn verify_one_receipt(
     task_contract_sha256: &str,
     task: &Value,
     source_tree_sha256: &str,
+    result_tree_sha256: &str,
     patch_sha256: &str,
     requested_task_id: &str,
 ) -> Result<VerifiedReceipt, Failure> {
@@ -1110,6 +1116,9 @@ fn verify_one_receipt(
     if string_field(task_part, "source_tree_sha256", "task")? != source_tree_sha256 {
         return Err(Failure::protocol("receipt source tree digest mismatch"));
     }
+    if string_field(task_part, "source_tree_digest_algorithm", "task")? != TREE_DIGEST_ALGORITHM {
+        return Err(Failure::protocol("receipt source-tree digest algorithm mismatch"));
+    }
     let source_snapshot = field(task, "source_snapshot", "task contract")?;
     if string_field(task_part, "fixture_revision", "task")?
         != string_field(source_snapshot, "revision", "source_snapshot")?
@@ -1120,8 +1129,9 @@ fn verify_one_receipt(
     let candidate = field(predicate, "candidate", "predicate")?;
     if string_field(candidate, "base_tree_sha256", "candidate")? != source_tree_sha256
         || string_field(candidate, "patch_sha256", "candidate")? != patch_sha256
+        || string_field(candidate, "result_tree_sha256", "candidate")? != result_tree_sha256
     {
-        return Err(Failure::protocol("candidate base-tree or patch digest mismatch"));
+        return Err(Failure::protocol("candidate base-tree, result-tree or patch digest mismatch"));
     }
     validate_changed_paths(candidate)?;
 
@@ -1285,6 +1295,8 @@ fn base_report(status: &str, reason: String) -> VerificationReport {
         task_id: None,
         task_contract_sha256: None,
         source_tree_sha256: None,
+        result_tree_sha256: None,
+        tree_digest_algorithm: TREE_DIGEST_ALGORITHM,
         patch_sha256: None,
         primary_envelope_sha256: None,
         regrade_envelope_sha256: None,
@@ -1330,10 +1342,14 @@ fn verify_pair_inner(inputs: &PairInputs) -> Result<VerificationReport, Failure>
         return Err(Failure::protocol("a DSSE envelope exceeds the maximum JSON size"));
     }
     let task_contract_sha256 = sha256_hex(&inputs.task_contract);
-    let patch_sha256 = sha256_hex(&inputs.patch);
-    if !is_sha256(&inputs.source_tree_sha256) {
-        return Err(Failure::protocol("source-tree pin must be 64 lowercase hexadecimal characters"));
+    if !is_sha256(&inputs.expected_task_contract_sha256)
+        || task_contract_sha256 != inputs.expected_task_contract_sha256
+    {
+        return Err(Failure::protocol("task contract digest does not match the out-of-band pin"));
     }
+    let patch_sha256 = sha256_hex(&inputs.patch);
+    let source_tree_sha256 = hash_source_tree_inner(&inputs.source_tree_dir)?;
+    let result_tree_sha256 = hash_source_tree_inner(&inputs.result_tree_dir)?;
 
     let (trust_policy, trusted_keys) = prepare_trust_policy(
         &inputs.trust_policy,
@@ -1345,13 +1361,16 @@ fn verify_pair_inner(inputs: &PairInputs) -> Result<VerificationReport, Failure>
         return Err(Failure::protocol("task contract task_id does not match CLI task_id"));
     }
     let source_snapshot = field(&task, "source_snapshot", "task contract")?;
+    if string_field(source_snapshot, "tree_digest_algorithm", "source_snapshot")? != TREE_DIGEST_ALGORITHM {
+        return Err(Failure::protocol("task source-tree digest algorithm is unsupported"));
+    }
     let task_source_tree = optional_string_field(source_snapshot, "tree_sha256", "source_snapshot")?;
     let execution_status = string_field(&task, "execution_status", "task contract")?;
     if execution_status != "qualified" {
         return Err(Failure::unresolved("task contract is not qualified; design-only and fixture-ready tasks cannot be scored"));
     }
-    if task_source_tree.as_deref() != Some(inputs.source_tree_sha256.as_str()) {
-        return Err(Failure::protocol("source-tree pin does not match the task contract"));
+    if task_source_tree.as_deref() != Some(source_tree_sha256.as_str()) {
+        return Err(Failure::protocol("recomputed source-tree digest does not match the task contract"));
     }
 
     let primary = verify_one_receipt(
@@ -1363,7 +1382,8 @@ fn verify_pair_inner(inputs: &PairInputs) -> Result<VerificationReport, Failure>
         "primary",
         &task_contract_sha256,
         &task,
-        &inputs.source_tree_sha256,
+        &source_tree_sha256,
+        &result_tree_sha256,
         &patch_sha256,
         &inputs.task_id,
     )?;
@@ -1376,7 +1396,8 @@ fn verify_pair_inner(inputs: &PairInputs) -> Result<VerificationReport, Failure>
         "pristine_regrade",
         &task_contract_sha256,
         &task,
-        &inputs.source_tree_sha256,
+        &source_tree_sha256,
+        &result_tree_sha256,
         &patch_sha256,
         &inputs.task_id,
     )?;
@@ -1389,7 +1410,9 @@ fn verify_pair_inner(inputs: &PairInputs) -> Result<VerificationReport, Failure>
         accepted: true,
         task_id: Some(inputs.task_id.clone()),
         task_contract_sha256: Some(task_contract_sha256),
-        source_tree_sha256: Some(inputs.source_tree_sha256.clone()),
+        source_tree_sha256: Some(source_tree_sha256),
+        result_tree_sha256: Some(result_tree_sha256),
+        tree_digest_algorithm: TREE_DIGEST_ALGORITHM,
         patch_sha256: Some(patch_sha256),
         primary_envelope_sha256: Some(primary.envelope_sha256),
         regrade_envelope_sha256: Some(regrade.envelope_sha256),
@@ -2096,6 +2119,7 @@ mod tests {
         });
         assert!(report.accepted, "unexpected verifier rejection: {:?}", report.reasons);
         assert_eq!(report.status, "accepted");
+        assert_eq!(report.tree_digest_algorithm, TREE_DIGEST_ALGORITHM);
         assert_eq!(report.primary_run_id.as_deref(), Some("primary-run-0001"));
         assert_eq!(report.regrade_run_id.as_deref(), Some("regrade-run-0002"));
         assert_ne!(report.primary_envelope_sha256, report.regrade_envelope_sha256);
