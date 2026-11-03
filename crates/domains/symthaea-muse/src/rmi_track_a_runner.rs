@@ -55,6 +55,7 @@ pub struct RmiTrackATrialV1 {
     pub fixed_agent: Result<RmiEvaluationEnvelopeV1, String>,
     pub one_way_prompt_agent: Result<RmiEvaluationEnvelopeV1, String>,
     pub yoked_replay_agent: Result<RmiEvaluationEnvelopeV1, String>,
+    pub unrelated_feature_agent: Result<RmiEvaluationEnvelopeV1, String>,
     pub imitation_agent: Result<RmiEvaluationEnvelopeV1, String>,
     pub synthetic_contingent_agent: Result<RmiEvaluationEnvelopeV1, String>,
     pub fixed_agent_with_responsive_partner: Result<RmiReciprocalEvaluationEnvelopeV1, String>,
@@ -69,6 +70,7 @@ pub struct RmiTrackASummaryV1 {
     pub fixed_agent_zero_sensitivity: usize,
     pub one_way_prompt_zero_sensitivity: usize,
     pub yoked_replay_zero_sensitivity: usize,
+    pub unrelated_feature_zero_target_sensitivity: usize,
     pub imitation_agent_target_sensitive: usize,
     pub positive_agent_target_sensitive: usize,
     pub positive_agent_zero_collateral: usize,
@@ -112,6 +114,15 @@ fn target_name_v1(target: RmiTargetFeatureV1) -> &'static str {
         RmiTargetFeatureV1::Rhythm => "rhythm",
         RmiTargetFeatureV1::Tempo => "tempo",
         RmiTargetFeatureV1::Role => "role",
+    }
+}
+
+fn unrelated_target_v1(target: RmiTargetFeatureV1) -> RmiTargetFeatureV1 {
+    match target {
+        RmiTargetFeatureV1::Motif => RmiTargetFeatureV1::Rhythm,
+        RmiTargetFeatureV1::Rhythm => RmiTargetFeatureV1::Tempo,
+        RmiTargetFeatureV1::Tempo => RmiTargetFeatureV1::Role,
+        RmiTargetFeatureV1::Role => RmiTargetFeatureV1::Motif,
     }
 }
 
@@ -356,6 +367,7 @@ pub fn run_rmi_track_a_suite_v1(
             "fixed-response-agent-v1".into(),
             "one-way-prompt-agent-v1".into(),
             "yoked-replay-agent-v1".into(),
+            "unrelated-feature-agent-v1".into(),
             "imitation-only-agent-v1".into(),
             "synthetic-contingent-agent-motif".into(),
             "synthetic-contingent-agent-rhythm".into(),
@@ -389,6 +401,10 @@ pub fn run_rmi_track_a_suite_v1(
                 yoked_replay_agent_v1(target, trial_index, seed_root)?;
             let yoked_replay_agent =
                 capture(evaluate_rmi_pair(&yoked_policy, &pair));
+            let unrelated_feature_agent = capture(evaluate_rmi_pair(
+                &contingent_agent_v1(unrelated_target_v1(target)),
+                &pair,
+            ));
             let imitation_agent = capture(evaluate_rmi_pair(&imitation_agent_v1(), &pair));
             let synthetic_contingent_agent =
                 capture(evaluate_rmi_pair(&contingent_agent_v1(target), &pair));
@@ -419,6 +435,7 @@ pub fn run_rmi_track_a_suite_v1(
                 fixed_agent,
                 one_way_prompt_agent,
                 yoked_replay_agent,
+                unrelated_feature_agent,
                 imitation_agent,
                 synthetic_contingent_agent,
                 fixed_agent_with_responsive_partner,
@@ -437,6 +454,7 @@ pub fn run_rmi_track_a_suite_v1(
             trial.fixed_agent.is_ok(),
             trial.one_way_prompt_agent.is_ok(),
             trial.yoked_replay_agent.is_ok(),
+            trial.unrelated_feature_agent.is_ok(),
             trial.imitation_agent.is_ok(),
             trial.synthetic_contingent_agent.is_ok(),
             trial.fixed_agent_with_responsive_partner.is_ok(),
@@ -457,6 +475,11 @@ pub fn run_rmi_track_a_suite_v1(
         }
         if let Ok(result) = &trial.yoked_replay_agent {
             summary.yoked_replay_zero_sensitivity +=
+                usize::from(!result.payload.targeted_input_sensitivity);
+            summary.agent_order_swap_verified += usize::from(result.payload.arm_order_swap_verified);
+        }
+        if let Ok(result) = &trial.unrelated_feature_agent {
+            summary.unrelated_feature_zero_target_sensitivity +=
                 usize::from(!result.payload.targeted_input_sensitivity);
             summary.agent_order_swap_verified += usize::from(result.payload.arm_order_swap_verified);
         }
@@ -502,6 +525,7 @@ pub fn run_rmi_track_a_suite_v1(
         && summary.fixed_agent_zero_sensitivity == summary.trials
         && summary.one_way_prompt_zero_sensitivity == summary.trials
         && summary.yoked_replay_zero_sensitivity == summary.trials
+        && summary.unrelated_feature_zero_target_sensitivity == summary.trials
         && summary.imitation_agent_target_sensitive == summary.trials
         && summary.positive_agent_target_sensitive == summary.trials
         && summary.positive_agent_zero_collateral == summary.trials
@@ -563,6 +587,19 @@ mod tests {
     }
 
     #[test]
+    fn wrong_feature_agent_is_not_counted_as_target_sensitive() {
+        for target in targets_v1() {
+            let pair = make_rmi_track_a_fixture_v1(target, 3, 42).unwrap();
+            let result = evaluate_rmi_pair(
+                &contingent_agent_v1(unrelated_target_v1(target)),
+                &pair,
+            )
+            .unwrap();
+            assert!(!result.payload.targeted_input_sensitivity);
+        }
+    }
+
+    #[test]
     fn yoked_replay_binds_a_distinct_donor_fixture() {
         let pair = make_rmi_track_a_fixture_v1(RmiTargetFeatureV1::Motif, 4, 42).unwrap();
         let (policy, donor_id, donor_digest) =
@@ -585,6 +622,7 @@ mod tests {
         assert_eq!(first.payload.summary.fixed_agent_zero_sensitivity, 8);
         assert_eq!(first.payload.summary.one_way_prompt_zero_sensitivity, 8);
         assert_eq!(first.payload.summary.yoked_replay_zero_sensitivity, 8);
+        assert_eq!(first.payload.summary.unrelated_feature_zero_target_sensitivity, 8);
         assert_eq!(first.payload.summary.imitation_agent_target_sensitive, 8);
         assert_eq!(first.payload.summary.positive_agent_target_sensitive, 8);
         assert_eq!(first.payload.summary.positive_agent_zero_collateral, 8);
