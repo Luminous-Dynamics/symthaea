@@ -77,10 +77,19 @@ The third condition is deliberately strict: unresolved outcomes could conceal fa
 
 **This is an IID diagnostic, not a cluster-adjusted confidence bound.** The grouped partition audit does not make repeated runs on one machine/day/soil lot independent. A valid inferential claim requires a preregistered challenge sampling plan with defensible independent units or a separate cluster-aware method. Do not use items, coupons, images, frames or assay replicates as independent trials.
 
-## Deliberate omissions
+## Probabilistic scoring and reliability
 
-The evaluator does not yet compute:
-- probability calibration metrics such as Brier score, log loss, reliability diagrams or interval coverage;
+For each endpoint, the evaluator additionally reports:
+- run-balanced Brier score and binary log loss, averaging item-level scores within a physical run before averaging runs;
+- run-balanced mean predicted pass probability and observed item pass fraction;
+- ten fixed-width reliability bins over each run's mean endpoint probability, with per-bin physical-run counts, mean prediction and mean observed item pass fraction;
+- resolved and unresolved run counts and the number of resolved item × endpoint pairs.
+
+An endpoint/run is scored only when every item has an adjudicable PASS or FAIL result for that endpoint. If any item is INDETERMINATE, the whole endpoint/run is excluded from binary probabilistic scoring and counted as unresolved. No missing label is imputed.
+
+The run-balanced weighting prevents larger loads from automatically contributing more statistical weight than single-item runs. Within each run, however, item-level predictions still contribute to the run's mean scoring loss. Reliability bins are descriptive; sparse bins are not strong evidence of calibration.
+
+Brier score and log loss measure probabilistic prediction quality but do not establish a safe false-release bound. The reliability summary is not a substitute for a separate model calibration protocol, locked confirmation, external replication or cluster-aware confidence intervals. The evaluator does not derive calibrated probabilities or recalibrate on the target data.
 - cluster-robust confidence intervals or hierarchical models;
 - causal comparisons between sensor tiers;
 - cost-weighted policy value or adaptive treatment effects;
@@ -90,7 +99,7 @@ Those must be added only with explicit calibration partitions, estimands, groupi
 
 ## Test coverage authored
 
-12 source-authored unit tests cover:
+14 source-authored unit tests cover:
 - threshold sorting and run-level risk/coverage;
 - a false-accepting challenge run;
 - unresolved assay truth and unverifiable release;
@@ -101,6 +110,8 @@ Those must be added only with explicit calibration partitions, estimands, groupi
 - external replication requiring a locked-confirmation partition;
 - frozen model/calibration identity;
 - invalid probability range;
+- run-balanced Brier/log-loss and reliability-bin arithmetic;
+- unresolved endpoint results excluded from binary scores and retained in the denominator;
 - missing evaluation runs and unsupported target partitions.
 
 These tests are source-authored. Cargo test/fmt/clippy must be run against the exact PR head before merge. No physical observer or early-stop performance is claimed.
