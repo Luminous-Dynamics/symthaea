@@ -12,6 +12,8 @@ First-principles and calibration-bounded engineering primitives for Luminous Ins
 - `pareto`: non-dominated candidate extraction over residual-soil fraction, energy, fresh water and duration.
 - `chemistry`: evidence-bounded validation of phase-resolved detergent release schedules against exact formulation, soil/surface, stage-temperature, water-hardness, per-release/per-cycle/total-dose and component-interaction calibrations. It validates a proposed plan; it does not formulate detergent, choose a dose, measure actual delivery or certify cleaning.
 
+See [detergent-control prior-art screening](docs/detergent-control-prior-art.md), the exploratory [signed dishcare calibration manifest](docs/signed-dishcare-manifest-draft.md), and the [FTO/interoperability research issue](https://github.com/Luminous-Dynamics/symthaea/issues/10219).
+
 See [phase-resolved chemistry benchmark](docs/phase-resolved-chemistry-benchmark.md) and the experiment [per-release dose event schema](experiments/dose-events-template.csv).
 
 ## Run
