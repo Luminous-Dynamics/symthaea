@@ -1,0 +1,90 @@
+{
+  "schema_version": "0.1.0",
+  "fate_inventory_id": "target-fates-demo-release-2",
+  "target_world": {
+    "world_id": "target-world-fate-demo",
+    "release_id": "release-2"
+  },
+  "target_manifest_sha256": "44603beb6d16ee64dca4cdcb51b45e79313ffe81e22e215e630b4aa684a5daef",
+  "correspondence_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "fates": [
+    {
+      "target_object_id": "segment-1",
+      "object_type": "SEGMENT",
+      "status": "MAPPED",
+      "mapping_id": "map-segment-1",
+      "alternative_set_id": null,
+      "scope_policy_sha256": null,
+      "reason_code": null,
+      "evidence_ids": [
+        "ev-segment-lineage-1"
+      ]
+    },
+    {
+      "target_object_id": "neuron-5-candidate-a",
+      "object_type": "NEURON",
+      "status": "ALTERNATIVE_CANDIDATE",
+      "mapping_id": "map-neuron-5-a",
+      "alternative_set_id": "neuron-5-candidates-v1",
+      "scope_policy_sha256": null,
+      "reason_code": null,
+      "evidence_ids": [
+        "ev-neuron-morphology-a"
+      ]
+    },
+    {
+      "target_object_id": "neuron-5-candidate-b",
+      "object_type": "NEURON",
+      "status": "ALTERNATIVE_CANDIDATE",
+      "mapping_id": "map-neuron-5-b",
+      "alternative_set_id": "neuron-5-candidates-v1",
+      "scope_policy_sha256": null,
+      "reason_code": null,
+      "evidence_ids": [
+        "ev-neuron-morphology-b"
+      ]
+    },
+    {
+      "target_object_id": "synapse-target-only",
+      "object_type": "SYNAPSE",
+      "status": "TARGET_ONLY_UNRESOLVED",
+      "mapping_id": null,
+      "alternative_set_id": null,
+      "scope_policy_sha256": null,
+      "reason_code": "NO_ADJUDICATED_SOURCE_PARTNER_MAPPING",
+      "evidence_ids": [
+        "ev-synapse-target-search"
+      ]
+    },
+    {
+      "target_object_id": "debug-artifact-1",
+      "object_type": "ARTIFACT",
+      "status": "OUT_OF_SCOPE",
+      "mapping_id": null,
+      "alternative_set_id": null,
+      "scope_policy_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "reason_code": "DERIVED_DEBUG_ARTIFACT_EXCLUDED_BY_POLICY",
+      "evidence_ids": [
+        "ev-debug-artifact-inventory"
+      ]
+    }
+  ],
+  "summary": {
+    "target_object_count": 5,
+    "mapped_object_count": 1,
+    "alternative_candidate_object_count": 2,
+    "target_only_unresolved_object_count": 1,
+    "out_of_scope_object_count": 1,
+    "rejected_object_count": 0,
+    "object_type_counts": {
+      "SEGMENT": 1,
+      "NEURON": 2,
+      "SYNAPSE": 1,
+      "ARTIFACT": 1
+    }
+  },
+  "provenance": {
+    "target_manifest_sha256": "44603beb6d16ee64dca4cdcb51b45e79313ffe81e22e215e630b4aa684a5daef",
+    "correspondence_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+  }
+}
