@@ -82,7 +82,7 @@ pub struct ComponentInteraction {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ValidatedFormulation {
+pub struct FormulationCalibrationProfile {
     pub formulation_id: String,
     pub formulation_evidence_sha256: String,
     pub maximum_total_dose_g: f64,
@@ -182,7 +182,7 @@ fn non_empty(value: &str) -> bool {
     !value.trim().is_empty()
 }
 
-fn validate_formulation(formulation: &ValidatedFormulation) -> Result<(), ChemistryError> {
+fn validate_formulation(formulation: &FormulationCalibrationProfile) -> Result<(), ChemistryError> {
     if !non_empty(&formulation.formulation_id) {
         return Err(ChemistryError::InvalidFormulationId);
     }
@@ -367,7 +367,7 @@ fn validate_stage_windows(
 /// Those conclusions must be established by the formulation owner and independent
 /// physical acceptance tests. If a condition is outside scope, the plan rejects.
 pub fn validate_dose_plan(
-    formulation: &ValidatedFormulation,
+    formulation: &FormulationCalibrationProfile,
     request: &DosePlanRequest,
 ) -> Result<ValidatedDoseSummary, ChemistryError> {
     validate_formulation(formulation)?;
@@ -548,8 +548,8 @@ mod tests {
         }
     }
 
-    fn formulation() -> ValidatedFormulation {
-        ValidatedFormulation {
+    fn formulation() -> FormulationCalibrationProfile {
+        FormulationCalibrationProfile {
             formulation_id: "test-formulation-v1".to_owned(),
             formulation_evidence_sha256: "b".repeat(64),
             maximum_total_dose_g: 3.0,
