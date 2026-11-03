@@ -131,6 +131,8 @@ pub struct ServiceAccountingReport {
     pub service_request_id: String,
     pub attempt_count: usize,
     pub physical_run_count: usize,
+    /// Number of physical attempts containing at least one previously attempted item.
+    pub rewash_attempt_count: usize,
     pub unique_item_count: usize,
     pub item_attempt_visits: usize,
     pub reattempted_item_visits: usize,
@@ -179,6 +181,7 @@ pub fn account_service(
     let mut qualified_items = BTreeSet::new();
     let mut first_pass_qualified_items = BTreeSet::new();
     let mut item_attempt_visits = 0_usize;
+    let mut rewash_attempt_count = 0_usize;
     let mut total_resources = AttemptResources::default();
     let mut earliest_start = u64::MAX;
     let mut latest_finish = 0_u64;
@@ -248,6 +251,7 @@ pub fn account_service(
 
         let mut items_in_attempt = HashSet::new();
         let mut first_seen_in_attempt = HashSet::new();
+        let mut includes_reattempted_item = false;
         for item_id in &attempt.item_ids {
             if !canonical_non_empty(item_id) {
                 return Err(ServiceAccountingError::InvalidIdentity("item_id"));
@@ -266,10 +270,17 @@ pub fn account_service(
             }
             if !seen_items.contains(item_id.as_str()) {
                 first_seen_in_attempt.insert(item_id.as_str());
+            } else {
+                includes_reattempted_item = true;
             }
             seen_items.insert(item_id.clone());
             item_attempt_visits = item_attempt_visits.checked_add(1)
                 .ok_or(ServiceAccountingError::InvalidResource("item_attempt_visits overflow"))?;
+        }
+
+        if includes_reattempted_item {
+            rewash_attempt_count = rewash_attempt_count.checked_add(1)
+                .ok_or(ServiceAccountingError::InvalidResource("rewash_attempt_count overflow"))?;
         }
 
         let mut decisions: HashMap<(&str, Endpoint), Decision> = HashMap::new();
@@ -344,6 +355,7 @@ pub fn account_service(
             .to_owned(),
         attempt_count: attempts.len(),
         physical_run_count: run_ids.len(),
+        rewash_attempt_count,
         unique_item_count,
         item_attempt_visits,
         reattempted_item_visits: item_attempt_visits.saturating_sub(unique_item_count),
@@ -459,6 +471,7 @@ mod tests {
         assert_eq!(report.verified_successful_item_ids, vec!["cup-1"]);
         assert_eq!(report.first_pass_verified_item_ids, vec!["cup-1"]);
         assert_eq!(report.first_pass_verified_item_count, 1);
+        assert_eq!(report.rewash_attempt_count, 0);
         assert_eq!(report.resources_per_verified_item.unwrap().fresh_water_l, 0.7);
     }
 
@@ -475,6 +488,7 @@ mod tests {
         assert_eq!(report.verified_successful_item_count, 1);
         assert!(report.first_pass_verified_item_ids.is_empty());
         assert_eq!(report.first_pass_verified_item_count, 0);
+        assert_eq!(report.rewash_attempt_count, 1);
         assert_eq!(report.item_attempt_visits, 2);
         assert_eq!(report.reattempted_item_visits, 1);
         assert!((report.total_resources.appliance_electricity_kwh - 0.09).abs() < 1e-12);
