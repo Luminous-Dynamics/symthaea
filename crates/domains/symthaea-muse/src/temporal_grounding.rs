@@ -91,6 +91,11 @@ pub enum GroundingPredictionStateV1 {
     NotEstimable {
         reason: String,
     },
+    /// Raw model output could not be parsed into the versioned answer schema.
+    Unparseable {
+        raw_output_sha256: String,
+        reason: String,
+    },
 }
 
 /// Prediction bound to one query and the exact audio artifact clock.
@@ -142,6 +147,10 @@ pub struct TemporalIntervalMatchV1 {
     pub prediction_index: usize,
     pub annotation_index: usize,
     pub interval_iou: f64,
+    /// Signed prediction-minus-annotation error.
+    pub start_error_frames: i64,
+    /// Signed prediction-minus-annotation error.
+    pub end_error_frames: i64,
 }
 
 /// Whether a sample contributes to positive-event or negative-query metrics.
@@ -161,6 +170,7 @@ pub enum GroundingPredictionKindV1 {
     NotDetected,
     Ambiguous,
     NotEstimable,
+    Unparseable,
 }
 
 /// Per-query score. Positive-query P/R/F1 are None for negative or excluded
@@ -170,10 +180,12 @@ pub struct TemporalGroundingScoreV1 {
     pub evaluator_version: String,
     pub query_id: String,
     pub audio_sha256: String,
+    pub sample_rate_hz: u32,
     pub outcome: TemporalGroundingOutcomeV1,
     pub prediction_kind: GroundingPredictionKindV1,
     pub scored: bool,
     pub abstained: bool,
+    pub parse_failure: bool,
     pub ground_truth_occurrences: usize,
     pub predicted_occurrences: usize,
     pub ambiguous_candidate_count: usize,
@@ -278,6 +290,17 @@ pub fn validate_temporal_grounding_prediction(
         }
         GroundingPredictionStateV1::NotEstimable { reason } if reason.trim().is_empty() => {
             issues.push(TemporalGroundingIssue::MissingPredictionStatusReason);
+        }
+        GroundingPredictionStateV1::Unparseable {
+            raw_output_sha256,
+            reason,
+        } => {
+            if !is_lower_hex_digest(raw_output_sha256) {
+                issues.push(TemporalGroundingIssue::InvalidAnnotationDigest);
+            }
+            if reason.trim().is_empty() {
+                issues.push(TemporalGroundingIssue::MissingPredictionStatusReason);
+            }
         }
         _ => {}
     }
@@ -395,10 +418,12 @@ pub fn score_temporal_grounding(
             evaluator_version: plan.evaluator_version.clone(),
             query_id: truth.query_id.clone(),
             audio_sha256: truth.artifact.audio_sha256.clone(),
+            sample_rate_hz: truth.artifact.sample_rate_hz,
             outcome,
             prediction_kind,
             scored: false,
             abstained,
+            parse_failure: matches!(&prediction.state, GroundingPredictionStateV1::Unparseable { .. }),
             ground_truth_occurrences: 0,
             predicted_occurrences,
             ambiguous_candidate_count,
@@ -422,17 +447,20 @@ pub fn score_temporal_grounding(
             GroundingPredictionStateV1::Occurrences { .. } => Some(false),
             GroundingPredictionStateV1::NotDetected
             | GroundingPredictionStateV1::Ambiguous { .. }
-            | GroundingPredictionStateV1::NotEstimable { .. } => None,
+            | GroundingPredictionStateV1::NotEstimable { .. }
+            | GroundingPredictionStateV1::Unparseable { .. } => None,
         };
         let false_positives = predicted_occurrences;
         return Ok(TemporalGroundingScoreV1 {
             evaluator_version: plan.evaluator_version.clone(),
             query_id: truth.query_id.clone(),
             audio_sha256: truth.artifact.audio_sha256.clone(),
+            sample_rate_hz: truth.artifact.sample_rate_hz,
             outcome,
             prediction_kind,
             scored: true,
             abstained,
+            parse_failure: matches!(&prediction.state, GroundingPredictionStateV1::Unparseable { .. }),
             ground_truth_occurrences: 0,
             predicted_occurrences,
             ambiguous_candidate_count,
@@ -483,10 +511,12 @@ pub fn score_temporal_grounding(
         evaluator_version: plan.evaluator_version.clone(),
         query_id: truth.query_id.clone(),
         audio_sha256: truth.artifact.audio_sha256.clone(),
+        sample_rate_hz: truth.artifact.sample_rate_hz,
         outcome,
         prediction_kind,
         scored: true,
         abstained,
+        parse_failure: matches!(&prediction.state, GroundingPredictionStateV1::Unparseable { .. }),
         ground_truth_occurrences: truth.intervals.len(),
         predicted_occurrences,
         ambiguous_candidate_count,
@@ -525,6 +555,9 @@ fn prediction_kind(state: &GroundingPredictionStateV1) -> GroundingPredictionKin
         GroundingPredictionStateV1::Ambiguous { .. } => GroundingPredictionKindV1::Ambiguous,
         GroundingPredictionStateV1::NotEstimable { .. } => {
             GroundingPredictionKindV1::NotEstimable
+        }
+        GroundingPredictionStateV1::Unparseable { .. } => {
+            GroundingPredictionKindV1::Unparseable
         }
     }
 }
@@ -615,6 +648,14 @@ fn maximum_cardinality_matches(
                     predictions[prediction_index],
                     annotations[annotation_index],
                 ),
+                start_error_frames: signed_frame_delta(
+                    predictions[prediction_index].start_frame,
+                    annotations[annotation_index].start_frame,
+                ),
+                end_error_frames: signed_frame_delta(
+                    predictions[prediction_index].end_frame,
+                    annotations[annotation_index].end_frame,
+                ),
             });
         }
     }
@@ -630,6 +671,14 @@ fn maximum_cardinality_matches(
             / matches.len() as f64
     };
     (matches, mean_iou)
+}
+
+fn signed_frame_delta(predicted: u64, annotated: u64) -> i64 {
+    if predicted >= annotated {
+        i64::try_from(predicted - annotated).unwrap_or(i64::MAX)
+    } else {
+        -i64::try_from(annotated - predicted).unwrap_or(i64::MAX)
+    }
 }
 
 fn augment_match(
@@ -678,6 +727,244 @@ fn augment_match(
         }
     }
     false
+}
+
+
+/// Dataset-level metrics derived from per-query score records.
+///
+/// Scores must come from score_temporal_grounding and share one evaluator
+/// version. This function aggregates records; it does not authenticate them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemporalGroundingAggregateV1 {
+    pub evaluator_version: String,
+    pub total_queries: usize,
+    pub scored_queries: usize,
+    pub excluded_ground_truth_queries: usize,
+    pub positive_queries: usize,
+    pub negative_queries: usize,
+    pub abstained_queries: usize,
+    pub parse_failure_queries: usize,
+    pub micro_true_positives: usize,
+    pub micro_false_positives: usize,
+    pub micro_false_negatives: usize,
+    pub micro_precision: Option<f64>,
+    pub micro_recall: Option<f64>,
+    pub micro_f1: Option<f64>,
+    pub macro_positive_f1: Option<f64>,
+    pub mean_matched_iou: Option<f64>,
+    pub start_boundary_mae_ms: Option<f64>,
+    pub start_boundary_p95_ms: Option<f64>,
+    pub end_boundary_mae_ms: Option<f64>,
+    pub end_boundary_p95_ms: Option<f64>,
+    pub one_to_many_queries: usize,
+    pub one_to_many_exact_count: usize,
+    pub one_to_many_count_accuracy: Option<f64>,
+    pub negative_absence_claims: usize,
+    pub negative_correct_absence_claims: usize,
+    pub negative_absence_accuracy: Option<f64>,
+    pub negative_absence_coverage: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TemporalGroundingAggregateIssue {
+    MixedEvaluatorVersions { found: String },
+    DuplicateQueryId { query_id: String },
+    InvalidSampleRate { query_id: String },
+}
+
+/// Aggregate per-query scores without collapsing positive retrieval and
+/// negative absence classification into one metric.
+pub fn aggregate_temporal_grounding_scores(
+    scores: &[TemporalGroundingScoreV1],
+) -> Result<TemporalGroundingAggregateV1, Vec<TemporalGroundingAggregateIssue>> {
+    let mut issues = Vec::new();
+    let evaluator_version = scores
+        .first()
+        .map(|score| score.evaluator_version.clone())
+        .unwrap_or_else(|| TEMPORAL_GROUNDING_EVALUATOR_V1.to_owned());
+    let mut query_ids = std::collections::BTreeSet::new();
+
+    for score in scores {
+        if score.evaluator_version != evaluator_version {
+            issues.push(TemporalGroundingAggregateIssue::MixedEvaluatorVersions {
+                found: score.evaluator_version.clone(),
+            });
+        }
+        if !query_ids.insert(score.query_id.as_str()) {
+            issues.push(TemporalGroundingAggregateIssue::DuplicateQueryId {
+                query_id: score.query_id.clone(),
+            });
+        }
+        if score.sample_rate_hz == 0 {
+            issues.push(TemporalGroundingAggregateIssue::InvalidSampleRate {
+                query_id: score.query_id.clone(),
+            });
+        }
+    }
+    if !issues.is_empty() {
+        return Err(issues);
+    }
+
+    let scored: Vec<_> = scores.iter().filter(|score| score.scored).collect();
+    let positive: Vec<_> = scored
+        .iter()
+        .copied()
+        .filter(|score| score.outcome == TemporalGroundingOutcomeV1::ScoredPresentQuery)
+        .collect();
+    let negative: Vec<_> = scored
+        .iter()
+        .copied()
+        .filter(|score| score.outcome == TemporalGroundingOutcomeV1::ScoredAbsentQuery)
+        .collect();
+
+    let micro_true_positives = positive.iter().map(|score| score.true_positives).sum();
+    let micro_false_positives = positive.iter().map(|score| score.false_positives).sum();
+    let micro_false_negatives = positive.iter().map(|score| score.false_negatives).sum();
+    let positive_denominator = micro_true_positives + micro_false_positives;
+    let truth_denominator = micro_true_positives + micro_false_negatives;
+    let micro_precision = if positive.is_empty() {
+        None
+    } else if positive_denominator == 0 {
+        Some(0.0)
+    } else {
+        Some(micro_true_positives as f64 / positive_denominator as f64)
+    };
+    let micro_recall = if truth_denominator == 0 {
+        None
+    } else {
+        Some(micro_true_positives as f64 / truth_denominator as f64)
+    };
+    let micro_f1 = match (micro_precision, micro_recall) {
+        (Some(precision), Some(recall)) if precision + recall > 0.0 => {
+            Some(2.0 * precision * recall / (precision + recall))
+        }
+        (Some(_), Some(_)) => Some(0.0),
+        _ => None,
+    };
+
+    let macro_positive_f1 = if positive.is_empty() {
+        None
+    } else {
+        Some(
+            positive
+                .iter()
+                .map(|score| score.f1.unwrap_or(0.0))
+                .sum::<f64>()
+                / positive.len() as f64,
+        )
+    };
+
+    let all_matches: Vec<_> = positive
+        .iter()
+        .flat_map(|score| {
+            score.matches.iter().map(move |item| {
+                (
+                    item.interval_iou,
+                    item.start_error_frames.unsigned_abs() as f64 * 1000.0
+                        / score.sample_rate_hz as f64,
+                    item.end_error_frames.unsigned_abs() as f64 * 1000.0
+                        / score.sample_rate_hz as f64,
+                )
+            })
+        })
+        .collect();
+
+    let mean_matched_iou = if all_matches.is_empty() {
+        None
+    } else {
+        Some(
+            all_matches.iter().map(|item| item.0).sum::<f64>()
+                / all_matches.len() as f64,
+        )
+    };
+    let start_errors: Vec<_> = all_matches.iter().map(|item| item.1).collect();
+    let end_errors: Vec<_> = all_matches.iter().map(|item| item.2).collect();
+    let start_boundary_mae_ms = mean_option(&start_errors);
+    let start_boundary_p95_ms = percentile_option(&start_errors, 0.95);
+    let end_boundary_mae_ms = mean_option(&end_errors);
+    let end_boundary_p95_ms = percentile_option(&end_errors, 0.95);
+
+    let one_to_many: Vec<_> = positive
+        .iter()
+        .copied()
+        .filter(|score| score.ground_truth_occurrences > 1)
+        .collect();
+    let one_to_many_exact_count = one_to_many
+        .iter()
+        .filter(|score| score.exact_occurrence_count == Some(true))
+        .count();
+    let one_to_many_count_accuracy = if one_to_many.is_empty() {
+        None
+    } else {
+        Some(one_to_many_exact_count as f64 / one_to_many.len() as f64)
+    };
+
+    let negative_absence_claims = negative
+        .iter()
+        .filter(|score| score.correct_absence_claim.is_some())
+        .count();
+    let negative_correct_absence_claims = negative
+        .iter()
+        .filter(|score| score.correct_absence_claim == Some(true))
+        .count();
+    let negative_absence_accuracy = if negative_absence_claims == 0 {
+        None
+    } else {
+        Some(negative_correct_absence_claims as f64 / negative_absence_claims as f64)
+    };
+    let negative_absence_coverage = if negative.is_empty() {
+        None
+    } else {
+        Some(negative_absence_claims as f64 / negative.len() as f64)
+    };
+
+    Ok(TemporalGroundingAggregateV1 {
+        evaluator_version,
+        total_queries: scores.len(),
+        scored_queries: scored.len(),
+        excluded_ground_truth_queries: scores.len() - scored.len(),
+        positive_queries: positive.len(),
+        negative_queries: negative.len(),
+        abstained_queries: scored.iter().filter(|score| score.abstained).count(),
+        parse_failure_queries: scored.iter().filter(|score| score.parse_failure).count(),
+        micro_true_positives,
+        micro_false_positives,
+        micro_false_negatives,
+        micro_precision,
+        micro_recall,
+        micro_f1,
+        macro_positive_f1,
+        mean_matched_iou,
+        start_boundary_mae_ms,
+        start_boundary_p95_ms,
+        end_boundary_mae_ms,
+        end_boundary_p95_ms,
+        one_to_many_queries: one_to_many.len(),
+        one_to_many_exact_count,
+        one_to_many_count_accuracy,
+        negative_absence_claims,
+        negative_correct_absence_claims,
+        negative_absence_accuracy,
+        negative_absence_coverage,
+    })
+}
+
+fn mean_option(values: &[f64]) -> Option<f64> {
+    if values.is_empty() {
+        None
+    } else {
+        Some(values.iter().sum::<f64>() / values.len() as f64)
+    }
+}
+
+fn percentile_option(values: &[f64], percentile: f64) -> Option<f64> {
+    if values.is_empty() {
+        return None;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    let rank = (percentile.clamp(0.0, 1.0) * sorted.len() as f64).ceil() as usize;
+    Some(sorted[rank.saturating_sub(1).min(sorted.len() - 1)])
 }
 
 #[cfg(test)]
