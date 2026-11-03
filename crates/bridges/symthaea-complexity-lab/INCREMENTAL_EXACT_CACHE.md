@@ -61,7 +61,7 @@ Seed: `20261103`.
 | One factor edit in one of two disconnected triangles | 3 dependent misses; 3 unaffected-component hits |
 | Result agreement for that edit | Incremental = cold = direct enumeration |
 | Reordering original factor list | 6/6 message hits |
-| Same-scope factor split/merge plus unit-factor elision | 2/2 message hits |
+| Same-scope split/merge plus unit-factor elision | 2/2 NaturalCount hits and 2/2 MaxCount hits |
 | Incorrect normalized same-scope product | Rejected by independent normalizer checker |
 | Factor-scope edit | Recomputed safely; exact agreement |
 | Forged/rehashed payload without valid HMAC | Rejected and recomputed |
