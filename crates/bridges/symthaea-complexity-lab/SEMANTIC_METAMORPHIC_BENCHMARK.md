@@ -27,7 +27,8 @@ Source:
 - versioned relation contracts: reference/semantic_metamorphic_relations.json
 
 Result:
-- reference/semantic_metamorphic_results.json
+- reference/semantic_metamorphic_results.json (100 instances per contract)
+- reference/semantic_metamorphic_scale_results.json (1,000 instances per contract)
 
 Execution environment: Python 3.13.5. Fixed seed: 0xE7025.
 
@@ -39,7 +40,9 @@ Observed:
 - 201 base formulas whose exact output was zero;
 - 0 failed relations;
 - targeted semantic controls all passed;
-- runtime for this small reference suite: approximately 0.35 seconds in this environment.
+- default run: 3,000 relation checks and 200 hidden-witness checks in approximately 0.35 seconds;
+- scale run: 30,000 relation checks and 2,000 hidden-witness checks in approximately 3.37 seconds;
+- both runs used the same fixed seed 0xE7025 and produced zero failures.
 
 The direct oracle enumerates all assignments on small finite formulas. The coefficient layer uses exact Fraction pairs, including Gaussian-rational Q(i) coefficients for complex AMC. It does not use floating point.
 
