@@ -1407,7 +1407,11 @@ mod tests {
         assert_eq!(report.verified_item_release_count, 2);
         assert_eq!(report.verified_items_per_hour, 72.0);
         assert_eq!(report.active_request_seconds, 120);
+        assert_eq!(report.active_compartment_seconds_total, 90);
+        assert_eq!(report.compartment_count, 1);
+        assert_eq!(report.compartment_utilization_fraction, 0.9);
         assert_eq!(report.maximum_concurrent_requests, 2);
+        assert_eq!(report.maximum_concurrent_compartments, 1);
         assert_eq!(report.request_latency_p50_seconds, Some(60));
         assert_eq!(report.request_latency_p95_seconds, Some(70));
         assert_eq!(report.first_pass_yield, Some(1.0));
@@ -1441,7 +1445,10 @@ mod tests {
             &basic_resources(),
         ).unwrap();
         assert_eq!(result.maximum_concurrent_requests, 1);
+        assert_eq!(result.maximum_concurrent_compartments, 1);
         assert_eq!(result.active_request_seconds, 90);
+        assert_eq!(result.active_compartment_seconds_total, 90);
+        assert_eq!(result.compartment_utilization_fraction, 0.9);
     }
 
     #[test]
@@ -1528,6 +1535,8 @@ mod tests {
         assert_eq!(result.unresolved_requests_at_window_end, 0);
         assert_eq!(result.verified_item_release_count, 1);
         assert_eq!(result.active_request_seconds, 40);
+        assert_eq!(result.active_compartment_seconds_total, 40);
+        assert_eq!(result.maximum_concurrent_compartments, 1);
         assert_eq!(result.physical_attempt_count_total, 1);
     }
 
@@ -1904,6 +1913,10 @@ mod tests {
         ).unwrap();
 
         assert_eq!(result.maximum_concurrent_requests, 2);
+        assert_eq!(result.maximum_concurrent_compartments, 2);
+        assert_eq!(result.active_compartment_seconds_total, 120);
+        assert_eq!(result.compartment_count, 2);
+        assert_eq!(result.compartment_utilization_fraction, 0.6);
         assert_eq!(result.compartment_stats.len(), 2);
         let cell_a = result.compartment_stats.iter().find(|cell| cell.compartment_id == "cell-01").unwrap();
         let cell_b = result.compartment_stats.iter().find(|cell| cell.compartment_id == "cell-02").unwrap();
