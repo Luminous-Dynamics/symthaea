@@ -142,7 +142,7 @@ pub struct SystemWindowReport {
     pub requests_started_in_window: usize,
     pub requests_completed_in_window: usize,
     pub cancelled_requests_in_window: usize,
-    pub cancelled_items_in_accepted_cohort: usize,
+    pub items_in_cancelled_accepted_requests: usize,
     pub unresolved_requests_at_window_end: usize,
     pub requested_items_in_accepted_cohort: usize,
     pub items_without_verified_qualification_in_accepted_unresolved_requests: usize,
@@ -576,7 +576,7 @@ fn validate_request(
                     request.service_request_id.clone(),
                 ));
             }
-            if cancelled_at_s >= spec.end_at_s {
+            if cancelled_at_s < spec.start_at_s || cancelled_at_s >= spec.end_at_s {
                 return Err(SystemWindowError::RequestOutsideWindow(
                     request.service_request_id.clone(),
                 ));
@@ -685,7 +685,7 @@ pub fn account_system_window(
             WindowRequestState::Cancelled { cancelled_at_s } => cancelled_at_s,
             WindowRequestState::Unresolved { .. } => spec.end_at_s,
         };
-        if request.accepted_at_s < spec.start_at_s && request_end_at_s > spec.start_at_s {
+        if request.accepted_at_s < spec.start_at_s && request_end_at_s >= spec.start_at_s {
             carry_in_count = carry_in_count.checked_add(1)
                 .ok_or(SystemWindowError::CounterOverflow("carry_in_requests"))?;
         }
@@ -1086,7 +1086,7 @@ pub fn account_system_window(
         requests_started_in_window: started_count,
         requests_completed_in_window: completed_count,
         cancelled_requests_in_window: cancelled_count,
-        cancelled_items_in_accepted_cohort: cancelled_item_count,
+        items_in_cancelled_accepted_requests: cancelled_item_count,
         unresolved_requests_at_window_end: unresolved_count,
         requested_items_in_accepted_cohort: requested_item_count,
         items_without_verified_qualification_in_accepted_unresolved_requests: unresolved_item_count,
@@ -1402,7 +1402,7 @@ mod tests {
             &basic_resources(),
         ).unwrap();
         assert_eq!(result.cancelled_requests_in_window, 1);
-        assert_eq!(result.cancelled_items_in_accepted_cohort, 1);
+        assert_eq!(result.items_in_cancelled_accepted_requests, 1);
         assert_eq!(result.unresolved_requests_at_window_end, 0);
         assert_eq!(result.active_request_seconds, 0);
         assert_eq!(result.verified_item_release_count, 0);
@@ -1425,7 +1425,7 @@ mod tests {
             &basic_resources(),
         ).unwrap();
         assert_eq!(result.cancelled_requests_in_window, 1);
-        assert_eq!(result.cancelled_items_in_accepted_cohort, 2);
+        assert_eq!(result.items_in_cancelled_accepted_requests, 2);
         assert_eq!(result.unresolved_requests_at_window_end, 0);
         assert_eq!(result.verified_item_release_count, 1);
         assert_eq!(result.active_request_seconds, 40);
