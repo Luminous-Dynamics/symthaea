@@ -79,6 +79,7 @@ struct Summary {
     relation_counts: BTreeMap<String, usize>,
     role_counts: BTreeMap<String, usize>,
     formal_dependency_edge_count: usize,
+    module_environment_edge_count: usize,
     retrieval_hint_edge_count: usize,
     rejected_edge_count: usize,
     scheduler_admission: bool,
@@ -407,8 +408,11 @@ fn validate_value(value: &Value) -> Result<(Graph, Summary), String> {
     let mut edge_tuples = BTreeSet::new();
     let mut relation_counts = BTreeMap::<String, usize>::new();
     let mut role_counts = BTreeMap::<String, usize>::new();
-    let mut dependency_graph = BTreeMap::<String, BTreeSet<String>>::new();
+    // Observed declaration references may contain valid mutual-recursion SCCs.
+    // Only the module/environment import relation is required to be a DAG here.
+    let mut module_dependency_graph = BTreeMap::<String, BTreeSet<String>>::new();
     let mut formal_dependency_edge_count = 0usize;
+    let mut module_environment_edge_count = 0usize;
     let mut retrieval_hint_edge_count = 0usize;
     let mut rejected_edge_count = 0usize;
 
@@ -512,10 +516,13 @@ fn validate_value(value: &Value) -> Result<(Graph, Summary), String> {
             rejected_edge_count += 1;
         } else if is_formal_dependency(&edge.relation) {
             formal_dependency_edge_count += 1;
-            dependency_graph
-                .entry(edge.source_node_id.clone())
-                .or_default()
-                .insert(edge.target_node_id.clone());
+            if edge.relation == "module_environment_dependency" {
+                module_environment_edge_count += 1;
+                module_dependency_graph
+                    .entry(edge.source_node_id.clone())
+                    .or_default()
+                    .insert(edge.target_node_id.clone());
+            }
         } else {
             retrieval_hint_edge_count += 1;
         }
@@ -528,7 +535,7 @@ fn validate_value(value: &Value) -> Result<(Graph, Summary), String> {
 
     let mut states = BTreeMap::new();
     for node_id in nodes.keys() {
-        visit_dependency(node_id, &dependency_graph, &mut states)?;
+        visit_dependency(node_id, &module_dependency_graph, &mut states)?;
     }
 
     let summary = Summary {
@@ -539,6 +546,7 @@ fn validate_value(value: &Value) -> Result<(Graph, Summary), String> {
         relation_counts,
         role_counts,
         formal_dependency_edge_count,
+        module_environment_edge_count,
         retrieval_hint_edge_count,
         rejected_edge_count,
         scheduler_admission: false,
@@ -623,6 +631,7 @@ fn self_test(manifest_path: &Path, evidence_root: &Path) -> Result<(), String> {
     if summary.node_count != 7
         || summary.edge_count != 7
         || summary.formal_dependency_edge_count != 4
+        || summary.module_environment_edge_count != 1
         || summary.retrieval_hint_edge_count != 3
         || summary.rejected_edge_count != 0
         || summary.scheduler_admission
@@ -657,13 +666,68 @@ fn self_test(manifest_path: &Path, evidence_root: &Path) -> Result<(), String> {
     bad["artifacts"][0]["path"] = Value::String("../outside.txt".into());
     must_reject("artifact path traversal", &bad)?;
 
+    // Mutual declaration references are valid elaborator observations. They
+    // must not be collapsed into the acyclic helper-plan graph.
+    let mut mutual = value.clone();
+    let mut reverse_type = mutual["edges"][0].clone();
+    reverse_type["edge_id"] = Value::String("mutual-type-reference".into());
+    reverse_type["source_node_id"] = Value::String("helper-normalize".into());
+    reverse_type["target_node_id"] = Value::String("target-main".into());
+    mutual["edges"].as_array_mut().ok_or("fixture edges must be an array")?.push(reverse_type);
+    let (_, mutual_summary) = validate_value(&mutual)?;
+    if mutual_summary.formal_dependency_edge_count != 5 {
+        return Err("mutual formal declaration references were not preserved".into());
+    }
+    println!("MUTUAL_FORMAL_REFERENCE_PASS: observed declaration SCCs remain representable");
+
+    // Module/import dependencies remain acyclic. Add a second module and two
+    // opposing build edges to make the invalid cycle explicit.
     let mut bad = value.clone();
-    let mut reverse = bad["edges"][0].clone();
-    reverse["edge_id"] = Value::String("negative-cycle".into());
-    reverse["source_node_id"] = Value::String("helper-normalize".into());
-    reverse["target_node_id"] = Value::String("target-main".into());
-    bad["edges"].as_array_mut().ok_or("fixture edges must be an array")?.push(reverse);
-    must_reject("formal dependency cycle", &bad)?;
+    bad["nodes"].as_array_mut().ok_or("fixture nodes must be an array")?.push(serde_json::json!({
+        "node_id":"module-child",
+        "kind":"module",
+        "label":"Demo child module",
+        "statement_sha256":"9".repeat(64),
+        "statement_artifact_id":"statement-module-child",
+        "source_locator":"Demo/Child.lean",
+        "formal_name":null
+    }));
+    bad["artifacts"].as_array_mut().ok_or("fixture artifacts must be an array")?.push(serde_json::json!({
+        "artifact_id":"statement-module-child",
+        "kind":"statement",
+        "path":"statements/module-child.txt",
+        "sha256":"9".repeat(64)
+    }));
+    bad["artifacts"].as_array_mut().ok_or("fixture artifacts must be an array")?.push(serde_json::json!({
+        "artifact_id":"edge-module-forward",
+        "kind":"edge_evidence",
+        "path":"edges/module-forward.txt",
+        "sha256":"a".repeat(64)
+    }));
+    bad["artifacts"].as_array_mut().ok_or("fixture artifacts must be an array")?.push(serde_json::json!({
+        "artifact_id":"edge-module-reverse",
+        "kind":"edge_evidence",
+        "path":"edges/module-reverse.txt",
+        "sha256":"b".repeat(64)
+    }));
+    for (edge_id, source, target, artifact_id) in [
+        ("module-forward", "module-root", "module-child", "edge-module-forward"),
+        ("module-reverse", "module-child", "module-root", "edge-module-reverse"),
+    ] {
+        bad["edges"].as_array_mut().ok_or("fixture edges must be an array")?.push(serde_json::json!({
+            "edge_id":edge_id,
+            "source_node_id":source,
+            "target_node_id":target,
+            "relation":"module_environment_dependency",
+            "evidence_class":"lean_build_graph",
+            "status":"observed",
+            "evidence_artifact_id":artifact_id,
+            "confidence":null,
+            "review_artifact_id":null,
+            "reviewer_key_id":null
+        }));
+    }
+    must_reject("module environment dependency cycle", &bad)?;
 
     let mut bad = value.clone();
     bad["unregistered_field"] = Value::Bool(true);
