@@ -61,6 +61,17 @@ This means camera-based load recognition, item classification, automatic dosing 
 
 Official source: https://www.miele.de/en/m/world-premiere-for-the-g8-diamond-8453.htm
 
+### 2026 one-hour wash/dry and adaptive chemical-dosing incumbents
+
+**LG 2026 European platform.** LG's 16 April 2026 release describes a one-hour wash-and-dry platform combining QuadWash Pro micro-bubbles (claimed to help detergent penetrate residue), Dynamic Heat Dry+ (a moisture-absorbing material that improves air circulation), TrueSteam and AI SenseClean. LG says its turbidity sensor monitors prewash, main wash and rinse and adapts water temperature, rinse count and detergent amount through up to 32 combinations. The company says A-grade energy efficiency is available across key models, but the release does not provide one exact SKU's full energy/water/cleaning table. Capture exact model and programme before numeric comparison; do not assume every announced feature is on every regional model.
+- Official LG global release: https://www.lg.com/global/newsroom/news/home-appliance-solution/lg-electronics-to-showcase-new-dishwasher-lineup-at-eurocucina-2026/
+- LG corporate release: https://www.lgcorp.com/media/release/30047
+
+**Henkel Somat Smartwash.** Launched in Germany on 20 October 2026, Smartwash is an add-on dispensing system intended for standard household dishwashers across brands. Henkel says it combines detergent, rinse aid, salt and machine-care components; temperature and movement sensing identify cycle phases and adapt product-release timing and quantity. It is a new incumbent for phase-aware chemistry control, not merely a fixed automatic dispenser. The release contains no independently matched energy, dose-mass, residual-soil or rinse-carryover results.
+- Official Henkel release: https://www.henkel.com/press-and-media/press-releases-and-kits/2026-10-20-henkel-launches-somat-smartwash-2258310
+
+**Competitive boundary.** The combination of turbidity sensing, adaptive detergent quantity, one-hour wash/dry, multi-angle spray, steam and moisture-absorbing drying now appears in announced or launched products. InstantClean cannot claim these features as novel in isolation. Its evidence-based opportunity is to quantify delivered component mass at each phase, fuse formulation-specific calibration with independent soil/rinse endpoints, and demonstrate lower total resources per verified successful clean at matched loading and soil. Do not compare LG's announced one-hour programme with an Eco-label cycle unless the same endpoint and measurement boundary are matched.
+
 ## Exact-model market reference points
 
 | Exact model / reference | Capacity | Labelled eco energy | Water per cycle | Eco duration | Evidence notes |
