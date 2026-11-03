@@ -1392,12 +1392,15 @@ mod tests {
         fs::create_dir_all(root.join("logs")).unwrap();
         let patch = b"diff --git a/src/lib.rs b/src/lib.rs";
         let log = b"independent test report with unique run evidence";
+        let report = b"primary stage report with a unique receipt digest";
         fs::write(root.join("candidate.patch"), patch).unwrap();
         fs::write(root.join("logs/test.log"), log).unwrap();
+        fs::write(root.join("primary-report.json"), report).unwrap();
         let predicate = serde_json::json!({
             "artifacts": [
                 {"artifact_id":"patch","path":"candidate.patch","role":"patch","sha256":sha256_hex(patch),"size_bytes":patch.len()},
-                {"artifact_id":"test-log","path":"logs/test.log","role":"test_log","sha256":sha256_hex(log),"size_bytes":log.len()}
+                {"artifact_id":"test-log","path":"logs/test.log","role":"test_log","sha256":sha256_hex(log),"size_bytes":log.len()},
+                {"artifact_id":"primary-report","path":"primary-report.json","role":"primary_report","sha256":sha256_hex(report),"size_bytes":report.len()}
             ]
         });
         let evidence = validate_artifacts(&predicate, &root, &sha256_hex(patch), "primary").unwrap();
@@ -1409,7 +1412,8 @@ mod tests {
         let traversal = serde_json::json!({
             "artifacts": [
                 {"artifact_id":"patch","path":"../candidate.patch","role":"patch","sha256":sha256_hex(patch),"size_bytes":patch.len()},
-                {"artifact_id":"test-log","path":"logs/test.log","role":"test_log","sha256":sha256_hex(log),"size_bytes":log.len()}
+                {"artifact_id":"test-log","path":"logs/test.log","role":"test_log","sha256":sha256_hex(log),"size_bytes":log.len()},
+                {"artifact_id":"primary-report","path":"primary-report.json","role":"primary_report","sha256":sha256_hex(report),"size_bytes":report.len()}
             ]
         });
         assert!(validate_artifacts(&traversal, &root, &sha256_hex(patch), "primary").is_err());
@@ -1467,13 +1471,16 @@ mod tests {
         fs::create_dir_all(&root).unwrap();
         let patch = b"patch";
         let log = b"evidence";
+        let report = b"primary stage report";
         fs::write(&outside, log).unwrap();
         fs::write(root.join("candidate.patch"), patch).unwrap();
+        fs::write(root.join("primary-report.json"), report).unwrap();
         symlink(&outside, root.join("outside.log")).unwrap();
         let predicate = serde_json::json!({
             "artifacts": [
                 {"artifact_id":"patch","path":"candidate.patch","role":"patch","sha256":sha256_hex(patch),"size_bytes":patch.len()},
-                {"artifact_id":"log","path":"outside.log","role":"test_log","sha256":sha256_hex(log),"size_bytes":log.len()}
+                {"artifact_id":"log","path":"outside.log","role":"test_log","sha256":sha256_hex(log),"size_bytes":log.len()},
+                {"artifact_id":"primary-report","path":"primary-report.json","role":"primary_report","sha256":sha256_hex(report),"size_bytes":report.len()}
             ]
         });
         assert!(validate_artifacts(&predicate, &root, &sha256_hex(patch), "primary").is_err());
