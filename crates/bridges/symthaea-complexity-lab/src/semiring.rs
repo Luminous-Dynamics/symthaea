@@ -950,6 +950,31 @@ mod tests {
     }
 
     #[test]
+    fn max_count_dual_factor_tables_reject_scope_and_feasibility_misalignment() {
+        let weighted = vec![ExactFactor {
+            scope: vec![0],
+            values: vec![MaxCountValue::candidate(3, 1), MaxCountValue::zero()],
+        }];
+        let wrong_scope = vec![ExactFactor {
+            scope: vec![1],
+            values: vec![1u128, 0u128],
+        }];
+        assert!(validate_support_factor_alignment(&weighted, &wrong_scope).is_err());
+
+        let wrong_feasibility = vec![ExactFactor {
+            scope: vec![0],
+            values: vec![0u128, 0u128],
+        }];
+        assert!(validate_support_factor_alignment(&weighted, &wrong_feasibility).is_err());
+
+        let correct = vec![ExactFactor {
+            scope: vec![0],
+            values: vec![1u128, 0u128],
+        }];
+        assert!(validate_support_factor_alignment(&weighted, &correct).is_ok());
+    }
+
+    #[test]
     fn max_count_support_count_overflow_fails_closed() {
         let mut graph = ExactFactorGraph::new(vec![2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
         graph.add_factor(vec![0], vec![
