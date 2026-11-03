@@ -24,7 +24,7 @@ pub const MOBILE_INVOCATION_MAX_LOCAL_REPLAY_ENTRIES: usize = 65_536;
 
 /// Explicitly selected, ephemeral device session. The serial-to-alias mapping
 /// remains local to the gateway and is never included in the portable receipt.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct MobileDeviceSessionSnapshot {
     pub session_alias: String,
     pub generation: u64,
@@ -37,7 +37,7 @@ pub struct MobileDeviceSessionSnapshot {
 ///
 /// Its digest and verifier label bind the supplied metadata, but this module
 /// does not validate a signature or decide whether the verifier is trusted.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MobileConsentGrant {
     pub consent_id: String,
@@ -53,8 +53,55 @@ pub struct MobileConsentGrant {
     pub revoked_at_unix_ms: Option<u64>,
 }
 
+impl fmt::Debug for MobileDeviceSessionSnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MobileDeviceSessionSnapshot")
+            .field("session_alias", &self.session_alias)
+            .field("generation", &self.generation)
+            .field("session_nonce", &"<redacted>")
+            .field("target_scope_sha256", &self.target_scope_sha256)
+            .finish()
+    }
+}
+
+impl fmt::Debug for MobileConsentGrant {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MobileConsentGrant")
+            .field("consent_id", &self.consent_id)
+            .field("consent_receipt_sha256", &self.consent_receipt_sha256)
+            .field("verifier_id", &self.verifier_id)
+            .field("caller_id", &"<redacted>")
+            .field("session_alias", &self.session_alias)
+            .field("session_generation", &self.session_generation)
+            .field("allowed_tools", &self.allowed_tools)
+            .field("issued_at_unix_ms", &self.issued_at_unix_ms)
+            .field("expires_at_unix_ms", &self.expires_at_unix_ms)
+            .field("revoked_at_unix_ms", &self.revoked_at_unix_ms)
+            .finish()
+    }
+}
+
+impl fmt::Debug for MobileInvocationRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MobileInvocationRequest")
+            .field("invocation_id", &self.invocation_id)
+            .field("invocation_nonce", &"<redacted>")
+            .field("caller_id", &"<redacted>")
+            .field("session_alias", &self.session_alias)
+            .field("session_generation", &self.session_generation)
+            .field("session_nonce", &"<redacted>")
+            .field("consent_id", &self.consent_id)
+            .field("consent_receipt_sha256", &self.consent_receipt_sha256)
+            .field("tool_name", &self.tool_name)
+            .field("arguments", &"<redacted>")
+            .field("issued_at_unix_ms", &self.issued_at_unix_ms)
+            .field("expires_at_unix_ms", &self.expires_at_unix_ms)
+            .finish()
+    }
+}
+
 /// Exact, one-use request presented to the gateway.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MobileInvocationRequest {
     pub invocation_id: String,
@@ -108,11 +155,24 @@ pub struct MobileInvocationReceipt {
 /// Prepared authorization passed to a narrowly scoped execution adapter.
 /// The arguments are kept separate from the portable receipt and are not
 /// serializable through this type.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct AuthorizedMobileInvocation {
     pub receipt: MobileInvocationReceipt,
     arguments: Value,
     pub provider_authorization: ProviderBoundToolAuthorization,
+}
+
+impl fmt::Debug for AuthorizedMobileInvocation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AuthorizedMobileInvocation")
+            .field("invocation_id", &self.receipt.invocation_id)
+            .field("receipt_sha256", &self.receipt.receipt_sha256)
+            .field("tool", &self.receipt.tool)
+            .field("arguments", &"<redacted>")
+            .field("provider_id", &self.provider_authorization.provider_id)
+            .field("expires_at_unix_ms", &self.receipt.expires_at_unix_ms)
+            .finish()
+    }
 }
 
 impl AuthorizedMobileInvocation {
@@ -605,6 +665,29 @@ mod tests {
         ));
         assert_eq!(authorized.receipt.session_nonce_sha256, sha256_hex(session.session_nonce.as_bytes()));
         verify_mobile_invocation_receipt(&authorized.receipt).unwrap();
+    }
+
+    #[test]
+    fn debug_formatting_redacts_session_secrets_callers_and_arguments() {
+        let (session, consent) = aliases();
+        let request = build_request(&session, &consent);
+        let session_debug = format!("{session:?}");
+        let consent_debug = format!("{consent:?}");
+        let request_debug = format!("{request:?}");
+        assert!(!session_debug.contains(&session.session_nonce));
+        assert!(!consent_debug.contains(&consent.caller_id));
+        assert!(!request_debug.contains(&request.session_nonce));
+        assert!(!request_debug.contains(&request.invocation_nonce));
+        assert!(!request_debug.contains(&request.caller_id));
+        assert!(!request_debug.contains("include_properties"));
+
+        let authorized = prepare_mobile_invocation(
+            &request, &consent, &session, &report(),
+            MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW,
+        ).unwrap();
+        let authorized_debug = format!("{authorized:?}");
+        assert!(!authorized_debug.contains(&session.session_nonce));
+        assert!(!authorized_debug.contains("include_properties"));
     }
 
     #[test]
