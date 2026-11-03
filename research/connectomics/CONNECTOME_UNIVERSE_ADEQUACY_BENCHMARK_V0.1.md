@@ -148,7 +148,7 @@ All methods must use the same source observations, frozen query and cost/evidenc
 - 100% explicit NOT_ESTIMABLE / abstention for unsupported evidence or unauthenticated oracle separation.
 - 100% of error-family denominators visible; no blind family hidden by pooling.
 - Independent replay emits byte-identical reports for identical pinned inputs.
-- Altered query, source artifact, generator, reference challenge, or candidate universe changes the report digest or invalidates verification.
+- Altered query, source artifact, generator, reference challenge, or candidate universe changes the exact input report/sidecar digests or invalidates verification. The verifier emits `source_report_sha256` over the input report bytes; the report does not contain its own digest.
 - No probabilities or population-level recall claims without a defensible sampling design.
 
 ## 10. Schema and validation contract
