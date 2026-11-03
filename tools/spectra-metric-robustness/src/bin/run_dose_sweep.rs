@@ -33,7 +33,9 @@ struct CampaignSummary {
 impl CampaignSummary {
     fn observe(&mut self, flags: &[DiagnosticFlag], disposition: MetricDisposition) {
         self.campaigns += 1;
-        self.any_flag += u64::from(!flags.is_empty());
+        if !flags.is_empty() {
+            self.any_flag += 1;
+        }
         match disposition {
             MetricDisposition::NotEvaluable => self.not_evaluable += 1,
             MetricDisposition::AssumptionConcern => self.assumption_concern += 1,
