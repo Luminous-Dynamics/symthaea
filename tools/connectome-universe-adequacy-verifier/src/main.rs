@@ -46,12 +46,15 @@ struct ReferenceWorld {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 struct FamilyCounts {
     compatible_reference_count: u64,
+    incompatible_reference_count: u64,
+    indeterminate_reference_count: u64,
+    compatible_estimable_reference_count: u64,
+    compatible_query_not_estimable_reference_count: u64,
     structurally_included_count: u64,
     query_flipping_reference_count: u64,
     omitted_query_flipping_count: u64,
     false_invariance_count: u64,
     false_ambiguity_count: u64,
-    not_estimable_count: u64,
     candidate_not_estimable_count: u64,
 }
 
@@ -62,12 +65,13 @@ struct Summary {
     compatible_reference_count: u64,
     incompatible_reference_count: u64,
     indeterminate_reference_count: u64,
+    compatible_estimable_reference_count: u64,
+    compatible_query_not_estimable_reference_count: u64,
     structurally_included_count: u64,
     query_state_covered_count: u64,
     query_flipping_reference_count: u64,
     omitted_query_flipping_count: u64,
     false_invariance_count: u64,
-    not_estimable_count: u64,
     false_ambiguity_count: u64,
     candidate_duplicate_structure_group_count: u64,
     reference_duplicate_structure_group_count: u64,
@@ -356,12 +360,15 @@ fn validate_family_summaries(
 
         let metrics = [
             ("compatible_reference_count", expected.compatible_reference_count),
+            ("incompatible_reference_count", expected.incompatible_reference_count),
+            ("indeterminate_reference_count", expected.indeterminate_reference_count),
+            ("compatible_estimable_reference_count", expected.compatible_estimable_reference_count),
+            ("compatible_query_not_estimable_reference_count", expected.compatible_query_not_estimable_reference_count),
             ("structurally_included_count", expected.structurally_included_count),
             ("query_flipping_reference_count", expected.query_flipping_reference_count),
             ("omitted_query_flipping_count", expected.omitted_query_flipping_count),
             ("false_invariance_count", expected.false_invariance_count),
             ("false_ambiguity_count", expected.false_ambiguity_count),
-            ("not_estimable_count", expected.not_estimable_count),
             ("candidate_not_estimable_count", expected.candidate_not_estimable_count),
         ];
         for (key, expected_value) in metrics {
@@ -706,45 +713,43 @@ fn validate_report(
     }
 
     for world in &references {
-        if world.compatibility == "INCOMPATIBLE" {
-            summary.incompatible_reference_count += 1;
-            continue;
-        }
-
-        let Some(state) = world.state.as_ref() else {
-            summary.indeterminate_reference_count += 1;
-            summary.not_estimable_count += 1;
-            family_counts
-                .get_mut(&world.family)
-                .expect("family checked")
-                .not_estimable_count += 1;
-            continue;
-        };
-
-        if world.compatibility == "INDETERMINATE" {
-            summary.indeterminate_reference_count += 1;
-            summary.not_estimable_count += 1;
-            family_counts
-                .get_mut(&world.family)
-                .expect("family checked")
-                .not_estimable_count += 1;
-            continue;
-        }
-
-        if world.compatibility != "COMPATIBLE" {
-            return Err(format!("reference world {} has invalid compatibility", world.id));
-        }
-
-        summary.compatible_reference_count += 1;
         let family = family_counts
             .get_mut(&world.family)
-            .expect("family checked");
-        family.compatible_reference_count += 1;
+            .expect("reference family was validated");
 
+        match world.compatibility.as_str() {
+            "INCOMPATIBLE" => {
+                summary.incompatible_reference_count += 1;
+                family.incompatible_reference_count += 1;
+                continue;
+            }
+            "INDETERMINATE" => {
+                summary.indeterminate_reference_count += 1;
+                family.indeterminate_reference_count += 1;
+                continue;
+            }
+            "COMPATIBLE" => {
+                summary.compatible_reference_count += 1;
+                family.compatible_reference_count += 1;
+            }
+            _ => return Err(format!("reference world {} has invalid compatibility", world.id)),
+        }
+
+        // Structural inclusion is independent of whether the downstream query
+        // can be evaluated for this otherwise evidence-compatible graph.
         if candidate_hashes.contains(&world.structural_sha256) {
             summary.structurally_included_count += 1;
             family.structurally_included_count += 1;
         }
+
+        let Some(state) = world.state.as_ref() else {
+            summary.compatible_query_not_estimable_reference_count += 1;
+            family.compatible_query_not_estimable_reference_count += 1;
+            continue;
+        };
+
+        summary.compatible_estimable_reference_count += 1;
+        family.compatible_estimable_reference_count += 1;
 
         if candidate_states.contains(state) {
             summary.query_state_covered_count += 1;
@@ -781,12 +786,15 @@ fn validate_report(
 
     let family_keys = [
         "compatible_reference_count",
+        "incompatible_reference_count",
+        "indeterminate_reference_count",
+        "compatible_estimable_reference_count",
+        "compatible_query_not_estimable_reference_count",
         "structurally_included_count",
         "query_flipping_reference_count",
         "omitted_query_flipping_count",
         "false_invariance_count",
         "false_ambiguity_count",
-        "not_estimable_count",
         "candidate_not_estimable_count",
     ];
     validate_family_summaries(&report, &required_families, &family_counts)?;
@@ -797,12 +805,13 @@ fn validate_report(
         "compatible_reference_count",
         "incompatible_reference_count",
         "indeterminate_reference_count",
+        "compatible_estimable_reference_count",
+        "compatible_query_not_estimable_reference_count",
         "structurally_included_count",
         "query_state_covered_count",
         "query_flipping_reference_count",
         "omitted_query_flipping_count",
         "false_invariance_count",
-        "not_estimable_count",
         "false_ambiguity_count",
         "candidate_duplicate_structure_group_count",
         "reference_duplicate_structure_group_count",
@@ -823,24 +832,30 @@ fn validate_report(
             .values()
             .map(|counts| match key {
                 "compatible_reference_count" => counts.compatible_reference_count,
+                "incompatible_reference_count" => counts.incompatible_reference_count,
+                "indeterminate_reference_count" => counts.indeterminate_reference_count,
+                "compatible_estimable_reference_count" => counts.compatible_estimable_reference_count,
+                "compatible_query_not_estimable_reference_count" => counts.compatible_query_not_estimable_reference_count,
                 "structurally_included_count" => counts.structurally_included_count,
                 "query_flipping_reference_count" => counts.query_flipping_reference_count,
                 "omitted_query_flipping_count" => counts.omitted_query_flipping_count,
                 "false_invariance_count" => counts.false_invariance_count,
                 "false_ambiguity_count" => counts.false_ambiguity_count,
-                "not_estimable_count" => counts.not_estimable_count,
                 "candidate_not_estimable_count" => counts.candidate_not_estimable_count,
                 _ => 0,
             })
             .sum();
         let aggregate = match key {
             "compatible_reference_count" => summary.compatible_reference_count,
+            "incompatible_reference_count" => summary.incompatible_reference_count,
+            "indeterminate_reference_count" => summary.indeterminate_reference_count,
+            "compatible_estimable_reference_count" => summary.compatible_estimable_reference_count,
+            "compatible_query_not_estimable_reference_count" => summary.compatible_query_not_estimable_reference_count,
             "structurally_included_count" => summary.structurally_included_count,
             "query_flipping_reference_count" => summary.query_flipping_reference_count,
             "omitted_query_flipping_count" => summary.omitted_query_flipping_count,
             "false_invariance_count" => summary.false_invariance_count,
             "false_ambiguity_count" => summary.false_ambiguity_count,
-            "not_estimable_count" => summary.not_estimable_count,
             "candidate_not_estimable_count" => summary.candidate_not_estimable_count,
             _ => 0,
         };
@@ -873,7 +888,7 @@ fn validate_report(
         || summary.false_ambiguity_count > 0;
     let every_required_family_supported = family_counts
         .values()
-        .all(|counts| counts.compatible_reference_count > 0);
+        .all(|counts| counts.compatible_estimable_reference_count > 0);
     // This crate does not yet consume an authenticated #10204 freeze-auth receipt or
     // independently replay the #10137 Cartesian-closure receipt. Until those adapters
     // are wired in, it must never promote a success claim based on report booleans.
@@ -883,7 +898,8 @@ fn validate_report(
         && oracle_boundary == "EVALUATOR_ONLY_VERIFIED"
         && freeze_receipt_present
         && truth_separation_verified
-        && summary.not_estimable_count == 0
+        && summary.indeterminate_reference_count == 0
+        && summary.compatible_query_not_estimable_reference_count == 0
         && summary.candidate_not_estimable_count == 0
         && every_required_family_supported
         && !candidate_states.is_empty()
@@ -928,7 +944,8 @@ fn validate_report(
             "query_flipping_reference_count": summary.query_flipping_reference_count,
             "omitted_query_flipping_count": summary.omitted_query_flipping_count,
             "false_invariance_count": summary.false_invariance_count,
-            "not_estimable_count": summary.not_estimable_count,
+            "compatible_estimable_reference_count": summary.compatible_estimable_reference_count,
+            "compatible_query_not_estimable_reference_count": summary.compatible_query_not_estimable_reference_count,
             "false_ambiguity_count": summary.false_ambiguity_count,
             "candidate_duplicate_structure_group_count": summary.candidate_duplicate_structure_group_count,
             "reference_duplicate_structure_group_count": summary.reference_duplicate_structure_group_count,
