@@ -307,10 +307,11 @@ fn derive_report(input: &VehicleModelDiscrepancyInput) -> Result<VehicleModelDis
         let mut action_ids=BTreeSet::new(); let mut action_pairs=Vec::new();
         let predicted_min = d.actions.iter().map(|a| a.predicted_utility).fold(f64::INFINITY, f64::min);
         let predicted_max = d.actions.iter().map(|a| a.predicted_utility).fold(f64::NEG_INFINITY, f64::max);
-        let realized_min = d.actions.iter().map(|a| a.realized_utility).fold(f64::INFINITY, f64::min);
-        let realized_max = d.actions.iter().map(|a| a.realized_utility).fold(f64::NEG_INFINITY, f64::max);
+        let realized_values = d.actions.iter().filter_map(|a| a.realized_utility).collect::<Vec<_>>();
+        let realized_min = realized_values.iter().copied().fold(f64::INFINITY, f64::min);
+        let realized_max = realized_values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
         let predicted_range = predicted_max - predicted_min;
-        let realized_range = realized_max - realized_min;
+        let realized_range = if realized_values.is_empty() { 0.0 } else { realized_max - realized_min };
         if !predicted_range.is_finite() || !realized_range.is_finite()
             || !(predicted_range + realized_range).is_finite()
         {
