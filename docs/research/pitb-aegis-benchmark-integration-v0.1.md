@@ -26,6 +26,25 @@ The paper reports:
 
 These are published comparator values, not PITB results. Reproduction must recover the paper's exact cohort selection, category definitions, exclusions, denominators, model/harness configuration, and budget semantics before treating the values as directly comparable.
 
+
+## 2A. Important evaluation details from the full paper
+
+The 2,000-statement sample is not equivalent to 2,000 attempted statements. The paper reports 1,997 attempts, 1,054 proofs, and 943 unresolved tasks. The 52.7% headline uses the full 2,000-statement sample as denominator. Preserve all three counts in any reproduction.
+
+The sample is stratified by LeetCode difficulty and specification category over 1,257 translated programs. It excludes statements already refuted by the Plausible screen and the category requested to fail. Consequently:
+- the published 52.7% is a proof rate on this selected sample, not an all-task resolution rate;
+- it is not a direct measurement of the system's ability to prove or refute arbitrary Aegis statements;
+- the 84.1% edge-case and 31.0% explicit-contract figures must be reported with the original stratum denominators and selection procedure;
+- reproduction must preserve pre-screen exclusions and requested-polarity metadata.
+
+The paper reports that each frozen Lean statement is about the extracted Lean program. Differential testing separately compares Rust and Lean outputs on retained reference cases. This is useful translation-validation evidence, but it is not a formal proof of semantic equivalence for all inputs. PITB must preserve this distinction in claims and receipts.
+
+The full paper also reports 2,356 attempted source problems, of which 2,045 (86.8%) passed Rust testing, extraction, translation, Lean elaboration, and differential evaluation. The 2,045 program pairs and 11,533 candidate specifications are corpus-generation outputs, not the evaluation sample size.
+
+The paper mentions optional mutated variants as a way to generate further tasks, but explicitly does not evaluate those mutation tasks. This creates a strong opportunity for SIB: develop a separate, independently labeled mutation evaluation while preserving the official Aegis cohort unchanged.
+
+At the time of this protocol revision, the paper body does not identify a direct downloadable official Aegis dataset artifact or release/license URL. Do not invent one. Locate an official release from the authors or request access and record provenance before claiming dataset acquisition or running a reproduction.
+
 ## 3. Claim model
 
 A successful implementation-verification result requires independent evidence for all of:
