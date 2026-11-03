@@ -22,7 +22,7 @@ A prediction may contain multiple intervals for the same query. Evaluation uses 
 
 The matcher uses deterministic augmenting paths to maximize the number of admissible matches. Candidate annotation edges are visited in descending IoU order, then annotation index. This guarantees maximum match cardinality; the reported mean matched IoU is for that deterministic maximum-cardinality assignment, not a claim that a globally maximum-IoU assignment was found.
 
-The score reports occurrence precision, recall, F1, absolute count error, exact occurrence-count success, and the selected interval matches separately. This directly exposes the under-counting failure highlighted by recent temporal-grounding benchmarks.
+The score reports occurrence precision, recall, F1, absolute count error, exact occurrence-count success, and the selected interval matches separately. Each match also retains signed onset/offset errors in frames. A dataset aggregator reports micro/macro event metrics, one-to-many count accuracy, explicit-absence accuracy and coverage, abstention and parse-failure counts, mean matched IoU, and p95 boundary errors in milliseconds. This directly exposes the under-counting and output-format failures highlighted by recent temporal-grounding benchmarks.
 
 ### 3. Absence is not detection failure
 
@@ -33,6 +33,7 @@ Prediction states are intentionally distinct:
 - NotDetected: the system attempted detection but found no accepted event.
 - Ambiguous: one or more candidate intervals remain unresolved.
 - NotEstimable: the task cannot be estimated from available evidence.
+- Unparseable: raw model output could not be converted into the versioned answer schema; its raw-output digest and failure reason are retained. This is a parsing failure, not an intentional abstention.
 
 For a known-absent query, only QueryAbsent is scored as a correct absence claim. NotDetected is recorded as an abstention, not as proof of absence. For a present query, NotDetected incurs missed occurrences. Ambiguous and NotEstimable predictions retain their status and are accounted for as abstentions.
 
@@ -57,6 +58,17 @@ The evaluator rejects:
 - invalid IoU thresholds.
 
 Overlapping and nested intervals are permitted because musical events can co-occur. Exact duplicate intervals are rejected.
+
+## Dataset aggregation
+
+The dataset-level aggregator rejects duplicate query IDs and mixed evaluator versions. It reports:
+- positive-query micro precision/recall/F1 and macro positive-query F1;
+- one-to-many exact-count accuracy;
+- negative-query explicit-absence accuracy and coverage;
+- ambiguity/not-estimable truth exclusions, explicit abstentions and parse failures;
+- mean matched IoU and onset/offset boundary MAE and p95 in milliseconds, converting each match under that artifact's sample rate.
+
+Boundary errors are not converted to beat fractions in V1 because the canonical beat-to-performance-time map is owned by #9477 and is not yet a universal audio clock. Do not infer beats from the output itself and score against that self-inferred grid.
 
 ## Test matrix
 
