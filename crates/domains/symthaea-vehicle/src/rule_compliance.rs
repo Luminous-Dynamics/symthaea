@@ -402,18 +402,28 @@ fn evaluate_requirement(
             let mut stop_start: Option<usize> = None;
             let mut index = crossing_index;
             let mut later_timestamp = crossing_sample.timestamp_s;
+            let mut later_stopped_progress: Option<f64> = None;
             while index > 0 {
                 let previous = index - 1;
                 let sample = &trajectory[previous];
                 let sample_gap = later_timestamp - sample.timestamp_s;
+                let progress_change_is_plausible = later_stopped_progress
+                    .map(|later_progress| {
+                        let observed_delta = later_progress - sample.route_progress_m;
+                        observed_delta
+                            <= *stop_speed_threshold_mps * sample_gap + *progress_tolerance_m
+                    })
+                    .unwrap_or(true);
                 if sample.route_progress_m > *stop_line_progress_m + *progress_tolerance_m
                     || sample.speed_mps > *stop_speed_threshold_mps
                     || sample_gap > *maximum_sample_gap_s
+                    || !progress_change_is_plausible
                 {
                     break;
                 }
                 stop_start = Some(previous);
                 later_timestamp = sample.timestamp_s;
+                later_stopped_progress = Some(sample.route_progress_m);
                 index = previous;
             }
             let observed_dwell = stop_start
@@ -752,6 +762,31 @@ mod tests {
             sample(0.5, 9.0, 0.0, 0.0),
             sample(2.0, 9.0, 0.0, 0.0),
             sample(2.1, 10.2, 1.0, 0.0),
+        ];
+        let report = evaluate_traffic_rules(&[rule], &trajectory).unwrap();
+        assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::Violation);
+    }
+
+    #[test]
+    fn stop_line_stationary_speed_with_impossible_progress_motion_is_rejected() {
+        let rule = TrafficRuleRequirement {
+            rule_id: "stop-line-motion".into(),
+            active_start_progress_m: 0.0,
+            active_end_progress_m: 20.0,
+            kind: TrafficRuleKind::StopBeforeLine {
+                stop_line_progress_m: 10.0,
+                stop_speed_threshold_mps: 0.1,
+                required_stationary_duration_s: 1.0,
+                maximum_sample_gap_s: 0.6,
+                progress_tolerance_m: 0.02,
+            },
+            evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
+        };
+        let trajectory = vec![
+            sample(0.0, 8.0, 2.0, 0.0),
+            sample(0.5, 8.8, 0.0, 0.0),
+            sample(1.0, 9.6, 0.0, 0.0),
+            sample(1.5, 10.2, 1.0, 0.0),
         ];
         let report = evaluate_traffic_rules(&[rule], &trajectory).unwrap();
         assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::Violation);
