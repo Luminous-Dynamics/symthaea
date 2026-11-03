@@ -308,7 +308,7 @@
     "correspondence_engine_sha256": null,
     "verifier_protocol_sha256": "026fa7f8ea0fa93fd7bb18d22b8c1b0fa65ac5e56d7d8e563bba61c90998a6b0",
     "verifier_sha256": null,
-    "report_schema_sha256": "399a5d1a6a0f7f81f9310c150e8f6f0032d99680f739bf4353dbb79b93d724f1",
+    "report_schema_sha256": "10c3eb5ab6deb5d4044897501a97336e8ae3ec2a6a3520e9d19e5f313dccad9c",
     "world_manifest_schema_sha256": "b8bbc20a6e581232b7439a1fbbbecf65bbcb6b6b702732c98720a2dce8575f06"
   }
 }
