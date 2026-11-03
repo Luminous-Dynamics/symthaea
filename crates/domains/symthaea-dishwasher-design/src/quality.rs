@@ -118,6 +118,7 @@ pub enum QualityError {
     MethodMismatch(Endpoint),
     DuplicateObservation { run_id: String, item_id: String, endpoint: Endpoint },
     InsufficientIndependentRuns { item_id: String, endpoint: Endpoint, observed: usize, required: usize },
+    UnbalancedRunMatrix { item_id: String, endpoint: Endpoint },
     OutcomeFailed { run_id: String, item_id: String, endpoint: Endpoint },
     OutcomeIndeterminate { run_id: String, item_id: String, endpoint: Endpoint },
 }
@@ -387,15 +388,32 @@ pub fn qualify_pilot_evidence(
         }
     }
 
+    let reference_key = (scope.item_ids[0].clone(), required[0]);
+    let reference_runs = counts
+        .get(&reference_key)
+        .ok_or(QualityError::InsufficientIndependentRuns {
+            item_id: reference_key.0.clone(),
+            endpoint: reference_key.1,
+            observed: 0,
+            required: policy.minimum_independent_runs,
+        })?;
+
     for item_id in &scope.item_ids {
         for endpoint in &required {
-            let count = counts.get(&(item_id.clone(), *endpoint)).map_or(0, HashSet::len);
+            let observed_runs = counts.get(&(item_id.clone(), *endpoint));
+            let count = observed_runs.map_or(0, HashSet::len);
             if count < policy.minimum_independent_runs {
                 return Err(QualityError::InsufficientIndependentRuns {
                     item_id: item_id.clone(),
                     endpoint: *endpoint,
                     observed: count,
                     required: policy.minimum_independent_runs,
+                });
+            }
+            if observed_runs != Some(reference_runs) {
+                return Err(QualityError::UnbalancedRunMatrix {
+                    item_id: item_id.clone(),
+                    endpoint: *endpoint,
                 });
             }
         }
@@ -500,9 +518,11 @@ mod tests {
 
     fn observations(policy: PilotPolicy) -> Vec<OutcomeObservation> {
         let endpoints = required_endpoints(policy);
+        let acceptance_criteria = criteria(policy);
+        let item_ids = scope().item_ids;
         let mut result = Vec::new();
         for run in 1..=5 {
-            for item in &scope().item_ids {
+            for item in &item_ids {
                 for endpoint in &endpoints {
                     let (method, unit, value, uncertainty) = match endpoint {
                         Endpoint::SoilRemovalResidual => ("fluorescence-assay-v1", "fraction", 0.02, 0.005),
@@ -515,16 +535,18 @@ mod tests {
                         run_id: format!("run-{run:02}"),
                         item_id: item.clone(),
                         endpoint: *endpoint,
-                        criterion_id: criteria(policy)
-                            .into_iter()
+                        criterion_id: acceptance_criteria
+                            .iter()
                             .find(|criterion| criterion.endpoint == *endpoint)
                             .unwrap()
-                            .criterion_id,
-                        metric_id: criteria(policy)
-                            .into_iter()
+                            .criterion_id
+                            .clone(),
+                        metric_id: acceptance_criteria
+                            .iter()
                             .find(|criterion| criterion.endpoint == *endpoint)
                             .unwrap()
-                            .metric_id,
+                            .metric_id
+                            .clone(),
                         evidence_kind: EvidenceKind::IndependentOutcomeAssay,
                         method_id: method.to_owned(),
                         protocol_id: "independent-assay-v1".to_owned(),
@@ -598,6 +620,38 @@ mod tests {
             qualify_pilot_evidence(scope(), policy, criteria(policy), readings),
             Err(QualityError::InsufficientIndependentRuns {
                 item_id, endpoint: Endpoint::FinalRinseResidue, observed: 4, required: 5
+            }) if item_id == "cup-b"
+        ));
+    }
+
+    #[test]
+    fn requires_the_same_physical_run_matrix_for_every_item_and_endpoint() {
+        let policy = policy();
+        let mut readings = observations(policy);
+        readings.retain(|reading| !(reading.item_id == "cup-b"
+            && reading.endpoint == Endpoint::FinalRinseResidue
+            && reading.run_id == "run-05"));
+        readings.push(OutcomeObservation {
+            run_id: "replacement-run".to_owned(),
+            item_id: "cup-b".to_owned(),
+            endpoint: Endpoint::FinalRinseResidue,
+            criterion_id: criteria(policy).into_iter()
+                .find(|criterion| criterion.endpoint == Endpoint::FinalRinseResidue)
+                .unwrap().criterion_id,
+            metric_id: "final_rinse_residue".to_owned(),
+            evidence_kind: EvidenceKind::IndependentOutcomeAssay,
+            method_id: "rinse-residue-assay-v1".to_owned(),
+            protocol_id: "independent-assay-v1".to_owned(),
+            measured_value: 2.0,
+            expanded_uncertainty: 0.5,
+            unit: "mg/L".to_owned(),
+            evidence_ref: "replacement-rinse-evidence".to_owned(),
+            calibration_bundle_sha256: "1".repeat(64),
+        });
+        assert!(matches!(
+            qualify_pilot_evidence(scope(), policy, criteria(policy), readings),
+            Err(QualityError::UnbalancedRunMatrix {
+                item_id, endpoint: Endpoint::FinalRinseResidue
             }) if item_id == "cup-b"
         ));
     }
