@@ -16,9 +16,9 @@ Date-time formats are asserted.
 
 The verifier needs:
 
-- The exact task contract JSON bytes.
+- The exact task contract JSON bytes and its out-of-band SHA-256 pin.
 - The exact candidate patch bytes.
-- The expected source-tree digest, supplied out of band.
+- Read-only source and result snapshot directories, each independently hashed by CEB-TREE-V1.
 - A primary DSSE envelope and a pristine-regrade DSSE envelope.
 - A separately provisioned trust-policy JSON file and its out-of-band SHA-256 pin.
 - Separate, immutable artifact roots for the two executions.
@@ -62,7 +62,9 @@ pinned trust policy and the key has the required stage role.
 cargo run --manifest-path tools/ceb-receipt-verifier/Cargo.toml --release -- verify-pair \
   --task-contract task.json \
   --task-id CEB-RUST-001 \
-  --source-tree-sha256 <64-lowercase-hex> \
+  --expected-task-contract-sha256 <64-lowercase-hex> \
+  --source-tree-dir source-snapshot \
+  --result-tree-dir result-snapshot \
   --patch candidate.patch \
   --primary primary.dsse.json \
   --primary-artifacts-dir primary-artifacts \
@@ -87,6 +89,8 @@ field, so the same immutable inputs produce byte-stable JSON.
   image digest, toolchain lock, runner policy and task budget. The receipt runtime
   profile, network policy, image digest, toolchain digest and runner-policy digest
   must each equal the corresponding value pinned by the task contract.
+- The task contract hash and trust-policy hash are pinned out of band. The source snapshot must match the contract's tree digest; the result snapshot is hashed independently by the verifier. The custom tree algorithm sorts UTF-8 relative paths and commits each entry type, byte length, executable bit and content digest; symlink target bytes are hashed without following links. Empty directories are ignored; .git metadata, non-UTF-8 names and special files are rejected.
+- The verifier computes the exact set of paths changed between source and result snapshots. The signed receipt's changed_paths and the Git patch's file headers must equal that set; quoted/space-containing patch paths are deliberately unsupported in V0.
 - The regrade links the SHA-256 of the exact primary envelope bytes; run IDs,
   receipt IDs, signer trust domains and check-evidence sets must be distinct.
 - Receipt check IDs, kinds, required flags and explicit authorities are bound to the exact acceptance-check set in the task contract. Required-check aggregates are recomputed from rows, not trusted from totals.
@@ -117,6 +121,29 @@ external negative-control corpus before it can be qualified for scored benchmark
 
 ## Current implementation status (2026-11-03)
 
-The verifier source and focused CI workflow are in draft PR [#10212](https://github.com/Luminous-Dynamics/symthaea/pull/10212), stacked on CEB schema PR #10115. The source currently contains 14 authored unit tests covering duplicate JSON members, DSSE PAE/signatures, trust roles, exact task-check parity, forged counters, required-check skips, budget enforcement, artifact digest/path validation, traversal/symlink rejection, runtime-environment parity, and a complete signed primary/regrade pair with detached-link and evidence-reuse negative controls. These tests are authored but have **not** been run; no build, rustfmt, Clippy, schema-conformance or end-to-end receipt-pair result is claimed. No Cargo.lock has yet been generated in this environment.
+The verifier source and focused CI workflow are in draft PR [#10212](https://github.com/Luminous-Dynamics/symthaea/pull/10212), stacked on CEB schema PR #10115. The source currently contains 18 authored unit tests covering duplicate JSON members, DSSE PAE/signatures, trust roles, exact task-check parity, forged counters, required-check skips, budget enforcement, artifact digest/path validation, traversal/symlink rejection, runtime-environment parity, deterministic source/result tree hashing, patch-path parity and a complete signed primary/regrade pair with detached-link and evidence-reuse negative controls. These tests are authored but have **not** been run; no build, rustfmt, Clippy, schema-conformance, tree-digest interoperability or end-to-end receipt-pair result is claimed. No Cargo.lock has yet been generated in this environment.
 
 The implementation intentionally returns unresolved for all current CEB catalog tasks because they remain `design_only`. Before any task can be scored, issue #10064 must qualify OS-level isolation, the task contract must be promoted with a frozen source and sealed split, and a real trusted signer policy must be provisioned outside the verifier inputs.
+
+
+## CEB-TREE-V1 details
+
+The digest is not a Git object ID and must not be compared directly with Git's
+tree hash. It is a CEB-specific snapshot commitment:
+
+1. Recursively enumerate regular files and symlinks; reject non-UTF-8 paths,
+   special files and any .git path component. Empty directories are omitted.
+2. Sort entries by UTF-8 relative-path bytes.
+3. Begin SHA-256 with the domain separator `CEB-TREE-V1\\0` and the entry count.
+4. For every entry, hash path length and bytes, target/file byte length, entry
+   type, executable bit, and SHA-256 of file contents or symlink target bytes.
+5. Do not follow symlinks.
+
+Snapshots must be mounted read-only and immutable for the entire verification
+operation. The standard-library path walk is not a defense against a concurrent
+attacker mutating the tree during hashing; the host control plane must enforce
+snapshot immutability. The result-tree digest and changed-path reconciliation do
+not prove that the submitted patch transforms the source tree into that result.
+They prove only that the supplied snapshots and the signed patch-path declarations
+are internally consistent. Applying patches safely and independently is a
+separate qualification gate.
