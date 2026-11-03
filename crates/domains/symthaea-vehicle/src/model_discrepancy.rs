@@ -230,7 +230,9 @@ fn derive_report(input: &VehicleModelDiscrepancyInput) -> Result<VehicleModelDis
         if [row.initial_state_digest.as_str(),row.environment_digest.as_str(),row.dynamics_digest.as_str(),row.action_history_digest.as_str(),row.observation_availability_digest.as_str()].iter().any(|d| !valid_digest(d)) {
             return Err(VehicleModelDiscrepancyError::InvalidDigest);
         }
-        if !row.predicted_value.is_finite() || !row.realized_value.is_finite() { return Err(VehicleModelDiscrepancyError::InvalidResidual); }
+        if !row.predicted_value.is_finite() || !row.realized_value.is_finite()
+            || !(row.predicted_value - row.realized_value).is_finite()
+        { return Err(VehicleModelDiscrepancyError::InvalidResidual); }
         let key = (row.scenario_id.clone(),row.actor_policy_id.clone(),row.action_history_digest.clone(),row.metric_id.clone());
         let ctx = residual_context_digest(row)?;
         if let Some(old) = contexts.get(&key) {
@@ -297,6 +299,13 @@ fn derive_report(input: &VehicleModelDiscrepancyInput) -> Result<VehicleModelDis
         if decision_context_digest(d)? != d.decision_context_digest { return Err(VehicleModelDiscrepancyError::InvalidDecisionContextDigest); }
         if d.actions.len()<2 { return Err(VehicleModelDiscrepancyError::TooFewActions); }
         let mut action_ids=BTreeSet::new(); let mut action_pairs=Vec::new();
+        let predicted_min = d.actions.iter().map(|a| a.predicted_utility).fold(f64::INFINITY, f64::min);
+        let predicted_max = d.actions.iter().map(|a| a.predicted_utility).fold(f64::NEG_INFINITY, f64::max);
+        let realized_min = d.actions.iter().map(|a| a.realized_utility).fold(f64::INFINITY, f64::min);
+        let realized_max = d.actions.iter().map(|a| a.realized_utility).fold(f64::NEG_INFINITY, f64::max);
+        if !(predicted_max - predicted_min).is_finite() || !(realized_max - realized_min).is_finite() {
+            return Err(VehicleModelDiscrepancyError::InvalidUtility);
+        }
         for a in &d.actions {
             if a.action_id.trim().is_empty() || a.execution_receipt_id.trim().is_empty() || a.evaluator_receipt_id.trim().is_empty() { return Err(VehicleModelDiscrepancyError::InvalidActionReceipt); }
             if !action_ids.insert(a.action_id.as_str()) { return Err(VehicleModelDiscrepancyError::DuplicateActionId); }
@@ -334,7 +343,7 @@ fn best_action<'a,F:Fn(&DiscrepancyActionOutcome)->f64>(actions:&[&'a Discrepanc
     let mut best=actions[0];
     for candidate in actions.iter().skip(1) {
         let delta=value(candidate)-value(best);
-        if delta>tol || (delta.abs()<=tol && candidate.action_id<best.action_id) { best=candidate; }
+        if delta>tol || (delta.abs()<=tol && candidate.action_id<best.action_id) { best=*candidate; }
     }
     best
 }
@@ -369,7 +378,14 @@ fn hash_json<T:Serialize>(value:&T)->Result<String,VehicleModelDiscrepancyError>
     Ok(blake3::hash(&bytes).to_hex().to_string())
 }
 fn valid_digest(value:&str)->bool { value.len()==64 && value.bytes().all(|b|b.is_ascii_hexdigit()) }
-fn mean(values:&[f64])->f64 { values.iter().sum::<f64>()/values.len() as f64 }
+fn mean(values:&[f64])->f64 {
+    values.iter().enumerate().fold(0.0, |average, (index, value)| {
+        let count = (index + 1) as f64;
+        if index == 0 { *value } else {
+            average * ((count - 1.0) / count) + *value / count
+        }
+    })
+}
 fn quantile(values:&[f64],p:f64)->f64 { let mut v=values.to_vec();v.sort_by(f64::total_cmp);let rank=((v.len() as f64)*p).ceil() as usize;v[rank.saturating_sub(1).min(v.len()-1)] }
 fn optional_mean(v:&[f64])->Option<f64>{if v.is_empty(){None}else{Some(mean(v))}}
 fn optional_quantile(v:&[f64],p:f64)->Option<f64>{if v.is_empty(){None}else{Some(quantile(v,p))}}
