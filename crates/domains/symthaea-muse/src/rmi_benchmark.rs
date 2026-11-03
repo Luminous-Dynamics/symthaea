@@ -229,6 +229,202 @@ pub fn validate_rmi_intervention_pair(
     }
 }
 
+
+/// Identity digest basis distinguishes content-addressed artifacts from
+/// caller-authored declarations. A declaration digest is useful for synthetic
+/// fixtures, but MUST NOT be represented as proof of immutable model bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RmiIdentityDigestBasisV1 {
+    ArtifactBytes,
+    CanonicalDeclaration,
+}
+
+/// Immutable components that can change a policy's next action.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RmiIdentityComponentKindV1 {
+    PolicyImplementation,
+    ModelArtifact,
+    Configuration,
+    Tokenizer,
+    Grammar,
+    Adapter,
+    RuntimeBuild,
+}
+
+/// One immutable component commitment and its evidence locator.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RmiPolicyIdentityComponentV1 {
+    pub kind: RmiIdentityComponentKindV1,
+    pub sha256: String,
+    pub digest_basis: RmiIdentityDigestBasisV1,
+    pub source_ref: String,
+    pub evidence_ref: String,
+    pub evidence_sha256: String,
+}
+
+/// Runtime and randomness identity that can affect otherwise identical
+/// weights/configuration on different execution substrates.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RmiPolicyExecutionIdentityV1 {
+    pub backend_mode: String,
+    pub device_mode: String,
+    pub stochastic_source: String,
+    pub seed_authority: String,
+    pub deterministic_execution: bool,
+}
+
+/// Immutable policy identity is separate from the per-trial mutable episode
+/// snapshot. Production adapters should use ArtifactBytes for every component
+/// that has an independently retrievable immutable artifact. Synthetic
+/// policies use CanonicalDeclaration and are intentionally not artifact-backed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RmiImmutablePolicyIdentityV1 {
+    pub schema_version: u32,
+    pub policy_id: String,
+    pub policy_version: String,
+    /// Components must be sorted by kind and unique.
+    pub components: Vec<RmiPolicyIdentityComponentV1>,
+    pub execution: RmiPolicyExecutionIdentityV1,
+}
+
+impl RmiImmutablePolicyIdentityV1 {
+    pub fn validate_for(&self, policy_id: &str, policy_version: &str) -> Result<(), String> {
+        if self.schema_version != 1 {
+            return Err(format!("unsupported immutable identity schema {}", self.schema_version));
+        }
+        if self.policy_id.trim().is_empty() || self.policy_id != policy_id {
+            return Err("immutable identity policy_id is empty or does not match policy".into());
+        }
+        if self.policy_version.trim().is_empty() || self.policy_version != policy_version {
+            return Err("immutable identity policy_version is empty or does not match policy".into());
+        }
+        if self.components.is_empty() {
+            return Err("immutable identity has no components".into());
+        }
+        let mut previous_kind = None;
+        let mut has_implementation = false;
+        let mut has_configuration = false;
+        let mut has_runtime_build = false;
+        for component in &self.components {
+            if !is_lowercase_sha256(&component.sha256)
+                || !is_lowercase_sha256(&component.evidence_sha256)
+            {
+                return Err(format!("invalid SHA-256 for {:?} identity component", component.kind));
+            }
+            if component.source_ref.trim().is_empty() || component.evidence_ref.trim().is_empty() {
+                return Err(format!("missing source/evidence reference for {:?} identity component", component.kind));
+            }
+            if previous_kind.is_some_and(|previous| previous >= component.kind) {
+                return Err("identity components must be sorted by kind and unique".into());
+            }
+            previous_kind = Some(component.kind);
+            has_implementation |= component.kind == RmiIdentityComponentKindV1::PolicyImplementation;
+            has_configuration |= component.kind == RmiIdentityComponentKindV1::Configuration;
+            has_runtime_build |= component.kind == RmiIdentityComponentKindV1::RuntimeBuild;
+        }
+        if !has_implementation || !has_configuration || !has_runtime_build {
+            return Err("identity requires implementation, configuration, and runtime-build components".into());
+        }
+        if self.execution.backend_mode.trim().is_empty()
+            || self.execution.device_mode.trim().is_empty()
+            || self.execution.stochastic_source.trim().is_empty()
+            || self.execution.seed_authority.trim().is_empty()
+        {
+            return Err("execution identity fields must be non-empty".into());
+        }
+        Ok(())
+    }
+
+    /// Hashes the complete immutable identity record, not the mutable episode
+    /// snapshot. Exact canonical bytes are required for stable replay.
+    pub fn digest_sha256(&self) -> Result<String, String> {
+        self.validate_for(&self.policy_id, &self.policy_version)?;
+        let bytes = serde_json::to_vec(self).map_err(|error| error.to_string())?;
+        Ok(sha256_hex(&bytes))
+    }
+
+    /// True only when every declared component is identified by exact artifact
+    /// bytes. This is not a resolver or availability check.
+    pub fn all_components_content_addressed(&self) -> bool {
+        !self.components.is_empty()
+            && self.components.iter().all(|component| {
+                component.digest_basis == RmiIdentityDigestBasisV1::ArtifactBytes
+            })
+    }
+}
+
+fn canonical_declaration_component_v1(
+    kind: RmiIdentityComponentKindV1,
+    bytes: &[u8],
+    source_ref: String,
+) -> RmiPolicyIdentityComponentV1 {
+    let digest = sha256_hex(bytes);
+    RmiPolicyIdentityComponentV1 {
+        kind,
+        sha256: digest.clone(),
+        digest_basis: RmiIdentityDigestBasisV1::CanonicalDeclaration,
+        source_ref: source_ref.clone(),
+        evidence_ref: format!("declaration-evidence://{source_ref}"),
+        evidence_sha256: digest,
+    }
+}
+
+/// Build explicit, honest identity receipts for the synthetic reference
+/// policies. These bind their type/configuration/runtime declarations, but do
+/// not pretend that a declaration hash is a compiled executable or model hash.
+fn synthetic_policy_identity_v1<T: Serialize>(
+    policy_id: &str,
+    policy_version: &str,
+    implementation_type: &str,
+    immutable_configuration: &T,
+) -> Result<RmiImmutablePolicyIdentityV1, String> {
+    let implementation_bytes =
+        format!("rmi-synthetic-implementation-declaration-v1:{implementation_type}").into_bytes();
+    let configuration_bytes =
+        serde_json::to_vec(immutable_configuration).map_err(|error| error.to_string())?;
+    let runtime_bytes = format!(
+        "{}:{}:{}:{}",
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION"),
+        std::env::consts::ARCH,
+        std::env::consts::OS
+    ).into_bytes();
+
+    let identity = RmiImmutablePolicyIdentityV1 {
+        schema_version: 1,
+        policy_id: policy_id.to_owned(),
+        policy_version: policy_version.to_owned(),
+        components: vec![
+            canonical_declaration_component_v1(
+                RmiIdentityComponentKindV1::PolicyImplementation,
+                &implementation_bytes,
+                format!("rust-type://{implementation_type}"),
+            ),
+            canonical_declaration_component_v1(
+                RmiIdentityComponentKindV1::Configuration,
+                &configuration_bytes,
+                format!("configuration-declaration://{policy_id}/{policy_version}"),
+            ),
+            canonical_declaration_component_v1(
+                RmiIdentityComponentKindV1::RuntimeBuild,
+                &runtime_bytes,
+                format!("runtime-declaration://{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")),
+            ),
+        ],
+        execution: RmiPolicyExecutionIdentityV1 {
+            backend_mode: "synthetic_rust_reference".into(),
+            device_mode: format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS),
+            stochastic_source: "none_for_synthetic_reference_policy".into(),
+            seed_authority: "rmi_intervention_pair.seed".into(),
+            deterministic_execution: true,
+        },
+    };
+    identity.validate_for(policy_id, policy_version)?;
+    Ok(identity)
+}
+
 /// Policy interface for controlled Track A evaluation.
 ///
 /// The policy receives the current observation and the same seed in both
@@ -236,11 +432,12 @@ pub fn validate_rmi_intervention_pair(
 /// was manipulated. Production Melothaea adapters can implement this trait
 /// later, after their observation/action boundaries are pinned.
 pub trait RmiPolicyV1: Sized {
-    /// Mutable episode state only. Static weights, binaries and device handles
-    /// are identified separately by policy_id/version and adapter provenance.
+    /// Mutable episode state only; immutable weights/configuration/runtime
+    /// identity is returned separately and must not be inferred from this snapshot.
     type Snapshot: Serialize + DeserializeOwned + PartialEq;
     fn policy_id(&self) -> &str;
     fn policy_version(&self) -> &str;
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String>;
     /// Every state field that can influence the next action must be included.
     /// Shared process-global state and external side effects are forbidden.
     fn snapshot_state(&self) -> Result<Self::Snapshot, String>;
@@ -261,6 +458,7 @@ pub trait RmiPartnerPolicyV1: Sized {
     type Snapshot: Serialize + DeserializeOwned + PartialEq;
     fn policy_id(&self) -> &str;
     fn policy_version(&self) -> &str;
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String>;
     /// Every state field that can influence the next response must be included.
     /// Shared process-global state and external side effects are forbidden.
     fn snapshot_state(&self) -> Result<Self::Snapshot, String>;
@@ -289,6 +487,9 @@ impl RmiPartnerPolicyV1 for FixedPartnerResponsePolicyV1 {
     fn policy_id(&self) -> &str { &self.id }
     fn policy_version(&self) -> &str { &self.version }
 
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> { synthetic_policy_identity_v1(&self.id, &self.version, std::any::type_name::<Self>(), &self.response) }
+
+
     fn respond(
         &mut self,
         _history: &[RmiHistoryEventV1],
@@ -314,6 +515,9 @@ impl RmiPartnerPolicyV1 for SyntheticResponsivePartnerPolicyV1 {
     fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> { Ok(snapshot.clone()) }
     fn policy_id(&self) -> &str { &self.id }
     fn policy_version(&self) -> &str { &self.version }
+
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> { synthetic_policy_identity_v1(&self.id, &self.version, std::any::type_name::<Self>(), &self.target) }
+
 
     fn respond(
         &mut self,
@@ -350,6 +554,9 @@ impl RmiPolicyV1 for FixedResponsePolicyV1 {
         &self.version
     }
 
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> { synthetic_policy_identity_v1(&self.id, &self.version, std::any::type_name::<Self>(), &self.response) }
+
+
     fn respond(
         &mut self,
         _history: &[RmiHistoryEventV1],
@@ -380,6 +587,9 @@ impl RmiPolicyV1 for OneWayPromptPolicyV1 {
     fn policy_version(&self) -> &str {
         &self.version
     }
+
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> { synthetic_policy_identity_v1(&self.id, &self.version, std::any::type_name::<Self>(), &self.frozen_response) }
+
 
     fn respond(
         &mut self,
@@ -412,6 +622,9 @@ impl RmiPolicyV1 for YokedReplayPolicyV1 {
         &self.version
     }
 
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> { synthetic_policy_identity_v1(&self.id, &self.version, std::any::type_name::<Self>(), &self.replayed_response) }
+
+
     fn respond(
         &mut self,
         _history: &[RmiHistoryEventV1],
@@ -443,6 +656,9 @@ impl RmiPolicyV1 for ImitationOnlyPolicyV1 {
     fn policy_version(&self) -> &str {
         &self.version
     }
+
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> { synthetic_policy_identity_v1(&self.id, &self.version, std::any::type_name::<Self>(), &()) }
+
 
     fn respond(
         &mut self,
@@ -501,6 +717,9 @@ impl RmiPolicyV1 for SyntheticContingentPolicyV1 {
     fn policy_version(&self) -> &str {
         &self.version
     }
+
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> { synthetic_policy_identity_v1(&self.id, &self.version, std::any::type_name::<Self>(), &self.target) }
+
 
     fn respond(
         &mut self,
@@ -581,6 +800,9 @@ pub struct RmiEvaluationPayloadV1 {
     pub intervention_pair_sha256: String,
     pub policy_id: String,
     pub policy_version: String,
+    /// Full immutable identity receipt plus its digest, separate from state snapshots.
+    pub immutable_policy_identity: RmiImmutablePolicyIdentityV1,
+    pub immutable_policy_identity_sha256: String,
     pub policy_pre_state_sha256: String,
     pub control_policy_post_state_sha256: String,
     pub treatment_policy_post_state_sha256: String,
@@ -612,8 +834,11 @@ pub struct RmiReciprocalEvaluationPayloadV1 {
     pub trial_id: String,
     pub seed: u64,
     pub agent_evaluation_sha256: String,
+    pub agent_immutable_policy_identity_sha256: String,
     pub partner_policy_id: String,
     pub partner_policy_version: String,
+    pub immutable_partner_policy_identity: RmiImmutablePolicyIdentityV1,
+    pub immutable_partner_policy_identity_sha256: String,
     pub partner_policy_pre_state_sha256: String,
     pub control_partner_post_state_sha256: String,
     pub treatment_partner_post_state_sha256: String,
@@ -650,6 +875,8 @@ pub enum RmiEvaluationErrorV1 {
     PolicyStateRestoreFailure { arm: String, reason: String },
     PolicyStateMismatch { arm: String },
     PolicyIdentityMismatch { arm: String },
+    InvalidPolicyImmutableIdentity(String),
+    PolicyImmutableIdentityMismatch { arm: String },
     EmptyPartnerPolicyId,
     EmptyPartnerPolicyVersion,
     InvalidPartnerResponseId { arm: String },
@@ -659,6 +886,8 @@ pub enum RmiEvaluationErrorV1 {
     PartnerStateRestoreFailure { arm: String, reason: String },
     PartnerStateMismatch { arm: String },
     PartnerPolicyIdentityMismatch { arm: String },
+    InvalidPartnerImmutableIdentity(String),
+    PartnerImmutableIdentityMismatch { arm: String },
     SerializationFailure(String),
 }
 
@@ -677,6 +906,15 @@ pub fn evaluate_rmi_pair<P: RmiPolicyV1>(
     if policy.policy_version().trim().is_empty() {
         return Err(RmiEvaluationErrorV1::EmptyPolicyVersion);
     }
+    let immutable_policy_identity = policy
+        .immutable_identity()
+        .map_err(RmiEvaluationErrorV1::InvalidPolicyImmutableIdentity)?;
+    immutable_policy_identity
+        .validate_for(policy.policy_id(), policy.policy_version())
+        .map_err(RmiEvaluationErrorV1::InvalidPolicyImmutableIdentity)?;
+    let immutable_policy_identity_sha256 = immutable_policy_identity
+        .digest_sha256()
+        .map_err(RmiEvaluationErrorV1::InvalidPolicyImmutableIdentity)?;
 
     // Snapshot once, then restore independent instances for both counterfactual
     // arms and for deterministic replay. Never run control then treatment on
@@ -718,6 +956,17 @@ pub fn evaluate_rmi_pair<P: RmiPolicyV1>(
             || restored.policy_version() != policy.policy_version()
         {
             return Err(RmiEvaluationErrorV1::PolicyIdentityMismatch {
+                arm: arm.to_owned(),
+            });
+        }
+        let restored_identity = restored
+            .immutable_identity()
+            .map_err(RmiEvaluationErrorV1::InvalidPolicyImmutableIdentity)?;
+        restored_identity
+            .validate_for(restored.policy_id(), restored.policy_version())
+            .map_err(RmiEvaluationErrorV1::InvalidPolicyImmutableIdentity)?;
+        if restored_identity != immutable_policy_identity {
+            return Err(RmiEvaluationErrorV1::PolicyImmutableIdentityMismatch {
                 arm: arm.to_owned(),
             });
         }
@@ -869,6 +1118,8 @@ pub fn evaluate_rmi_pair<P: RmiPolicyV1>(
         intervention_pair_sha256,
         policy_id: policy.policy_id().to_string(),
         policy_version: policy.policy_version().to_string(),
+        immutable_policy_identity,
+        immutable_policy_identity_sha256,
         policy_pre_state_sha256,
         control_policy_post_state_sha256,
         treatment_policy_post_state_sha256,
@@ -910,6 +1161,15 @@ where
     if partner_policy.policy_version().trim().is_empty() {
         return Err(RmiEvaluationErrorV1::EmptyPartnerPolicyVersion);
     }
+    let immutable_partner_policy_identity = partner_policy
+        .immutable_identity()
+        .map_err(RmiEvaluationErrorV1::InvalidPartnerImmutableIdentity)?;
+    immutable_partner_policy_identity
+        .validate_for(partner_policy.policy_id(), partner_policy.policy_version())
+        .map_err(RmiEvaluationErrorV1::InvalidPartnerImmutableIdentity)?;
+    let immutable_partner_policy_identity_sha256 = immutable_partner_policy_identity
+        .digest_sha256()
+        .map_err(RmiEvaluationErrorV1::InvalidPartnerImmutableIdentity)?;
 
     // Independently fork partner policy state for control, treatment and
     // repeatability checks, exactly as done for the agent policy above.
@@ -950,6 +1210,17 @@ where
             || restored.policy_version() != partner_policy.policy_version()
         {
             return Err(RmiEvaluationErrorV1::PartnerPolicyIdentityMismatch {
+                arm: arm.to_owned(),
+            });
+        }
+        let restored_identity = restored
+            .immutable_identity()
+            .map_err(RmiEvaluationErrorV1::InvalidPartnerImmutableIdentity)?;
+        restored_identity
+            .validate_for(restored.policy_id(), restored.policy_version())
+            .map_err(RmiEvaluationErrorV1::InvalidPartnerImmutableIdentity)?;
+        if restored_identity != immutable_partner_policy_identity {
+            return Err(RmiEvaluationErrorV1::PartnerImmutableIdentityMismatch {
                 arm: arm.to_owned(),
             });
         }
@@ -1102,8 +1373,11 @@ where
         trial_id: pair.trial_id.clone(),
         seed: pair.seed,
         agent_evaluation_sha256: agent.payload_sha256,
+        agent_immutable_policy_identity_sha256: agent.payload.immutable_policy_identity_sha256,
         partner_policy_id: partner_policy.policy_id().to_string(),
         partner_policy_version: partner_policy.policy_version().to_string(),
+        immutable_partner_policy_identity,
+        immutable_partner_policy_identity_sha256,
         partner_policy_pre_state_sha256,
         control_partner_post_state_sha256,
         treatment_partner_post_state_sha256,
@@ -1153,6 +1427,53 @@ mod tests {
 
     thread_local! {
         static UNTRACKED_PROCESS_CALLS: Cell<u32> = Cell::new(0);
+        static IDENTITY_RESTORE_CALLS: Cell<u32> = Cell::new(0);
+    }
+
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    struct IdentityDriftingPolicy {
+        identity_variant: u8,
+    }
+
+    impl RmiPolicyV1 for IdentityDriftingPolicy {
+        type Snapshot = Self;
+
+        fn policy_id(&self) -> &str { "identity-drifting-policy" }
+        fn policy_version(&self) -> &str { "1" }
+        fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> {
+            synthetic_policy_identity_v1(
+                self.policy_id(),
+                self.policy_version(),
+                std::any::type_name::<Self>(),
+                &self.identity_variant,
+            )
+        }
+        fn snapshot_state(&self) -> Result<Self::Snapshot, String> { Ok(self.clone()) }
+        fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> {
+            let restore_index = IDENTITY_RESTORE_CALLS.with(|counter| {
+                let index = counter.get();
+                counter.set(index + 1);
+                index
+            });
+            let mut restored = snapshot.clone();
+            // The third restore is the treatment instance. It deliberately
+            // reports a different immutable identity under identical labels.
+            if restore_index == 2 {
+                restored.identity_variant = restored.identity_variant.wrapping_add(1);
+            }
+            Ok(restored)
+        }
+        fn respond(
+            &mut self,
+            _history: &[RmiHistoryEventV1],
+            observation: &RmiPartnerObservationV1,
+            _seed: u64,
+        ) -> RmiAgentActionV1 {
+            RmiAgentActionV1 {
+                action_id: "identity-drift-response".into(),
+                features: observation.features.clone(),
+            }
+        }
     }
 
     fn base_features() -> RmiMusicalFeaturesV1 {
@@ -1201,6 +1522,98 @@ mod tests {
             action_id: "fixed-action".into(),
             features: base_features(),
         }
+    }
+
+    #[test]
+    fn immutable_identity_digest_distinguishes_same_label_different_artifacts() {
+        let mut first = synthetic_policy_identity_v1(
+            "same-policy",
+            "1",
+            "fixture::SamePolicy",
+            &"configuration-a",
+        ).unwrap();
+        let first_digest = first.digest_sha256().unwrap();
+
+        let artifact_digest = "a".repeat(64);
+        first.components.insert(1, RmiPolicyIdentityComponentV1 {
+            kind: RmiIdentityComponentKindV1::ModelArtifact,
+            sha256: artifact_digest.clone(),
+            digest_basis: RmiIdentityDigestBasisV1::ArtifactBytes,
+            source_ref: format!("sha256:{artifact_digest}"),
+            evidence_ref: format!("sha256:{artifact_digest}"),
+            evidence_sha256: artifact_digest.clone(),
+        });
+        let second_digest = first.digest_sha256().unwrap();
+        assert_ne!(first_digest, second_digest);
+        assert!(!first.all_components_content_addressed(),
+            "declaration-only implementation/runtime must not be labelled artifact-backed");
+
+        let mut other = first.clone();
+        let other_artifact_digest = "b".repeat(64);
+        let artifact = other.components.iter_mut()
+            .find(|component| component.kind == RmiIdentityComponentKindV1::ModelArtifact)
+            .unwrap();
+        artifact.sha256 = other_artifact_digest.clone();
+        artifact.source_ref = format!("sha256:{other_artifact_digest}");
+        artifact.evidence_ref = format!("sha256:{other_artifact_digest}");
+        artifact.evidence_sha256 = other_artifact_digest;
+        assert_ne!(second_digest, other.digest_sha256().unwrap());
+        assert_eq!(other.policy_id, "same-policy");
+        assert_eq!(other.policy_version, "1");
+    }
+
+    #[test]
+    fn immutable_identity_rejects_duplicate_or_unordered_components() {
+        let mut identity = synthetic_policy_identity_v1(
+            "ordered-policy",
+            "1",
+            "fixture::OrderedPolicy",
+            &(),
+        ).unwrap();
+        identity.components.push(identity.components[0].clone());
+        assert!(identity.validate_for("ordered-policy", "1").is_err());
+    }
+
+    #[test]
+    fn synthetic_identity_declarations_are_not_claimed_as_resolvable_artifacts() {
+        let identity = synthetic_policy_identity_v1(
+            "declared-policy",
+            "1",
+            "fixture::DeclaredPolicy",
+            &(),
+        ).unwrap();
+        assert!(!identity.all_components_content_addressed());
+        assert!(identity.digest_sha256().is_ok());
+    }
+
+    #[test]
+    fn restored_treatment_with_changed_immutable_identity_fails_before_action() {
+        IDENTITY_RESTORE_CALLS.with(|counter| counter.set(0));
+        let policy = IdentityDriftingPolicy { identity_variant: 0 };
+        let result = evaluate_rmi_pair(&policy, &pair_for(RmiTargetFeatureV1::Motif));
+        assert!(matches!(
+            result,
+            Err(RmiEvaluationErrorV1::PolicyImmutableIdentityMismatch { ref arm })
+                if arm == "treatment"
+        ));
+    }
+
+    #[test]
+    fn evaluation_payload_binds_immutable_identity_and_digest() {
+        let policy = SyntheticContingentPolicyV1 {
+            id: "identity-payload-control".into(),
+            version: "1".into(),
+            target: RmiTargetFeatureV1::Motif,
+        };
+        let result = evaluate_rmi_pair(&policy, &pair_for(RmiTargetFeatureV1::Motif)).unwrap();
+        assert_eq!(
+            result.payload.immutable_policy_identity_sha256,
+            result.payload.immutable_policy_identity.digest_sha256().unwrap()
+        );
+        assert_eq!(
+            result.payload.immutable_policy_identity.policy_id,
+            result.payload.policy_id
+        );
     }
 
     #[test]
@@ -1274,6 +1687,9 @@ mod tests {
         fn policy_id(&self) -> &str { "two-call-counter-agent" }
         fn policy_version(&self) -> &str { "1" }
 
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> { synthetic_policy_identity_v1(self.policy_id(), self.policy_version(), std::any::type_name::<Self>(), &()) }
+
+
         fn respond(
             &mut self,
             _history: &[RmiHistoryEventV1],
@@ -1326,6 +1742,9 @@ mod tests {
         fn policy_id(&self) -> &str { "process-global-counter" }
         fn policy_version(&self) -> &str { "1" }
 
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> { synthetic_policy_identity_v1(self.policy_id(), self.policy_version(), std::any::type_name::<Self>(), &()) }
+
+
         fn respond(
             &mut self,
             _history: &[RmiHistoryEventV1],
@@ -1376,6 +1795,9 @@ mod tests {
     fn restore_from_snapshot(snapshot: &Self::Snapshot) -> Result<Self, String> { Ok(snapshot.clone()) }
         fn policy_id(&self) -> &str { "two-call-counter-partner" }
         fn policy_version(&self) -> &str { "1" }
+
+    fn immutable_identity(&self) -> Result<RmiImmutablePolicyIdentityV1, String> { synthetic_policy_identity_v1(self.policy_id(), self.policy_version(), std::any::type_name::<Self>(), &()) }
+
 
         fn respond(
             &mut self,
