@@ -878,12 +878,16 @@ pub fn simulate(
 
     // Seed knowledge is deterministic and explicit: initial recipes are
     // distributed round-robin among the configured seed agents.
-    for recipe_index in 0..config.initial_seed_agents.saturating_mul(config.initial_seed_recipes_per_agent) {
-        if config.initial_seed_agents == 0 { break; }
-        let agent_index = recipe_index % config.initial_seed_agents;
-        let task_recipe = &task.recipes()[recipe_index % task.recipes().len()];
-        agents[agent_index].known_recipes.insert(task_recipe.recipe_id);
-        agents[agent_index].apply_closure(task);
+    for agent_index in 0..config.initial_seed_agents {
+        let first_recipe = agent_index
+            .saturating_mul(config.initial_seed_recipes_per_agent)
+            % task.recipes().len();
+        for offset in 0..config.initial_seed_recipes_per_agent {
+            let recipe_index = (first_recipe + offset) % task.recipes().len();
+            let task_recipe = &task.recipes()[recipe_index];
+            agents[agent_index].known_recipes.insert(task_recipe.recipe_id);
+            agents[agent_index].apply_closure(task);
+        }
     }
 
     let mut history = Vec::with_capacity(config.steps + 1);
