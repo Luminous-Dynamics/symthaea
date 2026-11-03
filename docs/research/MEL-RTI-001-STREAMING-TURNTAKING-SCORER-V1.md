@@ -50,12 +50,20 @@ Ground truth supplies an effect target and permitted window only for RESPOND and
 
 ### Causal-clock checks
 
+Keep two clocks separate:
+
+1. **Session sample-frame clock:** input chunk boundaries and musical response/yield event positions.
+2. **Monotonic runner clock:** chunk receipt, action decision, and actual effect emission timestamps in nanoseconds.
+
 For every prediction chunk:
 - observed-through frame must equal the current chunk's end frame;
-- decision time cannot precede the end of the chunk;
-- decision time cannot exceed the artifact boundary;
-- a RESPOND or YIELD effect time, when supplied, cannot precede the decision;
+- chunk receipt and decision times must be monotonic across the session;
+- decision time cannot precede chunk receipt;
+- a RESPOND or YIELD effect frame, when supplied, cannot precede the observed-through frame;
+- the monotonic effect-emission time, when supplied, cannot precede the decision;
 - a WAIT or CONTINUE decision cannot carry an action-effect timestamp.
+
+Decision latency is computed from monotonic `decision_at_ns - chunk_received_at_ns`; action-effect latency is computed from monotonic `effect_at_ns - decision_at_ns`. Musical effect-window error is computed separately in sample frames and converted using the source audio sample rate. This prevents musical timeline offsets from being misreported as compute or actuation latency.
 
 These checks reject declared lookahead, missing chunks and backdating. They do not prove the external runner's actual model-input isolation; that requires a trusted runner or independently captured input receipts.
 
@@ -66,7 +74,8 @@ These checks reject declared lookahead, missing chunks and backdating. They do n
 - WAIT false-activation rate.
 - CONTINUE premature-yield count.
 - Post-yield non-WAIT decisions before the next expected response invitation.
-- Decision latency p50/p95/p99.
+- Decision latency p50/p95/p99 from the monotonic runner clock.
+- Action-effect latency p50/p95/p99 from the monotonic runner clock.
 - Parse failures separately from valid WAIT decisions.
 
 Action classification and timed action execution are deliberately separate. A model can select RESPOND correctly but fail to produce the response effect within the permitted window.
