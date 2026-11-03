@@ -257,6 +257,19 @@ CEB-REPO-001 should compare against adjacent production-grade code-intelligence 
 - **CodeQL** is a separate security/data-flow baseline. GitHub documents Rust support; CodeQL 2.27.2 (2026-10-09) added Rust extractor and data-flow improvements. Use its alert/data-flow results for security-relevant relations, but do not mistake CodeQL's security graph for a complete semantic repository twin.
 - **Cargo metadata** is a manifest/dependency baseline; syntax-only parsers such as Tree-sitter provide a syntax extraction baseline.
 
+Cargo is the configuration authority for Cargo features and target-filtered dependency resolution. `cargo metadata` enables default features unless `--no-default-features` is supplied; explicit flags are selected with `--features`, and `--filter-platform <triple>` filters the resolved dependency graph. The matrix must therefore capture the exact Cargo invocation, target triple, lockfile and effective feature set. For this fixture, the eight rows map to: default (defaults enabled, no explicit features), no-default + explicit `audit`, no-default + explicit `windows-native`, and no-default + both explicit features, each on Linux and Windows.
+
+rust-analyzer does not own Cargo feature expansion: its `CrateGraph` models dependencies and cfg flags, while Cargo features are lowered into `--cfg feature=` flags by the project-loading layer. Keep the evidence chain explicit: **Cargo metadata / feature selection → lowered per-crate cfg + crate graph → rust-analyzer resolved symbols/types → SCIP index**. Record both the source evidence and the adapter's lowering receipt. Do not infer a feature's absence just because the semantic index has no node; it may have been omitted by an incorrect project configuration.
+
+The feature-world acceptance metrics should be:
+- **100% effective-feature-set accuracy** across the eight supported worlds.
+- **100% target-triple and target-dependency activation accuracy** for the pinned matrix.
+- **Zero false-active conditional facts** and **zero false-inactive conditional facts** on the synthetic gold set.
+- **100% world coverage** with no silent fallback when a requested target/feature combination is unsupported.
+- Exact equality between incremental graph updates after changing feature/target configuration and a clean full rebuild; report invalidation cost separately.
+
+Use SCIP as a versioned interchange baseline for definitions, references and implementations, not as a standalone oracle for Cargo feature semantics or security. Use CodeQL's Rust data-flow/security findings as a separate security baseline, not as a complete symbol graph. Pin each indexer and query pack and retain its configuration receipt.
+
 A competitive repository twin must combine these sources without merging their authority. Every fact should retain an exact source revision, path/span, cfg/feature/target world, indexer/compiler version and evidence artifact. Suggested authority levels are syntax-declared, manifest-declared, rust-analyzer-resolved, rustc-confirmed, runtime-observed and human-adjudicated. No fact may be promoted to a stronger authority simply because multiple weaker sources agree.
 
 **Paradigm shift:** make the graph temporal and evidence-carrying. Every repository edit produces a graph delta and an invalidation closure. The benchmark compares the incremental graph against a full rebuild after every mutation, including a fresh semantic re-index. This directly measures stale knowledge, invalidation underreach/overreach and computational cost, not just one-shot graph extraction.
