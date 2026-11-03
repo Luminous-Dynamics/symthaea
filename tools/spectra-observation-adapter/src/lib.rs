@@ -549,6 +549,27 @@ mod tests {
         assert!(report.confidence_category_counts.windows(2).all(|pair|
             pair[0].evidence_order < pair[1].evidence_order
         ));
+        assert!(report.confidence_category_counts_by_stratum.iter().all(|row|
+            row.participant_id == 0 && row.session_id == 0
+        ));
+        assert!(report.rt_category_counts_by_stratum.iter().all(|row|
+            row.participant_id == 0 && row.session_id == 0
+        ));
+    }
+
+    #[test]
+    fn raw_category_tables_do_not_pool_across_sessions() {
+        let (mut candidate, truth) = perfect_fixture();
+        for row in &mut candidate.trials[3..] {
+            row.session_id = 1;
+        }
+        let report = evaluate(&candidate, &truth).unwrap();
+        let confidence_sessions: BTreeSet<_> = report.confidence_category_counts_by_stratum
+            .iter().map(|row| row.session_id).collect();
+        let rt_sessions: BTreeSet<_> = report.rt_category_counts_by_stratum
+            .iter().map(|row| row.session_id).collect();
+        assert_eq!(confidence_sessions, BTreeSet::from([0, 1]));
+        assert_eq!(rt_sessions, BTreeSet::from([0, 1]));
     }
 
     #[test]
