@@ -117,3 +117,14 @@ Official source: https://daplab.cs.columbia.edu/benchmarks/sre-bench/
 ## Claim ceiling
 
 A valid receipt means its accounting, identities, task digests and declared budgets are internally consistent. It does not prove producer authenticity, grader correctness, task-answer truth, fair task construction, or general superiority over another system.
+
+
+## External benchmark baselines and cohort accounting
+
+The receipt schema is benchmark-neutral. It does not bake one leaderboard into the contract.
+
+For SRE-Bench public-facing results, preserve the official metric over graded instances and separately disclose eligible instances that were not graded. The October 2026 snapshot illustrates the risk: GPT-6-Astra reported 5.55/6 and 82.3% full solves on 181 graded instances out of 262; GPT-5.6-Sol reported 3.69/6 and 31.5% full solves on 254/262. Those conditional rates are not the same as full-universe coverage-adjusted yield. Store this leaderboard as external provenance, never as a local result. [Official SRE-Bench methodology and results](https://daplab.cs.columbia.edu/benchmarks/sre-bench/).
+
+For AgentRE-Bench, preserve its fixed 25-tool-call episode budget, isolated Docker environment, no network and read-only workspace; do not compare an arm using a different toolset or budget as though it were matched. [AgentRE-Bench protocol](https://github.com/agentrebench/AgentRE-Bench).
+
+For from-scratch firmware tasks, use the phase receipt extension from #10298: CVE/product identity → firmware acquisition → extraction/lineage → binary/root-cause identification → rehosting fidelity → safe target validation. A mock rehost cannot be counted as real firmware reproduction.
