@@ -127,7 +127,7 @@ impl SonataActionQualificationV1 {
                 if self.action != SymbolicAction::ReturnOpeningMaterial {
                     return Err("the Sonata-return adapter cannot qualify a different action".into());
                 }
-                if realizer_id != SONATA_RETURN_REALIZER_ID_V1
+                if realizer_id.as_str() != SONATA_RETURN_REALIZER_ID_V1
                     || *input_modality != SonataActionInputModalityV1::PlanBearingSonataRealization
                     || *output_modality != SonataActionOutputModalityV1::SymbolicScore
                     || evidence != &sonata_return_evidence_v1()
@@ -924,6 +924,16 @@ mod tests {
             }
             assert_eq!(qualification.digest_sha256().unwrap().len(), 64);
         }
+    }
+
+    #[test]
+    fn supported_receipt_cannot_be_relabelled_as_another_action() {
+        let mut qualification = qualify_sonata_action_v1(
+            SymbolicAction::ReturnOpeningMaterial,
+            SonataActionExecutionModeV1::Execute,
+        );
+        qualification.action = SymbolicAction::IncreaseDensity;
+        assert!(qualification.validate().is_err());
     }
 
     #[test]
