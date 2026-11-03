@@ -59,6 +59,7 @@ The evaluator:
 - treats missing/censored/timed-out/unsupported reference outcomes as IncompleteReference;
 - treats unknown candidate feasibility as indeterminate;
 - compares only the supplied finite candidate set;
+- suppresses ranking/regret when the caller declares the candidate set incomplete (`IncompleteCandidateSet`);
 - reports selected-action regret, predicted-vs-realized ranking reversal and optimism gap when comparison is determinate.
 
 Selection/reveal sequence numbers and receipts are caller-supplied assertions. This evaluator cannot cryptographically prove that the planner was blinded or that the reference outcome was independently generated. The separate protocol #10266 addresses reference suitability and common-mode disclosure.
@@ -100,6 +101,7 @@ The report retains canonical raw input rows, recomputes all aggregates, and vali
 Required first fixtures:
 
 1. Perfect model: predicted and realized values equal at all observed horizons; every residual is zero.
+2. Analytic crossing golden fixture: derive occupancy and utility independently, then assert Continue is predicted-best, Yield reference-best, ranking reversal=true, regret=6 and optimism gap=9.
 2. Frozen schedule completeness: every expected slot has one outcome; an omitted slot or unexpected row is rejected.
 3. Expected schedule digest: modified schedule metadata fails the frozen digest check.
 2. Known constant bias: signed residual has a known sign and magnitude at every horizon.
