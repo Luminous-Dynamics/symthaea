@@ -52,7 +52,7 @@ Resource rows must use canonical units:
 - rinse-aid mass: g;
 - active operator time: s.
 
-Multiple non-overlapping resource events may be summed by type. Ensure the capture protocol prevents duplicate integration of the same meter interval. The current validator sums rows but does not yet detect overlapping intervals across separate rows for the same resource instrument; that is a capture/ledger gate to implement before using automated ingestion at scale.
+Resource values are interval increments (delta energy, delta water, delta mass or active seconds), not cumulative meter-register readings. Multiple non-overlapping events may be summed by type. For a given resource kind and instrument ID, intervals must not overlap; the validator rejects overlapping intervals from the same meter to prevent double-counting. Distinct calibrated branch meters may be combined when their physical coverage is disjoint and their measurement boundary is documented.
 
 ## Fail-closed rules
 
