@@ -130,10 +130,12 @@ impl fmt::Display for QualityError {
 }
 impl std::error::Error for QualityError {}
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PilotEvidenceEnvelope {
     scope: QualificationScope,
     required_endpoints: Vec<Endpoint>,
+    criteria: Vec<EndpointCriterion>,
+    method_ids: Vec<(Endpoint, String)>,
     run_ids: Vec<String>,
     observation_count: usize,
     minimum_independent_runs: usize,
@@ -142,6 +144,8 @@ pub struct PilotEvidenceEnvelope {
 impl PilotEvidenceEnvelope {
     pub fn scope(&self) -> &QualificationScope { &self.scope }
     pub fn required_endpoints(&self) -> &[Endpoint] { &self.required_endpoints }
+    pub fn criteria(&self) -> &[EndpointCriterion] { &self.criteria }
+    pub fn method_ids(&self) -> &[(Endpoint, String)] { &self.method_ids }
     pub fn run_ids(&self) -> &[String] { &self.run_ids }
     pub fn observation_count(&self) -> usize { self.observation_count }
     pub fn minimum_independent_runs(&self) -> usize { self.minimum_independent_runs }
@@ -419,11 +423,35 @@ pub fn qualify_pilot_evidence(
         }
     }
 
+    let criteria_for_envelope: Vec<EndpointCriterion> = required
+        .iter()
+        .map(|endpoint| {
+            criteria_by_endpoint
+                .get(endpoint)
+                .expect("required criterion checked above")
+                .to_owned()
+                .clone()
+        })
+        .collect();
+    let methods_for_envelope: Vec<(Endpoint, String)> = required
+        .iter()
+        .map(|endpoint| {
+            (
+                *endpoint,
+                method_by_endpoint
+                    .get(endpoint)
+                    .expect("required outcome observations checked above")
+                    .clone(),
+            )
+        })
+        .collect();
     let mut sorted_run_ids: Vec<String> = run_ids.into_iter().collect();
     sorted_run_ids.sort();
     Ok(PilotEvidenceEnvelope {
         scope,
         required_endpoints: required,
+        criteria: criteria_for_envelope,
+        method_ids: methods_for_envelope,
         run_ids: sorted_run_ids,
         observation_count: observations.len(),
         minimum_independent_runs: policy.minimum_independent_runs,
