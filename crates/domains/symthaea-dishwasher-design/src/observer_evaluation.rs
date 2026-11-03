@@ -806,6 +806,10 @@ mod tests {
             operator_id: format!("operator-{suffix}"),
             assay_lab_id: format!("lab-{suffix}"),
             test_site_id: format!("site-{suffix}"),
+            service_request_id: format!("service-{run_id}"),
+            compartment_id: format!("cell-{suffix}"),
+            compartment_configuration_sha256: format!("{:064x}", suffix.len()),
+            utility_topology_id: format!("utility-{suffix}"),
         }
     }
 
