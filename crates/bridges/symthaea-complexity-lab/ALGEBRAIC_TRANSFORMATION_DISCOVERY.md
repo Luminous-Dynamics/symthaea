@@ -97,31 +97,16 @@ The independent checker does not trust the producer's selected rule or digest. I
 
 The separate-process checker is implemented in a second file and imports no producer module. The Python prototype is not yet a Lean-refined verifier, and this v1 certificate proves only one local rewrite step. Hashes bind bytes; the rule replay, not the digest, establishes the local equivalence.
 
-## 5. Executed finite reference experiment
+## 5. Prepared finite reference test plan — execution pending
 
-Files:
+Committed source files:
 - reference/algebraic_rewrite_oracle.py
 - reference/algebraic_rewrite_checker.py
 - reference/algebraic_rewrite_results.json
 
-Closed algebra tags:
-1. Boolean feasibility.
-2. Natural-number counting.
-3. MaxCount (optimum and multiplicity).
-4. ParetoCount.
-5. Truncated integer polynomial ring.
-6. Truncated rational polynomial Q-algebra.
+The intended suite covers 576 semiring-valid rewrite fixtures across six algebra tags, two ring-only cancellation fixtures, and nine adversarial certificate controls. These values are test-plan parameters written into the result manifest, **not measured results**. The Python producer and checker have not been executed in this session; syntax, fixture generation, separate-process behavior and semantic outcomes remain unverified.
 
-Results from deterministic seed 0xE7018:
-- Four semiring-valid rewrite families x 24 trials x 6 algebras = 576 positive instances.
-- Two additional ring-only cancellation instances.
-- A separately implemented checker, executed as a fresh process, accepted 578/578 positive certificates.
-- The checker rejected 9/9 negative controls: stale target digest; wrong rule identifier; an independent-factor scope violation; ring-only cancellation relabelled as MaxCount; non-boolean Boolean serialization; duplicate sparse polynomial monomial; unreduced/negative-denominator rational coefficient; duplicate factor scope; and a Pareto encoding containing a dominated earlier point.
-- The checker now enforces exact node/certificate shapes, canonical sparse coefficient order, nonzero coefficients, positive multiplicities, reduced rational encodings, canonical scopes, and pairwise Pareto nondominance.
-- The polynomial reference generator was corrected to never emit zero sparse coefficients.
-- Every positive semantic fixture was exhaustively evaluated over all assignments in its finite domains.
-
-This is meaningful reference evidence, not a proof of the universal laws. The checker and evaluator are Python prototypes; the Rust implementation has not been written or compiled, and there is no hardware performance result.
+The claim ceiling is therefore source preparation only. No accepted/rejected certificate count, exact-law pass count, Lean proof, Rust build, e-graph search or performance outcome is currently established.
 
 ## 6. Architecture proposed for Rust and Lean
 
