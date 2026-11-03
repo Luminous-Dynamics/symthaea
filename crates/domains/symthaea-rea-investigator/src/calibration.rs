@@ -295,9 +295,12 @@ fn validate_config(config: CalibrationConfig) -> Result<(), CalibrationError> {
 }
 
 fn validate_thresholds(thresholds: CalibrationThresholds) -> Result<(), CalibrationError> {
-    let finite = [thresholds.maximum_brier_score, thresholds.maximum_top_label_ece]
-        .into_iter()
-        .all(f64::is_finite);
+    let finite = [
+        thresholds.maximum_brier_score,
+        thresholds.maximum_top_label_ece,
+    ]
+    .into_iter()
+    .all(f64::is_finite);
     if thresholds.minimum_observations == 0
         || thresholds.minimum_source_groups == 0
         || !finite
@@ -397,7 +400,10 @@ fn validate_observations(
             if expected != &ids {
                 return Err(CalibrationError::new(
                     CalibrationErrorKind::InconsistentClassSet,
-                    format!("sample {} predicts a different class set", observation.sample_id),
+                    format!(
+                        "sample {} predicts a different class set",
+                        observation.sample_id
+                    ),
                 ));
             }
         } else {
@@ -456,7 +462,11 @@ fn validate_observations(
             .iter()
             .enumerate()
             .map(|(index, probability)| {
-                let expected = if index == observed_class_index { 1.0 } else { 0.0 };
+                let expected = if index == observed_class_index {
+                    1.0
+                } else {
+                    0.0
+                };
                 (probability - expected).powi(2)
             })
             .sum::<f64>();
@@ -481,7 +491,10 @@ fn validate_observations(
 
     normalized.sort_by(|left, right| left.sample_id.cmp(&right.sample_id));
     Ok((
-        class_set.expect("non-empty observations produce a class set").into_iter().collect(),
+        class_set
+            .expect("non-empty observations produce a class set")
+            .into_iter()
+            .collect(),
         normalized,
     ))
 }
@@ -504,8 +517,7 @@ fn summarize(
             None => zero_probability_count += 1,
         }
 
-        let bin_index = ((observation.top_label_confidence * bin_count as f64).floor()
-            as usize)
+        let bin_index = ((observation.top_label_confidence * bin_count as f64).floor() as usize)
             .min(bin_count - 1);
         bins[bin_index].0 += 1;
         bins[bin_index].1 += observation.top_label_confidence;
@@ -827,7 +839,9 @@ fn receipt_digest(receipt: &CalibrationReceipt) -> String {
     hasher.update([
         receipt.claim_ceiling.producer_authenticated as u8,
         receipt.claim_ceiling.source_labels_independently_verified as u8,
-        receipt.claim_ceiling.training_calibration_split_independently_audited as u8,
+        receipt
+            .claim_ceiling
+            .training_calibration_split_independently_audited as u8,
         receipt.claim_ceiling.calibration_certified as u8,
         receipt.claim_ceiling.target_scope_completeness_verified as u8,
         receipt.claim_ceiling.distribution_stationarity_proven as u8,
@@ -1059,10 +1073,7 @@ mod tests {
     fn known_answer_brier_logloss_and_top_label_ece() {
         let receipt = evaluate(&[observation("sample-1", '1', 0.8, 0.2, "fault")]);
         assert!((receipt.metrics.brier_score - 0.08).abs() < 1.0e-12);
-        assert!(
-            (receipt.metrics.mean_log_loss_nats.unwrap() - (-0.8f64.ln())).abs()
-                < 1.0e-12
-        );
+        assert!((receipt.metrics.mean_log_loss_nats.unwrap() - (-0.8f64.ln())).abs() < 1.0e-12);
         assert!((receipt.metrics.top_label_ece - 0.2).abs() < 1.0e-12);
         assert_eq!(receipt.metrics.zero_probability_count, 0);
     }
@@ -1166,10 +1177,7 @@ mod tests {
             first.metrics.top_label_ece_bootstrap_95,
             second.metrics.top_label_ece_bootstrap_95
         );
-        assert_eq!(
-            first.metrics.bootstrap_unit,
-            CALIBRATION_BOOTSTRAP_UNIT
-        );
+        assert_eq!(first.metrics.bootstrap_unit, CALIBRATION_BOOTSTRAP_UNIT);
     }
 
     #[test]
