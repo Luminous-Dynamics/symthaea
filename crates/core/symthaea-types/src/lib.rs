@@ -17,6 +17,7 @@
 use serde::{Deserialize, Serialize};
 
 pub mod discovery_handoff;
+pub mod hybrid_model;
 pub mod physical_type;
 pub mod scientific_model;
 pub mod threshold_overrides;
@@ -26,7 +27,18 @@ pub use discovery_handoff::{
     InquirySelectionScope, ScientificHypothesisHandoff, ScientificHypothesisRevisionReceipt,
     ScientificInquirySelectionReceipt, scientific_hypothesis_set_digest, HYPOTHESIS_HANDOFF_SCHEMA,
 };
-pub use scientific_model::{EvidenceClass, ModelAssumption, ModelEvidenceRequirement, ModelNonClaim, ObligationDischarge, ObligationStatus, ProjectionEntry, ProjectionReport, ProjectionTreatment, QuantityRole, ScientificEquation, ScientificExpression, ScientificModel, ScientificQuantity, SemanticObligation, SolverIntent, SCIENTIFIC_MODEL_SCHEMA};
+pub use hybrid_model::{
+    GuardCrossingDirection, GuardSurface, HybridDynamicsV0_1, HybridMode, HybridTransition,
+    ParameterCondition, ParameterRelation, RationalValue, ResetAssignment, ResetLaw, ResetMap,
+    SimultaneousEventPolicy, HYBRID_DYNAMICS_SCHEMA_V0_1,
+};
+pub use scientific_model::{
+    EvidenceClass, ModelAssumption, ModelEvidenceRequirement, ModelNonClaim, ObligationDischarge,
+    ObligationStatus, ProjectionEntry, ProjectionReport, ProjectionTreatment, QuantityRole,
+    ScientificEquation, ScientificExpression, ScientificModel, ScientificQuantity,
+    SemanticObligation, SolverIntent, SCIENTIFIC_MODEL_SCHEMA, SCIENTIFIC_MODEL_SCHEMA_V0_1,
+    SCIENTIFIC_MODEL_SCHEMA_V0_2,
+};
 pub use physical_type::{ModelMaturity, PhysicalDimension, PhysicalType, PhysicalTypeError, QuantityKind, RationalScale, Refinement, ScalarDomain, TypeJudgement, UnitRef, UnitScale, UnitTransform};
 
 /// Number of harmonies (Eight Harmonies including Sacred Stillness).
