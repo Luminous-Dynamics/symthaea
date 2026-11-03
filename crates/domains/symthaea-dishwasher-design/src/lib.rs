@@ -11,6 +11,7 @@
 pub mod chemistry;
 pub mod quality;
 pub mod validation;
+pub mod observer_evaluation;
 
 pub mod energy {
     pub const WATER_CP_KJ_PER_KG_K: f64 = 4.186;
