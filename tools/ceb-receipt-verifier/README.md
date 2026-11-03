@@ -137,10 +137,11 @@ external negative-control corpus before it can be qualified for scored benchmark
 
 ## Current implementation status (2026-11-03)
 
-The verifier source and focused CI workflow are in draft PR [#10212](https://github.com/Luminous-Dynamics/symthaea/pull/10212), stacked on CEB schema PR #10115. The source currently contains 19 authored unit tests covering duplicate JSON members, DSSE PAE/signatures, trust roles, exact task-check parity, forged counters, required-check skips, budget enforcement, artifact digest/path validation, traversal/symlink rejection, runtime-environment parity, deterministic source/result tree hashing, patch-path parity patch-result reconstruction (correct and wrong-patch controls), and a complete signed primary/regrade pair with detached-link and evidence-reuse negative controls. These tests are authored but have **not** been run; no build, rustfmt, Clippy, schema-conformance, tree-digest interoperability or end-to-end receipt-pair result is claimed. No Cargo.lock has yet been generated in this environment.
+The verifier source and focused CI workflow are in draft PR [#10212](https://github.com/Luminous-Dynamics/symthaea/pull/10212), stacked on CEB schema PR #10115. Nineteen Rust unit tests are authored, including strict JSON, DSSE PAE/signature verification, role-separated signers, task-check parity, forged counter rejection, budget enforcement, runtime pinning, artifact confinement/hash checks, deterministic tree hashing, source/result change-path checks, libgit2 patch reconstruction (valid transformation and wrong-result rejection), and a complete signed primary/regrade pair with detached-link and evidence-reuse negative controls.
 
-The implementation intentionally returns unresolved for all current CEB catalog tasks because they remain `design_only`. Before any task can be scored, issue #10064 must qualify OS-level isolation, the task contract must be promoted with a frozen source and sealed split, and a real trusted signer policy must be provisioned outside the verifier inputs.
+**None of these Rust tests have been run in this environment.** There is no `cargo` or `rustc` toolchain available here; no Rust build, rustfmt, Clippy, Cargo.lock generation, schema conformance or end-to-end receipt-pair result is claimed. Direct dependency versions are exact-pinned, but transitive dependency versions remain unlocked until a Cargo.lock is generated. The dedicated GitHub workflow is queued, not passed.
 
+The verifier intentionally returns unresolved for all current CEB catalog tasks because they remain `design_only`. Before any task can be scored, issue #10064 must qualify OS-level isolation, the task contract must be promoted with a frozen source and sealed split, and a real trusted signer policy must be provisioned outside the verifier inputs.
 
 ## CEB-TREE-V1 details
 
@@ -159,9 +160,19 @@ The V0 digest uses Unix executable-bit semantics and therefore requires the veri
 
 Snapshots must be mounted read-only and immutable for the entire verification
 operation. The standard-library path walk is not a defense against a concurrent
-attacker mutating the tree during hashing; the host control plane must enforce
-snapshot immutability. The result-tree digest and changed-path reconciliation do
-not prove that the submitted patch transforms the source tree into that result.
-They prove only that the supplied snapshots and the signed patch-path declarations
-are internally consistent. Applying patches safely and independently is a
-separate qualification gate.
+attacker mutating the tree during hashing or reconstruction; the host control plane
+must enforce snapshot immutability.
+
+The verifier now reconstructs the result for supported patches: it builds source
+and result snapshots as Git trees inside a private temporary bare libgit2 repository,
+applies the submitted UTF-8 textual Git diff to the source tree, and requires the
+resulting Git tree object to match the independently built result snapshot. This
+closes the path-only consistency gap. Binary patches and quoted/ambiguous paths
+remain unresolved in CEB V0. The reconstruction limit is 512 MiB combined source
+and result snapshot bytes.
+
+The verifier still does not establish runner isolation, independently adjudicate
+test semantics, or authenticate that a named model provider served the claimed
+model. The temporary Git object database is an implementation detail of patch
+reconstruction, not a security boundary; runner isolation remains governed by
+issue #10064.
