@@ -438,6 +438,7 @@ fn validate_service_report(
         });
     }
     if report.rewash_attempt_count > report.attempt_count
+        || report.rewash_attempt_count > report.reattempted_item_visits
         || (report.rewash_attempt_count == 0) != (report.reattempted_item_visits == 0)
     {
         return Err(SystemWindowError::InconsistentServiceReport {
