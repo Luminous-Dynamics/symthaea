@@ -285,6 +285,12 @@ pub fn summarize_paired_metric(
             PairedMetricDirection::LowerIsBetter => mean_baseline_value - mean_advanced_value,
             PairedMetricDirection::HigherIsBetter => mean_advanced_value - mean_baseline_value,
         };
+        if !mean_advanced_value.is_finite()
+            || !mean_baseline_value.is_finite()
+            || !mean_improvement.is_finite()
+        {
+            return Err(PairedStatisticsError::NonFiniteObservation);
+        }
         family_effects.push(PairedFamilyEffect {
             failure_family_id,
             scenario_ids: family_observations
@@ -339,19 +345,25 @@ fn bootstrap_family_means(values: &[f64], seed: u64, replicates: u32) -> (f64, f
     let mut rng = SplitMix64(seed);
     let mut means = Vec::with_capacity(replicates as usize);
     for _ in 0..replicates {
-        let mut total = 0.0;
+        let mut sample = Vec::with_capacity(values.len());
         for _ in 0..values.len() {
             let index = rng.index_below(values.len() as u64) as usize;
-            total += values[index];
+            sample.push(values[index]);
         }
-        means.push(total / values.len() as f64);
+        means.push(arithmetic_mean(&sample));
     }
     means.sort_by(f64::total_cmp);
     (percentile(&means, 0.025), percentile(&means, 0.975))
 }
 
 fn arithmetic_mean(values: &[f64]) -> f64 {
-    values.iter().sum::<f64>() / values.len() as f64
+    if values.is_empty() {
+        return f64::NAN;
+    }
+    // Divide before summation so a finite mean does not overflow merely
+    // because the unscaled sum would exceed f64::MAX.
+    let divisor = values.len() as f64;
+    values.iter().map(|value| value / divisor).sum()
 }
 
 fn percentile(sorted: &[f64], probability: f64) -> f64 {
@@ -362,7 +374,7 @@ fn percentile(sorted: &[f64], probability: f64) -> f64 {
     let lower = position.floor() as usize;
     let upper = position.ceil() as usize;
     let fraction = position - lower as f64;
-    sorted[lower] + (sorted[upper] - sorted[lower]) * fraction
+    sorted[lower] * (1.0 - fraction) + sorted[upper] * fraction
 }
 
 fn approximately_equal(left: f64, right: f64) -> bool {
@@ -563,6 +575,63 @@ mod tests {
                 PairedMetricDirection::LowerIsBetter,
                 &nonfinite,
                 1,
+                1000,
+            )
+            .unwrap_err(),
+            PairedStatisticsError::NonFiniteObservation
+        );
+    }
+
+    #[test]
+    fn finite_extreme_samples_do_not_overflow_just_while_averaging() {
+        let input = vec![
+            PairedMetricObservation {
+                failure_family_id: "family-a".into(),
+                scenario_id: "a".into(),
+                advanced_value: f64::MAX,
+                baseline_value: f64::MAX,
+            },
+            PairedMetricObservation {
+                failure_family_id: "family-b".into(),
+                scenario_id: "b".into(),
+                advanced_value: f64::MAX,
+                baseline_value: f64::MAX,
+            },
+        ];
+        let summary = summarize_paired_metric(
+            "large_finite_metric",
+            PairedMetricDirection::LowerIsBetter,
+            &input,
+            11,
+            1000,
+        )
+        .unwrap();
+        assert_eq!(summary.mean_family_improvement, 0.0);
+        assert!(summary.identity_is_valid());
+    }
+
+    #[test]
+    fn finite_inputs_with_unrepresentable_paired_difference_are_rejected() {
+        let input = vec![
+            PairedMetricObservation {
+                failure_family_id: "family-a".into(),
+                scenario_id: "a".into(),
+                advanced_value: -f64::MAX,
+                baseline_value: f64::MAX,
+            },
+            PairedMetricObservation {
+                failure_family_id: "family-b".into(),
+                scenario_id: "b".into(),
+                advanced_value: 0.0,
+                baseline_value: 0.0,
+            },
+        ];
+        assert_eq!(
+            summarize_paired_metric(
+                "unrepresentable_difference",
+                PairedMetricDirection::LowerIsBetter,
+                &input,
+                12,
                 1000,
             )
             .unwrap_err(),
