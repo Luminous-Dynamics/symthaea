@@ -3,6 +3,9 @@ name = "ceb-receipt-verifier"
 version = "0.1.0"
 edition = "2024"
 publish = false
+
+# Keep this verifier independently buildable outside the root workspace.
+[workspace]
 description = "Offline verifier for signed Computational Engineering Bench receipts"
 
 [dependencies]
