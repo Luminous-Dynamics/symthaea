@@ -200,13 +200,16 @@ jobs:
                       raise ValueError(f"Windows world has non-Windows target triple: {world['id']}")
                   if target_os == "linux" and "linux" not in triple:
                       raise ValueError(f"Linux world has non-Linux target triple: {world['id']}")
-                  enabled = set(world["enabled_features"])
-                  if not enabled <= vocabulary:
+                  explicit_features = set(world["enabled_features"])
+                  if not explicit_features <= vocabulary:
                       raise ValueError(f"world enables an undeclared Cargo feature: {world['id']}")
+                  effective_features = set(explicit_features)
+                  if world["default_features_enabled"]:
+                      effective_features.update({"audit"})
                   computed_active = set()
                   for fact in facts:
                       activation = fact["activation"]
-                      feature_ok = "feature" not in activation or activation["feature"] in enabled
+                      feature_ok = "feature" not in activation or activation["feature"] in effective_features
                       target_ok = "target_os" not in activation or activation["target_os"] == target_os
                       if feature_ok and target_ok:
                           computed_active.add(fact["node_id"])
@@ -238,10 +241,16 @@ jobs:
           expect_world_reject(mutant_worlds, graph, "Windows-only symbol activated on Linux")
 
           mutant_worlds = copy.deepcopy(worlds)
+          linux_default = next(world for world in mutant_worlds["worlds"] if world["id"] == "linux-default")
+          linux_default["expected_active_nodes"].remove("sym.audit.record_access")
+          linux_default["expected_inactive_nodes"].append("sym.audit.record_access")
+          expect_world_reject(mutant_worlds, graph, "Cargo default audit feature incorrectly inactive")
+
+          mutant_worlds = copy.deepcopy(worlds)
           windows_audit = next(world for world in mutant_worlds["worlds"] if world["id"] == "windows-audit")
           windows_audit["expected_active_nodes"].remove("sym.audit.record_access")
           windows_audit["expected_inactive_nodes"].append("sym.audit.record_access")
-          expect_world_reject(mutant_worlds, graph, "enabled audit feature symbol incorrectly inactive")
+          expect_world_reject(mutant_worlds, graph, "explicitly enabled audit feature symbol incorrectly inactive")
 
           mutant_worlds = copy.deepcopy(worlds)
           mutant_worlds["worlds"][1]["id"] = mutant_worlds["worlds"][0]["id"]
@@ -501,7 +510,7 @@ jobs:
           print(
               "CEB_CONTRACT_SCHEMA_PASS: "
               f"tasks={len(task_ids)} unique_tasks={len(set(task_ids))} "
-              f"schemas=4 negative_controls=34 worlds={world_count} conditional_facts={conditional_fact_count}"
+              f"schemas=4 negative_controls=35 worlds={world_count} conditional_facts={conditional_fact_count}"
           )
           print("CEB_CLAIM_BOUNDARY: schema validation is not DSSE signature verification or runner qualification")
           PY
