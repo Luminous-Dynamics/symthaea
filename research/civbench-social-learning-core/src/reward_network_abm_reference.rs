@@ -259,16 +259,16 @@ pub struct GenerationMetrics {
     pub population_size: usize,
     pub human_count: usize,
     pub machine_count: usize,
-    pub human_optimal_prevalence: f64,
-    pub machine_optimal_prevalence: f64,
-    pub human_myopic_prevalence: f64,
-    pub human_random_prevalence: f64,
-    pub human_individual_optimal_discovery_rate: f64,
-    pub human_social_optimal_acquisition_rate: f64,
-    pub human_social_only_optimal_integration_rate: f64,
-    pub human_machine_lineage_optimal_prevalence: f64,
+    pub human_optimal_prevalence: Option<f64>,
+    pub machine_optimal_prevalence: Option<f64>,
+    pub human_myopic_prevalence: Option<f64>,
+    pub human_random_prevalence: Option<f64>,
+    pub human_individual_optimal_discovery_rate: Option<f64>,
+    pub human_social_optimal_acquisition_rate: Option<f64>,
+    pub human_social_only_optimal_integration_rate: Option<f64>,
+    pub human_machine_lineage_optimal_prevalence: Option<f64>,
     pub mean_demonstration_reward: f64,
-    pub social_learning_rate_observed: f64,
+    pub social_learning_rate_observed: Option<f64>,
 }
 
 impl Generation {
@@ -278,7 +278,7 @@ impl Generation {
         let human_count = human.len();
         let machine_count = machine.len();
         let rate = |numerator: usize, denominator: usize| {
-            if denominator == 0 { 0.0 } else { numerator as f64 / denominator as f64 }
+            (denominator > 0).then(|| numerator as f64 / denominator as f64)
         };
 
         let human_optimal = human.iter()
@@ -313,6 +313,7 @@ impl Generation {
         let social_successes = human.iter()
             .filter(|a| a.social_learning_succeeded).count();
 
+        let social_opportunity_exists = self.index > 0;
         GenerationMetrics {
             generation: self.index,
             population_size: self.agents.len(),
@@ -323,11 +324,17 @@ impl Generation {
             human_myopic_prevalence: rate(human_myopic, human_count),
             human_random_prevalence: rate(human_random, human_count),
             human_individual_optimal_discovery_rate: rate(human_individual, human_count),
-            human_social_optimal_acquisition_rate: rate(human_social_optimal, human_count),
-            human_social_only_optimal_integration_rate: rate(human_social_only_integrated, human_count),
+            human_social_optimal_acquisition_rate: social_opportunity_exists
+                .then(|| rate(human_social_optimal, human_count))
+                .flatten(),
+            human_social_only_optimal_integration_rate: social_opportunity_exists
+                .then(|| rate(human_social_only_integrated, human_count))
+                .flatten(),
             human_machine_lineage_optimal_prevalence: rate(human_machine_lineage, human_count),
             mean_demonstration_reward: mean_reward,
-            social_learning_rate_observed: rate(social_successes, human_count),
+            social_learning_rate_observed: social_opportunity_exists
+                .then(|| rate(social_successes, human_count))
+                .flatten(),
         }
     }
 }
@@ -828,6 +835,48 @@ mod tests {
         assert_eq!(reward_demonstration(StrategyState::Random, c, &mut rng), 0.0);
         assert_eq!(reward_demonstration(StrategyState::Myopic, c, &mut rng), 0.5);
         assert_eq!(reward_demonstration(StrategyState::Optimal, c, &mut rng), 1.0);
+    }
+
+    #[test]
+    fn absent_human_or_machine_subpopulations_are_undefined_not_zero() {
+        let human_only = Config {
+            generations: 1,
+            population_size: 4,
+            machine_count: 0,
+            condition: PopulationCondition::Human,
+            ..Config::default()
+        };
+        let run = simulate(human_only, 10).unwrap();
+        let metrics = run.generations[0].metrics();
+        assert_eq!(metrics.human_optimal_prevalence, Some(metrics.human_optimal_prevalence.unwrap()));
+        assert_eq!(metrics.machine_optimal_prevalence, None);
+        assert_eq!(metrics.social_learning_rate_observed, None);
+        assert_eq!(metrics.human_social_optimal_acquisition_rate, None);
+
+        let all_machine = Config {
+            generations: 1,
+            population_size: 4,
+            machine_count: 4,
+            condition: PopulationCondition::HumanMachineAll,
+            ..Config::default()
+        };
+        let run = simulate(all_machine, 11).unwrap();
+        let metrics = run.generations[0].metrics();
+        assert_eq!(metrics.human_optimal_prevalence, None);
+        assert!(metrics.machine_optimal_prevalence.is_some());
+    }
+
+    #[test]
+    fn social_metrics_are_undefined_in_seed_generation_but_defined_later() {
+        let run = simulate(Config::default(), 12).unwrap();
+        let seed = run.generations[0].metrics();
+        let later = run.generations[1].metrics();
+        assert_eq!(seed.human_social_optimal_acquisition_rate, None);
+        assert_eq!(seed.human_social_only_optimal_integration_rate, None);
+        assert_eq!(seed.social_learning_rate_observed, None);
+        assert!(later.human_social_optimal_acquisition_rate.is_some());
+        assert!(later.human_social_only_optimal_integration_rate.is_some());
+        assert!(later.social_learning_rate_observed.is_some());
     }
 
     #[test]
