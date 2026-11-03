@@ -7,7 +7,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use crate::quality::{Decision, Endpoint, OutcomeObservation};
+use crate::quality::{Endpoint, OutcomeObservation};
 use crate::validation::{RunPartitionRecord, ValidationPartition};
 
 pub const EVIDENCE_BUNDLE_SCHEMA_VERSION: u16 = 1;
@@ -727,6 +727,16 @@ mod tests {
         assert!(matches!(
             validate_physical_run_bundle(&bundle, &[ResourceKind::FreshWater]),
             Err(EvidenceBundleError::CalibrationNotValidAt { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_process_proxy_as_an_independent_endpoint_assay() {
+        let mut bundle = valid_bundle();
+        bundle.assays[0].observation.evidence_kind = crate::quality::EvidenceKind::CalibratedProcessProxy;
+        assert!(matches!(
+            validate_physical_run_bundle(&bundle, &[ResourceKind::FreshWater]),
+            Err(EvidenceBundleError::InvalidIdentity("assay_must_be_independent_outcome"))
         ));
     }
 
