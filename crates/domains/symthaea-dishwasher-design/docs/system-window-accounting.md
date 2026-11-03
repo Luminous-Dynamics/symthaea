@@ -14,7 +14,7 @@ This module therefore separates three things:
 
 The system window uses one declared monotonic clock domain. Every request, release event and resource-meter interval must use that clock. The interval is `[start_at_s, end_at_s)`; events exactly at the end belong to the next window. Meter instrument IDs identify independently calibrated measurement streams, not a multi-channel data-acquisition chassis; distinct channels need distinct stream identities in this schema.
 
-Each scored window also freezes the machine-unit ID, whole-system configuration SHA-256 and utility-topology ID. Each request carries a compartment/cell ID and a compartment-configuration SHA-256. Reusing one cell ID for two configuration digests within one window is rejected; a configuration change is a different experimental condition and must not be pooled as if it were the same cell. Each window also freezes one `service_class_id` and one `protocol_id`; every request must match both. A window for lightly soiled glassware therefore cannot be mixed with a normally soiled plate workload or a different independent-assay protocol. Mixed workloads require separate windows or a separately specified workload-mix benchmark with fixed, declared proportions.
+Each scored window also freezes the machine-unit ID, whole-system configuration SHA-256 and utility-topology ID, and explicitly enumerates the complete installed compartment set with one configuration digest per cell. Idle installed cells remain in the utilization denominator and appear in the report with zero activity. Each request carries a compartment/cell ID and a compartment-configuration SHA-256. Reusing one cell ID for two configuration digests within one window is rejected; a configuration change is a different experimental condition and must not be pooled as if it were the same cell. Each window also freezes one `service_class_id` and one `protocol_id`; every request must match both. A window for lightly soiled glassware therefore cannot be mixed with a normally soiled plate workload or a different independent-assay protocol. Mixed workloads require separate windows or a separately specified workload-mix benchmark with fixed, declared proportions.
 
 ## Definitions
 
@@ -29,7 +29,7 @@ Each scored window also freezes the machine-unit ID, whole-system configuration 
 - **Maximum concurrent compartments:** peak number of distinct physical cells with at least one active request. Two overlapping request records in one cell count as one active compartment, not two.
 - **Active request seconds:** sum of each started request's intersection with the observation window. This can exceed elapsed wall time under concurrency and is not the window duration.
 - **Active compartment seconds:** the union of active request intervals within each compartment, summed across compartments. It measures physical cell occupancy; it is not inflated by overlapping request records inside one cell.
-- **Compartment utilization:** active compartment seconds divided by (number of compartments represented in the window × elapsed wall seconds).
+- **Compartment utilization:** active compartment seconds divided by (number of installed compartments declared for the scored window × elapsed wall seconds).
 
 ## Reported metrics
 
@@ -41,7 +41,7 @@ Each scored window also freezes the machine-unit ID, whole-system configuration 
 - First-pass yield: first-attempt verified items divided by requested items in completed requests accepted during the window. The service ledger reports first-pass IDs; an item first qualified after a re-wash is not first-pass.
 - Physical attempt count, rewash-attempt count, requests with any rewash attempt, item-attempt visits and reattempted item visits.
 - Unqualified items reported by the service ledgers, active request seconds and maximum concurrency.
-- Per-compartment request counts, cancellations, independently verified releases, active request seconds, active compartment seconds, cell utilization, peak within-cell request concurrency and the configuration digest.
+- Per-compartment request counts, cancellations/reasons, independently verified releases, active request seconds, active compartment seconds, cell utilization, peak within-cell request concurrency and the configuration digest. The complete configured cell set is reported, including idle cells.
 - System-level resource totals by canonical unit, plus window resource totals per verified release when at least one item was released. The field is a window-intensity ratio, not the full lifecycle resource cost for one service request.
 
 A release count is event-based. An item qualified in a service report but not released in the scored window is not counted as a release in that window. A request accepted before the window can still contribute a release during it; this is why carry-in is surfaced.
@@ -66,7 +66,7 @@ For a matched service class, protocol, item/soil mix, arrival trace and system b
 
 `eta_n = Q_n / (n * Q_1)`
 
-where Q is independently verified released items per wall-clock hour. Initial aspirational gates are eta_2 >= 0.90 (at least 1.8x one-cell throughput) and eta_4 >= 0.85 (at least 3.4x one-cell throughput). These are targets for experiments, not measured results. A scale-efficiency pass also requires no regression in per-verified-item energy/water/chemical/operator resources, non-inferior cleaning/rinse/cross-transfer endpoints, and no loss of reliability or maintainability. Report maximum concurrent requests and maximum active physical compartments separately; a second queued request in the same cell does not count as additional hardware parallelism.
+where Q is independently verified released items per wall-clock hour. Initial aspirational gates are eta_2 >= 0.90 (at least 1.8x one-cell throughput) and eta_4 >= 0.85 (at least 3.4x one-cell throughput). These are targets for experiments, not measured results. The denominator uses the full installed cell count, including idle cells. A scale-efficiency pass also requires no regression in per-verified-item energy/water/chemical/operator resources, non-inferior cleaning/rinse/cross-transfer endpoints, and no loss of reliability or maintainability. Report maximum concurrent requests and maximum active physical compartments separately; a second queued request in the same cell does not count as additional hardware parallelism.
 
 ## Experimental protocol: one cell, concurrent cells, commercial racks
 
@@ -114,6 +114,6 @@ Sources:
 
 ## Acceptance tests
 
-Source-authored Rust tests cover concurrent versus sequential service, carry-in requests, queued and in-flight cancellation, post-cancellation release rejection, right-censored queued and started requests, independent-assay release qualification, duplicate releases, clock mismatch, cross-instrument boundary overlap, declared parent/branch duplication, parallel operator person-time, missing required resource dimensions, first-pass yield, rewash aggregation, per-compartment statistics and configuration mismatch, and inconsistent upstream service reports. The module currently contains 23 tests; none are executed until the exact PR head is compiled and run.
+Source-authored Rust tests cover concurrent versus sequential service, carry-in requests, queued and in-flight cancellation, post-cancellation release rejection, right-censored queued and started requests, independent-assay release qualification, duplicate releases, clock mismatch, cross-instrument boundary overlap, declared parent/branch duplication, parallel operator person-time, missing required resource dimensions, first-pass yield, rewash aggregation, per-compartment statistics and configuration mismatch, and inconsistent upstream service reports. The module currently contains 26 tests; none are executed until the exact PR head is compiled and run.
 
 All tests, formatting and clippy must run on the exact pull-request head before any pass claim. The validator does not authenticate referenced evidence bytes, prove assay independence, establish the truth of boundary IDs, infer omitted requests, or establish physical cleaning/hygiene performance.
