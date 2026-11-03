@@ -21,6 +21,7 @@ const PAYLOAD_TYPE: &str = "application/vnd.in-toto+json";
 const MAX_JSON_BYTES: usize = 8 * 1024 * 1024;
 const MAX_PATCH_BYTES: usize = 32 * 1024 * 1024;
 const MAX_ARTIFACT_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_TOTAL_ARTIFACT_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_ARTIFACTS: usize = 256;
 const MAX_SIGNATURES: usize = 32;
 
@@ -567,12 +568,18 @@ fn validate_artifacts(
     let mut patch_count = 0usize;
     let mut execution_digests = BTreeSet::new();
     let mut all_digests = BTreeSet::new();
+    let mut total_artifact_bytes = 0u64;
     for artifact in artifacts {
         let id = string_field(artifact, "artifact_id", "artifact")?;
         let path = string_field(artifact, "path", "artifact")?;
         let role = string_field(artifact, "role", "artifact")?;
         let digest = string_field(artifact, "sha256", "artifact")?;
         let size = u64_field(artifact, "size_bytes", "artifact")?;
+        total_artifact_bytes = total_artifact_bytes.checked_add(size)
+            .ok_or_else(|| Failure::protocol("artifact aggregate size overflow"))?;
+        if total_artifact_bytes > MAX_TOTAL_ARTIFACT_BYTES {
+            return Err(Failure::unresolved("retained artifact set exceeds the aggregate 512 MiB verifier limit"));
+        }
         if id.trim().is_empty() || id.contains("..") || id.contains('/') || id.contains('\\') || id.contains('\0') {
             return Err(Failure::protocol(format!("unsafe artifact_id: {id}")));
         }
@@ -912,6 +919,9 @@ fn verify_one_receipt(
     }
     let started_at = parse_timestamp(field(execution, "started_at_utc", "execution")?, "started_at_utc")?;
     let finished_at = parse_timestamp(field(execution, "finished_at_utc", "execution")?, "finished_at_utc")?;
+    if started_at.offset().local_minus_utc() != 0 || finished_at.offset().local_minus_utc() != 0 {
+        return Err(Failure::protocol("execution timestamps suffixed _utc must use a zero UTC offset"));
+    }
     if finished_at < started_at {
         return Err(Failure::protocol("execution finished_at_utc precedes started_at_utc"));
     }
@@ -1046,7 +1056,7 @@ fn base_report(status: &str, reason: String) -> VerificationReport {
         trust_policy_sha256: None,
         schema_sha256: schema_digests(),
         reasons: vec![reason],
-        claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove the runner's isolation or the claimed model provider's identity.",
+        claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove runner isolation, independently adjudicate test semantics, recompute the resulting source tree, or authenticate the claimed model provider.",
     }
 }
 
@@ -1147,7 +1157,7 @@ fn verify_pair_inner(inputs: &PairInputs) -> Result<VerificationReport, Failure>
         trust_policy_sha256: Some(sha256_hex(&inputs.trust_policy)),
         schema_sha256: schema_digests(),
         reasons: Vec::new(),
-        claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove the runner's isolation or the claimed model provider's identity.",
+        claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove runner isolation, independently adjudicate test semantics, recompute the resulting source tree, or authenticate the claimed model provider.",
     })
 }
 
