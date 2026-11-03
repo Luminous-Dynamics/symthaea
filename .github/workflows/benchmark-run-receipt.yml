@@ -6,6 +6,7 @@ on:
     paths:
       - "schemas/benchmark-run-receipt-v1.schema.json"
       - "examples/benchmark-run-receipt-v1.synthetic.json"
+      - "docs/research/BENCHMARK_RUN_RECEIPT_V1.md"
       - "tools/benchmark-receipt-harness/**"
       - ".github/workflows/benchmark-run-receipt.yml"
   push:
