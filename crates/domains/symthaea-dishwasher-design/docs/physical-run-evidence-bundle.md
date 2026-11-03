@@ -14,7 +14,7 @@ The Rust module `experiment_manifest` validates the in-memory `PhysicalRunEviden
 A version-1 bundle comprises:
 
 1. One physical run row: unique run ID, service-request ID, explicit compartment/cell ID, compartment-configuration digest, shared/isolated utility-topology ID, exact machine/unit, programme and firmware, protocol, randomized block/treatment assignment, group identities, run start/end, partition, and top-level archive URI/digest.
-2. Item rows: unique item IDs belonging to the run, with material, finish, geometry and location metadata.
+2. Item rows: unique item IDs belonging to the run, each with material, surface finish, geometry, location stratum and item preparation batch.
 3. Instrument calibrations: instrument ID, calibration ID, calibration validity interval, certificate URI/digest and calibration-bundle digest.
 4. Sensor traces: instrument/channel/metric/unit, sample count/rate, start/end, calibration reference, source run ID and immutable raw archive reference/digest.
 5. Independent assay records: one required item × endpoint record, with criterion/metric/method/protocol, measured value, expanded uncertainty, unit, instrument/calibration, assay timestamp, source run and archive reference/digest.
@@ -25,7 +25,7 @@ The tables are normalized: all child tables repeat the physical `run_id`. Never 
 ## Identity and time rules
 
 - A run ID uniquely identifies one complete physical wash cycle. Do not reuse it for retries or rewashes; each attempt gets its own run ID and is linked at the service-request layer.
-- All timestamps are Unix UTC seconds in this schema version. Capture systems should retain higher-resolution raw timestamps in trace payloads when available.
+- Each run also records soil age at wash start, inlet-water hardness, inlet temperature, ambient temperature and relative humidity. The ambient relative-humidity value is expressed in permille and must be no greater than 1,000. All timestamps are Unix UTC seconds in this schema version. Capture systems should retain higher-resolution raw timestamps in trace payloads when available.
 - Run end must be strictly later than run start.
 - Sensor-trace and resource-measurement intervals must be contained within the physical run interval.
 - Assay measurements may occur after the wash ends, but must retain the exact source run ID and the assay timestamp.
@@ -89,6 +89,6 @@ A valid bundle is structurally complete, not necessarily scientifically valid. A
 
 ## Tests authored
 
-The 14 Rust unit tests cover complete-bundle acceptance and resource summation; schema version rejection; source-run mismatch; duplicate items and assay pairs; missing item/endpoints; traces outside the run; stale calibration; assay-calibration digest mismatch; resource unit/value/provenance failures; required resource omission; manual-water rejection; and duplicate artifacts across tables.
+The 16 Rust unit tests cover complete-bundle acceptance and resource summation; schema version rejection; source-run mismatch; duplicate items and assay pairs; missing item/endpoints; missing item material/geometry metadata; invalid ambient relative humidity; traces outside the run; stale calibration; assay-calibration digest mismatch; resource unit/value/provenance failures; required resource omission; manual-water rejection; and duplicate artifacts across tables.
 
 Cargo execution, formatting and clippy are required on the exact PR head. The source-authored tests are not claimed to pass until run.
