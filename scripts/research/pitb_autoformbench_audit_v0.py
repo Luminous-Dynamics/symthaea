@@ -386,8 +386,10 @@ def self_test():
         "b-high": {"book": "beta", "target_count": "7"},
     }
     toy_primary = {
-        "a-low": {"passed": "true"}, "a-high": {"passed": "false"},
-        "b-low": {"passed": "false"}, "b-high": {"passed": "false"},
+        "a-low": {"passed": "true", "cost_usd": "1", "input_tokens": "10", "turns": "1", "added_code_loc": "2"},
+        "a-high": {"passed": "false", "cost_usd": "1", "input_tokens": "10", "turns": "1", "added_code_loc": "2"},
+        "b-low": {"passed": "false", "cost_usd": "1", "input_tokens": "10", "turns": "1", "added_code_loc": "2"},
+        "b-high": {"passed": "false", "cost_usd": "1", "input_tokens": "10", "turns": "1", "added_code_loc": "2"},
     }
     complexity = target_complexity_analysis(toy_manifest, toy_primary, bootstrap_replicates=500)
     contrast = complexity["five_plus_vs_under_five_within_source_groups"]
