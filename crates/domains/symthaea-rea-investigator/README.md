@@ -127,7 +127,7 @@ The MinimaxRegret policy enumerates deterministic outcome-to-decision policies a
 
 ### Decision-aware tests
 
-The decision module includes known-answer and adversarial cases for:
+The decision module currently includes 10 unit tests with known-answer and adversarial cases for:
 - a high-EIG experiment that leaves the optimal action unchanged and therefore has zero EVSI;
 - a low-entropy rare-critical-fault probe that has higher decision value than a high-entropy benign-detail probe;
 - a shared minimax-regret policy that rejects a scenario-fragile probe;
@@ -135,6 +135,7 @@ The decision module includes known-answer and adversarial cases for:
 - rejection of unknown authorization and invalid utility matrices;
 - bounded minimax policy enumeration;
 - invariance to scenario ordering;
-- correct binary EVSI arithmetic and propagation of terminal decision impact.
+- correct binary EVSI arithmetic and propagation of terminal decision impact;
+- robust worst-case ranking that abstains when one plausible scenario has no decision value.
 
 The dedicated `REA Investigator Planner` workflow validates the full crate and isolated locked harness. The decision-aware extension remains unqualified until its exact-head run passes.
