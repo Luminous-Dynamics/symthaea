@@ -1348,5 +1348,29 @@ mod tests {
         );
     }
 
+    #[test]
+    fn rejects_unknown_report_fields_and_malformed_freeze_receipts() {
+        let mut report: Value = serde_json::from_str(OMITTED_REPORT).expect("valid fixture");
+        report["unregistered_extension"] = Value::Bool(true);
+        let bytes = serde_json::to_vec(&report).expect("serialized report");
+        assert!(validate_report(
+            &bytes,
+            OMITTED_CANDIDATE.as_bytes(),
+            OMITTED_REFERENCE.as_bytes()
+        )
+        .is_err());
+
+        let mut report: Value = serde_json::from_str(OMITTED_REPORT).expect("valid fixture");
+        report["reference_challenge"]["freeze_receipt_sha256"] =
+            Value::String("not-a-sha256".to_owned());
+        let bytes = serde_json::to_vec(&report).expect("serialized report");
+        assert!(validate_report(
+            &bytes,
+            OMITTED_CANDIDATE.as_bytes(),
+            OMITTED_REFERENCE.as_bytes()
+        )
+        .is_err());
+    }
+
 
 }
