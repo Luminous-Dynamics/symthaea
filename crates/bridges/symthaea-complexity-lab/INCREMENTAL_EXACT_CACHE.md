@@ -21,7 +21,7 @@ A raw bucket is first transformed using a versioned normalizer:
 - an independent normalizer checker reconstructs the grouped products from the raw inputs;
 - the message checker replays the generated message against the raw bucket, including any separator axes removed with identity factors.
 
-After producing a message, a second versioned canonicalizer removes any separator axis along which the entire exact output table is constant. It checks every assignment of the retained axes and every state of the candidate dropped axis. The message checker then independently replays against every assignment of the original raw separator scope and accepts the smaller output scope only if it represents exactly the same table function. Both the normalizer and message-canonicalizer identities are included in the cache key and authentication receipt.
+After producing a message, a second versioned canonicalizer removes any separator axis along which the entire exact output table is constant. It checks every assignment of the retained axes and every state of the candidate dropped axis. The message checker then independently replays against every assignment of the original raw separator scope and accepts the smaller output scope only if it represents exactly the same table function. Both the normalizer and message-canonicalizer identities are included in the cache key and authentication receipt. The pilot records 4 exact encoded-value comparisons for the NaturalCount scope reduction and 4 for the MaxCount scope reduction; these are comparison counts, not timing measurements.
 
 The message key binds:
 1. schema/protocol version;
@@ -76,7 +76,7 @@ Seed: `20261103`.
 | Randomized edits: cache hits / misses | 520 / 248 |
 | Randomized edits: invalidated message steps | 248 |
 
-Across the 128 randomized edits, the cached producer executed 2,016 additions and 3,820 multiplications versus 6,999 additions and 12,994 multiplications for cold recomputation. This is a reduction of roughly 71.2% and 70.6% in **producer operation counts** on this specific fixture/seed. It is not wall-time speedup: Python object/digest/HMAC costs, fresh-message checker replay, serialization, cache memory and public benchmark behaviour are not included in that comparison.
+Across the 128 randomized edits, the cached producer executed 2,016 additions and 3,820 multiplications versus 6,999 additions and 12,994 multiplications for cold recomputation. This is a reduction of roughly 71.2% and 70.6% in **producer operation counts** on this specific fixture/seed. It is not wall-time speedup: factor normalization, message-scope independence comparisons, Python object/digest/HMAC costs, fresh-message checker replay, serialization, cache memory and public benchmark behaviour are not included in that comparison.
 
 The checker is a separate implementation path in the same Python reference file, not yet a separately compiled/audited binary. The finite suite is not a Lean proof.
 
