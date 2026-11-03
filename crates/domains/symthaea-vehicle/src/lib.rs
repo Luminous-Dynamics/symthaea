@@ -151,7 +151,7 @@ pub use model_discrepancy::{
     ReferenceOutcomeStatus, VehicleModelDiscrepancyError, VehicleModelDiscrepancyInput,
     VehicleModelDiscrepancyReport, VEHICLE_MODEL_DISCREPANCY_SCHEMA,
     model_discrepancy_action_set_digest, model_discrepancy_decision_context_digest,
-    summarize_vehicle_model_discrepancy,
+    model_discrepancy_expected_schedule_digest, summarize_vehicle_model_discrepancy,
 };
 pub use model_stability::{
     MIN_MODEL_STABILITY_PROFILES, MAX_MODEL_STABILITY_PROFILES,
