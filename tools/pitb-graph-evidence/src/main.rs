@@ -155,8 +155,14 @@ fn safe_relative_path(relative: &str) -> Result<(), String> {
 
 fn expected_evidence_class(relation: &str) -> Option<&'static str> {
     match relation {
-        "type_reference" | "proof_term_reference" => Some("lean_elaborator"),
+        "type_reference"
+        | "signature_reference"
+        | "proof_term_reference"
+        | "definition_body_reference"
+        | "structure_field_reference"
+        | "inheritance_reference" => Some("lean_elaborator"),
         "instance_synthesis" => Some("lean_instance_trace"),
+        "documentation_reference" => Some("lean_doc_parser"),
         "blueprint_dependency" => Some("blueprint_curated"),
         "informal_candidate_dependency" => Some("informal_extractor"),
         "cross_formality_match" => Some("llm_alignment"),
@@ -169,10 +175,18 @@ fn is_formal_dependency(relation: &str) -> bool {
     matches!(
         relation,
         "type_reference"
+            | "signature_reference"
             | "proof_term_reference"
+            | "definition_body_reference"
+            | "structure_field_reference"
+            | "inheritance_reference"
             | "instance_synthesis"
             | "module_environment_dependency"
     )
+}
+
+fn is_observed_relation(relation: &str) -> bool {
+    is_formal_dependency(relation) || relation == "documentation_reference"
 }
 
 fn expected_role(edge: &Edge) -> &'static str {
@@ -180,10 +194,14 @@ fn expected_role(edge: &Edge) -> &'static str {
         return "excluded";
     }
     match edge.relation.as_str() {
-        "type_reference" => "formal_type_dependency_hash_bound",
+        "type_reference" | "signature_reference" => "formal_signature_dependency_hash_bound",
         "proof_term_reference" => "proof_support_observation_hash_bound",
+        "definition_body_reference" => "definition_body_reference_observation_hash_bound",
+        "structure_field_reference" => "structure_field_type_reference_observation_hash_bound",
+        "inheritance_reference" => "structure_or_class_inheritance_observation_hash_bound",
         "instance_synthesis" => "instance_environment_dependency_hash_bound",
         "module_environment_dependency" => "build_environment_dependency_hash_bound",
+        "documentation_reference" => "documentation_retrieval_hint",
         "blueprint_dependency" if edge.status == "human_reviewed" => {
             "curated_search_prior_review_signature_unverified"
         }
@@ -211,7 +229,14 @@ fn require_node_kind(
 
 fn validate_edge_endpoints(edge: &Edge, source: &Node, target: &Node) -> Result<(), String> {
     match edge.relation.as_str() {
-        "type_reference" | "proof_term_reference" | "instance_synthesis" => {
+        "type_reference"
+        | "signature_reference"
+        | "proof_term_reference"
+        | "definition_body_reference"
+        | "structure_field_reference"
+        | "inheritance_reference"
+        | "instance_synthesis"
+        | "documentation_reference" => {
             require_node_kind(source, &["formal_declaration"], &edge.edge_id, "source")?;
             require_node_kind(target, &["formal_declaration"], &edge.edge_id, "target")?;
         }
@@ -462,11 +487,12 @@ fn validate_value(value: &Value) -> Result<(Graph, Summary), String> {
         }
 
         let formal = is_formal_dependency(&edge.relation);
+        let observed = is_observed_relation(&edge.relation);
         match edge.status.as_str() {
-            "observed" if !formal => {
+            "observed" if !observed => {
                 return Err(format!("edge {} cannot mark inferred relation as observed", edge.edge_id))
             }
-            "candidate" if formal => {
+            "candidate" if formal || observed => {
                 return Err(format!("edge {} cannot mark formal dependency receipt as candidate", edge.edge_id))
             }
             "human_reviewed" if formal => {
@@ -629,10 +655,10 @@ fn self_test(manifest_path: &Path, evidence_root: &Path) -> Result<(), String> {
     let (graph, summary) = validate_value(&value)?;
     verify_artifact_bytes(&graph, evidence_root)?;
     if summary.node_count != 7
-        || summary.edge_count != 7
-        || summary.formal_dependency_edge_count != 4
+        || summary.edge_count != 12
+        || summary.formal_dependency_edge_count != 8
         || summary.module_environment_edge_count != 1
-        || summary.retrieval_hint_edge_count != 3
+        || summary.retrieval_hint_edge_count != 4
         || summary.rejected_edge_count != 0
         || summary.scheduler_admission
     {
@@ -796,6 +822,19 @@ mod tests {
             expected_evidence_class("cross_formality_match"),
             Some("llm_alignment")
         );
+        for relation in [
+            "signature_reference",
+            "proof_term_reference",
+            "definition_body_reference",
+            "structure_field_reference",
+            "inheritance_reference",
+        ] {
+            assert_eq!(expected_evidence_class(relation), Some("lean_elaborator"));
+            assert!(is_formal_dependency(relation));
+        }
+        assert_eq!(expected_evidence_class("documentation_reference"), Some("lean_doc_parser"));
+        assert!(!is_formal_dependency("documentation_reference"));
+        assert!(is_observed_relation("documentation_reference"));
         assert_eq!(expected_evidence_class("invented_relation"), None);
     }
 
