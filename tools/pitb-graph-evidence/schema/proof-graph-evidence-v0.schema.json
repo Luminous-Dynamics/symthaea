@@ -226,7 +226,12 @@
             "blueprint_dependency",
             "informal_candidate_dependency",
             "cross_formality_match",
-            "module_environment_dependency"
+            "module_environment_dependency",
+            "signature_reference",
+            "definition_body_reference",
+            "structure_field_reference",
+            "inheritance_reference",
+            "documentation_reference"
           ]
         },
         "evidence_class": {
@@ -236,7 +241,8 @@
             "blueprint_curated",
             "informal_extractor",
             "llm_alignment",
-            "lean_build_graph"
+            "lean_build_graph",
+            "lean_doc_parser"
           ]
         },
         "status": {
