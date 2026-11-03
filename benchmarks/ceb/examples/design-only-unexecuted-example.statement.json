@@ -23,7 +23,8 @@
       "task_id": "CEB-RUST-001",
       "task_contract_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "source_tree_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-      "fixture_revision": "not-provisioned"
+      "fixture_revision": "not-provisioned",
+      "source_tree_digest_algorithm": "ceb-tree-v1"
     },
     "candidate": {
       "base_tree_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
