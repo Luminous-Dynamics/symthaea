@@ -1,15 +1,8 @@
 {
-  "algebras": [
-    "bool",
-    "nat",
-    "maxcount",
-    "pareto",
-    "ipoly",
-    "qpoly"
-  ],
+  "algebras": ["bool", "nat", "maxcount", "pareto", "ipoly", "qpoly"],
   "all_passed": true,
   "claim_ceiling": "Finite exhaustive semantic checks on small table factors plus local certificate replay. Not a Lean proof, cross-language verifier, e-graph search, production Rust implementation, or performance result.",
-  "negative_controls_rejected": 4,
+  "negative_controls_rejected": 9,
   "positive_rule_checks": {
     "factor-independent-summand": 144,
     "split-independent-components": 144,
@@ -21,9 +14,9 @@
   "seed": "0xE7018",
   "separate_process_checker": {
     "accepted_positive": 578,
-    "negative_total": 4,
+    "negative_total": 9,
     "positive_total": 578,
-    "rejected_negative": 4
+    "rejected_negative": 9
   },
   "suite": "domain-qualified algebraic rewrite reference",
   "trials_per_algebra_and_rule": 24
