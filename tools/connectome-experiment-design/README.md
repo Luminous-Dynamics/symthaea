@@ -53,7 +53,8 @@ The unit tests cover:
 - Bayes posterior updates;
 - a cost-aware ranking that selects a lower-raw-EIG but more efficient experiment;
 - deterministic tie-breaking and selection regret;
-- invalid priors, invalid likelihood mass, NaN, zero cost, duplicate outcomes/IDs, impossible outcomes, and missing selections.
+- invalid priors, invalid likelihood mass, NaN, zero cost, duplicate outcomes/IDs, impossible outcomes, and missing selections;
+- exact Fisher-information D-/A-optimal known answers, an objective-ranking reversal, variance weighting, non-SPD/asymmetric priors, malformed sensitivities and costs.
 
 The analytical values are independently recorded in `fixtures/known-answers.json`.
 
@@ -98,4 +99,4 @@ A frozen four-hypothesis control demonstrates the distinction:
 - A noisy experiment that identifies the action-relevant group with 80% accuracy has only about 0.2780719 bits EIG but 0.3 utility units EVSI for the declared 0/1 utility matrix.
 - EIG therefore ranks the within-group experiment first, while EVSI ranks the decision-relevant experiment first.
 
-This is a synthetic known-answer demonstration. Utility functions, hypotheses, priors, likelihoods, costs and action feasibility remain caller-supplied and must be calibrated/preregistered for biological use. Fisher-information D-/A-optimal parameter identification remains a distinct comparator, not an implementation hidden inside EIG or EVSI.
+This is a synthetic known-answer demonstration. Utility functions, hypotheses, priors, likelihoods, costs and action feasibility remain caller-supplied and must be calibrated/preregistered for biological use. Fisher information is now implemented as an explicit third objective family; it remains mathematically separate from EIG and EVSI.
