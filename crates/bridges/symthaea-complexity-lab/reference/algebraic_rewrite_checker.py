@@ -3,6 +3,7 @@
 from __future__ import annotations
 from fractions import Fraction
 from itertools import product
+from math import gcd
 import hashlib,json,sys
 FMT="symthaea.algebraic-rewrite-certificate/v1"
 KINDS={"bool","nat","maxcount","pareto","ipoly","qpoly"}
@@ -19,13 +20,46 @@ def free(t):
  if op=="neg":return free(t["body"])
  if op=="zero":return set()
  raise ValueError("unknown op")
+def _int(x):return isinstance(x,int) and not isinstance(x,bool)
 def parseval(k,v):
- if k in ("bool","nat"):return v
- if k=="maxcount":return None if v is None else tuple(v)
- if k=="pareto":return {(x,y):c for x,y,c in v}
- if k=="ipoly":return {(x,y):c for x,y,c in v}
- if k=="qpoly":return {(x,y):Fraction(n,d) for x,y,n,d in v}
- raise ValueError(k)
+ if k=="bool":
+  if not isinstance(v,bool):raise ValueError("bool encoding")
+  return v
+ if k=="nat":
+  if not _int(v) or v<0:raise ValueError("natural encoding")
+  return v
+ if k=="maxcount":
+  if v is None:return None
+  if not isinstance(v,list) or len(v)!=2 or not _int(v[0]) or not _int(v[1]) or v[1]<1:raise ValueError("maxcount encoding")
+  return tuple(v)
+ if k=="pareto":
+  if not isinstance(v,list):raise ValueError("pareto encoding")
+  out={};last=None
+  for row in v:
+   if not isinstance(row,list) or len(row)!=3 or not all(_int(x) for x in row) or row[2]<1:raise ValueError("pareto row")
+   p=(row[0],row[1])
+   if last is not None and p<=last:raise ValueError("noncanonical pareto order")
+   if any(q!=p and all(x>=y for x,y in zip(q,p)) and any(x>y for x,y in zip(q,p)) for q in out):raise ValueError("dominated pareto point")
+   out[p]=row[2];last=p
+  return out
+ if k in ("ipoly","qpoly"):
+  if not isinstance(v,list):raise ValueEError("polynomial encoding")
+  out={};last=None
+  for row in v:
+   width=3 if k=="ipoly" else 4
+   if not isinstance(row,list) or len(row)!==width or not _int(row[0]) or not _int(row[1]) or not (0<=row[0]<4 and 0<=row[1]<4):raise ValueError("polynomial exponent")
+   p=(row[0],row[1])
+   if last is not None and p<=last:raise ValueError("noncanonical polynomial order")
+   if k=="ipoly":
+   c=row[2]
+   if not _int(c) or c==0:raise ValueError("integer coefficient")
+   else:
+    n,d=row[2],row[3]
+    if not _int(n) or not _int(d) or n==0 or d<=0 or gcd(abs(n),d)!=1:raise ValueError("rational coefficient")
+    c=Fraction(n,d)
+   out[p]=c;last=p
+  return out
+ raise ValueError("unknown algebra")
 def zero(k):return {"bool":False,"nat":0,"maxcount":None,"pareto":{},"ipoly":{},"qpoly":{}}[k]
 def add(k,a,b):
  if k=="bool":return a or b
@@ -70,61 +104,23 @@ def evalterm(t,k,dom,env):
   return add(k,a,b) if op=="add" else mul(k,a,b)
  raise ValueError("bad op")
 def validate_term(t,k,dom):
+ if not isinstance(t,dict) or not isinstance(t.get("op"),str):raise ValueError("term node")
  op=t["op"]
+ shapes={"factor":{"op","name","scope","values"},"add":{"op","left","right"},"mul":{"op","left","right"},"sum":{"op","variable","body"},"neg":{"op","body"},"zero":{"op"}}
+ if op not in shapes or set(t)!=shapes[op]:raise ValueError("term shape")
  if op=="factor":
-  s=t["scope"]
-  if not isinstance(s,list) or s!=sorted(set(s)) or any(v not in dom for v in s):raise ValueError("scope")
+  if not isinstance(t["name"],str) or not t["name"]:raise ValueError("factor name")
+  scope=t["scope"]
+  if not isinstance(scope,list) or scope!=sorted(set(scope)) or any(not isinstance(v,str) or v not in dom for v in scope):raise ValueEError("scope")
   n=1
-  for v in s:n*=dom[v]
+  for v in scope:n*=dom[v]
   if not isinstance(t["values"],list) or len(t["values"])!=n:raise ValueError("table size")
   for v in t["values"]:parseval(k,v)
  elif op in ("add","mul"):
   validate_term(t["left"],k,dom);validate_term(t["right"],k,dom)
  elif op in ("sum","neg"):
-  if op=="sum" and t["variable"] not in dom:raise ValueError("bound variable")
+  if op=="sum" and (not isinstance(t["variable"],str) or t["variable"] not in dom):raise ValueError("bound variable")
   if op=="neg" and k not in RING:raise ValueError("ring only")
   validate_term(t["body"],k,dom)
- elif op!="zero":raise ValueError("op")
 def apply(rule,s,k):
- if rule=="factor-independent-summand":
-  if s["op"]!="sum" or s["body"]["op"]!="mul":raise ValueError("pattern")
-  x=s["variable"];a=s["body"]["left"];b=s["body"]["right"]
-  if x not in free(a) or x in free(b):raise ValueError("scope")
-  return {"op":"mul","left":{"op":"sum","variable":x,"body":a},"right":b}
- if rule=="swap-finite-sums":
-  if s["op"]!="sum" or s["body"]["op"]!="sum" or s["variable"]==s["body"]["variable"]:raise ValueError("pattern")
-  x,y=s["variable"],s["body"]["variable"]
-  return {"op":"sum","variable":y,"body":{"op":"sum","variable":x,"body":s["body"]["body"]}}
- if rule=="split-independent-components":
-  if s["op"]!="sum" or s["body"]["op"]!="sum" or s["body"]["body"]["op"]!="mul":raise ValueError("pattern")
-  x,y=s["variable"],s["body"]["variable"];a=s["body"]["body"]["left"];b=s["body"]["body"]["right"]
-  if x==y or x in free(b) or y in free(a):raise ValueError("scope")
-  return {"op":"mul","left":{"op":"sum","variable":x,"body":a},"right":{"op":"sum","variable":y,"body":b}}
- if rule=="swap-multiplicands":
-  if s["op"]!="mul" or k not in COMMUTATIVE_MUL:raise ValueError("domain")
-  return {"op":"mul","left":s["right"],"right":s["left"]}
- if rule=="cancel-additive-inverse":
-  if k not in RING or s["op"]!="add":raise ValueError("ring-only")
-  a,b=s["left"],s["right"]
-  if a.get("op")=="neg" and a["body"]==b or b.get("op")=="neg" and b["body"]==a:return {"op":"zero"}
-  raise ValueError("inverse pair")
- raise ValueError("rule")
-def check(c):
- try:
-  if c.get("format")!=FMT:return False
-  k=c["algebra"]
-  if k not in KINDS:return False
-  d=c["domains"]
-  if not isinstance(d,dict) or not d or any(not isinstance(v,int) or v<1 or v>8 for v in d.values()):return False
-  s=c["source"];t=c["target"];validate_term(s,k,d);validate_term(t,k,d)
-  if sha(s)!=c.get("source_sha256") or sha(t)!=c.get("target_sha256"):return False
-  if apply(c["rule_id"],s,k)!=t:return False
-  vs=sorted(free(s)|free(t))
-  for values in product(*(range(d[v]) for v in vs)):
-   env=dict(zip(vs,values))
-   if evalterm(s,k,d,env)!=evalterm(t,k,d,env):return False
-  return True
- except (KeyError,TypeError,ValueError,IndexError,ZeroDivisionError):return False
-if __name__=="__main__":
- certs=json.load(sys.stdin);accepted=[check(c) for c in certs]
- print(json.dumps({"accepted":accepted,"accepted_count":sum(accepted),"rejected_count":len(accepted)-sum(accepted)}))
+ 
