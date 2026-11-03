@@ -46,12 +46,12 @@ python3 run_pwmc_semantic_microbench.py
 
 The runner writes pwmc_semantic_microbench_results.v1.json. It records the input SHA-256, exact values, producer/verifier descriptions and the explicit claim ceiling.
 
-Input SHA-256: 9f785d6033affab23351307ad47d8d02296d31f4cbabe579c1f8f00888b16ab6.
+Input SHA-256: d9514a22e92bfccad1a6eab0bb901255007fb1ae9d06044a14d571b333c0adf6.
 
 
 ## Executable metamorphic relations
 
-The runner also executes six transformation laws:
+The runner also executes eight transformation laws:
 
 1. Add a free hidden variable: full models double while projected support and PWMC remain unchanged.
 2. Permute variable order while consistently remapping DIMACS literals: full count, support and PWMC remain unchanged.
@@ -59,8 +59,10 @@ The runner also executes six transformation laws:
 4. Add a clause subsumed by an existing unit clause: exact outputs remain unchanged.
 5. Add a free visible variable with weights 2 and 3: full models and support double, while PWMC changes from 2/3 to 10/3.
 6. Move the formerly hidden free variable into the visible partition: support changes from one to two and PWMC changes from 2/3 to 4/3.
+7. Add a unique hidden definition z <-> d: full model count, projected support and PWMC remain unchanged on the fixed fixture.
+8. Substitute a visible weight map: support remains unchanged while exact PWMC changes from -2/5 to 17/24.
 
-The first four are invariance checks. The last two are exact predicted-delta checks. The input's metamorphic_tests array declares the operation and expected relation; the runner reconstructs each transformed instance and verifies the resulting exact counts.
+The first four are invariance checks. The remaining four include both invariance and exact predicted-delta checks. The input's metamorphic_tests array declares the operation and expected relation; the runner reconstructs each transformed instance and verifies the resulting exact counts.
 
 ## Limitations
 
