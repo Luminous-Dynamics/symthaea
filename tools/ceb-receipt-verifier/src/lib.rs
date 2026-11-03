@@ -554,6 +554,7 @@ fn validate_artifacts(
     predicate: &Value,
     root: &Path,
     expected_patch_sha256: &str,
+    expected_stage: &str,
 ) -> Result<BTreeSet<String>, Failure> {
     let artifacts = field(predicate, "artifacts", "predicate")?
         .as_array()
@@ -566,9 +567,15 @@ fn validate_artifacts(
     let mut ids = HashSet::new();
     let mut paths = HashSet::new();
     let mut patch_count = 0usize;
+    let mut stage_report_count = 0usize;
     let mut execution_digests = BTreeSet::new();
     let mut all_digests = BTreeSet::new();
     let mut total_artifact_bytes = 0u64;
+    let required_report_role = match expected_stage {
+        "primary" => "primary_report",
+        "pristine_regrade" => "regrade_report",
+        _ => return Err(Failure::protocol("unsupported receipt stage for artifact verification")),
+    };
     for artifact in artifacts {
         let id = string_field(artifact, "artifact_id", "artifact")?;
         let path = string_field(artifact, "path", "artifact")?;
@@ -596,11 +603,17 @@ fn validate_artifacts(
                 return Err(Failure::protocol("retained patch artifact digest differs from the candidate patch"));
             }
         } else {
-            execution_digests.insert(digest);
+            execution_digests.insert(digest.clone());
+        }
+        if role == required_report_role {
+            stage_report_count += 1;
         }
     }
     if patch_count != 1 {
         return Err(Failure::protocol("each receipt must contain exactly one patch artifact"));
+    }
+    if stage_report_count != 1 {
+        return Err(Failure::unresolved(format!("receipt must retain exactly one {required_report_role} artifact")));
     }
     if execution_digests.is_empty() {
         return Err(Failure::unresolved("receipt contains no retained execution evidence artifact"));
@@ -611,6 +624,9 @@ fn validate_changed_paths(candidate: &Value) -> Result<(), Failure> {
     let paths = field(candidate, "changed_paths", "candidate")?
         .as_array()
         .ok_or_else(|| Failure::protocol("candidate.changed_paths must be an array"))?;
+    if paths.is_empty() {
+        return Err(Failure::protocol("non-empty candidate patch must declare at least one changed path"));
+    }
     let mut seen = HashSet::new();
     for path in paths {
         let path = path.as_str().ok_or_else(|| Failure::protocol("changed_paths entries must be strings"))?;
@@ -947,7 +963,7 @@ fn verify_one_receipt(
 
     validate_task_check_binding(task, predicate)?;
     let check_evidence = validate_check_aggregates(predicate)?;
-    let artifact_evidence = validate_artifacts(predicate, artifact_root, patch_sha256)?;
+    let artifact_evidence = validate_artifacts(predicate, artifact_root, patch_sha256, expected_stage)?;
     if !check_evidence.is_subset(&artifact_evidence) {
         return Err(Failure::protocol("one or more check evidence digests are not present in the retained artifacts"));
     }
@@ -1384,11 +1400,11 @@ mod tests {
                 {"artifact_id":"test-log","path":"logs/test.log","role":"test_log","sha256":sha256_hex(log),"size_bytes":log.len()}
             ]
         });
-        let evidence = validate_artifacts(&predicate, &root, &sha256_hex(patch)).unwrap();
+        let evidence = validate_artifacts(&predicate, &root, &sha256_hex(patch), "primary").unwrap();
         assert!(evidence.contains(&sha256_hex(log)));
 
         let wrong_patch_digest = "a".repeat(64);
-        assert!(validate_artifacts(&predicate, &root, &wrong_patch_digest).is_err());
+        assert!(validate_artifacts(&predicate, &root, &wrong_patch_digest, "primary").is_err());
 
         let traversal = serde_json::json!({
             "artifacts": [
@@ -1396,7 +1412,7 @@ mod tests {
                 {"artifact_id":"test-log","path":"logs/test.log","role":"test_log","sha256":sha256_hex(log),"size_bytes":log.len()}
             ]
         });
-        assert!(validate_artifacts(&traversal, &root, &sha256_hex(patch)).is_err());
+        assert!(validate_artifacts(&traversal, &root, &sha256_hex(patch), "primary").is_err());
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -1460,7 +1476,7 @@ mod tests {
                 {"artifact_id":"log","path":"outside.log","role":"test_log","sha256":sha256_hex(log),"size_bytes":log.len()}
             ]
         });
-        assert!(validate_artifacts(&predicate, &root, &sha256_hex(patch)).is_err());
+        assert!(validate_artifacts(&predicate, &root, &sha256_hex(patch), "primary").is_err());
         fs::remove_dir_all(&root).unwrap();
         fs::remove_file(outside).unwrap();
     }
