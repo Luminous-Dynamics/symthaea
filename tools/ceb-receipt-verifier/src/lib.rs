@@ -1329,7 +1329,7 @@ fn base_report(status: &str, reason: String) -> VerificationReport {
         trust_policy_sha256: None,
         schema_sha256: schema_digests(),
         reasons: vec![reason],
-        claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove runner isolation, independently adjudicate test semantics, prove that the submitted patch produces the computed result snapshot, or authenticate the claimed model provider.",
+        claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove runner isolation, independently adjudicate test semantics, prove that the submitted patch transforms the pinned source snapshot into the computed result snapshot, or authenticate the claimed model provider.",
     }
 }
 
@@ -1363,28 +1363,28 @@ fn verify_pair_inner(inputs: &PairInputs) -> Result<VerificationReport, Failure>
     {
         return Err(Failure::protocol("task contract digest does not match the out-of-band pin"));
     }
-    let patch_sha256 = sha256_hex(&inputs.patch);
-    let source_tree_sha256 = hash_source_tree_inner(&inputs.source_tree_dir)?;
-    let result_tree_sha256 = hash_source_tree_inner(&inputs.result_tree_dir)?;
-
-    let (trust_policy, trusted_keys) = prepare_trust_policy(
-        &inputs.trust_policy,
-        &inputs.expected_trust_policy_sha256,
-    )?;
     let task = parse_strict_json(&inputs.task_contract, "task contract")?;
     validate_against_schema(TASK_SCHEMA, &task, "CEB task")?;
     if string_field(&task, "task_id", "task contract")? != inputs.task_id {
         return Err(Failure::protocol("task contract task_id does not match CLI task_id"));
+    }
+    let execution_status = string_field(&task, "execution_status", "task contract")?;
+    if execution_status != "qualified" {
+        return Err(Failure::unresolved("task contract is not qualified; design-only and fixture-ready tasks cannot be scored"));
     }
     let source_snapshot = field(&task, "source_snapshot", "task contract")?;
     if string_field(source_snapshot, "tree_digest_algorithm", "source_snapshot")? != TREE_DIGEST_ALGORITHM {
         return Err(Failure::protocol("task source-tree digest algorithm is unsupported"));
     }
     let task_source_tree = optional_string_field(source_snapshot, "tree_sha256", "source_snapshot")?;
-    let execution_status = string_field(&task, "execution_status", "task contract")?;
-    if execution_status != "qualified" {
-        return Err(Failure::unresolved("task contract is not qualified; design-only and fixture-ready tasks cannot be scored"));
-    }
+
+    let (trust_policy, trusted_keys) = prepare_trust_policy(
+        &inputs.trust_policy,
+        &inputs.expected_trust_policy_sha256,
+    )?;
+    let patch_sha256 = sha256_hex(&inputs.patch);
+    let source_tree_sha256 = hash_source_tree_inner(&inputs.source_tree_dir)?;
+    let result_tree_sha256 = hash_source_tree_inner(&inputs.result_tree_dir)?;
     if task_source_tree.as_deref() != Some(source_tree_sha256.as_str()) {
         return Err(Failure::protocol("recomputed source-tree digest does not match the task contract"));
     }
@@ -1445,7 +1445,7 @@ fn verify_pair_inner(inputs: &PairInputs) -> Result<VerificationReport, Failure>
         trust_policy_sha256: Some(sha256_hex(&inputs.trust_policy)),
         schema_sha256: schema_digests(),
         reasons: Vec::new(),
-        claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove runner isolation, independently adjudicate test semantics, prove that the submitted patch produces the computed result snapshot, or authenticate the claimed model provider.",
+        claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove runner isolation, independently adjudicate test semantics, prove that the submitted patch transforms the pinned source snapshot into the computed result snapshot, or authenticate the claimed model provider.",
     })
 }
 
