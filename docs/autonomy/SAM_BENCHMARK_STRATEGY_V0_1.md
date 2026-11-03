@@ -491,3 +491,18 @@ Protocol: [RISK_FORECAST_CALIBRATION_V0_1.md](./RISK_FORECAST_CALIBRATION_V0_1.m
 6. **MPC vs learning vs hybrid:** compare PD/Stanley/Pure Pursuit, constrained MPC, learned planner and cognitive-proposal + conventional execution + RTA with the same model, action budget and holdout. Publish solver time/deadline misses and infeasible/no-solution rates with control quality.
 
 The most important strategic shift is from "the model is confident" to **"the forecast probability is calibrated for this event/horizon and the downstream action remains robust to model discrepancy."** RTA thresholds must not be self-tuned from the same predictor's unverified confidence.
+
+
+## 18. Model-exploitation and cross-model ranking stability
+
+The new `symthaea_vehicle::model_stability` module compares a frozen finite action set across multiple declared model/dynamics profiles. Each model evaluates the same action IDs and exact steering/throttle/brake payloads under a shared scenario, initial state, environment, horizon and metric definition. Per-model receipts bind the action, model artifact/profile, evaluator identity and execution context.
+
+The report exposes per-model best action and selected-action regret, best-action agreement rate, selected-action infeasibility across profiles, no-feasible-model cases, and worst-case regret where defined. A model-dependent action ranking is surfaced as `BestActionChangesAcrossModels`; incomplete model/action sets or unknown feasibility are indeterminate.
+
+This is a model-sensitivity diagnostic, not proof that the profile family spans reality or that the most conservative model is physically correct. Preserve per-model outputs. Do not average incompatible model predictions or claim physical safety/global optimality from a finite profile set.
+
+Candidate model perturbations should be explicit and bounded: friction/axle grip, brake and steering delays, localization bias/staleness, actor timing/speed and independently justified parameter alternatives. Execute the same actions from the same conditions under each profile through Symtropy #3387. Measure rank reversals and regret shifts, then use those cases to prioritize higher-fidelity validation.
+
+Nine unit tests are authored but not compiled/run. No vehicle model-ensemble results have been produced.
+
+Protocol: [CROSS_MODEL_COUNTERFACTUAL_STABILITY_V0_1.md](./CROSS_MODEL_COUNTERFACTUAL_STABILITY_V0_1.md).
