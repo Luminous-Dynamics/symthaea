@@ -80,7 +80,7 @@ def run():
             optimum = expected_best["algebra_work_units_proxy"]
             baseline = reference["heuristics"]["min_fill"]["algebra_work_units_proxy"]
             min_bucket_baseline = reference["heuristics"]["min_bucket_work"]["algebra_work_units_proxy"]
-            all_exact = all_exact and result == oracle
+            all_exact = all_exact and result == algebra.encode(oracle)
             certificate = build_certificate(CARDS, factors, algebra, selected_order)
             replay = verify_certificate(CARDS, factors, algebra, certificate)
             if replay["result"] != algebra.encode(oracle):
