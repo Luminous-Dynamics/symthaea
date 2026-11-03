@@ -24,8 +24,9 @@ A process with an unvalidated cleaning/rinse flag is never selected. Soil or san
 
 ## Evidence-qualified measured occupancy curves
 
-The `resource_curve` module accepts physical resource observations scoped to one exact machine, programme, soil class, surface material, fixed load set, detergent batch, water hardness, inlet temperature, protocol and raw-data SHA-256 digest. It requires at least two measured occupancies, at least five distinct nonblank run IDs per occupancy, and zero cleaning/rinse failures at every occupancy point before constructing an eligible curve. Distinct IDs are provenance evidence, not proof of independent experiments.
+The `resource_curve` module accepts physical resource observations scoped to one exact machine, programme, soil class, surface material, fixed load set, soil batch, detergent batch, water batch/hardness, inlet temperature, ambient temperature/humidity, protocol and raw-data SHA-256 digest. Its preferred `OccupancyObservation::from_runs` constructor takes individual physical run measurements, cleaning/rinse pass flags, evidence references and a calibration-bundle SHA-256; it derives min/mean/max itself instead of trusting manually entered summaries. It requires at least five distinct nonblank run IDs per occupancy, unique across the entire curve, and zero cleaning/rinse failures at every occupancy point.
 
+A run must also identify the offline cleaning and rinse ground-truth records and the instrument-calibration bundle. Distinct IDs and hashes are provenance checks, not proof of experiment independence or evidence authenticity; lab notebooks and raw data must still be auditable. The constructor rejects invalid/non-finite resource values and any cleaning/rinse failure. Exact measured occupancy returns the stored observation; between-point interpolation remains diagnostic only, and out-of-range occupancy is rejected. The module does not change scheduler defaults.
 - Exact measured occupancy returns the stored observation.
 - Intermediate occupancy uses piecewise-linear interpolation, explicitly marked as an estimate.
 - Occupancy outside the measured range is rejected; no extrapolation is permitted.
