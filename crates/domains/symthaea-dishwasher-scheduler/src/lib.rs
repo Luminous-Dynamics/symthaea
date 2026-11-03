@@ -1168,3 +1168,261 @@ mod tests {
         .is_err());
     }
 }
+
+
+#[cfg(test)]
+mod evidence_bound_mode_tests {
+    use super::*;
+    use symthaea_dishwasher_design::quality::{
+        qualify_pilot_evidence, Endpoint, EndpointCriterion, EvidenceKind, LimitDirection,
+        OutcomeObservation, PilotPolicy, QualificationScope,
+    };
+
+    fn envelope(
+        programme: &str,
+        soil: SoilClass,
+        occupancy: usize,
+        machine_model: &str,
+        detergent_batch: &str,
+    ) -> PilotEvidenceEnvelope {
+        let item_ids: Vec<String> = (0..occupancy)
+            .map(|index| format!("item-{index:02}"))
+            .collect();
+        let scope = QualificationScope {
+            machine_model: machine_model.to_owned(),
+            programme: programme.to_owned(),
+            soil_class: soil.as_label().to_owned(),
+            surface_material: "ceramic".to_owned(),
+            item_set_id: format!("{}-{occupancy}-item-set", soil.as_label()),
+            item_ids: item_ids.clone(),
+            detergent_batch_id: detergent_batch.to_owned(),
+            water_batch_id: "water-lot-1".to_owned(),
+            water_hardness_ppm_as_caco3: 75,
+            inlet_temperature_millic: 15_000,
+            ambient_temperature_millic: 20_000,
+            ambient_relative_humidity_permille: 500,
+            protocol_id: "pilot-protocol-v1".to_owned(),
+            raw_archive_sha256: "a".repeat(64),
+        };
+        let criteria = vec![
+            EndpointCriterion {
+                endpoint: Endpoint::SoilRemovalResidual,
+                criterion_id: "soil-limit-v1".to_owned(),
+                metric_id: "residual_soil_area_fraction".to_owned(),
+                unit: "fraction".to_owned(),
+                direction: LimitDirection::AtMost,
+                limit: 0.05,
+                criterion_evidence_sha256: "b".repeat(64),
+            },
+            EndpointCriterion {
+                endpoint: Endpoint::FinalRinseResidue,
+                criterion_id: "rinse-limit-v1".to_owned(),
+                metric_id: "final_rinse_residue".to_owned(),
+                unit: "mg/L".to_owned(),
+                direction: LimitDirection::AtMost,
+                limit: 5.0,
+                criterion_evidence_sha256: "c".repeat(64),
+            },
+            EndpointCriterion {
+                endpoint: Endpoint::CrossContamination,
+                criterion_id: "cross-transfer-limit-v1".to_owned(),
+                metric_id: "marker_transfer_mass".to_owned(),
+                unit: "mg".to_owned(),
+                direction: LimitDirection::AtMost,
+                limit: 0.01,
+                criterion_evidence_sha256: "d".repeat(64),
+            },
+        ];
+        let endpoints = [
+            Endpoint::SoilRemovalResidual,
+            Endpoint::FinalRinseResidue,
+            Endpoint::CrossContamination,
+        ];
+        let mut observations = Vec::new();
+        for run in 1..=5 {
+            for item_id in &item_ids {
+                for endpoint in endpoints {
+                    let criterion = criteria
+                        .iter()
+                        .find(|criterion| criterion.endpoint == endpoint)
+                        .unwrap();
+                    let (method, measured_value, uncertainty) = match endpoint {
+                        Endpoint::SoilRemovalResidual => ("fluorescence-assay-v1", 0.02, 0.005),
+                        Endpoint::FinalRinseResidue => ("rinse-assay-v1", 2.0, 0.5),
+                        Endpoint::CrossContamination => ("witness-coupon-v1", 0.003, 0.001),
+                        _ => unreachable!(),
+                    };
+                    observations.push(OutcomeObservation {
+                        run_id: format!("run-{run:02}"),
+                        item_id: item_id.clone(),
+                        endpoint,
+                        criterion_id: criterion.criterion_id.clone(),
+                        metric_id: criterion.metric_id.clone(),
+                        evidence_kind: EvidenceKind::IndependentOutcomeAssay,
+                        method_id: method.to_owned(),
+                        protocol_id: "pilot-protocol-v1".to_owned(),
+                        measured_value,
+                        expanded_uncertainty: uncertainty,
+                        unit: criterion.unit.clone(),
+                        evidence_ref: format!("evidence-{run}-{item_id}-{endpoint:?}"),
+                        calibration_bundle_sha256: "1".repeat(64),
+                    });
+                }
+            }
+        }
+        qualify_pilot_evidence(
+            scope,
+            PilotPolicy {
+                minimum_independent_runs: 5,
+                require_drying_endpoint: false,
+                require_relative_microbiology_endpoint: false,
+            },
+            criteria,
+            observations,
+        )
+        .unwrap()
+    }
+
+    fn mode_profile(programme: &str, capacity: usize, supports_sanitization: bool) -> ModeProfile {
+        ModeProfile {
+            name: programme.to_owned(),
+            capacity,
+            duration_s: 900,
+            base_energy_kwh: 0.02,
+            energy_per_item_kwh: 0.01,
+            base_fresh_water_l: 0.2,
+            fresh_water_per_item_l: 0.3,
+            supported_soils_mask: ALL_SOILS_MASK,
+            supports_sanitization,
+            cleaning_and_rinse_validated: false,
+        }
+    }
+
+    #[test]
+    fn derives_supported_soils_from_a_complete_pilot_occupancy_ladder() {
+        let mode = EvidenceBoundMode::from_pilot_evidence(
+            mode_profile("quickcell-v1", 1, false),
+            vec![envelope("quickcell-v1", SoilClass::Starch, 1, "prototype-a", "detergent-1")],
+        )
+        .unwrap();
+
+        assert!(mode.profile().supports(&Job {
+            id: 1,
+            arrival_s: 0,
+            deadline_s: 2_000,
+            soil: SoilClass::Starch,
+            requires_sanitization: false,
+        }));
+        assert!(!mode.profile().supports(&Job {
+            id: 2,
+            arrival_s: 0,
+            deadline_s: 2_000,
+            soil: SoilClass::Protein,
+            requires_sanitization: false,
+        }));
+    }
+
+    #[test]
+    fn refuses_to_advertise_capacity_without_each_intermediate_occupancy() {
+        let result = EvidenceBoundMode::from_pilot_evidence(
+            mode_profile("full-load-v1", 2, false),
+            vec![envelope("full-load-v1", SoilClass::Starch, 2, "prototype-a", "detergent-1")],
+        );
+        assert!(matches!(
+            result,
+            Err(EvidenceBoundModeError::MissingSoilOccupancy {
+                soil: SoilClass::Starch,
+                occupancy: 1
+            })
+        ));
+    }
+
+    #[test]
+    fn rejects_evidence_from_different_machine_or_detergent_batches() {
+        let result = EvidenceBoundMode::from_pilot_evidence(
+            mode_profile("full-load-v1", 2, false),
+            vec![
+                envelope("full-load-v1", SoilClass::Starch, 1, "prototype-a", "detergent-1"),
+                envelope("full-load-v1", SoilClass::Starch, 2, "prototype-b", "detergent-1"),
+            ],
+        );
+        assert_eq!(result, Err(EvidenceBoundModeError::InconsistentPhysicalScope));
+
+        let result = EvidenceBoundMode::from_pilot_evidence(
+            mode_profile("full-load-v1", 2, false),
+            vec![
+                envelope("full-load-v1", SoilClass::Starch, 1, "prototype-a", "detergent-1"),
+                envelope("full-load-v1", SoilClass::Starch, 2, "prototype-a", "detergent-2"),
+            ],
+        );
+        assert_eq!(result, Err(EvidenceBoundModeError::InconsistentPhysicalScope));
+    }
+
+    #[test]
+    fn rejects_programme_mismatch_and_duplicate_soil_occupancy() {
+        let mismatch = EvidenceBoundMode::from_pilot_evidence(
+            mode_profile("quickcell-v2", 1, false),
+            vec![envelope("quickcell-v1", SoilClass::Starch, 1, "prototype-a", "detergent-1")],
+        );
+        assert_eq!(mismatch, Err(EvidenceBoundModeError::ProgrammeMismatch));
+
+        let duplicate = EvidenceBoundMode::from_pilot_evidence(
+            mode_profile("quickcell-v1", 1, false),
+            vec![
+                envelope("quickcell-v1", SoilClass::Starch, 1, "prototype-a", "detergent-1"),
+                envelope("quickcell-v1", SoilClass::Starch, 1, "prototype-a", "detergent-1"),
+            ],
+        );
+        assert!(matches!(
+            duplicate,
+            Err(EvidenceBoundModeError::DuplicateSoilOccupancy {
+                soil: SoilClass::Starch,
+                occupancy: 1
+            })
+        ));
+    }
+
+    #[test]
+    fn sanitization_cannot_be_enabled_by_cleaning_and_rinse_pilot_data() {
+        let result = EvidenceBoundMode::from_pilot_evidence(
+            mode_profile("quickcell-v1", 1, true),
+            vec![envelope("quickcell-v1", SoilClass::Starch, 1, "prototype-a", "detergent-1")],
+        );
+        assert_eq!(
+            result,
+            Err(EvidenceBoundModeError::SanitizationRequiresSeparateCertification)
+        );
+    }
+
+    #[test]
+    fn evidence_bound_profiles_can_enter_the_scheduler_without_a_free_boolean() {
+        let quick = EvidenceBoundMode::from_pilot_evidence(
+            mode_profile("quickcell-v1", 1, false),
+            vec![envelope("quickcell-v1", SoilClass::Starch, 1, "prototype-a", "detergent-1")],
+        )
+        .unwrap();
+        let full = EvidenceBoundMode::from_pilot_evidence(
+            mode_profile("full-load-v1", 2, false),
+            vec![
+                envelope("full-load-v1", SoilClass::Starch, 1, "prototype-a", "detergent-1"),
+                envelope("full-load-v1", SoilClass::Starch, 2, "prototype-a", "detergent-1"),
+            ],
+        )
+        .unwrap();
+
+        let result = simulate_with_pilot_evidence(
+            &[Job {
+                id: 7,
+                arrival_s: 0,
+                deadline_s: 2_000,
+                soil: SoilClass::Starch,
+                requires_sanitization: false,
+            }],
+            &quick,
+            &full,
+            Policy::QuickCellOnly,
+        )
+        .unwrap();
+        assert_eq!(result.completed_items(), 1);
+    }
+}
