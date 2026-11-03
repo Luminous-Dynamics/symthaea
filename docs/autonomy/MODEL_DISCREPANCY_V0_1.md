@@ -86,10 +86,10 @@ For each decision, the evaluator reports:
 - ranking reversal;
 - selected-action regret under realized utility;
 - optimism gap: predicted selected-action advantage minus its realized advantage;
-- status: comparable, incomplete reference, indeterminate feasibility, selected action infeasible, or no feasible action;
+- status: comparable, incomplete reference, incomplete candidate set, indeterminate feasibility, selected action infeasible, or no feasible action;
 - caller assertion that the finite candidate set is complete.
 
-The finite-set result is not a global optimum. If any action's feasibility is indeterminate, no ranking or regret claim is emitted for that decision. If the selected action is infeasible, the best feasible alternatives may be shown but selected-action regret is not computed as if it were an admissible choice.
+The finite-set result is not a global optimum. If the caller marks the candidate set incomplete, the decision is IncompleteCandidateSet and no ranking or regret claim is emitted. If any action's reference outcome is non-observed, the decision is IncompleteReference and no ranking or regret claim is emitted. If any action's feasibility is indeterminate, no ranking or regret claim is emitted for that decision. If the selected action is infeasible, the best feasible alternatives may be shown but selected-action regret is not computed as if it were an admissible choice.
 
 ### Report integrity
 
