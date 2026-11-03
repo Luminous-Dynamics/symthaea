@@ -93,7 +93,8 @@
     "not_estimable_count": 1,
     "false_ambiguity_count": 0,
     "candidate_duplicate_structure_group_count": 0,
-    "reference_duplicate_structure_group_count": 0
+    "reference_duplicate_structure_group_count": 0,
+    "candidate_not_estimable_count": 0
   },
   "family_summaries": [
     {
@@ -104,7 +105,8 @@
       "omitted_query_flipping_count": 0,
       "false_invariance_count": 0,
       "not_estimable_count": 0,
-      "false_ambiguity_count": 0
+      "false_ambiguity_count": 0,
+      "candidate_not_estimable_count": 0
     },
     {
       "error_family": "continuation_loss",
@@ -114,7 +116,8 @@
       "omitted_query_flipping_count": 1,
       "false_invariance_count": 1,
       "not_estimable_count": 0,
-      "false_ambiguity_count": 0
+      "false_ambiguity_count": 0,
+      "candidate_not_estimable_count": 0
     },
     {
       "error_family": "registration_uncertainty",
@@ -124,7 +127,8 @@
       "omitted_query_flipping_count": 0,
       "false_invariance_count": 0,
       "not_estimable_count": 1,
-      "false_ambiguity_count": 0
+      "false_ambiguity_count": 0,
+      "candidate_not_estimable_count": 0
     }
   ],
   "dispositions": {
