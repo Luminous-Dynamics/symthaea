@@ -58,6 +58,17 @@ pinned trust policy and the key has the required stage role.
 
 ## CLI
 
+Compute a CEB-TREE-V1 digest for a clean Unix snapshot:
+
+```sh
+cargo run --manifest-path tools/ceb-receipt-verifier/Cargo.toml --release -- hash-tree \
+  --directory ./source-snapshot
+```
+
+This prints the algorithm identifier and lowercase SHA-256. The resulting digest
+must be committed to the task contract by the trusted task registry; do not accept
+a task and its purported digest from the same untrusted source.
+
 ```sh
 cargo run --manifest-path tools/ceb-receipt-verifier/Cargo.toml --release -- verify-pair \
   --task-contract task.json \
