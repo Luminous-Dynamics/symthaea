@@ -819,14 +819,16 @@ mod tests {
     fn counterexample_minimizer_rejects_invalid_source_and_non_failure() {
         let source = generate_stratified_intersection_candidates(4, 1).unwrap().remove(0);
         assert_eq!(
-            minimize_intersection_counterexample(&source, "predicate-v1", 64, |_| false),
-            Err(CounterexampleMinimizationError::OriginalNotCounterexample)
+            minimize_intersection_counterexample(&source, "predicate-v1", 64, |_| false)
+                .unwrap_err(),
+            CounterexampleMinimizationError::OriginalNotCounterexample
         );
         let mut invalid = source;
         invalid.candidate_id.push_str("-tampered");
         assert_eq!(
-            minimize_intersection_counterexample(&invalid, "predicate-v1", 64, |_| true),
-            Err(CounterexampleMinimizationError::InvalidSourceCandidate)
+            minimize_intersection_counterexample(&invalid, "predicate-v1", 64, |_| true)
+                .unwrap_err(),
+            CounterexampleMinimizationError::InvalidSourceCandidate
         );
     }
 
@@ -834,8 +836,9 @@ mod tests {
     fn counterexample_minimizer_fails_closed_on_invalid_budgets_and_predicate_ids() {
         let source = generate_stratified_intersection_candidates(5, 1).unwrap().remove(0);
         assert_eq!(
-            minimize_intersection_counterexample(&source, "predicate-v1", 0, |_| true),
-            Err(CounterexampleMinimizationError::ZeroEvaluationBudget)
+            minimize_intersection_counterexample(&source, "predicate-v1", 0, |_| true)
+                .unwrap_err(),
+            CounterexampleMinimizationError::ZeroEvaluationBudget
         );
         assert_eq!(
             minimize_intersection_counterexample(
@@ -843,12 +846,13 @@ mod tests {
                 "predicate-v1",
                 MAX_COUNTEREXAMPLE_MINIMIZATION_EVALUATIONS + 1,
                 |_| true
-            ),
-            Err(CounterexampleMinimizationError::EvaluationBudgetTooLarge)
+            )
+            .unwrap_err(),
+            CounterexampleMinimizationError::EvaluationBudgetTooLarge
         );
         assert_eq!(
-            minimize_intersection_counterexample(&source, " ", 64, |_| true),
-            Err(CounterexampleMinimizationError::EmptyPredicateId)
+            minimize_intersection_counterexample(&source, " ", 64, |_| true).unwrap_err(),
+            CounterexampleMinimizationError::EmptyPredicateId
         );
     }
 
