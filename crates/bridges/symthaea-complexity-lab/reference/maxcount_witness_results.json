@@ -1,15 +1,17 @@
 {
-  "suite": "Exact MaxCount witness/backpointer reference",
+  "suite": "Exact MaxCount witness/backpointer dual-count reference",
   "seed": 20261103,
   "randomized_instances": 240,
   "randomized_certificates_checked": 240,
+  "distinct_support_matches": 240,
   "optimal_solution_dag_support_matches": 240,
-  "positive_handcrafted_cases": 2,
-  "triangle_maxcut": {"optimum": 2, "multiplicity": 6, "witness": [1,0,0], "distinct_optimum_assignments": 6},
-  "weighted_case": {"optimum": 6, "semiring_multiplicity": 4, "canonical_witness": [0,2,0], "distinct_optimum_assignments": 1},
+  "positive_handcrafted_cases": 3,
+  "triangle_maxcut": {"optimum": 2, "multiplicity": 6, "distinct_optimal_assignments": 6, "witness": [1,0,0]},
+  "weighted_unique_assignment": {"optimum": 6, "multiplicity": 4, "distinct_optimal_assignments": 1},
+  "weighted_tie_case": {"optimum": 5, "multiplicity": 6, "distinct_optimal_assignments": 2, "branches": [[0,4,1],[1,2,1]]},
   "negative_controls": {
-    "rejected": 8,
-    "total": 8,
+    "rejected": 11,
+    "total": 11,
     "cases": [
       "false_argmax_state_rehashed",
       "missing_tied_argmax_rehashed",
@@ -18,8 +20,11 @@
       "altered_instance_digest_rehashed",
       "duplicate_elimination_variable_rehashed",
       "wrong_separator_rehashed",
-      "false_output_cell_rehashed"
+      "false_output_cell_rehashed",
+      "false_distinct_support_rehashed",
+      "false_branch_support_rehashed",
+      "false_intermediate_support_table_rehashed"
     ]
   },
-  "claim_boundary": "Python exact reference only; backpointer trace and checker are not Rust, Lean, or performance-qualified."
+  "claim_boundary": "Python exact reference only; v2 dual-count backpointer trace and separate checker are not Rust, Lean, or performance-qualified. Each original factor-table cell is one local assignment."
 }
