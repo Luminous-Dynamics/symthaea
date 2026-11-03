@@ -123,3 +123,10 @@ The process-local replay guard has an expiry-aware bounded cache (65,536 active 
 Consent revocation is represented as a gateway-supplied revocation timestamp. A trusted consent provider must authenticate the signed grant and supply a current revocation result before this module is called. A caller-supplied timestamp is not itself proof of revocation status.
 
 The implementation is an authorization contract only. No ADB operation is run, no user-consent UI is implemented, no provider executable digest is independently authenticated, and no hardware attestation or device-output truth is claimed.
+
+
+### Read-only policy and log-safety hardening
+
+Invocation preparation accepts only the exact `mobile-device-read-only-v1` policy and `EffectCeiling::MOBILE_DEVICE_READ_ONLY`; broader effect ceilings are rejected. Receipt verification recomputes the pinned mobile tool-effect catalog digest and the selected tool's read-only policy/effect digests, so changing a tool/effect and recomputing only the receipt self-hash does not pass.
+
+Custom `Debug` implementations redact the raw session nonce, invocation nonce, caller ID and request argument payload. The mobile invocation unit suite now has 12 tests. These are authored tests; exact-head CI remains the validation authority.
