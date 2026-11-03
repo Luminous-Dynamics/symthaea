@@ -35,12 +35,14 @@
     {
       "world_id": "world-merge-split-a",
       "query_state": "BELOW_THRESHOLD",
-      "canonical_structural_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      "canonical_structural_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "error_family": "merge_split"
     },
     {
       "world_id": "world-merge-split-b",
       "query_state": "BELOW_THRESHOLD",
-      "canonical_structural_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      "canonical_structural_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "error_family": "merge_split"
     }
   ],
   "reference_worlds": [
