@@ -53,6 +53,14 @@ The following are important incumbents, not novelty claims for InstantClean:
 
 Therefore, dual compartments and turbidity sensing alone are not InstantClean differentiators. The defensible wedge must be demonstrated on a matched basis: a genuine one-item / micro-batch cell, measured clean-and-rinse endpoints, per-successful-item resources, time-to-release, cross-contamination controls, repairability and robust fallback when sensors are degraded. Any patent novelty or freedom-to-operate claim requires a separate patent search and legal review.
 
+### 2026 announced camera-AI dishwasher incumbent
+
+Miele announced the G8 Diamond on 2 September 2026. Its AutoVision camera uses image processing and AI-based recognition to estimate load level and item types, then applies load-dependent wash/dry settings (e.g. stronger cleaning for pots, optimized internal bottle cleaning, and drying selection for plastics). It is integrated with AutoDos automatic detergent dispensing, three ExcellentDry levels and app preferences for start scheduling / load thresholds / available photovoltaic energy. Miele states the DACH launch is April 2027, with other countries to follow.
+
+This means camera-based load recognition, item classification, automatic dosing and adaptive drying are not sufficient novelty claims. The differentiator must be demonstrated through quality-calibrated uncertainty, ground-truth cleaning/rinse tests, fault/occlusion detection, privacy-preserving operation and matched resource-per-successful-clean improvement. The press release contains no comparable cycle energy/water or cleaning-index dataset; do not insert invented values into the numeric leaderboard.
+
+Official source: https://www.miele.de/en/m/world-premiere-for-the-g8-diamond-8453.htm
+
 ## Exact-model market reference points
 
 | Exact model / reference | Capacity | Labelled eco energy | Water per cycle | Eco duration | Evidence notes |
@@ -88,6 +96,8 @@ Fast cycles need soil class and service context; published minutes are not inter
 | V-ZUG Party | 11 min | Repeated rapid turnaround between courses | 20-minute heating phase before repeated loading; five consecutive cycles described by manufacturer. Count preheat, refill, water and total event energy, not only the 11-minute interval |
 | Fisher & Paykel DishDrawer Quick modifier | Published as faster wash while maintaining performance | Faster wash modifier on an independently operated drawer | Exact duration, soil rating, consumption and model-specific test evidence must be obtained; do not invent a duration |
 
+| Miele G8 Diamond / AutoVision | Announced; DACH launch April 2027 | Camera + AI load/type recognition; pots intensify wash, bottle interiors optimized, plastics get drying selection | No public matched energy/water/IEC cleaning values yet; future competitor to test, not numeric SOTA row |
+
 Sources:
 - Miele South Africa QuickPowerWash: https://www.miele.co.za/domestic/range-of-dishwashers-2498.htm
 - V-ZUG Sprint / Party and soil suitability: https://www.vzug.com/be/en/service/device/v-zug-know-how-faq?query=%3Arelevance-desc%3AtabItemType%3AFaq%3AproductCategoryCode%3Adishwasher
@@ -115,6 +125,16 @@ For party / multi-course use, benchmark an **event service level** rather than o
 
 4. **Joint detergent and cycle optimization (Computers & Chemical Engineering 213, October 2026, Article 109771).** The abstract reports a model-based framework with a reference-case improvement of 31% shorter washing, 59% shorter drying and 5% higher stain removal. The data are confidential. Treat this as a lead to independently reproduce, not a performance claim for InstantClean.
    - DOI: https://doi.org/10.1016/j.compchemeng.2026.109771
+
+5. **Thermoelectric heating/cooling with thermal energy storage (Applied Thermal Engineering 296, June 2026, Article 130695).** The study reports 8.7% lower total energy, 40% lower internal water-heating energy, 42% shorter drying at the same remaining moisture content and an RC thermal model within ±1 K. The abstract reports 0.952 kWh/cycle in its modified setup. This is a study-specific prototype and not a matched result against the current ~0.39 kWh Eco-label frontier. Reproduce its baseline and measurement boundary before deciding whether thermoelectric storage is useful, and compare it against heat-pump, zeolite/desiccant and passive drying options.
+   - DOI: https://doi.org/10.1016/j.applthermaleng.2026.130695
+   - ORNL research record: https://impact.ornl.gov/en/publications/thermoelectric-heating-and-coolingintegrated-dishwasher-with-ther/
+
+### Pre-wetting and flexible thermal scheduling incumbent
+
+V-ZUG's AdoraDish V6000 heat-pump product page documents OptiStart: cold-water pre-wetting during the delay period softens soil so the subsequent wash can run 5–8 °C cooler, with claimed savings up to approximately 10%. It also documents load/soil sensors, partial-load operation, automatic airflow/door-opening drying and an 11-minute Party programme. These are model-specific manufacturer claims, but they show that pre-soaking and time-shifting are already commercial strategies.
+
+Official product information: https://www.vzug.com/gb/en/gb/en/products/kitchen/dishwashers/ultra-efficient/adoradish-v6000-with-heat-pump--p4112100010
 
 ## Proposed target ladder
 
