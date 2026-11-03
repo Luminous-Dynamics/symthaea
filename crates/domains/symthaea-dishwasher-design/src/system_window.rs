@@ -40,6 +40,8 @@ impl SystemResourceKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WindowRequestState {
     Completed { closed_at_s: u64 },
+    /// Terminal cancellation, either while queued or after physical work starts.
+    Cancelled { cancelled_at_s: u64 },
     /// The observation is right-censored at the system-window boundary.
     Unresolved { observed_until_s: u64 },
 }
@@ -115,6 +117,7 @@ pub struct CompartmentWindowStats {
     pub requests_accepted_in_window: usize,
     pub requests_started_in_window: usize,
     pub requests_completed_in_window: usize,
+    pub cancelled_requests_in_window: usize,
     pub unresolved_requests_at_window_end: usize,
     pub verified_item_release_count: usize,
     pub active_request_seconds: u64,
@@ -138,6 +141,8 @@ pub struct SystemWindowReport {
     pub requests_accepted_in_window: usize,
     pub requests_started_in_window: usize,
     pub requests_completed_in_window: usize,
+    pub cancelled_requests_in_window: usize,
+    pub cancelled_items_in_accepted_cohort: usize,
     pub unresolved_requests_at_window_end: usize,
     pub requested_items_in_accepted_cohort: usize,
     pub items_without_verified_qualification_in_accepted_unresolved_requests: usize,
@@ -177,6 +182,8 @@ pub enum SystemWindowError {
     DuplicateRequestedItem { request_id: String, item_id: String },
     RequestOutsideWindow(String),
     RequestFinishBeforeStart(String),
+    CancelledRequestBeforeAcceptance(String),
+    CancelledRequestFinishBeforeStart(String),
     RequestStartedBeforeAcceptance(String),
     StartedRequestMissingServiceReport(String),
     QueuedRequestHasServiceReport(String),
@@ -250,6 +257,7 @@ struct CompartmentAccumulator {
     requests_accepted_in_window: usize,
     requests_started_in_window: usize,
     requests_completed_in_window: usize,
+    cancelled_requests_in_window: usize,
     unresolved_requests_at_window_end: usize,
     verified_item_release_count: usize,
     active_request_seconds: u64,
@@ -311,6 +319,7 @@ fn build_compartment_stats(
             }
             let service_end = match request.state {
                 WindowRequestState::Completed { closed_at_s } => closed_at_s,
+                WindowRequestState::Cancelled { cancelled_at_s } => cancelled_at_s,
                 WindowRequestState::Unresolved { .. } => spec.end_at_s,
             };
             let start = started_at_s.max(spec.start_at_s);
@@ -330,6 +339,12 @@ fn build_compartment_stats(
             {
                 stats.requests_completed_in_window = stats.requests_completed_in_window.checked_add(1)
                     .ok_or(SystemWindowError::CounterOverflow("compartment_completed_count"))?;
+            }
+            WindowRequestState::Cancelled { cancelled_at_s }
+                if cancelled_at_s >= spec.start_at_s && cancelled_at_s < spec.end_at_s =>
+            {
+                stats.cancelled_requests_in_window = stats.cancelled_requests_in_window.checked_add(1)
+                    .ok_or(SystemWindowError::CounterOverflow("compartment_cancelled_count"))?;
             }
             WindowRequestState::Unresolved { .. } => {
                 stats.unresolved_requests_at_window_end = stats.unresolved_requests_at_window_end.checked_add(1)
@@ -359,6 +374,7 @@ fn build_compartment_stats(
             requests_accepted_in_window: stats.requests_accepted_in_window,
             requests_started_in_window: stats.requests_started_in_window,
             requests_completed_in_window: stats.requests_completed_in_window,
+            cancelled_requests_in_window: stats.cancelled_requests_in_window,
             unresolved_requests_at_window_end: stats.unresolved_requests_at_window_end,
             verified_item_release_count: stats.verified_item_release_count,
             active_request_seconds: stats.active_request_seconds,
@@ -554,6 +570,26 @@ fn validate_request(
             }
             validate_service_report(request, true)?;
         }
+        WindowRequestState::Cancelled { cancelled_at_s } => {
+            if cancelled_at_s < request.accepted_at_s {
+                return Err(SystemWindowError::CancelledRequestBeforeAcceptance(
+                    request.service_request_id.clone(),
+                ));
+            }
+            if cancelled_at_s >= spec.end_at_s {
+                return Err(SystemWindowError::RequestOutsideWindow(
+                    request.service_request_id.clone(),
+                ));
+            }
+            if let Some(started_at_s) = request.started_at_s {
+                if cancelled_at_s < started_at_s {
+                    return Err(SystemWindowError::CancelledRequestFinishBeforeStart(
+                        request.service_request_id.clone(),
+                    ));
+                }
+                validate_service_report(request, false)?;
+            }
+        }
         WindowRequestState::Unresolved { observed_until_s } => {
             if observed_until_s != spec.end_at_s {
                 return Err(SystemWindowError::UnresolvedRequestNotCensoredAtWindowEnd(
@@ -630,6 +666,8 @@ pub fn account_system_window(
     let mut item_attempt_visits_total = 0_usize;
     let mut reattempted_item_visits_total = 0_usize;
     let mut completed_count = 0_usize;
+    let mut cancelled_count = 0_usize;
+    let mut cancelled_item_count = 0_usize;
     let mut unresolved_count = 0_usize;
     let mut requested_item_count = 0_usize;
     let mut unresolved_item_count = 0_usize;
@@ -644,6 +682,7 @@ pub fn account_system_window(
     for request in requests {
         let request_end_at_s = match request.state {
             WindowRequestState::Completed { closed_at_s } => closed_at_s,
+            WindowRequestState::Cancelled { cancelled_at_s } => cancelled_at_s,
             WindowRequestState::Unresolved { .. } => spec.end_at_s,
         };
         if request.accepted_at_s < spec.start_at_s && request_end_at_s > spec.start_at_s {
@@ -670,6 +709,7 @@ pub fn account_system_window(
 
             let service_end = match request.state {
                 WindowRequestState::Completed { closed_at_s } => closed_at_s,
+                WindowRequestState::Cancelled { cancelled_at_s } => cancelled_at_s,
                 WindowRequestState::Unresolved { .. } => spec.end_at_s,
             };
             let intersection_start = started_at_s.max(spec.start_at_s);
@@ -703,6 +743,16 @@ pub fn account_system_window(
                     completed_cohort_item_count = completed_cohort_item_count.checked_add(
                         request.requested_item_ids.len()
                     ).ok_or(SystemWindowError::CounterOverflow("completed_cohort_item_count"))?;
+                }
+            }
+            WindowRequestState::Cancelled { cancelled_at_s } => {
+                if cancelled_at_s >= spec.start_at_s && cancelled_at_s < spec.end_at_s {
+                    cancelled_count = cancelled_count.checked_add(1)
+                        .ok_or(SystemWindowError::CounterOverflow("cancelled_requests"))?;
+                }
+                if accepted_in_window {
+                    cancelled_item_count = cancelled_item_count.checked_add(request.requested_item_ids.len())
+                        .ok_or(SystemWindowError::CounterOverflow("cancelled_items"))?;
                 }
             }
             WindowRequestState::Unresolved { .. } => {
@@ -798,6 +848,13 @@ pub fn account_system_window(
         }
         match request.state {
             WindowRequestState::Completed { closed_at_s } if release.released_at_s > closed_at_s => {
+                return Err(SystemWindowError::ReleaseOutsideService {
+                    request_id: release.service_request_id.clone(),
+                    item_id: release.item_id.clone(),
+                });
+            }
+            WindowRequestState::Cancelled { cancelled_at_s }
+                if release.released_at_s >= cancelled_at_s => {
                 return Err(SystemWindowError::ReleaseOutsideService {
                     request_id: release.service_request_id.clone(),
                     item_id: release.item_id.clone(),
@@ -1028,6 +1085,8 @@ pub fn account_system_window(
         requests_accepted_in_window: accepted_count,
         requests_started_in_window: started_count,
         requests_completed_in_window: completed_count,
+        cancelled_requests_in_window: cancelled_count,
+        cancelled_items_in_accepted_cohort: cancelled_item_count,
         unresolved_requests_at_window_end: unresolved_count,
         requested_items_in_accepted_cohort: requested_item_count,
         items_without_verified_qualification_in_accepted_unresolved_requests: unresolved_item_count,
