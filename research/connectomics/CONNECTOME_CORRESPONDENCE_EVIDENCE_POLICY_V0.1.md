@@ -30,6 +30,6 @@ The verifier rejects a label inconsistent with those lengths. A relation may not
 
 ## Promotion constraints
 
-No mapping is trusted as VERIFIED by this policy alone. The V0.1 semantic verifier reports COUNTERS_RECOMPUTED and trusted_promotion=false because it does not authenticate evidence artifacts, lineage transactions, expert adjudication, registration anchors, signer identities or revocation state.
+No mapping is trusted as `CLAIMED_VERIFIED` by this policy alone. The value is only an input claim until evidence bytes and authority have been authenticated. The V0.1 semantic verifier reports COUNTERS_RECOMPUTED and trusted_promotion=false because it does not authenticate evidence artifacts, lineage transactions, expert adjudication, registration anchors, signer identities or revocation state.
 
 No biological identity certificate may be issued from V0.1 synthetic fixtures.
