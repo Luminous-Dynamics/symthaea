@@ -36,6 +36,23 @@ pub struct HarmonyContribution {
     /// Timestamp (cycle number).
     pub cycle: u64,
 }
+/// A rejected contribution. Invalid or stale input is never silently admitted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContributionError {
+    /// The Phi proxy is not a finite number.
+    NonFinitePhi,
+    /// The Phi proxy must be in the normalized interval [0, 1].
+    PhiOutOfRange,
+    /// A harmony activation is not a finite number.
+    NonFiniteHarmony { index: usize },
+    /// A harmony activation must be in the normalized interval [0, 1].
+    HarmonyOutOfRange { index: usize },
+    /// An update would replace a newer contribution from the same participant.
+    StaleCycle { incoming_cycle: u64, current_cycle: u64 },
+    /// The session has reached its participant limit.
+    CapacityExceeded,
+}
+
 
 /// Blending strategy for combining multiple harmony contributions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,16 +95,50 @@ impl CollaborativeComposer {
     }
 
     /// Add or update a participant's contribution.
-    pub fn contribute(&mut self, contribution: HarmonyContribution) {
+    ///
+    /// Rejects non-finite/out-of-range values, stale per-participant cycles,
+    /// and capacity overflow. Callers must handle the result: no contribution
+    /// is silently dropped or allowed to overwrite newer state.
+    pub fn contribute(
+        &mut self,
+        contribution: HarmonyContribution,
+    ) -> Result<(), ContributionError> {
+        if !contribution.phi.is_finite() {
+            return Err(ContributionError::NonFinitePhi);
+        }
+        if !(0.0..=1.0).contains(&contribution.phi) {
+            return Err(ContributionError::PhiOutOfRange);
+        }
+        for (index, activation) in contribution.harmonies.iter().enumerate() {
+            if !activation.is_finite() {
+                return Err(ContributionError::NonFiniteHarmony { index });
+            }
+            if !(0.0..=1.0).contains(activation) {
+                return Err(ContributionError::HarmonyOutOfRange { index });
+            }
+        }
+
         if let Some(existing) = self
             .contributions
             .iter_mut()
             .find(|c| c.participant_id == contribution.participant_id)
         {
+            if contribution.cycle < existing.cycle {
+                return Err(ContributionError::StaleCycle {
+                    incoming_cycle: contribution.cycle,
+                    current_cycle: existing.cycle,
+                });
+            }
             *existing = contribution;
-        } else if self.contributions.len() < MAX_PARTICIPANTS {
-            self.contributions.push(contribution);
+            return Ok(());
         }
+
+        if self.contributions.len() >= MAX_PARTICIPANTS {
+            return Err(ContributionError::CapacityExceeded);
+        }
+
+        self.contributions.push(contribution);
+        Ok(())
     }
 
     /// Remove a participant.
@@ -226,7 +277,7 @@ mod tests {
     #[test]
     fn single_participant_is_identity() {
         let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
-        composer.contribute(make_contribution(1, 0.8, [0.5; 8]));
+        composer.contribute(make_contribution(1, 0.8, [0.5; 8])).expect("valid test contribution");
         let state = composer.blend();
         // With EMA smoothing from default [0.3; 8], won't be exactly [0.5; 8]
         // but should move toward it
@@ -237,9 +288,9 @@ mod tests {
     fn phi_weighted_favors_high_phi() {
         let mut composer = CollaborativeComposer::new(BlendStrategy::PhiWeighted);
         // High-phi participant with high harmonies
-        composer.contribute(make_contribution(1, 0.9, [0.8; 8]));
+        composer.contribute(make_contribution(1, 0.9, [0.8; 8])).expect("valid test contribution");
         // Low-phi participant with low harmonies
-        composer.contribute(make_contribution(2, 0.1, [0.2; 8]));
+        composer.contribute(make_contribution(2, 0.1, [0.2; 8])).expect("valid test contribution");
         let state = composer.blend();
 
         // Should be closer to high-phi participant
@@ -252,18 +303,109 @@ mod tests {
     }
 
     #[test]
+    fn rejects_non_finite_phi() {
+        let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
+        assert_eq!(
+            composer.contribute(make_contribution(1, f32::NAN, [0.5; 8])),
+            Err(ContributionError::NonFinitePhi)
+        );
+        assert_eq!(composer.participant_count(), 0);
+    }
+
+    #[test]
+    fn rejects_out_of_range_phi_and_harmony_values() {
+        let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
+        assert_eq!(
+            composer.contribute(make_contribution(1, 1.01, [0.5; 8])),
+            Err(ContributionError::PhiOutOfRange)
+        );
+        assert_eq!(
+            composer.contribute(make_contribution(2, 0.5, [-0.01; 8])),
+            Err(ContributionError::HarmonyOutOfRange { index: 0 })
+        );
+        assert_eq!(composer.participant_count(), 0);
+    }
+
+    #[test]
+    fn rejects_non_finite_harmony_values() {
+        let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
+        let mut harmonies = [0.5; 8];
+        harmonies[3] = f32::INFINITY;
+        assert_eq!(
+            composer.contribute(make_contribution(1, 0.5, harmonies)),
+            Err(ContributionError::NonFiniteHarmony { index: 3 })
+        );
+        assert_eq!(composer.participant_count(), 0);
+    }
+
+    #[test]
+    fn stale_cycle_cannot_replace_newer_contribution() {
+        let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
+        composer
+            .contribute(make_contribution(1, 0.5, [0.4; 8]))
+            .expect("initial contribution is valid");
+        assert_eq!(
+            composer.contribute(HarmonyContribution {
+                participant_id: 1,
+                harmonies: [0.8; 8],
+                phi: 0.9,
+                cycle: 9,
+            }),
+            Err(ContributionError::StaleCycle {
+                incoming_cycle: 9,
+                current_cycle: 10,
+            })
+        );
+
+        let state = composer.blend();
+        assert!(
+            (state.harmony_activations[0] - 0.315).abs() < 1e-6,
+            "stale contribution must not replace the cycle-10 state: {}",
+            state.harmony_activations[0]
+        );
+    }
+
+    #[test]
+    fn participant_capacity_overflow_is_reported() {
+        let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
+        for id in 0..MAX_PARTICIPANTS as u64 {
+            composer
+                .contribute(make_contribution(id, 0.5, [0.5; 8]))
+                .expect("participant should fit within capacity");
+        }
+
+        assert_eq!(
+            composer.contribute(make_contribution(999, 0.5, [0.5; 8])),
+            Err(ContributionError::CapacityExceeded)
+        );
+        assert_eq!(composer.participant_count(), MAX_PARTICIPANTS);
+    }
+
+    #[test]
+    fn same_or_newer_cycle_can_update_participant() {
+        let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
+        composer
+            .contribute(make_contribution(1, 0.3, [0.3; 8]))
+            .expect("initial contribution is valid");
+        composer
+            .contribute(make_contribution(1, 0.8, [0.8; 8]))
+            .expect("newer-or-equal contribution is valid");
+        assert_eq!(composer.participant_count(), 1);
+    }
+
+    #[test]
     fn maximum_takes_union() {
         let mut composer = CollaborativeComposer::new(BlendStrategy::Maximum);
         composer.contribute(make_contribution(
             1,
             0.5,
             [0.2, 0.8, 0.3, 0.1, 0.5, 0.6, 0.4, 0.7],
-        ));
+        )).expect("valid test contribution");
         composer.contribute(make_contribution(
             2,
             0.5,
             [0.8, 0.2, 0.7, 0.9, 0.1, 0.4, 0.6, 0.3],
-        ));
+        )).expect("valid test contribution");
         let state = composer.blend();
 
         // Each harmony should be at least the EMA-smoothed max of the two
@@ -275,8 +417,8 @@ mod tests {
     fn disagreement_increases_arousal() {
         let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
         // Very different Phi values = high disagreement
-        composer.contribute(make_contribution(1, 0.1, [0.5; 8]));
-        composer.contribute(make_contribution(2, 0.9, [0.5; 8]));
+        composer.contribute(make_contribution(1, 0.1, [0.5; 8])).expect("valid test contribution");
+        composer.contribute(make_contribution(2, 0.9, [0.5; 8])).expect("valid test contribution");
         let state = composer.blend();
 
         assert!(
@@ -289,8 +431,8 @@ mod tests {
     #[test]
     fn remove_participant() {
         let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
-        composer.contribute(make_contribution(1, 0.5, [0.5; 8]));
-        composer.contribute(make_contribution(2, 0.5, [0.5; 8]));
+        composer.contribute(make_contribution(1, 0.5, [0.5; 8])).expect("valid test contribution");
+        composer.contribute(make_contribution(2, 0.5, [0.5; 8])).expect("valid test contribution");
         assert_eq!(composer.participant_count(), 2);
 
         composer.remove_participant(1);
@@ -307,8 +449,8 @@ mod tests {
     #[test]
     fn update_replaces_existing() {
         let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
-        composer.contribute(make_contribution(1, 0.3, [0.3; 8]));
-        composer.contribute(make_contribution(1, 0.8, [0.8; 8])); // update, not add
+        composer.contribute(make_contribution(1, 0.3, [0.3; 8])).expect("valid test contribution");
+        composer.contribute(make_contribution(1, 0.8, [0.8; 8])).expect("valid test contribution"); // update, not add
         assert_eq!(composer.participant_count(), 1);
     }
 }
