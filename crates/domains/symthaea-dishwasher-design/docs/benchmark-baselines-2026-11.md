@@ -81,6 +81,25 @@ Official source: https://www.miele.de/en/m/world-premiere-for-the-g8-diamond-845
 
 **Competitive boundary.** The combination of turbidity sensing, adaptive detergent quantity, one-hour wash/dry, multi-angle spray, steam and moisture-absorbing drying now appears in announced or launched products. InstantClean cannot claim these features as novel in isolation. Its evidence-based opportunity is to quantify delivered component mass at each phase, fuse formulation-specific calibration with independent soil/rinse endpoints, and demonstrate lower total resources per verified successful clean at matched loading and soil. Do not compare LG's announced one-hour programme with an Eco-label cycle unless the same endpoint and measurement boundary are matched.
 
+## Manual dishwashing as the one-item / micro-batch competitor
+
+QuickCell must be compared with manual washing for one cup, glass or plate, not only with another dishwasher's full Eco programme.
+
+Published evidence establishes that the full-load manual method can consume substantially more resources than a machine, but the results vary widely and cannot be scaled directly to one item:
+
+- Which? 2026 compares a basin-based manual method at an estimated 4.5 L per place setting with 0.696 L per place setting for Eco and 0.926 L for the main programme across a mixed sample of 33 dishwashers. A place setting contains 11 individual items (cup, saucer, dinner plate, side plate, fruit bowl, glass and cutlery), so this is not a one-cup measurement.
+  - https://www.which.co.uk/news/article/which-research-reveals-how-little-water-dishwashers-use-compared-to-hand-washing-aUDng9Y2iK8E
+- A 2022 review reports large participant-to-participant variation, including 18.3–472.8 L for the same full set of soiled dishes across one cited study.
+  - https://www.degruyterbrill.com/document/doi/10.1515/tsd-2022-2423/html
+- A 2010 UK participant trial (150 people) reported 49 L and 1.7 kWh for manual full-load washing versus 13 L and 1.3 kWh for its 2007 dishwasher reference under the study conditions. This is not a current product comparison.
+  - https://onlinelibrary.wiley.com/doi/10.1111/j.1470-6431.2009.00840.x
+- A 2026 five-country study of pre-treatment reports 6.8–24.4 L across methods in its central-location trials. Pre-rinse and pre-soak water must be included in the manual baseline.
+  - https://link.springer.com/article/10.1007/s43832-026-00403-5
+
+Therefore, there is no defensible published "litres to wash one cup by hand" value in the reviewed evidence. Measure it directly with running-tap, one-basin, two-basin and habitual methods. Include upstream water-heating energy, soap mass, active human time, rinse water and the same residual-soil/rinse endpoints as QuickCell.
+
+InstantClean protocol: [manual-wash-baseline.md](manual-wash-baseline.md). Research issue: https://github.com/Luminous-Dynamics/symthaea/issues/10223.
+
 ## Exact-model market reference points
 
 | Exact model / reference | Capacity | Labelled eco energy | Water per cycle | Eco duration | Evidence notes |
