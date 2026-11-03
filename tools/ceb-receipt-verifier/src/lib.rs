@@ -1952,10 +1952,14 @@ mod tests {
 
         // A second run cannot reuse primary execution evidence.
         let mut reused = regrade_statement;
+        let reused_compile_bytes = b"primary compiler success";
+        fs::write(regrade_root.join("logs/compile.log"), reused_compile_bytes).unwrap();
         reused["predicate"]["checks"][0]["evidence_sha256"] =
-            serde_json::json!(primary_statement["predicate"]["checks"][0]["evidence_sha256"].clone());
+            serde_json::json!(sha256_hex(reused_compile_bytes));
         reused["predicate"]["artifacts"][1]["sha256"] =
-            primary_statement["predicate"]["artifacts"][1]["sha256"].clone();
+            serde_json::json!(sha256_hex(reused_compile_bytes));
+        reused["predicate"]["artifacts"][1]["size_bytes"] =
+            serde_json::json!(reused_compile_bytes.len());
         let reused_envelope = signed_test_envelope(
             &reused, PAYLOAD_TYPE, "regrade-test-key", &regrade_key
         );
