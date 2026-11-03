@@ -139,6 +139,64 @@ Keep this as a separate AutoformBench evaluation track. Do not merge its solve p
 | F4 | F3 + explicit declaration-DAG planning and incremental compile gates | Does infrastructure-first decomposition reduce rework? |
 | F5 | F4 + adaptive budget controller and bounded private-workspace branches | Does search allocation improve success-cost efficiency? |
 
+### Retrieval baseline correction: DAPS and TheoremGraph
+
+The earlier retrieval design is incomplete unless it explicitly includes **DAPS** and **TheoremGraph**. These are current dependency-aware baselines, and their results should change how PITB tests the retrieval layer.
+
+**DAPS (arXiv submitted 30 October 2026; project page labels NeurIPS 2026)** combines:
+- a typed, heterogeneous Mathlib dependency graph;
+- a structural neighborhood encoder;
+- dynamic subgraph sampling and two-hop bidirectional context;
+- a group-level contrastive objective that learns jointly useful premise sets, rather than only independent query-to-lemma similarity;
+- optional continual adaptation on Blueprint data with rare research-level and informal/formal nodes.
+
+Its reported Recall@32 is 89.25 on Mathlib4-Heldout (+11.41 points over LeanHammer), 23.53 on DAPS-Collection (+20.34 points over LeanHammer), and 50.08 on DAPS-Blueprint after Blueprint adaptation (+9.66 over LeanHammer). Supplying its premises raised Goedel-Prover-V2-8B miniF2F-test Pass@4 from 49.90 to 54.03. These results are on DAPS's own tasks, splits, models and budgets; they are not an AutoformBench score or a direct PITB result. DAPS's own ablations are especially informative: removing structural fusion or reducing the dependency neighborhood from two hops to one causes large Recall@32 reductions on Mathlib4-Heldout. The result supports graph structure and jointly-selected premise bundles, not just a better embedding model.
+
+**TheoremGraph / LeanGraph** supplies another important source:
+- its reported formal graph has 388,105 Lean declaration nodes and 11.3 million typed edges over 25 projects;
+- its informal graph contains 11.7 million theorem-like environments and 18.3 million *candidate* directed dependencies;
+- 47,952 informal/formal matches are LLM-affirmed above a cosine threshold, with an affirmation rate of 48% above 0.8 and 87% above 0.9;
+- name/signature plus graph expansion reports Recall@10 of 0.775, close to LeanSearch v2's 0.780 reranked result.
+
+TheoremGraph's elaborator-derived typed formal edges are a strong graph-resource baseline. Its informal dependencies and cross-formality matches are *candidate evidence*, not kernel-checked mathematical dependencies: retain extractor provenance, confidence, review status and source locator. Do not turn an LLM-affirmed match into a trusted proof edge. Also distinguish TheoremGraph's graph snapshot from DAPS's separately built Mathlib graph; their node and edge counts are not directly comparable.
+
+#### Matched retrieval experiment required for PITB
+
+On every selected AutoformBench development and confirmatory task, use the same target/query, source visibility, formalizer (where needed), LLM, prompt, toolchain, candidate-generation policy and total resource cap. Compare:
+1. lexical/BM25 and name/signature retrieval;
+2. LeanSearch / LeanExplore API baselines where reproducible;
+3. LeanGraphSearch multi-hop retrieval;
+4. DAPS with its published checkpoint and two-hop, bidirectional, group-aware premise selection;
+5. TheoremGraph name/signature graph expansion, keeping informal candidate links in a lower trust tier;
+6. a deduplicated union/reranker over the strongest available sources;
+7. PITB typed support-bundle selection, which must beat the strongest validation-selected arm in *downstream verified completion*, not merely retrieval recall.
+
+Use both K=16 and K=32 premise budgets. Report Recall@K, precision@K, macro-F1, complete reference-route coverage, type/instance compatibility, novel-useful-premise rate, duplicate/frequency skew, retrieval latency, prompt tokens, and downstream kernel-verified solve rate/cost. DAPS uses a formalized Lean query for informal prompts; record the formalizer and measure query-statement failure separately. Do not compare a DAPS Recall@32 result with PITB Pass@1.
+
+**Leakage and generalization controls:** DAPS-Blueprint's 236-query test is a node-level split among 53 projects; the paper explicitly does not claim unseen-project generalization. Before using it for training or tuning, audit project/source overlap with PITB's training families and AutoformBench source groups. PITB's confirmatory graph-transfer claim must use source/project-disjoint holdouts and, separately, a later temporal holdout. The DAPS collection and Blueprint training resources are comparator/training data candidates only after licensing, snapshot, and contamination review.
+
+**Implementation boundary:** DAPS's public implementation is Apache-2.0 and its reproduction stack uses Python, PyTorch, Transformers, Sentence-Transformers and PyTorch Geometric. PITB should first use pinned DAPS outputs/checkpoints through a thin importer/adapter and compare them with Rust-native graph extraction, indexing and orchestration. Do not import its Python training stack into production merely to claim parity; any reproduced paper run must preserve its stated environment separately.
+
+#### The graph model PITB should build
+
+Use a typed, multi-relational **proof-support hypergraph**, not an untyped similarity graph:
+
+| Relation class | Meaning | Trust / use |
+|---|---|---|
+| `type_reference` | Constants referenced by a declaration's elaborated type | High-confidence formal edge, exact Lean/toolchain identity |
+| `proof_term_reference` | Constants used by the checked proof term | High-confidence proof-support edge; does not by itself equal necessary support |
+| `instance_synthesis` | Local/global instance evidence used to elaborate the target or proof | High-confidence, environment- and scope-bound |
+| `blueprint_dependency` | Human-authored dependency edge from a formalization blueprint | Curated but independently reviewable |
+| `informal_candidate_dependency` | Extractor-proposed relation between informal results | Candidate only; retain extractor and source span |
+| `cross_formality_match` | Proposed informal-to-Lean statement match | Candidate only until independently reviewed |
+| `module_environment_dependency` | Imports, options, notation, macros, elaborators and environment state needed to rebuild | Build evidence; do not treat as theorem premise |
+
+A proof strategy usually needs a *set* of premises with joint compatibility. Model that as an AND/OR hypergraph: one obligation may have multiple alternative sufficient bundles (OR), while each bundle may require several premises jointly (AND). Record the provenance of every node/edge, exact declaration and environment identities, evidence status, and whether it was observed, proposed, checked, or independently reviewed.
+
+Do not infer that every declaration in a proof term is logically necessary. Preserve the distinction between typing closure, value provenance, actual elaborated support, and experimentally sufficient support. Support-antichain recovery and controlled ablation can estimate sufficient bundles under a declared context and budget; they cannot certify universal minimality without a stronger proof.
+
+**F4 should not be scored on graph construction alone.** It must reduce end-to-end verified-task cost while preserving the exact target, and it must report graph-edge precision/recall on independently audited dependencies, support-bundle recovery, cycle/closure defects, incremental re-elaboration cost, helper reuse, and collateral regressions.
+
 Required controls:
 
 - Same model/version, prompt family, source visibility, tool set, environment, per-task budget, wall-time cap, and total resource accounting across matched arms.
@@ -159,8 +217,8 @@ These are proposed gates, not results:
 3. Competitive gate: reach at least 299/341 (87.7%), which clears a +5 percentage-point absolute improvement over 281/341, with the paired 95% interval lower bound above zero.
 4. Efficiency gate: reduce recorded cost per verified task by at least 20% versus matched F0 while remaining non-inferior in solve rate (non-inferiority margin no worse than 1 percentage point).
 5. Stretch gate: reach at least 316/341 (92.7%), clearing +10 percentage points over the published baseline, without relaxing integrity, source, budget, or checker conditions.
-5. Reliability gate: 100% of counted successes survive exact-target comparator checks and independent clean-room replay; zero accepted target mutations or unapproved axiom additions.
-6. Generalization gate: replicate the direction of gain on held-out source groups or a later independent advanced-mathematics formalization cohort.
+6. Reliability gate: 100% of counted successes survive exact-target comparator checks and independent clean-room replay; zero accepted target mutations or unapproved axiom additions.
+7. Generalization gate: replicate the direction of gain on held-out source groups or a later independent advanced-mathematics formalization cohort.
 
 With a fixed 341-task denominator, 298/341 is still fractionally below +5.0 percentage points; the first integer threshold clearing +5 points is 299/341. Likewise, 315/341 is fractionally below +10 points; the first integer threshold is 316/341. These exact thresholds should be pre-registered. Do not describe 291/341 as a five-point improvement: it is approximately 85.3%, or +2.9 percentage points.
 
@@ -191,6 +249,9 @@ The AutoformBench repository states that the release is CC BY-NC 4.0 and intende
 
 - AutoformBench release and leaderboard: https://github.com/facebookresearch/autoformbench
 - AutoformBench paper description (13 October 2026): https://ai.meta.com/research/publications/autoformbench-a-lean-formalization-benchmark-for-advanced-mathematics/
+- DAPS: https://arxiv.org/abs/2610.41536; project/code: https://daps-eth.github.io/ and https://github.com/DAPS-ETH/DAPS (Apache-2.0).
+- TheoremGraph / LeanGraph: https://arxiv.org/abs/2606.25363; search service: https://theoremsearch.com/.
+- LeanGraphSearch: https://arxiv.org/abs/2610.22339 and https://pluslabnlp.github.io/LeanGraphSearch/
 - LeanGraphSearch: https://arxiv.org/abs/2610.22339 and https://pluslabnlp.github.io/LeanGraphSearch/
 - T² semantic theorem testing: https://aclanthology.org/2026.acl-industry.150/
 - BlueprintRepair / BlueprintTrace: https://aclanthology.org/2026.mathnlp-main.3/
