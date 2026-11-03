@@ -84,6 +84,7 @@ pub mod fep_agent;
 pub mod perturbations;
 pub mod paired_rollout;
 pub mod paired_statistics;
+pub mod model_stability;
 pub mod plugin;
 pub mod reward;
 pub mod risk_calibration;
@@ -133,6 +134,13 @@ pub use paired_rollout::{
     VehiclePairedRolloutError, VehiclePairedRolloutFrame, VehiclePairedRolloutResult,
     VehicleTrajectoryMetrics, run_paired_lane_keep_rollout,
     run_paired_lane_keep_rollout_with_baseline,
+};
+pub use model_stability::{
+    MIN_MODEL_STABILITY_PROFILES, MAX_MODEL_STABILITY_PROFILES,
+    VEHICLE_MODEL_STABILITY_SCHEMA, ModelActionEvaluation, ModelActionFeasibility,
+    ModelStabilityDirection, ModelStabilityError, ModelStabilityOutcome,
+    PerModelStabilityFinding, VehicleModelStabilityFinding, VehicleModelStabilityInput,
+    VehicleModelStabilityReport, evaluate_vehicle_model_stability,
 };
 pub use paired_statistics::{
     MAX_PAIRED_BOOTSTRAP_REPLICATES, MIN_PAIRED_BOOTSTRAP_REPLICATES,
