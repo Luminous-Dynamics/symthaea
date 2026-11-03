@@ -273,3 +273,29 @@ Add these metrics to CEB-REPO-001:
 Prospective targets remain syntax P/R ≥0.95, supported semantic relation P/R ≥0.90, impact recall ≥0.95 with precision ≥0.80, zero stale facts after completed invalidation, and zero authority inflation. These are internal targets, not current results or industry standards.
 
 The current fixture remains design-only. Issue #10064 must qualify the compiler/LSP execution environment before any build script, compiler or language server is launched on untrusted fixture content.
+
+
+### Cargo feature/target configuration-world benchmark
+
+The synthetic repository-twin fixture now includes `worlds.v0.json`: a complete
+2×2×2 matrix over Linux/Windows targets and the `audit`/`windows-native`
+Cargo features (default, each individually enabled, and both enabled on each
+target). It explicitly separates *feature enabled* from *target-gated code active*:
+on Linux, enabling `windows-native` activates the Cargo feature node but must not
+activate the Windows module or target-specific `windows-sys` dependency.
+
+Seven conditional facts are enumerated: two feature nodes, one Windows target
+node, two audit-gated symbols, one Windows-gated symbol and one target/feature
+gated dependency. Each world supplies exact active and inactive sets. The
+contract validator recomputes those sets from the declared conditions and
+rejects missing/extra facts, false activation, missed activation and duplicate
+world IDs. Three new negative controls bring the contract workflow to 34
+authored controls across four Draft 2020-12 schemas. Static matrix consistency
+checks passed in this repository review, but the CI controls have not yet passed
+an exact-head workflow. All eight worlds remain design-only expectations, not
+compiler-confirmed results.
+
+Next qualification: obtain Cargo metadata and rust-analyzer/SCIP output inside
+the isolated pinned runner for each feature/target world, then compare observed
+active nodes and edges against the sealed gold sets. Do not compile the fixture
+on a host development runner.
