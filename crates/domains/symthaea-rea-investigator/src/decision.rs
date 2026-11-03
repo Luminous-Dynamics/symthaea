@@ -601,7 +601,6 @@ fn mixture_policy(
 fn policy_regrets(
     policy: &[usize],
     evaluations: &[ScenarioEvaluation],
-    proposal: &RobustExperimentProposal,
     decision_ids: &[String],
     utilities: &BTreeMap<String, BTreeMap<String, f64>>,
     hypothesis_ids: &[&str],
@@ -672,7 +671,6 @@ fn minimax_regret_policy(
         let (regrets, _, _) = policy_regrets(
             &candidate,
             evaluations,
-            proposal,
             decisions,
             utilities,
             &hypothesis_ids,
@@ -707,6 +705,7 @@ fn minimax_regret_policy(
 fn candidate_metrics(
     proposal: &RobustExperimentProposal,
     evaluations: &[ScenarioEvaluation],
+    lower_tail_probability: f64,
     policy: &[usize],
     decision_ids: &[String],
     utilities: &BTreeMap<String, BTreeMap<String, f64>>,
@@ -718,7 +717,6 @@ fn candidate_metrics(
     let (regrets, policy_values, stability) = policy_regrets(
         policy,
         evaluations,
-        proposal,
         decision_ids,
         utilities,
         &hypothesis_ids,
@@ -741,7 +739,7 @@ fn candidate_metrics(
         .iter()
         .map(|(value, _)| *value)
         .fold(f64::INFINITY, f64::min);
-    let lower_tail_cvar_evsi = lower_tail_cvar(&scenario_evsi, 1.0_f64.min(1.0));
+    let lower_tail_cvar_evsi = lower_tail_cvar(&scenario_evsi, lower_tail_probability);
     let expected_shared_policy_evsi = scenario_policy_evsi
         .iter()
         .map(|(value, weight)| value * weight)
@@ -751,7 +749,7 @@ fn candidate_metrics(
         .map(|(value, _)| *value)
         .fold(f64::INFINITY, f64::min);
     let lower_tail_shared_policy_cvar_evsi =
-        lower_tail_cvar(&scenario_policy_evsi, 1.0_f64.min(1.0));
+        lower_tail_cvar(&scenario_policy_evsi, lower_tail_probability);
     let expected_regret = evaluations
         .iter()
         .zip(regrets.iter())
@@ -949,6 +947,7 @@ pub fn plan_next_experiment_decision_aware(
         let metrics = candidate_metrics(
             proposal,
             &evaluations,
+            config.lower_tail_probability,
             &policy,
             &decision_ids,
             &utilities,
@@ -1101,7 +1100,10 @@ mod tests {
             .map(|(index, prior)| Hypothesis {
                 id: format!("h{index}"),
                 prior_probability: *prior,
-                supporting_evidence_ids: vec![format!("ev_{}", if index % 2 == 0 { "a" } else { "b" }.repeat(64))],
+                supporting_evidence_ids: vec![format!(
+                    "ev_{}",
+                    if index % 2 == 0 { "a".repeat(64) } else { "b".repeat(64) }
+                )],
                 contradicting_evidence_ids: Vec::new(),
             })
             .collect()
