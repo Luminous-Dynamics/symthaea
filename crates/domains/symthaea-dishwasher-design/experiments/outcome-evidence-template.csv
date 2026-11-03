@@ -1,1 +1,1 @@
-run_id,item_id,endpoint,evidence_kind,method_id,protocol_id,measured_value,expanded_uncertainty,unit,evidence_ref,calibration_bundle_sha256,raw_measurement_sha256,assessor_or_lab_id,operator_notes
+run_id,item_id,endpoint,criterion_id,metric_id,evidence_kind,method_id,protocol_id,measured_value,expanded_uncertainty,unit,evidence_ref,calibration_bundle_sha256,raw_measurement_sha256,assessor_or_lab_id,operator_notes
