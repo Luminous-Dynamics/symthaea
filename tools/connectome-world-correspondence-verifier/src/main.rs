@@ -21,9 +21,9 @@ const REPORT_SCHEMA_SHA256: &str =
 const WORLD_SCHEMA_SHA256: &str =
     "b8bbc20a6e581232b7439a1fbbbecf65bbcb6b6b702732c98720a2dce8575f06";
 const PROTOCOL_SHA256: &str =
-    "026fa7f8ea0fa93fd7bb18d22b8c1b0fa65ac5e56d7d8e563bba61c90998a6b0";
+    "e341601d28f54c7260bedeff62af8d91468fd152e8871200b2342192602a6dcf";
 const POLICY_SHA256: &str =
-    "96e4cc525f8bbf0f6bf2979cf88ed96734ee75ebd24b782117dd6d9350a93d0c";
+    "2d9c68e6c835e266225a680601d79e15c1aed79ff53204b67386187b001f45eb";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Cardinality {
