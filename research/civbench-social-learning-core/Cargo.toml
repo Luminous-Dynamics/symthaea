@@ -55,4 +55,8 @@ path = "src/bin/reward_network_abm_reference_sweep.rs"
 name = "intentional-teaching-sweep"
 path = "src/bin/intentional_teaching_sweep.rs"
 
+[[bin]]
+name = "adaptive-transmission-sweep"
+path = "src/bin/adaptive_transmission_sweep.rs"
+
 [dependencies]
