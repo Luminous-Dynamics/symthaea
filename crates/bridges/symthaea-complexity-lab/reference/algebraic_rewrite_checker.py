@@ -53,11 +53,11 @@ def parse_value(kind, value):
             point = (row[0], row[1])
             if previous is not None and point <= previous:
                 raise ValueError("Pareto rows are not canonical and unique")
-            if any(q != point and all(a >= b for a, b in zip(q, point))
-                   and any(a > b for a, b in zip(q, point)) for q in out):
-                raise ValueError("dominated Pareto point")
             out[point] = row[2]
             previous = point
+        if any(q != p and all(a >= b for a, b in zip(q, p))
+               and any(a > b for a, b in zip(q, p)) for p in out for q in out):
+            raise ValueError("dominated Pareto point")
         return out
     if kind in RING:
         if not isinstance(value, list):
