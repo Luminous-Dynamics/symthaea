@@ -115,7 +115,9 @@ Results from deterministic seed 0xE7018:
 - Four semiring-valid rewrite families x 24 trials x 6 algebras = 576 positive instances.
 - Two additional ring-only cancellation instances.
 - A separately implemented checker, executed as a fresh process, accepted 578/578 positive certificates.
-- The same checker rejected 4/4 negative controls: stale target digest, wrong rule identifier, an independent-factor scope violation with recomputed source digest, and a ring-only cancellation relabelled as MaxCount.
+- The checker rejected 9/9 negative controls: stale target digest; wrong rule identifier; an independent-factor scope violation; ring-only cancellation relabelled as MaxCount; non-boolean Boolean serialization; duplicate sparse polynomial monomial; unreduced/negative-denominator rational coefficient; duplicate factor scope; and a Pareto encoding containing a dominated earlier point.
+- The checker now enforces exact node/certificate shapes, canonical sparse coefficient order, nonzero coefficients, positive multiplicities, reduced rational encodings, canonical scopes, and pairwise Pareto nondominance.
+- The polynomial reference generator was corrected to never emit zero sparse coefficients.
 - Every positive semantic fixture was exhaustively evaluated over all assignments in its finite domains.
 
 This is meaningful reference evidence, not a proof of the universal laws. The checker and evaluator are Python prototypes; the Rust implementation has not been written or compiled, and there is no hardware performance result.
