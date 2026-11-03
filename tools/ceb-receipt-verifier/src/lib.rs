@@ -1,0 +1,1191 @@
+//! Offline, fail-closed verifier for a CEB primary/pristine-regrade pair.
+//!
+//! The verifier never executes candidate code and has no network or shell path.
+//! Trust roots are supplied out of band; JSON Schema files are embedded at build time.
+
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+use chrono::{DateTime, FixedOffset};
+use ed25519_dalek::{Signature, VerifyingKey};
+use serde::de::{Deserialize, Deserializer, Error as DeError, MapAccess, SeqAccess, Visitor};
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Number, Value};
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeSet, HashSet};
+use std::fs::{self, File};
+use std::io::Read;
+use std::path::{Path, PathBuf};
+
+const STATEMENT_TYPE: &str = "https://in-toto.io/Statement/v1";
+const PREDICATE_TYPE: &str = "https://luminousdynamics.io/attestations/ceb-run/v0";
+const PAYLOAD_TYPE: &str = "application/vnd.in-toto+json";
+const MAX_JSON_BYTES: usize = 8 * 1024 * 1024;
+const MAX_PATCH_BYTES: usize = 32 * 1024 * 1024;
+const MAX_ARTIFACT_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_ARTIFACTS: usize = 256;
+const MAX_SIGNATURES: usize = 32;
+
+const TASK_SCHEMA: &str = include_str!("../../../benchmarks/ceb/task.schema.json");
+const RECEIPT_SCHEMA: &str = include_str!("../../../benchmarks/ceb/run-receipt.schema.json");
+const ENVELOPE_SCHEMA: &str = include_str!("../../../benchmarks/ceb/dsse-envelope.schema.json");
+
+#[derive(Clone, Debug, Serialize)]
+pub struct VerificationReport {
+    pub report_version: u32,
+    pub verifier_version: &'static str,
+    pub status: String,
+    pub accepted: bool,
+    pub task_id: Option<String>,
+    pub task_contract_sha256: Option<String>,
+    pub source_tree_sha256: Option<String>,
+    pub patch_sha256: Option<String>,
+    pub primary_envelope_sha256: Option<String>,
+    pub regrade_envelope_sha256: Option<String>,
+    pub primary_run_id: Option<String>,
+    pub regrade_run_id: Option<String>,
+    pub primary_signer_domains: Vec<String>,
+    pub regrade_signer_domains: Vec<String>,
+    pub schema_sha256: SchemaDigests,
+    pub reasons: Vec<String>,
+    pub claim_ceiling: &'static str,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct SchemaDigests {
+    pub task: String,
+    pub receipt: String,
+    pub envelope: String,
+}
+
+pub struct PairInputs {
+    pub task_contract: Vec<u8>,
+    pub task_id: String,
+    pub source_tree_sha256: String,
+    pub patch: Vec<u8>,
+    pub primary_envelope: Vec<u8>,
+    pub primary_artifacts_dir: PathBuf,
+    pub regrade_envelope: Vec<u8>,
+    pub regrade_artifacts_dir: PathBuf,
+    pub trust_policy: Vec<u8>,
+    /// Out-of-band pin; lowercase SHA-256 hex without a prefix.
+    pub expected_trust_policy_sha256: String,
+}
+
+#[derive(Debug)]
+struct Failure {
+    status: &'static str,
+    reason: String,
+}
+
+impl Failure {
+    fn protocol(reason: impl Into<String>) -> Self {
+        Self { status: "protocol_violation", reason: reason.into() }
+    }
+    fn rejected(reason: impl Into<String>) -> Self {
+        Self { status: "rejected", reason: reason.into() }
+    }
+    fn unresolved(reason: impl Into<String>) -> Self {
+        Self { status: "unresolved", reason: reason.into() }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TrustPolicy {
+    schema_version: u32,
+    policy_id: String,
+    minimum_signers: usize,
+    keys: Vec<TrustedKey>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TrustedKey {
+    key_id: String,
+    algorithm: String,
+    public_key_base64: String,
+    role: String,
+    trust_domain: String,
+    status: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StrictEnvelope {
+    #[serde(rename = "payloadType")]
+    payload_type: String,
+    payload: String,
+    signatures: Vec<StrictSignature>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StrictSignature {
+    keyid: String,
+    sig: String,
+}
+
+/// Serde's ordinary Value map accepts duplicate object members by retaining the last
+/// value. Attestations must not have parser-dependent meaning, so reject duplicates at
+/// every nesting level before schema or semantic validation.
+struct UniqueValue(Value);
+
+impl<'de> Deserialize<'de> for UniqueValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_any(UniqueVisitor)
+    }
+}
+
+struct UniqueVisitor;
+
+impl<'de> Visitor<'de> for UniqueVisitor {
+    type Value = UniqueValue;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("strict JSON without duplicate object keys")
+    }
+
+    fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
+        Ok(UniqueValue(Value::Bool(value)))
+    }
+
+    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> {
+        Ok(UniqueValue(Value::Number(Number::from(value))))
+    }
+
+    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E> {
+        Ok(UniqueValue(Value::Number(Number::from(value))))
+    }
+
+    fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
+    where
+        E: DeError,
+    {
+        Number::from_f64(value)
+            .map(|number| UniqueValue(Value::Number(number)))
+            .ok_or_else(|| E::custom("non-finite JSON number"))
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E> {
+        Ok(UniqueValue(Value::String(value.to_owned())))
+    }
+
+    fn visit_string<E>(self, value: String) -> Result<Self::Value, E> {
+        Ok(UniqueValue(Value::String(value)))
+    }
+
+    fn visit_none<E>(self) -> Result<Self::Value, E> {
+        Ok(UniqueValue(Value::Null))
+    }
+
+    fn visit_unit<E>(self) -> Result<Self::Value, E> {
+        Ok(UniqueValue(Value::Null))
+    }
+
+    fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        UniqueValue::deserialize(deserializer)
+    }
+
+    fn visit_seq<A>(self, mut sequence: A) -> Result<Self::Value, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        let mut values = Vec::new();
+        while let Some(UniqueValue(value)) = sequence.next_element::<UniqueValue>()? {
+            values.push(value);
+        }
+        Ok(UniqueValue(Value::Array(values)))
+    }
+
+    fn visit_map<A>(self, mut object: A) -> Result<Self::Value, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        let mut values = Map::new();
+        while let Some(key) = object.next_key::<String>()? {
+            if values.contains_key(&key) {
+                return Err(A::Error::custom(format!("duplicate JSON object key: {key}")));
+            }
+            let UniqueValue(value) = object.next_value::<UniqueValue>()?;
+            values.insert(key, value);
+        }
+        Ok(UniqueValue(Value::Object(values)))
+    }
+}
+
+fn parse_strict_json(bytes: &[u8], label: &str) -> Result<Value, Failure> {
+    let mut deserializer = serde_json::Deserializer::from_slice(bytes);
+    let UniqueValue(value) = UniqueValue::deserialize(&mut deserializer)
+        .map_err(|error| Failure::protocol(format!("{label}: invalid strict JSON: {error}")))?;
+    deserializer.end()
+        .map_err(|error| Failure::protocol(format!("{label}: trailing JSON data: {error}")))?;
+    Ok(value)
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut output = String::with_capacity(64);
+    for byte in digest {
+        use std::fmt::Write as _;
+        let _ = write!(&mut output, "{byte:02x}");
+    }
+    output
+}
+
+fn is_sha256(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+fn schema_digests() -> SchemaDigests {
+    SchemaDigests {
+        task: sha256_hex(TASK_SCHEMA.as_bytes()),
+        receipt: sha256_hex(RECEIPT_SCHEMA.as_bytes()),
+        envelope: sha256_hex(ENVELOPE_SCHEMA.as_bytes()),
+    }
+}
+
+fn validate_against_schema(
+    schema_source: &str,
+    instance: &Value,
+    label: &str,
+) -> Result<(), Failure> {
+    let schema: Value = serde_json::from_str(schema_source)
+        .map_err(|error| Failure::protocol(format!("embedded {label} schema is invalid JSON: {error}")))?;
+    let validator = jsonschema::draft202012::options()
+        .should_validate_formats(true)
+        .build(&schema)
+        .map_err(|error| Failure::protocol(format!("cannot compile embedded {label} schema: {error}")))?;
+    let errors: Vec<String> = validator
+        .iter_errors(instance)
+        .take(12)
+        .map(|error| format!("{} at {}", error, error.instance_path))
+        .collect();
+    if !errors.is_empty() {
+        return Err(Failure::protocol(format!(
+            "{label} schema validation failed: {}",
+            errors.join("; ")
+        )));
+    }
+    Ok(())
+}
+
+fn field<'a>(value: &'a Value, key: &str, context: &str) -> Result<&'a Value, Failure> {
+    value.get(key).ok_or_else(|| Failure::protocol(format!("{context}.{key} is missing")))
+}
+
+fn string_field(value: &Value, key: &str, context: &str) -> Result<String, Failure> {
+    field(value, key, context)?
+        .as_str()
+        .map(str::to_owned)
+        .ok_or_else(|| Failure::protocol(format!("{context}.{key} must be a string")))
+}
+
+fn optional_string_field(value: &Value, key: &str, context: &str) -> Result<Option<String>, Failure> {
+    match field(value, key, context)? {
+        Value::Null => Ok(None),
+        Value::String(text) => Ok(Some(text.clone())),
+        _ => Err(Failure::protocol(format!("{context}.{key} must be a string or null"))),
+    }
+}
+
+fn bool_field(value: &Value, key: &str, context: &str) -> Result<bool, Failure> {
+    field(value, key, context)?
+        .as_bool()
+        .ok_or_else(|| Failure::protocol(format!("{context}.{key} must be a boolean")))
+}
+
+fn u64_field(value: &Value, key: &str, context: &str) -> Result<u64, Failure> {
+    field(value, key, context)?
+        .as_u64()
+        .ok_or_else(|| Failure::protocol(format!("{context}.{key} must be a non-negative integer")))
+}
+
+fn canonical_base64(encoded: &str, label: &str) -> Result<Vec<u8>, Failure> {
+    let decoded = STANDARD
+        .decode(encoded)
+        .map_err(|error| Failure::protocol(format!("{label} is not valid standard Base64: {error}")))?;
+    if STANDARD.encode(&decoded) != encoded {
+        return Err(Failure::protocol(format!("{label} is not canonical padded Base64")));
+    }
+    Ok(decoded)
+}
+
+#[derive(Clone, Debug)]
+struct PreparedKey {
+    key_id: String,
+    role: String,
+    trust_domain: String,
+    verifying_key: VerifyingKey,
+}
+
+fn prepare_trust_policy(policy_bytes: &[u8], expected_digest: &str) -> Result<(TrustPolicy, Vec<PreparedKey>), Failure> {
+    if !is_sha256(expected_digest) {
+        return Err(Failure::protocol("expected trust-policy SHA-256 pin must be 64 lowercase hexadecimal characters"));
+    }
+    let actual_digest = sha256_hex(policy_bytes);
+    if actual_digest != expected_digest {
+        return Err(Failure::protocol(format!(
+            "trust-policy digest mismatch: expected {expected_digest}, got {actual_digest}"
+        )));
+    }
+    let policy_value = parse_strict_json(policy_bytes, "trust policy")?;
+    let policy: TrustPolicy = serde_json::from_value(policy_value)
+        .map_err(|error| Failure::protocol(format!("trust policy has unknown, duplicate, or invalid fields: {error}")))?;
+    if policy.schema_version != 0 || policy.policy_id.trim().is_empty() || policy.minimum_signers == 0 {
+        return Err(Failure::protocol("trust-policy identity, schema_version, or minimum_signers is invalid"));
+    }
+    if policy.keys.is_empty() || policy.keys.len() > 128 {
+        return Err(Failure::protocol("trust policy must contain between 1 and 128 keys"));
+    }
+
+    let mut seen_ids = HashSet::new();
+    let mut seen_public_keys = HashSet::new();
+    let mut prepared = Vec::new();
+    for entry in &policy.keys {
+        if entry.key_id.trim().is_empty() || !seen_ids.insert(entry.key_id.as_str()) {
+            return Err(Failure::protocol(format!("empty or duplicate trust key_id: {}", entry.key_id)));
+        }
+        if entry.algorithm != "ed25519" {
+            return Err(Failure::protocol(format!("unsupported trust-key algorithm for {}", entry.key_id)));
+        }
+        if !matches!(entry.role.as_str(), "primary_runner" | "regrade_runner") {
+            return Err(Failure::protocol(format!("unsupported trust-key role for {}", entry.key_id)));
+        }
+        if entry.trust_domain.trim().is_empty() {
+            return Err(Failure::protocol(format!("empty trust domain for {}", entry.key_id)));
+        }
+        if !matches!(entry.status.as_str(), "active" | "revoked") {
+            return Err(Failure::protocol(format!("unsupported trust-key status for {}", entry.key_id)));
+        }
+        let bytes = canonical_base64(&entry.public_key_base64, "trust public key")?;
+        let public_key: [u8; 32] = bytes
+            .as_slice()
+            .try_into()
+            .map_err(|_| Failure::protocol(format!("Ed25519 key {} must be exactly 32 bytes", entry.key_id)))?;
+        if !seen_public_keys.insert(public_key) {
+            return Err(Failure::protocol("the same Ed25519 public key is registered more than once"));
+        }
+        if entry.status == "active" {
+            let verifying_key = VerifyingKey::from_bytes(&public_key)
+                .map_err(|error| Failure::protocol(format!("invalid Ed25519 key {}: {error}", entry.key_id)))?;
+            prepared.push(PreparedKey {
+                key_id: entry.key_id.clone(),
+                role: entry.role.clone(),
+                trust_domain: entry.trust_domain.clone(),
+                verifying_key,
+            });
+        }
+    }
+    for role in ["primary_runner", "regrade_runner"] {
+        let distinct_domains: BTreeSet<&str> = prepared
+            .iter()
+            .filter(|key| key.role == role)
+            .map(|key| key.trust_domain.as_str())
+            .collect();
+        if distinct_domains.len() < policy.minimum_signers {
+            return Err(Failure::protocol(format!(
+                "trust policy has fewer than minimum_signers distinct active trust domains for {role}"
+            )));
+        }
+    }
+    Ok((policy, prepared))
+}
+
+fn dsse_pae(payload_type: &str, payload: &[u8]) -> Vec<u8> {
+    let mut result = Vec::with_capacity(32 + payload_type.len() + payload.len());
+    result.extend_from_slice(b"DSSEv1 ");
+    result.extend_from_slice(payload_type.len().to_string().as_bytes());
+    result.push(b' ');
+    result.extend_from_slice(payload_type.as_bytes());
+    result.push(b' ');
+    result.extend_from_slice(payload.len().to_string().as_bytes());
+    result.push(b' ');
+    result.extend_from_slice(payload);
+    result
+}
+
+#[derive(Clone, Debug)]
+struct VerifiedReceipt {
+    statement: Value,
+    predicate: Value,
+    envelope_sha256: String,
+    run_id: String,
+    receipt_id: String,
+    started_at: DateTime<FixedOffset>,
+    finished_at: DateTime<FixedOffset>,
+    signer_ids: BTreeSet<String>,
+    signer_domains: BTreeSet<String>,
+    check_evidence: BTreeSet<String>,
+}
+
+fn verify_signatures(
+    signatures: &[StrictSignature],
+    payload_type: &str,
+    payload: &[u8],
+    policy: &TrustPolicy,
+    keys: &[PreparedKey],
+    required_role: &str,
+) -> Result<(BTreeSet<String>, BTreeSet<String>), Failure> {
+    if signatures.is_empty() || signatures.len() > MAX_SIGNATURES {
+        return Err(Failure::protocol(format!("DSSE signature count must be in 1..={MAX_SIGNATURES}")));
+    }
+    let pae = dsse_pae(payload_type, payload);
+    let mut accepted_ids = BTreeSet::new();
+    let mut accepted_domains = BTreeSet::new();
+    for entry in signatures {
+        if !accepted_ids.insert(entry.keyid.clone()) {
+            return Err(Failure::protocol("duplicate DSSE keyid in one envelope"));
+        }
+        let trusted = keys.iter().find(|key| key.key_id == entry.keyid)
+            .ok_or_else(|| Failure::protocol(format!("DSSE keyid is absent from pinned trust policy: {}", entry.keyid)))?;
+        if trusted.role != required_role {
+            return Err(Failure::protocol(format!("DSSE signer {} has role {}, expected {required_role}", entry.keyid, trusted.role)));
+        }
+        let policy_entry = policy.keys.iter().find(|key| key.key_id == entry.keyid)
+            .ok_or_else(|| Failure::protocol("internal trust-policy key lookup failed"))?;
+        if policy_entry.status != "active" {
+            return Err(Failure::protocol(format!("revoked or inactive DSSE signer: {}", entry.keyid)));
+        }
+        let signature_bytes = canonical_base64(&entry.sig, "DSSE signature")?;
+        let signature = Signature::from_slice(&signature_bytes)
+            .map_err(|error| Failure::protocol(format!("malformed Ed25519 signature: {error}")))?;
+        trusted.verifying_key.verify_strict(&pae, &signature)
+            .map_err(|_| Failure::protocol(format!("DSSE signature verification failed for key {}", entry.keyid)))?;
+        if !accepted_domains.insert(trusted.trust_domain.clone()) {
+            return Err(Failure::protocol("multiple signatures from one trust domain cannot increase the signer threshold"));
+        }
+    }
+    if accepted_ids.len() < policy.minimum_signers {
+        return Err(Failure::protocol(format!(
+            "DSSE signature threshold not met: {} valid signers, {} required",
+            accepted_ids.len(),
+            policy.minimum_signers
+        )));
+    }
+    Ok((accepted_ids, accepted_domains))
+}
+
+fn parse_timestamp(value: &Value, key: &str) -> Result<DateTime<FixedOffset>, Failure> {
+    let text = value.as_str().ok_or_else(|| Failure::protocol(format!("execution.{key} must be an RFC 3339 date-time")))?;
+    DateTime::parse_from_rfc3339(text)
+        .map_err(|error| Failure::protocol(format!("execution.{key} is not a valid RFC 3339 date-time: {error}")))
+}
+
+fn safe_relative_path(value: &str) -> bool {
+    if value.is_empty()
+        || value.starts_with('/')
+        || value.contains('\\')
+        || value.contains(':')
+        || value.contains('\0')
+        || value.starts_with('~')
+    {
+        return false;
+    }
+    value.split('/').all(|part| !part.is_empty() && part != "." && part != "..")
+}
+
+fn hash_artifact(root: &Path, relative: &str, expected_size: u64, expected_digest: &str) -> Result<(), Failure> {
+    if !safe_relative_path(relative) {
+        return Err(Failure::protocol(format!("unsafe artifact path: {relative}")));
+    }
+    let canonical_root = root.canonicalize()
+        .map_err(|error| Failure::protocol(format!("cannot resolve artifact root {}: {error}", root.display())))?;
+    if !canonical_root.is_dir() {
+        return Err(Failure::protocol("artifact root is not a directory"));
+    }
+
+    // Reject every symlink component, then verify the canonical target remains under
+    // the selected root. The artifact store must be immutable/read-only during checking.
+    let mut candidate = canonical_root.clone();
+    for component in relative.split('/') {
+        candidate.push(component);
+        let metadata = fs::symlink_metadata(&candidate)
+            .map_err(|error| Failure::protocol(format!("artifact {relative} is missing or unreadable: {error}")))?;
+        if metadata.file_type().is_symlink() {
+            return Err(Failure::protocol(format!("artifact path traverses a symlink: {relative}")));
+        }
+    }
+    let canonical_file = candidate.canonicalize()
+        .map_err(|error| Failure::protocol(format!("cannot canonicalize artifact {relative}: {error}")))?;
+    if !canonical_file.starts_with(&canonical_root) {
+        return Err(Failure::protocol(format!("artifact escapes its root: {relative}")));
+    }
+    let metadata = fs::metadata(&canonical_file)
+        .map_err(|error| Failure::protocol(format!("cannot stat artifact {relative}: {error}")))?;
+    if !metadata.is_file() || metadata.len() > MAX_ARTIFACT_BYTES {
+        return Err(Failure::protocol(format!("artifact {relative} is not a regular file within the size limit")));
+    }
+    if metadata.len() != expected_size {
+        return Err(Failure::protocol(format!("artifact {relative} size mismatch")));
+    }
+    let mut file = File::open(&canonical_file)
+        .map_err(|error| Failure::protocol(format!("cannot open artifact {relative}: {error}")))?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    let mut total = 0u64;
+    loop {
+        let read = file.read(&mut buffer)
+            .map_err(|error| Failure::protocol(format!("cannot read artifact {relative}: {error}")))?;
+        if read == 0 { break; }
+        total = total.checked_add(read as u64)
+            .ok_or_else(|| Failure::protocol("artifact length arithmetic overflow"))?;
+        if total > MAX_ARTIFACT_BYTES {
+            return Err(Failure::protocol(format!("artifact {relative} exceeds the size limit while reading")));
+        }
+        hasher.update(&buffer[..read]);
+    }
+    let actual = format!("{:x}", hasher.finalize());
+    if total != expected_size || actual != expected_digest {
+        return Err(Failure::protocol(format!("artifact {relative} digest or final size mismatch")));
+    }
+    Ok(())
+}
+
+fn validate_artifacts(predicate: &Value, root: &Path) -> Result<(), Failure> {
+    let artifacts = field(predicate, "artifacts", "predicate")?
+        .as_array()
+        .ok_or_else(|| Failure::protocol("predicate.artifacts must be an array"))?;
+    if artifacts.is_empty() || artifacts.len() > MAX_ARTIFACTS {
+        return Err(Failure::unresolved(format!("receipt must reference 1..={MAX_ARTIFACTS} retained artifacts")));
+    }
+    let mut ids = HashSet::new();
+    let mut paths = HashSet::new();
+    for artifact in artifacts {
+        let id = string_field(artifact, "artifact_id", "artifact")?;
+        let path = string_field(artifact, "path", "artifact")?;
+        let digest = string_field(artifact, "sha256", "artifact")?;
+        let size = u64_field(artifact, "size_bytes", "artifact")?;
+        if id.trim().is_empty() || id.contains("..") || id.contains('/') || id.contains('\\') || id.contains('\0') {
+            return Err(Failure::protocol(format!("unsafe artifact_id: {id}")));
+        }
+        if !ids.insert(id.clone()) || !paths.insert(path.clone()) {
+            return Err(Failure::protocol("duplicate artifact_id or artifact path"));
+        }
+        if !is_sha256(&digest) {
+            return Err(Failure::protocol(format!("artifact {id} has malformed SHA-256")));
+        }
+        hash_artifact(root, &path, size, &digest)?;
+    }
+    Ok(())
+}
+
+fn validate_changed_paths(candidate: &Value) -> Result<(), Failure> {
+    let paths = field(candidate, "changed_paths", "candidate")?
+        .as_array()
+        .ok_or_else(|| Failure::protocol("candidate.changed_paths must be an array"))?;
+    let mut seen = HashSet::new();
+    for path in paths {
+        let path = path.as_str().ok_or_else(|| Failure::protocol("changed_paths entries must be strings"))?;
+        if !safe_relative_path(path) {
+            return Err(Failure::protocol(format!("unsafe changed path: {path}")));
+        }
+        if !seen.insert(path) {
+            return Err(Failure::protocol(format!("duplicate changed path: {path}")));
+        }
+    }
+    Ok(())
+}
+
+fn validate_check_aggregates(predicate: &Value) -> Result<BTreeSet<String>, Failure> {
+    let checks = field(predicate, "checks", "predicate")?
+        .as_array()
+        .ok_or_else(|| Failure::protocol("predicate.checks must be an array"))?;
+    let mut ids = HashSet::new();
+    let mut evidence = BTreeSet::new();
+    let mut count = 0u64;
+    let mut passed = 0u64;
+    let mut failed = 0u64;
+    let mut errored = 0u64;
+    let mut skipped = 0u64;
+    for check in checks {
+        let id = string_field(check, "check_id", "check")?;
+        if !ids.insert(id.clone()) {
+            return Err(Failure::protocol(format!("duplicate check_id: {id}")));
+        }
+        let required = bool_field(check, "required", "check")?;
+        let status = string_field(check, "status", "check")?;
+        let digest = optional_string_field(check, "evidence_sha256", "check")?;
+        if let Some(digest) = digest {
+            if !is_sha256(&digest) {
+                return Err(Failure::protocol(format!("check {id} has malformed evidence SHA-256")));
+            }
+            evidence.insert(digest);
+        }
+        if !required { continue; }
+        count += 1;
+        match status.as_str() {
+            "pass" => {
+                passed += 1;
+                if field(check, "evidence_sha256", "check")? == &Value::Null {
+                    return Err(Failure::protocol(format!("passing required check {id} has no evidence digest")));
+                }
+            }
+            "fail" => failed += 1,
+            "error" => errored += 1,
+            "skipped" => skipped += 1,
+            _ => return Err(Failure::protocol(format!("unsupported check status for {id}"))),
+        }
+    }
+
+    let result = field(predicate, "result", "predicate")?;
+    let declared = [
+        ("required_check_count", count),
+        ("required_pass_count", passed),
+        ("required_fail_count", failed),
+        ("required_error_count", errored),
+        ("required_skipped_count", skipped),
+    ];
+    for (key, computed) in declared {
+        if u64_field(result, key, "result")? != computed {
+            return Err(Failure::protocol(format!("result.{key} does not match required check rows")));
+        }
+    }
+    let verdict = string_field(result, "verdict", "result")?;
+    let safety = bool_field(result, "safety_violation", "result")?;
+    let protocol = bool_field(result, "protocol_violation", "result")?;
+    match verdict.as_str() {
+        "pass" => {
+            if count == 0 || passed != count || failed != 0 || errored != 0 || skipped != 0 || safety || protocol {
+                return Err(Failure::protocol("claimed pass conflicts with required checks or violation flags"));
+            }
+        }
+        "fail" => {
+            if failed == 0 && errored == 0 && !safety && !protocol {
+                return Err(Failure::protocol("claimed fail has no failed/error check or declared violation"));
+            }
+        }
+        "unresolved" => {}
+        _ => return Err(Failure::protocol("unsupported result verdict")),
+    }
+    Ok(evidence)
+}
+
+fn check_budget(task: &Value, predicate: &Value) -> Result<(), Failure> {
+    let budget = field(task, "budget", "task")?;
+    let resources = field(predicate, "resources", "predicate")?;
+    let checks: [(&str, &str, u64); 4] = [
+        ("wall_clock_seconds", "wall_clock_ms", 1_000),
+        ("max_turns", "turns", 1),
+        ("max_tool_calls", "tool_calls", 1),
+        ("input_token_budget", "input_tokens", 1),
+    ];
+    for (limit_key, usage_key, multiplier) in checks {
+        let limit = field(budget, limit_key, "budget")?;
+        if limit.is_null() { continue; }
+        let maximum = limit.as_u64()
+            .ok_or_else(|| Failure::protocol(format!("budget.{limit_key} must be an integer or null")))?
+            .checked_mul(multiplier)
+            .ok_or_else(|| Failure::protocol(format!("budget.{limit_key} overflow")))?;
+        let usage_value = field(resources, usage_key, "resources")?;
+        let usage = usage_value.as_u64().ok_or_else(|| {
+            Failure::unresolved(format!("resources.{usage_key} is required to enforce the declared task budget"))
+        })?;
+        if usage > maximum {
+            return Err(Failure::rejected(format!("resources.{usage_key} exceeds budget.{limit_key}")));
+        }
+    }
+    let output_limit = field(budget, "output_token_budget", "budget")?;
+    if let Some(maximum) = output_limit.as_u64() {
+        let usage = field(resources, "output_tokens", "resources")?.as_u64()
+            .ok_or_else(|| Failure::unresolved("resources.output_tokens is required to enforce output_token_budget"))?;
+        if usage > maximum {
+            return Err(Failure::rejected("resources.output_tokens exceeds budget.output_token_budget"));
+        }
+    }
+    let cost_limit = field(budget, "cost_budget_usd", "budget")?;
+    if let Some(maximum) = cost_limit.as_f64() {
+        let usage = field(resources, "cost_usd", "resources")?.as_f64()
+            .ok_or_else(|| Failure::unresolved("resources.cost_usd is required to enforce cost_budget_usd"))?;
+        if !usage.is_finite() || usage > maximum {
+            return Err(Failure::rejected("resources.cost_usd exceeds budget.cost_budget_usd"));
+        }
+    }
+    Ok(())
+}
+
+fn verify_one_receipt(
+    envelope_bytes: &[u8],
+    artifact_root: &Path,
+    trust_policy: &TrustPolicy,
+    trusted_keys: &[PreparedKey],
+    expected_role: &str,
+    expected_stage: &str,
+    task_contract_sha256: &str,
+    task: &Value,
+    source_tree_sha256: &str,
+    patch_sha256: &str,
+    requested_task_id: &str,
+) -> Result<VerifiedReceipt, Failure> {
+    if envelope_bytes.len() > MAX_JSON_BYTES {
+        return Err(Failure::protocol("DSSE envelope exceeds the maximum JSON size"));
+    }
+    let envelope_value = parse_strict_json(envelope_bytes, "DSSE envelope")?;
+    validate_against_schema(ENVELOPE_SCHEMA, &envelope_value, "DSSE envelope")?;
+    let envelope: StrictEnvelope = serde_json::from_value(envelope_value)
+        .map_err(|error| Failure::protocol(format!("invalid DSSE envelope fields: {error}")))?;
+    if envelope.payload_type != PAYLOAD_TYPE {
+        return Err(Failure::protocol("unexpected DSSE payloadType"));
+    }
+    let payload = canonical_base64(&envelope.payload, "DSSE payload")?;
+    if payload.len() > MAX_JSON_BYTES {
+        return Err(Failure::protocol("DSSE payload exceeds the maximum JSON size"));
+    }
+    let statement = parse_strict_json(&payload, "in-toto statement")?;
+    validate_against_schema(RECEIPT_SCHEMA, &statement, "CEB run receipt")?;
+    let (signer_ids, signer_domains) = verify_signatures(
+        &envelope.signatures,
+        &envelope.payload_type,
+        &payload,
+        trust_policy,
+        trusted_keys,
+        expected_role,
+    )?;
+
+    if string_field(&statement, "_type", "statement")? != STATEMENT_TYPE
+        || string_field(&statement, "predicateType", "statement")? != PREDICATE_TYPE
+    {
+        return Err(Failure::protocol("in-toto statement type or predicate type mismatch"));
+    }
+    let predicate = field(&statement, "predicate", "statement")?;
+    let task_part = field(predicate, "task", "predicate")?;
+    if string_field(task_part, "task_id", "task")? != requested_task_id {
+        return Err(Failure::protocol("receipt task_id does not match requested task"));
+    }
+    if string_field(task_part, "task_contract_sha256", "task")? != task_contract_sha256 {
+        return Err(Failure::protocol("receipt task contract digest mismatch"));
+    }
+    if string_field(task_part, "source_tree_sha256", "task")? != source_tree_sha256 {
+        return Err(Failure::protocol("receipt source tree digest mismatch"));
+    }
+    let source_snapshot = field(task, "source_snapshot", "task contract")?;
+    if string_field(task_part, "fixture_revision", "task")?
+        != string_field(source_snapshot, "revision", "source_snapshot")?
+    {
+        return Err(Failure::protocol("receipt fixture_revision does not match the task contract"));
+    }
+
+    let candidate = field(predicate, "candidate", "predicate")?;
+    if string_field(candidate, "base_tree_sha256", "candidate")? != source_tree_sha256
+        || string_field(candidate, "patch_sha256", "candidate")? != patch_sha256
+    {
+        return Err(Failure::protocol("candidate base-tree or patch digest mismatch"));
+    }
+    validate_changed_paths(candidate)?;
+
+    let subjects = field(&statement, "subject", "statement")?
+        .as_array()
+        .ok_or_else(|| Failure::protocol("statement.subject must be an array"))?;
+    if subjects.len() != 2 {
+        return Err(Failure::protocol("CEB statement must contain exactly the patch and source-tree subjects"));
+    }
+    let mut subject_names = HashSet::new();
+    for subject in subjects {
+        let name = string_field(subject, "name", "subject")?;
+        let digest = field(subject, "digest", "subject")?;
+        let digest = string_field(digest, "sha256", "subject.digest")?;
+        if !subject_names.insert(name.clone()) {
+            return Err(Failure::protocol("duplicate in-toto subject name"));
+        }
+        match name.as_str() {
+            "ceb/candidate.patch" if digest == patch_sha256 => {}
+            "ceb/source.tree" if digest == source_tree_sha256 => {}
+            "ceb/candidate.patch" | "ceb/source.tree" => {
+                return Err(Failure::protocol(format!("in-toto subject digest mismatch for {name}")));
+            }
+            _ => return Err(Failure::protocol(format!("unexpected in-toto subject: {name}"))),
+        }
+    }
+    if !subject_names.contains("ceb/candidate.patch") || !subject_names.contains("ceb/source.tree") {
+        return Err(Failure::protocol("required in-toto subjects are absent"));
+    }
+
+    let agent = field(predicate, "agent", "predicate")?;
+    if bool_field(agent, "secrets_exposed", "agent")? {
+        return Err(Failure::protocol("agent was exposed to secrets"));
+    }
+    let execution = field(predicate, "execution", "predicate")?;
+    if string_field(execution, "stage", "execution")? != expected_stage {
+        return Err(Failure::protocol(format!("receipt execution stage must be {expected_stage}")));
+    }
+    let run_id = string_field(execution, "run_id", "execution")?;
+    let receipt_id = string_field(predicate, "receipt_id", "predicate")?;
+    if run_id.trim().is_empty() || receipt_id.trim().is_empty() {
+        return Err(Failure::protocol("run_id and receipt_id must be non-empty"));
+    }
+    let started_at = parse_timestamp(field(execution, "started_at_utc", "execution")?, "started_at_utc")?;
+    let finished_at = parse_timestamp(field(execution, "finished_at_utc", "execution")?, "finished_at_utc")?;
+    if finished_at < started_at {
+        return Err(Failure::protocol("execution finished_at_utc precedes started_at_utc"));
+    }
+
+    let runner_profile = string_field(execution, "runner_profile", "execution")?;
+    let network_policy = string_field(execution, "network_policy", "execution")?;
+    let image_digest = optional_string_field(execution, "image_digest", "execution")?;
+    if !matches!(runner_profile.as_str(), "isolated_container" | "isolated_microvm")
+        || !matches!(network_policy.as_str(), "disabled" | "allowlisted")
+        || image_digest.as_deref().is_none_or(|digest| !digest.starts_with("sha256:") || !is_sha256(&digest[7..]))
+    {
+        return Err(Failure::unresolved("runner profile, image digest, or network policy is not qualified"));
+    }
+
+    let grader = field(predicate, "grader", "predicate")?;
+    if !matches!(string_field(grader, "trust_domain", "grader")?.as_str(), "separate_host_control_plane" | "separate_vm")
+        || string_field(grader, "candidate_access", "grader")? != "read_only"
+        || bool_field(grader, "hidden_tests_visible_to_agent", "grader")?
+        || bool_field(grader, "grader_writable_by_agent", "grader")?
+    {
+        return Err(Failure::unresolved("grader is not isolated from candidate writes or hidden-test disclosure"));
+    }
+
+    let check_evidence = validate_check_aggregates(predicate)?;
+    validate_artifacts(predicate, artifact_root)?;
+    check_budget(task, predicate)?;
+
+    let verdict = string_field(field(predicate, "result", "predicate")?, "verdict", "result")?;
+    match verdict.as_str() {
+        "pass" => {}
+        "fail" => return Err(Failure::rejected(format!("{expected_stage} receipt reports a failed task"))),
+        "unresolved" => return Err(Failure::unresolved(format!("{expected_stage} receipt is unresolved"))),
+        _ => return Err(Failure::protocol("unknown receipt verdict")),
+    }
+
+    let regrade_of = optional_string_field(execution, "regrade_of_receipt_sha256", "execution")?;
+    if expected_stage == "primary" && regrade_of.is_some() {
+        return Err(Failure::protocol("primary receipt must not reference a prior regrade"));
+    }
+    let envelope_sha256 = sha256_hex(envelope_bytes);
+    Ok(VerifiedReceipt {
+        statement,
+        predicate: predicate.clone(),
+        envelope_sha256,
+        run_id,
+        receipt_id,
+        started_at,
+        finished_at,
+        signer_ids,
+        signer_domains,
+        check_evidence,
+    })
+}
+
+fn check_pair_consistency(primary: &VerifiedReceipt, regrade: &VerifiedReceipt) -> Result<(), Failure> {
+    if primary.run_id == regrade.run_id || primary.receipt_id == regrade.receipt_id {
+        return Err(Failure::protocol("primary and regrade must have distinct run_id and receipt_id values"));
+    }
+    if primary.envelope_sha256 == regrade.envelope_sha256 {
+        return Err(Failure::protocol("primary and regrade envelope digests are identical"));
+    }
+    if regrade.started_at < primary.finished_at {
+        return Err(Failure::protocol("pristine regrade started before the primary execution finished"));
+    }
+    let primary_predicate = &primary.predicate;
+    let regrade_predicate = &regrade.predicate;
+    for key in ["task", "candidate", "agent", "grader"] {
+        if field(primary_predicate, key, "primary predicate")?
+            != field(regrade_predicate, key, "regrade predicate")?
+        {
+            return Err(Failure::protocol(format!("primary/regrade {key} binding differs")));
+        }
+    }
+    let primary_execution = field(primary_predicate, "execution", "primary predicate")?;
+    let regrade_execution = field(regrade_predicate, "execution", "regrade predicate")?;
+    for key in ["runner_profile", "image_digest", "runner_policy_sha256", "network_policy"] {
+        if field(primary_execution, key, "primary execution")?
+            != field(regrade_execution, key, "regrade execution")?
+        {
+            return Err(Failure::protocol(format!("primary/regrade execution.{key} binding differs")));
+        }
+    }
+    let linked = optional_string_field(regrade_execution, "regrade_of_receipt_sha256", "regrade execution")?;
+    if linked.as_deref() != Some(primary.envelope_sha256.as_str()) {
+        return Err(Failure::protocol("pristine regrade does not link the exact primary DSSE envelope digest"));
+    }
+    if !primary.signer_ids.is_disjoint(&regrade.signer_ids)
+        || !primary.signer_domains.is_disjoint(&regrade.signer_domains)
+    {
+        return Err(Failure::protocol("primary and regrade signer identities/trust domains are not independent"));
+    }
+    if primary.check_evidence.is_empty() || regrade.check_evidence.is_empty()
+        || primary.check_evidence == regrade.check_evidence
+    {
+        return Err(Failure::protocol("primary and regrade do not carry distinct check-evidence digest sets"));
+    }
+    Ok(())
+}
+
+fn base_report(status: &str, reason: String) -> VerificationReport {
+    VerificationReport {
+        report_version: 1,
+        verifier_version: env!("CARGO_PKG_VERSION"),
+        status: status.to_owned(),
+        accepted: status == "accepted",
+        task_id: None,
+        task_contract_sha256: None,
+        source_tree_sha256: None,
+        patch_sha256: None,
+        primary_envelope_sha256: None,
+        regrade_envelope_sha256: None,
+        primary_run_id: None,
+        regrade_run_id: None,
+        primary_signer_domains: Vec::new(),
+        regrade_signer_domains: Vec::new(),
+        schema_sha256: schema_digests(),
+        reasons: vec![reason],
+        claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove the runner's isolation or the claimed model provider's identity.",
+    }
+}
+
+/// Verify one primary receipt and one independently signed pristine regrade.
+///
+/// All byte inputs are treated as untrusted. The function performs no shell calls,
+/// process creation, network access, candidate execution, or filesystem writes.
+pub fn verify_pair(inputs: PairInputs) -> VerificationReport {
+    match verify_pair_inner(&inputs) {
+        Ok(report) => report,
+        Err(failure) => base_report(failure.status, failure.reason),
+    }
+}
+
+fn verify_pair_inner(inputs: &PairInputs) -> Result<VerificationReport, Failure> {
+    if inputs.task_contract.len() > MAX_JSON_BYTES || inputs.trust_policy.len() > MAX_JSON_BYTES {
+        return Err(Failure::protocol("task contract or trust policy exceeds the maximum JSON size"));
+    }
+    if inputs.patch.len() > MAX_PATCH_BYTES {
+        return Err(Failure::protocol("candidate patch exceeds the maximum size"));
+    }
+    if inputs.primary_envelope.len() > MAX_JSON_BYTES || inputs.regrade_envelope.len() > MAX_JSON_BYTES {
+        return Err(Failure::protocol("a DSSE envelope exceeds the maximum JSON size"));
+    }
+    let task_contract_sha256 = sha256_hex(&inputs.task_contract);
+    let patch_sha256 = sha256_hex(&inputs.patch);
+    if !is_sha256(&inputs.source_tree_sha256) {
+        return Err(Failure::protocol("source-tree pin must be 64 lowercase hexadecimal characters"));
+    }
+
+    let (trust_policy, trusted_keys) = prepare_trust_policy(
+        &inputs.trust_policy,
+        &inputs.expected_trust_policy_sha256,
+    )?;
+    let task = parse_strict_json(&inputs.task_contract, "task contract")?;
+    validate_against_schema(TASK_SCHEMA, &task, "CEB task")?;
+    if string_field(&task, "task_id", "task contract")? != inputs.task_id {
+        return Err(Failure::protocol("task contract task_id does not match CLI task_id"));
+    }
+    let source_snapshot = field(&task, "source_snapshot", "task contract")?;
+    let task_source_tree = optional_string_field(source_snapshot, "tree_sha256", "source_snapshot")?;
+    if task_source_tree.as_deref() != Some(inputs.source_tree_sha256.as_str()) {
+        return Err(Failure::protocol("source-tree pin does not match the task contract"));
+    }
+    let execution_status = string_field(&task, "execution_status", "task contract")?;
+    if execution_status != "qualified" {
+        return Err(Failure::unresolved("task contract is not qualified; design-only and fixture-ready tasks cannot be scored"));
+    }
+
+    let primary = verify_one_receipt(
+        &inputs.primary_envelope,
+        &inputs.primary_artifacts_dir,
+        &trust_policy,
+        &trusted_keys,
+        "primary_runner",
+        "primary",
+        &task_contract_sha256,
+        &task,
+        &inputs.source_tree_sha256,
+        &patch_sha256,
+        &inputs.task_id,
+    )?;
+    let regrade = verify_one_receipt(
+        &inputs.regrade_envelope,
+        &inputs.regrade_artifacts_dir,
+        &trust_policy,
+        &trusted_keys,
+        "regrade_runner",
+        "pristine_regrade",
+        &task_contract_sha256,
+        &task,
+        &inputs.source_tree_sha256,
+        &patch_sha256,
+        &inputs.task_id,
+    )?;
+    check_pair_consistency(&primary, &regrade)?;
+
+    Ok(VerificationReport {
+        report_version: 1,
+        verifier_version: env!("CARGO_PKG_VERSION"),
+        status: "accepted".to_owned(),
+        accepted: true,
+        task_id: Some(inputs.task_id.clone()),
+        task_contract_sha256: Some(task_contract_sha256),
+        source_tree_sha256: Some(inputs.source_tree_sha256.clone()),
+        patch_sha256: Some(patch_sha256),
+        primary_envelope_sha256: Some(primary.envelope_sha256),
+        regrade_envelope_sha256: Some(regrade.envelope_sha256),
+        primary_run_id: Some(primary.run_id),
+        regrade_run_id: Some(regrade.run_id),
+        primary_signer_domains: primary.signer_domains.into_iter().collect(),
+        regrade_signer_domains: regrade.signer_domains.into_iter().collect(),
+        schema_sha256: schema_digests(),
+        reasons: Vec::new(),
+        claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove the runner's isolation or the claimed model provider's identity.",
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ed25519_dalek::{Signer, SigningKey};
+
+    fn signing_key(seed: u8) -> SigningKey {
+        SigningKey::from_bytes(&[seed; 32])
+    }
+
+    #[test]
+    fn dsse_pae_counts_utf8_bytes_and_binds_payload_type() {
+        let bytes = dsse_pae("application/vnd.in-toto+json", br#"{"ok":true}"#);
+        assert_eq!(
+            bytes,
+            b"DSSEv1 27 application/vnd.in-toto+json 11 {\"ok\":true}"
+        );
+        assert_ne!(
+            dsse_pae("application/vnd.in-toto+json", b"payload"),
+            dsse_pae("application/json", b"payload")
+        );
+    }
+
+    #[test]
+    fn duplicate_object_members_are_rejected_recursively() {
+        assert!(parse_strict_json(br#"{"a":1,"a":2}"#, "test").is_err());
+        assert!(parse_strict_json(br#"{"a":{"b":1,"b":2}}"#, "test").is_err());
+        assert!(parse_strict_json(br#"{"a":[1,2]}"#, "test").is_ok());
+    }
+
+    #[test]
+    fn base64_must_be_canonical_padded_standard_encoding() {
+        assert_eq!(canonical_base64("YWJj", "test").unwrap(), b"abc");
+        assert!(canonical_base64("YWJj\n", "test").is_err());
+        assert!(canonical_base64("YWJj==", "test").is_err());
+    }
+
+    #[test]
+    fn safe_paths_reject_absolute_traversal_windows_and_empty_segments() {
+        for unsafe_path in ["/etc/passwd", "../secret", "a/../secret", "a//b", "C:/secret", "a\\b", "a\0b", "~/secret"] {
+            assert!(!safe_relative_path(unsafe_path), "accepted unsafe path {unsafe_path:?}");
+        }
+        assert!(safe_relative_path("logs/run-01/test.log"));
+    }
+
+    #[test]
+    fn signature_verification_binds_pae_and_trust_role() {
+        let key = signing_key(7);
+        let verifying = key.verifying_key();
+        let public_key_base64 = STANDARD.encode(verifying.to_bytes());
+        let policy = TrustPolicy {
+            schema_version: 0,
+            policy_id: "unit-test".to_string(),
+            minimum_signers: 1,
+            keys: vec![
+                TrustedKey {
+                    key_id: "primary".to_string(),
+                    algorithm: "ed25519".to_string(),
+                    public_key_base64,
+                    role: "primary_runner".to_string(),
+                    trust_domain: "primary-domain".to_string(),
+                    status: "active".to_string(),
+                },
+                {
+                    let second = signing_key(8);
+                    TrustedKey {
+                        key_id: "regrade".to_string(),
+                        algorithm: "ed25519".to_string(),
+                        public_key_base64: STANDARD.encode(second.verifying_key().to_bytes()),
+                        role: "regrade_runner".to_string(),
+                        trust_domain: "regrade-domain".to_string(),
+                        status: "active".to_string(),
+                    }
+                },
+            ],
+        };
+        let prepared = prepare_trust_policy_keys_for_test(&policy);
+        let payload = br#"{"_type":"test"}"#;
+        let pae = dsse_pae(PAYLOAD_TYPE, payload);
+        let signature = key.sign(&pae);
+        let signatures = vec![StrictSignature {
+            keyid: "primary".to_string(),
+            sig: STANDARD.encode(signature.to_bytes()),
+        }];
+        let result = verify_signatures(&signatures, PAYLOAD_TYPE, payload, &policy, &prepared, "primary_runner");
+        assert!(result.is_ok());
+        assert!(verify_signatures(&signatures, "application/json", payload, &policy, &prepared, "primary_runner").is_err());
+        assert!(verify_signatures(&signatures, PAYLOAD_TYPE, payload, &policy, &prepared, "regrade_runner").is_err());
+    }
+
+    fn prepare_trust_policy_keys_for_test(policy: &TrustPolicy) -> Vec<PreparedKey> {
+        policy.keys.iter().map(|entry| {
+            let decoded = STANDARD.decode(&entry.public_key_base64).unwrap();
+            let bytes: [u8; 32] = decoded.try_into().unwrap();
+            PreparedKey {
+                key_id: entry.key_id.clone(),
+                role: entry.role.clone(),
+                trust_domain: entry.trust_domain.clone(),
+                verifying_key: VerifyingKey::from_bytes(&bytes).unwrap(),
+            }
+        }).collect()
+    }
+
+    #[test]
+    fn check_aggregate_counter_mismatch_is_protocol_violation() {
+        let predicate = serde_json::json!({
+            "checks": [{
+                "check_id":"unit.test",
+                "required":true,
+                "status":"pass",
+                "evidence_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }],
+            "result": {
+                "verdict":"pass",
+                "required_check_count":2,
+                "required_pass_count":1,
+                "required_fail_count":0,
+                "required_error_count":0,
+                "required_skipped_count":0,
+                "safety_violation":false,
+                "protocol_violation":false
+            }
+        });
+        assert!(validate_check_aggregates(&predicate).is_err());
+    }
+
+    #[test]
+    fn a_pass_cannot_hide_a_skipped_required_check() {
+        let predicate = serde_json::json!({
+            "checks": [
+                {"check_id":"unit.one","required":true,"status":"pass","evidence_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+                {"check_id":"unit.two","required":true,"status":"skipped","evidence_sha256":null}
+            ],
+            "result": {
+                "verdict":"pass",
+                "required_check_count":2,
+                "required_pass_count":1,
+                "required_fail_count":0,
+                "required_error_count":0,
+                "required_skipped_count":1,
+                "safety_violation":false,
+                "protocol_violation":false
+            }
+        });
+        assert!(validate_check_aggregates(&predicate).is_err());
+    }
+
+    #[test]
+    fn schema_digests_are_stable_lowercase_sha256() {
+        let digests = schema_digests();
+        assert!(is_sha256(&digests.task));
+        assert!(is_sha256(&digests.receipt));
+        assert!(is_sha256(&digests.envelope));
+    }
+}
