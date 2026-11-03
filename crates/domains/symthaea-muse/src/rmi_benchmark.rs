@@ -649,6 +649,7 @@ pub enum RmiEvaluationErrorV1 {
     PolicyStateSnapshotFailure(String),
     PolicyStateRestoreFailure { arm: String, reason: String },
     PolicyStateMismatch { arm: String },
+    PolicyIdentityMismatch { arm: String },
     EmptyPartnerPolicyId,
     EmptyPartnerPolicyVersion,
     InvalidPartnerResponseId { arm: String },
@@ -657,6 +658,7 @@ pub enum RmiEvaluationErrorV1 {
     PartnerStateSnapshotFailure(String),
     PartnerStateRestoreFailure { arm: String, reason: String },
     PartnerStateMismatch { arm: String },
+    PartnerPolicyIdentityMismatch { arm: String },
     SerializationFailure(String),
 }
 
@@ -712,6 +714,13 @@ pub fn evaluate_rmi_pair<P: RmiPolicyV1>(
         ("treatment", &treatment_policy),
         ("treatment_replay", &treatment_replay),
     ] {
+        if restored.policy_id() != policy.policy_id()
+            || restored.policy_version() != policy.policy_version()
+        {
+            return Err(RmiEvaluationErrorV1::PolicyIdentityMismatch {
+                arm: arm.to_owned(),
+            });
+        }
         let restored_snapshot = restored
             .snapshot_state()
             .map_err(RmiEvaluationErrorV1::PolicyStateSnapshotFailure)?;
@@ -937,6 +946,13 @@ where
         ("treatment", &treatment_partner),
         ("treatment_replay", &treatment_partner_replay),
     ] {
+        if restored.policy_id() != partner_policy.policy_id()
+            || restored.policy_version() != partner_policy.policy_version()
+        {
+            return Err(RmiEvaluationErrorV1::PartnerPolicyIdentityMismatch {
+                arm: arm.to_owned(),
+            });
+        }
         let restored_snapshot = restored
             .snapshot_state()
             .map_err(RmiEvaluationErrorV1::PartnerStateSnapshotFailure)?;
