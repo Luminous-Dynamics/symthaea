@@ -390,7 +390,7 @@ TrafficSignBench (arXiv:2609.38463, code released 28 Sep 2026) is now a priority
 
 This benchmark demonstrates that destination and collision metrics do not imply rule compliance. SAM therefore adds a separate rule-evidence/trajectory layer in `symthaea_vehicle::rule_compliance`. The initial offline evaluator implements speed limit, mandatory direction and stop-before-line checks; unsupported rule families (yield, crosswalk, signals, no-entry, turn prohibitions) are explicit `Indeterminate` outcomes, not silently ignored.
 
-The evaluator retains raw typed rule evidence and trajectory samples, replays all per-rule findings, distinguishes NotEncountered from Pending stop-zone episodes, permits genuinely unavailable sources without fabricated digests, and rejects non-finite inputs. Stop dwell excludes the final post-stop acceleration/crossing gap and requires plausible stationary route progress. It does not perform perception, map matching, legal interpretation or simulator execution. Symtropy #3387 remains the future execution/receipt owner.
+The evaluator retains raw typed rule evidence and trajectory samples, replays all per-rule findings, distinguishes NotEncountered from Pending stop-zone episodes, permits genuinely unavailable sources without fabricated digests, and rejects non-finite inputs. Speed/direction compliance additionally requires the trajectory to bracket the full active interval, have at least two in-zone samples and avoid overlarge intersecting sample gaps. Stop evaluation requires the full approach-zone start and treats large sample gaps or speed/position contradictions as Indeterminate rather than asserting a violation. Stop dwell excludes the final post-stop acceleration/crossing gap. It does not perform perception, map matching, legal interpretation or simulator execution. Symtropy #3387 remains the future execution/receipt owner.
 
 Benchmark sequence:
 1. Reproduce the TrafficSignBench published baselines and manifests.
@@ -417,3 +417,25 @@ This is not a simulator or an optimal-control solver. It does not prove that the
 Run separate reports for safety margin, rule compliance, progress, comfort and energy; avoid a hidden weighted composite. For each scenario family, report counterfactual regret distributions and the fraction of decisions where a better feasible alternative was found. The selected action being infeasible can still retain the best feasible alternative for diagnosis, but regret remains undefined. A positive regret is evidence of an opportunity within the evaluated set/model, not proof that the deployed controller could have safely executed that alternative in reality.
 
 Protocol: [COUNTERFACTUAL_DECISION_QUALITY_V0_1.md](./COUNTERFACTUAL_DECISION_QUALITY_V0_1.md).
+
+
+## 15. Symtropy execution substrate — reuse, do not duplicate physics
+
+A source inspection of the current Symtropy repository confirms an existing deterministic replay foundation:
+- `symtropy-physics::replay::ReplayTape` represents ordered timestep frames and commands.
+- `WorldSnapshot` captures rigid-body state and collision events using raw floating-point bit patterns.
+- `tests/replay_harness.rs` checks same-build, same-process record/replay snapshots for bitwise equality at every tick.
+- `replay_cli.rs` exposes a versioned demo tape format and explicitly describes cross-platform bitwise identity as an audit target rather than a guarantee.
+
+The current Symtropy vehicle demo uses `symthaea_vehicle::simulator::BicycleModelSimulator` as its vehicle-dynamics object and `StanleyController` as its controller. The bicycle model exposes cloneable state, a dynamics-profile digest, reset and per-step command execution. It does not include pedestrian/cyclist actors, traffic-rule semantics or an intersection collision observable. The existing rigid-body replay tape is a different execution substrate and should not be misrepresented as replaying the bicycle model.
+
+Therefore:
+1. Keep Symthaea's vehicle dynamics implementation as the named road-model owner; do not create a competing vehicle physics engine in Symtropy.
+2. Have Symtropy's scenario adapter bind the bicycle-model artifact/profile plus route/actor-script/exogenous-disturbance digests into one exact execution manifest.
+3. Use deterministic scripted pedestrian/cyclist actor trajectories as scenario inputs for the first crossing vertical slice; explicitly label them kinematic actor scripts, not validated human dynamics.
+4. Compute swept-geometry/minimum-separation observables against the vehicle's declared footprint approximation, with a clear uncertainty/error budget and no contact-equivalence claim where the model lacks it.
+5. Record each timestep's vehicle state, actor state, rule context, observable and exact profile identity; re-run in a fresh process and compare complete trace digest, not just final state.
+6. Return explicit unsupported outcomes for vehicle-actor contact dynamics, sensor rendering, occlusion perception, right-of-way negotiation and any other features not actually represented.
+7. Reuse the existing ReplayTape/WorldSnapshot infrastructure for systems built on `PhysicsWorld`; do not claim it covers the BicycleModelSimulator until an explicit bridge and independent parity test exist.
+
+The adapter contract is tracked in Symtropy #3387. This is a bounded replay/evidence layer, not a new simulator.
