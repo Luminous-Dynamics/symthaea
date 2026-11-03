@@ -1885,8 +1885,10 @@ mod tests {
             &[],
         );
         let path = write_temp(&bytes);
-        let mut limits = ReaderLimits::default();
-        limits.max_entries = 0;
+        let limits = ReaderLimits {
+            max_entries: 0,
+            ..ReaderLimits::default()
+        };
         assert_eq!(
             ZipArtifactReader::open(&path, limits).unwrap_err().kind,
             ReaderErrorKind::LimitExceeded
@@ -1894,8 +1896,10 @@ mod tests {
         fs::remove_file(&path).unwrap();
 
         let path = write_temp(&bytes);
-        let mut limits = ReaderLimits::default();
-        limits.max_total_declared_uncompressed_bytes = 1;
+        let limits = ReaderLimits {
+            max_total_declared_uncompressed_bytes: 1,
+            ..ReaderLimits::default()
+        };
         assert_eq!(
             ZipArtifactReader::open(&path, limits).unwrap_err().kind,
             ReaderErrorKind::LimitExceeded
@@ -2036,15 +2040,19 @@ mod tests {
     #[test]
     fn enforces_archive_and_central_directory_limits_before_entry_allocation() {
         let path = write_temp(&single_entry(b"a", b"x"));
-        let mut limits = ReaderLimits::default();
-        limits.max_central_directory_bytes = 1;
+        let limits = ReaderLimits {
+            max_central_directory_bytes: 1,
+            ..ReaderLimits::default()
+        };
         let error = ZipArtifactReader::open(&path, limits).unwrap_err();
         assert_eq!(error.kind, ReaderErrorKind::LimitExceeded);
         fs::remove_file(path).unwrap();
 
         let path = write_temp(&single_entry(b"a", b"x"));
-        let mut limits = ReaderLimits::default();
-        limits.max_archive_bytes = 1;
+        let limits = ReaderLimits {
+            max_archive_bytes: 1,
+            ..ReaderLimits::default()
+        };
         let error = ZipArtifactReader::open(&path, limits).unwrap_err();
         assert_eq!(error.kind, ReaderErrorKind::LimitExceeded);
         fs::remove_file(path).unwrap();
