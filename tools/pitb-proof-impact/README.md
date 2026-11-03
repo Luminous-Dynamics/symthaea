@@ -6,15 +6,18 @@ It compares two **typed dependency snapshots** and computes a conservative impac
 
 ## Run
 
-From the repository root:
+This crate is staged outside the production workspace because the root workspace glob is independently incomplete on this branch. From the repository root:
 
 ```sh
-cargo fmt --check --manifest-path tools/pitb-proof-impact/Cargo.toml
-cargo test --locked --manifest-path tools/pitb-proof-impact/Cargo.toml
-cargo run --locked --manifest-path tools/pitb-proof-impact/Cargo.toml -- --self-test
-cargo run --locked --manifest-path tools/pitb-proof-impact/Cargo.toml -- \
-  tools/pitb-proof-impact/fixtures/old-snapshot.synthetic.json \
-  tools/pitb-proof-impact/fixtures/new-snapshot.synthetic.json \
+tmp="$(mktemp -d)"
+cp -a tools/pitb-proof-impact/. "$tmp/"
+cd "$tmp"
+cargo fmt --check
+cargo test --locked
+cargo run --locked -- --self-test
+cargo run --locked -- \
+  fixtures/old-snapshot.synthetic.json \
+  fixtures/new-snapshot.synthetic.json \
   /tmp/pitb-proof-impact-report.json
 ```
 
