@@ -155,6 +155,10 @@ All methods must use the same source observations, frozen query and cost/evidenc
 
 The report shape is defined in `connectome-universe-adequacy-report-v0.1.schema.json`; evaluator-only graph sidecars are defined in `connectome-universe-structure-artifacts-v0.1.schema.json`.
 
+The report binds `evaluator_protocol_sha256`, `rules_sha256` and `canonicalizer_sha256` to versioned protocol identifiers; these are not source-binary attestations. The semantic verifier computes the exact input report digest in its output rather than attempting a self-referential report hash.
+
+The current Rust semantic verifier does **not** independently validate the #10137 Cartesian-closure receipt or #10204 freeze-authentication receipt. It preserves the report's closure field as `claimed_enumeration_closure`, emits `worldset_closure_validation=NOT_PERFORMED_BY_THIS_TOOL`, and hard-disables trusted adequacy promotion. It can independently detect that a supplied, byte-pinned reference challenge exposes omitted or invented query outcomes; absent such a counterexample, it returns ADEQUACY_NOT_ESTIMABLE until the external trust adapters are integrated.
+
 JSON Schema checks structural shape only. A Rust semantic validator must additionally enforce:
 - unique candidate and reference world IDs;
 - canonical world-ID validity and digest recomputation;
