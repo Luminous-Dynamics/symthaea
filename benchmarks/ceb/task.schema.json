@@ -75,7 +75,8 @@
         "kind",
         "uri",
         "revision",
-        "tree_sha256"
+        "tree_sha256",
+        "tree_digest_algorithm"
       ],
       "properties": {
         "kind": {
@@ -104,6 +105,9 @@
             "null"
           ],
           "pattern": "^[0-9a-f]{64}$"
+        },
+        "tree_digest_algorithm": {
+          "const": "ceb-tree-v1"
         }
       }
     },
