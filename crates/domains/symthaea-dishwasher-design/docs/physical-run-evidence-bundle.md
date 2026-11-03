@@ -89,6 +89,6 @@ A valid bundle is structurally complete, not necessarily scientifically valid. A
 
 ## Tests authored
 
-The 16 Rust unit tests cover complete-bundle acceptance and resource summation; schema version rejection; source-run mismatch; duplicate items and assay pairs; missing item/endpoints; missing item material/geometry metadata; invalid ambient relative humidity; traces outside the run; stale calibration; assay-calibration digest mismatch; resource unit/value/provenance failures; required resource omission; manual-water rejection; and duplicate artifacts across tables.
+The 18 Rust unit tests cover complete-bundle acceptance and resource summation; schema version rejection; source-run mismatch for assay and resource records; duplicate items and assay pairs; missing item/endpoints; invalid assay measurement/uncertainty; missing item material/geometry metadata; invalid ambient relative humidity; traces outside the run; stale calibration; assay-calibration digest mismatch; resource unit/value/provenance failures; required resource omission; manual-water rejection; and duplicate artifacts across tables.
 
 Cargo execution, formatting and clippy are required on the exact PR head. The source-authored tests are not claimed to pass until run.
