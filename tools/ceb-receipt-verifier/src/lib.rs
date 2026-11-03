@@ -1833,6 +1833,7 @@ mod tests {
         parent_envelope_sha256: Option<&str>,
         task_contract_sha256: &str,
         source_tree_sha256: &str,
+        result_tree_sha256: &str,
         patch_sha256: &str,
         artifact_root: &std::path::Path,
     ) -> Value {
@@ -1862,12 +1863,13 @@ mod tests {
                     "task_id": "CEB-RUST-001",
                     "task_contract_sha256": task_contract_sha256,
                     "source_tree_sha256": source_tree_sha256,
+                    "source_tree_digest_algorithm": TREE_DIGEST_ALGORITHM,
                     "fixture_revision": "synthetic-rust-fixture-v1"
                 },
                 "candidate": {
                     "base_tree_sha256": source_tree_sha256,
                     "patch_sha256": patch_sha256,
-                    "result_tree_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                    "result_tree_sha256": result_tree_sha256,
                     "changed_paths": ["src/lib.rs"]
                 },
                 "agent": {
@@ -1943,7 +1945,7 @@ mod tests {
         })
     }
 
-    fn build_test_task() -> Value {
+    fn build_test_task(source_tree_sha256: &str) -> Value {
         serde_json::json!({
             "schema_version": 0,
             "benchmark_id": "CEB",
@@ -1957,7 +1959,8 @@ mod tests {
                 "kind": "synthetic_fixture",
                 "uri": "fixture://ceb-e2e/rust",
                 "revision": "synthetic-rust-fixture-v1",
-                "tree_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+                "tree_digest_algorithm": TREE_DIGEST_ALGORITHM,
+                "tree_sha256": source_tree_sha256
             },
             "environment": {
                 "image": "oci://registry.example/ceb@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -2051,18 +2054,25 @@ mod tests {
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
+        let source_root = root.join("source-snapshot");
+        let result_root = root.join("result-snapshot");
         let primary_root = root.join("primary");
         let regrade_root = root.join("regrade");
+        fs::create_dir_all(source_root.join("src")).unwrap();
+        fs::create_dir_all(result_root.join("src")).unwrap();
         fs::create_dir_all(&primary_root).unwrap();
         fs::create_dir_all(&regrade_root).unwrap();
+        fs::write(source_root.join("src/lib.rs"), b"pub fn verified() -> bool { false }").unwrap();
+        fs::write(result_root.join("src/lib.rs"), b"pub fn verified() -> bool { true }").unwrap();
+        let source_digest = hash_source_tree_inner(&source_root).unwrap();
+        let result_digest = hash_source_tree_inner(&result_root).unwrap();
 
         let primary_key = signing_key(31);
         let regrade_key = signing_key(32);
         let policy_bytes = build_test_trust_policy(&primary_key, &regrade_key);
         let policy_digest = sha256_hex(&policy_bytes);
-        let task_bytes = serde_json::to_vec(&build_test_task()).unwrap();
+        let task_bytes = serde_json::to_vec(&build_test_task(&source_digest)).unwrap();
         let task_digest = sha256_hex(&task_bytes);
-        let source_digest = "3333333333333333333333333333333333333333333333333333333333333333".to_string();
         let patch = b"diff --git a/src/lib.rs b/src/lib.rs\n+pub fn verified() -> bool { true }\n".to_vec();
         let patch_digest = sha256_hex(&patch);
 
@@ -2075,6 +2085,7 @@ mod tests {
             None,
             &task_digest,
             &source_digest,
+            &result_digest,
             &patch_digest,
             &primary_root
         );
@@ -2095,6 +2106,7 @@ mod tests {
             Some(&primary_digest),
             &task_digest,
             &source_digest,
+            &result_digest,
             &patch_digest,
             &regrade_root
         );
@@ -2107,8 +2119,10 @@ mod tests {
 
         let report = verify_pair(PairInputs {
             task_contract: task_bytes.clone(),
+            expected_task_contract_sha256: task_digest.clone(),
             task_id: "CEB-RUST-001".to_string(),
-            source_tree_sha256: source_digest,
+            source_tree_dir: source_root.clone(),
+            result_tree_dir: result_root.clone(),
             patch,
             primary_envelope: primary_envelope.clone(),
             primary_artifacts_dir: primary_root.clone(),
@@ -2138,8 +2152,10 @@ mod tests {
         );
         let detached_report = verify_pair(PairInputs {
             task_contract: task_bytes.clone(),
+            expected_task_contract_sha256: task_digest.clone(),
             task_id: "CEB-RUST-001".to_string(),
-            source_tree_sha256: "3333333333333333333333333333333333333333333333333333333333333333".to_string(),
+            source_tree_dir: source_root.clone(),
+            result_tree_dir: result_root.clone(),
             patch: b"diff --git a/src/lib.rs b/src/lib.rs\n+pub fn verified() -> bool { true }\n".to_vec(),
             primary_envelope: primary_envelope.clone(),
             primary_artifacts_dir: primary_root.clone(),
@@ -2166,8 +2182,10 @@ mod tests {
         );
         let reused_report = verify_pair(PairInputs {
             task_contract: task_bytes,
+            expected_task_contract_sha256: task_digest,
             task_id: "CEB-RUST-001".to_string(),
-            source_tree_sha256: "3333333333333333333333333333333333333333333333333333333333333333".to_string(),
+            source_tree_dir: source_root,
+            result_tree_dir: result_root,
             patch: b"diff --git a/src/lib.rs b/src/lib.rs\n+pub fn verified() -> bool { true }\n".to_vec(),
             primary_envelope,
             primary_artifacts_dir: primary_root,
