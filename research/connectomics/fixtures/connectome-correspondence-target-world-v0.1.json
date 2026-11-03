@@ -49,9 +49,9 @@
         "stable_anchor_id": null
       },
       {
-        "object_id": "segmentation-v2",
+        "object_id": "skeleton-artifact-shared",
         "object_type": "ARTIFACT",
-        "lineage_id": "segmentation-release",
+        "lineage_id": "shared-skeleton-artifact",
         "stable_anchor_id": null
       }
     ]
