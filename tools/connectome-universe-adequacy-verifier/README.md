@@ -23,7 +23,7 @@ Exit status:
 - `64`: usage error;
 - `66`: input file could not be read.
 
-The output is deterministic JSON with `status=COUNTERS_RECOMPUTED`, `source_report_sha256`, and `trusted_promotion=false`. The report's `evaluator_protocol_sha256`, `rules_sha256` and `canonicalizer_sha256` must match the pinned protocol identifiers compiled into this verifier; these are protocol identity hashes, not a source-binary/build attestation.
+The output is deterministic JSON with `status=COUNTERS_RECOMPUTED`, `source_report_sha256`, and `trusted_promotion=false`. It reports the input `claimed_enumeration_closure` separately from `worldset_closure_validation=NOT_PERFORMED_BY_THIS_TOOL`; it never echoes an upstream `CLOSED_VERIFIED` claim as a result established by this executable. The report's `evaluator_protocol_sha256`, `rules_sha256` and `canonicalizer_sha256` must match the pinned protocol identifiers compiled into this verifier; these are protocol identity hashes, not a source-binary/build attestation.
 
 ## What is independently recomputed
 
