@@ -34,7 +34,7 @@ After forward elimination, reverse the order. The separator variables have alrea
 
 MaxCount's second component is the semiring multiplicity, not necessarily the number of distinct variable assignments. With unit local multiplicities, these coincide. If local factors encode weights/multiple derivations, a single assignment can contribute multiplicity greater than one.
 
-The exact witness DAG represents distinct variable assignments only. The checker separately verifies:
+The exact witness DAG represents distinct variable assignments only. The dual-count extension also computes the distinct assignment total during elimination, rather than requiring DAG enumeration. The checker separately verifies:
 1. every local argmax set against the original bucket tables;
 2. every intermediate MaxCount message and tie multiplicity;
 3. the final optimum and total semiring multiplicity;
@@ -42,6 +42,23 @@ The exact witness DAG represents distinct variable assignments only. The checker
 5. the complete optimum-assignment support represented by the DAG on small exhaustive tests.
 
 Example: triangle MaxCut has optimum 2, multiplicity 6 and six distinct optimal assignments. A weighted mixed-cardinality example has optimum 6, semiring multiplicity 4, but only one distinct optimum assignment. Conflating these quantities would be incorrect.
+
+## Dual-count extension: multiplicity plus distinct assignment support
+
+The same elimination pass can compute a second count that must not be confused with MaxCount multiplicity:
+
+- The **multiplicity channel** multiplies factor multiplicities and sums them across score ties.
+- The **distinct-support channel** initializes each feasible original factor-table cell to support 1 and each infeasible cell to 0. During elimination, support counts multiply across factors whose eliminated-variable sets are disjoint, and add across tied values of the currently eliminated variable.
+
+This is valid for the current API because factors are created from original tables, where each table cell is one local assignment. It does not silently support pre-aggregated factors that encode overlapping hidden assignment sets; any future API admitting those must supply provenance or reject the distinct-support output contract.
+
+Rust additions in `semiring.rs`:
+- `MaxCountBackpointerRow.branch_assignment_counts` alongside `branch_multiplicities`;
+- `MaxCountWitnessResult.distinct_optimal_assignments`;
+- support-count operation counters with checked overflow;
+- `OutputContract::OptimumWithWitnessMultiplicityAndDistinctAssignmentCount` and `SuggestedAlgebra::MaxCountWithDistinctSupport`.
+
+The certificate format is now v2 dual-count. The independent checker recomputes each intermediate MaxCount table, each support table, the branch tie list and both final counts. It rejects rehashed false support values, not just bad hashes.
 
 ## Executed Python reference
 
