@@ -1123,6 +1123,88 @@ mod tests {
     }
 
     #[test]
+    fn reports_run_balanced_endpoint_brier_log_loss_and_reliability() {
+        let manifest = manifest_for_target(
+            ValidationPartition::LockedConfirmation,
+            &["calibration-metric-run"],
+        );
+        let mut run = scores("calibration-metric-run", Decision::Pass, 0.9);
+        run.item_ids.push("plate-2".to_owned());
+        for endpoint in REQUIRED {
+            run.predictions.push(EndpointPrediction {
+                item_id: "plate-2".to_owned(),
+                endpoint,
+                pass_probability: 0.2,
+            });
+            run.outcomes.push(EndpointOutcome {
+                source_run_id: "calibration-metric-run".to_owned(),
+                item_id: "plate-2".to_owned(),
+                endpoint,
+                decision: if endpoint == Endpoint::SoilRemovalResidual {
+                    Decision::Fail
+                } else {
+                    Decision::Pass
+                },
+                assay_record_id: format!("assay-calibration-metric-run-plate-2-{endpoint:?}"),
+            });
+        }
+
+        let report = evaluate_observer_risk_coverage(
+            &manifest,
+            &[run],
+            &[HoldoutAxis::MachineUnit],
+            ValidationPartition::LockedConfirmation,
+            &REQUIRED,
+            &[0.9],
+            0.05,
+        ).unwrap();
+
+        let soil = report.endpoint_calibration.iter()
+            .find(|metrics| metrics.endpoint == Endpoint::SoilRemovalResidual)
+            .unwrap();
+        assert_eq!(soil.resolved_run_count, 1);
+        assert_eq!(soil.unresolved_run_count, 0);
+        assert_eq!(soil.resolved_item_endpoint_pair_count, 2);
+        assert!((soil.run_balanced_brier_score.unwrap() - 0.025).abs() < 1e-12);
+        assert!((soil.run_balanced_mean_predicted_probability.unwrap() - 0.55).abs() < 1e-12);
+        assert!((soil.run_balanced_observed_pass_fraction.unwrap() - 0.5).abs() < 1e-12);
+        let expected_log_loss = (-0.9_f64.ln() - 0.8_f64.ln()) / 2.0;
+        assert!((soil.run_balanced_log_loss.unwrap() - expected_log_loss).abs() < 1e-12);
+        let occupied_bin = soil.reliability_bins.iter()
+            .find(|bin| bin.physical_run_count > 0)
+            .unwrap();
+        assert_eq!(occupied_bin.physical_run_count, 1);
+        assert!((occupied_bin.mean_predicted_pass_probability.unwrap() - 0.55).abs() < 1e-12);
+        assert!((occupied_bin.observed_pass_fraction.unwrap() - 0.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn unresolved_endpoint_runs_are_counted_and_excluded_from_binary_scores() {
+        let manifest = manifest_for_target(
+            ValidationPartition::LockedConfirmation,
+            &["unknown-calibration-run"],
+        );
+        let report = evaluate_observer_risk_coverage(
+            &manifest,
+            &[scores("unknown-calibration-run", Decision::Indeterminate, 0.8)],
+            &[HoldoutAxis::MachineUnit],
+            ValidationPartition::LockedConfirmation,
+            &REQUIRED,
+            &[0.9],
+            0.05,
+        ).unwrap();
+
+        for endpoint in &report.endpoint_calibration {
+            assert_eq!(endpoint.resolved_run_count, 0);
+            assert_eq!(endpoint.unresolved_run_count, 1);
+            assert_eq!(endpoint.resolved_item_endpoint_pair_count, 0);
+            assert_eq!(endpoint.run_balanced_brier_score, None);
+            assert_eq!(endpoint.run_balanced_log_loss, None);
+            assert!(endpoint.reliability_bins.iter().all(|bin| bin.physical_run_count == 0));
+        }
+    }
+
+    #[test]
     fn rejects_proxy_scores_outside_probability_range() {
         let manifest = manifest_for_target(
             ValidationPartition::LockedConfirmation,
