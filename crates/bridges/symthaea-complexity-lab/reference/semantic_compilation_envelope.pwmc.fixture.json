@@ -64,8 +64,8 @@
           "kind": "projected_support_equivalence",
           "status": "tested_only",
           "tests": {
-            "suite_id": "eth027-schema-fixture",
-            "artifact_digest": "sha256:af628947a7a1c07f4de9ed59c33607e7bb7f7d83e1919a83f8815b064b83f9d0",
+            "suite_id": "eth027-semantic-envelope-v1",
+            "artifact_digest": "sha256:9d59da164404dafb2be68672f3735bc4d7cff14fc33370c382d00a1a3984abcc",
             "case_count": 1,
             "claim_ceiling": "finite_test_evidence"
           },
@@ -76,8 +76,8 @@
           "kind": "deterministic_disjunction",
           "status": "tested_only",
           "tests": {
-            "suite_id": "eth027-schema-fixture",
-            "artifact_digest": "sha256:af628947a7a1c07f4de9ed59c33607e7bb7f7d83e1919a83f8815b064b83f9d0",
+            "suite_id": "eth027-semantic-envelope-v1",
+            "artifact_digest": "sha256:9d59da164404dafb2be68672f3735bc4d7cff14fc33370c382d00a1a3984abcc",
             "case_count": 1,
             "claim_ceiling": "finite_test_evidence"
           },
@@ -105,8 +105,8 @@
           "kind": "weighted_value_preservation",
           "status": "tested_only",
           "tests": {
-            "suite_id": "eth027-schema-fixture",
-            "artifact_digest": "sha256:af628947a7a1c07f4de9ed59c33607e7bb7f7d83e1919a83f8815b064b83f9d0",
+            "suite_id": "eth027-semantic-envelope-v1",
+            "artifact_digest": "sha256:9d59da164404dafb2be68672f3735bc4d7cff14fc33370c382d00a1a3984abcc",
             "case_count": 1,
             "claim_ceiling": "finite_test_evidence"
           },
@@ -117,8 +117,8 @@
           "kind": "exact_arithmetic_replay",
           "status": "tested_only",
           "tests": {
-            "suite_id": "eth027-schema-fixture",
-            "artifact_digest": "sha256:af628947a7a1c07f4de9ed59c33607e7bb7f7d83e1919a83f8815b064b83f9d0",
+            "suite_id": "eth027-semantic-envelope-v1",
+            "artifact_digest": "sha256:9d59da164404dafb2be68672f3735bc4d7cff14fc33370c382d00a1a3984abcc",
             "case_count": 1,
             "claim_ceiling": "finite_test_evidence"
           },
