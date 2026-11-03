@@ -257,6 +257,183 @@ fn schema_digests() -> SchemaDigests {
     }
 }
 
+
+const TREE_DIGEST_ALGORITHM: &str = "ceb-tree-v1";
+const MAX_TREE_FILES: usize = 200_000;
+const MAX_TREE_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+
+#[derive(Clone, Debug)]
+enum TreeEntryContent {
+    File(PathBuf),
+    Symlink(Vec<u8>),
+}
+
+#[derive(Clone, Debug)]
+struct TreeEntry {
+    relative_path: String,
+    content: TreeEntryContent,
+    executable: bool,
+    size: u64,
+}
+
+fn is_executable(metadata: &fs::Metadata) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        metadata.permissions().mode() & 0o111 != 0
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = metadata;
+        false
+    }
+}
+
+fn safe_tree_relative_path(path: &str) -> bool {
+    !path.is_empty()
+        && !path.starts_with('/')
+        && !path.contains('\\')
+        && !path.contains('\0')
+        && !path.starts_with('~')
+        && path.split('/').all(|part| !part.is_empty() && part != "." && part != "..")
+}
+
+fn collect_tree_entries(
+    current: &Path,
+    relative: &str,
+    entries: &mut Vec<TreeEntry>,
+    total_bytes: &mut u64,
+) -> Result<(), Failure> {
+    let directory = fs::read_dir(current)
+        .map_err(|error| Failure::protocol(format!("cannot read source-tree directory {}: {error}", current.display())))?;
+    for item in directory {
+        let item = item.map_err(|error| Failure::protocol(format!("cannot read source-tree entry: {error}")))?;
+        let name = item.file_name().into_string()
+            .map_err(|_| Failure::unresolved("source-tree contains a non-UTF-8 path component"))?;
+        let relative_path = if relative.is_empty() {
+            name
+        } else {
+            format!("{relative}/{name}")
+        };
+        if !safe_tree_relative_path(&relative_path) {
+            return Err(Failure::protocol(format!("source-tree contains an unsafe relative path: {relative_path}")));
+        }
+        if relative_path.split('/').any(|part| part == ".git") {
+            return Err(Failure::unresolved("source-tree snapshot must be a clean export without .git metadata"));
+        }
+
+        let absolute_path = item.path();
+        let metadata = fs::symlink_metadata(&absolute_path)
+            .map_err(|error| Failure::protocol(format!("cannot stat source-tree entry {relative_path}: {error}")))?;
+        let file_type = metadata.file_type();
+        if file_type.is_dir() {
+            collect_tree_entries(&absolute_path, &relative_path, entries, total_bytes)?;
+        } else if file_type.is_file() {
+            let size = metadata.len();
+            *total_bytes = total_bytes.checked_add(size)
+                .ok_or_else(|| Failure::protocol("source-tree aggregate size overflow"))?;
+            if *total_bytes > MAX_TREE_BYTES {
+                return Err(Failure::unresolved("source tree exceeds the 4 GiB hashing limit"));
+            }
+            entries.push(TreeEntry {
+                relative_path,
+                content: TreeEntryContent::File(absolute_path),
+                executable: is_executable(&metadata),
+                size,
+            });
+        } else if file_type.is_symlink() {
+            let target = fs::read_link(&absolute_path)
+                .map_err(|error| Failure::protocol(format!("cannot read source-tree symlink {relative_path}: {error}")))?;
+            let target = target.to_str()
+                .ok_or_else(|| Failure::unresolved(format!("symlink target for {relative_path} is not UTF-8")))?;
+            let target_bytes = target.as_bytes().to_vec();
+            let size = target_bytes.len() as u64;
+            *total_bytes = total_bytes.checked_add(size)
+                .ok_or_else(|| Failure::protocol("source-tree aggregate size overflow"))?;
+            if *total_bytes > MAX_TREE_BYTES {
+                return Err(Failure::unresolved("source tree exceeds the 4 GiB hashing limit"));
+            }
+            entries.push(TreeEntry {
+                relative_path,
+                content: TreeEntryContent::Symlink(target_bytes),
+                executable: false,
+                size,
+            });
+        } else {
+            return Err(Failure::unresolved(format!("source tree contains an unsupported special file: {relative_path}")));
+        }
+        if entries.len() > MAX_TREE_FILES {
+            return Err(Failure::unresolved("source tree exceeds the 200,000-entry hashing limit"));
+        }
+    }
+    Ok(())
+}
+
+/// Compute the versioned CEB filesystem-tree digest without executing or invoking Git.
+///
+/// The digest covers sorted UTF-8 relative paths, regular-file executable bits,
+/// symlink target bytes, entry types, byte lengths and SHA-256 content digests.
+/// Empty directories are intentionally ignored. Git metadata and special files
+/// are rejected. The caller must supply a stable, read-only snapshot during hashing.
+pub fn hash_source_tree(root: &Path) -> Result<String, String> {
+    hash_source_tree_inner(root).map_err(|failure| format!("{}: {}", failure.status, failure.reason))
+}
+
+fn hash_source_tree_inner(root: &Path) -> Result<String, Failure> {
+    let canonical_root = root.canonicalize()
+        .map_err(|error| Failure::protocol(format!("cannot resolve source-tree root {}: {error}", root.display())))?;
+    if !canonical_root.is_dir() {
+        return Err(Failure::protocol("source-tree root is not a directory"));
+    }
+    let mut entries = Vec::new();
+    let mut total_bytes = 0u64;
+    collect_tree_entries(&canonical_root, "", &mut entries, &mut total_bytes)?;
+    entries.sort_by(|left, right| left.relative_path.as_bytes().cmp(right.relative_path.as_bytes()));
+
+    let mut tree_hasher = Sha256::new();
+    tree_hasher.update(b"CEB-TREE-V1\0");
+    tree_hasher.update((entries.len() as u64).to_be_bytes());
+    for entry in entries {
+        let path_bytes = entry.relative_path.as_bytes();
+        tree_hasher.update((path_bytes.len() as u64).to_be_bytes());
+        tree_hasher.update(path_bytes);
+        tree_hasher.update(entry.size.to_be_bytes());
+        let mut content_hasher = Sha256::new();
+        match entry.content {
+            TreeEntryContent::File(path) => {
+                tree_hasher.update([b'F']);
+                tree_hasher.update([u8::from(entry.executable)]);
+                let mut file = File::open(&path)
+                    .map_err(|error| Failure::protocol(format!("cannot open source-tree file {}: {error}", path.display())))?;
+                let mut total = 0u64;
+                let mut buffer = [0u8; 64 * 1024];
+                loop {
+                    let read = file.read(&mut buffer)
+                        .map_err(|error| Failure::protocol(format!("cannot read source-tree file {}: {error}", path.display())))?;
+                    if read == 0 { break; }
+                    total = total.checked_add(read as u64)
+                        .ok_or_else(|| Failure::protocol("source-tree file length overflow"))?;
+                    if total > entry.size || total > MAX_TREE_BYTES {
+                        return Err(Failure::protocol(format!("source-tree file changed or exceeded its declared size: {}", path.display())));
+                    }
+                    content_hasher.update(&buffer[..read]);
+                }
+                if total != entry.size {
+                    return Err(Failure::protocol(format!("source-tree file size changed during hashing: {}", path.display())));
+                }
+            }
+            TreeEntryContent::Symlink(target) => {
+                tree_hasher.update([b'L']);
+                tree_hasher.update([0]);
+                content_hasher.update(target);
+            }
+        }
+        let content_digest = content_hasher.finalize();
+        tree_hasher.update(content_digest);
+    }
+    Ok(format!("{:x}", tree_hasher.finalize()))
+}
+
 fn validate_against_schema(
     schema_source: &str,
     instance: &Value,
