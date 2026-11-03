@@ -265,6 +265,8 @@ fn schema_digests() -> SchemaDigests {
 
 const TREE_DIGEST_ALGORITHM: &str = "ceb-tree-v1";
 const MAX_TREE_FILES: usize = 200_000;
+const MAX_TREE_ENTRIES: usize = 250_000;
+const MAX_TREE_DEPTH: usize = 128;
 const MAX_TREE_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 
 #[derive(Clone, Debug)]
@@ -308,13 +310,23 @@ fn collect_tree_entries(
     relative: &str,
     entries: &mut Vec<TreeEntry>,
     total_bytes: &mut u64,
+    visited_entries: &mut usize,
+    depth: usize,
 ) -> Result<(), Failure> {
+    if depth > MAX_TREE_DEPTH {
+        return Err(Failure::unresolved("source tree exceeds the 128-directory depth limit"));
+    }
     let directory = fs::read_dir(current)
         .map_err(|error| Failure::protocol(format!("cannot read source-tree directory {}: {error}", current.display())))?;
     for item in directory {
         let item = item.map_err(|error| Failure::protocol(format!("cannot read source-tree entry: {error}")))?;
         let name = item.file_name().into_string()
             .map_err(|_| Failure::unresolved("source-tree contains a non-UTF-8 path component"))?;
+        *visited_entries = visited_entries.checked_add(1)
+            .ok_or_else(|| Failure::protocol("source-tree entry count overflow"))?;
+        if *visited_entries > MAX_TREE_ENTRIES {
+            return Err(Failure::unresolved("source tree exceeds the 250,000-entry traversal limit"));
+        }
         let relative_path = if relative.is_empty() {
             name
         } else {
@@ -332,7 +344,7 @@ fn collect_tree_entries(
             .map_err(|error| Failure::protocol(format!("cannot stat source-tree entry {relative_path}: {error}")))?;
         let file_type = metadata.file_type();
         if file_type.is_dir() {
-            collect_tree_entries(&absolute_path, &relative_path, entries, total_bytes)?;
+            collect_tree_entries(&absolute_path, &relative_path, entries, total_bytes, visited_entries, depth + 1)?;
         } else if file_type.is_file() {
             let size = metadata.len();
             *total_bytes = total_bytes.checked_add(size)
@@ -392,7 +404,11 @@ fn hash_source_tree_inner(root: &Path) -> Result<String, Failure> {
     }
     let mut entries = Vec::new();
     let mut total_bytes = 0u64;
-    collect_tree_entries(&canonical_root, "", &mut entries, &mut total_bytes)?;
+    let mut visited_entries = 0usize;
+    collect_tree_entries(&canonical_root, "", &mut entries, &mut total_bytes, &mut visited_entries, 0)?;
+    if entries.is_empty() {
+        return Err(Failure::unresolved("empty source/result trees cannot qualify as engineering evidence"));
+    }
     entries.sort_by(|left, right| left.relative_path.as_bytes().cmp(right.relative_path.as_bytes()));
 
     let mut tree_hasher = Sha256::new();
@@ -2197,6 +2213,48 @@ mod tests {
         assert!(!reused_report.accepted);
         assert!(matches!(reused_report.status.as_str(), "protocol_violation" | "rejected"));
 
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn ceb_tree_digest_is_order_independent_content_sensitive_and_rejects_git_metadata() {
+        use std::fs;
+        let root = std::env::temp_dir().join(format!("ceb-tree-hash-{}", std::process::id()));
+        let first = root.join("first");
+        let second = root.join("second");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(first.join("src")).unwrap();
+        fs::create_dir_all(second.join("src")).unwrap();
+        fs::write(first.join("src/lib.rs"), b"pub fn value() -> u8 { 1 }").unwrap();
+        fs::write(first.join("Cargo.toml"), b"[package]\\nname = \"fixture\"\\n").unwrap();
+        // Create the same entries in the reverse order in the second snapshot.
+        fs::write(second.join("Cargo.toml"), b"[package]\\nname = \"fixture\"\\n").unwrap();
+        fs::write(second.join("src/lib.rs"), b"pub fn value() -> u8 { 1 }").unwrap();
+        let first_digest = hash_source_tree_inner(&first).unwrap();
+        let second_digest = hash_source_tree_inner(&second).unwrap();
+        assert_eq!(first_digest, second_digest);
+
+        fs::write(second.join("src/lib.rs"), b"pub fn value() -> u8 { 2 }").unwrap();
+        assert_ne!(first_digest, hash_source_tree_inner(&second).unwrap());
+
+        fs::create_dir_all(second.join(".git")).unwrap();
+        assert!(hash_source_tree_inner(&second).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn ceb_tree_digest_records_symlink_target_without_following_it() {
+        use std::fs;
+        use std::os::unix::fs::symlink;
+        let root = std::env::temp_dir().join(format!("ceb-tree-symlink-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("target.txt"), b"target").unwrap();
+        symlink("target.txt", root.join("link.txt")).unwrap();
+        let digest = hash_source_tree_inner(&root).unwrap();
+        fs::write(root.join("target.txt"), b"changed target").unwrap();
+        assert_ne!(digest, hash_source_tree_inner(&root).unwrap());
         fs::remove_dir_all(root).unwrap();
     }
 
