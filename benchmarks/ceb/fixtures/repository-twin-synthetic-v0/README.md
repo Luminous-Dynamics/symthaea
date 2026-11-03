@@ -27,6 +27,16 @@ compiler pass must supply those receipts before such an authority can be assigne
 The anchors establish source-text provenance only; they are not complete AST spans
 or compiler/LSP semantic locations. Static intake must also verify that the anchored declaration actually names the graph node; a line that exists and matches its text can still be assigned to the wrong symbol.
 
+`worlds.v0.json` defines eight design-only Cargo configuration worlds: Linux
+and Windows, each crossed with the default feature set, `audit`, `windows-native`,
+and both features. The matrix distinguishes a feature being enabled from a
+target-gated module/dependency actually being active. In particular,
+`windows-native` may be enabled on Linux while the Windows module and
+`windows-sys` dependency remain inactive. The contract workflow checks exact
+active/inactive inventories for seven conditional graph facts and includes
+negative controls for false activation, missed activation and duplicate worlds.
+These are expected configuration semantics, not compiler-produced evidence.
+
 `mutations.v0.json` defines deterministic edit scenarios and expected impact
 sets. They are scenario specifications, not pre-applied patches.
 
