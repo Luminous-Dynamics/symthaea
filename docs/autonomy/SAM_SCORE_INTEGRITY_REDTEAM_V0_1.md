@@ -58,7 +58,7 @@ The attack set is not exhaustive. Counterexample-guided search (#10043) should p
 
 ## 3A. Machine-readable attack manifest
 
-The canonical fixture manifest is [`fixtures/SAM_SCORE_ATTACKS_V0_1.json`](fixtures/SAM_SCORE_ATTACKS_V0_1.json). It defines the 12 attack IDs, required evidence fields, expected countermeasures, forbidden success labels, positive controls and global invariants in a machine-readable form. It is a specification manifest, not an executed test report.
+The canonical fixture manifest is [`fixtures/SAM_SCORE_ATTACKS_V0_1.json`](fixtures/SAM_SCORE_ATTACKS_V0_1.json). It defines the 15 attack IDs, required evidence fields, expected countermeasures, forbidden success labels, positive controls and global invariants in a machine-readable form. It is a specification manifest, not an executed test report.
 
 ## 4. Scorecard contract
 
