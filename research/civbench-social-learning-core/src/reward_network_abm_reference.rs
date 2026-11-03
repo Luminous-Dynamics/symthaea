@@ -909,6 +909,10 @@ mod tests {
     #[test]
     fn non_finite_generated_demonstration_reward_fails_closed() {
         let config = Config {
+            demonstration_count: 4,
+            random_reward_per_demonstration: 0.0,
+            myopic_reward_per_demonstration: 0.0,
+            optimal_reward_per_demonstration: 0.0,
             demonstration_noise_epsilon: f64::MAX,
             ..Config::default()
         };
