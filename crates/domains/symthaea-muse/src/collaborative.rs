@@ -342,8 +342,13 @@ mod tests {
     fn stale_cycle_cannot_replace_newer_contribution() {
         let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
         composer
-            .contribute(make_contribution(1, 0.5, [0.4; 8]))
-            .expect("initial contribution is valid");
+            .contribute(HarmonyContribution {
+                participant_id: 1,
+                harmonies: [0.4; 8],
+                phi: 0.5,
+                cycle: 10,
+            })
+            .expect("cycle-10 contribution is valid");
         assert_eq!(
             composer.contribute(HarmonyContribution {
                 participant_id: 1,
