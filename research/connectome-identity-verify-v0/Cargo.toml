@@ -1,0 +1,12 @@
+[package]
+name = "connectome-identity-verify-harness"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Isolated exact-source tests for Symthaea connectome axis identity joins"
+
+[dependencies]
+sha2 = "=0.10.9"
+
+[workspace]

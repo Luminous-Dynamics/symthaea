@@ -1,0 +1,27 @@
+# symthaea-connectome-identity
+
+Source-bound identity joins for full square connectome matrices.
+
+## Scope
+
+This crate validates that:
+- matrix row IDs, matrix column IDs and neuron annotation IDs form the same unique stable-ID set;
+- declared matrix dimensions match the axis ID arrays;
+- row/column orientation is explicit;
+- reordered axes and annotation tables resolve through deterministic bijections;
+- stimulus and keep/remove requests resolve through stable neuron IDs;
+- numeric matrices and per-neuron annotation/parameter vectors can be reordered into canonical identity order;
+- returned identity mappings are immutable through the public API;
+- duplicate, missing, extra, unknown or conflicting identities fail closed.
+
+It emits two separate SHA-256 commitments: a semantic canonical identity commitment over dataset/release/taxon/life-stage, mapping protocol, orientation and sorted stable IDs; and an exact source-binding commitment that additionally binds raw matrix/annotation payload digests and the original row, column and annotation order. Reordered exports can therefore retain the same semantic identity digest while producing a different source-binding digest.
+
+The source-artifact digest strings are computed by the intake layer. This crate checks digest syntax and binds the references; it does not fetch or authenticate source bytes or inspect matrix numerical values.
+
+## Non-goals
+
+No silent ID normalization/coercion, biological identity inference, missing-neuron imputation, matrix payload parsing, connectivity correction, physiology, neural simulation or behaviour claims.
+
+A valid identity join proves that the declared axes and annotations reconcile under the supplied source IDs and mapping protocol. It does not prove anatomical truth or function.
+
+All unit-test data are synthetic fixtures. The unit oracle includes exact-order, permuted-axis, digest-stability, malformed identity, unknown target and keep/remove conflict controls.
