@@ -67,6 +67,16 @@ pub struct CounterfactualActionEvaluation {
 pub struct CounterfactualDecisionInput {
     pub decision_id: String,
     pub scenario_id: String,
+    /// Exact scenario candidate or route artifact identity.
+    pub scenario_artifact_digest: String,
+    /// Shared decision-time state from which every action candidate is evaluated.
+    pub initial_state_digest: String,
+    /// Frozen road, weather, actor state, sensor and map context.
+    pub environment_profile_digest: String,
+    /// Named dynamics/model parameters used by every action evaluation.
+    pub dynamics_profile_digest: String,
+    /// Execution timestep, horizon, termination and evaluator protocol profile.
+    pub execution_protocol_digest: String,
     pub failure_family_id: String,
     /// Frozen controller artifact identity. A digest-format check is not authentication.
     pub controller_artifact_digest: String,
@@ -192,8 +202,17 @@ fn derive_finding(
     {
         return Err(CounterfactualDecisionError::EmptyIdentity);
     }
-    if !digest_is_valid(&input.controller_artifact_digest)
-        || !digest_is_valid(&input.evaluator_artifact_digest)
+    if [
+        &input.scenario_artifact_digest,
+        &input.initial_state_digest,
+        &input.environment_profile_digest,
+        &input.dynamics_profile_digest,
+        &input.execution_protocol_digest,
+        &input.controller_artifact_digest,
+        &input.evaluator_artifact_digest,
+    ]
+    .iter()
+    .any(|digest| !digest_is_valid(digest))
     {
         return Err(CounterfactualDecisionError::InvalidArtifactDigest);
     }
@@ -396,6 +415,11 @@ mod tests {
         CounterfactualDecisionInput {
             decision_id: "decision-001".into(),
             scenario_id: "scenario-001".into(),
+            scenario_artifact_digest: "1".repeat(64),
+            initial_state_digest: "2".repeat(64),
+            environment_profile_digest: "3".repeat(64),
+            dynamics_profile_digest: "4".repeat(64),
+            execution_protocol_digest: "5".repeat(64),
             failure_family_id: "pedestrian-crossing".into(),
             controller_artifact_digest: "a".repeat(64),
             evaluator_artifact_digest: "b".repeat(64),
@@ -541,6 +565,23 @@ mod tests {
         assert_eq!(
             report.finding.outcome,
             CounterfactualDecisionOutcome::NoFeasibleAction
+        );
+    }
+
+    #[test]
+    fn rejects_missing_or_malformed_shared_execution_context_digests() {
+        let mut sample = input();
+        sample.initial_state_digest.clear();
+        assert_eq!(
+            evaluate_counterfactual_decision(sample).unwrap_err(),
+            CounterfactualDecisionError::InvalidArtifactDigest
+        );
+
+        let mut sample = input();
+        sample.dynamics_profile_digest = "not-a-digest".into();
+        assert_eq!(
+            evaluate_counterfactual_decision(sample).unwrap_err(),
+            CounterfactualDecisionError::InvalidArtifactDigest
         );
     }
 
