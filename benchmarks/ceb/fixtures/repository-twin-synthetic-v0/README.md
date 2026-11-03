@@ -27,14 +27,21 @@ compiler pass must supply those receipts before such an authority can be assigne
 The anchors establish source-text provenance only; they are not complete AST spans
 or compiler/LSP semantic locations. Static intake must also verify that the anchored declaration actually names the graph node; a line that exists and matches its text can still be assigned to the wrong symbol.
 
-`worlds.v0.json` defines eight design-only Cargo configuration worlds: Linux
-and Windows, each crossed with the default feature set, `audit`, `windows-native`,
-and both features. The matrix distinguishes a feature being enabled from a
-target-gated module/dependency actually being active. In particular,
+`worlds.v0.json` defines eight design-only Cargo configuration worlds across
+Linux/Windows and the effective `audit`/`windows-native` feature combinations.
+Each world separately records whether Cargo defaults are enabled, explicitly
+selected features, the resulting effective features, and exact active/inactive
+sets for seven conditional graph facts. This is necessary because this API crate
+sets `default = ["audit"]`: an empty explicit feature list does not mean that
+`audit` is inactive when Cargo defaults are enabled. A separate
+no-default-features + explicit-`audit` world checks that feature path too.
+
+The matrix distinguishes feature activation from target activation. In particular,
 `windows-native` may be enabled on Linux while the Windows module and
 `windows-sys` dependency remain inactive. The contract workflow checks exact
-active/inactive inventories for seven conditional graph facts and includes
-negative controls for false activation, missed activation and duplicate worlds.
+effective feature sets and target triples, then derives the expected active and
+inactive facts. Six new negative controls attack false/missed feature activation,
+effective-feature misdeclaration, target-triple mismatch and duplicate world IDs.
 These are expected configuration semantics, not compiler-produced evidence.
 
 `mutations.v0.json` defines deterministic edit scenarios and expected impact
