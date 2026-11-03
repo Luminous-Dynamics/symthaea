@@ -502,10 +502,17 @@ fn metric_for_obligation(
             let source = planned_section(plan, source_kind);
             let target = planned_section(plan, target_kind);
             let development_evidence = source.zip(target).map(|(source, target)| {
+                let target_duration = target.end - target.start;
+                let proposed_source_end = source.start + target_duration;
+                let source_window_end = if proposed_source_end < source.end {
+                    proposed_source_end
+                } else {
+                    source.end
+                };
                 compare_melodic_regions(
                     score,
                     source.start,
-                    source.end,
+                    source_window_end,
                     target.start,
                     target.end,
                     *transformation,
@@ -923,6 +930,27 @@ mod tests {
                 .windows(2)
                 .all(|pair| pair[0].end == pair[1].start)
         );
+    }
+
+    #[test]
+    fn sonata_development_obligation_has_separate_score_side_evidence() {
+        let home = Key::major(PitchClass::C);
+        let realized = realize_sonata_with_plan(home, 100.0, 4.0, &theme(), 31, &intent());
+        let evidence = realized
+            .verification
+            .iter()
+            .find(|item| item.obligation_id == DEVELOP_PRIMARY_MOTIF)
+            .expect("development motif obligation must be scored");
+        assert!(matches!(
+            &evidence.metric,
+            SonataVerificationMetric::MotifDevelopment {
+                source: SonataSectionKind::ExpositionPrimary,
+                target: SonataSectionKind::Development,
+                transformation: ReturnTransformation::Transposed,
+                ..
+            }
+        ));
+        assert!(evidence.verified, "default planned development should preserve its named motif");
     }
 
     #[test]
