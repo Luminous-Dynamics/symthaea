@@ -85,7 +85,7 @@ field, so the same immutable inputs produce byte-stable JSON.
   image, runner policy and task budget.
 - The regrade links the SHA-256 of the exact primary envelope bytes; run IDs,
   receipt IDs, signer trust domains and check-evidence sets must be distinct.
-- Required-check aggregates are recomputed from rows, not trusted from totals.
+- Receipt check IDs, kinds, required flags and explicit authorities are bound to the exact acceptance-check set in the task contract. Required-check aggregates are recomputed from rows, not trusted from totals.
 - Every artifact path must be relative, remain beneath its supplied root,
   resolve without symlink components, and match both declared size and digest.
 - Usage is checked against the task contract's wall-clock, turn, tool-call,
@@ -106,3 +106,10 @@ build script, test, or agent-generated program.
 The code is a first implementation slice. It must still pass Rust compilation,
 formatting, the included unit tests, schema conformance tests and the external
 negative-control corpus before it can be qualified for scored benchmark use.
+
+
+## Current implementation status (2026-11-03)
+
+The verifier source and focused CI workflow are in draft PR [#TBD](https://github.com/Luminous-Dynamics/symthaea) stacked on CEB schema PR #10115. The source currently contains unit tests for duplicate JSON members, DSSE PAE and signature checks, trust roles, task-check parity, budget enforcement, artifact digest/path validation, traversal and symlink rejection. These tests are authored but have **not** been run; no build, format, Clippy, schema-conformance or end-to-end receipt-pair result is claimed. No Cargo.lock has yet been generated in this environment.
+
+The implementation intentionally returns unresolved for all current CEB catalog tasks because they remain `design_only`. Before any task can be scored, issue #10064 must qualify OS-level isolation, the task contract must be promoted with a frozen source and sealed split, and a real trusted signer policy must be provisioned outside the verifier inputs.
