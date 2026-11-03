@@ -7,6 +7,7 @@
 //! extrapolation. Piecewise-linear interpolation is a diagnostic estimate,
 //! not a validated prediction or a substitute for testing the target occupancy.
 
+use std::collections::HashSet;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -15,6 +16,10 @@ pub struct CurveScope {
     pub programme: String,
     pub soil_class: String,
     pub surface_material: String,
+    pub load_set_id: String,
+    pub detergent_batch_id: String,
+    pub water_hardness_ppm_as_caco3: u16,
+    pub inlet_temperature_millic: u32,
     pub protocol_id: String,
     /// SHA-256 digest of the frozen raw-data bundle (64 hexadecimal characters).
     pub dataset_sha256: String,
@@ -27,11 +32,18 @@ impl CurveScope {
             ("programme", &self.programme),
             ("soil_class", &self.soil_class),
             ("surface_material", &self.surface_material),
+            ("load_set_id", &self.load_set_id),
+            ("detergent_batch_id", &self.detergent_batch_id),
             ("protocol_id", &self.protocol_id),
         ] {
             if value.trim().is_empty() {
                 return Err(CurveError::InvalidScope(name));
             }
+        }
+        if self.water_hardness_ppm_as_caco3 > 1_000
+            || self.inlet_temperature_millic > 90_000
+        {
+            return Err(CurveError::InvalidWaterCondition);
         }
         if self.dataset_sha256.len() != 64
             || !self.dataset_sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
@@ -79,7 +91,8 @@ impl ObservedBand {
 pub struct OccupancyObservation {
     /// Number of place settings or items under the frozen protocol's definition.
     pub occupancy: usize,
-    pub replicate_count: usize,
+    /// Distinct run IDs included in the frozen raw-data bundle.
+    pub replicate_ids: Vec<String>,
     pub cleaning_failures: usize,
     pub rinse_failures: usize,
     pub energy_kwh: ObservedBand,
@@ -92,13 +105,23 @@ impl OccupancyObservation {
         if self.occupancy == 0 {
             return Err(CurveError::ZeroOccupancy);
         }
-        // Five independent runs is the minimum pilot gate in issue #10136.
-        // Confirmatory studies may require materially more replicates.
-        if self.replicate_count < 5 {
+        // Five distinct physical run IDs is the minimum pilot gate in issue
+        // #10136. The raw-data digest must include these run identifiers.
+        // Unique IDs are a provenance check, not proof of independence by themselves.
+        if self.replicate_ids.len() < 5 {
             return Err(CurveError::InsufficientReplicates {
                 occupancy: self.occupancy,
-                observed: self.replicate_count,
+                observed: self.replicate_ids.len(),
                 required: 5,
+            });
+        }
+        if self.replicate_ids.iter().any(|id| id.trim().is_empty()) {
+            return Err(CurveError::InvalidReplicateId);
+        }
+        let unique_ids: HashSet<&str> = self.replicate_ids.iter().map(String::as_str).collect();
+        if unique_ids.len() != self.replicate_ids.len() {
+            return Err(CurveError::DuplicateReplicateId {
+                occupancy: self.occupancy,
             });
         }
         if self.cleaning_failures > self.replicate_count
@@ -145,6 +168,11 @@ pub struct MeasuredOccupancyCurve {
 pub enum CurveError {
     InvalidScope(&'static str),
     InvalidDatasetDigest,
+    InvalidWaterCondition,
+    InvalidReplicateId,
+    DuplicateReplicateId {
+        occupancy: usize,
+    },
     TooFewOccupancyPoints,
     ZeroOccupancy,
     InsufficientReplicates {
@@ -266,6 +294,10 @@ mod tests {
             programme: "Eco".to_owned(),
             soil_class: "starch".to_owned(),
             surface_material: "ceramic".to_owned(),
+            load_set_id: "standardized-ceramic-load-v1".to_owned(),
+            detergent_batch_id: "detergent-lot-2026-01".to_owned(),
+            water_hardness_ppm_as_caco3: 120,
+            inlet_temperature_millic: 15_000,
             protocol_id: "IEC60436-2025-COR1-test-protocol-v1".to_owned(),
             dataset_sha256: "a".repeat(64),
         }
@@ -274,7 +306,13 @@ mod tests {
     fn point(occupancy: usize, energy: f64, water: f64, duration: f64) -> OccupancyObservation {
         OccupancyObservation {
             occupancy,
-            replicate_count: 5,
+            replicate_ids: vec![
+                "run-01".to_owned(),
+                "run-02".to_owned(),
+                "run-03".to_owned(),
+                "run-04".to_owned(),
+                "run-05".to_owned(),
+            ],
             cleaning_failures: 0,
             rinse_failures: 0,
             energy_kwh: ObservedBand {
@@ -352,7 +390,7 @@ mod tests {
     #[test]
     fn insufficient_replicates_are_rejected() {
         let mut underpowered = point(4, 0.28, 3.5, 1_200.0);
-        underpowered.replicate_count = 4;
+        underpowered.replicate_ids.pop();
         let result = MeasuredOccupancyCurve::new(
             scope(),
             vec![point(1, 0.2, 2.0, 900.0), underpowered],
@@ -380,6 +418,42 @@ mod tests {
                 vec![point(1, 0.2, 2.0, 900.0), point(2, 0.24, 2.5, 1_000.0)],
             ),
             Err(CurveError::InvalidScope("programme"))
+        ));
+    }
+
+    #[test]
+    fn duplicate_or_blank_run_ids_are_rejected() {
+        let mut duplicate = point(4, 0.28, 3.5, 1_200.0);
+        duplicate.replicate_ids[4] = duplicate.replicate_ids[0].clone();
+        assert!(matches!(
+            MeasuredOccupancyCurve::new(
+                scope(),
+                vec![point(1, 0.2, 2.0, 900.0), duplicate],
+            ),
+            Err(CurveError::DuplicateReplicateId { .. })
+        ));
+
+        let mut blank = point(4, 0.28, 3.5, 1_200.0);
+        blank.replicate_ids[0].clear();
+        assert!(matches!(
+            MeasuredOccupancyCurve::new(
+                scope(),
+                vec![point(1, 0.2, 2.0, 900.0), blank],
+            ),
+            Err(CurveError::InvalidReplicateId)
+        ));
+    }
+
+    #[test]
+    fn invalid_water_conditions_are_rejected() {
+        let mut invalid = scope();
+        invalid.water_hardness_ppm_as_caco3 = 1_001;
+        assert!(matches!(
+            MeasuredOccupancyCurve::new(
+                invalid,
+                vec![point(1, 0.2, 2.0, 900.0), point(2, 0.24, 2.5, 1_000.0)],
+            ),
+            Err(CurveError::InvalidWaterCondition)
         ));
     }
 
