@@ -492,7 +492,10 @@
               "nonlinear_higher_order",
               "anatomical_plus_latent",
               "rewired_connectome",
-              "other_declared"
+              "other_declared",
+              "higher_order_nonadditive",
+              "state_gated_dynamics",
+              "sequence_dependent"
             ]
           },
           "mechanistic_channels": {
@@ -591,7 +594,10 @@
               "anatomical_plus_latent",
               "degree_type_rewired",
               "spatial_rewired",
-              "other_declared"
+              "other_declared",
+              "higher_order_nonadditive",
+              "state_gated_dynamics",
+              "sequence_dependent"
             ]
           },
           "hypothesis_id": {
@@ -688,7 +694,10 @@
             "cost_normalized_eig",
             "joint_pareto",
             "manual_preregistered",
-            "not_selected"
+            "not_selected",
+            "expected_value_of_sample_information",
+            "maximum_model_disagreement",
+            "sequential_model_recovery"
           ]
         },
         "selection_objective": {
@@ -1281,8 +1290,192 @@
         },
         "safety_constraints_sha256": {
           "$ref": "#/$defs/sha256OrNull"
+        },
+        "protocol_semantics": {
+          "enum": [
+            "simultaneous_targets",
+            "ordered_steps",
+            "repeated_train",
+            "closed_loop_adaptive",
+            "not_applicable"
+          ]
+        },
+        "state_context_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "state_measurement_manifest_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "protocol_steps": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "step_index",
+              "target_ids",
+              "manipulation_type",
+              "waveform",
+              "inter_step_interval_seconds"
+            ],
+            "properties": {
+              "step_index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "target_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "manipulation_type": {
+                "enum": [
+                  "optogenetic_activation",
+                  "optogenetic_inhibition",
+                  "electrical_stimulation",
+                  "pharmacological",
+                  "genetic",
+                  "mechanical",
+                  "sensory_deprivation",
+                  "simulated_ablation",
+                  "simulated_edge_deletion",
+                  "other_declared"
+                ]
+              },
+              "waveform": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "shape",
+                  "amplitude",
+                  "amplitude_unit",
+                  "duration_seconds",
+                  "onset_seconds",
+                  "frequency_hz",
+                  "duty_cycle"
+                ],
+                "properties": {
+                  "shape": {
+                    "enum": [
+                      "step",
+                      "pulse",
+                      "train",
+                      "sinusoid",
+                      "chirp",
+                      "impulse",
+                      "arbitrary",
+                      "not_applicable"
+                    ]
+                  },
+                  "amplitude": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "amplitude_unit": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1
+                  },
+                  "duration_seconds": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "onset_seconds": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "frequency_hz": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "duty_cycle": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "waveform_sha256": {
+                    "$ref": "#/$defs/sha256OrNull"
+                  }
+                }
+              },
+              "inter_step_interval_seconds": {
+                "type": "number",
+                "minimum": 0
+              },
+              "state_context_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1
+              }
+            }
+          }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "protocol_semantics": {
+                "const": "ordered_steps"
+              }
+            },
+            "required": [
+              "protocol_semantics"
+            ]
+          },
+          "then": {
+            "required": [
+              "protocol_steps"
+            ],
+            "properties": {
+              "protocol_steps": {
+                "minItems": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "protocol_steps"
+            ]
+          },
+          "then": {
+            "properties": {
+              "protocol_semantics": {
+                "const": "ordered_steps"
+              }
+            }
+          }
+        }
+      ]
     },
     "metricDefinition": {
       "type": "object",
@@ -1318,7 +1511,12 @@
             "response_latency",
             "compute_cost",
             "failure_rate",
-            "other_declared"
+            "other_declared",
+            "expected_value_of_sample_information",
+            "fisher_d_optimal_gain_nats",
+            "fisher_a_optimal_variance_reduction",
+            "persistent_excitation_rank",
+            "persistent_excitation_condition_number"
           ]
         },
         "definition_version": {
