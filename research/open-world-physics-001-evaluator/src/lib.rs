@@ -1,0 +1,875 @@
+//! Open-world physical-law discovery reference evaluator (v0.1).
+//!
+//! This crate is intentionally a small, dependency-light baseline harness. It
+//! does not claim to be a general discovery agent or a blind benchmark: the
+//! reference corpus is source-visible. Its purpose is to freeze an executable
+//! model-selection/evaluation contract before adapter work begins.
+//!
+//! The candidate generator and the independent scoring boundary must remain
+//! separate in later versions. In v0.1, the grid-search fit is a baseline;
+//! the report explicitly labels the corpus as non-blind.
+
+use serde::Serialize;
+use sha2::{Digest, Sha256};
+use std::fmt;
+
+pub const REPORT_SCHEMA: &str = "open-world-physics-evaluator.v0.1";
+pub const TRAIN_X_MIN: f64 = 0.75;
+pub const TRAIN_X_MAX: f64 = 3.5;
+pub const HOLDOUT_X_MIN: f64 = 4.0;
+pub const HOLDOUT_X_MAX: f64 = 7.0;
+pub const TRAIN_QUERY_BUDGET: usize = 12;
+pub const HOLDOUT_POINT_COUNT: usize = 31;
+const RELATIVE_NOISE: f64 = 0.005;
+/// A BIC difference below this value is reported as indeterminate, not a unique recovery.
+const BIC_DECISIVE_DELTA: f64 = 2.0;
+
+const AMPLITUDES: &[f64] = &[0.5, 1.0, 1.5, 2.0, 2.5, 3.0];
+const EXPONENTS: &[f64] = &[1.0, 1.5, 2.0, 2.5, 3.0];
+const SCALES: &[f64] = &[0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LawFamily {
+    InversePower,
+    ScreenedInversePower,
+    Saturating,
+}
+
+impl LawFamily {
+    fn parameter_count(self) -> usize {
+        match self {
+            Self::InversePower => 2,
+            Self::ScreenedInversePower | Self::Saturating => 3,
+        }
+    }
+}
+
+/// A dimensionless scalar law used by the v0 reference suite.
+///
+/// `scale` is ignored by `InversePower`; it remains present so that the
+/// candidate descriptor has one simple serialized shape across families.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct Law {
+    pub family: LawFamily,
+    pub amplitude: f64,
+    pub exponent: f64,
+    pub scale: f64,
+}
+
+impl Law {
+    pub fn predict(self, x: f64) -> Option<f64> {
+        if !x.is_finite()
+            || x <= 0.0
+            || !self.amplitude.is_finite()
+            || self.amplitude <= 0.0
+            || !self.exponent.is_finite()
+            || self.exponent <= 0.0
+        {
+            return None;
+        }
+        if self.family != LawFamily::InversePower && (!self.scale.is_finite() || self.scale <= 0.0)
+        {
+            return None;
+        }
+
+        let value = match self.family {
+            LawFamily::InversePower => self.amplitude / x.powf(self.exponent),
+            LawFamily::ScreenedInversePower => {
+                self.amplitude * (-x / self.scale).exp() / x.powf(self.exponent)
+            }
+            LawFamily::Saturating => self.amplitude / (1.0 + (x / self.scale).powf(self.exponent)),
+        };
+        value.is_finite().then_some(value)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct Observation {
+    pub x: f64,
+    pub response: f64,
+    pub declared_sigma: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryPolicy {
+    FixedGrid,
+    SeededRandom,
+}
+
+impl QueryPolicy {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::FixedGrid => "fixed_grid",
+            Self::SeededRandom => "seeded_random",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SelectionDisposition {
+    DecisiveWithinReferenceGrammar,
+    Indeterminate,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct CaseResult {
+    pub world_id: String,
+    pub policy: QueryPolicy,
+    pub expected_family: LawFamily,
+    pub selected_family: LawFamily,
+    pub family_recovered: bool,
+    pub selection_disposition: SelectionDisposition,
+    /// BIC-like score gap between the best and second-best family; heuristic only.
+    pub delta_bic_to_runner_up: f64,
+    pub query_count: usize,
+    pub selected_law: Law,
+    /// Normalized RMSE against noisy discovery observations.
+    pub discovery_nrmse: f64,
+    /// Normalized RMSE against exact, noiseless outputs in the held-out range.
+    pub heldout_nrmse: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct PolicySummary {
+    pub policy: QueryPolicy,
+    pub case_count: usize,
+    /// Selected family matches the hidden reference family, regardless of ambiguity label.
+    pub family_recovery_rate: f64,
+    /// Fraction of cases both correctly matched and decisive under the declared BIC heuristic.
+    pub decisive_family_recovery_rate: f64,
+    pub mean_heldout_nrmse: f64,
+    pub median_heldout_nrmse: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ReportBody {
+    pub schema: String,
+    /// False by design: this first reference corpus is open source and source-visible.
+    pub blind_evaluation: bool,
+    pub corpus_sha256: String,
+    /// Compiler identity captured by the build script.
+    pub rustc_identity: String,
+    /// Cargo identity captured by the build script.
+    pub cargo_identity: String,
+    /// Git HEAD at build time; source-tree cleanliness is recorded separately.
+    pub source_commit_at_build: String,
+    pub source_tree_state_at_build: String,
+    /// SHA-256 over Cargo.toml, build.rs and Rust source files used by this harness.
+    pub evaluator_source_sha256: String,
+    /// SHA-256 over the nested Cargo.lock, or "missing" when unavailable.
+    pub dependency_lock_sha256: String,
+    pub training_query_budget_per_case: usize,
+    pub holdout_point_count_per_case: usize,
+    pub policies: Vec<PolicySummary>,
+    pub cases: Vec<CaseResult>,
+    pub claim_boundary: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct BenchmarkReport {
+    pub body: ReportBody,
+    /// SHA-256 of the compact deterministic JSON serialization of `body`.
+    pub receipt_sha256: String,
+}
+
+impl BenchmarkReport {
+    pub fn verify_receipt(&self) -> bool {
+        let Ok(bytes) = serde_json::to_vec(&self.body) else {
+            return false;
+        };
+        self.receipt_sha256 == sha256_hex(&bytes)
+            && self.body.corpus_sha256 == reference_corpus_sha256()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum QueryError {
+    NonFiniteInput,
+    OutsideDiscoveryDomain,
+    InvalidReferenceOutput,
+}
+
+impl fmt::Display for QueryError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NonFiniteInput => write!(f, "query x must be finite"),
+            Self::OutsideDiscoveryDomain => {
+                write!(f, "query lies outside the declared discovery domain")
+            }
+            Self::InvalidReferenceOutput => write!(f, "reference law returned an invalid output"),
+        }
+    }
+}
+
+impl std::error::Error for QueryError {}
+
+/// The only agent-facing surface of a reference world.
+///
+/// The truth is private to this module and is not returned by the query API.
+/// Because this is an open-source reference fixture, this encapsulation is not
+/// a security boundary: a real blind evaluation needs evaluator-owned worlds
+/// or a separate process/service boundary.
+#[derive(Clone)]
+pub struct ReferenceWorld {
+    id: &'static str,
+    truth: Law,
+    seed: u64,
+}
+
+impl ReferenceWorld {
+    pub fn id(&self) -> &'static str {
+        self.id
+    }
+
+    pub fn query(&self, x: f64, observation_id: u64) -> Result<Observation, QueryError> {
+        if !x.is_finite() {
+            return Err(QueryError::NonFiniteInput);
+        }
+        if !(TRAIN_X_MIN..=TRAIN_X_MAX).contains(&x) {
+            return Err(QueryError::OutsideDiscoveryDomain);
+        }
+        let expected = self
+            .truth
+            .predict(x)
+            .ok_or(QueryError::InvalidReferenceOutput)?;
+        let noise_seed = self.seed
+            ^ observation_id.wrapping_mul(0x9e37_79b9_7f4a_7c15)
+            ^ x.to_bits().rotate_left(17);
+        let noise = standard_normal(noise_seed);
+        let sigma = RELATIVE_NOISE * expected.abs().max(0.05);
+        let response = expected + sigma * noise;
+        if !response.is_finite() {
+            return Err(QueryError::InvalidReferenceOutput);
+        }
+        Ok(Observation {
+            x,
+            response,
+            declared_sigma: RELATIVE_NOISE * response.abs().max(0.05),
+        })
+    }
+}
+
+#[derive(Serialize)]
+struct CorpusEntry {
+    id: &'static str,
+    truth: Law,
+    seed: u64,
+    train_min: f64,
+    train_max: f64,
+    holdout_min: f64,
+    holdout_max: f64,
+}
+
+fn reference_worlds() -> Vec<ReferenceWorld> {
+    vec![
+        ReferenceWorld {
+            id: "world-inverse-power-a",
+            truth: Law {
+                family: LawFamily::InversePower,
+                amplitude: 2.0,
+                exponent: 2.0,
+                scale: 1.5,
+            },
+            seed: 0x5048_5953_0000_0001,
+        },
+        ReferenceWorld {
+            id: "world-screened-power-b",
+            truth: Law {
+                family: LawFamily::ScreenedInversePower,
+                amplitude: 2.5,
+                exponent: 2.0,
+                scale: 2.5,
+            },
+            seed: 0x5048_5953_0000_0002,
+        },
+        ReferenceWorld {
+            id: "world-saturating-c",
+            truth: Law {
+                family: LawFamily::Saturating,
+                amplitude: 1.5,
+                exponent: 2.0,
+                scale: 1.5,
+            },
+            seed: 0x5048_5953_0000_0003,
+        },
+    ]
+}
+
+/// Return the source-visible reference worlds through their query-only API.
+///
+/// This is useful for smoke tests and local agent development. It is not a
+/// blind evaluation interface because the corpus implementation is open source.
+pub fn open_reference_worlds() -> Vec<ReferenceWorld> {
+    reference_worlds()
+}
+
+fn reference_corpus_manifest() -> Vec<CorpusEntry> {
+    reference_worlds()
+        .into_iter()
+        .map(|world| CorpusEntry {
+            id: world.id,
+            truth: world.truth,
+            seed: world.seed,
+            train_min: TRAIN_X_MIN,
+            train_max: TRAIN_X_MAX,
+            holdout_min: HOLDOUT_X_MIN,
+            holdout_max: HOLDOUT_X_MAX,
+        })
+        .collect()
+}
+
+pub fn reference_corpus_sha256() -> String {
+    let bytes = serde_json::to_vec(&reference_corpus_manifest())
+        .expect("the fixed reference corpus must serialize deterministically");
+    sha256_hex(&bytes)
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut out = String::with_capacity(64);
+    for byte in digest {
+        use fmt::Write as _;
+        write!(&mut out, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    out
+}
+
+fn splitmix64(state: &mut u64) -> u64 {
+    *state = state.wrapping_add(0x9e37_79b9_7f4a_7c15);
+    let mut z = *state;
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    z ^ (z >> 31)
+}
+
+fn uniform01(state: &mut u64) -> f64 {
+    let bits = splitmix64(state) >> 11;
+    (bits as f64) / ((1_u64 << 53) as f64)
+}
+
+fn standard_normal(seed: u64) -> f64 {
+    let mut state = seed;
+    let u1 = uniform01(&mut state).max(1.0e-12);
+    let u2 = uniform01(&mut state);
+    (-2.0 * u1.ln()).sqrt() * (std::f64::consts::TAU * u2).cos()
+}
+
+fn query_points(policy: QueryPolicy, seed: u64) -> Vec<f64> {
+    let n = TRAIN_QUERY_BUDGET;
+    let mut points = match policy {
+        QueryPolicy::FixedGrid => (0..n)
+            .map(|i| {
+                TRAIN_X_MIN + (i as f64 + 1.0) * (TRAIN_X_MAX - TRAIN_X_MIN) / (n as f64 + 1.0)
+            })
+            .collect::<Vec<_>>(),
+        QueryPolicy::SeededRandom => {
+            let mut state = seed ^ 0x4558_5045_5249_4d45;
+            (0..n)
+                .map(|_| TRAIN_X_MIN + uniform01(&mut state) * (TRAIN_X_MAX - TRAIN_X_MIN))
+                .collect::<Vec<_>>()
+        }
+    };
+    points.sort_by(f64::total_cmp);
+    points
+}
+
+fn candidate_grid(family: LawFamily) -> Vec<Law> {
+    let scales: &[f64] = match family {
+        LawFamily::InversePower => &[1.0],
+        LawFamily::ScreenedInversePower | LawFamily::Saturating => SCALES,
+    };
+    let mut candidates = Vec::new();
+    for &amplitude in AMPLITUDES {
+        for &exponent in EXPONENTS {
+            for &scale in scales {
+                candidates.push(Law {
+                    family,
+                    amplitude,
+                    exponent,
+                    scale,
+                });
+            }
+        }
+    }
+    candidates
+}
+
+fn normalized_rmse(predicted: &[f64], observed: &[f64]) -> Option<f64> {
+    if predicted.is_empty() || predicted.len() != observed.len() {
+        return None;
+    }
+    if predicted
+        .iter()
+        .chain(observed.iter())
+        .any(|value| !value.is_finite())
+    {
+        return None;
+    }
+    let mse = predicted
+        .iter()
+        .zip(observed)
+        .map(|(p, y)| (p - y).powi(2))
+        .sum::<f64>()
+        / predicted.len() as f64;
+    let scale = (observed.iter().map(|y| y * y).sum::<f64>() / observed.len() as f64).sqrt();
+    (mse.is_finite() && scale.is_finite() && scale > 0.0).then_some(mse.sqrt() / scale.max(1.0e-12))
+}
+
+fn bic_for(law: Law, observations: &[Observation]) -> Option<f64> {
+    if observations.is_empty() {
+        return None;
+    }
+    // Gaussian -2 log-likelihood up to the candidate-independent constant
+    // ln(2*pi), followed by the BIC parameter-count penalty.
+    let mut negative_two_log_likelihood = 0.0;
+    for observation in observations {
+        if !observation.declared_sigma.is_finite() || observation.declared_sigma <= 0.0 {
+            return None;
+        }
+        let predicted = law.predict(observation.x)?;
+        let residual = (predicted - observation.response) / observation.declared_sigma;
+        negative_two_log_likelihood += residual * residual + 2.0 * observation.declared_sigma.ln();
+    }
+    let n = observations.len() as f64;
+    let score = negative_two_log_likelihood + law.family.parameter_count() as f64 * n.ln();
+    score.is_finite().then_some(score)
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FitOutcome {
+    selected: Law,
+    delta_bic_to_runner_up: f64,
+    disposition: SelectionDisposition,
+}
+
+/// Exhaustive, deterministic grid-search baseline using BIC-like complexity
+/// penalization. The best candidate is found separately per family so the
+/// ambiguity margin is between structural families, not neighbouring
+/// parameter-grid points. This remains a bounded baseline, not Ramanujan or
+/// open-ended theory generation.
+fn disposition_from_delta_bic(delta: f64) -> SelectionDisposition {
+    if delta.is_finite() && delta >= BIC_DECISIVE_DELTA {
+        SelectionDisposition::DecisiveWithinReferenceGrammar
+    } else {
+        SelectionDisposition::Indeterminate
+    }
+}
+
+fn fit_grid_baseline(observations: &[Observation]) -> Option<FitOutcome> {
+    if observations.len() < 3 {
+        return None;
+    }
+    let mut family_best: Vec<(f64, Law)> = Vec::new();
+    for family in [
+        LawFamily::InversePower,
+        LawFamily::ScreenedInversePower,
+        LawFamily::Saturating,
+    ] {
+        let mut best_for_family: Option<(f64, Law)> = None;
+        for law in candidate_grid(family) {
+            let Some(score) = bic_for(law, observations) else {
+                continue;
+            };
+            if best_for_family
+                .as_ref()
+                .is_none_or(|(best_score, _)| score < *best_score)
+            {
+                best_for_family = Some((score, law));
+            }
+        }
+        family_best.push(best_for_family?);
+    }
+    family_best.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let delta = (family_best[1].0 - family_best[0].0).max(0.0);
+    let disposition = disposition_from_delta_bic(delta);
+    Some(FitOutcome {
+        selected: family_best[0].1,
+        delta_bic_to_runner_up: delta,
+        disposition,
+    })
+}
+
+fn evaluate_case(world: &ReferenceWorld, policy: QueryPolicy) -> Option<CaseResult> {
+    let points = query_points(policy, world.seed);
+    let observations = points
+        .iter()
+        .enumerate()
+        .map(|(i, x)| world.query(*x, i as u64))
+        .collect::<Result<Vec<_>, _>>()
+        .ok()?;
+    let fit = fit_grid_baseline(&observations)?;
+    let selected = fit.selected;
+
+    let discovery_prediction = observations
+        .iter()
+        .map(|observation| selected.predict(observation.x))
+        .collect::<Option<Vec<_>>>()?;
+    let discovery_response = observations
+        .iter()
+        .map(|observation| observation.response)
+        .collect::<Vec<_>>();
+    let discovery_nrmse = normalized_rmse(&discovery_prediction, &discovery_response)?;
+
+    let mut heldout_prediction = Vec::with_capacity(HOLDOUT_POINT_COUNT);
+    let mut heldout_truth = Vec::with_capacity(HOLDOUT_POINT_COUNT);
+    for i in 0..HOLDOUT_POINT_COUNT {
+        let x = HOLDOUT_X_MIN
+            + i as f64 * (HOLDOUT_X_MAX - HOLDOUT_X_MIN)
+                / (HOLDOUT_POINT_COUNT.saturating_sub(1) as f64);
+        heldout_prediction.push(selected.predict(x)?);
+        heldout_truth.push(world.truth.predict(x)?);
+    }
+    let heldout_nrmse = normalized_rmse(&heldout_prediction, &heldout_truth)?;
+
+    Some(CaseResult {
+        world_id: world.id.to_owned(),
+        policy,
+        expected_family: world.truth.family,
+        selected_family: selected.family,
+        family_recovered: selected.family == world.truth.family,
+        selection_disposition: fit.disposition,
+        delta_bic_to_runner_up: fit.delta_bic_to_runner_up,
+        query_count: observations.len(),
+        selected_law: selected,
+        discovery_nrmse,
+        heldout_nrmse,
+    })
+}
+
+fn median(values: &mut [f64]) -> Option<f64> {
+    if values.is_empty() {
+        return None;
+    }
+    values.sort_by(f64::total_cmp);
+    let middle = values.len() / 2;
+    Some(if values.len().is_multiple_of(2) {
+        (values[middle - 1] + values[middle]) / 2.0
+    } else {
+        values[middle]
+    })
+}
+
+fn summarize(policy: QueryPolicy, rows: &[CaseResult]) -> Option<PolicySummary> {
+    let selected = rows
+        .iter()
+        .filter(|row| row.policy == policy)
+        .collect::<Vec<_>>();
+    if selected.is_empty() {
+        return None;
+    }
+    let recovered = selected.iter().filter(|row| row.family_recovered).count();
+    let decisive_recovered = selected
+        .iter()
+        .filter(|row| {
+            row.family_recovered
+                && row.selection_disposition == SelectionDisposition::DecisiveWithinReferenceGrammar
+        })
+        .count();
+    let mut errors = selected
+        .iter()
+        .map(|row| row.heldout_nrmse)
+        .collect::<Vec<_>>();
+    let mean = errors.iter().sum::<f64>() / errors.len() as f64;
+    let median = median(&mut errors)?;
+    Some(PolicySummary {
+        policy,
+        case_count: selected.len(),
+        family_recovery_rate: recovered as f64 / selected.len() as f64,
+        decisive_family_recovery_rate: decisive_recovered as f64 / selected.len() as f64,
+        mean_heldout_nrmse: mean,
+        median_heldout_nrmse: median,
+    })
+}
+
+pub fn run_reference_benchmark() -> BenchmarkReport {
+    let worlds = reference_worlds();
+    let mut rows = Vec::new();
+    for policy in [QueryPolicy::FixedGrid, QueryPolicy::SeededRandom] {
+        for world in &worlds {
+            rows.push(evaluate_case(world, policy).expect("fixed reference case must evaluate"));
+        }
+    }
+    let policies = [QueryPolicy::FixedGrid, QueryPolicy::SeededRandom]
+        .into_iter()
+        .map(|policy| summarize(policy, &rows).expect("each policy has reference cases"))
+        .collect();
+
+    let body = ReportBody {
+        schema: REPORT_SCHEMA.to_owned(),
+        blind_evaluation: false,
+        corpus_sha256: reference_corpus_sha256(),
+        rustc_identity: option_env!("OPEN_WORLD_RUSTC_ID")
+            .unwrap_or("unavailable")
+            .to_owned(),
+        cargo_identity: option_env!("OPEN_WORLD_CARGO_ID")
+            .unwrap_or("unavailable")
+            .to_owned(),
+        source_commit_at_build: option_env!("OPEN_WORLD_SOURCE_COMMIT")
+            .unwrap_or("unavailable")
+            .to_owned(),
+        source_tree_state_at_build: option_env!("OPEN_WORLD_SOURCE_TREE_STATE")
+            .unwrap_or("unavailable")
+            .to_owned(),
+        evaluator_source_sha256: option_env!("OPEN_WORLD_SOURCE_SHA256")
+            .unwrap_or("unavailable")
+            .to_owned(),
+        dependency_lock_sha256: option_env!("OPEN_WORLD_LOCK_SHA256")
+            .unwrap_or("missing")
+            .to_owned(),
+        training_query_budget_per_case: TRAIN_QUERY_BUDGET,
+        holdout_point_count_per_case: HOLDOUT_POINT_COUNT,
+        policies,
+        cases: rows,
+        claim_boundary: "Open, source-visible synthetic reference suite and bounded grid-search baseline only; not a blind SOTA result, not evidence of new real-world physics, and not production solver qualification.".to_owned(),
+    };
+    let bytes = serde_json::to_vec(&body).expect("report body must serialize deterministically");
+    BenchmarkReport {
+        body,
+        receipt_sha256: sha256_hex(&bytes),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn analytical_values_match_hand_calculation() {
+        let inverse = Law {
+            family: LawFamily::InversePower,
+            amplitude: 2.0,
+            exponent: 2.0,
+            scale: 1.0,
+        };
+        assert!((inverse.predict(2.0).unwrap() - 0.5).abs() < 1.0e-12);
+
+        let screened = Law {
+            family: LawFamily::ScreenedInversePower,
+            amplitude: 2.0,
+            exponent: 2.0,
+            scale: 2.0,
+        };
+        assert!(
+            (screened.predict(2.0).unwrap() - std::f64::consts::E.recip() / 2.0).abs() < 1.0e-12
+        );
+
+        let saturating = Law {
+            family: LawFamily::Saturating,
+            amplitude: 2.0,
+            exponent: 2.0,
+            scale: 2.0,
+        };
+        assert!((saturating.predict(2.0).unwrap() - 1.0).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn invalid_inputs_fail_closed() {
+        let law = Law {
+            family: LawFamily::InversePower,
+            amplitude: 1.0,
+            exponent: 2.0,
+            scale: 1.0,
+        };
+        assert!(law.predict(0.0).is_none());
+        assert!(law.predict(f64::NAN).is_none());
+        assert!(law.predict(f64::INFINITY).is_none());
+        assert!(
+            Law {
+                amplitude: f64::NAN,
+                ..law
+            }
+            .predict(1.0)
+            .is_none()
+        );
+        assert!(
+            Law {
+                exponent: 0.0,
+                ..law
+            }
+            .predict(1.0)
+            .is_none()
+        );
+        assert!(
+            Law {
+                scale: f64::NAN,
+                ..law
+            }
+            .predict(1.0)
+            .is_some()
+        );
+        assert!(
+            Law {
+                family: LawFamily::ScreenedInversePower,
+                scale: f64::NAN,
+                ..law
+            }
+            .predict(1.0)
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn query_api_rejects_nonfinite_and_holdout_domain_inputs() {
+        let world = open_reference_worlds().remove(0);
+        assert_eq!(world.query(f64::NAN, 0), Err(QueryError::NonFiniteInput));
+        assert_eq!(
+            world.query(HOLDOUT_X_MIN, 1),
+            Err(QueryError::OutsideDiscoveryDomain)
+        );
+        assert_eq!(
+            world.query(TRAIN_X_MIN - 0.1, 2),
+            Err(QueryError::OutsideDiscoveryDomain)
+        );
+
+        let first = world.query(1.5, 99).unwrap();
+        let repeated = world.query(1.5, 99).unwrap();
+        assert_eq!(first, repeated);
+        assert!(first.response.is_finite());
+        assert!(first.declared_sigma.is_finite() && first.declared_sigma > 0.0);
+    }
+
+    #[test]
+    fn noiseless_grid_search_recovers_each_reference_family() {
+        for world in reference_worlds() {
+            let points = query_points(QueryPolicy::FixedGrid, world.seed);
+            let observations = points
+                .into_iter()
+                .map(|x| Observation {
+                    x,
+                    response: world.truth.predict(x).unwrap(),
+                    declared_sigma: RELATIVE_NOISE
+                        * world.truth.predict(x).unwrap().abs().max(0.05),
+                })
+                .collect::<Vec<_>>();
+            let fitted = fit_grid_baseline(&observations).unwrap();
+            assert_eq!(
+                fitted.selected.family, world.truth.family,
+                "failed to recover reference family for {}",
+                world.id
+            );
+        }
+    }
+
+    #[test]
+    fn ambiguity_gate_fails_closed_at_nonfinite_or_small_score_gaps() {
+        assert_eq!(
+            disposition_from_delta_bic(BIC_DECISIVE_DELTA - f64::EPSILON),
+            SelectionDisposition::Indeterminate
+        );
+        assert_eq!(
+            disposition_from_delta_bic(BIC_DECISIVE_DELTA),
+            SelectionDisposition::DecisiveWithinReferenceGrammar
+        );
+        assert_eq!(
+            disposition_from_delta_bic(f64::NAN),
+            SelectionDisposition::Indeterminate
+        );
+        assert_eq!(
+            disposition_from_delta_bic(f64::INFINITY),
+            SelectionDisposition::Indeterminate
+        );
+    }
+
+    #[test]
+    fn model_selection_rejects_malformed_observation_contracts() {
+        let valid = Observation {
+            x: 1.0,
+            response: 1.0,
+            declared_sigma: 0.1,
+        };
+        let valid_observations = vec![valid; 12];
+        assert!(fit_grid_baseline(&valid_observations).is_some());
+
+        let mut zero_sigma = valid_observations.clone();
+        zero_sigma[0].declared_sigma = 0.0;
+        assert!(fit_grid_baseline(&zero_sigma).is_none());
+
+        let mut nonfinite_response = valid_observations.clone();
+        nonfinite_response[0].response = f64::NAN;
+        assert!(fit_grid_baseline(&nonfinite_response).is_none());
+
+        let mut invalid_domain = valid_observations;
+        invalid_domain[0].x = 0.0;
+        assert!(fit_grid_baseline(&invalid_domain).is_none());
+    }
+
+    #[test]
+    fn noisy_reference_suite_recovers_all_identifiable_families_decisively() {
+        let report = run_reference_benchmark();
+        assert_eq!(report.body.cases.len(), 6);
+        for row in &report.body.cases {
+            assert!(
+                row.family_recovered,
+                "wrong family for {} under {:?}: selected {:?}, expected {:?}",
+                row.world_id, row.policy, row.selected_family, row.expected_family
+            );
+            assert_eq!(
+                row.selection_disposition,
+                SelectionDisposition::DecisiveWithinReferenceGrammar,
+                "ambiguous model selection for {} under {:?}",
+                row.world_id,
+                row.policy
+            );
+            assert!(
+                row.heldout_nrmse < 1.0e-12,
+                "held-out fit drift for {} under {:?}: {}",
+                row.world_id,
+                row.policy,
+                row.heldout_nrmse
+            );
+        }
+    }
+
+    #[test]
+    fn report_is_deterministic_and_receipt_verifies() {
+        let first = run_reference_benchmark();
+        let second = run_reference_benchmark();
+        assert_eq!(first, second);
+        assert!(first.verify_receipt());
+        assert!(!first.body.blind_evaluation);
+        assert_eq!(first.body.cases.len(), 6);
+        assert!(!first.body.rustc_identity.is_empty());
+        assert!(!first.body.cargo_identity.is_empty());
+        assert!(!first.body.source_commit_at_build.is_empty());
+        assert!(!first.body.source_tree_state_at_build.is_empty());
+        assert!(!first.body.evaluator_source_sha256.is_empty());
+        assert!(!first.body.dependency_lock_sha256.is_empty());
+    }
+
+    #[test]
+    fn report_preserves_per_case_metrics_and_fixed_budgets() {
+        let report = run_reference_benchmark();
+        assert_eq!(
+            report.body.training_query_budget_per_case,
+            TRAIN_QUERY_BUDGET
+        );
+        assert_eq!(
+            report.body.holdout_point_count_per_case,
+            HOLDOUT_POINT_COUNT
+        );
+        assert_eq!(report.body.policies.len(), 2);
+        for row in &report.body.cases {
+            assert_eq!(row.query_count, TRAIN_QUERY_BUDGET);
+            assert!(row.discovery_nrmse.is_finite());
+            assert!(row.heldout_nrmse.is_finite());
+            assert!(row.discovery_nrmse >= 0.0);
+            assert!(row.heldout_nrmse >= 0.0);
+            assert!(row.delta_bic_to_runner_up.is_finite());
+            assert!(row.delta_bic_to_runner_up >= 0.0);
+            assert_eq!(
+                row.selection_disposition == SelectionDisposition::DecisiveWithinReferenceGrammar,
+                row.delta_bic_to_runner_up >= BIC_DECISIVE_DELTA
+            );
+        }
+    }
+
+    #[test]
+    fn receipt_detects_report_tampering() {
+        let mut report = run_reference_benchmark();
+        report.body.cases[0].heldout_nrmse += 0.01;
+        assert!(!report.verify_receipt());
+    }
+}
