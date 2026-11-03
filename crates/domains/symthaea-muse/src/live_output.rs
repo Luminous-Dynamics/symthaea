@@ -8,10 +8,11 @@
 //! update can invalidate stale application-queued output before the callback
 //! copies it into a device buffer.
 //!
-//! An epoch invalidation fences the application ring buffer only. It cannot
-//! recall frames already copied into an in-flight callback or submitted to
-//! the operating system / device queue. Acoustic silence needs a separate
-//! loopback or physical-output observation.
+//! An epoch invalidation fences the application ring buffer only. A frame
+//! that has already passed the callback's epoch check is admitted to that
+//! in-flight callback and cannot be revoked. Frames already submitted to the
+//! operating system / device queue also cannot be recalled. Acoustic silence
+//! needs a separate loopback or physical-output observation.
 
 use crate::output_epoch::{EpochTaggedStereoFrame, OutputEpochClock, OutputEpochError};
 use crate::streaming::StreamingSynth;
@@ -162,9 +163,27 @@ impl LiveMuseOutput {
                     let chunk_epoch = render_epoch;
                     let chunk = synth.render_chunk();
 
-                    // A chunk interrupted by invalidation retains its old tag
-                    // and is rejected even if this loop enqueues it afterward.
+                    // A chunk interrupted by invalidation retains its old tag.
+                    // Drain commands while enqueueing as well as between chunks,
+                    // so a full queue cannot force the producer to publish the
+                    // rest of an obsolete chunk before it notices a veto.
                     for pair in &chunk {
+                        while let Ok(command) = state_rx.try_recv() {
+                            match command {
+                                LiveCommand::UpdateState(state) => synth.update_state(&state),
+                                LiveCommand::InvalidateOutput { epoch } => {
+                                    render_epoch = epoch;
+                                }
+                                LiveCommand::UpdateStateImmediately { state, epoch } => {
+                                    synth.update_state(&state);
+                                    render_epoch = epoch;
+                                }
+                            }
+                        }
+                        if render_epoch != chunk_epoch {
+                            break;
+                        }
+
                         let mut attempts = 0;
                         while prod.vacant_len() < 1 {
                             std::thread::sleep(std::time::Duration::from_micros(100));
@@ -172,6 +191,24 @@ impl LiveMuseOutput {
                             if attempts > 1000 || !running_synth.load(Ordering::Relaxed) {
                                 return;
                             }
+                            while let Ok(command) = state_rx.try_recv() {
+                                match command {
+                                    LiveCommand::UpdateState(state) => synth.update_state(&state),
+                                    LiveCommand::InvalidateOutput { epoch } => {
+                                        render_epoch = epoch;
+                                    }
+                                    LiveCommand::UpdateStateImmediately { state, epoch } => {
+                                        synth.update_state(&state);
+                                        render_epoch = epoch;
+                                    }
+                                }
+                            }
+                            if render_epoch != chunk_epoch {
+                                break;
+                            }
+                        }
+                        if render_epoch != chunk_epoch {
+                            break;
                         }
 
                         let frame = EpochTaggedStereoFrame::new(chunk_epoch, *pair);
