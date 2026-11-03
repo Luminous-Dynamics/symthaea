@@ -737,6 +737,26 @@ mod tests {
     }
 
     #[test]
+    fn rejects_item_without_material_or_geometry_metadata() {
+        let mut bundle = valid_bundle();
+        bundle.items[0].material.clear();
+        assert_eq!(
+            validate_physical_run_bundle(&bundle, &[ResourceKind::FreshWater]),
+            Err(EvidenceBundleError::InvalidIdentity("item.material"))
+        );
+    }
+
+    #[test]
+    fn rejects_relative_humidity_outside_permille_range() {
+        let mut bundle = valid_bundle();
+        bundle.ambient_relative_humidity_permille = 1_001;
+        assert_eq!(
+            validate_physical_run_bundle(&bundle, &[ResourceKind::FreshWater]),
+            Err(EvidenceBundleError::InvalidIdentity("ambient_relative_humidity_permille"))
+        );
+    }
+
+    #[test]
     fn rejects_wrong_schema_version() {
         let mut bundle = valid_bundle();
         bundle.schema_version = 2;
