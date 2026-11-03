@@ -1,0 +1,749 @@
+#![forbid(unsafe_code)]
+
+//! Evidence-bounded, phase-resolved detergent dosing contract.
+//!
+//! This module does not formulate detergents, select an unvalidated dose, or
+//! predict cleaning. It verifies that an externally selected dose schedule is
+//! inside a versioned physical calibration envelope for the exact formulation,
+//! soil, surface, water hardness and temperature. It fails closed when evidence
+//! or compatibility data are missing.
+
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum WashStage {
+    Prewash,
+    MainWash,
+    IntermediateRinse,
+    FinalRinse,
+    Drying,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ComponentKind {
+    EnzymeBlend,
+    Surfactant,
+    Builder,
+    OxidizingBleach,
+    RinseAid,
+    WaterSoftenerSalt,
+    MachineCare,
+    Other,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct StageWindow {
+    pub stage: WashStage,
+    pub start_s: u32,
+    pub end_s: u32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DoseEvent {
+    pub event_id: String,
+    pub component_id: String,
+    pub stage: WashStage,
+    /// Elapsed seconds from the beginning of the complete cycle.
+    pub elapsed_s: u32,
+    /// Component mass in grams. Volumetric ingredients must be converted using
+    /// a measured batch density and archived as part of the formulation protocol.
+    pub dose_g: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ComponentCalibration {
+    pub component_id: String,
+    pub kind: ComponentKind,
+    pub calibration_id: String,
+    pub calibration_evidence_sha256: String,
+    pub allowed_stages: Vec<WashStage>,
+    pub supported_soil_classes: Vec<String>,
+    pub supported_surface_materials: Vec<String>,
+    pub minimum_temperature_c: f64,
+    pub maximum_temperature_c: f64,
+    pub minimum_water_hardness_ppm_as_caco3: u16,
+    pub maximum_water_hardness_ppm_as_caco3: u16,
+    pub minimum_release_g: f64,
+    pub maximum_release_g: f64,
+    pub maximum_cycle_g: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ComponentInteraction {
+    pub first_component_id: String,
+    pub second_component_id: String,
+    /// Minimum interval between any release events from these two components.
+    /// Must be supported by the exact-formulation compatibility study.
+    pub minimum_separation_s: u32,
+    pub compatibility_evidence_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ValidatedFormulation {
+    pub formulation_id: String,
+    pub formulation_evidence_sha256: String,
+    pub maximum_total_dose_g: f64,
+    pub components: Vec<ComponentCalibration>,
+    pub interactions: Vec<ComponentInteraction>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DosePlanRequest {
+    pub soil_class: String,
+    pub surface_material: String,
+    pub water_hardness_ppm_as_caco3: u16,
+    pub wash_temperature_c: f64,
+    pub cycle_duration_s: u32,
+    pub stage_windows: Vec<StageWindow>,
+    pub events: Vec<DoseEvent>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ValidatedDoseSummary {
+    pub event_count: usize,
+    pub component_count: usize,
+    pub total_dose_g: f64,
+    pub cycle_duration_s: u32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ChemistryError {
+    InvalidFormulationId,
+    InvalidEvidenceDigest(&'static str),
+    InvalidMaximumTotalDose,
+    NoCalibratedComponents,
+    DuplicateComponentId(String),
+    InvalidComponentCalibration {
+        component_id: String,
+        field: &'static str,
+    },
+    DuplicateInteraction(String, String),
+    UnknownInteractionComponent(String),
+    InvalidInteractionEvidence,
+    ZeroInteractionSeparation,
+    InvalidRequestScope(&'static str),
+    InvalidStageWindow,
+    DuplicateStageWindow(WashStage),
+    OverlappingStageWindows,
+    EmptyDosePlan,
+    DuplicateEventId(String),
+    UnknownComponent(String),
+    UnsupportedSoil {
+        component_id: String,
+        soil_class: String,
+    },
+    UnsupportedSurface {
+        component_id: String,
+        surface_material: String,
+    },
+    TemperatureOutsideCalibration {
+        component_id: String,
+    },
+    WaterHardnessOutsideCalibration {
+        component_id: String,
+    },
+    StageNotCalibrated {
+        component_id: String,
+        stage: WashStage,
+    },
+    EventOutsideStageWindow {
+        event_id: String,
+    },
+    DoseOutsideCalibration {
+        event_id: String,
+    },
+    ComponentCycleLimitExceeded {
+        component_id: String,
+    },
+    TotalDoseLimitExceeded,
+    IncompatibleReleaseTiming {
+        first_event_id: String,
+        second_event_id: String,
+        required_separation_s: u32,
+    },
+}
+
+impl fmt::Display for ChemistryError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{self:?}")
+    }
+}
+
+impl std::error::Error for ChemistryError {}
+
+fn valid_digest(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn non_empty(value: &str) -> bool {
+    !value.trim().is_empty()
+}
+
+fn validate_formulation(formulation: &ValidatedFormulation) -> Result<(), ChemistryError> {
+    if !non_empty(&formulation.formulation_id) {
+        return Err(ChemistryError::InvalidFormulationId);
+    }
+    if !valid_digest(&formulation.formulation_evidence_sha256) {
+        return Err(ChemistryError::InvalidEvidenceDigest("formulation"));
+    }
+    if !formulation.maximum_total_dose_g.is_finite()
+        || formulation.maximum_total_dose_g <= 0.0
+    {
+        return Err(ChemistryError::InvalidMaximumTotalDose);
+    }
+    if formulation.components.is_empty() {
+        return Err(ChemistryError::NoCalibratedComponents);
+    }
+
+    let mut component_ids = HashSet::with_capacity(formulation.components.len());
+    for component in &formulation.components {
+        if !non_empty(&component.component_id)
+            || !component_ids.insert(component.component_id.as_str())
+        {
+            return Err(ChemistryError::DuplicateComponentId(
+                component.component_id.clone(),
+            ));
+        }
+        if !non_empty(&component.calibration_id) {
+            return Err(ChemistryError::InvalidComponentCalibration {
+                component_id: component.component_id.clone(),
+                field: "calibration_id",
+            });
+        }
+        if !valid_digest(&component.calibration_evidence_sha256) {
+            return Err(ChemistryError::InvalidEvidenceDigest("component calibration"));
+        }
+        if component.allowed_stages.is_empty()
+            || component.supported_soil_classes.is_empty()
+            || component.supported_surface_materials.is_empty()
+        {
+            return Err(ChemistryError::InvalidComponentCalibration {
+                component_id: component.component_id.clone(),
+                field: "empty supported scope",
+            });
+        }
+        if component.minimum_temperature_c.is_finite().not()
+            || component.maximum_temperature_c.is_finite().not()
+            || component.minimum_temperature_c > component.maximum_temperature_c
+        {
+            return Err(ChemistryError::InvalidComponentCalibration {
+                component_id: component.component_id.clone(),
+                field: "temperature range",
+            });
+        }
+        if component.minimum_water_hardness_ppm_as_caco3
+            > component.maximum_water_hardness_ppm_as_caco3
+        {
+            return Err(ChemistryError::InvalidComponentCalibration {
+                component_id: component.component_id.clone(),
+                field: "water hardness range",
+            });
+        }
+        if !component.minimum_release_g.is_finite()
+            || !component.maximum_release_g.is_finite()
+            || !component.maximum_cycle_g.is_finite()
+            || component.minimum_release_g <= 0.0
+            || component.maximum_release_g < component.minimum_release_g
+            || component.maximum_cycle_g < component.minimum_release_g
+        {
+            return Err(ChemistryError::InvalidComponentCalibration {
+                component_id: component.component_id.clone(),
+                field: "dose bounds",
+            });
+        }
+    }
+
+    let mut interaction_keys = HashSet::new();
+    for interaction in &formulation.interactions {
+        if !component_ids.contains(interaction.first_component_id.as_str()) {
+            return Err(ChemistryError::UnknownInteractionComponent(
+                interaction.first_component_id.clone(),
+            ));
+        }
+        if !component_ids.contains(interaction.second_component_id.as_str()) {
+            return Err(ChemistryError::UnknownInteractionComponent(
+                interaction.second_component_id.clone(),
+            ));
+        }
+        if interaction.first_component_id == interaction.second_component_id {
+            return Err(ChemistryError::DuplicateInteraction(
+                interaction.first_component_id.clone(),
+                interaction.second_component_id.clone(),
+            ));
+        }
+        if interaction.minimum_separation_s == 0 {
+            return Err(ChemistryError::ZeroInteractionSeparation);
+        }
+        if !valid_digest(&interaction.compatibility_evidence_sha256) {
+            return Err(ChemistryError::InvalidInteractionEvidence);
+        }
+        let (left, right) = if interaction.first_component_id
+            <= interaction.second_component_id
+        {
+            (
+                interaction.first_component_id.as_str(),
+                interaction.second_component_id.as_str(),
+            )
+        } else {
+            (
+                interaction.second_component_id.as_str(),
+                interaction.first_component_id.as_str(),
+            )
+        };
+        if !interaction_keys.insert((left, right)) {
+            return Err(ChemistryError::DuplicateInteraction(
+                left.to_owned(),
+                right.to_owned(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+trait FloatFiniteNot {
+    fn not(self) -> bool;
+}
+
+impl FloatFiniteNot for bool {
+    fn not(self) -> bool {
+        !self
+    }
+}
+
+fn validate_stage_windows(
+    windows: &[StageWindow],
+    cycle_duration_s: u32,
+) -> Result<HashMap<WashStage, &StageWindow>, ChemistryError> {
+    if windows.is_empty() || cycle_duration_s == 0 {
+        return Err(ChemistryError::InvalidStageWindow);
+    }
+
+    let mut map = HashMap::with_capacity(windows.len());
+    let mut ordered: Vec<&StageWindow> = windows.iter().collect();
+    ordered.sort_by_key(|window| (window.start_s, window.end_s));
+
+    for window in &ordered {
+        if window.start_s >= window.end_s || window.end_s > cycle_duration_s {
+            return Err(ChemistryError::InvalidStageWindow);
+        }
+        if map.insert(window.stage, *window).is_some() {
+            return Err(ChemistryError::DuplicateStageWindow(window.stage));
+        }
+    }
+    if ordered
+        .windows(2)
+        .any(|pair| pair[0].end_s > pair[1].start_s)
+    {
+        return Err(ChemistryError::OverlappingStageWindows);
+    }
+    Ok(map)
+}
+
+/// Validate a proposed phase-resolved dose plan against physical calibration.
+///
+/// This function verifies bounds and timing only. It does not decide that a
+/// recipe is chemically optimal, safe for human contact, or sufficient to clean.
+/// Those conclusions must be established by the formulation owner and independent
+/// physical acceptance tests. If a condition is outside scope, the plan rejects.
+pub fn validate_dose_plan(
+    formulation: &ValidatedFormulation,
+    request: &DosePlanRequest,
+) -> Result<ValidatedDoseSummary, ChemistryError> {
+    validate_formulation(formulation)?;
+
+    if !non_empty(&request.soil_class) {
+        return Err(ChemistryError::InvalidRequestScope("soil_class"));
+    }
+    if !non_empty(&request.surface_material) {
+        return Err(ChemistryError::InvalidRequestScope("surface_material"));
+    }
+    if !request.wash_temperature_c.is_finite() {
+        return Err(ChemistryError::InvalidRequestScope("wash_temperature_c"));
+    }
+    if request.events.is_empty() {
+        return Err(ChemistryError::EmptyDosePlan);
+    }
+
+    let stage_windows = validate_stage_windows(&request.stage_windows, request.cycle_duration_s)?;
+    let calibration_by_id: HashMap<&str, &ComponentCalibration> = formulation
+        .components
+        .iter()
+        .map(|component| (component.component_id.as_str(), component))
+        .collect();
+
+    let mut event_ids = HashSet::with_capacity(request.events.len());
+    let mut component_totals: HashMap<&str, f64> = HashMap::new();
+    let mut total_dose_g = 0.0_f64;
+
+    for event in &request.events {
+        if !non_empty(&event.event_id) || !event_ids.insert(event.event_id.as_str()) {
+            return Err(ChemistryError::DuplicateEventId(event.event_id.clone()));
+        }
+        let calibration = calibration_by_id
+            .get(event.component_id.as_str())
+            .copied()
+            .ok_or_else(|| ChemistryError::UnknownComponent(event.component_id.clone()))?;
+
+        if !calibration
+            .supported_soil_classes
+            .iter()
+            .any(|soil| soil == &request.soil_class)
+        {
+            return Err(ChemistryError::UnsupportedSoil {
+                component_id: event.component_id.clone(),
+                soil_class: request.soil_class.clone(),
+            });
+        }
+        if !calibration
+            .supported_surface_materials
+            .iter()
+            .any(|surface| surface == &request.surface_material)
+        {
+            return Err(ChemistryError::UnsupportedSurface {
+                component_id: event.component_id.clone(),
+                surface_material: request.surface_material.clone(),
+            });
+        }
+        if request.wash_temperature_c < calibration.minimum_temperature_c
+            || request.wash_temperature_c > calibration.maximum_temperature_c
+        {
+            return Err(ChemistryError::TemperatureOutsideCalibration {
+                component_id: event.component_id.clone(),
+            });
+        }
+        if request.water_hardness_ppm_as_caco3
+            < calibration.minimum_water_hardness_ppm_as_caco3
+            || request.water_hardness_ppm_as_caco3
+                > calibration.maximum_water_hardness_ppm_as_caco3
+        {
+            return Err(ChemistryError::WaterHardnessOutsideCalibration {
+                component_id: event.component_id.clone(),
+            });
+        }
+        if !calibration.allowed_stages.contains(&event.stage) {
+            return Err(ChemistryError::StageNotCalibrated {
+                component_id: event.component_id.clone(),
+                stage: event.stage,
+            });
+        }
+        let window = stage_windows
+            .get(&event.stage)
+            .ok_or(ChemistryError::EventOutsideStageWindow {
+                event_id: event.event_id.clone(),
+            })?;
+        if event.elapsed_s < window.start_s || event.elapsed_s > window.end_s {
+            return Err(ChemistryError::EventOutsideStageWindow {
+                event_id: event.event_id.clone(),
+            });
+        }
+        if !event.dose_g.is_finite()
+            || event.dose_g < calibration.minimum_release_g
+            || event.dose_g > calibration.maximum_release_g
+        {
+            return Err(ChemistryError::DoseOutsideCalibration {
+                event_id: event.event_id.clone(),
+            });
+        }
+
+        let component_total = component_totals
+            .entry(calibration.component_id.as_str())
+            .or_insert(0.0);
+        *component_total += event.dose_g;
+        total_dose_g += event.dose_g;
+        if !component_total.is_finite() || *component_total > calibration.maximum_cycle_g {
+            return Err(ChemistryError::ComponentCycleLimitExceeded {
+                component_id: calibration.component_id.clone(),
+            });
+        }
+        if !total_dose_g.is_finite() || total_dose_g > formulation.maximum_total_dose_g {
+            return Err(ChemistryError::TotalDoseLimitExceeded);
+        }
+    }
+
+    for interaction in &formulation.interactions {
+        let first: Vec<&DoseEvent> = request
+            .events
+            .iter()
+            .filter(|event| event.component_id == interaction.first_component_id)
+            .collect();
+        let second: Vec<&DoseEvent> = request
+            .events
+            .iter()
+            .filter(|event| event.component_id == interaction.second_component_id)
+            .collect();
+
+        for left in &first {
+            for right in &second {
+                if left.elapsed_s.abs_diff(right.elapsed_s) < interaction.minimum_separation_s {
+                    return Err(ChemistryError::IncompatibleReleaseTiming {
+                        first_event_id: left.event_id.clone(),
+                        second_event_id: right.event_id.clone(),
+                        required_separation_s: interaction.minimum_separation_s,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(ValidatedDoseSummary {
+        event_count: request.events.len(),
+        component_count: component_totals.len(),
+        total_dose_g,
+        cycle_duration_s: request.cycle_duration_s,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn calibration(
+        component_id: &str,
+        kind: ComponentKind,
+        stages: Vec<WashStage>,
+        max_cycle: f64,
+    ) -> ComponentCalibration {
+        ComponentCalibration {
+            component_id: component_id.to_owned(),
+            kind,
+            calibration_id: format!("calibration-{component_id}-v1"),
+            calibration_evidence_sha256: "a".repeat(64),
+            allowed_stages: stages,
+            supported_soil_classes: vec!["starch".to_owned(), "protein".to_owned()],
+            supported_surface_materials: vec![
+                "ceramic".to_owned(),
+                "glass".to_owned(),
+                "stainless_steel".to_owned(),
+            ],
+            minimum_temperature_c: 35.0,
+            maximum_temperature_c: 65.0,
+            minimum_water_hardness_ppm_as_caco3: 50,
+            maximum_water_hardness_ppm_as_caco3: 250,
+            minimum_release_g: 0.1,
+            maximum_release_g: 2.0,
+            maximum_cycle_g: max_cycle,
+        }
+    }
+
+    fn formulation() -> ValidatedFormulation {
+        ValidatedFormulation {
+            formulation_id: "test-formulation-v1".to_owned(),
+            formulation_evidence_sha256: "b".repeat(64),
+            maximum_total_dose_g: 3.0,
+            components: vec![
+                calibration(
+                    "enzyme",
+                    ComponentKind::EnzymeBlend,
+                    vec![WashStage::Prewash, WashStage::MainWash],
+                    2.0,
+                ),
+                calibration(
+                    "bleach",
+                    ComponentKind::OxidizingBleach,
+                    vec![WashStage::MainWash],
+                    1.0,
+                ),
+                calibration(
+                    "rinse-aid",
+                    ComponentKind::RinseAid,
+                    vec![WashStage::FinalRinse],
+                    0.5,
+                ),
+            ],
+            interactions: vec![ComponentInteraction {
+                first_component_id: "enzyme".to_owned(),
+                second_component_id: "bleach".to_owned(),
+                minimum_separation_s: 120,
+                compatibility_evidence_sha256: "c".repeat(64),
+            }],
+        }
+    }
+
+    fn request() -> DosePlanRequest {
+        DosePlanRequest {
+            soil_class: "starch".to_owned(),
+            surface_material: "ceramic".to_owned(),
+            water_hardness_ppm_as_caco3: 120,
+            wash_temperature_c: 50.0,
+            cycle_duration_s: 1_800,
+            stage_windows: vec![
+                StageWindow { stage: WashStage::Prewash, start_s: 0, end_s: 300 },
+                StageWindow { stage: WashStage::MainWash, start_s: 300, end_s: 1_200 },
+                StageWindow { stage: WashStage::FinalRinse, start_s: 1_200, end_s: 1_500 },
+                StageWindow { stage: WashStage::Drying, start_s: 1_500, end_s: 1_800 },
+            ],
+            events: vec![
+                DoseEvent {
+                    event_id: "enzyme-pre".to_owned(),
+                    component_id: "enzyme".to_owned(),
+                    stage: WashStage::Prewash,
+                    elapsed_s: 120,
+                    dose_g: 0.5,
+                },
+                DoseEvent {
+                    event_id: "bleach-main".to_owned(),
+                    component_id: "bleach".to_owned(),
+                    stage: WashStage::MainWash,
+                    elapsed_s: 600,
+                    dose_g: 0.4,
+                },
+                DoseEvent {
+                    event_id: "rinse-aid-final".to_owned(),
+                    component_id: "rinse-aid".to_owned(),
+                    stage: WashStage::FinalRinse,
+                    elapsed_s: 1_350,
+                    dose_g: 0.2,
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn validates_a_fully_scoped_calibrated_schedule() {
+        let result = validate_dose_plan(&formulation(), &request()).unwrap();
+        assert_eq!(result.event_count, 3);
+        assert_eq!(result.component_count, 3);
+        assert!((result.total_dose_g - 1.1).abs() < 1e-12);
+    }
+
+    #[test]
+    fn rejects_component_outside_soil_envelope() {
+        let mut profile = formulation();
+        profile.components[0].supported_soil_classes = vec!["protein".to_owned()];
+        assert!(matches!(
+            validate_dose_plan(&profile, &request()),
+            Err(ChemistryError::UnsupportedSoil { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_temperature_outside_calibration() {
+        let mut input = request();
+        input.wash_temperature_c = 70.0;
+        assert!(matches!(
+            validate_dose_plan(&formulation(), &input),
+            Err(ChemistryError::TemperatureOutsideCalibration { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_water_hardness_outside_calibration() {
+        let mut input = request();
+        input.water_hardness_ppm_as_caco3 = 300;
+        assert!(matches!(
+            validate_dose_plan(&formulation(), &input),
+            Err(ChemistryError::WaterHardnessOutsideCalibration { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_component_in_unsupported_stage() {
+        let mut input = request();
+        input.events[2].stage = WashStage::MainWash;
+        input.events[2].elapsed_s = 1_000;
+        assert!(matches!(
+            validate_dose_plan(&formulation(), &input),
+            Err(ChemistryError::StageNotCalibrated { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_release_outside_stage_window() {
+        let mut input = request();
+        input.events[0].elapsed_s = 600;
+        assert!(matches!(
+            validate_dose_plan(&formulation(), &input),
+            Err(ChemistryError::EventOutsideStageWindow { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_per_event_and_total_component_overdose() {
+        let mut input = request();
+        input.events[0].dose_g = 2.1;
+        assert!(matches!(
+            validate_dose_plan(&formulation(), &input),
+            Err(ChemistryError::DoseOutsideCalibration { .. })
+        ));
+
+        let mut input = request();
+        input.events[0].dose_g = 1.1;
+        input.events.push(DoseEvent {
+            event_id: "enzyme-pre-2".to_owned(),
+            component_id: "enzyme".to_owned(),
+            stage: WashStage::Prewash,
+            elapsed_s: 240,
+            dose_g: 1.0,
+        });
+        input.events[1].elapsed_s = 700;
+        assert!(matches!(
+            validate_dose_plan(&formulation(), &input),
+            Err(ChemistryError::ComponentCycleLimitExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_incompatible_component_timing() {
+        let mut input = request();
+        input.events[0].elapsed_s = 590;
+        assert!(matches!(
+            validate_dose_plan(&formulation(), &input),
+            Err(ChemistryError::IncompatibleReleaseTiming { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_total_formulation_limit() {
+        let mut profile = formulation();
+        profile.maximum_total_dose_g = 0.8;
+        assert!(matches!(
+            validate_dose_plan(&profile, &request()),
+            Err(ChemistryError::TotalDoseLimitExceeded)
+        ));
+    }
+
+    #[test]
+    fn rejects_missing_evidence_or_unknown_component() {
+        let mut profile = formulation();
+        profile.components[0].calibration_evidence_sha256 = "missing".to_owned();
+        assert!(matches!(
+            validate_dose_plan(&profile, &request()),
+            Err(ChemistryError::InvalidEvidenceDigest("component calibration"))
+        ));
+
+        let mut input = request();
+        input.events[0].component_id = "unvalidated".to_owned();
+        assert!(matches!(
+            validate_dose_plan(&formulation(), &input),
+            Err(ChemistryError::UnknownComponent(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_duplicate_events_and_empty_plans() {
+        let mut input = request();
+        input.events[1].event_id = input.events[0].event_id.clone();
+        assert!(matches!(
+            validate_dose_plan(&formulation(), &input),
+            Err(ChemistryError::DuplicateEventId(_))
+        ));
+
+        input.events.clear();
+        assert!(matches!(
+            validate_dose_plan(&formulation(), &input),
+            Err(ChemistryError::EmptyDosePlan)
+        ));
+    }
+
+    #[test]
+    fn rejects_invalid_stage_windows() {
+        let mut input = request();
+        input.stage_windows[1].start_s = 200;
+        assert!(matches!(
+            validate_dose_plan(&formulation(), &input),
+            Err(ChemistryError::OverlappingStageWindows)
+        ));
+    }
+}
