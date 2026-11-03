@@ -37,6 +37,8 @@ pub struct StageWindow {
     pub stage: WashStage,
     pub start_s: u32,
     pub end_s: u32,
+    /// Water temperature at the release point; drying has no liquid-water temperature.
+    pub water_temperature_c: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -93,7 +95,6 @@ pub struct DosePlanRequest {
     pub soil_class: String,
     pub surface_material: String,
     pub water_hardness_ppm_as_caco3: u16,
-    pub wash_temperature_c: f64,
     pub cycle_duration_s: u32,
     pub stage_windows: Vec<StageWindow>,
     pub events: Vec<DoseEvent>,
@@ -126,6 +127,7 @@ pub enum ChemistryError {
     InvalidStageWindow,
     DuplicateStageWindow(WashStage),
     OverlappingStageWindows,
+    StageOrderViolation,
     EmptyDosePlan,
     DuplicateEventId(String),
     UnknownComponent(String),
@@ -315,9 +317,27 @@ fn validate_stage_windows(
     let mut ordered: Vec<&StageWindow> = windows.iter().collect();
     ordered.sort_by_key(|window| (window.start_s, window.end_s));
 
+    let mut previous_order: Option<u8> = None;
     for window in &ordered {
         if window.start_s >= window.end_s || window.end_s > cycle_duration_s {
             return Err(ChemistryError::InvalidStageWindow);
+        }
+        let stage_order = match window.stage {
+            WashStage::Prewash => 0,
+            WashStage::MainWash => 1,
+            WashStage::IntermediateRinse => 2,
+            WashStage::FinalRinse => 3,
+            WashStage::Drying => 4,
+        };
+        if previous_order.is_some_and(|previous| stage_order <= previous) {
+            return Err(ChemistryError::StageOrderViolation);
+        }
+        previous_order = Some(stage_order);
+        match (window.stage, window.water_temperature_c) {
+            (WashStage::Drying, None) => {}
+            (WashStage::Drying, Some(_)) => return Err(ChemistryError::InvalidStageWindow),
+            (_, Some(temperature)) if temperature.is_finite() && temperature >= 0.0 => {}
+            _ => return Err(ChemistryError::InvalidStageWindow),
         }
         if map.insert(window.stage, *window).is_some() {
             return Err(ChemistryError::DuplicateStageWindow(window.stage));
@@ -350,10 +370,7 @@ pub fn validate_dose_plan(
     if !non_empty(&request.surface_material) {
         return Err(ChemistryError::InvalidRequestScope("surface_material"));
     }
-    if !request.wash_temperature_c.is_finite() {
-        return Err(ChemistryError::InvalidRequestScope("wash_temperature_c"));
-    }
-    if request.events.is_empty() {
+request temp check    if request.events.is_empty() {
         return Err(ChemistryError::EmptyDosePlan);
     }
 
@@ -397,13 +414,6 @@ pub fn validate_dose_plan(
                 surface_material: request.surface_material.clone(),
             });
         }
-        if request.wash_temperature_c < calibration.minimum_temperature_c
-            || request.wash_temperature_c > calibration.maximum_temperature_c
-        {
-            return Err(ChemistryError::TemperatureOutsideCalibration {
-                component_id: event.component_id.clone(),
-            });
-        }
         if request.water_hardness_ppm_as_caco3
             < calibration.minimum_water_hardness_ppm_as_caco3
             || request.water_hardness_ppm_as_caco3
@@ -424,9 +434,21 @@ pub fn validate_dose_plan(
             .ok_or(ChemistryError::EventOutsideStageWindow {
                 event_id: event.event_id.clone(),
             })?;
-        if event.elapsed_s < window.start_s || event.elapsed_s > window.end_s {
+        if event.elapsed_s < window.start_s || event.elapsed_s >= window.end_s {
             return Err(ChemistryError::EventOutsideStageWindow {
                 event_id: event.event_id.clone(),
+            });
+        }
+        let Some(stage_temperature_c) = window.water_temperature_c else {
+            return Err(ChemistryError::TemperatureOutsideCalibration {
+                component_id: event.component_id.clone(),
+            });
+        };
+        if stage_temperature_c < calibration.minimum_temperature_c
+            || stage_temperature_c > calibration.maximum_temperature_c
+        {
+            return Err(ChemistryError::TemperatureOutsideCalibration {
+                component_id: event.component_id.clone(),
             });
         }
         if !event.dose_g.is_finite()
@@ -560,10 +582,10 @@ mod tests {
             wash_temperature_c: 50.0,
             cycle_duration_s: 1_800,
             stage_windows: vec![
-                StageWindow { stage: WashStage::Prewash, start_s: 0, end_s: 300 },
-                StageWindow { stage: WashStage::MainWash, start_s: 300, end_s: 1_200 },
-                StageWindow { stage: WashStage::FinalRinse, start_s: 1_200, end_s: 1_500 },
-                StageWindow { stage: WashStage::Drying, start_s: 1_500, end_s: 1_800 },
+                StageWindow { stage: WashStage::Prewash, start_s: 0, end_s: 300, water_temperature_c: Some(40.0) },
+                StageWindow { stage: WashStage::MainWash, start_s: 300, end_s: 1_200, water_temperature_c: Some(55.0) },
+                StageWindow { stage: WashStage::FinalRinse, start_s: 1_200, end_s: 1_500, water_temperature_c: Some(45.0) },
+                StageWindow { stage: WashStage::Drying, start_s: 1_500, end_s: 1_800, water_temperature_c: None },
             ],
             events: vec![
                 DoseEvent {
@@ -597,6 +619,40 @@ mod tests {
         assert_eq!(result.event_count, 3);
         assert_eq!(result.component_count, 3);
         assert!((result.total_dose_g - 1.1).abs() < 1e-12);
+    }
+
+    #[test]
+    fn validates_temperature_at_each_dosing_phase_not_one_global_value() {
+        let mut input = request();
+        input.stage_windows[0].water_temperature_c = Some(70.0);
+        assert!(matches!(
+            validate_dose_plan(&formulation(), &input),
+            Err(ChemistryError::TemperatureOutsideCalibration { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_a_stage_order_that_runs_backward_in_time() {
+        let mut input = request();
+        input.stage_windows[1].start_s = 1_000;
+        input.stage_windows[1].end_s = 1_100;
+        input.stage_windows[2].start_s = 500;
+        input.stage_windows[2].end_s = 800;
+        assert!(matches!(
+            validate_dose_plan(&formulation(), &input),
+            Err(ChemistryError::StageOrderViolation)
+                | Err(ChemistryError::OverlappingStageWindows)
+        ));
+    }
+
+    #[test]
+    fn rejects_dosing_at_the_exclusive_stage_end() {
+        let mut input = request();
+        input.events[0].elapsed_s = 300;
+        assert!(matches!(
+            validate_dose_plan(&formulation(), &input),
+            Err(ChemistryError::EventOutsideStageWindow { .. })
+        ));
     }
 
     #[test]
