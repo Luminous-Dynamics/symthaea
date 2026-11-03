@@ -189,6 +189,8 @@ This oracle is not a substitute for public benchmarks. It is the analytic gate b
 | Argoverse 2 multi-agent motion forecasting test | SOTA2 surfaced IMR 0.92 minADE K=1 and QCNeXt 0.50 minADE K=6 (board updated about 3 months ago) | minADE/minFDE, miss rate, Brier score, calibration and downstream action regret |
 | Waymo Open Sim Agents Challenge 2025 | SMART-R1 realism 78.58; kinematics 49.44; interactivity 81.10; map adherence 92.01 (third-party board updated about 7 months ago) | Keep realism dimensions separate; verify exact official evaluator/version before claiming comparability |
 | Fail2Drive | 200 paired routes, 17 shift classes; paper reports 22.8% average success-rate degradation for evaluated models | Paired ID/OOD degradation, family worst-case, failure taxonomy and confidence intervals |
+| Waymo E2E Driving Challenge | SOTA2 surfaced OpenEMMA 2026.05 at 6.3162 overall RFS; construction/intersection/pedestrian/cyclist RFS dimensions are separately listed; board updated about 4 months ago | RFS direction and evaluator semantics must be frozen from the official protocol; do not infer operational safety from the score |
+| Bench2Drive 220-route official track | SOTA2 surfaced LVDrive 2026.05 at 80.71 Overall Success Rate (DS), with SR 58.26; board updated about 4 months ago | Use the exact 220-route task and scoring; compare route completion, success, efficiency, comfort and maneuver-specific outcomes separately |
 | CARLA Leaderboard 2.1 | Linear infraction penalty; early-stop reward exploit explicitly addressed | Route completion and each infraction family; frozen route/route-phase denominator; no 2.0/2.1 score mixing |
 | NIST Measurement Science for Automated Vehicles | Four-tier progression: surrogate metrics, outcome prediction, counterfactual decisions, cross-scenario diagnosis | Use as SAM's decision-measurement architecture, not as a claim of NIST endorsement or certification |
 
@@ -200,6 +202,9 @@ Sources:
 - https://waymo.com/open/challenges/
 - https://arxiv.org/abs/2604.08535
 - https://leaderboard.carla.org/
+- https://www.sota2.com/research/sota/end-to-end-driving-on-waymo-e2e-driving-challenge-leaderboard
+- https://www.sota2.com/research/sota/end-to-end-autonomous-driving-on-bench2drive-220-routes-official
+- https://github.com/autonomousvision/Bench2Drive-Leaderboard
 - https://www.nist.gov/programs-projects/measurement-science-automated-vehicles-0
 
 ## 10. Milestones and acceptance
@@ -240,6 +245,14 @@ Sources:
 - At least 10% lower median and p95 finite-set regret versus a frozen baseline at matched compute, with no increase in infeasibility or deadline misses.
 
 These are research targets, not current capabilities, safety thresholds or certification criteria.
+
+### Industry architecture reference: NVIDIA Alpamayo
+
+NVIDIA Alpamayo 2 Super is an important industry reference, but not a directly comparable benchmark entry. NVIDIA describes a 34B reasoning VLA, the AlpaSim closed-loop simulator, AlpaGym closed-loop RL, causal reasoning traces and open driving datasets. NVIDIA-reported results include 0.911 m minADE6 at 6.4 s on 1,434 challenging samples, reasoning score 0.433, LingoQA 79.2, and AlpaSim score 1.50 ± 0.13 on 913 reconstructed scenes. These numbers belong to different tasks/data/protocols and must not be compared as one score.
+
+Strategic implication: SAM should not try to beat a 34B camera-language-action foundation model at raw perception with a small analytic/HDC controller. Its differentiated research target is evidence qualification: expose model error, detect action-ranking exploitation, preserve uncertainty/missingness and produce independently recomputable counterfactual decision audits. A later teacher/student or external-VLA integration can compare decision quality at matched observations, action spaces and compute.
+
+Reference: https://developer.nvidia.com/blog/generate-trajectories-reasoning-traces-and-auto-labels-with-nvidia-alpamayo-2-super/
 
 ## 11. Claim ceiling
 
