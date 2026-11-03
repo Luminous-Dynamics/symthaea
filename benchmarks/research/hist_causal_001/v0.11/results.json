@@ -1,0 +1,36 @@
+{
+  "benchmark": "HIST-CAUSAL-001",
+  "version": "0.11",
+  "design": {
+    "replicates": 1000,
+    "permutations": 999,
+    "clusters": 64,
+    "treated_clusters": 32,
+    "participants_per_cluster": 16,
+    "repeated_probes_per_participant": 3,
+    "cluster_sd": 1.0,
+    "participant_sd": 0.5,
+    "measurement_sd": 1.0,
+    "treatment_effect": 0.0,
+    "seed": 20261103
+  },
+  "independent_assignment_unit": "cluster/family",
+  "null_hypothesis": "zero treatment effect",
+  "false_positive_rate_at_alpha_0_05": {
+    "invalid_participant_level_welch": 0.682,
+    "cluster_mean_welch": 0.05,
+    "cluster_level_randomization_inference": 0.049
+  },
+  "wilson_95_percent_interval": {
+    "invalid_participant_level_welch": [0.6525, 0.7101],
+    "cluster_mean_welch": [0.0381, 0.0653],
+    "cluster_level_randomization_inference": [0.0373, 0.0642]
+  },
+  "power_by_treatment_effect": {
+    "0.0": {"invalid_participant_level_welch":0.682,"cluster_mean_welch":0.05,"cluster_level_randomization_inference":0.049},
+    "0.2": {"invalid_participant_level_welch":0.768,"cluster_mean_welch":0.126,"cluster_level_randomization_inference":0.125},
+    "0.4": {"invalid_participant_level_welch":0.9,"cluster_mean_welch":0.352,"cluster_level_randomization_inference":0.345},
+    "0.6": {"invalid_participant_level_welch":0.971,"cluster_mean_welch":0.643,"cluster_level_randomization_inference":0.642}
+  },
+  "claim_ceiling": "synthetic design stress test under Gaussian cluster random-intercept model; no universal or empirical guarantee"
+}
