@@ -1,0 +1,19 @@
+{
+  "benchmark":"HIST-CAUSAL-001",
+  "version":"0.10",
+  "issue":10184,
+  "status":"exact_finite_grid_nuisance_robust_pvalue_fixture",
+  "method":"Berger-Boos-style p = min(1, sup(theta in C) p_theta + beta)",
+  "pilot_independent_of_evaluation":true,
+  "nuisance_grid":["1/4","1/2","3/4"],
+  "pilot_n":20,
+  "evaluation_n":20,
+  "beta":"1/100",
+  "alpha":"1/20",
+  "alternative_theta":"1/8",
+  "minimum_grid_confidence_coverage":0.9928866463969825,
+  "maximum_grid_false_rejection_probability":0.02657267381824577,
+  "alternative_power":0.24847753514317353,
+  "tests":6,
+  "claim_ceiling":"finite grid proof fixture only; continuous nuisance and persistent-cluster validity not established"
+}
