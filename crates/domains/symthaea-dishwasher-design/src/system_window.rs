@@ -137,6 +137,8 @@ pub struct CompartmentWindowStats {
     pub unresolved_requests_at_window_end: usize,
     pub verified_item_release_count: usize,
     pub active_request_seconds: u64,
+    pub active_compartment_seconds: u64,
+    pub compartment_utilization_fraction: f64,
     pub maximum_concurrent_requests: usize,
 }
 
@@ -173,6 +175,9 @@ pub struct SystemWindowReport {
     pub verified_items_per_hour: f64,
     pub time_to_first_release_seconds: Option<u64>,
     pub active_request_seconds: u64,
+    pub active_compartment_seconds_total: u64,
+    pub compartment_count: usize,
+    pub compartment_utilization_fraction: f64,
     pub maximum_concurrent_requests: usize,
     pub maximum_concurrent_compartments: usize,
     /// Percentiles use nearest-rank over completed requests accepted in-window.
@@ -307,7 +312,7 @@ fn build_compartment_stats(
     spec: &SystemWindowSpec,
     requests: &[ServiceWindowRequest],
     releases: &[ItemReleaseEvent],
-) -> Result<Vec<CompartmentWindowStats>, SystemWindowError> {
+) -> Result<(Vec<CompartmentWindowStats>, usize, u64), SystemWindowError> {
     let mut accumulators: BTreeMap<String, CompartmentAccumulator> = BTreeMap::new();
     let mut request_by_id = HashMap::with_capacity(requests.len());
 
@@ -387,9 +392,37 @@ fn build_compartment_stats(
             .ok_or(SystemWindowError::CounterOverflow("compartment_release_count"))?;
     }
 
-    accumulators.into_iter().map(|(compartment_id, mut stats)| {
+    let mut active_compartment_events = Vec::new();
+    let mut active_compartment_seconds_total = 0_u64;
+    let mut compartment_stats = Vec::with_capacity(accumulators.len());
+    for (compartment_id, mut stats) in accumulators {
         let maximum_concurrent_requests = maximum_concurrency(&mut stats.concurrency_events)?;
-        Ok(CompartmentWindowStats {
+        let mut current_requests = 0_isize;
+        let mut active_start_at_s: Option<u64> = None;
+        let mut active_compartment_seconds = 0_u64;
+        for (timestamp, delta) in &stats.concurrency_events {
+            let previous = current_requests;
+            current_requests += *delta as isize;
+            if current_requests < 0 {
+                return Err(SystemWindowError::InvalidWindow);
+            }
+            if previous == 0 && current_requests > 0 {
+                active_start_at_s = Some(*timestamp);
+                active_compartment_events.push((*timestamp, 1));
+            } else if previous > 0 && current_requests == 0 {
+                let start = active_start_at_s.take().ok_or(SystemWindowError::InvalidWindow)?;
+                let duration = timestamp.saturating_sub(start);
+                active_compartment_seconds = active_compartment_seconds.checked_add(duration)
+                    .ok_or(SystemWindowError::CounterOverflow("active_compartment_seconds"))?;
+                active_compartment_events.push((*timestamp, -1));
+            }
+        }
+        if current_requests != 0 || active_start_at_s.is_some() {
+            return Err(SystemWindowError::InvalidWindow);
+        }
+        active_compartment_seconds_total = active_compartment_seconds_total.checked_add(active_compartment_seconds)
+            .ok_or(SystemWindowError::CounterOverflow("active_compartment_seconds_total"))?;
+        compartment_stats.push(CompartmentWindowStats {
             compartment_id,
             compartment_configuration_sha256: stats.configuration_sha256,
             request_record_count: stats.request_record_count,
@@ -400,9 +433,14 @@ fn build_compartment_stats(
             unresolved_requests_at_window_end: stats.unresolved_requests_at_window_end,
             verified_item_release_count: stats.verified_item_release_count,
             active_request_seconds: stats.active_request_seconds,
+            active_compartment_seconds,
+            compartment_utilization_fraction: active_compartment_seconds as f64
+                / (spec.end_at_s - spec.start_at_s) as f64,
             maximum_concurrent_requests,
-        })
-    }).collect()
+        });
+    }
+    let maximum_concurrent_compartments = maximum_concurrency(&mut active_compartment_events)?;
+    Ok((compartment_stats, maximum_concurrent_compartments, active_compartment_seconds_total))
 }
 
 fn validate_service_report(
