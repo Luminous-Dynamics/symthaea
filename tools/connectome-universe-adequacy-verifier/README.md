@@ -23,12 +23,12 @@ Exit status:
 - `64`: usage error;
 - `66`: input file could not be read.
 
-The output is deterministic JSON with `status=COUNTERS_RECOMPUTED`, `source_report_sha256`, and `trusted_promotion=false`. It reports the input `claimed_enumeration_closure` separately from `worldset_closure_validation=NOT_PERFORMED_BY_THIS_TOOL`; it never echoes an upstream `CLOSED_VERIFIED` claim as a result established by this executable. The report's `evaluator_protocol_sha256`, `rules_sha256` and `canonicalizer_sha256` must match the pinned protocol identifiers compiled into this verifier; these are protocol identity hashes, not a source-binary/build attestation.
+The output is deterministic JSON with `status=COUNTERS_RECOMPUTED`, `source_report_sha256`, and `trusted_promotion=false`. It reports the input `claimed_enumeration_closure` separately from `worldset_closure_validation=NOT_PERFORMED_BY_THIS_TOOL`; it never echoes an upstream `CLOSED_VERIFIED` claim as a result established by this executable. The report's `evaluator_protocol_sha256`, `rules_sha256`, `canonicalizer_sha256`, `report_schema_sha256` and `structure_schema_sha256` must match the exact SHA-256 values of the versioned protocol, benchmark-rules and schema files in this repository. These are document/schema identity hashes, not a source-binary/build attestation.
 
 ## What is independently recomputed
 
 - SHA-256 over exact candidate/reference sidecar bytes against the report's manifest digests;
-- exact evaluator-protocol, adequacy-rules-protocol and canonicalizer-protocol identity digests;
+- exact evaluator-protocol, adequacy-rules, canonicalizer, report-schema and structure-schema file digests;
 - SHA-256 of the exact input report bytes in the verifier output (the report does not contain a self-referential report digest).
 - Structural graph SHA-256 from canonical directed nodes/edges, with node and edge array order normalized.
 - Sidecar/report world-ID set equality and uniqueness.
@@ -58,4 +58,4 @@ The graph canonicalizer V1 is a synthetic directed-graph identity representation
 
 ## Validation status
 
-Ten Rust unit tests are authored, including the omitted-query-flip and false-ambiguity controls, sidecar byte mutation, structural digest mutation, array-order invariance, and inconsistent query-state rejection, plus an independent compatibility-versus-query-estimability fixture and a fail-closed stable-report control where no external closure/freeze receipts are authenticated, plus strict-schema rejection of unknown report fields and malformed receipt digests. They have **not** been compiled or executed in this authoring environment because `cargo`, `rustc` and `rustfmt` are unavailable. No Rust test, formatting, Clippy or CI pass is claimed.
+Eleven Rust unit tests are authored, including the omitted-query-flip and false-ambiguity controls, sidecar byte mutation, structural digest mutation, array-order invariance, and inconsistent query-state rejection, plus an independent compatibility-versus-query-estimability fixture and a fail-closed stable-report control where no external closure/freeze receipts are authenticated, plus strict-schema rejection of unknown report fields malformed receipt digests, and report-schema digest mismatch. They have **not** been compiled or executed in this authoring environment because `cargo`, `rustc` and `rustfmt` are unavailable. No Rust test, formatting, Clippy or CI pass is claimed.
