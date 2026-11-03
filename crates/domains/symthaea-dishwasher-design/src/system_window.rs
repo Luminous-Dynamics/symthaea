@@ -111,6 +111,12 @@ pub struct SystemWindowResourceMeasurement {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompartmentConfiguration {
+    pub compartment_id: String,
+    pub configuration_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SystemWindowSpec {
     pub window_id: String,
     pub service_class_id: String,
@@ -123,6 +129,8 @@ pub struct SystemWindowSpec {
     pub machine_unit_id: String,
     pub system_configuration_sha256: String,
     pub utility_topology_id: String,
+    /// Complete installed cell set for the scored system configuration.
+    pub compartments: Vec<CompartmentConfiguration>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -205,6 +213,9 @@ pub enum SystemWindowError {
     InvalidResourceClockDomain { measurement_id: String },
     EmptyRequests,
     DuplicateRequestId(String),
+    EmptyCompartmentSet,
+    DuplicateCompartmentId(String),
+    UnknownCompartmentId { request_id: String, compartment_id: String },
     EmptyRequestedItemSet(String),
     DuplicateRequestedItem { request_id: String, item_id: String },
     RequestOutsideWindow(String),
@@ -313,17 +324,24 @@ fn build_compartment_stats(
     requests: &[ServiceWindowRequest],
     releases: &[ItemReleaseEvent],
 ) -> Result<(Vec<CompartmentWindowStats>, usize, u64), SystemWindowError> {
-    let mut accumulators: BTreeMap<String, CompartmentAccumulator> = BTreeMap::new();
+    let mut accumulators: BTreeMap<String, CompartmentAccumulator> = spec.compartments.iter()
+        .map(|cell| (
+            cell.compartment_id.clone(),
+            CompartmentAccumulator {
+                configuration_sha256: cell.configuration_sha256.clone(),
+                ..CompartmentAccumulator::default()
+            },
+        ))
+        .collect();
     let mut request_by_id = HashMap::with_capacity(requests.len());
 
     for request in requests {
         request_by_id.insert(request.service_request_id.as_str(), request);
-        let stats = accumulators
-            .entry(request.compartment_id.clone())
-            .or_insert_with(|| CompartmentAccumulator {
-                configuration_sha256: request.compartment_configuration_sha256.clone(),
-                ..CompartmentAccumulator::default()
-            });
+        let stats = accumulators.get_mut(&request.compartment_id)
+            .ok_or_else(|| SystemWindowError::UnknownCompartmentId {
+                request_id: request.service_request_id.clone(),
+                compartment_id: request.compartment_id.clone(),
+            })?;
         if stats.configuration_sha256 != request.compartment_configuration_sha256 {
             return Err(SystemWindowError::CompartmentConfigurationMismatch {
                 compartment_id: request.compartment_id.clone(),
@@ -576,6 +594,17 @@ fn validate_request(
     if !valid_digest(&request.compartment_configuration_sha256) {
         return Err(SystemWindowError::InvalidEvidenceDigest("compartment_configuration_sha256"));
     }
+    let compartment = spec.compartments.iter()
+        .find(|cell| cell.compartment_id == request.compartment_id)
+        .ok_or_else(|| SystemWindowError::UnknownCompartmentId {
+            request_id: request.service_request_id.clone(),
+            compartment_id: request.compartment_id.clone(),
+        })?;
+    if compartment.configuration_sha256 != request.compartment_configuration_sha256 {
+        return Err(SystemWindowError::CompartmentConfigurationMismatch {
+            compartment_id: request.compartment_id.clone(),
+        });
+    }
     if !canonical_non_empty(&request.clock_domain_id)
         || request.clock_domain_id != spec.clock_domain_id
     {
@@ -709,6 +738,23 @@ pub fn account_system_window(
     }
     if !canonical_non_empty(&spec.utility_topology_id) {
         return Err(SystemWindowError::InvalidSystemIdentity("utility_topology_id"));
+    }
+    if spec.compartments.is_empty() {
+        return Err(SystemWindowError::EmptyCompartmentSet);
+    }
+    let mut configured_compartments = BTreeSet::new();
+    for compartment in &spec.compartments {
+        if !canonical_non_empty(&compartment.compartment_id) {
+            return Err(SystemWindowError::InvalidSystemIdentity("compartment_id"));
+        }
+        if !valid_digest(&compartment.configuration_sha256) {
+            return Err(SystemWindowError::InvalidSystemIdentity("compartment_configuration_sha256"));
+        }
+        if !configured_compartments.insert(compartment.compartment_id.as_str()) {
+            return Err(SystemWindowError::DuplicateCompartmentId(
+                compartment.compartment_id.clone(),
+            ));
+        }
     }
     if requests.is_empty() {
         return Err(SystemWindowError::EmptyRequests);
@@ -1322,6 +1368,10 @@ mod tests {
             machine_unit_id: "machine-01".to_owned(),
             system_configuration_sha256: digest('d'),
             utility_topology_id: "two-cell-isolated-wet-loops-shared-thermal-bus-v1".to_owned(),
+            compartments: vec![CompartmentConfiguration {
+                compartment_id: "cell-01".to_owned(),
+                configuration_sha256: digest('c'),
+            }],
         }
     }
 
@@ -1578,6 +1628,7 @@ mod tests {
             &basic_resources(),
         ).unwrap();
         assert_eq!(result.unresolved_requests_at_window_end, 1);
+        assert_eq!(result.compartment_count, 1);
         assert_eq!(result.items_without_verified_qualification_in_accepted_unresolved_requests, 1);
         assert_eq!(result.verified_item_release_count, 0);
         assert_eq!(result.verified_items_per_hour, 0.0);
@@ -1881,6 +1932,45 @@ mod tests {
     }
 
     #[test]
+    fn rejects_duplicate_installed_compartment_ids() {
+        let mut window = spec(&REQUIRED);
+        window.compartments.push(CompartmentConfiguration {
+            compartment_id: "cell-01".to_owned(),
+            configuration_sha256: digest('e'),
+        });
+        let request = request(
+            "service-one",
+            0,
+            Some(0),
+            WindowRequestState::Completed { closed_at_s: 60 },
+            &["cup-one"],
+            Some(report("service-one", &["cup-one"], &[], &["cup-one"])),
+        );
+        assert!(matches!(
+            account_system_window(&window, &[request], &[], &basic_resources()),
+            Err(SystemWindowError::DuplicateCompartmentId(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_request_for_unconfigured_compartment() {
+        let mut one = request(
+            "service-other-cell",
+            0,
+            Some(0),
+            WindowRequestState::Completed { closed_at_s: 60 },
+            &["cup-one"],
+            Some(report("service-other-cell", &["cup-one"], &[], &["cup-one"])),
+        );
+        one.compartment_id = "cell-not-installed".to_owned();
+        one.compartment_configuration_sha256 = digest('e');
+        assert!(matches!(
+            account_system_window(&spec(&REQUIRED), &[one], &[], &basic_resources()),
+            Err(SystemWindowError::UnknownCompartmentId { .. })
+        ));
+    }
+
+    #[test]
     fn reports_per_compartment_activity_and_release_counts() {
         let requests = [
             request(
@@ -1905,8 +1995,13 @@ mod tests {
                 second
             },
         ];
+        let mut window = spec(&REQUIRED);
+        window.compartments.push(CompartmentConfiguration {
+            compartment_id: "cell-02".to_owned(),
+            configuration_sha256: digest('e'),
+        });
         let result = account_system_window(
-            &spec(&REQUIRED),
+            &window,
             &requests,
             &[release("service-cell-a", "cup-a", 50), release("service-cell-b", "cup-b", 70)],
             &basic_resources(),
