@@ -82,6 +82,57 @@ impl ObservedBand {
     }
 }
 
+/// One independently executed physical observation at a single occupancy.
+///
+/// Quality pass flags must come from the frozen acceptance protocol and ground
+/// truth, not from the dishwasher's own turbidity/camera estimate.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PhysicalRunMeasurement {
+    pub run_id: String,
+    pub cleaning_pass: bool,
+    pub rinse_pass: bool,
+    pub energy_kwh: f64,
+    pub fresh_water_l: f64,
+    pub duration_s: f64,
+}
+
+fn observed_band_from_runs(
+    runs: &[PhysicalRunMeasurement],
+    metric: &'static str,
+    value: impl Fn(&PhysicalRunMeasurement) -> f64,
+) -> Result<ObservedBand, CurveError> {
+    let mut minimum = f64::INFINITY;
+    let mut maximum = f64::NEG_INFINITY;
+    let mut mean = 0.0_f64;
+
+    for (index, run) in runs.iter().enumerate() {
+        let current = value(run);
+        if !current.is_finite() || current < 0.0 {
+            return Err(CurveError::InvalidRunMetric {
+                run_id: run.run_id.clone(),
+                metric,
+            });
+        }
+        minimum = minimum.min(current);
+        maximum = maximum.max(current);
+        // Online mean avoids summing a long series into an overflowing total.
+        mean += (current - mean) / (index + 1) as f64;
+    }
+
+    if !mean.is_finite() {
+        return Err(CurveError::InvalidRunMetric {
+            run_id: runs.last().map_or_else(String::new, |run| run.run_id.clone()),
+            metric,
+        });
+    }
+
+    Ok(ObservedBand {
+        minimum,
+        mean,
+        maximum,
+    })
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct OccupancyObservation {
     /// Number of place settings or items under the frozen protocol's definition.
@@ -96,6 +147,85 @@ pub struct OccupancyObservation {
 }
 
 impl OccupancyObservation {
+    /// Build an occupancy summary from individual physical runs.
+    ///
+    /// This is the preferred constructor: min/mean/max are derived from raw
+    /// run-level observations, rather than manually entered summary values.
+    /// Every run must pass cleaning and rinse ground-truth gates. A failed run
+    /// rejects the occupancy point instead of being silently excluded.
+    pub fn from_runs(
+        occupancy: usize,
+        runs: Vec<PhysicalRunMeasurement>,
+    ) -> Result<Self, CurveError> {
+        if occupancy == 0 {
+            return Err(CurveError::ZeroOccupancy);
+        }
+        if runs.len() < 5 {
+            return Err(CurveError::InsufficientReplicates {
+                occupancy,
+                observed: runs.len(),
+                required: 5,
+            });
+        }
+
+        let mut ids = HashSet::with_capacity(runs.len());
+        let mut cleaning_failures = 0_usize;
+        let mut rinse_failures = 0_usize;
+        for run in &runs {
+            if run.run_id.trim().is_empty() {
+                return Err(CurveError::InvalidReplicateId);
+            }
+            if !ids.insert(run.run_id.as_str()) {
+                return Err(CurveError::DuplicateReplicateId { occupancy });
+            }
+            if !run.energy_kwh.is_finite() || run.energy_kwh < 0.0 {
+                return Err(CurveError::InvalidRunMetric {
+                    run_id: run.run_id.clone(),
+                    metric: "energy_kwh",
+                });
+            }
+            if !run.fresh_water_l.is_finite() || run.fresh_water_l < 0.0 {
+                return Err(CurveError::InvalidRunMetric {
+                    run_id: run.run_id.clone(),
+                    metric: "fresh_water_l",
+                });
+            }
+            if !run.duration_s.is_finite() || run.duration_s < 0.0 {
+                return Err(CurveError::InvalidRunMetric {
+                    run_id: run.run_id.clone(),
+                    metric: "duration_s",
+                });
+            }
+            cleaning_failures += usize::from(!run.cleaning_pass);
+            rinse_failures += usize::from(!run.rinse_pass);
+        }
+
+        if cleaning_failures != 0 || rinse_failures != 0 {
+            return Err(CurveError::QualityGateFailed {
+                occupancy,
+                cleaning_failures,
+                rinse_failures,
+            });
+        }
+
+        let energy_kwh =
+            observed_band_from_runs(&runs, "energy_kwh", |run| run.energy_kwh)?;
+        let fresh_water_l =
+            observed_band_from_runs(&runs, "fresh_water_l", |run| run.fresh_water_l)?;
+        let duration_s =
+            observed_band_from_runs(&runs, "duration_s", |run| run.duration_s)?;
+
+        Ok(Self {
+            occupancy,
+            replicate_ids: runs.into_iter().map(|run| run.run_id).collect(),
+            cleaning_failures,
+            rinse_failures,
+            energy_kwh,
+            fresh_water_l,
+            duration_s,
+        })
+    }
+
     fn validate(&self) -> Result<(), CurveError> {
         if self.occupancy == 0 {
             return Err(CurveError::ZeroOccupancy);
@@ -165,6 +295,10 @@ pub enum CurveError {
     InvalidScope(&'static str),
     InvalidDatasetDigest,
     InvalidReplicateId,
+    InvalidRunMetric {
+        run_id: String,
+        metric: &'static str,
+    },
     DuplicateReplicateId {
         occupancy: usize,
     },
@@ -338,6 +472,66 @@ mod tests {
             ],
         )
         .unwrap()
+    }
+
+    fn raw_runs(occupancy: usize) -> Vec<PhysicalRunMeasurement> {
+        (0..5)
+            .map(|index| PhysicalRunMeasurement {
+                run_id: format!("physical-{occupancy}-{index}"),
+                cleaning_pass: true,
+                rinse_pass: true,
+                energy_kwh: 0.10 + index as f64 * 0.01,
+                fresh_water_l: 2.0 + index as f64 * 0.1,
+                duration_s: 900.0 + index as f64 * 10.0,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn raw_physical_runs_derive_summary_bands() {
+        let observation = OccupancyObservation::from_runs(2, raw_runs(2)).unwrap();
+        assert_eq!(observation.replicate_ids.len(), 5);
+        assert_eq!(observation.energy_kwh.minimum, 0.10);
+        assert!((observation.energy_kwh.mean - 0.12).abs() < 1e-12);
+        assert_eq!(observation.energy_kwh.maximum, 0.14);
+        assert_eq!(observation.fresh_water_l.minimum, 2.0);
+        assert!((observation.fresh_water_l.mean - 2.2).abs() < 1e-12);
+        assert_eq!(observation.fresh_water_l.maximum, 2.4);
+    }
+
+    #[test]
+    fn raw_run_quality_failure_disqualifies_the_occupancy() {
+        let mut runs = raw_runs(2);
+        runs[3].cleaning_pass = false;
+        runs[4].rinse_pass = false;
+        assert!(matches!(
+            OccupancyObservation::from_runs(2, runs),
+            Err(CurveError::QualityGateFailed {
+                cleaning_failures: 1,
+                rinse_failures: 1,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn raw_run_duplicate_ids_and_invalid_metrics_are_rejected() {
+        let mut duplicate = raw_runs(2);
+        duplicate[4].run_id = duplicate[0].run_id.clone();
+        assert!(matches!(
+            OccupancyObservation::from_runs(2, duplicate),
+            Err(CurveError::DuplicateReplicateId { .. })
+        ));
+
+        let mut invalid = raw_runs(2);
+        invalid[2].energy_kwh = f64::NAN;
+        assert!(matches!(
+            OccupancyObservation::from_runs(2, invalid),
+            Err(CurveError::InvalidRunMetric {
+                metric: "energy_kwh",
+                ..
+            })
+        ));
     }
 
     #[test]
