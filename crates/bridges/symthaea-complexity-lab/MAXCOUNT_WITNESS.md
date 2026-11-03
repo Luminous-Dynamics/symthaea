@@ -130,6 +130,12 @@ Report separately: optimum correctness, multiplicity correctness, witness validi
 
 Aspirational gates (not achieved): 100% agreement with exhaustive support on tractable cases; zero accepted mutated certificates; no re-solving required for the canonical witness; exact multiplicity preserved; median backpointer overhead below 25% on a declared low-width slice; verified solve+check overhead below 2x against the same unverified elimination baseline; clear Pareto comparison with PB proof systems on overlapping MaxSAT cases.
 
+## Fair cross-system sampling comparison
+
+For a DPSampler/WAPS comparison, first compute the exact optimum score, then restrict the external SAT/PB instance to the optimum-score slice. The sampled object must remain the original assignment. Auxiliary variables must be projected away, or the encoding must be proved functional (exactly one auxiliary extension per original assignment); otherwise auxiliary multiplicity changes the sample distribution.
+
+Use unit weights for distinct-uniform sampling. For multiplicity-weighted sampling, compare only where the competitor supports exactly the same assignment-weight function. Arbitrary finite-domain local multiplicities that cannot be represented by the target literal/factor-weight language belong in a separate general-factor track. Counting systems such as PBCount2, DPMC and ADDMC can validate normalizers or projected support but must not be reported as samplers. On small shared instances, use exact rational path probabilities; on larger cases, empirical TVD is a diagnostic only.
+
 ## Claim ceiling
 
 - Python finite reference != Rust implementation or Lean proof;
