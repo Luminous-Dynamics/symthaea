@@ -81,7 +81,8 @@ For every frozen query, report counts and denominators before percentages:
 - omitted query-flipping worlds;
 - false-invariance events (candidate universe has one decision state, while a compatible reference world has another);
 - false-ambiguity events (candidate permits a decision state unsupported by compatible reference worlds);
-- NOT_ESTIMABLE / abstention counts.
+- NOT_ESTIMABLE / abstention counts;
+- candidate and reference duplicate canonical-structure groups (different world IDs that canonicalize to the same structure).
 
 Report the same quantities per error family and per source cluster. The reference challenge manifest must predeclare `required_error_families`; the report must contain exactly one family summary for every required family, including families with zero support. Missing family summaries are invalid; a required family with zero estimable compatible support forces ADEQUACY_NOT_ESTIMABLE. A pooled average must not conceal an entire omitted family. Where challenge generation is not probability sampled, use the name **challenge-set coverage**, never population recall.
 
@@ -152,7 +153,8 @@ JSON Schema checks structural shape only. A Rust semantic validator must additio
 - exact count reconciliation between world arrays and `summary`;
 - compatible + incompatible + indeterminate = reference count;
 - all count numerators are bounded by the appropriate denominators;
-- candidate and reference structural digests are recomputed by the pinned evaluator canonicalizer; duplicate canonical structures with distinct world IDs are disclosed;
+- candidate and reference structural digests are recomputed by the pinned evaluator canonicalizer; duplicate canonical structures with distinct world IDs are counted separately for candidate and reference worlds;
+- query evaluation is deterministic for a canonical structure: structurally equivalent worlds with different query states under the same query/code digest invalidate the report;
 - `false_ambiguity_count` is recomputed as candidate worlds whose query state is absent from the compatible, estimable reference query-state set;
 - family totals reconcile without duplicate family keys, and every predeclared required family has exactly one summary row;
 - required families with zero support force ADEQUACY_NOT_ESTIMABLE;
