@@ -141,8 +141,8 @@ impl MusicalForecastV1 {
         if self.target_window_start_tick >= self.target_window_end_tick {
             return Err("target execution window must be non-empty".into());
         }
-        if self.created_at_tick >= self.target_window_end_tick {
-            return Err("forecast must be committed before the target window ends".into());
+        if self.created_at_tick >= self.target_window_start_tick {
+            return Err("forecast must be committed before the target execution window begins".into());
         }
         if self.expires_at_tick < self.target_window_end_tick {
             return Err("forecast expiry must cover the complete target window".into());
@@ -322,6 +322,11 @@ impl MusicalForecastLedgerV1 {
         if receipt.displayed_at_tick < forecast.created_at_tick {
             return Err("display cannot precede forecast commitment".into());
         }
+        if receipt.displayed_at_tick > forecast.expires_at_tick
+            || !self.is_active_at(&receipt.forecast_id, receipt.displayed_at_tick)
+        {
+            return Err("an expired, superseded or invalidated forecast cannot be displayed as current".into());
+        }
         self.validate_next_event(sequence, receipt.displayed_at_tick)?;
         self.append_event(
             sequence,
@@ -395,9 +400,15 @@ impl MusicalForecastLedgerV1 {
         })
     }
 
-    pub fn displayed_before(&self, forecast_id: &str, event_tick: u64) -> bool {
+    pub fn displayed_before(
+        &self,
+        forecast_id: &str,
+        event_tick: u64,
+        sequence: u64,
+    ) -> bool {
         self.events.iter().any(|item| {
-            item.event_tick <= event_tick
+            item.sequence <= sequence
+                && item.event_tick < event_tick
                 && matches!(
                     &item.event,
                     MusicalForecastLedgerEventKindV1::Displayed { receipt }
@@ -483,6 +494,65 @@ impl MusicalForecastLedgerV1 {
             .unwrap_or_else(ledger_genesis_sha256_v1)
     }
 
+    /// Returns the hash-chain head at an exact event-sequence high-water mark.
+    /// Sequence zero means the empty ledger. Nonzero values must identify an
+    /// actual event so same-tick events are never ambiguously included.
+    pub fn ledger_head_sha256_at_sequence(&self, sequence: u64) -> Result<String, String> {
+        if sequence == 0 {
+            return Ok(ledger_genesis_sha256_v1());
+        }
+        if sequence > self.last_sequence {
+            return Err("realization sequence is beyond the ledger head".into());
+        }
+        self.events
+            .iter()
+            .find(|event| event.sequence == sequence)
+            .map(|event| event.event_sha256.clone())
+            .ok_or_else(|| "realization sequence does not identify a ledger event".to_owned())
+    }
+
+    /// True only when the forecast was committed and has not been superseded
+    /// or invalidated within the exact event-sequence prefix.
+    pub fn is_active_at_sequence(&self, forecast_id: &str, sequence: u64) -> bool {
+        let Some(commit_sequence) = self.events.iter().find_map(|item| match &item.event {
+            MusicalForecastLedgerEventKindV1::Committed { forecast }
+                if forecast.forecast_id == forecast_id => Some(item.sequence),
+            _ => None,
+        }) else {
+            return false;
+        };
+        if commit_sequence > sequence {
+            return false;
+        }
+        !self.events.iter().any(|item| {
+            item.sequence <= sequence
+                && match &item.event {
+                    MusicalForecastLedgerEventKindV1::Committed { forecast } => {
+                        forecast.supersedes_forecast_id.as_deref() == Some(forecast_id)
+                    }
+                    MusicalForecastLedgerEventKindV1::Invalidated { invalidation } => {
+                        invalidation.forecast_id == forecast_id
+                    }
+                    MusicalForecastLedgerEventKindV1::Displayed { .. } => false,
+                }
+        })
+    }
+
+    fn validate_sequence_at_tick(&self, sequence: u64, event_tick: u64) -> Result<(), String> {
+        if sequence > self.last_sequence {
+            return Err("realization sequence is beyond the current ledger head".into());
+        }
+        if sequence > 0 {
+            let last_event = self.events.iter()
+                .find(|item| item.sequence == sequence)
+                .ok_or_else(|| "realization sequence must identify an exact ledger event".to_owned())?;
+            if last_event.event_tick > event_tick {
+                return Err("realization sequence includes events after the realization tick".into());
+            }
+        }
+        Ok(())
+    }
+
     fn validate_next_event(&self, sequence: u64, event_tick: u64) -> Result<(), String> {
         if sequence <= self.last_sequence {
             return Err("ledger event sequence must increase strictly".into());
@@ -511,6 +581,9 @@ pub struct ForecastEvaluationContextV1 {
     pub clock_domain: String,
     pub input_history_sha256: String,
     pub immutable_policy_identity_sha256: String,
+    /// Exact ledger event-sequence high-water mark observed at realization.
+    /// This resolves multiple events that may share the same coarse clock tick.
+    pub ledger_sequence_at_realization: u64,
     /// Exact score/MIDI/audio artifact whose event projection is being scored.
     pub realization_artifact_ref: String,
     pub realization_artifact_sha256: String,
@@ -551,7 +624,8 @@ pub struct ForecastFieldOutcomeV1 {
 pub struct ForecastEvaluationV1 {
     pub forecast_id: String,
     pub forecast_sha256: String,
-    /// Hash-linked ledger prefix observed at realization time.
+    /// Exact high-water mark and hash-linked ledger prefix observed at realization.
+    pub ledger_sequence_at_realization: u64,
     pub ledger_head_sha256: String,
     pub realization_artifact_ref: String,
     pub realization_artifact_sha256: String,
@@ -632,8 +706,15 @@ pub fn evaluate_musical_forecast_v1(
     {
         return Err("forecast is stale or realization is outside its target window".into());
     }
-    if !ledger.is_active_at(forecast_id, context.realization_tick) {
-        return Err("forecast was superseded or invalidated before realization".into());
+    ledger.validate_sequence_at_tick(
+        context.ledger_sequence_at_realization,
+        context.realization_tick,
+    )?;
+    if !ledger.is_active_at_sequence(
+        forecast_id,
+        context.ledger_sequence_at_realization,
+    ) {
+        return Err("forecast was not committed in the realization prefix or was superseded or invalidated before realization".into());
     }
     let mut actual_by_slot = std::collections::BTreeMap::new();
     for event in &context.realized_events {
@@ -648,6 +729,13 @@ pub fn evaluate_musical_forecast_v1(
     }
 
     let forecast_sha256 = forecast.digest_sha256()?;
+    let ledger_head_sha256 = ledger
+        .ledger_head_sha256_at_sequence(context.ledger_sequence_at_realization)?;
+    let displayed_before_realization = ledger.displayed_before(
+        forecast_id,
+        context.realization_tick,
+        context.ledger_sequence_at_realization,
+    );
     let mut outcomes = Vec::with_capacity(forecast.predicted_events.len() * 6);
     let mut matched_event_count = 0usize;
     let mut correct_field_count = 0usize;
@@ -726,14 +814,15 @@ pub fn evaluate_musical_forecast_v1(
     Ok(ForecastEvaluationV1 {
         forecast_id: forecast_id.to_owned(),
         forecast_sha256,
-        ledger_head_sha256: ledger.ledger_head_sha256_at(context.realization_tick),
+        ledger_sequence_at_realization: context.ledger_sequence_at_realization,
+        ledger_head_sha256,
         realization_artifact_ref: context.realization_artifact_ref.clone(),
         realization_artifact_sha256: context.realization_artifact_sha256.clone(),
         event_projection_id: context.event_projection_id.clone(),
         event_projection_sha256: context.event_projection_sha256.clone(),
         realization_tick: context.realization_tick,
         committed_before_realization: true,
-        displayed_before_realization: ledger.displayed_before(forecast_id, context.realization_tick),
+        displayed_before_realization,
         predicted_event_count: forecast.predicted_events.len(),
         matched_event_count,
         unrealized_predicted_event_count,
@@ -838,6 +927,7 @@ mod tests {
             clock_domain: "fixture-monotonic-v1".into(),
             input_history_sha256: digest("input-history"),
             immutable_policy_identity_sha256: digest("policy-identity"),
+            ledger_sequence_at_realization: 1,
             realization_artifact_ref: "sha256:realized-score".into(),
             realization_artifact_sha256: digest("realized-score"),
             event_projection_id: "symbolic-score-events-v1".into(),
@@ -865,10 +955,12 @@ mod tests {
             )
             .unwrap();
 
+        let mut evaluation_context = context(12);
+        evaluation_context.ledger_sequence_at_realization = 2;
         let score = evaluate_musical_forecast_v1(
             &ledger,
             "forecast-1",
-            &context(12),
+            &evaluation_context,
             ForecastScoringPolicyV1::default(),
         )
         .unwrap();
@@ -945,10 +1037,12 @@ mod tests {
         assert!(!ledger.is_active_at("forecast-1", 12));
         assert!(ledger.is_active_at("forecast-1", 7));
         assert!(ledger.is_active_at("forecast-2", 12));
+        let mut evaluation_context = context(12);
+        evaluation_context.ledger_sequence_at_realization = 2;
         let result = evaluate_musical_forecast_v1(
             &ledger,
             "forecast-1",
-            &context(12),
+            &evaluation_context,
             ForecastScoringPolicyV1::default(),
         );
         assert!(result.unwrap_err().contains("superseded"));
@@ -1064,10 +1158,12 @@ mod tests {
             },
         ).unwrap();
         ledger.validate().unwrap();
+        let mut evaluation_context = context(12);
+        evaluation_context.ledger_sequence_at_realization = 2;
         let result = evaluate_musical_forecast_v1(
             &ledger,
             "forecast-1",
-            &context(12),
+            &evaluation_context,
             ForecastScoringPolicyV1::default(),
         );
         assert!(result.unwrap_err().contains("superseded or invalidated"));
@@ -1118,7 +1214,7 @@ mod tests {
     fn evaluation_binds_ledger_prefix_at_realization_not_future_events() {
         let mut ledger = MusicalForecastLedgerV1::default();
         ledger.append_forecast(forecast(1, 5, None)).unwrap();
-        let before = ledger.ledger_head_sha256_at(12);
+        let before = ledger.ledger_head_sha256_at_sequence(1).unwrap();
         let first_score = evaluate_musical_forecast_v1(
             &ledger,
             "forecast-1",
@@ -1136,7 +1232,8 @@ mod tests {
                 display_evidence_sha256: digest("later-display"),
             },
         ).unwrap();
-        assert_eq!(ledger.ledger_head_sha256_at(12), before);
+        assert_eq!(ledger.ledger_head_sha256_at_sequence(1).unwrap(), before);
+        assert_eq!(first_score.ledger_sequence_at_realization, 1);
         assert_eq!(first_score.ledger_head_sha256, before);
         assert_ne!(ledger.ledger_head_sha256(), before);
     }
@@ -1147,6 +1244,50 @@ mod tests {
         ledger.append_forecast(forecast(1, 15, None)).unwrap();
         assert!(!ledger.is_active_at("forecast-1", 12));
         assert!(ledger.is_active_at("forecast-1", 16));
+    }
+
+    #[test]
+    fn realization_sequence_cannot_include_a_later_display_event() {
+        let mut ledger = MusicalForecastLedgerV1::default();
+        ledger.append_forecast(forecast(1, 5, None)).unwrap();
+        ledger.append_display_receipt(
+            2,
+            ForecastDisplayReceiptV1 {
+                forecast_id: "forecast-1".into(),
+                recipient_id: "musician-1".into(),
+                display_surface_id: "score-preview-panel".into(),
+                displayed_at_tick: 20,
+                display_evidence_ref: "fixture://display-after-realization".into(),
+                display_evidence_sha256: digest("display-after-realization"),
+            },
+        ).unwrap();
+        let mut evaluation_context = context(12);
+        evaluation_context.ledger_sequence_at_realization = 2;
+        let result = evaluate_musical_forecast_v1(
+            &ledger,
+            "forecast-1",
+            &evaluation_context,
+            ForecastScoringPolicyV1::default(),
+        );
+        assert!(result.unwrap_err().contains("events after the realization tick"));
+    }
+
+    #[test]
+    fn display_receipt_cannot_resurface_an_expired_preview() {
+        let mut ledger = MusicalForecastLedgerV1::default();
+        ledger.append_forecast(forecast(1, 5, None)).unwrap();
+        let result = ledger.append_display_receipt(
+            2,
+            ForecastDisplayReceiptV1 {
+                forecast_id: "forecast-1".into(),
+                recipient_id: "musician-1".into(),
+                display_surface_id: "score-preview-panel".into(),
+                displayed_at_tick: 31,
+                display_evidence_ref: "fixture://expired-display".into(),
+                display_evidence_sha256: digest("expired-display"),
+            },
+        ).unwrap_err();
+        assert!(result.contains("cannot be displayed as current"));
     }
 
     #[test]
