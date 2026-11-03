@@ -57,14 +57,14 @@ Where the ordering cannot be authenticated, output ADEQUACY_NOT_ESTIMABLE and pr
 
 ## 4. World identity and comparability
 
-World IDs must be canonical, content-addressed identifiers with domain separation and a versioned canonicalization rule. Candidate and reference worlds must be comparable under an evaluator-owned structural canonicalizer. A raw string match is not enough if IDs were produced by unrelated rules.
+World IDs must be canonical, content-addressed identifiers with domain separation and a versioned canonicalization rule. In addition, every candidate and reference world carries an evaluator-recomputed `canonical_structural_sha256` produced by the same versioned structural canonicalizer. Structural inclusion is based on canonical structural digest equality, not raw world-ID equality: candidate and reference IDs may differ while the represented graph is equivalent. The canonicalizer must declare node/edge identity, direction, synapse attributes, coordinate-frame normalization and permitted equivalence transformations. A canonical digest is an identity/equivalence key under that declared canonicalizer, not proof of biological truth.
 
 The evaluator must distinguish:
 - **structural inclusion:** a reference structural world is equivalent to a candidate world under the declared canonical equivalence;
 - **query-state coverage:** the reference world's query decision state is represented somewhere in the candidate universe, even when its exact structure is not included;
 - **evidence compatibility:** whether the reference world is compatible with the observations available to the candidate.
 
-An evidence-incompatible reference world is counted and disclosed but does not count as a missed admissible world. An indeterminate reference world is not silently counted as compatible or incompatible; it contributes to NOT_ESTIMABLE / abstention reporting.
+An evidence-incompatible reference world is counted and disclosed but does not count as a missed admissible world. An indeterminate reference world is not silently counted as compatible or incompatible; it contributes to NOT_ESTIMABLE / abstention reporting. Structural inclusion is determined using the common canonical structural digest. Query-state coverage is a weaker, distinct result: a structurally omitted reference world may still have its decision state represented by a different candidate world.
 
 The initial protocol must not assign probabilities to worlds. Challenge-set frequencies are not population prevalence.
 
