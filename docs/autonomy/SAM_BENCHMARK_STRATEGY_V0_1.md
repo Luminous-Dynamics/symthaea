@@ -461,3 +461,33 @@ Proposed evaluation sequence:
 Nine unit tests are authored but not compiled/run. No event forecast or calibration result is currently claimed.
 
 Protocol: [RISK_FORECAST_CALIBRATION_V0_1.md](./RISK_FORECAST_CALIBRATION_V0_1.md).
+
+
+## 17. Uncertainty-calibrated, interactive decision-making — 2026 research update
+
+Recent 2026 surveys reinforce several limits in the current evaluation landscape:
+
+- The NIST Measurement Science for Automated Vehicles programme is explicitly separating observed surrogate metrics, forward outcome prediction, post-hoc counterfactual comparisons and cross-scenario diagnosis. It also intends to use a black-box CARLA/Autoware harness and physical-vehicle validation. SAM's Tier-3 and Tier-4 work should align with that separation, not reimplement one monolithic score. Reference: https://www.nist.gov/programs-projects/measurement-science-automated-vehicles-0.
+- The 2026 sensor-centric survey distinguishes frequentist calibration, Bayesian approximation and stronger uncertainty representations, and warns that ordinary calibration provides no guarantee under out-of-distribution SOTIF-triggering conditions. It also emphasizes measurement physics, synchronization drift and uncertainty propagation across heterogeneous sensors. Reference: https://www.mdpi.com/1424-8220/26/12/3801.
+- A June 2026 survey of ML prediction-to-planning argues that marginal prediction, conditional prediction and interactive prediction/planning are different problem formulations; treating other road users as fixed future trajectories can miss their response to ego actions. Reference: https://link.springer.com/article/10.1007/s10462-026-11604-8.
+- A September 2026 world-model survey identifies compounding rollout error, planner exploitation of inaccurate models, horizon management and uncertainty calibration as central closed-loop tensions. Reference: https://link.springer.com/article/10.1007/s44163-026-02122-1.
+- A 2026 safety-oriented MPC review of 101 studies reports that the evidence base remains simulation-heavy, with inconsistent safety metrics and incomplete treatment of uncertainty and computational feasibility. Reference: https://www.mdpi.com/2673-4052/7/3/88.
+
+### New vehicle risk-calibration implementation
+
+The new `symthaea_vehicle::risk_calibration` module evaluates a declared event probability against fully observed outcomes at one explicit horizon. It reports Brier score, log loss, reliability-bin data/ECE, maximum calibration gap, failure-family macro Brier and worst-family Brier. Censored episodes are retained and counted but excluded from event/no-event scoring. The report refuses all-censored datasets and reconstructs metrics from canonical raw observations before digest validation.
+
+This creates a distinct calibration track, not a claim that SAM currently predicts collision probability. No forecasts/results have been produced. Calibration is conditional on the event definition, outcome evaluator, horizon, sampling frame and family taxonomy. Adversarial search yield remains a stress-exposure metric, not event prevalence.
+
+Protocol: [RISK_FORECAST_CALIBRATION_V0_1.md](./RISK_FORECAST_CALIBRATION_V0_1.md).
+
+### Next benchmark comparisons
+
+1. **Marginal vs interactive prediction:** hold the ego planner fixed and compare static other-agent trajectories against action-conditioned/reactive actor response. Report joint outcome accuracy and closed-loop displacement; don't treat a static actor script as interactive behavior.
+2. **Raw vs calibrated risk:** compare raw probabilities, post-hoc Platt/isotonic calibration and calibration-aware training at identical event/horizon/sampling definitions. Report Brier/log loss, reliability bins, ECE, AUROC/AUPRC and event base rate.
+3. **In-distribution vs OOD calibration:** freeze separate environment, sensor/degradation, actor-policy and map shift families. Calibration on the nominal split does not establish OOD reliability.
+4. **Predictive uncertainty vs conformal coverage:** keep probabilistic calibration and set/interval coverage as distinct statistical claims. Report coverage, width/sharpness, conditional coverage slices and distribution-shift failures.
+5. **Planner exploitation:** perturb the predictive model or introduce calibrated model discrepancy; compare predicted action ranking with execution outcomes. Measure rank reversals, optimism bias and forecast error growth by rollout horizon.
+6. **MPC vs learning vs hybrid:** compare PD/Stanley/Pure Pursuit, constrained MPC, learned planner and cognitive-proposal + conventional execution + RTA with the same model, action budget and holdout. Publish solver time/deadline misses and infeasible/no-solution rates with control quality.
+
+The most important strategic shift is from "the model is confident" to **"the forecast probability is calibrated for this event/horizon and the downstream action remains robust to model discrepancy."** RTA thresholds must not be self-tuned from the same predictor's unverified confidence.
