@@ -24,6 +24,23 @@ struct RawNote {
     velocity: u8,
 }
 
+fn part_id_for_track(track: usize) -> Result<PartId, String> {
+    u16::try_from(track)
+        .map(PartId)
+        .map_err(|_| format!("MIDI track index {track} exceeds the supported PartId range"))
+}
+
+fn duration_from_ticks(ticks: u64, ticks_per_beat: u64) -> Result<Duration, String> {
+    let numerator = i64::try_from(ticks)
+        .map_err(|_| "MIDI absolute tick count exceeds the supported duration range")?;
+    let denominator = i64::try_from(ticks_per_beat)
+        .map_err(|_| "MIDI ticks-per-beat exceeds the supported duration range")?;
+    if denominator <= 0 {
+        return Err("MIDI ticks-per-beat must be positive".into());
+    }
+    Ok(Duration::new(numerator, denominator))
+}
+
 pub fn parse_symbolic(bytes: &[u8], format: SymbolicImportFormat) -> Result<Score, String> {
     match format {
         SymbolicImportFormat::Midi => parse_midi(bytes),
@@ -137,12 +154,10 @@ pub fn parse_midi(bytes: &[u8]) -> Result<Score, String> {
             // it), so this is the importer passing through what the file
             // already stated. Tracks beyond u16 are refused rather than
             // wrapped into a collision with a real part.
-            part: u16::try_from(note.track)
-                .map(PartId)
-                .unwrap_or(PartId::UNASSIGNED),
+            part: part_id_for_track(note.track)?,
             pitch: Pitch::from_midi(note.pitch),
-            onset: Duration::new(note.onset as i64, ticks_per_beat as i64),
-            duration: Duration::new(note.duration as i64, ticks_per_beat as i64),
+            onset: duration_from_ticks(note.onset, ticks_per_beat)?,
+            duration: duration_from_ticks(note.duration, ticks_per_beat)?,
             velocity: (note.velocity as f32 / 127.0).clamp(0.05, 1.0),
             role: roles
                 .get(&note.track)
@@ -445,6 +460,19 @@ mod tests {
         assert!((score.notes[1].onset.beats() - 0.5).abs() < 1.0e-6);
         assert!((score.notes[0].duration.beats() - 1.0).abs() < 1.0e-6);
         assert!((score.notes[1].duration.beats() - 1.0).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn track_identity_overflow_rejects_instead_of_colliding_with_unassigned() {
+        assert!(part_id_for_track(usize::from(u16::MAX)).is_ok());
+        assert!(part_id_for_track(usize::from(u16::MAX) + 1).is_err());
+    }
+
+    #[test]
+    fn midi_tick_conversion_rejects_values_outside_duration_range() {
+        assert!(duration_from_ticks(i64::MAX as u64, 96).is_ok());
+        assert!(duration_from_ticks(i64::MAX as u64 + 1, 96).is_err());
+        assert!(duration_from_ticks(1, 0).is_err());
     }
 
     #[test]
