@@ -2412,7 +2412,7 @@ mod tests {
             task_id: "CEB-RUST-001".to_string(),
             source_tree_dir: source_root.clone(),
             result_tree_dir: result_root.clone(),
-            patch: b"diff --git a/src/lib.rs b/src/lib.rs\\n+pub fn verified() -> bool { true }\\n".to_vec(),
+            patch: b"diff --git a/src/lib.rs b/src/lib.rs\n+pub fn verified() -> bool { true }\n".to_vec(),
             primary_envelope: primary_envelope.clone(),
             primary_artifacts_dir: primary_root.clone(),
             regrade_envelope: regrade_envelope.clone(),
@@ -2433,7 +2433,7 @@ mod tests {
             task_id: "CEB-RUST-001".to_string(),
             source_tree_dir: changed_source_root.clone(),
             result_tree_dir: result_root.clone(),
-            patch: b"diff --git a/src/lib.rs b/src/lib.rs\\n+pub fn verified() -> bool { true }\\n".to_vec(),
+            patch: b"diff --git a/src/lib.rs b/src/lib.rs\n+pub fn verified() -> bool { true }\n".to_vec(),
             primary_envelope: primary_envelope.clone(),
             primary_artifacts_dir: primary_root.clone(),
             regrade_envelope: regrade_envelope.clone(),
@@ -2454,7 +2454,7 @@ mod tests {
             task_id: "CEB-RUST-001".to_string(),
             source_tree_dir: source_root.clone(),
             result_tree_dir: changed_result_root.clone(),
-            patch: b"diff --git a/src/lib.rs b/src/lib.rs\\n+pub fn verified() -> bool { true }\\n".to_vec(),
+            patch: b"diff --git a/src/lib.rs b/src/lib.rs\n+pub fn verified() -> bool { true }\n".to_vec(),
             primary_envelope: primary_envelope.clone(),
             primary_artifacts_dir: primary_root.clone(),
             regrade_envelope: regrade_envelope.clone(),
@@ -2509,13 +2509,17 @@ mod tests {
         fs::create_dir_all(first.join("src")).unwrap();
         fs::create_dir_all(second.join("src")).unwrap();
         fs::write(first.join("src/lib.rs"), b"pub fn value() -> u8 { 1 }").unwrap();
-        fs::write(first.join("Cargo.toml"), b"[package]\\nname = \"fixture\"\\n").unwrap();
+        fs::write(first.join("Cargo.toml"), b"[package]\nname = \"fixture\"\n").unwrap();
         // Create the same entries in the reverse order in the second snapshot.
-        fs::write(second.join("Cargo.toml"), b"[package]\\nname = \"fixture\"\\n").unwrap();
+        fs::write(second.join("Cargo.toml"), b"[package]\nname = \"fixture\"\n").unwrap();
         fs::write(second.join("src/lib.rs"), b"pub fn value() -> u8 { 1 }").unwrap();
         let first_digest = hash_source_tree_inner(&first).unwrap();
         let second_digest = hash_source_tree_inner(&second).unwrap();
         assert_eq!(first_digest, second_digest);
+        assert_eq!(
+            first_digest,
+            "651f0d72766558c82e0cb2b3741d226577ad46cad601136e7d6a9d6c54a48696"
+        );
 
         fs::write(second.join("src/lib.rs"), b"pub fn value() -> u8 { 2 }").unwrap();
         assert_ne!(first_digest, hash_source_tree_inner(&second).unwrap());
