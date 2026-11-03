@@ -76,6 +76,14 @@ Compare exact SKUs and exact programmes; capture market, label, detergent, optio
 | V-ZUG OptiStart / heat-pump platform | Cold pre-wetting during delayed start; lower subsequent wash temperature claimed by manufacturer | Compare timed pre-soak with phase dosing for aged protein/starch soils and total standby/thermal energy |
 | Conventional fixed-dose programme | Fixed detergent mass and fixed stage timing | Baseline for determining whether added complexity has measurable benefit |
 
+### Johannesburg water-hardness baseline
+
+Rand Water's report for supply to Johannesburg municipality (23 April 2024–22 April 2025) records mean total hardness of 74.51 mg/L as CaCO3, SD 9.51 mg/L, mean + 3 SD 103.03 mg/L, and an operational range of 20–200 mg/L across 336 results. These statistics do not specify the water at an individual residence.
+
+Initial controlled water-hardness points: **20, 50, 75, 100, 150 and 200 mg/L as CaCO3**. At least three actual local inlet-water samples should also be measured, including any post-tank / filter / softener effects. Record hardness at the appliance inlet per run; never assign the municipal mean to every test.
+
+Source: https://www.randwater.co.za/media/sans241/12month_Johannesburg_Apr2025.pdf
+
 ## Experimental matrix
 
 ### Soil and surface
