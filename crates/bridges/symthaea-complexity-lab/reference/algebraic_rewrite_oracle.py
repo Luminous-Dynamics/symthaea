@@ -73,8 +73,14 @@ def randval(r,a):
         for _ in range(r.randrange(1,4)):
             p=(r.randrange(4),r.randrange(4));m[p]=m.get(p,0)+r.randrange(1,3)
         return a.prune(m)
-    if k=="ipoly":return {(i,j):r.randrange(-2,3) for i in range(3) for j in range(3) if r.randrange(3)==0 and r.randrange(-2,3)!=0}
-    if k=="qpoly":return {(i,j):Fraction(r.randrange(-2,3),r.randrange(1,4)) for i in range(3) for j in range(3) if r.randrange(3)==0 and r.randrange(-2,3)!=0}
+    if k in ("ipoly", "qpoly"):
+        out={}
+        for i in range(3):
+            for j in range(3):
+                if r.randrange(3)==0:
+                    numerator=r.choice((-2,-1,1,2))
+                    out[(i,j)]=numerator if k=="ipoly" else Fraction(numerator,r.randrange(1,4))
+        return out
     raise ValueError(k)
 def fac(r,a,name,scope,cards):
     n=1
@@ -135,6 +141,14 @@ def sha(v):return hashlib.sha256(canon(v).encode()).hexdigest()
 def cert(rule,src,a,cards):
     dst=apply(rule,src,a)
     return {"format":FMT,"algebra":a.kind,"domains":dict(sorted(cards.items())),"rule_id":rule,"source":src,"target":dst,"source_sha256":sha(src),"target_sha256":sha(dst)}
+def mutate_factors(term, mutate):
+    if term["op"]=="factor":
+        mutate(term)
+    elif term["op"] in ("add","mul"):
+        mutate_factors(term["left"],mutate);mutate_factors(term["right"],mutate)
+    elif "body" in term:
+        mutate_factors(term["body"],mutate)
+
 def main():
     r=random.Random(0xE7018);cards={"x":2,"y":3,"z":2};positive=[];counts={x:0 for x in RULES}
     for kind in KINDS:
@@ -157,6 +171,24 @@ def main():
     c=json.loads(json.dumps(positive[0]));c["rule_id"]="swap-finite-sums";negatives.append(c)
     c=json.loads(json.dumps(positive[0]));c["source"]["body"]["right"]["scope"]=["x","y","z"];c["source"]["body"]["right"]["values"]*=2;c["source_sha256"]=sha(c["source"]);negatives.append(c)
     c=json.loads(json.dumps(positive[-1]));c["algebra"]="maxcount";c["source_sha256"]=sha(c["source"]);c["target_sha256"]=sha(c["target"]);negatives.append(c)
+    # Malformed encodings: the hashes are recomputed so only strict parsing can reject them.
+    c=json.loads(json.dumps(positive[3]))
+    def malformed_bool(f): f["values"]=["true" if v else "false" for v in f["values"]]
+    mutate_factors(c["source"],malformed_bool);mutate_factors(c["target"],malformed_bool)
+    c["source_sha256"]=sha(c["source"]);c["target_sha256"]=sha(c["target"]);negatives.append(c)
+    c=json.loads(json.dumps(positive[-2]))
+    def duplicate_poly_term(f):
+        if f["values"] and f["values"][0]: f["values"][0].append(list(f["values"][0][0]))
+    mutate_factors(c["source"],duplicate_poly_term);c["source_sha256"]=sha(c["source"]);negatives.append(c)
+    c=json.loads(json.dumps(positive[-1]))
+    def noncanonical_rational(f):
+        for value in f["values"]:
+            if value:
+                value[0][2:]=[2,-4]
+                return
+    mutate_factors(c["source"],noncanonical_rational);c["source_sha256"]=sha(c["source"]);negatives.append(c)
+    c=json.loads(json.dumps(positive[0]));c["source"]["body"]["left"]["scope"]=["x","x"]
+    c["source_sha256"]=sha(c["source"]);negatives.append(c)
     payload=positive+negatives
     checker=Path(__file__).with_name("algebraic_rewrite_checker.py")
     p=subprocess.run([sys.executable,str(checker)],input=json.dumps(payload),text=True,capture_output=True,check=True)
