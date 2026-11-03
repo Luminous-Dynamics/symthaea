@@ -269,7 +269,10 @@ struct CandidateMetrics {
 }
 
 fn decision_error(kind: PlannerErrorKind, message: impl Into<String>) -> PlannerError {
-    PlannerError { kind, message: message.into() }
+    PlannerError {
+        kind,
+        message: message.into(),
+    }
 }
 
 fn validate_decision_config(config: DecisionPlannerConfig) -> Result<(), PlannerError> {
@@ -299,7 +302,10 @@ fn validate_utility_model(model: &DecisionUtilityModel) -> Result<(), PlannerErr
         || model.scope.trim().is_empty()
         || model.units.trim().is_empty()
         || model.declared_exclusions.is_empty()
-        || model.declared_exclusions.iter().any(|item| item.trim().is_empty())
+        || model
+            .declared_exclusions
+            .iter()
+            .any(|item| item.trim().is_empty())
     {
         return Err(decision_error(
             PlannerErrorKind::InvalidDecisionMatrix,
@@ -325,7 +331,10 @@ fn validate_decisions(
         if decision.id.trim().is_empty() || validated.contains_key(&decision.id) {
             return Err(decision_error(
                 PlannerErrorKind::InvalidDecisionMatrix,
-                format!("terminal decision ID is empty or duplicated: {}", decision.id),
+                format!(
+                    "terminal decision ID is empty or duplicated: {}",
+                    decision.id
+                ),
             ));
         }
         if decision.utilities.len() != hypothesis_ids.len() {
@@ -341,7 +350,9 @@ fn validate_decisions(
         for entry in &decision.utilities {
             if !entry.utility.is_finite()
                 || !hypothesis_ids.contains(&entry.hypothesis_id.as_str())
-                || utilities.insert(entry.hypothesis_id.clone(), entry.utility).is_some()
+                || utilities
+                    .insert(entry.hypothesis_id.clone(), entry.utility)
+                    .is_some()
             {
                 return Err(decision_error(
                     PlannerErrorKind::InvalidDecisionMatrix,
@@ -450,9 +461,7 @@ fn utility_for_posterior(
     hypothesis_ids
         .iter()
         .zip(posterior.iter())
-        .map(|(hypothesis_id, probability)| {
-            probability * utilities[decision_id][*hypothesis_id]
-        })
+        .map(|(hypothesis_id, probability)| probability * utilities[decision_id][*hypothesis_id])
         .sum()
 }
 
@@ -491,8 +500,7 @@ fn lower_tail_cvar(values: &[(f64, f64)], alpha: f64) -> f64 {
 
 fn normalized_cost(proposal: &RobustExperimentProposal, config: PlannerConfig) -> f64 {
     config.cost_weights.time * (proposal.estimated_time_seconds / config.max_time_seconds)
-        + config.cost_weights.energy
-            * (proposal.estimated_energy_joules / config.max_energy_joules)
+        + config.cost_weights.energy * (proposal.estimated_energy_joules / config.max_energy_joules)
         + config.cost_weights.risk * (proposal.estimated_risk / config.max_risk)
 }
 
@@ -621,14 +629,11 @@ fn policy_regrets(
                 continue;
             }
             let selected_id = &decision_ids[policy[outcome_index]];
-            let selected_value = utility_for_posterior(
-                utilities,
-                selected_id,
-                hypothesis_ids,
-                &outcome.posterior,
-            );
+            let selected_value =
+                utility_for_posterior(utilities, selected_id, hypothesis_ids, &outcome.posterior);
             policy_value += outcome.probability * selected_value;
-            regret += outcome.probability * (outcome.best_expected_utility - selected_value).max(0.0);
+            regret +=
+                outcome.probability * (outcome.best_expected_utility - selected_value).max(0.0);
             if outcome.optimal_decision_index == Some(policy[outcome_index]) {
                 stability += scenario.scenario_probability * outcome.probability;
             }
@@ -648,9 +653,8 @@ fn minimax_regret_policy(
     priors: &BTreeMap<&str, f64>,
     maximum_combinations: usize,
 ) -> Result<Vec<usize>, PlannerError> {
-    let combinations = (0..proposal.outcomes.len()).try_fold(1usize, |count, _| {
-        count.checked_mul(decisions.len())
-    });
+    let combinations = (0..proposal.outcomes.len())
+        .try_fold(1usize, |count, _| count.checked_mul(decisions.len()));
     let combinations = combinations.unwrap_or(usize::MAX);
     if combinations > maximum_combinations {
         return Err(decision_error(
@@ -735,11 +739,17 @@ fn candidate_metrics(
         .iter()
         .zip(policy_values.iter())
         .map(|(scenario, policy_value)| {
-            (policy_value - baseline_utility, scenario.scenario_probability)
+            (
+                policy_value - baseline_utility,
+                scenario.scenario_probability,
+            )
         })
         .collect();
 
-    let expected_evsi = scenario_evsi.iter().map(|(value, weight)| value * weight).sum();
+    let expected_evsi = scenario_evsi
+        .iter()
+        .map(|(value, weight)| value * weight)
+        .sum();
     let worst_case_evsi = scenario_evsi
         .iter()
         .map(|(value, _)| *value)
@@ -853,7 +863,10 @@ pub fn plan_next_experiment_decision_aware(
         if proposal.id.trim().is_empty() || !proposal_ids.insert(proposal.id.as_str()) {
             return Err(decision_error(
                 PlannerErrorKind::DuplicateExperimentId,
-                format!("empty or duplicate decision-aware proposal ID: {}", proposal.id),
+                format!(
+                    "empty or duplicate decision-aware proposal ID: {}",
+                    proposal.id
+                ),
             ));
         }
     }
@@ -879,7 +892,10 @@ pub fn plan_next_experiment_decision_aware(
                     baseline_expected_utility: None,
                     prior_entropy_bits: 0.0,
                     grounded_hypothesis_ids: Vec::new(),
-                    scenario_ids: scenarios.iter().map(|scenario| scenario.scenario_id.clone()).collect(),
+                    scenario_ids: scenarios
+                        .iter()
+                        .map(|scenario| scenario.scenario_id.clone())
+                        .collect(),
                     utility_model_id: utility_model.id.clone(),
                     utility_model_owner: utility_model.owner.clone(),
                     utility_model_scope: utility_model.scope.clone(),
@@ -926,7 +942,10 @@ pub fn plan_next_experiment_decision_aware(
             baseline_expected_utility: Some(baseline_expected_utility),
             prior_entropy_bits,
             grounded_hypothesis_ids,
-            scenario_ids: scenarios.iter().map(|scenario| scenario.scenario_id.clone()).collect(),
+            scenario_ids: scenarios
+                .iter()
+                .map(|scenario| scenario.scenario_id.clone())
+                .collect(),
             utility_model_id: utility_model.id.clone(),
             utility_model_owner: utility_model.owner.clone(),
             utility_model_scope: utility_model.scope.clone(),
@@ -946,7 +965,10 @@ pub fn plan_next_experiment_decision_aware(
             baseline_expected_utility: Some(baseline_expected_utility),
             prior_entropy_bits,
             grounded_hypothesis_ids,
-            scenario_ids: scenarios.iter().map(|scenario| scenario.scenario_id.clone()).collect(),
+            scenario_ids: scenarios
+                .iter()
+                .map(|scenario| scenario.scenario_id.clone())
+                .collect(),
             utility_model_id: utility_model.id.clone(),
             utility_model_owner: utility_model.owner.clone(),
             utility_model_scope: utility_model.scope.clone(),
@@ -1020,7 +1042,9 @@ pub fn plan_next_experiment_decision_aware(
                 config.maximum_policy_combinations,
             ) {
                 Ok(policy) => policy,
-                Err(error) if error.kind == PlannerErrorKind::DecisionPolicySearchBudgetExceeded => {
+                Err(error)
+                    if error.kind == PlannerErrorKind::DecisionPolicySearchBudgetExceeded =>
+                {
                     rejected_experiments.push(DecisionRejectedExperiment {
                         experiment_id: proposal.id.clone(),
                         reasons: vec![DecisionRejectionReason::PolicySearchBudgetExceeded],
@@ -1045,9 +1069,7 @@ pub fn plan_next_experiment_decision_aware(
             &priors,
         );
 
-        if metrics.decision_stability + OBJECTIVE_TOLERANCE
-            < config.minimum_decision_stability
-        {
+        if metrics.decision_stability + OBJECTIVE_TOLERANCE < config.minimum_decision_stability {
             saw_unstable = true;
             rejected_experiments.push(DecisionRejectedExperiment {
                 experiment_id: proposal.id.clone(),
@@ -1124,20 +1146,22 @@ pub fn plan_next_experiment_decision_aware(
         });
     }
 
-    ranked_experiments.sort_by(|left, right| {
-        match config.ranking_policy {
-            DecisionRankingPolicy::MinimaxRegret => right
-                .utility
-                .total_cmp(&left.utility)
-                .then_with(|| right.expected_shared_policy_evsi.total_cmp(&left.expected_shared_policy_evsi))
-                .then_with(|| left.normalized_cost.total_cmp(&right.normalized_cost))
-                .then_with(|| left.experiment_id.cmp(&right.experiment_id)),
-            _ => right
-                .utility
-                .total_cmp(&left.utility)
-                .then_with(|| right.selected_objective.total_cmp(&left.selected_objective))
-                .then_with(|| left.experiment_id.cmp(&right.experiment_id)),
-        }
+    ranked_experiments.sort_by(|left, right| match config.ranking_policy {
+        DecisionRankingPolicy::MinimaxRegret => right
+            .utility
+            .total_cmp(&left.utility)
+            .then_with(|| {
+                right
+                    .expected_shared_policy_evsi
+                    .total_cmp(&left.expected_shared_policy_evsi)
+            })
+            .then_with(|| left.normalized_cost.total_cmp(&right.normalized_cost))
+            .then_with(|| left.experiment_id.cmp(&right.experiment_id)),
+        _ => right
+            .utility
+            .total_cmp(&left.utility)
+            .then_with(|| right.selected_objective.total_cmp(&left.selected_objective))
+            .then_with(|| left.experiment_id.cmp(&right.experiment_id)),
     });
     rejected_experiments.sort_by(|left, right| left.experiment_id.cmp(&right.experiment_id));
 
@@ -1161,7 +1185,10 @@ pub fn plan_next_experiment_decision_aware(
         baseline_expected_utility: Some(baseline_expected_utility),
         prior_entropy_bits,
         grounded_hypothesis_ids,
-        scenario_ids: scenarios.iter().map(|scenario| scenario.scenario_id.clone()).collect(),
+        scenario_ids: scenarios
+            .iter()
+            .map(|scenario| scenario.scenario_id.clone())
+            .collect(),
         utility_model_id: utility_model.id.clone(),
         utility_model_owner: utility_model.owner.clone(),
         utility_model_scope: utility_model.scope.clone(),
@@ -1200,7 +1227,11 @@ mod tests {
                 prior_probability: *prior,
                 supporting_evidence_ids: vec![format!(
                     "ev_{}",
-                    if index % 2 == 0 { "a".repeat(64) } else { "b".repeat(64) }
+                    if index % 2 == 0 {
+                        "a".repeat(64)
+                    } else {
+                        "b".repeat(64)
+                    }
                 )],
                 contradicting_evidence_ids: Vec::new(),
             })
@@ -1294,10 +1325,7 @@ mod tests {
     #[test]
     fn expected_evsi_matches_a_binary_known_answer() {
         let hypotheses = hypotheses(&[0.5, 0.5]);
-        let decisions = decisions(&[
-            ("repair-a", &[10.0, 0.0]),
-            ("repair-b", &[0.0, 10.0]),
-        ]);
+        let decisions = decisions(&[("repair-a", &[10.0, 0.0]), ("repair-b", &[0.0, 10.0])]);
         let proposals = vec![proposal("probe", &["yes", "no"])];
         let scenarios = vec![scenario(
             "nominal",
@@ -1364,7 +1392,10 @@ mod tests {
         let scenarios = vec![scenario(
             "nominal",
             1.0,
-            vec![matrix("probe", &[("h0", &[0.99, 0.01]), ("h1", &[0.01, 0.99])])],
+            vec![matrix(
+                "probe",
+                &[("h0", &[0.99, 0.01]), ("h1", &[0.01, 0.99])],
+            )],
         )];
         let plan = plan(
             &hypotheses,
@@ -1400,11 +1431,19 @@ mod tests {
             vec![
                 matrix(
                     "benign-detail",
-                    &[("h0", &[1.0, 0.0]), ("h1", &[1.0, 0.0]), ("h2", &[0.0, 1.0])],
+                    &[
+                        ("h0", &[1.0, 0.0]),
+                        ("h1", &[1.0, 0.0]),
+                        ("h2", &[0.0, 1.0]),
+                    ],
                 ),
                 matrix(
                     "rare-critical-fault",
-                    &[("h0", &[0.0, 1.0]), ("h1", &[1.0, 0.0]), ("h2", &[0.0, 1.0])],
+                    &[
+                        ("h0", &[0.0, 1.0]),
+                        ("h1", &[1.0, 0.0]),
+                        ("h2", &[0.0, 1.0]),
+                    ],
                 ),
             ],
         )];
@@ -1418,11 +1457,22 @@ mod tests {
         .unwrap();
 
         assert_eq!(result.baseline_decision_id.as_deref(), Some("mitigate"));
-        let benign = result.ranked_experiments.iter().find(|item| item.experiment_id == "benign-detail").unwrap();
-        let critical = result.ranked_experiments.iter().find(|item| item.experiment_id == "rare-critical-fault").unwrap();
+        let benign = result
+            .ranked_experiments
+            .iter()
+            .find(|item| item.experiment_id == "benign-detail")
+            .unwrap();
+        let critical = result
+            .ranked_experiments
+            .iter()
+            .find(|item| item.experiment_id == "rare-critical-fault")
+            .unwrap();
         assert!(benign.expected_evsi > critical.expected_evsi);
         assert!(critical.expected_shared_policy_evsi > benign.expected_shared_policy_evsi);
-        assert_eq!(result.selected.unwrap().experiment_id, "rare-critical-fault");
+        assert_eq!(
+            result.selected.unwrap().experiment_id,
+            "rare-critical-fault"
+        );
     }
 
     #[test]
@@ -1468,8 +1518,15 @@ mod tests {
         let selected = result.selected.unwrap();
         assert_eq!(selected.experiment_id, "stable");
         assert_eq!(
-            selected.shared_policy.iter().map(|item| item.impact).collect::<Vec<_>>(),
-            vec![DecisionImpact::ServiceDisruption, DecisionImpact::PhysicalActuation]
+            selected
+                .shared_policy
+                .iter()
+                .map(|item| item.impact)
+                .collect::<Vec<_>>(),
+            vec![
+                DecisionImpact::ServiceDisruption,
+                DecisionImpact::PhysicalActuation
+            ]
         );
         assert_eq!(
             selected.scenario_results[0].outcomes[0].shared_policy_decision_impact,
@@ -1486,7 +1543,10 @@ mod tests {
             scenario(
                 "informative",
                 0.9,
-                vec![matrix("probe", &[("h0", &[0.99, 0.01]), ("h1", &[0.01, 0.99])])],
+                vec![matrix(
+                    "probe",
+                    &[("h0", &[0.99, 0.01]), ("h1", &[0.01, 0.99])],
+                )],
             ),
             scenario(
                 "uninformative",
@@ -1591,24 +1651,42 @@ mod tests {
             impact: DecisionImpact::Informational,
         }];
         assert_eq!(
-            plan(&hypotheses, &proposals, &scenarios, &missing, DecisionPlannerConfig::default())
-                .unwrap_err()
-                .kind,
+            plan(
+                &hypotheses,
+                &proposals,
+                &scenarios,
+                &missing,
+                DecisionPlannerConfig::default()
+            )
+            .unwrap_err()
+            .kind,
             PlannerErrorKind::InvalidDecisionMatrix
         );
 
         let duplicate = vec![TerminalDecision {
             id: "bad".to_owned(),
             utilities: vec![
-                DecisionUtility { hypothesis_id: "h0".to_owned(), utility: 1.0 },
-                DecisionUtility { hypothesis_id: "h0".to_owned(), utility: 2.0 },
+                DecisionUtility {
+                    hypothesis_id: "h0".to_owned(),
+                    utility: 1.0,
+                },
+                DecisionUtility {
+                    hypothesis_id: "h0".to_owned(),
+                    utility: 2.0,
+                },
             ],
             impact: DecisionImpact::Informational,
         }];
         assert_eq!(
-            plan(&hypotheses, &proposals, &scenarios, &duplicate, DecisionPlannerConfig::default())
-                .unwrap_err()
-                .kind,
+            plan(
+                &hypotheses,
+                &proposals,
+                &scenarios,
+                &duplicate,
+                DecisionPlannerConfig::default()
+            )
+            .unwrap_err()
+            .kind,
             PlannerErrorKind::InvalidDecisionMatrix
         );
     }
@@ -1619,13 +1697,38 @@ mod tests {
         let decisions = decisions(&[("a", &[10.0, 0.0]), ("b", &[0.0, 10.0])]);
         let proposals = vec![proposal("probe", &["yes", "no"])];
         let first = vec![
-            scenario("a", 0.5, vec![matrix("probe", &[("h0", &[0.9, 0.1]), ("h1", &[0.1, 0.9])])]),
-            scenario("b", 0.5, vec![matrix("probe", &[("h0", &[0.8, 0.2]), ("h1", &[0.2, 0.8])])]),
+            scenario(
+                "a",
+                0.5,
+                vec![matrix("probe", &[("h0", &[0.9, 0.1]), ("h1", &[0.1, 0.9])])],
+            ),
+            scenario(
+                "b",
+                0.5,
+                vec![matrix("probe", &[("h0", &[0.8, 0.2]), ("h1", &[0.2, 0.8])])],
+            ),
         ];
         let second = first.iter().cloned().rev().collect::<Vec<_>>();
-        let one = plan(&hypotheses, &proposals, &first, &decisions, DecisionPlannerConfig::default()).unwrap();
-        let two = plan(&hypotheses, &proposals, &second, &decisions, DecisionPlannerConfig::default()).unwrap();
-        assert_eq!(one.selected.as_ref().unwrap().experiment_id, two.selected.as_ref().unwrap().experiment_id);
+        let one = plan(
+            &hypotheses,
+            &proposals,
+            &first,
+            &decisions,
+            DecisionPlannerConfig::default(),
+        )
+        .unwrap();
+        let two = plan(
+            &hypotheses,
+            &proposals,
+            &second,
+            &decisions,
+            DecisionPlannerConfig::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            one.selected.as_ref().unwrap().experiment_id,
+            two.selected.as_ref().unwrap().experiment_id
+        );
         assert!(
             (one.selected.unwrap().expected_shared_policy_evsi
                 - two.selected.unwrap().expected_shared_policy_evsi)
