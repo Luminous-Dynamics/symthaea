@@ -1598,9 +1598,12 @@ mod tests {
         let log_bytes = format!("independent {stage} test evidence").into_bytes();
         let report_bytes = format!("signed {stage} run report").into_bytes();
         let patch_artifact = write_test_artifact(artifact_root, "candidate.patch", patch_bytes);
+        let compile_log = format!("{stage} compiler success").into_bytes();
+        let compile_artifact = write_test_artifact(artifact_root, "logs/compile.log", &compile_log);
         let log_artifact = write_test_artifact(artifact_root, "logs/test.log", &log_bytes);
         let report_name = if stage == "primary" { "primary-report.json" } else { "regrade-report.json" };
         let report_artifact = write_test_artifact(artifact_root, report_name, &report_bytes);
+        let compile_digest = sha256_hex(&compile_log);
         let check_digest = sha256_hex(&log_bytes);
         serde_json::json!({
             "_type": STATEMENT_TYPE,
@@ -1653,18 +1656,28 @@ mod tests {
                     "hidden_tests_visible_to_agent": false,
                     "grader_writable_by_agent": false
                 },
-                "checks": [{
-                    "check_id": "tests.correctness",
-                    "kind": "hidden_test",
-                    "required": true,
-                    "authority": "independent_grader",
-                    "status": "pass",
-                    "evidence_sha256": check_digest
-                }],
+                "checks": [
+                    {
+                        "check_id": "compile.clean",
+                        "kind": "compile",
+                        "required": true,
+                        "authority": "external_tool",
+                        "status": "pass",
+                        "evidence_sha256": compile_digest
+                    },
+                    {
+                        "check_id": "tests.correctness",
+                        "kind": "hidden_test",
+                        "required": true,
+                        "authority": "independent_grader",
+                        "status": "pass",
+                        "evidence_sha256": check_digest
+                    }
+                ],
                 "result": {
                     "verdict": "pass",
-                    "required_check_count": 1,
-                    "required_pass_count": 1,
+                    "required_check_count": 2,
+                    "required_pass_count": 2,
                     "required_fail_count": 0,
                     "required_error_count": 0,
                     "required_skipped_count": 0,
@@ -1683,7 +1696,7 @@ mod tests {
                     "tool_calls": 4,
                     "cost_usd": 0.01
                 },
-                "artifacts": [patch_artifact, log_artifact, report_artifact]
+                "artifacts": [patch_artifact, compile_artifact, log_artifact, report_artifact]
             }
         })
     }
@@ -1723,13 +1736,22 @@ mod tests {
                 "empty_patch_must_fail": true,
                 "independent_grader": "unit-independent-grader",
                 "grader_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
-                "checks": [{
-                    "check_id": "tests.correctness",
-                    "kind": "hidden_test",
-                    "authority": "independent_grader",
-                    "required": true,
-                    "description": "The hidden behavioral contract must pass in the isolated grader."
-                }]
+                "checks": [
+                    {
+                        "check_id": "compile.clean",
+                        "kind": "compile",
+                        "authority": "external_tool",
+                        "required": true,
+                        "description": "The exact task source must compile under the pinned toolchain."
+                    },
+                    {
+                        "check_id": "tests.correctness",
+                        "kind": "hidden_test",
+                        "authority": "independent_grader",
+                        "required": true,
+                        "description": "The hidden behavioral contract must pass in the isolated grader."
+                    }
+                ]
             },
             "budget": {
                 "wall_clock_seconds": 10,
