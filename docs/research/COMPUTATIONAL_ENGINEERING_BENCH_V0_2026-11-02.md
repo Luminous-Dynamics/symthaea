@@ -227,7 +227,7 @@ The workflow contains 31 authored negative controls, including result-tree subje
 
 ## 17. 2026-11-03 verifier and benchmark direction update
 
-The receipt contract now has exactly three in-toto subjects: candidate patch, source tree and result tree. Task contracts declare the CEB-TREE-V1 digest algorithm. The Rust verifier draft independently hashes clean source/result snapshots, checks that receipt changed_paths equal the computed tree delta, and checks that unquoted Git diff file headers name exactly that changed-path set. This is stronger than trusting a runner's claimed result-tree digest, but it is not yet proof that applying the submitted patch to the source produces the result. A safe, independent patch reconstruction/apply stage remains an explicit gate.
+The receipt contract now has exactly three in-toto subjects: candidate patch, source tree and result tree. Task contracts declare the CEB-TREE-V1 digest algorithm. The Rust verifier draft independently hashes clean source/result snapshots, checks that receipt changed_paths equal the computed tree delta, and checks that unquoted Git diff file headers name exactly that changed-path set. The verifier now applies the UTF-8 textual Git patch to a Git tree built from the pinned source snapshot using libgit2's tree-level patch API in a private temporary bare repository, then requires the reconstructed tree to equal the independently built result snapshot. No worktree or candidate execution is involved. Binary patches and quoted/ambiguous paths remain unresolved in CEB V0; snapshots must remain immutable/read-only. This is authored but uncompiled/unrun.
 
 ### Where to compete, and where not to overfit
 
