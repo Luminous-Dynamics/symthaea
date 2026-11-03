@@ -130,6 +130,15 @@ pub enum SonataVerificationMetric {
         #[serde(default)]
         return_evidence: Option<MotifReturnEvidence>,
     },
+    MotifDevelopment {
+        source: SonataSectionKind,
+        target: SonataSectionKind,
+        transformation: ReturnTransformation,
+        interval_similarity: f32,
+        exact_pitch_similarity: f32,
+        #[serde(default)]
+        development_evidence: Option<MotifReturnEvidence>,
+    },
     ClimaxLocation {
         section: SonataSectionKind,
         section_peak_intensity: f32,
@@ -152,6 +161,7 @@ const RETURN_PRIMARY_SUBJECT: u64 = 3;
 const RETURN_HOME_KEY: u64 = 4;
 const RETURN_SECONDARY_SUBJECT: u64 = 5;
 const CLOSE_IN_HOME_KEY: u64 = 6;
+const DEVELOP_PRIMARY_MOTIF: u64 = 7;
 
 struct SectionBlueprint {
     kind: SonataSectionKind,
@@ -296,6 +306,16 @@ pub fn plan_sonata(home_key: Key, meter: f64, motif: &Motif, seed: u64) -> Sonat
         development.end,
         0.8,
         ObligationKind::ReachClimax,
+    ));
+    obligations.add(CompositionalObligation::new(
+        DEVELOP_PRIMARY_MOTIF,
+        Duration::zero(),
+        development.end,
+        0.85,
+        ObligationKind::DevelopMotif {
+            motif_id: "sonata.primary".into(),
+            transformation: ReturnTransformation::Transposed,
+        },
     ));
     obligations.add(CompositionalObligation::new(
         RETURN_PRIMARY_SUBJECT,
@@ -465,6 +485,47 @@ fn metric_for_obligation(
     obligation: &CompositionalObligation,
 ) -> SonataVerificationMetric {
     match &obligation.kind {
+        ObligationKind::DevelopMotif {
+            motif_id,
+            transformation,
+        } => {
+            let source_kind = match motif_id.as_str() {
+                "sonata.primary" => SonataSectionKind::ExpositionPrimary,
+                "sonata.secondary" => SonataSectionKind::ExpositionSecondary,
+                _ => {
+                    return SonataVerificationMetric::Unsupported {
+                        obligation: format!("DevelopMotif({motif_id})"),
+                    };
+                }
+            };
+            let target_kind = SonataSectionKind::Development;
+            let source = planned_section(plan, source_kind);
+            let target = planned_section(plan, target_kind);
+            let development_evidence = source.zip(target).map(|(source, target)| {
+                compare_melodic_regions(
+                    score,
+                    source.start,
+                    source.end,
+                    target.start,
+                    target.end,
+                    *transformation,
+                )
+            });
+            let interval_similarity = development_evidence
+                .as_ref()
+                .map_or(0.0, |evidence| evidence.interval_similarity);
+            let exact_pitch_similarity = development_evidence
+                .as_ref()
+                .map_or(0.0, |evidence| evidence.literal_pitch_similarity);
+            SonataVerificationMetric::MotifDevelopment {
+                source: source_kind,
+                target: target_kind,
+                transformation: *transformation,
+                interval_similarity,
+                exact_pitch_similarity,
+                development_evidence,
+            }
+        }
         ObligationKind::ReturnMotif {
             motif_id,
             transformation,
@@ -589,6 +650,33 @@ fn metric_is_verified(metric: &SonataVerificationMetric) -> bool {
             return_evidence,
             ..
         } => return_evidence.as_ref().map_or_else(
+            || match transformation {
+                ReturnTransformation::Literal => *exact_pitch_similarity >= 0.999,
+                ReturnTransformation::Transposed
+                | ReturnTransformation::Restored
+                | ReturnTransformation::Augmented
+                | ReturnTransformation::Diminished => *interval_similarity >= 0.999,
+                ReturnTransformation::Inverted | ReturnTransformation::Fragmented => false,
+            },
+            |evidence| {
+                let threshold = match transformation {
+                    ReturnTransformation::Literal | ReturnTransformation::Transposed => 0.95,
+                    ReturnTransformation::Restored => 0.90,
+                    ReturnTransformation::Inverted
+                    | ReturnTransformation::Augmented
+                    | ReturnTransformation::Diminished => 0.85,
+                    ReturnTransformation::Fragmented => 0.75,
+                };
+                evidence.meets_threshold(threshold)
+            },
+        ),
+        SonataVerificationMetric::MotifDevelopment {
+            transformation,
+            interval_similarity,
+            exact_pitch_similarity,
+            development_evidence,
+            ..
+        } => development_evidence.as_ref().map_or_else(
             || match transformation {
                 ReturnTransformation::Literal => *exact_pitch_similarity >= 0.999,
                 ReturnTransformation::Transposed
@@ -822,7 +910,14 @@ mod tests {
             SonataSectionKind::RecapitulationPrimary
         );
         assert_eq!(plan.sections[3].key, home);
-        assert_eq!(plan.obligations.pending().len(), 6);
+        assert_eq!(plan.obligations.pending().len(), 7);
+        assert!(plan.obligations.pending().iter().any(|item| matches!(
+            item.kind,
+            ObligationKind::DevelopMotif {
+                motif_id,
+                transformation: ReturnTransformation::Transposed,
+            } if motif_id == "sonata.primary"
+        )));
         assert!(
             plan.sections
                 .windows(2)
