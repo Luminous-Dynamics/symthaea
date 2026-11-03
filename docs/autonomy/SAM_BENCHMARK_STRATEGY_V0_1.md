@@ -247,3 +247,68 @@ These are hypotheses, not claims that HDC-LTC or active inference already outper
 ## 10. Non-claims
 
 A benchmark pass does not establish road safety, collision-risk reduction, legal compliance, vehicle roadworthiness, an ISO 26262 safety case, ISO 21448 validation, public-road permission, production readiness, SAE Level 4 or SAE Level 5. Those require separate, configuration-specific engineering, validation, operational evidence and regulatory processes.
+
+
+## 7. New 2026 benchmark and dataset update
+
+The Waymo Open Dataset portal states that it is not hosting formal challenges in 2026, while the established leaderboards remain open for submissions. The 2025 challenge areas relevant to SAM included vision-based end-to-end driving, scenario generation, simulated agents and interaction prediction. Treat these as continuing reference tracks rather than assuming a live 2026 competition deadline.
+
+The 2026 CVPR WOD-E2E benchmark adds 4,021 driving segments (approximately 12 hours) curated for challenging long-tail scenarios reported to occur at less than 0.03% frequency. This is a strong external long-tail evaluation candidate for permitted tasks and data splits. It complements, rather than replaces, closed-loop simulation: a curated segment benchmark does not by itself demonstrate closed-loop behavior or operational safety.
+
+NVIDIA's August 2026 Alpamayo 2 Super release reports 34B parameters and vendor-evaluated open-loop and AlpaSim closed-loop metrics. Include it as a reference model only when weights, licensing, preprocessing, hardware and evaluation task allow a reproducible, resource-matched comparison. Do not compare a vendor-reported metric to a SAM simulator score without matching definitions and denominators.
+
+ASAM OpenSCENARIO XML 1.4.0 (published May 2026) and DSL 2.2.0 should be tracked as separate adapter targets. XML 1.4.0 includes semantics relevant to signal phases and lane layers/roadworks. Adapters must return explicit unsupported/approximated semantic outcomes and preserve the original candidate as the source of truth.
+
+Sources:
+- Waymo Open Dataset challenges / leaderboard status: https://waymo.com/open/challenges/
+- WOD-E2E, CVPR 2026: https://openaccess.thecvf.com/content/CVPR2026/html/Xu_WOD-E2E_Waymo_Open_Dataset_for_End-to-End_Driving_in_Challenging_Long-tail_CVPR_2026_paper.html
+- NVIDIA Alpamayo 2 Super release: https://developer.nvidia.com/blog/generate-trajectories-reasoning-traces-and-auto-labels-with-nvidia-alpamayo-2-super/
+- ASAM OpenSCENARIO XML 1.4.0: https://openscenario.asam.net/ASAM_OpenSCENARIO_XML/v1.4.0/index.html
+
+## 8. Strategic paradigm shifts and measurable programme targets
+
+### Shift from a single end-to-end score to an evidence-carrying autonomy case
+
+The primary object should be a versioned, ODD-scoped evidence package: controller artifact identity, sensor/estimator assumptions, map/road profile, scenario lineage, dynamics profile, runtime budget, monitor decision, fallback result, replay output and independent verifier conclusion. A model score without this context is not an autonomy claim.
+
+### Shift from "rare-event accuracy" to adversarial exposure plus calibrated prevalence
+
+Keep two distinct ledgers. The *stress ledger* measures how effectively a search method discovers diverse boundary cases under a fixed compute budget. The *prevalence ledger* estimates how often those cases occur under a separately justified traffic/environment distribution. Never convert adversarial-search yield into real-world event probability.
+
+### Shift from a monolithic learned driver to constrained hierarchical control
+
+Use Symthaea for perception-conditioned belief/world-model proposals, uncertainty-aware prediction and strategic behavior. Use a conventional trajectory optimizer/controller for short-horizon physical execution. Keep a separate runtime-assurance monitor and independent viability/reachability checks outside the learned controller's authority. Learning can improve proposed behavior without being the only mechanism that prevents an inadmissible command.
+
+### Shift from test-set pass rates to failure-family closure
+
+Every counterexample should have a stable identity, minimized reproducer, causal classification, action-conditioned avoidability result where supportable, owner, regression test and residual-risk note. A failure is closed only when the original failure replays and the fix passes adjacent and negative-control cases. "No failure found" is not "safe."
+
+### Shift from one simulator to model-discrepancy-aware evidence
+
+Treat simulator outputs as observations from a named model. Cross-check selected scenarios against an independent implementation or higher-fidelity simulator, quantify discrepancy, and prevent unsupported physical claims where the model does not include tires, actors, sensing, weather or actuator behavior adequately.
+
+### Initial numeric targets (proposed gates, not results)
+
+| Gate | Proposed target | Interpretation / limitation |
+|---|---:|---|
+| Deterministic replay | 100% exact profile/output digest verification on the frozen platform/build | Replay identity only; does not prove physical correctness |
+| Paired initialization | 0 state/config/disturbance mismatches in every accepted pair | A benchmark validity prerequisite |
+| Simulator validity | 0 non-finite plant states or off-clock steps in accepted runs | Reject the run; never silently drop the frame |
+| Runtime assurance controls | 0 false-safe decisions on the seeded monitor-fault control suite | Applies only to the explicit control contract and tested faults |
+| Deadline performance | p99 monitor + command path below 50% of the declared control deadline on named hardware | Reserve headroom; report max and deadline misses too |
+| Holdout coverage | At least 10,000 executed scenarios across at least 10 disjoint failure families before any broad robustness summary | Counts describe coverage, not probability or fleet risk |
+| Search efficiency | Compare random, stratified and AST under equal simulator-call and wall-clock budgets; require statistically supported improvement in unique minimized counterexamples without holdout leakage | Numeric superiority target should be set after baseline measurements |
+| Safety outcomes | 0 severe contact / critical constraint violations on the pre-registered holdout suite, with confidence intervals and failure-family slices | Necessary simulator gate, not evidence of road safety |
+| Generalization | No regression beyond the pre-registered non-inferiority margin on unseen maps/weather/actor-policy families | Margin set before evaluation, not after seeing results |
+| Compute efficiency | Publish p50/p95/p99 end-to-end latency, memory, power and throughput on compact and large-model tracks | No cross-hardware score without disclosed budget |
+
+### How to beat strong baselines
+
+1. First beat the project's existing PD teacher on frozen, held-out closed-loop tasks without trading away constraint margins, actor safety or reliability.
+2. Add independent Stanley/Pure-Pursuit and constrained MPC baselines. Do not call a PD-teacher comparison "state of the art".
+3. Compare HDC-LTC alone, HDC-LTC + RTA, classical + RTA, and cognitive proposal + classical execution + RTA. These ablations isolate which subsystem actually provides improvement.
+4. On long-tail tasks, compare WOD-E2E / Waymo datasets and matched simulator tracks; split by scenario family, geography, map and actor intent rather than by adjacent frames.
+5. Run random, stratified and AST scenario generators at identical budgets, then evaluate all methods on an independent held-out generator.
+6. Publish every failure, no-result, unsupported simulator feature and resource constraint. Treat confidence and calibration as first-class measurements.
+
+The immediate implementation now includes same-observation shadow comparison and a separate paired closed-loop lane-keeping runner. Neither yet integrates the RTA monitor or actor-capable intersection simulator.
