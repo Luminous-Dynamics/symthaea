@@ -146,7 +146,7 @@ pub use paired_rollout::{
 };
 pub use model_discrepancy::{
     DecisionAuditResult, DecisionAuditStatus, DecisionAuditSummary, DiscrepancyActionOutcome,
-    DiscrepancyFeasibility, FamilyHorizonResidualSummary, HorizonResidualSummary,
+    DiscrepancyFeasibility, ExpectedResidualSlot, FamilyHorizonResidualSummary, HorizonResidualSummary,
     ModelDecisionObservation, ModelResidualObservation, PairedHorizonResidualGrowth,
     ReferenceOutcomeStatus, VehicleModelDiscrepancyError, VehicleModelDiscrepancyInput,
     VehicleModelDiscrepancyReport, VEHICLE_MODEL_DISCREPANCY_SCHEMA,
