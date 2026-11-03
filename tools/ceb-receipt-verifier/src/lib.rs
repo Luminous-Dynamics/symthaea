@@ -147,15 +147,15 @@ impl<'de> Visitor<'de> for UniqueVisitor {
         formatter.write_str("strict JSON without duplicate object keys")
     }
 
-    fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
+    fn visit_bool<E: DeError>(self, value: bool) -> Result<Self::Value, E> {
         Ok(UniqueValue(Value::Bool(value)))
     }
 
-    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> {
+    fn visit_i64<E: DeError>(self, value: i64) -> Result<Self::Value, E> {
         Ok(UniqueValue(Value::Number(Number::from(value))))
     }
 
-    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E> {
+    fn visit_u64<E: DeError>(self, value: u64) -> Result<Self::Value, E> {
         Ok(UniqueValue(Value::Number(Number::from(value))))
     }
 
@@ -168,19 +168,19 @@ impl<'de> Visitor<'de> for UniqueVisitor {
             .ok_or_else(|| E::custom("non-finite JSON number"))
     }
 
-    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E> {
+    fn visit_str<E: DeError>(self, value: &str) -> Result<Self::Value, E> {
         Ok(UniqueValue(Value::String(value.to_owned())))
     }
 
-    fn visit_string<E>(self, value: String) -> Result<Self::Value, E> {
+    fn visit_string<E: DeError>(self, value: String) -> Result<Self::Value, E> {
         Ok(UniqueValue(Value::String(value)))
     }
 
-    fn visit_none<E>(self) -> Result<Self::Value, E> {
+    fn visit_none<E: DeError>(self) -> Result<Self::Value, E> {
         Ok(UniqueValue(Value::Null))
     }
 
-    fn visit_unit<E>(self) -> Result<Self::Value, E> {
+    fn visit_unit<E: DeError>(self) -> Result<Self::Value, E> {
         Ok(UniqueValue(Value::Null))
     }
 
@@ -1049,7 +1049,7 @@ mod tests {
         let bytes = dsse_pae("application/vnd.in-toto+json", br#"{"ok":true}"#);
         assert_eq!(
             bytes,
-            b"DSSEv1 27 application/vnd.in-toto+json 11 {\"ok\":true}"
+            b"DSSEv1 28 application/vnd.in-toto+json 11 {\"ok\":true}"
         );
         assert_ne!(
             dsse_pae("application/vnd.in-toto+json", b"payload"),
