@@ -1339,6 +1339,86 @@ mod tests {
         assert_eq!(ranked[0].experiment_id, "cheap");
     }
 
+    fn pairwise_and_triplet_response(stimulus_mask: u8, interaction_gain: f64, state: bool) -> f64 {
+        let x1 = f64::from(stimulus_mask & 1 != 0);
+        let x2 = f64::from(stimulus_mask & 2 != 0);
+        let x3 = f64::from(stimulus_mask & 4 != 0);
+        x1 + 2.0 * x2 + 3.0 * x3
+            + 0.5 * x1 * x2
+            - 0.25 * x1 * x3
+            + 0.75 * x2 * x3
+            + if state { interaction_gain * x1 * x2 * x3 } else { 0.0 }
+    }
+
+    fn deterministic_pairwise_vs_triplet_experiment(
+        id: &str,
+        stimulus_mask: u8,
+        state: bool,
+    ) -> CandidateExperiment {
+        let pairwise = pairwise_and_triplet_response(stimulus_mask, 0.0, state);
+        let triplet = pairwise_and_triplet_response(stimulus_mask, 2.0, state);
+        let cost = f64::from(stimulus_mask.count_ones().max(1));
+        if (pairwise - triplet).abs() <= f64::EPSILON {
+            CandidateExperiment {
+                id: id.to_owned(),
+                cost,
+                outcomes: vec!["same_response".to_owned()],
+                likelihoods_by_hypothesis: vec![vec![1.0], vec![1.0]],
+            }
+        } else {
+            CandidateExperiment {
+                id: id.to_owned(),
+                cost,
+                outcomes: vec!["pairwise_prediction".to_owned(), "triplet_prediction".to_owned()],
+                likelihoods_by_hypothesis: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+            }
+        }
+    }
+
+    #[test]
+    fn single_and_pairwise_stimuli_cannot_recover_a_pure_three_way_interaction() {
+        let priors = [0.5, 0.5];
+        let candidates: Vec<CandidateExperiment> = (1_u8..=6)
+            .map(|mask| {
+                deterministic_pairwise_vs_triplet_experiment(
+                    &format!("subset-{mask:03b}"),
+                    mask,
+                    true,
+                )
+            })
+            .collect();
+        for candidate in &candidates {
+            let score = evaluate_candidate(&priors, candidate).unwrap();
+            close(score.information_gain_bits, 0.0, 1.0e-12);
+        }
+
+        let triple = deterministic_pairwise_vs_triplet_experiment("triple-111", 0b111, true);
+        let score = evaluate_candidate(&priors, &triple).unwrap();
+        close(score.information_gain_bits, 1.0, 1.0e-12);
+
+        let mut all_candidates = candidates;
+        all_candidates.push(triple);
+        let ranked = rank_candidates(&priors, &all_candidates).unwrap();
+        assert_eq!(ranked[0].experiment_id, "triple-111");
+    }
+
+    #[test]
+    fn three_way_interaction_is_not_identifiable_outside_its_gating_state() {
+        let priors = [0.5, 0.5];
+        let inactive = deterministic_pairwise_vs_triplet_experiment("triple-state-off", 0b111, false);
+        let active = deterministic_pairwise_vs_triplet_experiment("triple-state-on", 0b111, true);
+        close(
+            evaluate_candidate(&priors, &inactive).unwrap().information_gain_bits,
+            0.0,
+            1.0e-12,
+        );
+        close(
+            evaluate_candidate(&priors, &active).unwrap().information_gain_bits,
+            1.0,
+            1.0e-12,
+        );
+    }
+
     #[test]
     fn eig_and_decision_value_are_distinct_experiment_objectives() {
         let priors = [0.25, 0.25, 0.25, 0.25];
