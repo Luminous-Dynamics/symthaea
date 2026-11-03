@@ -595,7 +595,7 @@ fn verify_receipt(
     let mut unmapped_sources = BTreeSet::new();
     let mut source_mapping_kinds = BTreeMap::<String, (String, Option<String>)>::new();
     let mut alternative_groups =
-        BTreeMap::<String, (String, Vec<String>, BTreeSet<String>)>::new();
+        BTreeMap::<String, (String, Vec<String>, BTreeSet<Vec<String>>)>::new();
 
     for (index, mapping) in mappings.iter().enumerate() {
         let context = format!("mappings[{index}]");
