@@ -740,6 +740,75 @@ mod tests {
     }
 
     #[test]
+    fn max_count_backpointer_dag_enumerates_every_triangle_maxcut_assignment() {
+        fn visit(
+            position: isize,
+            backpointers: &[MaxCountBackpointer],
+            assignment: &mut [Option<usize>],
+            output: &mut Vec<Vec<usize>>,
+        ) {
+            if position < 0 {
+                output.push(assignment.iter().map(|v| v.unwrap()).collect());
+                return;
+            }
+            let backpointer = &backpointers[position as usize];
+            let key: Vec<usize> = backpointer.separator.iter()
+                .map(|&v| assignment[v].unwrap())
+                .collect();
+            let row_index = backpointer.separator.iter().zip(key.iter())
+                .fold(0usize, |index, (&v, &state)| index * [2usize, 2, 2][v] + state);
+            let row = &backpointer.rows[row_index];
+            assert_eq!(row.separator_assignment, key);
+            for &state in &row.maximizing_states {
+                assignment[backpointer.variable] = Some(state);
+                visit(position - 1, backpointers, assignment, output);
+            }
+            assignment[backpointer.variable] = None;
+        }
+
+        let mut graph = ExactFactorGraph::new(vec![2,2,2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        for (u, v) in [(0,1), (1,2), (0,2)] {
+            graph.add_factor(vec![u,v], vec![0,1,1,0]
+                .into_iter().map(|score| MaxCountValue::candidate(score, 1)).collect()).unwrap();
+        }
+        let result = graph.evaluate_with_witness(&[0,1,2]).unwrap();
+        let mut actual = Vec::new();
+        visit(
+            result.backpointers.len() as isize - 1,
+            &result.backpointers,
+            &mut vec![None; 3],
+            &mut actual,
+        );
+        actual.sort();
+        let mut expected = Vec::new();
+        for a in 0..2 {
+            for b in 0..2 {
+                for c in 0..2 {
+                    let cut = i32::from(a != b) + i32::from(b != c) + i32::from(a != c);
+                    if cut == 2 { expected.push(vec![a,b,c]); }
+                }
+            }
+        }
+        expected.sort();
+        assert_eq!(actual, expected);
+        assert_eq!(actual.len(), 6);
+    }
+
+    #[test]
+    fn elimination_statistics_counters_fail_closed_on_overflow() {
+        let mut count = u128::MAX;
+        assert!(matches!(
+            increment_u128(&mut count, "test counter"),
+            Err(EliminationError::StatisticsOverflow { metric: "test counter" })
+        ));
+        let mut steps = usize::MAX;
+        assert!(matches!(
+            increment_usize(&mut steps, "test steps"),
+            Err(EliminationError::StatisticsOverflow { metric: "test steps" })
+        ));
+    }
+
+    #[test]
     fn max_count_witness_keeps_semiring_multiplicity_distinct_from_assignment_count() {
         let mut g = ExactFactorGraph::new(vec![2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
         g.add_factor(vec![0], vec![
