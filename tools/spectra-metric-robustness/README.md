@@ -27,6 +27,19 @@ The benchmark has a strict separation:
 
 The type split prevents accidental API mixing; it is not cryptographic custody.
 
+**Measurement boundary:** the candidate-visible `evidence_score` is a synthetic,
+graded observer-output surrogate supplied by the benchmark generator. It is
+not a latent brain signal and it is not a field that a person can be assumed to
+report. Variance, tail-shape and score-autocorrelation diagnostics in this
+benchmark are directly applicable only when a real task has a separately
+validated graded observation channel. SPECTRA-OBS-001
+[#10179](https://github.com/Luminous-Dynamics/symthaea/issues/10179) owns the
+future confidence / response-time measurement profile. A binary yes/no-only
+record does not identify the unequal-variance ROC shape from one operating
+point; do not infer a participant's internal evidence distribution from
+hit/miss counts alone.
+
+
 ## Frozen stress worlds
 
 | World | Synthetic departure | Required diagnostic |
