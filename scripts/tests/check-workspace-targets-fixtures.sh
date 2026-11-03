@@ -10,6 +10,8 @@ mkdir -p "$tmp/scripts"
 mkdir -p "$tmp/crates/core/good/src"
 mkdir -p "$tmp/crates/core/symthaea/examples"
 mkdir -p "$tmp/crates/core/symthaea-observation-attestation/src"
+mkdir -p "$tmp/crates/core/symthaea-iit/tests"
+: > "$tmp/crates/core/symthaea-iit/tests/harness.rs"
 cp "$repo_root/scripts/check-workspace-targets.sh" "$tmp/scripts/check-workspace-targets.sh"
 
 cat > "$tmp/Cargo.toml" <<'EOF'
@@ -19,6 +21,7 @@ exclude = [
     "crates/core/nixward-web",
     "crates/core/symthaea",
     "crates/core/symthaea-observation-attestation",
+    "crates/core/symthaea-iit",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
