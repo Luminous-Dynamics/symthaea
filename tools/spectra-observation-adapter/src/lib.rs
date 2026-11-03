@@ -82,10 +82,11 @@ pub enum ObservationError {
     EmptyCampaign,
     MisalignedTruth,
     DuplicateTrialId,
-    PartialDecision,
+    DecisionTimestampWithoutDecision,
     InvalidDecisionTimestamp,
     PartialConfidence,
     ConfidenceWithoutDecision,
+    ConfidenceWithoutDecisionTimestamp,
     InvalidConfidenceTimestamp,
     ConfidenceOutOfRange,
     InvalidClockResolution,
@@ -101,10 +102,11 @@ impl fmt::Display for ObservationError {
             Self::EmptyCampaign => "candidate campaign must contain at least one trial",
             Self::MisalignedTruth => "candidate rows do not align with evaluator truth",
             Self::DuplicateTrialId => "trial identifiers must be unique",
-            Self::PartialDecision => "decision and decision timestamp must both be present or both be absent",
+            Self::DecisionTimestampWithoutDecision => "decision timestamp is present without a committed binary decision",
             Self::InvalidDecisionTimestamp => "decision timestamp must be strictly after stimulus onset",
             Self::PartialConfidence => "confidence level and confidence timestamp must both be present or both be absent",
             Self::ConfidenceWithoutDecision => "confidence requires a committed binary decision",
+            Self::ConfidenceWithoutDecisionTimestamp => "confidence chronology cannot be verified without a decision timestamp",
             Self::InvalidConfidenceTimestamp => "confidence timestamp must be strictly after the binary decision",
             Self::ConfidenceOutOfRange => "confidence level is outside the predeclared ordinal range",
             Self::InvalidClockResolution => "clock resolution must be non-zero",
@@ -252,8 +254,8 @@ fn validate_trial(
         return Err(ObservationError::InvalidClockResolution);
     }
 
-    if row.decision_yes.is_some() != row.decision_time_ns.is_some() {
-        return Err(ObservationError::PartialDecision);
+    if row.decision_yes.is_none() && row.decision_time_ns.is_some() {
+        return Err(ObservationError::DecisionTimestampWithoutDecision);
     }
 
     if let Some(decision_time) = row.decision_time_ns {
@@ -275,7 +277,7 @@ fn validate_trial(
         }
         let decision_time = row
             .decision_time_ns
-            .ok_or(ObservationError::ConfidenceWithoutDecision)?;
+            .ok_or(ObservationError::ConfidenceWithoutDecisionTimestamp)?;
         let confidence_time = row
             .confidence_time_ns
             .ok_or(ObservationError::PartialConfidence)?;
@@ -484,6 +486,34 @@ mod tests {
         };
         let report = evaluate(&CandidateView { profile, trials: rows }, &truth).unwrap();
         assert_eq!(report.rt_roc_auc, Some(0.5));
+    }
+
+    #[test]
+    fn missing_rt_timestamp_preserves_binary_decision_counts() {
+        let (mut candidate, truth) = perfect_fixture();
+        for row in &mut candidate.trials {
+            row.decision_time_ns = None;
+            row.confidence_level = None;
+            row.confidence_time_ns = None;
+        }
+        let report = evaluate(&candidate, &truth).unwrap();
+        assert_eq!(report.decision_trials, 6);
+        assert_eq!(report.missing_decisions, 0);
+        assert_eq!(report.rt_trials, 0);
+        assert_eq!(report.missing_rt_after_decision, 6);
+        assert_eq!(report.decision_counts.hits, 3);
+        assert!(report.rt_type1_roc.is_none());
+        assert!(report.confidence_type1_roc.is_none());
+    }
+
+    #[test]
+    fn confidence_requires_observable_decision_chronology() {
+        let (mut candidate, truth) = perfect_fixture();
+        candidate.trials[0].decision_time_ns = None;
+        assert_eq!(
+            evaluate(&candidate, &truth),
+            Err(ObservationError::ConfidenceWithoutDecisionTimestamp)
+        );
     }
 
     #[test]
