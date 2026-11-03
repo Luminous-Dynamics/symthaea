@@ -94,8 +94,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pitb-typed-graph-evidence-rustfmt
-          path: ${{ runner.temp }}/pitb-graph-evidence/src/main.rs
+          name: pitb-typed-graph-evidence-build-inputs
+          path: |
+            ${{ runner.temp }}/pitb-graph-evidence/src/main.rs
+            ${{ runner.temp }}/pitb-graph-evidence/Cargo.lock
           if-no-files-found: warn
           retention-days: 7
 
