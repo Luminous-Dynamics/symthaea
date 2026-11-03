@@ -77,10 +77,13 @@ impl MuseStream {
         }
     }
 
-    /// Update the cognitive state driving generation.
+    /// Update the cognitive state driving future generation.
     ///
     /// Rebuilds the scale, tempo, and section type from the new state.
-    /// The next call to `next_note()` will use the updated parameters.
+    /// Notes already buffered in the queue are preserved and emitted first;
+    /// the new state is used when the next generation batch is requested.
+    /// Use `update_state_immediately` when an urgent intervention should
+    /// discard unconsumed buffered notes instead.
     pub fn update_state(&mut self, state: &MusicalState) {
         self.state = state.clone();
         self.scale = pitch::build_scale(&self.state);
@@ -88,6 +91,28 @@ impl MuseStream {
         self.beat_duration = 60.0 / self.tempo;
         self.section = structure::determine_section(&self.state);
         self.state_dirty = true;
+    }
+
+    /// Apply a cognitive-state update at the next pull boundary.
+    ///
+    /// Unlike `update_state`, this discards every note that has been
+    /// generated but not yet returned by `next_note`. It preserves
+    /// the playback cursor, emitted-note count, and most recently emitted
+    /// note. The exact number of discarded pending notes is returned so the
+    /// caller can account for the intervention.
+    ///
+    /// This does not cancel audio or MIDI events already submitted to a
+    /// downstream renderer/device; that requires an output-scheduler API.
+    pub fn update_state_immediately(&mut self, state: &MusicalState) -> usize {
+        self.update_state(state);
+        let discarded = self.note_queue.len();
+        self.note_queue.clear();
+        discarded
+    }
+
+    /// Number of generated notes waiting to be returned by `next_note`.
+    pub fn buffered_note_count(&self) -> usize {
+        self.note_queue.len()
     }
 
     /// Pull the next note from the stream.
@@ -252,6 +277,88 @@ mod tests {
     }
 
     #[test]
+    fn preserve_update_keeps_pending_notes_until_generation_boundary() {
+        let mut stream = MuseStream::new(
+            51,
+            MuseConfig {
+                duration_secs: 20.0,
+                max_notes: 32,
+                ..Default::default()
+            },
+        );
+        assert!(stream.next_note().is_some());
+        let buffered = stream.buffered_note_count();
+        assert!(buffered > 0, "fixture should leave a generated batch pending");
+        let cursor = stream.time_cursor();
+
+        stream.update_state(&MusicalState {
+            arousal: 0.95,
+            noradrenaline: 0.9,
+            ..Default::default()
+        });
+
+        assert_eq!(stream.buffered_note_count(), buffered);
+        assert_eq!(stream.time_cursor(), cursor);
+        assert!(stream.state_dirty());
+        assert!(stream.next_note().is_some());
+        assert_eq!(stream.buffered_note_count(), buffered - 1);
+        assert!(stream.state_dirty(), "preserved notes still belong to the prior batch");
+    }
+
+    #[test]
+    fn immediate_update_discards_only_pending_notes_and_preserves_stream_time() {
+        let mut stream = MuseStream::new(
+            52,
+            MuseConfig {
+                duration_secs: 20.0,
+                max_notes: 32,
+                ..Default::default()
+            },
+        );
+        let first = stream.next_note().expect("fixture must generate a note");
+        let buffered = stream.buffered_note_count();
+        assert!(buffered > 0, "fixture should leave a generated batch pending");
+        let cursor = stream.time_cursor();
+        let emitted_count = stream.notes_generated();
+        let last_start = stream.last_note().map(|note| note.start_time);
+
+        let discarded = stream.update_state_immediately(&MusicalState {
+            arousal: 0.95,
+            noradrenaline: 0.9,
+            ..Default::default()
+        });
+
+        assert_eq!(discarded, buffered);
+        assert_eq!(stream.buffered_note_count(), 0);
+        assert_eq!(stream.time_cursor(), cursor);
+        assert_eq!(stream.notes_generated(), emitted_count);
+        assert_eq!(stream.last_note().map(|note| note.start_time), last_start);
+        assert_eq!(stream.last_note().map(|note| note.start_time), Some(first.start_time));
+        assert!(stream.state_dirty());
+
+        let next = stream.next_note().expect("updated state should generate a new note");
+        assert_eq!(next.start_time, cursor);
+        assert!(!stream.state_dirty());
+    }
+
+    #[test]
+    fn immediate_update_with_empty_buffer_discards_zero_notes() {
+        let mut stream = MuseStream::new(53, default_config());
+        let cursor = stream.time_cursor();
+        let discarded = stream.update_state_immediately(&MusicalState {
+            arousal: 0.9,
+            ..Default::default()
+        });
+
+        assert_eq!(discarded, 0);
+        assert_eq!(stream.buffered_note_count(), 0);
+        assert_eq!(stream.time_cursor(), cursor);
+        assert!(stream.state_dirty());
+        assert!(stream.next_note().is_some());
+        assert!(!stream.state_dirty());
+    }
+
+    #[test]
     fn reset_clears() {
         let mut stream = MuseStream::new(47, default_config());
         let _ = stream.next_note();
@@ -262,6 +369,7 @@ mod tests {
         stream.reset(99);
         assert_eq!(stream.notes_generated(), 0);
         assert_eq!(stream.time_cursor(), 0.0);
+        assert_eq!(stream.buffered_note_count(), 0);
         assert!(stream.last_note().is_none());
     }
 
