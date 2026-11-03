@@ -6,7 +6,9 @@
   "distinct_support_matches": 240,
   "optimal_solution_dag_support_matches": 240,
   "positive_handcrafted_cases": 3,
-  "triangle_maxcut": {"optimum": 2, "multiplicity": 6, "distinct_optimal_assignments": 6, "witness": [1,0,0]},
+  "exact_uniform_probability_checks": 1383,
+  "uniform_sampling_probability_verified": true,
+  "triangle_maxcut": {"optimum": 2, "multiplicity": 6, "distinct_optimal_assignments": 6, "witness": [1,0,0], "each_optimum_probability": "1/6"},
   "weighted_unique_assignment": {"optimum": 6, "multiplicity": 4, "distinct_optimal_assignments": 1},
   "weighted_tie_case": {"optimum": 5, "multiplicity": 6, "distinct_optimal_assignments": 2, "branches": [[0,4,1],[1,2,1]]},
   "negative_controls": {
@@ -26,5 +28,5 @@
       "false_intermediate_support_table_rehashed"
     ]
   },
-  "claim_boundary": "Python exact reference only; v2 dual-count backpointer trace and separate checker are not Rust, Lean, or performance-qualified. Each original factor-table cell is one local assignment."
+  "claim_boundary": "Python exact reference only; v2 dual-count backpointer trace, support-proportional exact sampler and separate checker are not Rust, Lean, or performance-qualified. Every original factor-table cell is one local assignment; an unbiased bounded-integer source is required for exact uniform sampling."
 }
