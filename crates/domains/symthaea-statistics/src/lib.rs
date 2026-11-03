@@ -40,6 +40,7 @@ pub mod distributions;
 pub mod inference;
 pub mod regression;
 pub mod special;
+pub mod sequential;
 
 pub use bayes::{Confusion, posterior, posterior_positive};
 pub use descriptive::{correlation, covariance, mean, median, quantile, std_dev, variance};
@@ -52,3 +53,7 @@ pub use inference::{
     z_confidence_interval_mean,
 };
 pub use regression::{LinearFit, linear_regression};
+pub use sequential::{
+    BernoulliSprt, BoundedMeanConfidenceSequence, BoundedMeanInterval, SequentialDecision,
+    SequentialError,
+};
