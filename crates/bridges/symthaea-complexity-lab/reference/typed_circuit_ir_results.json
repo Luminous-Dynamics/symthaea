@@ -1,0 +1,29 @@
+{
+  "suite": "ETH-026 typed tractable-circuit IR reference fixtures",
+  "execution_status": "executed_locally",
+  "environment": {
+    "python": "3.13.5",
+    "arithmetic": "fractions.Fraction and exact Gaussian-rational Q(i)",
+    "floating_point_used": false
+  },
+  "source": {
+    "path": "crates/bridges/symthaea-complexity-lab/reference/typed_circuit_ir.py",
+    "git_blob_sha": "1d22ecdc1a9d8ed5b174471ee204d9a8d6ac9350",
+    "sha_matches_executed_file": true
+  },
+  "checks": 8,
+  "passed": 8,
+  "failed": 0,
+  "fixtures": [
+    {"name": "#SAT with one hidden free variable", "expected": "2", "actual": "2"},
+    {"name": "PMC with one visible variable and one hidden free variable", "expected": "1", "actual": "1"},
+    {"name": "PWMC distinct visible weight applied once", "expected": "2/3", "actual": "2/3"},
+    {"name": "signed rational WMC cancellation", "expected": "0", "actual": "0"},
+    {"name": "complex Q(i) AMC cancellation", "expected": "0", "actual": "0"},
+    {"name": "overlapping product scopes", "expected": "reject", "actual": "reject"},
+    {"name": "false deterministic-sum claim", "expected": "reject", "actual": "reject"},
+    {"name": "Boolean support circuit mislabeled as complex AMC", "expected": "reject", "actual": "reject"}
+  ],
+  "all_passed": true,
+  "claim_ceiling": "Eight exact finite reference fixtures executed locally against the source blob pinned above. This is not a CPOG or VeriPB adapter, a Lean proof, an independent cross-language checker, a production-scale evaluator, a solver differential run, or a performance/SOTA result."
+}
