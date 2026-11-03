@@ -408,6 +408,33 @@ mod tests {
     }
 
     #[test]
+    fn rejects_attempts_from_mixed_service_requests() {
+        let first = attempt(
+            1, "attempt-1", "run-1", 0, 60, &["cup-1"], resources(0.05, 0.7),
+            outcomes("run-1", "cup-1", Decision::Fail),
+        );
+        let mut second = attempt(
+            2, "attempt-2", "run-2", 70, 130, &["cup-1"], resources(0.05, 0.7),
+            outcomes("run-2", "cup-1", Decision::Pass),
+        );
+        second.service_request_id = "different-service-request".to_owned();
+        assert!(matches!(
+            account_service(&[first, second], &REQUIRED),
+            Err(ServiceAccountingError::ServiceRequestMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn includes_rinse_aid_in_total_and_per_verified_item_resources() {
+        let report = account_service(&[attempt(
+            1, "attempt-1", "run-1", 0, 60, &["cup-1"], resources(0.05, 0.7),
+            outcomes("run-1", "cup-1", Decision::Pass),
+        )], &REQUIRED).unwrap();
+        assert!((report.total_resources.rinse_aid_g - 0.5).abs() < 1e-12);
+        assert!((report.resources_per_verified_item.unwrap().rinse_aid_g - 0.5).abs() < 1e-12);
+    }
+
+    #[test]
     fn qualifies_only_when_every_required_endpoint_passes() {
         let report = account_service(&[attempt(
             1, "attempt-1", "run-1", 0, 60, &["cup-1"], resources(0.05, 0.7),
