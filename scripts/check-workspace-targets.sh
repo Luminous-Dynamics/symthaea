@@ -27,6 +27,7 @@ EXCLUDES=(
   "crates/core/nixward-web"
   "crates/core/symthaea"
   "crates/core/symthaea-observation-attestation"
+  "crates/core/symthaea-iit"
   "crates/core/symthaea-zkproof/methods"
   "crates/core/symthaea-zkproof/host"
   "crates/domains/symthaea-spore/fuzz"
