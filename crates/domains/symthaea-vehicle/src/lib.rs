@@ -85,6 +85,7 @@ pub mod perturbations;
 pub mod paired_rollout;
 pub mod paired_statistics;
 pub mod model_stability;
+pub mod model_discrepancy;
 pub mod plugin;
 pub mod reward;
 pub mod risk_calibration;
@@ -142,6 +143,14 @@ pub use paired_rollout::{
     VehiclePairedRolloutError, VehiclePairedRolloutFrame, VehiclePairedRolloutResult,
     VehicleTrajectoryMetrics, run_paired_lane_keep_rollout,
     run_paired_lane_keep_rollout_with_baseline,
+};
+pub use model_discrepancy::{
+    DecisionAuditResult, DecisionAuditStatus, DecisionAuditSummary, DiscrepancyActionOutcome,
+    DiscrepancyFeasibility, FamilyHorizonResidualSummary, HorizonResidualSummary,
+    ModelDecisionObservation, ModelResidualObservation, PairedHorizonResidualGrowth,
+    VehicleModelDiscrepancyError, VehicleModelDiscrepancyInput,
+    VehicleModelDiscrepancyReport, VEHICLE_MODEL_DISCREPANCY_SCHEMA,
+    summarize_vehicle_model_discrepancy,
 };
 pub use model_stability::{
     MIN_MODEL_STABILITY_PROFILES, MAX_MODEL_STABILITY_PROFILES,
