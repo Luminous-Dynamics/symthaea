@@ -68,6 +68,69 @@ impl Road {
         Self::from_segments_at(segs, 0.0, 0.0, 0.0, true)
     }
 
+    /// Validate resolved geometry and compute its deterministic BLAKE3 profile identity.
+    ///
+    /// The digest binds the actual geometry used by projection and lane context,
+    /// not a caller-provided human-readable road name.
+    pub fn profile_digest(&self) -> Option<String> {
+        if self.segments.is_empty()
+            || !self.total_length.is_finite()
+            || self.total_length <= 0.0
+            || !self.lookahead.is_finite()
+            || self.lookahead <= 0.0
+        {
+            return None;
+        }
+
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea.vehicle.road-profile.v1");
+        hasher.update(&self.total_length.to_bits().to_le_bytes());
+        hasher.update(&self.lookahead.to_bits().to_le_bytes());
+        hasher.update(&[u8::from(self.closed)]);
+        hasher.update(&(self.segments.len() as u64).to_le_bytes());
+
+        for segment in &self.segments {
+            for value in [
+                segment.start_x,
+                segment.start_y,
+                segment.start_heading,
+                segment.s_start,
+                segment.length,
+            ] {
+                if !value.is_finite() {
+                    return None;
+                }
+                hasher.update(&value.to_bits().to_le_bytes());
+            }
+            match &segment.kind {
+                RoadSegment::Straight { length } => {
+                    if !length.is_finite() || *length <= 0.0 {
+                        return None;
+                    }
+                    hasher.update(&[0]);
+                    hasher.update(&length.to_bits().to_le_bytes());
+                }
+                RoadSegment::Arc {
+                    radius,
+                    sweep_angle,
+                } => {
+                    if !radius.is_finite()
+                        || *radius <= 0.0
+                        || !sweep_angle.is_finite()
+                        || sweep_angle.abs() <= f64::EPSILON
+                    {
+                        return None;
+                    }
+                    hasher.update(&[1]);
+                    hasher.update(&radius.to_bits().to_le_bytes());
+                    hasher.update(&sweep_angle.to_bits().to_le_bytes());
+                }
+            }
+        }
+
+        Some(hasher.finalize().to_hex().to_string())
+    }
+
     fn from_segments_at(
         segs: &[RoadSegment],
         start_x: f64,
@@ -554,6 +617,19 @@ mod tests {
             "Boundary lat should be ~0.5: {}",
             proj.lateral_offset
         );
+    }
+
+    #[test]
+    fn road_profile_digest_binds_geometry_and_lookahead() {
+        let first = Road::from_segments(&[RoadSegment::Straight { length: 500.0 }]);
+        let second = Road::from_segments(&[RoadSegment::Straight { length: 600.0 }]);
+        assert_ne!(first.profile_digest(), second.profile_digest());
+
+        let mut changed_lookahead = first.clone();
+        changed_lookahead.lookahead += 1.0;
+        assert_ne!(first.profile_digest(), changed_lookahead.profile_digest());
+
+        assert!(Road::from_segments(&[]).profile_digest().is_none());
     }
 
     #[test]
