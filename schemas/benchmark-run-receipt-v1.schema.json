@@ -758,7 +758,8 @@
         "numerator",
         "denominator",
         "is_official",
-        "source_output_sha256"
+        "source_output_sha256",
+        "unavailable_reason"
       ],
       "properties": {
         "metric_id": {
@@ -770,7 +771,10 @@
           "minLength": 1
         },
         "value": {
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "unit": {
           "type": "string",
@@ -795,8 +799,53 @@
         "source_output_sha256": {
           "type": "string",
           "pattern": "^[a-f0-9]{64}$"
+        },
+        "unavailable_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "value"
+            ]
+          },
+          "then": {
+            "properties": {
+              "numerator": {
+                "type": "null"
+              },
+              "denominator": {
+                "type": "null"
+              },
+              "unavailable_reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "denominator": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "unavailable_reason": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
     },
     "derived_metrics": {
       "type": "array",
