@@ -383,3 +383,22 @@ Positive improvement is normalized to favor the advanced controller for both low
 This does not prove the scenario families are independent or representative. The confidence interval is conditional on the declared family corpus and its sampling assumptions, not an operational fleet-risk interval. Use the proposed minimum of ten disjoint failure families and 10,000 executed holdout scenarios before broad robustness summaries, while still showing every family separately.
 
 Protocol: [PAIRED_FAMILY_STATISTICS_V0_1.md](./PAIRED_FAMILY_STATISTICS_V0_1.md).
+
+## 13. Rule-centric driving compliance — 2026 benchmark update
+
+TrafficSignBench (arXiv:2609.38463, code released 28 Sep 2026) is now a priority external track. Its paper describes 34 sign types, 29 scenario types, 29,000 diverse road scenes and 5,800 test scenes. The repository's current scenario registry exposes 25 profile IDs. Its README reports 2.9–9.0% Sign-Compliant Destination for several held-out planners and 72.3% for a rule-supervised PlanT-2 fine-tune (up from 5.9%). The table uses episode-weighted conventional metrics and scenario-type macro-averaged SCD. Preserve those exact definitions during reproduction.
+
+This benchmark demonstrates that destination and collision metrics do not imply rule compliance. SAM therefore adds a separate rule-evidence/trajectory layer in `symthaea_vehicle::rule_compliance`. The initial offline evaluator implements speed limit, mandatory direction and stop-before-line checks; unsupported rule families (yield, crosswalk, signals, no-entry, turn prohibitions) are explicit `Indeterminate` outcomes, not silently ignored.
+
+The evaluator retains raw typed rule evidence and trajectory samples, replays all per-rule findings, distinguishes NotEncountered from Pending stop-zone episodes and rejects non-finite inputs. It does not perform perception, map matching, legal interpretation or simulator execution. Symtropy #3387 remains the future execution/receipt owner.
+
+Benchmark sequence:
+1. Reproduce the TrafficSignBench published baselines and manifests.
+2. Separate perception/rule-evidence quality from rule-conditioned planning and executed trajectory compliance.
+3. Compare no-rule planners, rule-aware fine-tuned planners and privileged rule-access oracles.
+4. Report destination, collision/contact, progress, compliance and calibration separately, both episode-weighted and macro-averaged by scenario family.
+5. Freeze the holdout profiles before adaptation.
+
+Proposed stretch target after exact reproduction: at least 90% macro-averaged Sign-Compliant Destination, at least 80% destination completion, and no degradation in the separately reported collision/contact metric versus the strongest reproduced baseline. These are proposed targets only.
+
+Protocol: [TRAFFIC_RULE_COMPLIANCE_V0_1.md](./TRAFFIC_RULE_COMPLIANCE_V0_1.md).
