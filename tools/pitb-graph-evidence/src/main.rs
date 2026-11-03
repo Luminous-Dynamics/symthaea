@@ -772,3 +772,114 @@ fn main() -> ExitCode {
         Err(message) => fail(message),
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn relative_paths_reject_escape_and_absolute_paths() {
+        assert!(safe_relative_path("statements/theorem.lean").is_ok());
+        assert!(safe_relative_path("../outside").is_err());
+        assert!(safe_relative_path("/tmp/outside").is_err());
+        assert!(safe_relative_path("a/./b").is_err());
+        assert!(safe_relative_path("a//b").is_err());
+        assert!(safe_relative_path("").is_err());
+    }
+
+    #[test]
+    fn relation_to_evidence_class_mapping_is_explicit() {
+        assert_eq!(expected_evidence_class("type_reference"), Some("lean_elaborator"));
+        assert_eq!(expected_evidence_class("instance_synthesis"), Some("lean_instance_trace"));
+        assert_eq!(
+            expected_evidence_class("cross_formality_match"),
+            Some("llm_alignment")
+        );
+        assert_eq!(expected_evidence_class("invented_relation"), None);
+    }
+
+    #[test]
+    fn candidate_and_observed_confidence_policies_are_separate() {
+        let make_edge = |status: &str, confidence: Value| Edge {
+            edge_id: "edge-test".into(),
+            source_node_id: "source".into(),
+            target_node_id: "target".into(),
+            relation: "informal_candidate_dependency".into(),
+            evidence_class: "informal_extractor".into(),
+            status: status.into(),
+            evidence_artifact_id: "evidence".into(),
+            confidence,
+            review_artifact_id: Value::Null,
+            reviewer_key_id: Value::Null,
+        };
+        assert!(validate_confidence(&make_edge("candidate", Value::from(0.7))).is_ok());
+        assert!(validate_confidence(&make_edge("candidate", Value::from(1.01))).is_err());
+        assert!(validate_confidence(&make_edge("candidate", Value::Null)).is_err());
+        assert!(validate_confidence(&make_edge("observed", Value::Null)).is_ok());
+        assert!(validate_confidence(&make_edge("observed", Value::from(0.9))).is_err());
+    }
+
+    #[test]
+    fn only_registered_module_graph_must_be_acyclic() {
+        let mut graph = BTreeMap::new();
+        graph.insert("module-a".to_owned(), BTreeSet::from(["module-b".to_owned()]));
+        let mut states = BTreeMap::new();
+        assert!(visit_dependency("module-a", &graph, &mut states).is_ok());
+
+        let mut cyclic = BTreeMap::new();
+        cyclic.insert("module-a".to_owned(), BTreeSet::from(["module-b".to_owned()]));
+        cyclic.insert("module-b".to_owned(), BTreeSet::from(["module-a".to_owned()]));
+        assert!(visit_dependency("module-a", &cyclic, &mut BTreeMap::new()).is_err());
+    }
+
+    #[test]
+    fn formal_and_candidate_edge_roles_never_collapse() {
+        let observed = Edge {
+            edge_id: "formal".into(),
+            source_node_id: "a".into(),
+            target_node_id: "b".into(),
+            relation: "proof_term_reference".into(),
+            evidence_class: "lean_elaborator".into(),
+            status: "observed".into(),
+            evidence_artifact_id: "proof".into(),
+            confidence: Value::Null,
+            review_artifact_id: Value::Null,
+            reviewer_key_id: Value::Null,
+        };
+        let candidate = Edge {
+            edge_id: "candidate".into(),
+            source_node_id: "a".into(),
+            target_node_id: "b".into(),
+            relation: "cross_formality_match".into(),
+            evidence_class: "llm_alignment".into(),
+            status: "candidate".into(),
+            evidence_artifact_id: "match".into(),
+            confidence: Value::from(0.95),
+            review_artifact_id: Value::Null,
+            reviewer_key_id: Value::Null,
+        };
+        assert_eq!(expected_role(&observed), "proof_support_observation_hash_bound");
+        assert_eq!(expected_role(&candidate), "candidate_retrieval_hint");
+        assert_ne!(is_formal_dependency(&observed.relation), is_formal_dependency(&candidate.relation));
+    }
+
+    #[test]
+    fn reviewer_artifact_and_key_are_required_as_a_pair() {
+        assert!(check_optional_pair(
+            &Value::String("review-1".into()),
+            &Value::String("key-1".into()),
+            true,
+            "edge-1"
+        )
+        .is_ok());
+        assert!(check_optional_pair(&Value::Null, &Value::Null, true, "edge-1").is_err());
+        assert!(check_optional_pair(
+            &Value::String("review-1".into()),
+            &Value::Null,
+            false,
+            "edge-1"
+        )
+        .is_err());
+    }
+}
