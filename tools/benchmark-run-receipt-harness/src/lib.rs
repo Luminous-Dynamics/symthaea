@@ -971,6 +971,7 @@ fn validate_official_and_derived(
     value: &Value,
     derived: &Value,
     access_class: &str,
+    benchmark_grader_output_sha256: &str,
     counts: Counts,
 ) -> Result<(), ReceiptError> {
     let score = obj(value, "official_score")?;
@@ -1023,7 +1024,14 @@ fn validate_official_and_derived(
                 "synthetic receipts cannot claim a benchmark-owner official score",
             ));
         }
-        sha256_field(source_output, "official_score.source_output_sha256")?;
+        let official_source_sha256 =
+            sha256_field(source_output, "official_score.source_output_sha256")?;
+        if official_source_sha256 != benchmark_grader_output_sha256 {
+            return Err(error(
+                ReceiptErrorKind::DigestMismatch,
+                "official_score.source_output_sha256 must match benchmark.grader_output_sha256",
+            ));
+        }
         if score_value.is_null() {
             if !numerator.is_null() || !denominator.is_null() {
                 return Err(error(
@@ -1271,6 +1279,10 @@ pub fn verify_receipt_value(value: &Value) -> Result<VerifiedReceipt, ReceiptErr
         "benchmark.access_class",
         false,
     )?;
+    let benchmark_grader_output_sha256 = sha256_field(
+        required(benchmark, "grader_output_sha256", "benchmark")?,
+        "benchmark.grader_output_sha256",
+    )?;
     if !["public", "authorized_private", "synthetic", "internal"].contains(&access) {
         return Err(error(
             ReceiptErrorKind::SchemaViolation,
@@ -1454,6 +1466,7 @@ pub fn verify_receipt_value(value: &Value) -> Result<VerifiedReceipt, ReceiptErr
         required(top, "official_score", "receipt")?,
         required(top, "derived_metrics", "receipt")?,
         access,
+        benchmark_grader_output_sha256,
         computed,
     )?;
 
@@ -1943,9 +1956,25 @@ mod tests {
         receipt["official_score"]["value"] = json!(1.0);
         receipt["official_score"]["numerator"] = json!(1);
         receipt["official_score"]["denominator"] = json!(1);
-        receipt["official_score"]["source_output_sha256"] = json!(C);
+        receipt["official_score"]["source_output_sha256"] = json!(B);
         receipt["official_score"]["unavailable_reason"] = Value::Null;
         assert!(verify_receipt_value(&receipt).is_ok());
+    }
+
+    #[test]
+    fn rejects_official_score_from_a_different_grader_output_artifact() {
+        let mut receipt = base_receipt();
+        receipt["benchmark"]["access_class"] = json!("public");
+        receipt["official_score"]["is_official"] = json!(true);
+        receipt["official_score"]["value"] = json!(1.0);
+        receipt["official_score"]["numerator"] = json!(1);
+        receipt["official_score"]["denominator"] = json!(1);
+        receipt["official_score"]["source_output_sha256"] = json!(C);
+        receipt["official_score"]["unavailable_reason"] = Value::Null;
+        assert_eq!(
+            verify_receipt_value(&receipt).unwrap_err().kind,
+            ReceiptErrorKind::DigestMismatch
+        );
     }
 
     #[test]
