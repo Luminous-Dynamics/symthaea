@@ -198,6 +198,19 @@ pub enum DiagnosticFlag {
 }
 
 impl DiagnosticFlag {
+    /// Stable order used by the benchmark's per-diagnostic campaign summary.
+    pub const ALL: [Self; 9] = [
+        Self::UnequalClassVariance,
+        Self::NonGaussianTails,
+        Self::SerialDependence,
+        Self::TemporalSensitivityDrift,
+        Self::TemporalCriterionDrift,
+        Self::ParticipantHeterogeneity,
+        Self::DifferentialMissingness,
+        Self::TemporalMissingness,
+        Self::AuxiliaryChannelLeakage,
+    ];
+
     pub fn as_str(self) -> &'static str {
         match self {
             Self::UnequalClassVariance => "unequal_class_variance",
@@ -837,6 +850,14 @@ mod tests {
     fn report(world: StressWorld, seed: u64) -> RobustnessReport {
         let bundle = simulate(world, design(seed)).unwrap();
         evaluate(&bundle.candidate, &bundle.evaluator).unwrap()
+    }
+
+    #[test]
+    fn diagnostic_flag_catalog_is_complete_and_has_unique_names() {
+        let names: std::collections::BTreeSet<_> =
+            DiagnosticFlag::ALL.iter().map(|flag| flag.as_str()).collect();
+        assert_eq!(DiagnosticFlag::ALL.len(), 9);
+        assert_eq!(names.len(), DiagnosticFlag::ALL.len());
     }
 
     #[test]
