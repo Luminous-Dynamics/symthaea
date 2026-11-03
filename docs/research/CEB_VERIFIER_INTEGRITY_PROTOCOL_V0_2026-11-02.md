@@ -131,7 +131,7 @@ The statement binds at least two subjects: the candidate patch and the source tr
 - Runner profile, immutable image digest, network policy and execution times.
 - Grader identity/digest, trust domain and hidden-test visibility.
 - Required checks, their authorities, outcomes and evidence digests.
-- Recomputed resource totals and the run-level verdict.
+- Recomputed resource totals (including turns and tool calls) and the run-level verdict. The task-contract digest commits the declared budget; the verifier checks measured wall time, turns, tool calls, input/output tokens and cost against that exact task budget.
 - The relationship to the prior primary receipt for a pristine regrade.
 
 The DSSE envelope carries the serialized statement as base64 with payload type `application/vnd.in-toto+json` and one or more signatures. Verify the DSSE pre-authentication encoding and signatures against an explicit trust-root policy; a key ID by itself is not authentication. The signing key must remain in the host control plane and must never be mounted into the guest or candidate process.
