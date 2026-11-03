@@ -141,7 +141,12 @@ jobs:
                       identity_matches = declared_name in anchor["text"]
                   if not identity_matches:
                       raise ValueError(f"source anchor does not declare graph node name: {node['id']}")
-                  if anchor["authority"] != "source_text_anchor":
+                  expected_anchor_authority = (
+                      "manifest_text_anchor"
+                      if anchor["kind"] == "manifest_name_anchor"
+                      else "source_text_anchor"
+                  )
+                  if anchor["authority"] != expected_anchor_authority:
                       raise ValueError(f"unexpected source-anchor authority for {node['id']}")
               if mutations_value["fixture_id"] != graph_value["fixture_id"]:
                   raise ValueError("mutation scenarios refer to a different fixture ID")
@@ -214,6 +219,13 @@ jobs:
               "authority": "source_text_anchor"
           }
           expect_repo_reject(mutant_graph, mutations, "valid line anchor for wrong symbol")
+
+          # Manifest identity has its own provenance authority; swapping it to a
+          # source-code authority must be rejected.
+          mutant_graph = copy.deepcopy(graph)
+          package_node = next(node for node in mutant_graph["nodes"] if node["id"] == "pkg.domain")
+          package_node["source_anchor"]["authority"] = "source_text_anchor"
+          expect_repo_reject(mutant_graph, mutations, "manifest anchor authority mismatch")
 
           # Positive shape control: a design-only task is valid as a design record.
           task_validator.validate(catalog["tasks"][0])
@@ -408,7 +420,7 @@ jobs:
           print(
               "CEB_CONTRACT_SCHEMA_PASS: "
               f"tasks={len(task_ids)} unique_tasks={len(set(task_ids))} "
-              "schemas=3 negative_controls=31"
+              "schemas=3 negative_controls=32"
           )
           print("CEB_CLAIM_BOUNDARY: schema validation is not DSSE signature verification or runner qualification")
           PY
