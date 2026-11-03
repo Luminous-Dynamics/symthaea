@@ -36,6 +36,10 @@ The Rust/Lean comparison is differential testing on retained reference inputs, n
 
 The paper body does not link a direct official Aegis dataset artifact or state its release license. PITB must obtain an official author release or access confirmation before acquisition/reproduction claims.
 
+
+
+Aegis representativeness boundary: the published generation pipeline retains single pure-function interfaces over first-order inputs (integers, booleans, lists, nested lists, strings, trees, linked lists). It excludes stateful/class-based interfaces and unsupported constructs including hash tables, closures, nested references, and unrestricted aliasing. The benchmark is valuable for its machine-level and control-flow obligations, but should not be described as coverage of arbitrary production Rust, concurrent systems, unsafe Rust, or general stateful services.
+
 ## 4. Strategic conclusion
 
 PITB should compete on a vector of capabilities, not a single aggregate:
