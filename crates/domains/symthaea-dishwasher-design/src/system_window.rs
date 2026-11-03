@@ -809,9 +809,11 @@ pub fn account_system_window(
     for release in releases {
         if !canonical_non_empty(&release.service_request_id)
             || !canonical_non_empty(&release.item_id)
-            || !canonical_non_empty(&release.evidence_ref)
         {
             return Err(SystemWindowError::InvalidIdentity("item_release"));
+        }
+        if !canonical_non_empty(&release.evidence_ref) {
+            return Err(SystemWindowError::InvalidEvidenceReference("item_release"));
         }
         if !valid_digest(&release.evidence_sha256) {
             return Err(SystemWindowError::InvalidEvidenceDigest("item_release"));
