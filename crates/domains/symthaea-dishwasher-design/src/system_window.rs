@@ -144,10 +144,10 @@ pub struct CompartmentWindowStats {
     pub cancelled_requests_in_window: usize,
     pub unresolved_requests_at_window_end: usize,
     pub verified_item_release_count: usize,
-    pub active_request_seconds: u64,
-    pub active_compartment_seconds: u64,
-    pub compartment_utilization_fraction: f64,
-    pub maximum_concurrent_requests: usize,
+    pub open_request_seconds: u64,
+    pub reserved_compartment_seconds: u64,
+    pub compartment_reservation_fraction: f64,
+    pub maximum_concurrent_open_requests: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -182,12 +182,12 @@ pub struct SystemWindowReport {
     pub first_pass_yield: Option<f64>,
     pub verified_items_per_hour: f64,
     pub time_to_first_release_seconds: Option<u64>,
-    pub active_request_seconds: u64,
-    pub active_compartment_seconds_total: u64,
+    pub open_request_seconds: u64,
+    pub reserved_compartment_seconds_total: u64,
     pub compartment_count: usize,
-    pub compartment_utilization_fraction: f64,
-    pub maximum_concurrent_requests: usize,
-    pub maximum_concurrent_compartments: usize,
+    pub compartment_reservation_fraction: f64,
+    pub maximum_concurrent_open_requests: usize,
+    pub maximum_concurrently_reserved_compartments: usize,
     /// Percentiles use nearest-rank over completed requests accepted in-window.
     /// Right-censored requests are reported separately and never imputed.
     pub request_latency_p50_seconds: Option<u64>,
@@ -298,7 +298,7 @@ struct CompartmentAccumulator {
     cancelled_requests_in_window: usize,
     unresolved_requests_at_window_end: usize,
     verified_item_release_count: usize,
-    active_request_seconds: u64,
+    open_request_seconds: u64,
     concurrency_events: Vec<(u64, i8)>,
 }
 
@@ -371,8 +371,8 @@ fn build_compartment_stats(
             let end = service_end.min(spec.end_at_s);
             if end > start {
                 let duration = end - start;
-                stats.active_request_seconds = stats.active_request_seconds.checked_add(duration)
-                    .ok_or(SystemWindowError::CounterOverflow("compartment_active_request_seconds"))?;
+                stats.open_request_seconds = stats.open_request_seconds.checked_add(duration)
+                    .ok_or(SystemWindowError::CounterOverflow("compartment_open_request_seconds"))?;
                 stats.concurrency_events.push((start, 1));
                 stats.concurrency_events.push((end, -1));
             }
@@ -411,13 +411,13 @@ fn build_compartment_stats(
     }
 
     let mut active_compartment_events = Vec::new();
-    let mut active_compartment_seconds_total = 0_u64;
+    let mut reserved_compartment_seconds_total = 0_u64;
     let mut compartment_stats = Vec::with_capacity(accumulators.len());
     for (compartment_id, mut stats) in accumulators {
-        let maximum_concurrent_requests = maximum_concurrency(&mut stats.concurrency_events)?;
+        let maximum_concurrent_open_requests = maximum_concurrency(&mut stats.concurrency_events)?;
         let mut current_requests = 0_isize;
         let mut active_start_at_s: Option<u64> = None;
-        let mut active_compartment_seconds = 0_u64;
+        let mut reserved_compartment_seconds = 0_u64;
         for (timestamp, delta) in &stats.concurrency_events {
             let previous = current_requests;
             current_requests += *delta as isize;
@@ -430,16 +430,16 @@ fn build_compartment_stats(
             } else if previous > 0 && current_requests == 0 {
                 let start = active_start_at_s.take().ok_or(SystemWindowError::InvalidWindow)?;
                 let duration = timestamp.saturating_sub(start);
-                active_compartment_seconds = active_compartment_seconds.checked_add(duration)
-                    .ok_or(SystemWindowError::CounterOverflow("active_compartment_seconds"))?;
+                reserved_compartment_seconds = reserved_compartment_seconds.checked_add(duration)
+                    .ok_or(SystemWindowError::CounterOverflow("reserved_compartment_seconds"))?;
                 active_compartment_events.push((*timestamp, -1));
             }
         }
         if current_requests != 0 || active_start_at_s.is_some() {
             return Err(SystemWindowError::InvalidWindow);
         }
-        active_compartment_seconds_total = active_compartment_seconds_total.checked_add(active_compartment_seconds)
-            .ok_or(SystemWindowError::CounterOverflow("active_compartment_seconds_total"))?;
+        reserved_compartment_seconds_total = reserved_compartment_seconds_total.checked_add(reserved_compartment_seconds)
+            .ok_or(SystemWindowError::CounterOverflow("reserved_compartment_seconds_total"))?;
         compartment_stats.push(CompartmentWindowStats {
             compartment_id,
             compartment_configuration_sha256: stats.configuration_sha256,
@@ -450,15 +450,15 @@ fn build_compartment_stats(
             cancelled_requests_in_window: stats.cancelled_requests_in_window,
             unresolved_requests_at_window_end: stats.unresolved_requests_at_window_end,
             verified_item_release_count: stats.verified_item_release_count,
-            active_request_seconds: stats.active_request_seconds,
-            active_compartment_seconds,
-            compartment_utilization_fraction: active_compartment_seconds as f64
+            open_request_seconds: stats.open_request_seconds,
+            reserved_compartment_seconds,
+            compartment_reservation_fraction: reserved_compartment_seconds as f64
                 / (spec.end_at_s - spec.start_at_s) as f64,
-            maximum_concurrent_requests,
+            maximum_concurrent_open_requests,
         });
     }
-    let maximum_concurrent_compartments = maximum_concurrency(&mut active_compartment_events)?;
-    Ok((compartment_stats, maximum_concurrent_compartments, active_compartment_seconds_total))
+    let maximum_concurrently_reserved_compartments = maximum_concurrency(&mut active_compartment_events)?;
+    Ok((compartment_stats, maximum_concurrently_reserved_compartments, reserved_compartment_seconds_total))
 }
 
 fn validate_service_report(
@@ -799,7 +799,7 @@ pub fn account_system_window(
     let mut unqualified_item_count = 0_usize;
     let mut first_pass_item_count = 0_usize;
     let mut completed_cohort_item_count = 0_usize;
-    let mut active_request_seconds = 0_u64;
+    let mut open_request_seconds = 0_u64;
     let mut latency_values = Vec::new();
     let mut queue_wait_values = Vec::new();
     let mut concurrency_events: Vec<(u64, i8)> = Vec::new();
@@ -841,8 +841,8 @@ pub fn account_system_window(
             let intersection_end = service_end.min(spec.end_at_s);
             if intersection_end > intersection_start {
                 let duration = intersection_end - intersection_start;
-                active_request_seconds = active_request_seconds.checked_add(duration)
-                    .ok_or(SystemWindowError::CounterOverflow("active_request_seconds"))?;
+                open_request_seconds = open_request_seconds.checked_add(duration)
+                    .ok_or(SystemWindowError::CounterOverflow("open_request_seconds"))?;
                 concurrency_events.push((intersection_start, 1));
                 concurrency_events.push((intersection_end, -1));
             }
@@ -920,13 +920,13 @@ pub fn account_system_window(
 
     concurrency_events.sort_unstable_by_key(|(timestamp, delta)| (*timestamp, *delta));
     let mut current_concurrency = 0_isize;
-    let mut maximum_concurrent_requests = 0_usize;
+    let mut maximum_concurrent_open_requests = 0_usize;
     for (_, delta) in concurrency_events {
         current_concurrency += delta as isize;
         if current_concurrency < 0 {
             return Err(SystemWindowError::InvalidWindow);
         }
-        maximum_concurrent_requests = maximum_concurrent_requests.max(current_concurrency as usize);
+        maximum_concurrent_open_requests = maximum_concurrent_open_requests.max(current_concurrency as usize);
     }
     if current_concurrency != 0 {
         return Err(SystemWindowError::InvalidWindow);
@@ -1197,10 +1197,10 @@ pub fn account_system_window(
         }).collect()
     });
 
-    let (compartment_stats, maximum_concurrent_compartments, active_compartment_seconds_total) =
+    let (compartment_stats, maximum_concurrently_reserved_compartments, reserved_compartment_seconds_total) =
         build_compartment_stats(spec, requests, releases)?;
     let compartment_count = compartment_stats.len();
-    let compartment_utilization_fraction = active_compartment_seconds_total as f64
+    let compartment_reservation_fraction = reserved_compartment_seconds_total as f64
         / (compartment_count as f64 * elapsed_wall_seconds as f64);
 
     Ok(SystemWindowReport {
@@ -1235,12 +1235,12 @@ pub fn account_system_window(
         verified_items_per_hour,
         time_to_first_release_seconds: first_release_at_s
             .map(|timestamp| timestamp - spec.start_at_s),
-        active_request_seconds,
-        active_compartment_seconds_total,
+        open_request_seconds,
+        reserved_compartment_seconds_total,
         compartment_count,
-        compartment_utilization_fraction,
-        maximum_concurrent_requests,
-        maximum_concurrent_compartments,
+        compartment_reservation_fraction,
+        maximum_concurrent_open_requests,
+        maximum_concurrently_reserved_compartments,
         request_latency_p50_seconds: percentile_nearest_rank(&mut latency_values, 0.50),
         request_latency_p95_seconds: percentile_nearest_rank(&mut latency_values, 0.95),
         queue_wait_p50_seconds: percentile_nearest_rank(&mut queue_wait_values, 0.50),
@@ -1456,12 +1456,12 @@ mod tests {
         assert_eq!(report.elapsed_wall_seconds, 100);
         assert_eq!(report.verified_item_release_count, 2);
         assert_eq!(report.verified_items_per_hour, 72.0);
-        assert_eq!(report.active_request_seconds, 120);
-        assert_eq!(report.active_compartment_seconds_total, 90);
+        assert_eq!(report.open_request_seconds, 120);
+        assert_eq!(report.reserved_compartment_seconds_total, 90);
         assert_eq!(report.compartment_count, 1);
-        assert_eq!(report.compartment_utilization_fraction, 0.9);
-        assert_eq!(report.maximum_concurrent_requests, 2);
-        assert_eq!(report.maximum_concurrent_compartments, 1);
+        assert_eq!(report.compartment_reservation_fraction, 0.9);
+        assert_eq!(report.maximum_concurrent_open_requests, 2);
+        assert_eq!(report.maximum_concurrently_reserved_compartments, 1);
         assert_eq!(report.request_latency_p50_seconds, Some(60));
         assert_eq!(report.request_latency_p95_seconds, Some(70));
         assert_eq!(report.first_pass_yield, Some(1.0));
@@ -1494,11 +1494,11 @@ mod tests {
             &[release("service-a", "cup-a", 50), release("service-b", "cup-b", 80)],
             &basic_resources(),
         ).unwrap();
-        assert_eq!(result.maximum_concurrent_requests, 1);
-        assert_eq!(result.maximum_concurrent_compartments, 1);
-        assert_eq!(result.active_request_seconds, 90);
-        assert_eq!(result.active_compartment_seconds_total, 90);
-        assert_eq!(result.compartment_utilization_fraction, 0.9);
+        assert_eq!(result.maximum_concurrent_open_requests, 1);
+        assert_eq!(result.maximum_concurrently_reserved_compartments, 1);
+        assert_eq!(result.open_request_seconds, 90);
+        assert_eq!(result.reserved_compartment_seconds_total, 90);
+        assert_eq!(result.compartment_reservation_fraction, 0.9);
     }
 
     #[test]
@@ -1560,7 +1560,7 @@ mod tests {
         assert_eq!(result.cancelled_requests_in_window, 1);
         assert_eq!(result.items_in_cancelled_accepted_requests, 1);
         assert_eq!(result.unresolved_requests_at_window_end, 0);
-        assert_eq!(result.active_request_seconds, 0);
+        assert_eq!(result.open_request_seconds, 0);
         assert_eq!(result.verified_item_release_count, 0);
     }
 
@@ -1584,9 +1584,9 @@ mod tests {
         assert_eq!(result.items_in_cancelled_accepted_requests, 2);
         assert_eq!(result.unresolved_requests_at_window_end, 0);
         assert_eq!(result.verified_item_release_count, 1);
-        assert_eq!(result.active_request_seconds, 40);
-        assert_eq!(result.active_compartment_seconds_total, 40);
-        assert_eq!(result.maximum_concurrent_compartments, 1);
+        assert_eq!(result.open_request_seconds, 40);
+        assert_eq!(result.reserved_compartment_seconds_total, 40);
+        assert_eq!(result.maximum_concurrently_reserved_compartments, 1);
         assert_eq!(result.physical_attempt_count_total, 1);
     }
 
@@ -1993,14 +1993,14 @@ mod tests {
         ).unwrap();
         assert_eq!(result.compartment_count, 2);
         assert_eq!(result.compartment_stats.len(), 2);
-        assert_eq!(result.maximum_concurrent_compartments, 1);
-        assert_eq!(result.active_compartment_seconds_total, 60);
-        assert_eq!(result.compartment_utilization_fraction, 0.3);
+        assert_eq!(result.maximum_concurrently_reserved_compartments, 1);
+        assert_eq!(result.reserved_compartment_seconds_total, 60);
+        assert_eq!(result.compartment_reservation_fraction, 0.3);
         let idle = result.compartment_stats.iter()
             .find(|cell| cell.compartment_id == "cell-02")
             .unwrap();
-        assert_eq!(idle.active_compartment_seconds, 0);
-        assert_eq!(idle.compartment_utilization_fraction, 0.0);
+        assert_eq!(idle.reserved_compartment_seconds, 0);
+        assert_eq!(idle.compartment_reservation_fraction, 0.0);
     }
 
     #[test]
@@ -2040,18 +2040,18 @@ mod tests {
             &basic_resources(),
         ).unwrap();
 
-        assert_eq!(result.maximum_concurrent_requests, 2);
-        assert_eq!(result.maximum_concurrent_compartments, 2);
-        assert_eq!(result.active_compartment_seconds_total, 120);
+        assert_eq!(result.maximum_concurrent_open_requests, 2);
+        assert_eq!(result.maximum_concurrently_reserved_compartments, 2);
+        assert_eq!(result.reserved_compartment_seconds_total, 120);
         assert_eq!(result.compartment_count, 2);
-        assert_eq!(result.compartment_utilization_fraction, 0.6);
+        assert_eq!(result.compartment_reservation_fraction, 0.6);
         assert_eq!(result.compartment_stats.len(), 2);
         let cell_a = result.compartment_stats.iter().find(|cell| cell.compartment_id == "cell-01").unwrap();
         let cell_b = result.compartment_stats.iter().find(|cell| cell.compartment_id == "cell-02").unwrap();
         assert_eq!(cell_a.verified_item_release_count, 1);
         assert_eq!(cell_b.verified_item_release_count, 1);
-        assert_eq!(cell_a.maximum_concurrent_requests, 1);
-        assert_eq!(cell_b.maximum_concurrent_requests, 1);
+        assert_eq!(cell_a.maximum_concurrent_open_requests, 1);
+        assert_eq!(cell_b.maximum_concurrent_open_requests, 1);
         assert_eq!(cell_a.compartment_configuration_sha256, digest('c'));
         assert_eq!(cell_b.compartment_configuration_sha256, digest('e'));
     }
