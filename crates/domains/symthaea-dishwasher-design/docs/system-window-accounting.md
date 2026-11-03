@@ -31,7 +31,7 @@ Each scored window also freezes the machine-unit ID, whole-system configuration 
 
 - Quality-qualified throughput: independently verified item releases divided by elapsed wall-clock window hours.
 - Request count, accepted/started/completed counts, carry-in requests, and unresolved requests at window end.
-- Requested and unresolved items for the accepted-in-window cohort.
+- Requested items in the accepted-in-window cohort and items in unresolved accepted requests that have not yet achieved a complete independent-assay qualification. An already-qualified item in a still-open multi-item request is not counted as pending qualification.
 - Time to first independently verified release.
 - Request latency p50/p95 over completed requests accepted during the window, and queue-wait p50/p95 over requests accepted in-window that actually started (including requests still in service at window end). Both use nearest-rank percentiles. Right-censored request latency is reported separately and is not imputed into percentiles.
 - First-pass yield: first-attempt verified items divided by requested items in completed requests accepted during the window. The service ledger reports first-pass IDs; an item first qualified after a re-wash is not first-pass.
@@ -60,7 +60,7 @@ A zero resource measurement must be represented by an explicit row. A missing re
 
 For each condition:
 
-1. Freeze machine/programme/firmware, topology, water batch/hardness/inlet temperature, detergent and rinse-aid lots, soil family/age, loading recipe, required independent endpoints, resource meter map and clock source.
+1. Freeze machine unit, whole-system configuration digest, utility-topology ID, compartment IDs/configuration digests, programme/firmware, water batch/hardness/inlet temperature, detergent and rinse-aid lots, soil family/age, loading recipe, required independent endpoints, resource meter map and clock source.
 2. Register an arrival trace and service-request item set before dispatch. Retain every accepted, queued, started, cancelled, failed, interrupted and unresolved request.
 3. Randomize service order within declared blocks. Capture actual start, item-level release, close, rewash and abort timestamps against the same monotonic clock.
 4. Measure system-boundary wall electricity, upstream hot-water energy, fresh water, delivered detergent/rinse aid and operator person-seconds. Allocate shared preheat, standby, purge and fill overhead once at a documented boundary.
@@ -68,7 +68,7 @@ For each condition:
 6. Score a fixed wall-clock window. Report carry-in, unresolved, queue, throughput, latency and all resources. Do not sum overlapping request durations to form the denominator.
 7. Repeat with one compartment active, two compartments simultaneous, all compartments active, injected isolation/valve/filter/sensor faults, and an external operator/site where feasible.
 
-Primary system-level results are verified items/hour, first-pass yield, physical rewash attempts, reattempted item visits, time-to-first-release, p50/p95 request latency, maximum concurrency, resource totals per window and window resource totals per verified release. Report per-compartment statistics and the exact machine/configuration/topology IDs. Also report per-request lifecycle resources from complete service ledgers; the two denominators answer different questions.
+Primary system-level results are verified items/hour, first-pass yield, physical attempt count, physical rewash-attempt count, number of requests containing a rewash, reattempted item visits, time-to-first-release, p50/p95 request latency, maximum concurrency, resource totals per window and window resource totals per verified release. Report per-compartment request/release counts, active time and concurrency, plus exact machine/configuration/topology IDs. Also report per-request lifecycle resources from complete service ledgers; the two denominators answer different questions.
 
 ## Benchmark standards and scope separation
 
@@ -102,6 +102,6 @@ Sources:
 
 ## Acceptance tests
 
-Source-authored Rust tests cover concurrent versus sequential service, carry-in requests, right-censored queued and started requests, independent-assay release qualification, duplicate releases, clock mismatch, cross-instrument boundary overlap, declared parent/branch duplication, parallel operator person-time, missing required resource dimensions, first-pass yield, rewash aggregation, per-compartment statistics and configuration mismatch, and inconsistent upstream service reports.
+Source-authored Rust tests cover concurrent versus sequential service, carry-in requests, right-censored queued and started requests, independent-assay release qualification, duplicate releases, clock mismatch, cross-instrument boundary overlap, declared parent/branch duplication, parallel operator person-time, missing required resource dimensions, first-pass yield, rewash aggregation, per-compartment statistics and configuration mismatch, and inconsistent upstream service reports. The module currently contains 19 tests; none are executed until the exact PR head is compiled and run.
 
 All tests, formatting and clippy must run on the exact pull-request head before any pass claim. The validator does not authenticate referenced evidence bytes, prove assay independence, establish the truth of boundary IDs, infer omitted requests, or establish physical cleaning/hygiene performance.
