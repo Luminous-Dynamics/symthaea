@@ -1099,7 +1099,9 @@ mod tests {
             SonataVerificationMetric::MotifDevelopment {
                 source: SonataSectionKind::ExpositionPrimary,
                 target: SonataSectionKind::Development,
-                transformation: ReturnTransformation::Transposed,
+                transformation: MotifDevelopmentTransformation::DiatonicTransposition {
+                    degree_shift: 1,
+                },
                 ..
             }
         ));
