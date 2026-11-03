@@ -555,7 +555,14 @@ mod tests {
     fn residual(t:u64,p:f64,r:f64)->ModelResidualObservation{ModelResidualObservation{
         scenario_id:"scenario-1".into(),failure_family_id:"crossing".into(),actor_policy_id:"ped-yield-v1".into(),split_id:"heldout".into(),shift_regime_id:"nominal".into(),
         initial_state_digest:h('a'),environment_digest:h('b'),dynamics_digest:h('c'),action_history_digest:h('d'),observation_availability_digest:h('e'),
-        forecast_issued_at_ms:1000,horizon_ms:t,metric_id:"position-error".into(),metric_unit_id:"meters".into(),predicted_value:p,realized_value:r,prediction_set_contains_realized:None}}
+        forecast_issued_at_ms:1000,horizon_ms:t,metric_id:"position-error".into(),metric_unit_id:"meters".into(),predicted_value:Some(p),realized_value:Some(r),prediction_set_contains_realized:None,reference_status:ReferenceOutcomeStatus::Observed}}
+    fn incomplete_residual(t:u64,status:ReferenceOutcomeStatus)->ModelResidualObservation {
+        let mut row=residual(t,0.0,0.0);
+        row.reference_status=status;
+        row.realized_value=None;
+        row.prediction_set_contains_realized=None;
+        row
+    }
     fn decision()->ModelDecisionObservation{
         let mut d=ModelDecisionObservation{
             decision_id:"decision-1".into(),scenario_id:"scenario-1".into(),failure_family_id:"crossing".into(),actor_policy_id:"ped-yield-v1".into(),split_id:"heldout".into(),shift_regime_id:"nominal".into(),
@@ -595,8 +602,8 @@ mod tests {
         let mut sample = input();
         sample.residual_observations = vec![residual(1_000, 5.0, 5.0), residual(2_000, 10.0, 10.0)];
         let report = summarize_vehicle_model_discrepancy(&sample).unwrap();
-        assert_eq!(report.horizon_summaries[0].p95_absolute_residual, 0.0);
-        assert_eq!(report.horizon_summaries[1].p95_absolute_residual, 0.0);
+        assert_eq!(report.horizon_summaries[0].p95_absolute_residual, Some(0.0));
+        assert_eq!(report.horizon_summaries[1].p95_absolute_residual, Some(0.0));
         assert_eq!(report.paired_horizon_growth[0].absolute_residual_growth, 0.0);
     }
 
@@ -605,14 +612,14 @@ mod tests {
         let mut sample = input();
         sample.residual_observations = vec![residual(1_000, 3.0, 4.0)];
         let report = summarize_vehicle_model_discrepancy(&sample).unwrap();
-        assert_eq!(report.horizon_summaries[0].mean_signed_residual, -1.0);
+        assert_eq!(report.horizon_summaries[0].mean_signed_residual, Some(-1.0));
     }
 
     #[test]
     fn rejects_overflowing_signed_residual() {
         let mut sample = input();
-        sample.residual_observations[0].predicted_value = f64::MAX;
-        sample.residual_observations[0].realized_value = -f64::MAX;
+        sample.residual_observations[0].predicted_value = Some(f64::MAX);
+        sample.residual_observations[0].realized_value = Some(-f64::MAX);
         assert_eq!(
             summarize_vehicle_model_discrepancy(&sample).unwrap_err(),
             VehicleModelDiscrepancyError::InvalidResidual
@@ -628,6 +635,42 @@ mod tests {
             summarize_vehicle_model_discrepancy(&sample).unwrap_err(),
             VehicleModelDiscrepancyError::InvalidUtility
         );
+    }
+
+    #[test]
+    fn horizon_denominators_retain_each_incomplete_outcome_status() {
+        let mut sample = input();
+        sample.residual_observations = vec![
+            residual(1_000, 2.0, 1.0),
+            incomplete_residual(2_000, ReferenceOutcomeStatus::Missing),
+            incomplete_residual(3_000, ReferenceOutcomeStatus::Censored),
+            incomplete_residual(4_000, ReferenceOutcomeStatus::TimedOut),
+            incomplete_residual(5_000, ReferenceOutcomeStatus::Unsupported),
+        ];
+        let report = summarize_vehicle_model_discrepancy(&sample).unwrap();
+        assert_eq!(report.horizon_summaries.len(), 5);
+        assert_eq!(report.horizon_summaries[0].outcome_count, 1);
+        assert_eq!(report.horizon_summaries[0].observed_count, 1);
+        assert_eq!(report.horizon_summaries[1].missing_count, 1);
+        assert_eq!(report.horizon_summaries[2].censored_count, 1);
+        assert_eq!(report.horizon_summaries[3].timed_out_count, 1);
+        assert_eq!(report.horizon_summaries[4].unsupported_count, 1);
+        assert_eq!(report.horizon_summaries[1].p95_absolute_residual, None);
+    }
+
+    #[test]
+    fn missing_intermediate_horizon_does_not_bridge_paired_growth() {
+        let mut sample = input();
+        sample.residual_observations = vec![
+            residual(1_000, 1.0, 0.0),
+            incomplete_residual(2_000, ReferenceOutcomeStatus::Missing),
+            residual(3_000, 5.0, 0.0),
+        ];
+        let report = summarize_vehicle_model_discrepancy(&sample).unwrap();
+        assert!(report.paired_horizon_growth.is_empty());
+        assert_eq!(report.horizon_summaries[1].outcome_count, 1);
+        assert_eq!(report.horizon_summaries[1].observed_count, 0);
+        assert_eq!(report.horizon_summaries[1].mean_signed_residual, None);
     }
 
     #[test] fn reports_paired_horizon_error_growth(){let r=summarize_vehicle_model_discrepancy(&input()).unwrap();assert_eq!(r.paired_horizon_growth.len(),1);assert_eq!(r.paired_horizon_growth[0].absolute_residual_growth,3.0);}
