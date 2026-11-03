@@ -393,6 +393,11 @@ pub enum ConfigError {
     ZeroAttentionCapacity,
     ZeroTransmissionBudget,
     SeedRecipesTooLarge { requested: usize, available: usize },
+    InvalidProgramIdentifier,
+    InvalidProgramVersion,
+    InvalidProgramPrerequisiteThreshold { threshold_milli: u16 },
+    InvalidProgramMessageLimit,
+    InvalidProgramScoreWeights,
 }
 
 impl fmt::Display for ConfigError {
@@ -409,6 +414,20 @@ impl fmt::Display for ConfigError {
             Self::SeedRecipesTooLarge { requested, available } => {
                 write!(f, "requested {requested} initial recipes per seed agent, task has {available}")
             }
+            Self::InvalidProgramIdentifier => write!(f, "transmission program ID must not be empty"),
+            Self::InvalidProgramVersion => write!(f, "transmission program version must be positive"),
+            Self::InvalidProgramPrerequisiteThreshold { threshold_milli } => write!(
+                f,
+                "minimum prerequisite match {threshold_milli} milli-units exceeds 1000"
+            ),
+            Self::InvalidProgramMessageLimit => write!(
+                f,
+                "program message limits must be positive and no greater than the configured per-step budget"
+            ),
+            Self::InvalidProgramScoreWeights => write!(
+                f,
+                "program score weights must be bounded, nonzero in total, and no greater than the declared maximum"
+            ),
         }
     }
 }
@@ -448,6 +467,118 @@ impl Config {
                 requested: self.initial_seed_recipes_per_agent,
                 available: task.total_recipe_count(),
             });
+        }
+        Ok(())
+    }
+}
+
+/// Bounded, deterministic score terms for a transmission program.
+///
+/// All weights are non-negative integer coefficients. The scheduler uses
+/// integer arithmetic and stable action ordering; no executable code or
+/// arbitrary expression evaluation is accepted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TransmissionScoreWeights {
+    pub immediate_executability: u32,
+    pub prerequisite_match: u32,
+    pub collective_novelty: u32,
+    pub downstream_unlocks: u32,
+    pub sender_knowledge: u32,
+}
+
+impl TransmissionScoreWeights {
+    pub const MAX_WEIGHT: u32 = 1_000_000;
+
+    fn is_valid(self) -> bool {
+        let values = [
+            self.immediate_executability,
+            self.prerequisite_match,
+            self.collective_novelty,
+            self.downstream_unlocks,
+            self.sender_knowledge,
+        ];
+        values.iter().any(|weight| *weight > 0)
+            && values.iter().all(|weight| *weight <= Self::MAX_WEIGHT)
+    }
+}
+
+/// A versioned, inspectable transmission program.
+///
+/// The program can only rank legal sender/receiver/recipe actions. It cannot
+/// mutate agent state, inspect hidden task truth, bypass graph edges, or exceed
+/// the global message and recipient-attention limits in Config.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransmissionProgram {
+    pub program_id: String,
+    pub version: u16,
+    /// Minimum proportion of the recipe's prerequisites already known by the
+    /// recipient, expressed in thousandths (0..=1000).
+    pub minimum_prerequisite_match_milli: u16,
+    /// When true, only transmit recipes whose output is not yet known by the
+    /// collective.
+    pub require_collective_novelty: bool,
+    pub max_messages_per_step: usize,
+    pub max_messages_per_sender: usize,
+    pub weights: TransmissionScoreWeights,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProgramIdentity {
+    pub program_id: String,
+    pub version: u16,
+}
+
+impl TransmissionProgram {
+    /// Re-expresses the transparent StateAwareFrontier heuristic as a bounded
+    /// data program. Its default weights are exactly proportional to that
+    /// heuristic's score terms, preserving its deterministic ranking.
+    pub fn frontier_v1(config: Config) -> Self {
+        Self {
+            program_id: "frontier-v1".to_owned(),
+            version: 1,
+            minimum_prerequisite_match_milli: 0,
+            require_collective_novelty: false,
+            max_messages_per_step: config.transmission_budget_per_step,
+            max_messages_per_sender: config.transmission_budget_per_step,
+            weights: TransmissionScoreWeights {
+                immediate_executability: 100_000,
+                prerequisite_match: 10_000,
+                collective_novelty: 5_000,
+                downstream_unlocks: 1_000,
+                sender_knowledge: 1,
+            },
+        }
+    }
+
+    pub fn identity(&self) -> ProgramIdentity {
+        ProgramIdentity {
+            program_id: self.program_id.clone(),
+            version: self.version,
+        }
+    }
+
+    pub fn validate(&self, config: Config) -> Result<(), ConfigError> {
+        if self.program_id.trim().is_empty() {
+            return Err(ConfigError::InvalidProgramIdentifier);
+        }
+        if self.version == 0 {
+            return Err(ConfigError::InvalidProgramVersion);
+        }
+        if self.minimum_prerequisite_match_milli > 1_000 {
+            return Err(ConfigError::InvalidProgramPrerequisiteThreshold {
+                threshold_milli: self.minimum_prerequisite_match_milli,
+            });
+        }
+        if config.transmission_budget_per_step == 0
+            || self.max_messages_per_step == 0
+            || self.max_messages_per_sender == 0
+            || self.max_messages_per_step > config.transmission_budget_per_step
+            || self.max_messages_per_sender > config.transmission_budget_per_step
+        {
+            return Err(ConfigError::InvalidProgramMessageLimit);
+        }
+        if !self.weights.is_valid() {
+            return Err(ConfigError::InvalidProgramScoreWeights);
         }
         Ok(())
     }
@@ -540,6 +671,7 @@ pub struct Run {
     pub graph: SocialGraph,
     pub agents: Vec<AgentKnowledge>,
     pub history: Vec<StepMetrics>,
+    pub program_identity: Option<ProgramIdentity>,
 }
 
 impl Run {
@@ -746,6 +878,94 @@ fn state_aware_schedule(
     schedule
 }
 
+fn program_schedule(
+    task: &InnovationTask,
+    graph: &SocialGraph,
+    agents: &[AgentKnowledge],
+    config: Config,
+    program: &TransmissionProgram,
+) -> Vec<TransmissionAction> {
+    let group_elements = group_known_elements(agents);
+    let mut schedule = Vec::new();
+    let mut recipient_load = vec![0usize; agents.len()];
+    let mut sender_load = vec![0usize; agents.len()];
+    let mut used_actions = BTreeSet::new();
+    let budget = program.max_messages_per_step.min(config.transmission_budget_per_step);
+
+    while schedule.len() < budget {
+        let mut best: Option<(u64, TransmissionAction)> = None;
+        for sender in 0..agents.len() {
+            if sender_load[sender] >= program.max_messages_per_sender {
+                continue;
+            }
+            let Some(neighbors) = graph.neighbors(sender) else { continue };
+            if agents[sender].known_recipes.is_empty() {
+                continue;
+            }
+            for &receiver in neighbors {
+                if recipient_load[receiver] >= config.attention_capacity_per_recipient {
+                    continue;
+                }
+                for &recipe_id in &agents[sender].known_recipes {
+                    if agents[receiver].known_recipes.contains(&recipe_id) {
+                        continue;
+                    }
+                    let recipe = task.recipe(recipe_id)
+                        .expect("agent recipe ID must exist in task");
+                    let matched = recipe.ingredients.iter()
+                        .filter(|ingredient| agents[receiver].known_elements.contains(ingredient))
+                        .count();
+                    let prerequisite_match_milli =
+                        (matched * 1_000 / recipe.ingredients.len()) as u16;
+                    if prerequisite_match_milli < program.minimum_prerequisite_match_milli {
+                        continue;
+                    }
+
+                    let group_novelty = !group_elements.contains(&recipe.output_element);
+                    if program.require_collective_novelty && !group_novelty {
+                        continue;
+                    }
+
+                    let action = TransmissionAction { sender, receiver, recipe_id };
+                    if used_actions.contains(&(sender, receiver, recipe_id)) {
+                        continue;
+                    }
+
+                    let ready = matched == recipe.ingredients.len();
+                    let weights = program.weights;
+                    let score =
+                        u64::from(ready) * u64::from(weights.immediate_executability)
+                        + (matched as u64 * u64::from(weights.prerequisite_match)
+                            / recipe.ingredients.len() as u64)
+                        + u64::from(group_novelty) * u64::from(weights.collective_novelty)
+                        + task.descendant_count(recipe.output_element) as u64
+                            * u64::from(weights.downstream_unlocks)
+                        + agents[sender].known_recipes.len() as u64
+                            * u64::from(weights.sender_knowledge);
+
+                    let replace = match best {
+                        None => true,
+                        Some((best_score, best_action)) => {
+                            score > best_score
+                                || (score == best_score && action < best_action)
+                        }
+                    };
+                    if replace {
+                        best = Some((score, action));
+                    }
+                }
+            }
+        }
+
+        let Some((_, action)) = best else { break };
+        used_actions.insert((action.sender, action.receiver, action.recipe_id));
+        recipient_load[action.receiver] += 1;
+        sender_load[action.sender] += 1;
+        schedule.push(action);
+    }
+    schedule
+}
+
 fn fixed_ring_pairs(population_size: usize) -> Vec<(usize, usize)> {
     (0..population_size)
         .map(|sender| (sender, (sender + 1) % population_size))
@@ -906,6 +1126,28 @@ pub fn simulate(
     config: Config,
     seed: u64,
 ) -> Result<Run, ConfigError> {
+    simulate_internal(task, config, seed, None)
+}
+
+/// Simulate with an inspectable, bounded data program instead of a fixed policy
+/// enum. The program cannot bypass the graph, change agent state directly, or
+/// exceed the configured message/recipient-attention budgets.
+pub fn simulate_with_program(
+    task: &InnovationTask,
+    config: Config,
+    seed: u64,
+    program: &TransmissionProgram,
+) -> Result<Run, ConfigError> {
+    program.validate(config)?;
+    simulate_internal(task, config, seed, Some(program))
+}
+
+fn simulate_internal(
+    task: &InnovationTask,
+    config: Config,
+    seed: u64,
+    program: Option<&TransmissionProgram>,
+) -> Result<Run, ConfigError> {
     config.validate(task)?;
     let mut rng = Rng::new(seed);
     let graph = SocialGraph::generate(
@@ -942,7 +1184,10 @@ pub fn simulate(
             config.individual_discovery_probability,
             &mut rng,
         );
-        let actions = build_schedule(config.policy, task, &graph, &agents, config, &mut rng);
+        let actions = match program {
+            Some(program) => program_schedule(task, &graph, &agents, config, program),
+            None => build_schedule(config.policy, task, &graph, &agents, config, &mut rng),
+        };
         let (redundant, acquisitions, new_results, attention_used) = apply_actions(
             task,
             &mut agents,
@@ -963,7 +1208,13 @@ pub fn simulate(
         ));
     }
 
-    Ok(Run { seed, graph, agents, history })
+    Ok(Run {
+        seed,
+        graph,
+        agents,
+        history,
+        program_identity: program.map(TransmissionProgram::identity),
+    })
 }
 
 #[cfg(test)]
@@ -1227,6 +1478,64 @@ mod tests {
         assert!(metrics.result_coverage() >= 0.0 && metrics.result_coverage() <= 1.0);
         assert!(metrics.transmissions_scheduled <= config.transmission_budget_per_step);
         assert!(metrics.mean_results_per_agent_milli <= (task.total_result_count() * 1000) as u32);
+    }
+
+    #[test]
+    fn frontier_v1_program_reproduces_named_heuristic_exactly() {
+        let task = InnovationTask::family_task(TaskFamily::Branching);
+        let config = deterministic_config(TransmissionPolicy::StateAwareFrontier);
+        let heuristic = simulate(&task, config, 818).unwrap();
+        let program = TransmissionProgram::frontier_v1(config);
+        let compiled = simulate_with_program(&task, config, 818, &program).unwrap();
+
+        assert_eq!(heuristic.graph, compiled.graph);
+        assert_eq!(heuristic.agents, compiled.agents);
+        assert_eq!(heuristic.history, compiled.history);
+        assert_eq!(
+            compiled.program_identity,
+            Some(ProgramIdentity {
+                program_id: "frontier-v1".to_owned(),
+                version: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn bounded_program_respects_sender_message_cap() {
+        let task = InnovationTask::family_task(TaskFamily::Layered);
+        let config = deterministic_config(TransmissionPolicy::StateAwareFrontier);
+        let mut program = TransmissionProgram::frontier_v1(config);
+        program.program_id = "one-message-per-sender".to_owned();
+        program.max_messages_per_sender = 1;
+        let run = simulate_with_program(&task, config, 819, &program).unwrap();
+
+        // At most one outbound message per sender per step; the total schedule
+        // is also bounded by the run-level transmission budget.
+        for step in 1..run.history.len() {
+            assert!(run.history[step].transmissions_scheduled <= config.transmission_budget_per_step);
+        }
+    }
+
+    #[test]
+    fn bounded_program_rejects_invalid_filters_and_unbounded_weights() {
+        let task = InnovationTask::family_task(TaskFamily::Layered);
+        let config = deterministic_config(TransmissionPolicy::StateAwareFrontier);
+        let mut threshold = TransmissionProgram::frontier_v1(config);
+        threshold.minimum_prerequisite_match_milli = 1_001;
+        assert_eq!(
+            simulate_with_program(&task, config, 1, &threshold),
+            Err(ConfigError::InvalidProgramPrerequisiteThreshold {
+                threshold_milli: 1_001,
+            })
+        );
+
+        let mut weights = TransmissionProgram::frontier_v1(config);
+        weights.weights.immediate_executability =
+            TransmissionScoreWeights::MAX_WEIGHT + 1;
+        assert_eq!(
+            simulate_with_program(&task, config, 1, &weights),
+            Err(ConfigError::InvalidProgramScoreWeights)
+        );
     }
 
     #[test]
