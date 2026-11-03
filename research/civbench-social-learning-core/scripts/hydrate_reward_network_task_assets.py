@@ -14,6 +14,7 @@ import os
 import hashlib
 import json
 import re
+import sys
 import tempfile
 import urllib.error
 import urllib.request
@@ -278,6 +279,8 @@ def main() -> int:
     with zipfile.ZipFile(args.archive) as archive:
         pointers = {path: read_pointer(archive, path) for path in TASK_ASSETS}
         batch_url = lfs_batch_url(archive, args.lfs_batch_url)
+    # Safe diagnostic: endpoint only, never credentials or signed object URLs.
+    print(f"Git LFS batch endpoint selected: {batch_url}", file=sys.stderr)
 
     batch = post_json(
         batch_url,
