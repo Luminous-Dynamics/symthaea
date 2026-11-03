@@ -287,9 +287,9 @@ pub fn generate_seeded_random_intersection_candidates(
 /// Minimize a scenario while preserving a caller-defined failure predicate.
 ///
 /// The callback is the execution boundary: in the intended workflow it asks
-/// Symtropy to execute/replay the candidate and returns whether the exact
-/// registered failure predicate still holds. This function does not run
-/// physics or infer failure labels itself.
+/// Symtropy to execute/replay the candidate and returns a receipt binding the
+/// exact candidate ID, predicate ID, evaluator identity and execution digest.
+/// This function does not run physics or infer failure labels itself.
 ///
 /// The deterministic coordinate shrinker moves each factor toward a declared
 /// nominal value. Where the target removes the failure, a bounded 12-step
