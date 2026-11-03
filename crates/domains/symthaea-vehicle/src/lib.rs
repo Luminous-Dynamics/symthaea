@@ -86,6 +86,7 @@ pub mod plugin;
 pub mod reward;
 pub mod road;
 pub mod runtime_assurance;
+pub mod rta_shadow_audit;
 pub mod scenario_discovery;
 pub mod shadow_evaluation;
 pub mod scenarios;
@@ -124,6 +125,10 @@ pub use shadow_evaluation::{
 pub use runtime_assurance::{
     VehicleRtaConfig, VehicleRtaDecision, VehicleRtaError, VehicleRtaMode, VehicleRtaObservation,
     VehicleRtaReason, VehicleRtaWitness, VehicleRuntimeAssurance,
+};
+pub use rta_shadow_audit::{
+    VEHICLE_RTA_SHADOW_AUDIT_SCHEMA, VehicleRtaShadowAudit, VehicleRtaShadowFrame,
+    VehicleRtaShadowReport,
 };
 pub use scenarios::{
     ScenarioConfig, ScenarioResult, default_scenarios, results_to_csv, run_all_scenarios,
