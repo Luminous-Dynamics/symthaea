@@ -54,3 +54,32 @@ The exact upstream-generated Evidence provenance test suite remains separate fro
 ## Claim ceiling
 
 This is a deterministic decision-support planner over supplied probability models. It is not a causal inference engine, a security decision authority, an autonomous experimentation agent or an evidence authenticator.
+
+
+## Robust likelihood-model uncertainty (additive API)
+
+The `robust` module is an additive extension; it does not change the point-estimate `plan_next_experiment` contract.
+
+Call `plan_next_experiment_robust` with:
+- the same independently rooted REA Evidence provenance catalog and competing hypotheses;
+- experiment metadata and safety/resource constraints;
+- a shared set of `LikelihoodModelScenario` values. Every scenario must cover every candidate experiment, and each experiment matrix must cover every hypothesis with a normalized outcome distribution;
+- `RobustPlannerConfig`, selecting expected EIG, worst-case EIG, or lower-tail CVaR-EIG plus a minimum top-1 rank-stability threshold.
+
+The result reports, per candidate:
+- expected EIG across scenarios;
+- worst-case EIG;
+- lower-tail CVaR-EIG;
+- between-scenario EIG variance;
+- top-1 and top-3 rank stability;
+- each scenario's outcome probabilities and posterior hypothesis distributions.
+
+The default policy ranks by lower-tail CVaR at alpha 0.25 and requires top-1 stability of at least 0.5. If no candidate meets that stability threshold, the planner abstains. Scenario/proposal order does not alter semantic ranking or output order.
+
+### Important uncertainty boundary
+
+Scenario weights and likelihood matrices are still caller-supplied. They are not automatically calibrated, authenticated or guaranteed to contain the true data-generating process. Worst-case or CVaR over an incomplete scenario set is not a formal global worst-case guarantee. The API reports the scenario set used and keeps the claim ceiling false for calibration, scenario-weight authentication, causal truth and experiment execution.
+
+Do not pass ad hoc cell-wise lower/upper probability bounds and renormalize them as though they were a valid joint uncertainty set. If adding interval bounds later, use a mathematically valid simplex-constrained uncertainty set or a reviewed robust-optimization formulation.
+
+The robust tests are additive to the point-planner tests. The dedicated planner workflow runs both through the same isolated locked harness.

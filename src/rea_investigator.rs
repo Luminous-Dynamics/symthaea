@@ -4,6 +4,22 @@
 //! Provenance classes and likelihood models are caller-supplied and are not
 //! authenticated or calibrated by this module.
 
+pub use symthaea_rea_investigator::robust::{
+    LikelihoodModelScenario,
+    RobustAbstentionReason,
+    RobustClaimCeiling,
+    RobustExperimentProposal,
+    RobustInvestigationPlan,
+    RobustPlannerConfig,
+    RobustRankedExperiment,
+    RobustRankingPolicy,
+    RobustRejectedExperiment,
+    RobustRejectionReason,
+    ScenarioExperimentLikelihood,
+    ScenarioInformationGain,
+    plan_next_experiment_robust,
+};
+
 pub use symthaea_rea_investigator::{
     AbstentionReason,
     Authorization,
