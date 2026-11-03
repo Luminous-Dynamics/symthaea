@@ -20,11 +20,15 @@ const REPORT_VERSION: &str = "0.1.0";
 const SIDECAR_VERSION: &str = "0.1.0";
 const CANONICALIZER_PROTOCOL: &str = "CONNECTOME-STRUCTURAL-GRAPH-CANONICAL-V1";
 const EVALUATOR_PROTOCOL_SHA256: &str =
-    "df83b9386deee6ed881e58b6aaa78919206233619571459c94c611dfccbb82e5";
+    "eb780dac0d14b867ef8b0b42773c911e8e01890cca3ec4709b870e0989f8b085";
 const RULES_PROTOCOL_SHA256: &str =
-    "60c1b8a20a774908f239160c0c9a7b816c22e4c4a8a40b3ed45b9d7f87ea08a4";
+    "ee9caeef8c104c10a170de7eb33aba058c8d33c443d7140b9ebac028aa818b11";
 const CANONICALIZER_PROTOCOL_SHA256: &str =
-    "578a939bfdf68a11f279fcce606f97d2c11dfd90cd569fa1edd1fc7e8e8c6a70";
+    "604a03409b21c5c7af1ec41c0bf8466d6b999103f95a429c5d9add6083e3e05c";
+const REPORT_SCHEMA_SHA256: &str =
+    "7640424b4afff287f9d11d1d4a6a8474f533b1b1a90face915c56bd972f1afbc";
+const STRUCTURE_SCHEMA_SHA256: &str =
+    "16f2b9eac1f4a0145289d6100f8c902e5b470ece45a623d032e874ce5bd50476";
 
 #[derive(Debug, Clone)]
 struct CandidateWorld {
@@ -448,6 +452,8 @@ fn validate_report(
             "rules_sha256",
             "truth_separation_verified",
             "canonicalizer_sha256",
+            "report_schema_sha256",
+            "structure_schema_sha256",
             "candidate_structure_manifest_sha256",
             "reference_structure_manifest_sha256",
         ],
@@ -466,6 +472,16 @@ fn validate_report(
     }
     if canonicalizer_sha256 != CANONICALIZER_PROTOCOL_SHA256 {
         return Err("provenance.canonicalizer_sha256 does not match the pinned graph canonicalizer".to_owned());
+    }
+    let report_schema_sha256 =
+        digest_field(provenance, "report_schema_sha256", "provenance")?;
+    let structure_schema_sha256 =
+        digest_field(provenance, "structure_schema_sha256", "provenance")?;
+    if report_schema_sha256 != REPORT_SCHEMA_SHA256 {
+        return Err("provenance.report_schema_sha256 does not match the pinned report schema".to_owned());
+    }
+    if structure_schema_sha256 != STRUCTURE_SCHEMA_SHA256 {
+        return Err("provenance.structure_schema_sha256 does not match the pinned structure schema".to_owned());
     }
 
     let candidate_manifest = digest_field(
