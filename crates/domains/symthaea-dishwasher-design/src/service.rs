@@ -64,6 +64,12 @@ pub struct ItemEndpointOutcome {
     pub run_id: String,
     pub item_id: String,
     pub endpoint: Endpoint,
+    /// Must identify the preregistered endpoint criterion and assay.
+    pub criterion_id: String,
+    pub method_id: String,
+    pub protocol_id: String,
+    /// Reference to the source assay record in the frozen run archive.
+    pub evidence_ref: String,
     /// Only independent outcome assays can qualify a successful item.
     pub evidence_kind: EvidenceKind,
     pub decision: Decision,
@@ -82,6 +88,11 @@ pub struct ServiceAttempt {
     pub item_ids: Vec<String>,
     /// Include allocated preheat/standby/purge overhead in this resource vector.
     pub resources: AttemptResources,
+    /// References and digests identify source archives; they do not authenticate them.
+    pub resource_archive_ref: String,
+    pub resource_archive_sha256: String,
+    pub outcome_archive_ref: String,
+    pub outcome_archive_sha256: String,
     pub interrupted: bool,
     /// Missing observations are unknown, never passes.
     pub outcomes: Vec<ItemEndpointOutcome>,
@@ -98,6 +109,8 @@ pub enum ServiceAccountingError {
     NonIncreasingSequence { previous: u64, observed: u64 },
     FinishBeforeStart { attempt_id: String },
     InvalidResource(&'static str),
+    InvalidEvidenceReference(&'static str),
+    InvalidEvidenceDigest(&'static str),
     DuplicateItemInAttempt { attempt_id: String, item_id: String },
     ItemRepeatedAfterQualification { item_id: String, attempt_id: String },
     OutcomeForUnknownItem { attempt_id: String, item_id: String },
@@ -185,6 +198,22 @@ pub fn account_service(
             });
         }
         attempt.resources.validate()?;
+        for (field, reference) in [
+            ("resource_archive_ref", attempt.resource_archive_ref.as_str()),
+            ("outcome_archive_ref", attempt.outcome_archive_ref.as_str()),
+        ] {
+            if !canonical_non_empty(reference) {
+                return Err(ServiceAccountingError::InvalidEvidenceReference(field));
+            }
+        }
+        for (field, digest) in [
+            ("resource_archive_sha256", attempt.resource_archive_sha256.as_str()),
+            ("outcome_archive_sha256", attempt.outcome_archive_sha256.as_str()),
+        ] {
+            if !valid_digest(digest) {
+                return Err(ServiceAccountingError::InvalidEvidenceDigest(field));
+            }
+        }
         total_resources = total_resources.checked_add(attempt.resources)?;
         earliest_start = earliest_start.min(attempt.started_at_s);
         latest_finish = latest_finish.max(attempt.finished_at_s);
@@ -213,8 +242,17 @@ pub fn account_service(
 
         let mut decisions: HashMap<(&str, Endpoint), Decision> = HashMap::new();
         for outcome in &attempt.outcomes {
-            if !canonical_non_empty(&outcome.run_id) {
-                return Err(ServiceAccountingError::InvalidIdentity("outcome.run_id"));
+            for (field, value) in [
+                ("outcome.run_id", outcome.run_id.as_str()),
+                ("outcome.item_id", outcome.item_id.as_str()),
+                ("outcome.criterion_id", outcome.criterion_id.as_str()),
+                ("outcome.method_id", outcome.method_id.as_str()),
+                ("outcome.protocol_id", outcome.protocol_id.as_str()),
+                ("outcome.evidence_ref", outcome.evidence_ref.as_str()),
+            ] {
+                if !canonical_non_empty(value) {
+                    return Err(ServiceAccountingError::InvalidIdentity(field));
+                }
             }
             if outcome.run_id.as_str() != attempt.run_id.as_str() {
                 return Err(ServiceAccountingError::OutcomeRunMismatch {
@@ -283,6 +321,10 @@ fn canonical_non_empty(value: &str) -> bool {
     !value.trim().is_empty() && value.trim() == value
 }
 
+fn valid_digest(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -298,6 +340,10 @@ mod tests {
             run_id: run_id.to_owned(),
             item_id: item_id.to_owned(),
             endpoint: *endpoint,
+            criterion_id: format!("criterion-{endpoint:?}"),
+            method_id: "independent-assay-v1".to_owned(),
+            protocol_id: "protocol-v1".to_owned(),
+            evidence_ref: format!("evidence://{run_id}/{item_id}/{endpoint:?}"),
             evidence_kind: EvidenceKind::IndependentOutcomeAssay,
             decision,
         }).collect()
@@ -315,6 +361,10 @@ mod tests {
             finished_at_s: finish,
             item_ids: item_ids.iter().map(|id| (*id).to_owned()).collect(),
             resources,
+            resource_archive_ref: format!("archive://{run_id}/resources"),
+            resource_archive_sha256: "1".repeat(64),
+            outcome_archive_ref: format!("archive://{run_id}/outcomes"),
+            outcome_archive_sha256: "2".repeat(64),
             interrupted: false,
             outcomes,
         }
@@ -438,6 +488,42 @@ mod tests {
         assert!(matches!(
             account_service(&duplicate_runs, &REQUIRED),
             Err(ServiceAccountingError::DuplicateRunId(_))
+        ));
+    }
+
+
+    #[test]
+    fn rejects_missing_resource_or_outcome_archive_provenance() {
+        let mut record = attempt(
+            1, "attempt-1", "run-1", 0, 60, &["cup-1"], resources(0.05, 0.7),
+            outcomes("run-1", "cup-1", Decision::Pass),
+        );
+        record.resource_archive_sha256 = "not-a-digest".to_owned();
+        assert!(matches!(
+            account_service(&[record], &REQUIRED),
+            Err(ServiceAccountingError::InvalidEvidenceDigest(_))
+        ));
+
+        let mut record = attempt(
+            1, "attempt-1", "run-1", 0, 60, &["cup-1"], resources(0.05, 0.7),
+            outcomes("run-1", "cup-1", Decision::Pass),
+        );
+        record.outcome_archive_ref.clear();
+        assert!(matches!(
+            account_service(&[record], &REQUIRED),
+            Err(ServiceAccountingError::InvalidEvidenceReference(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_an_outcome_without_criterion_method_protocol_or_evidence_reference() {
+        let mut evidence = outcomes("run-1", "cup-1", Decision::Pass);
+        evidence[0].evidence_ref.clear();
+        assert!(matches!(
+            account_service(&[attempt(
+                1, "attempt-1", "run-1", 0, 60, &["cup-1"], resources(0.05, 0.7), evidence,
+            )], &REQUIRED),
+            Err(ServiceAccountingError::InvalidIdentity("outcome.evidence_ref"))
         ));
     }
 
