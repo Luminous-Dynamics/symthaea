@@ -350,6 +350,24 @@ fn validate_family_summaries(
 
     let mut seen = BTreeSet::new();
     for value in values {
+        require_keys(
+            object(value, "family_summaries[]")?,
+            &[
+                "error_family",
+                "compatible_reference_count",
+                "incompatible_reference_count",
+                "indeterminate_reference_count",
+                "compatible_estimable_reference_count",
+                "compatible_query_not_estimable_reference_count",
+                "structurally_included_count",
+                "query_flipping_reference_count",
+                "omitted_query_flipping_count",
+                "false_invariance_count",
+                "false_ambiguity_count",
+                "candidate_not_estimable_count",
+            ],
+            "family_summaries[]",
+        )?;
         let family = string_field(value, "error_family", "family_summaries[]")?;
         if !seen.insert(family.clone()) {
             return Err(format!("duplicate family summary {family}"));
@@ -397,7 +415,24 @@ fn validate_report(
 ) -> Result<Value, String> {
     let report: Value = serde_json::from_slice(report_bytes)
         .map_err(|error| format!("report JSON invalid: {error}"))?;
-    object(&report, "report")?;
+    let report_object = object(&report, "report")?;
+    require_keys(
+        report_object,
+        &[
+            "schema_version",
+            "evaluation_id",
+            "query",
+            "candidate_universe",
+            "reference_challenge",
+            "candidate_worlds",
+            "reference_worlds",
+            "summary",
+            "family_summaries",
+            "dispositions",
+            "provenance",
+        ],
+        "report",
+    )?;
     if string_field(&report, "schema_version", "report")? != REPORT_VERSION {
         return Err("unsupported report schema_version".to_owned());
     }
@@ -406,6 +441,18 @@ fn validate_report(
     let provenance = report
         .get("provenance")
         .ok_or_else(|| "provenance missing".to_owned())?;
+    require_keys(
+        object(provenance, "provenance")?,
+        &[
+            "evaluator_protocol_sha256",
+            "rules_sha256",
+            "truth_separation_verified",
+            "canonicalizer_sha256",
+            "candidate_structure_manifest_sha256",
+            "reference_structure_manifest_sha256",
+        ],
+        "provenance",
+    )?;
     let evaluator_protocol_sha256 =
         digest_field(provenance, "evaluator_protocol_sha256", "provenance")?;
     let rules_sha256 = digest_field(provenance, "rules_sha256", "provenance")?;
@@ -444,6 +491,21 @@ fn validate_report(
         parse_structure_sidecar(reference_sidecar_bytes, "reference_structures")?;
 
     let query = report.get("query").ok_or_else(|| "query missing".to_owned())?;
+    require_keys(
+        object(query, "query")?,
+        &[
+            "query_id",
+            "definition_sha256",
+            "decision_rule_sha256",
+            "metric",
+            "unit",
+            "baseline_decision",
+        ],
+        "query",
+    )?;
+    string_field(query, "query_id", "query")?;
+    string_field(query, "metric", "query")?;
+    string_field(query, "unit", "query")?;
     let baseline_decision = string_field(query, "baseline_decision", "query")?;
     if !matches!(
         baseline_decision.as_str(),
@@ -457,6 +519,21 @@ fn validate_report(
     let reference_challenge = report
         .get("reference_challenge")
         .ok_or_else(|| "reference_challenge missing".to_owned())?;
+    require_keys(
+        object(reference_challenge, "reference_challenge")?,
+        &[
+            "challenge_id",
+            "manifest_sha256",
+            "generator_sha256",
+            "freeze_receipt_sha256",
+            "oracle_boundary",
+            "required_error_families",
+        ],
+        "reference_challenge",
+    )?;
+    string_field(reference_challenge, "challenge_id", "reference_challenge")?;
+    digest_field(reference_challenge, "manifest_sha256", "reference_challenge")?;
+    digest_field(reference_challenge, "generator_sha256", "reference_challenge")?;
     let oracle_boundary = string_field(
         reference_challenge,
         "oracle_boundary",
@@ -468,9 +545,11 @@ fn validate_report(
     ) {
         return Err("unknown reference oracle_boundary".to_owned());
     }
-    let freeze_receipt_present = reference_challenge
-        .get("freeze_receipt_sha256")
-        .is_some_and(|value| value.as_str().is_some_and(valid_sha256));
+    let freeze_receipt_present = match reference_challenge.get("freeze_receipt_sha256") {
+        Some(Value::Null) => false,
+        Some(Value::String(value)) if valid_sha256(value) => true,
+        _ => return Err("reference_challenge.freeze_receipt_sha256 must be null or lowercase SHA-256 hex".to_owned()),
+    };
     let truth_separation_verified =
         bool_field(provenance, "truth_separation_verified", "provenance")?;
 
@@ -506,10 +585,25 @@ fn validate_report(
             .ok_or_else(|| "reference_worlds missing".to_owned())?,
         "reference_worlds",
     )?;
+    if candidate_values.is_empty() || reference_values.is_empty() {
+        return Err("candidate_worlds and reference_worlds must both be non-empty".to_owned());
+    }
 
     let candidate_universe = report
         .get("candidate_universe")
         .ok_or_else(|| "candidate_universe missing".to_owned())?;
+    require_keys(
+        object(candidate_universe, "candidate_universe")?,
+        &[
+            "universe_id",
+            "manifest_sha256",
+            "generator_sha256",
+            "closure_disposition",
+            "world_ids",
+        ],
+        "candidate_universe",
+    )?;
+    string_field(candidate_universe, "universe_id", "candidate_universe")?;
     let closure_disposition = string_field(
         candidate_universe,
         "closure_disposition",
@@ -544,6 +638,11 @@ fn validate_report(
     let mut candidates = Vec::new();
     let mut candidate_ids = BTreeSet::new();
     for value in candidate_values {
+        require_keys(
+            object(value, "candidate_worlds[]")?,
+            &["world_id", "query_state", "canonical_structural_sha256", "error_family"],
+            "candidate_worlds[]",
+        )?;
         let id = string_field(value, "world_id", "candidate_worlds[]")?;
         if !candidate_ids.insert(id.clone()) {
             return Err(format!("duplicate candidate world ID {id}"));
@@ -589,6 +688,11 @@ fn validate_report(
     let mut references = Vec::new();
     let mut reference_ids = BTreeSet::new();
     for value in reference_values {
+        require_keys(
+            object(value, "reference_worlds[]")?,
+            &["world_id", "error_family", "evidence_compatibility", "query_state", "canonical_structural_sha256"],
+            "reference_worlds[]",
+        )?;
         let id = string_field(value, "world_id", "reference_worlds[]")?;
         if !reference_ids.insert(id.clone()) {
             return Err(format!("duplicate reference world ID {id}"));
@@ -678,6 +782,30 @@ fn validate_report(
     } else {
         None
     };
+
+    let summary_object = report.get("summary").ok_or_else(|| "summary missing".to_owned())?;
+    require_keys(
+        object(summary_object, "summary")?,
+        &[
+            "candidate_world_count",
+            "reference_world_count",
+            "compatible_reference_count",
+            "incompatible_reference_count",
+            "indeterminate_reference_count",
+            "compatible_estimable_reference_count",
+            "compatible_query_not_estimable_reference_count",
+            "structurally_included_count",
+            "query_state_covered_count",
+            "query_flipping_reference_count",
+            "omitted_query_flipping_count",
+            "false_invariance_count",
+            "false_ambiguity_count",
+            "candidate_duplicate_structure_group_count",
+            "reference_duplicate_structure_group_count",
+            "candidate_not_estimable_count",
+        ],
+        "summary",
+    )?;
 
     let mut summary = Summary {
         candidate_world_count: candidates.len() as u64,
@@ -894,6 +1022,11 @@ fn validate_report(
     let dispositions = report
         .get("dispositions")
         .ok_or_else(|| "dispositions missing".to_owned())?;
+    require_keys(
+        object(dispositions, "dispositions")?,
+        &["enumeration_closure", "universe_adequacy"],
+        "dispositions",
+    )?;
     let reported_closure = string_field(dispositions, "enumeration_closure", "dispositions")?;
     let reported_adequacy = string_field(dispositions, "universe_adequacy", "dispositions")?;
     if reported_closure != closure_disposition {
