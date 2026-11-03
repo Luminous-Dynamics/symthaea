@@ -1657,14 +1657,16 @@ fn base_report(status: &str, reason: String) -> VerificationReport {
         trust_policy_sha256: None,
         schema_sha256: schema_digests(),
         reasons: vec![reason],
-        claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove runner isolation, independently adjudicate test semantics, prove that the submitted patch transforms the pinned source snapshot into the computed result snapshot, or authenticate the claimed model provider.",
+        claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove runner isolation, independently adjudicate test semantics or authenticate the claimed model provider; patch reconstruction is limited to supported UTF-8 Git text diffs and immutable supplied snapshots.",
     }
 }
 
 /// Verify one primary receipt and one independently signed pristine regrade.
 ///
 /// All byte inputs are treated as untrusted. The function performs no shell calls,
-/// process creation, network access, candidate execution, or filesystem writes.
+/// process creation, network access, build/test invocation or candidate execution.
+/// It creates a private temporary bare libgit2 object database for patch reconstruction;
+/// the temporary directory is removed by RAII when verification returns.
 pub fn verify_pair(inputs: PairInputs) -> VerificationReport {
     match verify_pair_inner(&inputs) {
         Ok(report) => report,
@@ -1785,7 +1787,7 @@ fn verify_pair_inner(inputs: &PairInputs) -> Result<VerificationReport, Failure>
         trust_policy_sha256: Some(sha256_hex(&inputs.trust_policy)),
         schema_sha256: schema_digests(),
         reasons: Vec::new(),
-        claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove runner isolation, independently adjudicate test semantics, prove that the submitted patch transforms the pinned source snapshot into the computed result snapshot, or authenticate the claimed model provider.",
+        claim_ceiling: "Authenticated, schema-valid, task-bound evidence pair under the supplied trust policy; this does not prove runner isolation, independently adjudicate test semantics or authenticate the claimed model provider; patch reconstruction is limited to supported UTF-8 Git text diffs and immutable supplied snapshots.",
     })
 }
 
