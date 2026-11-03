@@ -19,7 +19,7 @@ pub enum DiscrepancyFeasibility { Feasible, Infeasible, Indeterminate }
 pub enum ReferenceOutcomeStatus { Observed, Missing, Censored, TimedOut, Unsupported }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DecisionAuditStatus { Comparable, IncompleteReference, IndeterminateFeasibility, SelectedActionInfeasible, NoFeasibleAction }
+pub enum DecisionAuditStatus { Comparable, IncompleteReference, IncompleteCandidateSet, IndeterminateFeasibility, SelectedActionInfeasible, NoFeasibleAction }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ModelResidualObservation {
@@ -213,6 +213,7 @@ pub struct DecisionAuditSummary {
     pub decision_count: usize,
     pub comparable_decision_count: usize,
     pub incomplete_reference_decision_count: usize,
+    pub incomplete_candidate_set_decision_count: usize,
     pub indeterminate_decision_count: usize,
     pub selected_action_infeasible_count: usize,
     pub no_feasible_action_count: usize,
@@ -570,6 +571,9 @@ fn evaluate_decision(d:&ModelDecisionObservation)->DecisionAuditResult {
     if d.actions.iter().any(|a|a.reference_status!=ReferenceOutcomeStatus::Observed) {
         return base(DecisionAuditStatus::IncompleteReference,None,None,None,None,None);
     }
+    if !d.candidate_set_complete {
+        return base(DecisionAuditStatus::IncompleteCandidateSet,None,None,None,None,None);
+    }
     if d.actions.iter().any(|a|a.feasibility==DiscrepancyFeasibility::Indeterminate) { return base(DecisionAuditStatus::IndeterminateFeasibility,None,None,None,None,None); }
     let feasible=d.actions.iter().filter(|a|a.feasibility==DiscrepancyFeasibility::Feasible).collect::<Vec<_>>();
     if feasible.is_empty() { return base(DecisionAuditStatus::NoFeasibleAction,None,None,None,None,None); }
@@ -607,6 +611,7 @@ fn summarize_decisions(rows:&[DecisionAuditResult])->DecisionAuditSummary {
     DecisionAuditSummary {
         decision_count:rows.len(),comparable_decision_count:comparable.len(),
         incomplete_reference_decision_count:rows.iter().filter(|r|r.status==DecisionAuditStatus::IncompleteReference).count(),
+        incomplete_candidate_set_decision_count:rows.iter().filter(|r|r.status==DecisionAuditStatus::IncompleteCandidateSet).count(),
         indeterminate_decision_count:rows.iter().filter(|r|r.status==DecisionAuditStatus::IndeterminateFeasibility).count(),
         selected_action_infeasible_count:rows.iter().filter(|r|r.status==DecisionAuditStatus::SelectedActionInfeasible).count(),
         no_feasible_action_count:rows.iter().filter(|r|r.status==DecisionAuditStatus::NoFeasibleAction).count(),
@@ -864,6 +869,23 @@ mod tests {
             VehicleModelDiscrepancyError::MissingResidualOutcomeSlot
         );
     }
+    #[test]
+    fn incomplete_candidate_set_suppresses_ranking_and_regret() {
+        let mut sample = input();
+        sample.decisions[0].candidate_set_complete = false;
+        sample.decisions[0].decision_context_digest =
+            model_discrepancy_decision_context_digest(&sample.decisions[0]).unwrap();
+        let report = summarize_vehicle_model_discrepancy(&sample).unwrap();
+        let result = &report.decision_results[0];
+        assert_eq!(result.status, DecisionAuditStatus::IncompleteCandidateSet);
+        assert_eq!(result.predicted_best_action_id, None);
+        assert_eq!(result.realized_best_action_id, None);
+        assert_eq!(result.ranking_reversed, None);
+        assert_eq!(result.selected_action_regret, None);
+        assert_eq!(result.optimism_gap, None);
+        assert_eq!(report.decision_summary.incomplete_candidate_set_decision_count, 1);
+    }
+
     #[test] fn detects_planner_ranking_reversal_and_regret(){let r=summarize_vehicle_model_discrepancy(&input()).unwrap();let d=&r.decision_results[0];assert_eq!(d.selected_action_id,"continue");assert_eq!(d.predicted_best_action_id.as_deref(),Some("continue"));assert_eq!(d.realized_best_action_id.as_deref(),Some("yield"));assert_eq!(d.ranking_reversed,Some(true));assert_eq!(d.selected_action_regret,Some(6.0));assert_eq!(d.optimism_gap,Some(9.0));}
     #[test] fn rejects_outcome_leakage(){let mut x=input();x.decisions[0].reference_outcome_reveal_sequence=9;x.decisions[0].decision_context_digest=model_discrepancy_decision_context_digest(&x.decisions[0]).unwrap();assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::OutcomeLeakage);}
     #[test] fn unknown_feasibility_makes_decision_indeterminate(){let mut x=input();x.decisions[0].actions[0].feasibility=DiscrepancyFeasibility::Indeterminate;x.decisions[0].actions[0].realized_utility=None;let r=summarize_vehicle_model_discrepancy(&x).unwrap();assert_eq!(r.decision_results[0].status,DecisionAuditStatus::IndeterminateFeasibility);}
