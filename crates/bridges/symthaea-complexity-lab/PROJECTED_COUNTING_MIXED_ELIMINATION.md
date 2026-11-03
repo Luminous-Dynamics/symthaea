@@ -1,6 +1,6 @@
 # ETH-021: projected counting through mixed existential/counting elimination
 
-**Status:** Finite Python semantic reference committed. Full parser, proof certificate, Rust and Lean work remain open.
+**Status:** Python semantic-reference source committed; the finite test suite was not executed in this session. Full parser, proof certificate, Rust and Lean work remain open.
 
 ## 1. Output semantics are not interchangeable
 
