@@ -103,6 +103,7 @@ pub enum CounterexampleMinimizationError {
     ZeroEvaluationBudget,
     EvaluationBudgetTooLarge,
     OriginalNotCounterexample,
+    InvalidEvaluationReceipt,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -298,10 +299,10 @@ pub fn minimize_intersection_counterexample<F>(
     source: &IntersectionScenarioCandidate,
     predicate_id: impl Into<String>,
     maximum_evaluations: u32,
-    mut preserves_failure: F,
+    mut evaluator: F,
 ) -> Result<IntersectionCounterexampleMinimization, CounterexampleMinimizationError>
 where
-    F: FnMut(&IntersectionScenarioCandidate) -> bool,
+    F: FnMut(&IntersectionScenarioCandidate) -> CounterexampleEvaluationReceipt,
 {
     let predicate_id = predicate_id.into();
     if !source.identity_is_valid() {
@@ -316,7 +317,16 @@ where
     if maximum_evaluations > MAX_COUNTEREXAMPLE_MINIMIZATION_EVALUATIONS {
         return Err(CounterexampleMinimizationError::EvaluationBudgetTooLarge);
     }
-    if !preserves_failure(source) {
+
+    let mut evaluation_receipts = Vec::with_capacity(maximum_evaluations as usize);
+    let source_preserves = evaluate_and_record(
+        source,
+        &predicate_id,
+        &mut evaluator,
+        &mut evaluation_receipts,
+    )?;
+    let mut evaluations = 1_u32;
+    if !source_preserves {
         return Err(CounterexampleMinimizationError::OriginalNotCounterexample);
     }
 
@@ -341,10 +351,10 @@ where
         "brake_actuation_delay_s",
     ];
 
+    // Preserve the source generator identity. The report separately binds
+    // the minimization algorithm; candidate identity continues to mean
+    // original scenario provenance plus exact current factor values.
     let mut minimized = source.clone();
-    minimized.generator_policy_id = MINIMIZATION_GENERATOR_POLICY_ID.into();
-    minimized.candidate_id = candidate_identity(&minimized);
-    let mut evaluations = 1_u32;
 
     for dimension in 0..targets.len() {
         if evaluations >= maximum_evaluations {
@@ -359,9 +369,15 @@ where
         let mut target_candidate = minimized.clone();
         set_factor_value(&mut target_candidate, dimension, target_value);
         target_candidate.candidate_id = candidate_identity(&target_candidate);
+        let target_preserves = evaluate_and_record(
+            &target_candidate,
+            &predicate_id,
+            &mut evaluator,
+            &mut evaluation_receipts,
+        )?;
         evaluations += 1;
 
-        if preserves_failure(&target_candidate) {
+        if target_preserves {
             minimized = target_candidate;
             continue;
         }
@@ -379,9 +395,15 @@ where
             let mut proposal = accepted.clone();
             set_factor_value(&mut proposal, dimension, midpoint_value);
             proposal.candidate_id = candidate_identity(&proposal);
+            let preserves = evaluate_and_record(
+                &proposal,
+                &predicate_id,
+                &mut evaluator,
+                &mut evaluation_receipts,
+            )?;
             evaluations += 1;
 
-            if preserves_failure(&proposal) {
+            if preserves {
                 accepted = proposal;
             } else {
                 rejected = proposal;
@@ -414,13 +436,15 @@ where
     let mut report = IntersectionCounterexampleMinimization {
         schema_version: INTERSECTION_CANDIDATE_SCHEMA.into(),
         parent_candidate_id,
+        parent_candidate: source.clone(),
         predicate_id,
-        minimization_policy_id: MINIMIZATION_GENERATOR_POLICY_ID.into(),
+        minimization_policy_id: COUNTEREXAMPLE_MINIMIZATION_POLICY_ID.into(),
         evaluation_budget: maximum_evaluations,
         evaluations,
         failure_preserved: true,
         termination,
         factor_changes,
+        evaluation_receipts,
         minimized_candidate: minimized,
         report_digest: String::new(),
     };
@@ -428,6 +452,24 @@ where
         .map_err(|_| CounterexampleMinimizationError::InvalidSourceCandidate)?;
     report.report_digest = blake3::hash(&report_bytes).to_hex().to_string();
     Ok(report)
+}
+
+fn evaluate_and_record<F>(
+    candidate: &IntersectionScenarioCandidate,
+    predicate_id: &str,
+    evaluator: &mut F,
+    receipts: &mut Vec<CounterexampleEvaluationReceipt>,
+) -> Result<bool, CounterexampleMinimizationError>
+where
+    F: FnMut(&IntersectionScenarioCandidate) -> CounterexampleEvaluationReceipt,
+{
+    let receipt = evaluator(candidate);
+    if !receipt.is_valid_for(candidate, predicate_id) {
+        return Err(CounterexampleMinimizationError::InvalidEvaluationReceipt);
+    }
+    let predicate_holds = receipt.predicate_holds;
+    receipts.push(receipt);
+    Ok(predicate_holds)
 }
 
 fn factor_changes_are_consistent(
@@ -446,16 +488,17 @@ fn factor_changes_are_consistent(
     ];
     let original = factor_values(parent);
     let final_values = factor_values(minimized);
-    let expected = names
-        .iter()
-        .enumerate()
-        .filter(|(index, _)| original[*index].to_bits() != final_values[*index].to_bits())
-        .collect::<Vec<_>>();
+    let mut expected = Vec::new();
+    for (index, name) in names.iter().enumerate() {
+        if original[index].to_bits() != final_values[index].to_bits() {
+            expected.push((*name, original[index], final_values[index]));
+        }
+    }
     expected.len() == changes.len()
-        && expected.iter().zip(changes).all(|((index, name), change)| {
-            change.factor_name == **name
-                && change.original_value.to_bits() == original[*index].to_bits()
-                && change.minimized_value.to_bits() == final_values[*index].to_bits()
+        && expected.iter().zip(changes).all(|(expected, change)| {
+            change.factor_name == expected.0
+                && change.original_value.to_bits() == expected.1.to_bits()
+                && change.minimized_value.to_bits() == expected.2.to_bits()
         })
 }
 
