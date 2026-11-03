@@ -4,7 +4,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use ceb_receipt_verifier::{verify_pair, PairInputs};
+use ceb_receipt_verifier::{hash_source_tree, verify_pair, PairInputs, TREE_DIGEST_ALGORITHM};
 
 #[derive(Debug, Parser)]
 #[command(name = "ceb-receipt-verifier", version, about = "Offline verifier for signed CEB primary/regrade receipt pairs")]
@@ -15,6 +15,11 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Compute a CEB-TREE-V1 SHA-256 for a clean source snapshot.
+    HashTree {
+        #[arg(long)]
+        directory: PathBuf,
+    },
     /// Verify one primary DSSE receipt and its independently signed pristine regrade.
     VerifyPair {
         #[arg(long)]
@@ -71,6 +76,7 @@ fn read_limited(path: &Path, limit: u64) -> Result<Vec<u8>, String> {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    let command = cli.command;
     let Command::VerifyPair {
         task_contract,
         task_id,
@@ -84,7 +90,22 @@ fn main() -> ExitCode {
         regrade_artifacts_dir,
         trust_policy,
         expected_trust_policy_sha256,
-    } = cli.command;
+    } = command else {
+        let Command::HashTree { directory } = command else {
+            unreachable!("clap command variant was already matched");
+        };
+        return match hash_source_tree(&directory) {
+            Ok(sha256) => {
+                println!("algorithm={TREE_DIGEST_ALGORITHM}");
+                println!("sha256={sha256}");
+                ExitCode::SUCCESS
+            }
+            Err(reason) => {
+                eprintln!("tree hashing unresolved: {reason}");
+                ExitCode::from(2)
+            }
+        };
+    };
 
     let loaded = (|| -> Result<PairInputs, String> {
         Ok(PairInputs {
