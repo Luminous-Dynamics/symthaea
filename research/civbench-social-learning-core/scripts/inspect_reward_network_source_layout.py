@@ -21,9 +21,17 @@ def digest(data: bytes) -> str:
 
 def find_member(names: list[str], relative: str) -> str | None:
     matches = [n for n in names if n == relative or n.endswith("/" + relative)]
-    if len(matches) > 1:
-        raise RuntimeError(f"ambiguous archive path for {relative}: {matches}")
-    return matches[0] if matches else None
+    if not matches:
+        return None
+    # Zenodo's GitHub source ZIP has one repository-root prefix. For generic
+    # names such as README.md, prefer the shortest path (root file) rather than
+    # confusing it with nested README files. Scoped names such as abm/README.md
+    # remain unambiguous after the suffix match.
+    shortest_depth = min(name.count("/") for name in matches)
+    shortest = [name for name in matches if name.count("/") == shortest_depth]
+    if len(shortest) != 1:
+        raise RuntimeError(f"ambiguous root-level archive path for {relative}: {shortest}")
+    return shortest[0]
 
 def main() -> int:
     parser = argparse.ArgumentParser()
