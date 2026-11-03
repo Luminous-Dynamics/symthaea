@@ -465,23 +465,78 @@ fn git_patch_paths(patch: &[u8]) -> Result<Vec<String>, Failure> {
     let text = std::str::from_utf8(patch)
         .map_err(|_| Failure::unresolved("CEB V0 patch path audit requires UTF-8 Git diff headers"))?;
     let mut paths = BTreeSet::new();
+    let mut current: Option<(String, String, Option<String>, Option<String>)> = None;
+
+    let finish_block = |block: (String, String, Option<String>, Option<String>),
+                        all_paths: &mut BTreeSet<String>|
+     -> Result<(), Failure> {
+        let (old_header, new_header, old_marker, new_marker) = block;
+        if old_marker != Some(old_header.clone()) || new_marker != Some(new_header.clone()) {
+            return Err(Failure::protocol("Git patch ---/+++ file headers do not match the diff --git path pair"));
+        }
+        all_paths.insert(old_header);
+        all_paths.insert(new_header);
+        Ok(())
+    };
+
     for line in text.lines() {
-        let Some(header) = line.strip_prefix("diff --git ") else { continue; };
-        let (old_path, new_path) = header.split_once(' ')
-            .ok_or_else(|| Failure::protocol("malformed Git diff header"))?;
-        if old_path.starts_with('"') || new_path.starts_with('"') || new_path.contains(' ') {
-            return Err(Failure::unresolved("quoted or whitespace-containing Git diff paths are not supported in CEB V0"));
-        }
-        let old_path = old_path.strip_prefix("a/")
-            .ok_or_else(|| Failure::protocol("Git diff header must contain an a/ source path"))?;
-        let new_path = new_path.strip_prefix("b/")
-            .ok_or_else(|| Failure::protocol("Git diff header must contain a b/ destination path"))?;
-        for path in [old_path, new_path] {
-            if !safe_tree_relative_path(path) {
-                return Err(Failure::protocol(format!("Git patch contains unsafe path: {path}")));
+        if let Some(header) = line.strip_prefix("diff --git ") {
+            if let Some(block) = current.take() {
+                finish_block(block, &mut paths)?;
             }
-            paths.insert(path.to_owned());
+            let (old_path, new_path) = header.split_once(' ')
+                .ok_or_else(|| Failure::protocol("malformed Git diff header"))?;
+            if old_path.starts_with('"') || new_path.starts_with('"') || new_path.contains(' ') {
+                return Err(Failure::unresolved("quoted or whitespace-containing Git diff paths are not supported in CEB V0"));
+            }
+            let old_path = old_path.strip_prefix("a/")
+                .ok_or_else(|| Failure::protocol("Git diff header must contain an a/ source path"))?;
+            let new_path = new_path.strip_prefix("b/")
+                .ok_or_else(|| Failure::protocol("Git diff header must contain a b/ destination path"))?;
+            if !safe_tree_relative_path(old_path) || !safe_tree_relative_path(new_path) {
+                return Err(Failure::protocol("Git diff header contains an unsafe source or destination path"));
+            }
+            current = Some((old_path.to_owned(), new_path.to_owned(), None, None));
+        } else if let Some(old) = line.strip_prefix("--- ") {
+            let block = current.as_mut()
+                .ok_or_else(|| Failure::protocol("patch has a --- file marker before any diff --git header"))?;
+            if block.2.is_some() {
+                return Err(Failure::protocol("duplicate --- file marker in one Git diff block"));
+            }
+            let old = old.split('\t').next().unwrap_or(old);
+            if old.starts_with('"') {
+                return Err(Failure::unresolved("quoted patch file markers are not supported in CEB V0"));
+            }
+            let path = if old == "/dev/null" {
+                None
+            } else {
+                Some(old.strip_prefix("a/")
+                    .ok_or_else(|| Failure::protocol("patch --- marker must use a/ or /dev/null"))?
+                    .to_owned())
+            };
+            block.2 = path;
+        } else if let Some(new) = line.strip_prefix("+++ ") {
+            let block = current.as_mut()
+                .ok_or_else(|| Failure::protocol("patch has a +++ file marker before any diff --git header"))?;
+            if block.3.is_some() {
+                return Err(Failure::protocol("duplicate +++ file marker in one Git diff block"));
+            }
+            let new = new.split('\t').next().unwrap_or(new);
+            if new.starts_with('"') {
+                return Err(Failure::unresolved("quoted patch file markers are not supported in CEB V0"));
+            }
+            let path = if new == "/dev/null" {
+                None
+            } else {
+                Some(new.strip_prefix("b/")
+                    .ok_or_else(|| Failure::protocol("patch +++ marker must use b/ or /dev/null"))?
+                    .to_owned())
+            };
+            block.3 = path;
         }
+    }
+    if let Some(block) = current {
+        finish_block(block, &mut paths)?;
     }
     if paths.is_empty() {
         return Err(Failure::rejected("candidate patch contains no auditable diff --git file headers"));
