@@ -25,7 +25,8 @@
         "image": null,
         "toolchain_lock_sha256": null,
         "runner_profile": "not_provisioned",
-        "network_policy": "disabled"
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
       },
       "agent_policy": {
         "writable_paths": [],
@@ -83,7 +84,8 @@
         "image": null,
         "toolchain_lock_sha256": null,
         "runner_profile": "not_provisioned",
-        "network_policy": "disabled"
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
       },
       "agent_policy": {
         "writable_paths": [],
@@ -141,7 +143,8 @@
         "image": null,
         "toolchain_lock_sha256": null,
         "runner_profile": "not_provisioned",
-        "network_policy": "disabled"
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
       },
       "agent_policy": {
         "writable_paths": [],
@@ -199,7 +202,8 @@
         "image": null,
         "toolchain_lock_sha256": null,
         "runner_profile": "not_provisioned",
-        "network_policy": "disabled"
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
       },
       "agent_policy": {
         "writable_paths": [],
@@ -257,7 +261,8 @@
         "image": null,
         "toolchain_lock_sha256": null,
         "runner_profile": "not_provisioned",
-        "network_policy": "disabled"
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
       },
       "agent_policy": {
         "writable_paths": [],
@@ -315,7 +320,8 @@
         "image": null,
         "toolchain_lock_sha256": null,
         "runner_profile": "not_provisioned",
-        "network_policy": "disabled"
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
       },
       "agent_policy": {
         "writable_paths": [],
@@ -373,7 +379,8 @@
         "image": null,
         "toolchain_lock_sha256": null,
         "runner_profile": "not_provisioned",
-        "network_policy": "disabled"
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
       },
       "agent_policy": {
         "writable_paths": [],
@@ -431,7 +438,8 @@
         "image": null,
         "toolchain_lock_sha256": null,
         "runner_profile": "not_provisioned",
-        "network_policy": "disabled"
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
       },
       "agent_policy": {
         "writable_paths": [],
@@ -489,7 +497,8 @@
         "image": null,
         "toolchain_lock_sha256": null,
         "runner_profile": "not_provisioned",
-        "network_policy": "disabled"
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
       },
       "agent_policy": {
         "writable_paths": [],
@@ -551,7 +560,8 @@
         "image": null,
         "toolchain_lock_sha256": null,
         "runner_profile": "not_provisioned",
-        "network_policy": "disabled"
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
       },
       "agent_policy": {
         "writable_paths": [],
