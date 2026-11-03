@@ -58,6 +58,20 @@ The exact order minimizing the algebra-work proxy differed among MaxCount, Paret
 
 These numbers compare heuristics to exhaustive best on the same tiny synthetic cases under a model-specific proxy. They are not runtime speedups. The algebra-work proxy charges support operations, approximate coefficient-bit work and, for the reference Pareto implementation, quadratic dominance comparisons. The reference certificate byte count is exact UTF-8 JSON size under certificate v1, not production Rust trace size. The stochastic method's 1.99% median regret includes 32 independent greedy starts in candidate generation, but not yet a separately measured planning-runtime overhead.
 
+## Six-variable extension (3 Nov 2026)
+
+A bounded larger-state pilot used one six-variable binary graph with scopes `[[0,1],[1,2],[2,3],[3,4],[4,5],[0,5],[0,3],[1,4],[2,5]]`. All 720 elimination orders were executed under MaxCount, two-objective ParetoCount and a bounded polynomial profile: **2,160 exact order/algebra executions**. All orders preserved the exact result in each algebra, the direct assignment oracle agreed in 3/3 cases, and 8 selected certificates passed the independent checker.
+
+| Algebra | Exhaustive-best order | Min-fill regret | Best of 32 stochastic min-fill regret | Cost-frontier size |
+|---|---|---:|---:|---:|
+| MaxCount | `[1,5,0,2,3,4]` | 21.45% | 0.00% | 16 |
+| ParetoCount | `[5,1,4,2,0,3]` | 35.69% | 5.12% | 1 |
+| Polynomial profile | `[1,3,5,0,4,2]` | 21.73% | 10.87% | 12 |
+
+On this one six-variable graph, all three algebras selected different exhaustive-best work-proxy orders. Min-fill and min-bucket-work happened to return the same candidate on this graph. The stochastic pool found the MaxCount exhaustive best, but still missed the Pareto and polynomial best. This is proxy regret versus exhaustive enumeration on one small synthetic graph—not measured runtime and not a general heuristic guarantee.
+
+An exploratory four-graph mixed-cardinality six-variable exhaustive run (8,640 intended order/algebra cases) exceeded a 300-second execution limit before completion. It is an incomplete attempt and is **not** included as successful evidence. The completed binary run is recorded in `src/elimination_order_scale6_binary.py` and `src/elimination_order_scale6_binary_results.json`.
+
 ## What this proves and does not prove
 
 **It does show:** exact output invariance across all 120 orders on each frozen case; measurable algebra-specific intermediate-value costs in the finite reference; different best proxy orders for different output algebras; trade-offs between operation proxy, table size and certificate bytes; and that selected proof traces can be replayed against the separate checker.
