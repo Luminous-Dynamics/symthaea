@@ -44,7 +44,7 @@ The result also includes signed advanced-minus-baseline differences. Lower track
 
 ## Failure and validity semantics
 
-The runner rejects malformed profile identities, invalid or non-finite chassis parameters, invalid road geometry, invalid initial state, invalid commands, non-finite post-step states and simulator timestamp increments inconsistent with the requested timestep. It caps the step budget at 100,000.
+The runner rejects malformed profile identities, invalid or non-finite chassis parameters, invalid road geometry, invalid initial state, malformed perturbation schedules, invalid commands, non-finite or out-of-envelope post-step states and simulator timestamp increments inconsistent with the requested timestep. Clearing a tire-blowout schedule restores both global and per-axle grip multipliers. It caps the step budget at 100,000.
 
 The road profile digest is derived from the resolved segment geometry rather than merely trusting the supplied road label. The dynamics profile digest includes chassis parameters, friction multipliers, initial speed and pending external force.
 
@@ -56,7 +56,7 @@ The model itself is a simplified bicycle model with a simplified tire-force law.
 
 ## Verification status
 
-Six Rust test declarations cover cloned initial conditions, identical perturbation scheduling, road/profile identity tampering, output-trace tampering and invalid-profile rejection. They have not been compiled or executed in this session. The environment has no Rust toolchain; current CI workflows on this branch were reported as `skipped`, not passed.
+Eight Rust test declarations cover cloned initial conditions, identical disturbance application to both branches, deterministic replay receipts, road/profile identity tampering, output-trace tampering and invalid-profile rejection. One additional perturbation-scheduler regression test checks that clearing tire blowout restores per-axle grip. They have not been compiled or executed in this session. The environment has no Rust toolchain; current CI workflows on this branch were reported as `skipped`, not passed.
 
 ## Next progression
 
