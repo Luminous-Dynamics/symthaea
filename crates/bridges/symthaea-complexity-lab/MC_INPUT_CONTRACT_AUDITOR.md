@@ -1,6 +1,6 @@
 # ETH-023: fail-closed MC input semantic contract auditor
 
-**Status:** Python reference parser/auditor and finite fixture/fuzz tests committed. Rust port and differential comparison against official solver parsers remain open.
+**Status:** Python parser/auditor and fixture/fuzz source committed; the Python test harness was not executed in this session. Rust port and differential comparison against official solver parsers remain open.
 
 ## 1. Why input semantics are part of exactness
 
