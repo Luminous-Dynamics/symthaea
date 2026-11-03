@@ -56,6 +56,8 @@ pub struct CandidateTrial {
     pub clock_resolution_ns: u64,
     /// Independently bounded uncertainty in the physical stimulus-onset time.
     pub onset_uncertainty_ns: u64,
+    /// Independently calibrated response-device/input latency uncertainty.
+    pub input_latency_uncertainty_ns: u64,
 }
 
 /// Candidate-visible records. The observation profile is frozen separately
@@ -87,6 +89,7 @@ pub enum ObservationError {
     InvalidConfidenceTimestamp,
     ConfidenceOutOfRange,
     InvalidClockResolution,
+    TimingBoundOverflow,
     MissingEventClass,
     StatisticFailure,
 }
@@ -105,6 +108,7 @@ impl fmt::Display for ObservationError {
             Self::InvalidConfidenceTimestamp => "confidence timestamp must be strictly after the binary decision",
             Self::ConfidenceOutOfRange => "confidence level is outside the predeclared ordinal range",
             Self::InvalidClockResolution => "clock resolution must be non-zero",
+            Self::TimingBoundOverflow => "combined RT timing uncertainty bound overflowed",
             Self::MissingEventClass => "evaluator truth must contain both event-present and event-absent trials",
             Self::StatisticFailure => "shared ROC or signal-detection API could not evaluate observations",
         };
@@ -124,6 +128,8 @@ pub struct ObservationReport {
     pub confidence_trials: usize,
     pub missing_confidence_after_decision: usize,
     pub rt_trials: usize,
+    pub rt_usable_trials: usize,
+    pub rt_resolution_limited_trials: usize,
     pub missing_rt_after_decision: usize,
     pub distinct_confidence_categories: usize,
     pub distinct_rt_categories: usize,
@@ -206,7 +212,8 @@ pub fn evaluate(
         }
     }
 
-    let rt_observations = build_rt_observations(candidate, truth, profile)?;
+    let (rt_observations, rt_usable_trials, rt_resolution_limited_trials) =
+        build_rt_observations(candidate, truth, profile)?;
     let rt_categories: BTreeSet<_> = rt_observations
         .iter()
         .map(|observation| observation.score.to_bits())
@@ -223,6 +230,8 @@ pub fn evaluate(
         confidence_trials,
         missing_confidence_after_decision: decision_trials - confidence_trials,
         rt_trials,
+        rt_usable_trials,
+        rt_resolution_limited_trials,
         missing_rt_after_decision: decision_trials - rt_trials,
         distinct_confidence_categories: confidence_categories.len(),
         distinct_rt_categories: rt_categories.len(),
@@ -297,8 +306,10 @@ fn build_rt_observations(
     candidate: &CandidateView,
     truth: &EvaluatorTruth,
     profile: ObservationProfile,
-) -> Result<Vec<RocObservation>, ObservationError> {
+) -> Result<(Vec<RocObservation>, usize, usize), ObservationError> {
     let mut by_participant: BTreeMap<u32, Vec<(usize, u64)>> = BTreeMap::new();
+    let mut rt_usable_trials = 0usize;
+    let mut rt_resolution_limited_trials = 0usize;
 
     for (index, row) in candidate.trials.iter().enumerate() {
         let (Some(_decision_yes), Some(decision_time)) = (row.decision_yes, row.decision_time_ns)
@@ -311,6 +322,16 @@ fn build_rt_observations(
         if latency == 0 {
             return Err(ObservationError::InvalidDecisionTimestamp);
         }
+        let timing_bound = row.clock_resolution_ns
+            .checked_mul(2)
+            .and_then(|value| value.checked_add(row.onset_uncertainty_ns))
+            .and_then(|value| value.checked_add(row.input_latency_uncertainty_ns))
+            .ok_or(ObservationError::TimingBoundOverflow)?;
+        if latency <= timing_bound {
+            rt_resolution_limited_trials += 1;
+            continue;
+        }
+        rt_usable_trials += 1;
         by_participant.entry(row.participant_id).or_default().push((index, latency));
     }
 
@@ -352,7 +373,7 @@ fn build_rt_observations(
             });
         }
     }
-    Ok(result)
+    Ok((result, rt_usable_trials, rt_resolution_limited_trials))
 }
 
 fn optional_roc(
@@ -379,7 +400,7 @@ mod tests {
 
     fn perfect_fixture() -> (CandidateView, EvaluatorTruth) {
         let rows = vec![
-            CandidateTrial { trial_id: 0, participant_id: 0, session_id: 0, stimulus_onset_ns: 1_000, decision_yes: Some(true), decision_time_ns: Some(1_100), confidence_level: Some(3), confidence_time_ns: Some(1_200), clock_resolution_ns: 1, onset_uncertainty_ns: 1 },
+            CandidateTrial { trial_id: 0, participant_id: 0, session_id: 0, stimulus_onset_ns: 1_000, decision_yes: Some(true), decision_time_ns: Some(1_100), confidence_level: Some(3), confidence_time_ns: Some(1_200), clock_resolution_ns: 1, onset_uncertainty_ns: 1, input_latency_uncertainty_ns: 1 },
             CandidateTrial { trial_id: 1, participant_id: 0, session_id: 0, stimulus_onset_ns: 2_000, decision_yes: Some(true), decision_time_ns: Some(2_200), confidence_level: Some(2), confidence_time_ns: Some(2_300), clock_resolution_ns: 1, onset_uncertainty_ns: 1 },
             CandidateTrial { trial_id: 2, participant_id: 0, session_id: 0, stimulus_onset_ns: 3_000, decision_yes: Some(true), decision_time_ns: Some(3_300), confidence_level: Some(1), confidence_time_ns: Some(3_400), clock_resolution_ns: 1, onset_uncertainty_ns: 1 },
             CandidateTrial { trial_id: 3, participant_id: 0, session_id: 0, stimulus_onset_ns: 4_000, decision_yes: Some(false), decision_time_ns: Some(4_300), confidence_level: Some(1), confidence_time_ns: Some(4_400), clock_resolution_ns: 1, onset_uncertainty_ns: 1 },
@@ -424,6 +445,45 @@ mod tests {
         assert_eq!(report.rt_trials, 6);
         assert!(report.rt_type1_roc.is_some());
         assert_eq!(report.decision_trials, 6);
+    }
+
+    #[test]
+    fn rt_below_timing_uncertainty_is_excluded_and_counted() {
+        let (mut candidate, truth) = perfect_fixture();
+        candidate.trials[0].clock_resolution_ns = 100;
+        candidate.trials[0].onset_uncertainty_ns = 50;
+        candidate.trials[0].input_latency_uncertainty_ns = 50;
+        let report = evaluate(&candidate, &truth).unwrap();
+        assert_eq!(report.rt_resolution_limited_trials, 1);
+        assert_eq!(report.rt_usable_trials, 5);
+        assert_eq!(report.rt_trials, 6);
+    }
+
+    #[test]
+    fn equal_rt_ties_are_not_arbitrarily_ordered() {
+        let profile = ObservationProfile { confidence_levels: 3, rt_bins: 3 };
+        let rows = vec![
+            CandidateTrial {
+                trial_id: 0, participant_id: 0, session_id: 0,
+                stimulus_onset_ns: 0, decision_yes: Some(true),
+                decision_time_ns: Some(100), confidence_level: None,
+                confidence_time_ns: None, clock_resolution_ns: 1,
+                onset_uncertainty_ns: 1, input_latency_uncertainty_ns: 1,
+            },
+            CandidateTrial {
+                trial_id: 1, participant_id: 0, session_id: 0,
+                stimulus_onset_ns: 0, decision_yes: Some(true),
+                decision_time_ns: Some(100), confidence_level: None,
+                confidence_time_ns: None, clock_resolution_ns: 1,
+                onset_uncertainty_ns: 1, input_latency_uncertainty_ns: 1,
+            },
+        ];
+        let truth = EvaluatorTruth {
+            trial_ids: vec![0, 1],
+            event_present: vec![true, false],
+        };
+        let report = evaluate(&CandidateView { profile, trials: rows }, &truth).unwrap();
+        assert_eq!(report.rt_roc_auc, Some(0.5));
     }
 
     #[test]
