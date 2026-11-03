@@ -43,6 +43,8 @@ jobs:
 
       - name: Hydrate selected LFS task assets and audit
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           python research/civbench-social-learning-core/scripts/hydrate_reward_network_task_assets.py \
