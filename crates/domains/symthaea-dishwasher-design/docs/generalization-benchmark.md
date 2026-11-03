@@ -51,7 +51,7 @@ For a run-level release decision, define failure conservatively: if any required
 
 ### 3.2 Split by groups, never by rows
 
-All data derived from one physical run stay in one partition: images, crops, sensor windows, assay replicates, process logs and item observations.
+All data derived from one physical run stay in one partition: images, crops, sensor windows, assay replicates, process logs and item observations. Record the lineage in `experiments/derived-record-partition-template.csv`; each derived record must carry a `source_run_id` and inherit that run's partition. Run the run-level grouped holdout audit and then the derived-record partition audit before fitting or evaluating any model.
 
 Use pre-registered grouped partitions:
 
@@ -246,7 +246,7 @@ These are falsifiable engineering hypotheses, not claims that the architecture h
 9. Publish the raw manifest, analysis script, pre-registration, exact software SHA, instrument calibration and every failed/aborted run. A digest identifies a file; it does not authenticate its scientific validity.
 10. Only after independent confirmation consider an actual early-stop trial. Until then, no observer may shorten a qualified physical process.
 
-## 9. Sources and status boundary
+## 9. Implementation status boundary\n\nThe Rust module `validation` exports `audit_grouped_holdout` for the physical-run manifest and `audit_derived_record_partitions` for derived item/image/frame/assay records. Call both audits before any model split is accepted. The code verifies manifest identity, partition separation and lineage; it does not authenticate artifacts, prove physical independence or provide cluster-robust inference.\n\n## 10. Sources and status boundary
 
 - IEC 60436:2025, corrected 2026-04: https://webstore.iec.ch/en/publication/80459
 - ENERGY STAR dishwasher criteria: https://www.energystar.gov/products/dishwashers/key_product_criteria
