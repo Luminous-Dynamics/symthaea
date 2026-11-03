@@ -69,11 +69,17 @@ For each generalization axis, hold out complete groups:
 - soil preparation batch IDs;
 - detergent/formulation batch IDs;
 - water batch/source IDs;
-- operator and, where feasible, assay laboratory IDs.
+- operator and, where feasible, assay laboratory IDs;
+- service-request IDs (important for repeated attempts/rewashes);
+- compartment/cell IDs;
+- compartment-configuration digests;
+- shared/isolated hydraulic and thermal utility-topology IDs.
 
 Do not place one member of a held-out group in training and another in confirmation. Do not tune after opening the locked-confirmation outcomes. If the protocol or threshold changes after unblinding, create a new version and a new confirmation set.
 
 A single split cannot prove every type of generalization. Run distinct, pre-registered transfer tests for new days, new soil batches, new detergent/water lots, new units and new operators. Then run a harder external test that combines several shifts. Record which axes were actually held out; do not describe a same-unit/new-day test as cross-unit validation.
+
+For multi-compartment and asynchronous-service tests, the compartment configuration and utility topology are explicit grouping axes. A cell-configuration change, shared pump/manifold change, or thermal-bus change can alter the data-generating process. If any of these is the claimed transfer target, hold out its entire identifier/digest. Multiple runs under the same service-request ID are retries/rewashes or stages of one requested service and must remain together when evaluating service-level policy outcomes.
 
 ### 3.3 Model and threshold development
 

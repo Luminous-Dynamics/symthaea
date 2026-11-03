@@ -795,6 +795,9 @@ mod tests {
         partition: ValidationPartition,
         suffix: &str,
     ) -> RunPartitionRecord {
+        let configuration_token = suffix.bytes().fold(0_u64, |value, byte| {
+            value.wrapping_mul(131).wrapping_add(byte as u64)
+        });
         RunPartitionRecord {
             run_id: run_id.to_owned(),
             partition,
@@ -806,6 +809,10 @@ mod tests {
             operator_id: format!("operator-{suffix}"),
             assay_lab_id: format!("lab-{suffix}"),
             test_site_id: format!("site-{suffix}"),
+            service_request_id: format!("service-{run_id}"),
+            compartment_id: format!("cell-{suffix}"),
+            compartment_configuration_sha256: format!("{configuration_token:064x}"),
+            utility_topology_id: format!("utility-{suffix}"),
         }
     }
 
