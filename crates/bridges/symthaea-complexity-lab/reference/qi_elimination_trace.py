@@ -274,6 +274,13 @@ def main():
         invalid = copy.deepcopy(mutation_base)
         mutate(invalid)
         mutations.append(invalid)
+    reserved_id = copy.deepcopy(mutation_base)
+    reserved_id["instance"] = {
+        "domains": {"x": 2},
+        "factors": [{"id": "free:x", "scope": [], "values": [qencode(ONE)]}],
+    }
+    reserved_id["instance_sha256"] = digest(reserved_id["instance"])
+    mutations.append(reserved_id)
 
     payload = certificates + [mutation_base] + mutations
     checker = Path(__file__).with_name("qi_elimination_trace_checker.py")
@@ -312,6 +319,7 @@ def main():
             "unbound variable in elimination order",
             "missing final scalar binding",
             "forged joined scope",
+            "reserved generated-factor ID collision",
         ],
         "certificate_contract": (
             "Input and output factors are content-addressed. Intermediate tables are "
