@@ -1,7 +1,4 @@
-use benchmark_run_receipt_validator::{
-    validate_comparable_arms,
-    verify_receipt_json,
-};
+use benchmark_run_receipt_validator::{validate_comparable_arms, verify_receipt_json};
 use serde_json::json;
 use std::env;
 use std::fs;
@@ -93,6 +90,9 @@ fn main() -> ExitCode {
         "receipts": summaries,
         "claim_ceiling": "Accounting and consistency only; independent benchmark grader remains the correctness oracle. Hashes do not authenticate a producer."
     });
-    println!("{}", serde_json::to_string_pretty(&output).expect("JSON summary serializes"));
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&output).expect("JSON summary serializes")
+    );
     ExitCode::SUCCESS
 }
