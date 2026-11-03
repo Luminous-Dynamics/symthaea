@@ -1151,7 +1151,11 @@ pub fn account_system_window(
         }).collect()
     });
 
-    let compartment_stats = build_compartment_stats(spec, requests, releases)?;
+    let (compartment_stats, maximum_concurrent_compartments, active_compartment_seconds_total) =
+        build_compartment_stats(spec, requests, releases)?;
+    let compartment_count = compartment_stats.len();
+    let compartment_utilization_fraction = active_compartment_seconds_total as f64
+        / (compartment_count as f64 * elapsed_wall_seconds as f64);
 
     Ok(SystemWindowReport {
         window_id: spec.window_id.clone(),
@@ -1186,7 +1190,11 @@ pub fn account_system_window(
         time_to_first_release_seconds: first_release_at_s
             .map(|timestamp| timestamp - spec.start_at_s),
         active_request_seconds,
+        active_compartment_seconds_total,
+        compartment_count,
+        compartment_utilization_fraction,
         maximum_concurrent_requests,
+        maximum_concurrent_compartments,
         request_latency_p50_seconds: percentile_nearest_rank(&mut latency_values, 0.50),
         request_latency_p95_seconds: percentile_nearest_rank(&mut latency_values, 0.95),
         queue_wait_p50_seconds: percentile_nearest_rank(&mut queue_wait_values, 0.50),
