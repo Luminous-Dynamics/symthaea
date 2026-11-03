@@ -204,7 +204,68 @@ The strict JSON Schema is `CONNECTOME_INTERVENTION_BENCHMARK_MANIFEST.schema.jso
 
 External solver implementation and synthetic oracle status must not be confused with biological validation. The benchmark remains source- and assay-specific.
 
-## 13. Baseline coverage gate and run-completion verifier
+## 14. November 2026 field update: versioned baselines and the next frontier
+
+This section records the versions and claim limits as of 2026-11-03. Preprints, in-silico results and measured intervention outcomes must not share an unqualified leaderboard.
+
+### C. elegans: reproduce the exact Creamer LDS version before claiming to exceed it
+
+The latest surfaced bioRxiv version is **v4**, posted 2026-05-18; its abstract reports that the connectome-constrained model captures causal interactions at **82% of perturbation-data reproducibility**. Earlier v1 (2024-09-23) and v3 (2025-09-26) report **92%**. These are versioned, reproducibility-relative claims, not absolute “82%/92% accuracy.” Do not pool them or compare them without pinning exact code, connectome, data, split and metric versions.
+
+The v3 full-text methods specify 110 animals split into 80 training and 30 held-out test animals; a latent linear dynamical system with non-zero dynamics weights only on chemical/electrical connectome edges (9.4% of all possible pairwise weights); a diagonal single-stimulated-neuron input filter of 45 timepoints (22.5 s at 2 Hz); and Kalman filtering/smoothing plus EM parameter estimation. The reported measured STAM correlation was 0.15, versus a train/test STAM correlation of 0.16, yielding relative correlation 0.92. These raw and normalized values must always be reported separately.
+
+The v3 authors explicitly identify limitations: pairwise perturbations do not measure nonlinear interactions among groups; fixed-point LTI dynamics cannot represent bistability or limit cycles; calcium is only a proxy for neural activity; learning, neuromodulation and state-based processing are outside the model. Extrasynaptic signalling also remains a live alternative for some responses.
+
+**Required reproduction gates:** run v3 and v4 as separate frozen hypotheses; recover their exact train/test protocol, code, connectome and data; reproduce raw and normalized scores; include original-connectome and identity-shuffled controls; report per-animal paired scores and uncertainty. Matching only a relative score is not a reproduction.
+
+The independent 2023 Nature signal-propagation atlas remains a key functional comparator: it directly stimulated neurons and measured 23,433 neuron pairs (66% of possible pairs), covering 186 of 188 head neurons. It demonstrates that extrasynaptic signalling can generate responses not explained by direct anatomical edges alone. This does not make anatomy irrelevant; it means structural connectivity and effective signalling are separate evidence channels.
+
+### Drosophila: evaluate more than rhythm generation
+
+Pugliese et al. (Nature version of record, 2026-10-28) report a three-interneuron minimal rhythm-generating core downstream of DNg100, producing motor rhythms across six legs and four connectome datasets, plus experimental optogenetic support for a separate DNb08 descending pathway. Treat this as a strong comparator for a specific fly walking circuit, not a universal CPG claim.
+
+Benchmark four levels independently:
+1. **Circuit sufficiency:** reproduce rhythms across the declared connectome datasets and parameter uncertainty.
+2. **Circuit necessity:** preregister ablation/silencing controls and quantify loss or compensation.
+3. **Coordination:** predict inter-leg phase-offset distributions, not merely the presence of oscillation.
+4. **Embodied behavior:** predict stance/swing transitions, kinematic trajectories, stability, perturbation recovery and task success.
+
+Use FlyBench's cited behavioural tasks and simulator-adapter protocol rather than creating an incompatible duplicate. Passing a CPG rhythm task does not imply closed-loop locomotion competence or success across all FlyBench tasks.
+
+### Critical perturbations: make competing models disagree
+
+Golan, Schütt and Kriegeskorte's August 2026 review motivates selecting inputs where competing models make divergent predictions, tempered by a prior over ecologically valid stimuli. The intervention analogue is a **critical perturbation**: select a feasible target, combination, temporal order, waveform and state context that separates mechanistically distinct models.
+
+Compare four policies under equal cost and safety constraints: random/standard, parameter identification (Fisher information and D-/A-optimality), model discrimination (EIG/model disagreement), and decision-focused design (EVSI/regret). They have different objectives and need not choose the same experiment.
+
+### Next benchmark tier: higher-order, state-conditioned model recovery
+
+The next synthetic and prospective task family should make every pairwise model insufficient by construction:
+- Generate pairwise-additive, three-way interaction, state-gated, sequence-dependent and shared-latent-input ground-truth systems.
+- Construct at least one fixture where every single-target and pairwise response marginal matches while a three-target response differs.
+- Split by held-out target combinations, intervention sequence and state context before preprocessing or model selection.
+- Compare pairwise-additive, higher-order, recurrent/state-space, anatomical-only, anatomy-plus-latent and identity/degree/type/spatial-rewired models.
+- Run model-recovery confusion matrices and calibration across noise, missingness and observation-kernel regimes.
+- Select interventions sequentially and score realized information gain, EVSI, parameter error and decision regret separately.
+
+Predicting unseen single-neuron interventions is pairwise extrapolation, not proof of higher-order causal understanding.
+
+### Aspirational promotion targets for the new tier
+
+| Test | Initial target |
+|---|---:|
+| Synthetic model-family recovery | ≥90% balanced accuracy in declared identifiable regimes |
+| Higher-order interaction detection | ≥80% power at a preregistered minimum effect, with family-wise false-discovery control |
+| Pairwise-matched / triplet-different control | Correctly reject the pairwise-additive model without leakage |
+| Held-out target-combination prediction | ≥10% relative improvement in a preregistered proper score over the strongest non-connectome baseline |
+| Predictive uncertainty | Calibration reported by noise, state and missingness strata |
+| Experiment selection | Lower realized decision regret and higher realized information than random/degree/expert baselines at equal cost |
+| Model robustness | Publish worst-condition performance, abstentions and failure rates |
+
+These are research hypotheses, not achieved results or universal acceptance thresholds. Promotion remains evidence-tier specific.
+
+
+## 15. Baseline coverage gate and run-completion verifier
 
 A `complete` run is stricter than an incomplete research plan. It requires:
 - at least four pinned model implementations, including a candidate, at least one non-connectome baseline and a negative control;
