@@ -39,7 +39,7 @@ Positive residual means the predictor's numeric value exceeds the matched refere
 
 A row key is scenario × actor-policy × action-history × metric × horizon. Duplicate keys are rejected. Rows for a paired horizon-growth claim must share the same scenario, actor policy, action history, forecast issuance and full context signature. Context mismatch is rejected. No absent horizon is interpolated or imputed.
 
-The caller also supplies a frozen `ExpectedResidualSlot` schedule independently of reference outcomes. Every expected slot must have exactly one typed outcome row. The evaluator rejects duplicate expected slots, outcome rows not in the schedule, and expected slots with no outcome row. The schedule binds scenario, family, actor policy, split/shift, initial state, environment, dynamics, action history, observation availability, forecast issuance, horizon, metric and unit. Its source and digest must be frozen before outcomes are revealed; the evaluator checks exact slot equality but cannot authenticate the caller's sampling design or prove schedule completeness.
+The caller also supplies a frozen `ExpectedResidualSlot` schedule independently of reference outcomes, together with `expected_schedule_artifact_digest`. The digest must equal the canonical BLAKE3 digest produced by `model_discrepancy_expected_schedule_digest`. Every expected slot must have exactly one typed outcome row. The evaluator rejects duplicate expected slots, outcome rows not in the schedule, and expected slots with no outcome row. The schedule binds scenario, family, actor policy, split/shift, initial state, environment, dynamics, action history, observation availability, forecast issuance, horizon, metric and unit. Its source and digest must be frozen before outcomes are revealed; the evaluator checks exact slot equality but cannot authenticate the caller's sampling design or prove schedule completeness.
 
 ### Decision/action row
 
@@ -52,7 +52,7 @@ Reference-outcome status is one of Observed, Missing, Censored, TimedOut or Unsu
 For residual rows, Observed requires finite predicted and realized values; Missing, Censored, TimedOut and Unsupported retain a typed expected slot without a realized value or prediction-set membership. These rows count in horizon/family denominators but do not enter numeric residual metrics. If an expected slot is omitted entirely, the evaluator rejects the report.
 
 The evaluator:
-- recomputes the decision-context digest and exposes public digest-building helpers for callers;
+- recomputes the expected-schedule digest and decision-context digest, and exposes public digest-building helpers for callers;
 - recomputes the action-set digest from sorted action ID / command digest pairs;
 - rejects duplicate action and receipt identities;
 - requires the selection commit sequence to precede the reference-outcome reveal sequence;
@@ -99,7 +99,9 @@ The report retains canonical raw input rows, recomputes all aggregates, and vali
 
 Required first fixtures:
 
-1. Perfect model: predicted and realized values equal at all horizons; every residual is zero.
+1. Perfect model: predicted and realized values equal at all observed horizons; every residual is zero.
+2. Frozen schedule completeness: every expected slot has one outcome; an omitted slot or unexpected row is rejected.
+3. Expected schedule digest: modified schedule metadata fails the frozen digest check.
 2. Known constant bias: signed residual has a known sign and magnitude at every horizon.
 3. Known horizon growth: absolute residual grows by a fixed amount; paired growth matches the analytic delta.
 4. Sign control: positive and negative signed bias remain distinct.
@@ -107,6 +109,8 @@ Required first fixtures:
 6. Context mismatch: changed environment, action history, actor policy, state, forecast time, split or shift rejects a paired claim.
 7. Duplicate scenario/action-history/metric/horizon key is rejected.
 8. Missing, censored, timed-out and unsupported candidate reference outcomes produce IncompleteReference; no ranking/regret is emitted. The residual expected-schedule denominator retains each incomplete slot.
+9. A missing intermediate horizon prevents paired growth from bridging the gap.
+10. A missing-only horizon reports counts and `None` numeric metrics, never zero.
 9. Ranking reversal: planner-predicted best action loses under realized utility; the reversal and regret are exposed.
 10. Optimism attack: inject an optimistic selected-action utility and verify optimism gap rises.
 11. Outcome leakage: reveal sequence at or before selection commit is rejected.
