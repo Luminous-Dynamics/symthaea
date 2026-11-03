@@ -20,6 +20,8 @@ The service-level resource ratio is:
 
 R_per_verified_item = sum(resources for all attempts) / number of unique items that qualified
 
+The report also identifies `first_pass_verified_item_ids` and `first_pass_verified_item_count`: an item is first-pass only if it passes every required endpoint on its first physical attempt. Passing after a failure, interruption or incomplete first attempt remains a verified success but is not a first-pass success. This distinction feeds system-window first-pass yield.
+
 If no item qualifies, the per-item ratio is absent rather than zero or infinity. Report total resources and unqualified IDs separately.
 
 ## Resource boundaries
