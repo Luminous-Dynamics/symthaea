@@ -1,16 +1,15 @@
 {
-  "suite": "Dual-count MaxCount exact semiring reference",
-  "seed": 20261103,
   "algebra_law_trials": 20000,
   "algebra_laws_passed": true,
-  "randomized_instances": 512,
-  "orders_per_instance": 3,
-  "order_algebra_executions": 1536,
+  "claim_boundary": "Python arbitrary-precision finite reference only. Assumes each input factor-table cell represents one local assignment; support counts multiply across disjoint eliminated-variable blocks. No Rust/Lean or performance claim.",
   "direct_maxcount_matches": 1536,
   "distinct_support_matches": 512,
-  "weighted_unique_assignment": {"optimum": 5, "multiplicity": 4, "distinct_assignments": 1},
-  "weighted_tie_case": {"optimum": 5, "multiplicity": 6, "distinct_assignments": 2},
-  "triangle_maxcut": {"optimum": 2, "multiplicity": 6, "distinct_assignments": 6},
-  "unconstrained_three_variable_product": {"optimum": 0, "multiplicity": 24, "distinct_assignments": 24},
-  "claim_boundary": "Python arbitrary-precision finite reference only. Assumes each input factor-table cell represents one local assignment; support counts multiply across disjoint eliminated-variable blocks. No Rust/Lean or performance claim."
+  "order_algebra_executions": 1536,
+  "orders_per_instance": 3,
+  "randomized_instances": 512,
+  "seed": 20261103,
+  "suite": "Dual-count MaxCount exact semiring reference",
+  "triangle_maxcut": {"distinct_assignments": 6, "multiplicity": 6, "optimum": 2},
+  "unconstrained_three_variable_product": {"distinct_assignments": 24, "multiplicity": 24, "optimum": 0},
+  "weighted_unique_assignment": {"distinct_assignments": 1, "multiplicity": 4, "optimum": 5}
 }
