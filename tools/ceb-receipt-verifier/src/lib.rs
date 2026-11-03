@@ -418,6 +418,14 @@ fn dsse_pae(payload_type: &str, payload: &[u8]) -> Vec<u8> {
 }
 
 #[derive(Clone, Debug)]
+struct ArtifactSets {
+    /// All non-patch evidence, including the stage report, available to bind checks.
+    evidence_digests: BTreeSet<String>,
+    /// Run-generated evidence excluding the stage report and submitted patch.
+    execution_digests: BTreeSet<String>,
+}
+
+#[derive(Clone, Debug)]
 struct VerifiedReceipt {
     predicate: Value,
     envelope_sha256: String,
@@ -429,6 +437,7 @@ struct VerifiedReceipt {
     signer_domains: BTreeSet<String>,
     check_evidence: BTreeSet<String>,
     artifact_evidence: BTreeSet<String>,
+    execution_artifact_digests: BTreeSet<String>,
 }
 
 fn verify_signatures(
@@ -559,7 +568,7 @@ fn validate_artifacts(
     root: &Path,
     expected_patch_sha256: &str,
     expected_stage: &str,
-) -> Result<BTreeSet<String>, Failure> {
+ ) -> Result<ArtifactSets, Failure> {
     let artifacts = field(predicate, "artifacts", "predicate")?
         .as_array()
         .ok_or_else(|| Failure::protocol("predicate.artifacts must be an array"))?;
@@ -572,6 +581,7 @@ fn validate_artifacts(
     let mut paths = HashSet::new();
     let mut patch_count = 0usize;
     let mut stage_report_count = 0usize;
+    let mut evidence_digests = BTreeSet::new();
     let mut execution_digests = BTreeSet::new();
     let mut all_digests = BTreeSet::new();
     let mut total_artifact_bytes = 0u64;
@@ -607,7 +617,14 @@ fn validate_artifacts(
                 return Err(Failure::protocol("retained patch artifact digest differs from the candidate patch"));
             }
         } else {
-            execution_digests.insert(digest.clone());
+            evidence_digests.insert(digest.clone());
+            if role == "primary_report" || role == "regrade_report" {
+                if role != required_report_role {
+                    return Err(Failure::protocol("receipt contains a report for the wrong execution stage"));
+                }
+            } else {
+                execution_digests.insert(digest.clone());
+            }
         }
         if role == required_report_role {
             stage_report_count += 1;
@@ -622,7 +639,10 @@ fn validate_artifacts(
     if execution_digests.is_empty() {
         return Err(Failure::unresolved("receipt contains no retained execution evidence artifact"));
     }
-    Ok(execution_digests)
+    Ok(ArtifactSets {
+        evidence_digests,
+        execution_digests,
+    })
 }
 fn validate_changed_paths(candidate: &Value) -> Result<(), Failure> {
     let paths = field(candidate, "changed_paths", "candidate")?
@@ -990,8 +1010,8 @@ fn verify_one_receipt(
 
     validate_task_check_binding(task, predicate)?;
     let check_evidence = validate_check_aggregates(predicate)?;
-    let artifact_evidence = validate_artifacts(predicate, artifact_root, patch_sha256, expected_stage)?;
-    if !check_evidence.is_subset(&artifact_evidence) {
+    let artifact_sets = validate_artifacts(predicate, artifact_root, patch_sha256, expected_stage)?;
+    if !check_evidence.is_subset(&artifact_sets.evidence_digests) {
         return Err(Failure::protocol("one or more check evidence digests are not present in the retained artifacts"));
     }
     check_budget(task, predicate)?;
@@ -1019,7 +1039,8 @@ fn verify_one_receipt(
         signer_ids,
         signer_domains,
         check_evidence,
-        artifact_evidence,
+        artifact_evidence: artifact_sets.evidence_digests,
+        execution_artifact_digests: artifact_sets.execution_digests,
     })
 }
 
@@ -1069,11 +1090,11 @@ fn check_pair_consistency(primary: &VerifiedReceipt, regrade: &VerifiedReceipt) 
     {
         return Err(Failure::protocol("primary and regrade check-evidence digests are not independent"));
     }
-    if primary.artifact_evidence.is_empty()
-        || regrade.artifact_evidence.is_empty()
-        || !primary.artifact_evidence.is_disjoint(&regrade.artifact_evidence)
+    if primary.execution_artifact_digests.is_empty()
+        || regrade.execution_artifact_digests.is_empty()
+        || !primary.execution_artifact_digests.is_disjoint(&regrade.execution_artifact_digests)
     {
-        return Err(Failure::protocol("primary and regrade execution artifact digests are not independent"));
+        return Err(Failure::protocol("primary and regrade run-generated execution artifact digests are not independent"));
     }
     Ok(())
 }
