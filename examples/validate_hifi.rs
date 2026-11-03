@@ -333,13 +333,13 @@ fn main() {
             harmonies: [0.8; 8],
             phi: 0.9,
             cycle: 0,
-        });
+        }).expect("valid demo contribution");
         composer.contribute(HarmonyContribution {
             participant_id: 2,
             harmonies: [0.3; 8],
             phi: 0.3,
             cycle: 0,
-        });
+        }).expect("valid demo contribution");
         let collective = composer.blend();
         check(
             &mut pass,
