@@ -93,6 +93,7 @@ For a research simulation that should be gated by physical outcome data, constru
 - preserves exact endpoint criteria, metric IDs, units, directions, limits, method IDs and criterion evidence digests in each pilot envelope, and requires those identities to stay fixed across the occupancy ladder for a given soil;
 - requires independent soil-residual, final-rinse-residue and cross-contamination evidence;
 - requires the same exact machine, programme, material, detergent/water batches, hardness and ambient/inlet conditions;
+- requires soil batch and soil age to remain fixed across each soil's occupancy ladder (different soil classes may use different batches);
 - requires a complete occupancy ladder from 1 item through the declared mode capacity for every soil class advertised;
 - rejects inconsistent scopes and duplicate soil/occupancy evidence;
 - never converts pilot outcome evidence into a sanitization capability.
