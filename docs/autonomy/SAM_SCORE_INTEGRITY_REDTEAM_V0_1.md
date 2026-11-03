@@ -52,9 +52,9 @@ Each attack needs a deterministic known-bad fixture, an expected retained eviden
 | Telemetry suppression | Drop/delay signals that would establish an infraction or contact | Expected telemetry schedule, sequence/gap checks, missingness denominator and independent event source |
 | Post-result threshold tuning | Alter weights, exclusions, event thresholds after seeing holdout | Frozen protocol digest, exposure log, confirmatory split and report recomputation |
 | Fallback masking | Hide repeated interventions or unavailable/failed fallback in average success | Separate intervention, fallback availability, no-admissible-fallback and recovery outcomes |
-| Duplicate/replay inflation | Count a successful run multiple times or replace failures with a replayed pass | Unique scenario/run/receipt keys, exact source-head binding, replay lineage and duplicate rejection |
+| Duplicate/replay inflation | Count a successful run multiple times or replace failures with a replayed pass | Unique scenario/run/receipt keys, exact source-head binding, replay lineage and duplicate rejection |\n| Stationary-comfort proxy | Remain stopped or exploit segment weighting to accumulate comfort credit without completing the task | Distance- and task-conditioned comfort; stationary duration and task completion reported separately |\n| Harness action override | Replace model steering or route guidance with an external controller while crediting the model | Preserve raw model action, transformation receipt, target provenance and applied control as separate evidence |\n| Navigation input provenance shift | Change target-point source/schema/frame between training and evaluation without disclosure | Compare training/evaluation input contracts; reject or separately label mismatches and assisted tracks |
 
-The attack set is not exhaustive. Counterexample-guided search (#10043) should propose additional scoring exploits, and every accepted exploit becomes a permanent regression fixture.
+The attack set is not exhaustive. Counterexample-guided search (#10043) should propose additional scoring exploits, and every accepted exploit becomes a permanent regression fixture.\n\n### 3B. Evaluator-side attacks from the October 2026 Bench2Drive audit\n\nThe October 15, 2026 paper [*Comfortably Stuck: Evaluation Pitfalls in Bench2Drive's Closed-Loop Protocol*](https://arxiv.org/abs/2610.21741) reports three concrete evaluator risks: a comfort metric/segmentation that rewards stationary time, a harness path that can replace model steering with navigation-target guidance, and a mismatch between training-time and evaluation-time navigation targets. These are represented as three additional attacks in the machine-readable manifest. They are protocol threats to audit, not assertions that every Bench2Drive implementation or leaderboard submission is affected.\n\nThe harness must retain three distinct action layers: (1) raw model output, (2) any adapter/harness transformation, and (3) applied control. Navigation targets must carry source, schema, frame and train/evaluation provenance. A waypoint-assisted baseline is valid when declared, but it is not an unassisted end-to-end model result. Comfort must not reward stopped time as though it were smooth task execution; task completion, distance travelled and stationary duration stay separately visible.
 
 ## 3A. Machine-readable attack manifest
 
@@ -132,9 +132,9 @@ For every scoring attack:
 - **Telemetry gap:** drop an expected observation; expose it as missing and block unsupported compliance claims.
 - **Post-hoc tuning:** mutate weights or thresholds after outcome reveal; protocol digest mismatch invalidates confirmation.
 - **Fallback mask:** make baseline unavailable or induce transition failure; keep no-admissible-fallback visible.
-- **Replay duplicate:** submit one successful receipt twice; uniqueness gate rejects duplicate contribution.
+- **Replay duplicate:** submit one successful receipt twice; uniqueness gate rejects duplicate contribution.\n- **Stationary comfort:** remain stationary through the scored episode; route completion remains false and no driving-comfort gain is attributed to stopped time alone.\n- **Harness override:** replace the model's steering output with an external route-point controller; the report exposes the transformation and refuses unassisted-model attribution.\n- **Navigation provenance shift:** change the evaluation target-point source/schema/frame from the frozen training contract; reject or report a separate shifted/assisted track.
 
-Positive controls must also show that a legitimate complete, rule-compliant run is not rejected merely because it is slow, cautious or uses fallback when those behaviors are valid under the task definition.
+Positive controls must also show that a legitimate complete, rule-compliant run is not rejected merely because it is slow, cautious or uses fallback when those behaviors are valid under the task definition. A task-justified safe pause must remain distinguishable from stationary score gaming, and a transparently declared waypoint-assisted controller may be evaluated on its own assisted track.
 
 ## 6. Statistical and experimental rules
 
@@ -159,7 +159,7 @@ Positive controls must also show that a legitimate complete, rule-compliant run 
 
 ## 8. Acceptance
 
-- All 12 named score attacks have deterministic known-bad fixtures.
+- All 15 named score attacks have deterministic known-bad fixtures.
 - Each attack is exposed by a retained metric or causes a completeness/protocol rejection.
 - No attack improves the task-completion claim by dropping assigned work or denominator rows.
 - Safe-stop, timeout, censoring, missing telemetry and unavailable fallback remain distinct.
@@ -191,4 +191,4 @@ Passing these fixtures establishes only that the named SAM benchmark version res
 - [Symthaea #10237 — counterfactual decision quality](https://github.com/Luminous-Dynamics/symthaea/issues/10237)
 - [Symthaea #10257 — model discrepancy and planner exploitation](https://github.com/Luminous-Dynamics/symthaea/issues/10257)
 - [Symtropy #3387 — deterministic scenario execution/replay](https://github.com/Luminous-Dynamics/symtropy/issues/3387)
-- [CARLA Leaderboard 2.1](https://leaderboard.carla.org/)
+- [CARLA Leaderboard 2.1](https://leaderboard.carla.org/)\n- [Comfortably Stuck: Evaluation Pitfalls in Bench2Drive's Closed-Loop Protocol (October 15, 2026)](https://arxiv.org/abs/2610.21741)
