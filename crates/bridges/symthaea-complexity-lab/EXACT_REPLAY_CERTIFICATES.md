@@ -19,23 +19,16 @@ It binds:
 
 **The digest is not the proof.** The checker recomputes exact multiplication and summation and checks the resulting factor digest. This is deterministic replay, not a succinct proof.
 
-## 2. Executed finite experiment
+## 2. Prepared finite replay-certificate test plan — execution pending
 
-Files:
-- \`reference/qi_elimination_trace.py\`
-- \`reference/qi_elimination_trace_checker.py\`
-- \`reference/qi_elimination_trace_results.json\`
+Committed files:
+- reference/qi_elimination_trace.py
+- reference/qi_elimination_trace_checker.py
+- reference/qi_elimination_trace_results.json
 
-Executed locally with Python standard-library exact \`Fraction\` arithmetic:
-- 120 randomized Q(i) factor networks;
-- four elimination orders per network (forward, reverse, degree-like, random);
-- 480 direct enumeration vs variable elimination exact comparisons;
-- a separately implemented checker executed as a subprocess accepted 481/481 valid certificates (the 480 random executions plus the canonical mutation fixture);
-- the checker rejected 8/8 negative controls: stale instance digest, forged intermediate output digest, forged bucket membership, tampered result, unbound elimination variable, missing final scalar binding and forged joined scope; and a reserved generated-factor identifier collision.
+The intended test plan describes 120 Q(i) networks, four elimination orders each, 480 direct-enumeration comparisons, one additional positive fixture and eight certificate mutations. The scripts were not executed in this session; there is currently no measured exact-agreement count and no measured checker acceptance/rejection count.
 
-The producer computes join then sum-out. The verifier independently fuses the bucket multiplication and finite sum in a direct nested-loop traversal, then hashes the resulting factor. The verifier imports no producer code.
-
-These are finite small-instance checks. They do not establish a Rust implementation, Lean proof, benchmark performance, production input parser, all-algebra support, or an advantage over Ganak/MICE/POG-CPOG.
+The trace/checker architecture is prepared in source, but it is not yet a qualified deterministic replay implementation. Hashing, replay correctness, parser behavior and actual certificate sizes remain to be tested.
 
 ## 3. Why this is useful
 
