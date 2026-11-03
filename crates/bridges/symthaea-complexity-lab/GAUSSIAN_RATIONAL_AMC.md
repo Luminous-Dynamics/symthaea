@@ -1,6 +1,6 @@
 # ETH-020: exact Gaussian-rational algebraic model counting
 
-**Status:** Finite Python Q(i) reference arithmetic and bucket variable-elimination oracle committed. Ganak already provides exact complex-rational support, so Q(i) alone is not a novelty claim; Rust/Lean qualification, proof-carrying execution and competitive evaluation remain open.
+**Status:** Q(i) reference source committed but not executed in this session. Ganak already provides exact complex-rational support, so Q(i) alone is not a novelty claim; Rust/Lean qualification, proof-carrying execution and competitive evaluation remain open.
 
 ## 1. Why this matters now
 
