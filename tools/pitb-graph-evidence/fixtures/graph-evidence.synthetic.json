@@ -1,0 +1,255 @@
+{
+  "schema_version": "pitb.proof-graph-evidence.v0",
+  "evidence_class": "synthetic_contract_fixture",
+  "snapshot": {
+    "snapshot_id": "synthetic-typed-graph-v0",
+    "repository_commit": "2222222222222222222222222222222222222222",
+    "environment_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "extractor_id": "pitb.synthetic-graph-export",
+    "extractor_version": "0.0.1",
+    "extractor_config_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+  },
+  "nodes": [
+    {
+      "node_id": "target-main",
+      "kind": "formal_declaration",
+      "label": "Target theorem",
+      "statement_sha256": "71680c4524ea98a58d98f09f679b6753a0d9633d461f00161a727f2563b177aa",
+      "statement_artifact_id": "statement-target",
+      "source_locator": "Demo/Target.lean:1-1",
+      "formal_name": "Demo.target"
+    },
+    {
+      "node_id": "helper-normalize",
+      "kind": "formal_declaration",
+      "label": "Normalization helper",
+      "statement_sha256": "e9dbf86e5edae82081e5e1372bc7386b2643c79055aa37f1f3ad620a824651f5",
+      "statement_artifact_id": "statement-helper",
+      "source_locator": "Demo/Helpers.lean:1-1",
+      "formal_name": "Demo.helper_normalize"
+    },
+    {
+      "node_id": "instance-example",
+      "kind": "formal_declaration",
+      "label": "Example typeclass instance",
+      "statement_sha256": "6046f4e99654ca220e83f319a1551e0cc89e2978d5f0d5974e9c3f8240470949",
+      "statement_artifact_id": "statement-instance",
+      "source_locator": "Demo/Instances.lean:1-1",
+      "formal_name": "Demo.instExample"
+    },
+    {
+      "node_id": "module-root",
+      "kind": "module",
+      "label": "Demo root module",
+      "statement_sha256": "725fe0b84f89df2ca2f3327fc892c01fa2ecf7e6df35138c982ea27bb969221c",
+      "statement_artifact_id": "statement-module",
+      "source_locator": "Demo/Root.lean",
+      "formal_name": null
+    },
+    {
+      "node_id": "informal-source",
+      "kind": "informal_statement",
+      "label": "Informal theorem statement",
+      "statement_sha256": "771fecf7c0618d01d936cea44154769d8e60767945afa556416db55b4c79bcdd",
+      "statement_artifact_id": "statement-informal-source",
+      "source_locator": "https://example.invalid/paper#theorem-1",
+      "formal_name": null
+    },
+    {
+      "node_id": "informal-related",
+      "kind": "informal_statement",
+      "label": "Related informal premise",
+      "statement_sha256": "0a0c1a35eb7993e9ea18d133b3fe12f6cba0e0c5b3e1a1d649640a720a409f2a",
+      "statement_artifact_id": "statement-informal-related",
+      "source_locator": "https://example.invalid/paper#lemma-2",
+      "formal_name": null
+    },
+    {
+      "node_id": "blueprint-lemma",
+      "kind": "blueprint_node",
+      "label": "Curated blueprint lemma",
+      "statement_sha256": "6bf025bce40ab8b94f122d293e7185047fedb5dca55fad4227d5657656eb8877",
+      "statement_artifact_id": "statement-blueprint",
+      "source_locator": "blueprint://synthetic-project/lemma-1",
+      "formal_name": null
+    }
+  ],
+  "edges": [
+    {
+      "edge_id": "edge-type-reference",
+      "source_node_id": "target-main",
+      "target_node_id": "helper-normalize",
+      "relation": "type_reference",
+      "evidence_class": "lean_elaborator",
+      "status": "observed",
+      "evidence_artifact_id": "edge-type",
+      "confidence": null,
+      "review_artifact_id": null,
+      "reviewer_key_id": null
+    },
+    {
+      "edge_id": "edge-proof-reference",
+      "source_node_id": "target-main",
+      "target_node_id": "helper-normalize",
+      "relation": "proof_term_reference",
+      "evidence_class": "lean_elaborator",
+      "status": "observed",
+      "evidence_artifact_id": "edge-proof",
+      "confidence": null,
+      "review_artifact_id": null,
+      "reviewer_key_id": null
+    },
+    {
+      "edge_id": "edge-instance",
+      "source_node_id": "target-main",
+      "target_node_id": "instance-example",
+      "relation": "instance_synthesis",
+      "evidence_class": "lean_instance_trace",
+      "status": "observed",
+      "evidence_artifact_id": "edge-instance",
+      "confidence": null,
+      "review_artifact_id": null,
+      "reviewer_key_id": null
+    },
+    {
+      "edge_id": "edge-module",
+      "source_node_id": "target-main",
+      "target_node_id": "module-root",
+      "relation": "module_environment_dependency",
+      "evidence_class": "lean_build_graph",
+      "status": "observed",
+      "evidence_artifact_id": "edge-build",
+      "confidence": null,
+      "review_artifact_id": null,
+      "reviewer_key_id": null
+    },
+    {
+      "edge_id": "edge-blueprint",
+      "source_node_id": "blueprint-lemma",
+      "target_node_id": "helper-normalize",
+      "relation": "blueprint_dependency",
+      "evidence_class": "blueprint_curated",
+      "status": "human_reviewed",
+      "evidence_artifact_id": "edge-blueprint",
+      "confidence": null,
+      "review_artifact_id": "review-blueprint",
+      "reviewer_key_id": "synthetic-key-not-authenticated"
+    },
+    {
+      "edge_id": "edge-informal-candidate",
+      "source_node_id": "informal-source",
+      "target_node_id": "informal-related",
+      "relation": "informal_candidate_dependency",
+      "evidence_class": "informal_extractor",
+      "status": "candidate",
+      "evidence_artifact_id": "edge-informal",
+      "confidence": 0.84,
+      "review_artifact_id": null,
+      "reviewer_key_id": null
+    },
+    {
+      "edge_id": "edge-cross-formality",
+      "source_node_id": "informal-source",
+      "target_node_id": "helper-normalize",
+      "relation": "cross_formality_match",
+      "evidence_class": "llm_alignment",
+      "status": "candidate",
+      "evidence_artifact_id": "edge-cross",
+      "confidence": 0.92,
+      "review_artifact_id": null,
+      "reviewer_key_id": null
+    }
+  ],
+  "artifacts": [
+    {
+      "artifact_id": "statement-target",
+      "kind": "statement",
+      "path": "statements/target.lean.txt",
+      "sha256": "71680c4524ea98a58d98f09f679b6753a0d9633d461f00161a727f2563b177aa"
+    },
+    {
+      "artifact_id": "statement-helper",
+      "kind": "statement",
+      "path": "statements/helper.lean.txt",
+      "sha256": "e9dbf86e5edae82081e5e1372bc7386b2643c79055aa37f1f3ad620a824651f5"
+    },
+    {
+      "artifact_id": "statement-instance",
+      "kind": "statement",
+      "path": "statements/instance.lean.txt",
+      "sha256": "6046f4e99654ca220e83f319a1551e0cc89e2978d5f0d5974e9c3f8240470949"
+    },
+    {
+      "artifact_id": "statement-module",
+      "kind": "statement",
+      "path": "statements/module.txt",
+      "sha256": "725fe0b84f89df2ca2f3327fc892c01fa2ecf7e6df35138c982ea27bb969221c"
+    },
+    {
+      "artifact_id": "statement-informal-source",
+      "kind": "statement",
+      "path": "statements/informal-source.txt",
+      "sha256": "771fecf7c0618d01d936cea44154769d8e60767945afa556416db55b4c79bcdd"
+    },
+    {
+      "artifact_id": "statement-informal-related",
+      "kind": "statement",
+      "path": "statements/informal-related.txt",
+      "sha256": "0a0c1a35eb7993e9ea18d133b3fe12f6cba0e0c5b3e1a1d649640a720a409f2a"
+    },
+    {
+      "artifact_id": "statement-blueprint",
+      "kind": "statement",
+      "path": "statements/blueprint.txt",
+      "sha256": "6bf025bce40ab8b94f122d293e7185047fedb5dca55fad4227d5657656eb8877"
+    },
+    {
+      "artifact_id": "edge-type",
+      "kind": "edge_evidence",
+      "path": "edges/type-reference.txt",
+      "sha256": "0cc3b879972890a04894596406fd7c7e63e26e1cddf7efe721288f81a74395a7"
+    },
+    {
+      "artifact_id": "edge-proof",
+      "kind": "edge_evidence",
+      "path": "edges/proof-term-reference.txt",
+      "sha256": "1e51739619b9a16c77b4b1643dccdb3c39f68aa755c825c8ff2c7231da053191"
+    },
+    {
+      "artifact_id": "edge-instance",
+      "kind": "edge_evidence",
+      "path": "edges/instance-synthesis.txt",
+      "sha256": "eb4480106c5be0e427a438063d533b0f3a6fb6483835737ec3048bdd3d7c4213"
+    },
+    {
+      "artifact_id": "edge-build",
+      "kind": "edge_evidence",
+      "path": "edges/module-environment.txt",
+      "sha256": "17d826ed65c2c9a8faf988fd946b54b6ceb66884596849da343ec9f62985318c"
+    },
+    {
+      "artifact_id": "edge-blueprint",
+      "kind": "edge_evidence",
+      "path": "edges/blueprint-dependency.txt",
+      "sha256": "9a472d1b3d9f6682f4e42e37793fd9dd4f11bf3704fa952eee305a0c22256b01"
+    },
+    {
+      "artifact_id": "edge-informal",
+      "kind": "edge_evidence",
+      "path": "edges/informal-candidate.txt",
+      "sha256": "af4b6d3901e146bd4009030ad3ad36927b7e4371a50bc4158f7d7825a8b2724b"
+    },
+    {
+      "artifact_id": "edge-cross",
+      "kind": "edge_evidence",
+      "path": "edges/cross-formality.txt",
+      "sha256": "ce62c8f80534f333e0e0314a90af62b2382dac80cb81f7cf6eb0b976428549ca"
+    },
+    {
+      "artifact_id": "review-blueprint",
+      "kind": "review_attestation",
+      "path": "reviews/blueprint-review.txt",
+      "sha256": "ed12cabbb7214c951946162c51cdecb9a1ef30f5866e3839ed10121bc3996ae5"
+    }
+  ]
+}
