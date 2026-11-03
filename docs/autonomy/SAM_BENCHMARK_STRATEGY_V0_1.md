@@ -506,3 +506,39 @@ Candidate model perturbations should be explicit and bounded: friction/axle grip
 Ten unit tests are authored but not compiled/run. No vehicle model-ensemble results have been produced.
 
 Protocol: [CROSS_MODEL_COUNTERFACTUAL_STABILITY_V0_1.md](./CROSS_MODEL_COUNTERFACTUAL_STABILITY_V0_1.md).
+
+
+## 19. Trajectory prediction-set coverage and sharpness
+
+The new `symthaea_vehicle::trajectory_coverage` evaluator complements event-probability calibration (#10247) without conflating the claims. Brier/log loss assess event probabilities; trajectory coverage asks whether the realised future falls inside a forecast set; set measure asks how broad or costly that set is. MinADE/minFDE remain separate point/multimodal accuracy metrics.
+
+The evaluator consumes a frozen calibration split and a disjoint evaluation split of caller-supplied nonconformity scores and prediction-set measures. It computes the finite-sample split-conformal order statistic, empirical coverage and signed coverage error, mean/p95 set measure, macro-family and worst-family coverage, and canonical report identity. It rejects duplicate IDs, calibration/evaluation overlap, malformed scores and insufficient calibration for a finite threshold. A matching sampling-profile digest is disclosed but is not proof of exchangeability; a shifted profile is a stress diagnostic, not a nominal-coverage guarantee.
+
+Benchmark sequence:
+1. Exact synthetic fixtures with rank, boundary-membership, duplicate, leakage, shuffled-order and insufficient-calibration controls.
+2. Waymo Open Motion and Argoverse 2 Motion under official splits, reporting minADE/minFDE/miss rate separately from coverage and set measure.
+3. WOD-E2E as a long-tail end-to-end planning track and Fail2Drive as a paired in-/OOD closed-loop shift track; neither route score replaces trajectory-set coverage.
+4. Connect actor/ego observations and fresh-process execution receipts from Symtropy #3387 / interactive actor work #3471.
+5. Evaluate whether wider or multimodal sets actually improve downstream action quality, abstention and counterfactual regret.
+
+Prospective target: on adequately sampled, family-disjoint exchangeable holdouts, target empirical compatibility with 90% and 95% marginal coverage; at matched coverage, target at least 20% lower median/p95 set measure than a frozen heuristic tube without degrading worst-family coverage. These are experiment targets, not validity theorems or existing results. Under shift, measure coverage/size/abstention/planner degradation without reusing the exchangeable guarantee.
+
+Protocol: [TRAJECTORY_PREDICTION_SET_COVERAGE_V0_1.md](./TRAJECTORY_PREDICTION_SET_COVERAGE_V0_1.md). Tracking issue: [SAM-PRED-COV-001 #10256](https://github.com/Luminous-Dynamics/symthaea/issues/10256).
+
+## 20. Interactive actor response as a causal execution primitive
+
+The fixed scripted actor in the first crossing vertical slice is an appropriate deterministic plumbing control, but it cannot represent negotiation because its future trajectory is invariant to ego yielding, creeping or acceleration. The next paradigm shift is to make actor behaviour respond to the ego's *observable action history* without exposing privileged world state or future commands.
+
+Symtropy issue [ROAD-AUTONOMY-ACTOR-001 #3471](https://github.com/Luminous-Dynamics/symtropy/issues/3471) defines the actor-response contract under parent scenario executor #3387. It proposes a small synthetic state-machine actor with waiting/approach/cross/continue/pause/yield/retreat modes, bounded response delays and acceleration, observation staleness/occlusion and a separate fixed-script baseline. The actor receives only timestamped allowed observations; its state transitions are append-only and causal.
+
+Required falsification controls:
+- future ego commands cannot influence actor outputs before becoming observable;
+- hidden simulator state not represented in the actor's observation cannot influence its policy;
+- occluded signals cannot trigger reactions;
+- dropout/stale observations follow declared fallback behaviour;
+- matched counterfactual runs share exogenous disturbances until ego action causally changes downstream actor response;
+- fresh-process replay reproduces the named synthetic policy trace.
+
+This is a behaviour layer over existing stepping and road dynamics, not a new physics engine or a human behaviour model. Human fidelity requires an independent, rights-cleared observational dataset and separate evaluation. Synthetic actors must remain synthetic labels.
+
+The decision-quality chain becomes: forecast set -> interactive actor response -> exact execution -> counterfactual comparison -> planner action. This exposes model exploitation and planner regret that open-loop trajectory replay can conceal.
