@@ -277,23 +277,33 @@ The current fixture remains design-only. Issue #10064 must qualify the compiler/
 
 ### Cargo feature/target configuration-world benchmark
 
-The synthetic repository-twin fixture now includes `worlds.v0.json`: a complete
-2×2×2 matrix over Linux/Windows targets and the `audit`/`windows-native`
-Cargo features (default, each individually enabled, and both enabled on each
-target). It explicitly separates *feature enabled* from *target-gated code active*:
-on Linux, enabling `windows-native` activates the Cargo feature node but must not
-activate the Windows module or target-specific `windows-sys` dependency.
+The synthetic repository-twin fixture includes `worlds.v0.json`: a complete
+2×2×2 matrix over Linux/Windows targets and the effective `audit`/`windows-native`
+Cargo features. The matrix explicitly records three separate values:
+`default_features_enabled`, `explicit_features` and `effective_features`.
+This matters because the API crate declares `default = ["audit"]`: an empty
+explicit feature list with defaults enabled still activates the audit feature.
+The matrix also contains a no-default-features world with `audit` explicitly
+selected, allowing the indexing path to be checked independently of Cargo's
+default-feature expansion.
 
-Seven conditional facts are enumerated: two feature nodes, one Windows target
-node, two audit-gated symbols, one Windows-gated symbol and one target/feature
-gated dependency. Each world supplies exact active and inactive sets. The
-contract validator recomputes those sets from the declared conditions and
-rejects missing/extra facts, false activation, missed activation and duplicate
-world IDs. Three new negative controls bring the contract workflow to 34
-authored controls across four Draft 2020-12 schemas. Static matrix consistency
-checks passed in this repository review, but the CI controls have not yet passed
-an exact-head workflow. All eight worlds remain design-only expectations, not
-compiler-confirmed results.
+The key target distinction remains: on Linux, enabling `windows-native` activates
+the Cargo feature node but must not activate the Windows module or target-specific
+`windows-sys` dependency. Seven conditional facts are enumerated: two feature
+nodes, one Windows target node, two audit-gated symbols, one Windows-gated symbol
+and one target/feature-gated dependency. Each world supplies explicit and effective
+features plus exact active/inactive fact sets. The validator recomputes effective
+features from Cargo defaults and explicit flags, verifies the exact target triple,
+and derives every active/inactive fact set.
+
+Six new world controls cover false Windows activation on Linux, missed default
+audit activation, missed explicitly selected audit activation, inconsistent
+effective-feature declarations, target-triple mismatch and duplicate world IDs.
+Together with the 31 existing controls, this brings the contract workflow to
+37 authored negative controls across four Draft 2020-12 schemas. Static matrix
+consistency checks passed in this repository review, but these CI controls have
+not yet passed a successful exact-head workflow. All eight worlds remain
+design-only expectations, not compiler-confirmed results.
 
 Next qualification: obtain Cargo metadata and rust-analyzer/SCIP output inside
 the isolated pinned runner for each feature/target world, then compare observed
