@@ -24,7 +24,7 @@ fn main() -> ExitCode {
     let mut compare_paths = Vec::new();
     let mut compare_mode = false;
     while let Some(arg) = args.next() {
-        if arg == "--compare" {
+        if arg == std::ffi::OsStr::new("--compare") {
             compare_mode = true;
             continue;
         }
@@ -76,6 +76,11 @@ fn main() -> ExitCode {
                 "run_id": receipt.run_id,
                 "raw_file_sha256": receipt.raw_file_sha256,
                 "canonical_receipt_sha256": receipt.canonical_receipt_sha256,
+                "benchmark_id": receipt.value["benchmark"]["id"],
+                "benchmark_version": receipt.value["benchmark"]["version"],
+                "access_class": receipt.value["benchmark"]["access_class"],
+                "system_arm": receipt.value["system"]["arm"],
+                "target_scope": receipt.value["target_scope"],
                 "accounting": receipt.accounting,
             })
         })
