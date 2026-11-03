@@ -175,7 +175,8 @@
         "variables",
         "contract",
         "quantifier_semantics",
-        "coefficient_domain"
+        "coefficient_domain",
+        "aggregation_plan"
       ],
       "properties": {
         "source": {
@@ -270,6 +271,9 @@
         },
         "weight_map": {
           "$ref": "#/$defs/weightMap"
+        },
+        "aggregation_plan": {
+          "$ref": "#/$defs/aggregationPlan"
         }
       },
       "allOf": [
@@ -417,6 +421,136 @@
                 "properties": {
                   "domain": {
                     "const": "Q(i)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "contract": {
+                "const": "#sat"
+              }
+            },
+            "required": [
+              "contract"
+            ]
+          },
+          "then": {
+            "properties": {
+              "aggregation_plan": {
+                "properties": {
+                  "projection": {
+                    "const": "none"
+                  },
+                  "final": {
+                    "const": "count"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "contract": {
+                "const": "wmc"
+              }
+            },
+            "required": [
+              "contract"
+            ]
+          },
+          "then": {
+            "properties": {
+              "aggregation_plan": {
+                "properties": {
+                  "projection": {
+                    "const": "none"
+                  },
+                  "final": {
+                    "const": "weighted_sum"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "contract": {
+                "const": "pmc"
+              }
+            },
+            "required": [
+              "contract"
+            ]
+          },
+          "then": {
+            "properties": {
+              "aggregation_plan": {
+                "properties": {
+                  "projection": {
+                    "const": "exists"
+                  },
+                  "final": {
+                    "const": "count"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "contract": {
+                "const": "pwmc"
+              }
+            },
+            "required": [
+              "contract"
+            ]
+          },
+          "then": {
+            "properties": {
+              "aggregation_plan": {
+                "properties": {
+                  "projection": {
+                    "const": "exists"
+                  },
+                  "final": {
+                    "const": "weighted_sum"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "contract": {
+                "const": "amc-complex"
+              }
+            },
+            "required": [
+              "contract"
+            ]
+          },
+          "then": {
+            "properties": {
+              "aggregation_plan": {
+                "properties": {
+                  "projection": {
+                    "const": "none"
+                  },
+                  "final": {
+                    "const": "weighted_sum"
                   }
                 }
               }
@@ -1017,6 +1151,28 @@
         "peak_rss_bytes": {
           "type": "integer",
           "minimum": 0
+        }
+      }
+    },
+    "aggregationPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projection",
+        "final"
+      ],
+      "properties": {
+        "projection": {
+          "enum": [
+            "none",
+            "exists"
+          ]
+        },
+        "final": {
+          "enum": [
+            "count",
+            "weighted_sum"
+          ]
         }
       }
     }
