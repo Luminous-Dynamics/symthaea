@@ -591,7 +591,6 @@ mod tests {
             soil_class: "starch".to_owned(),
             surface_material: "ceramic".to_owned(),
             water_hardness_ppm_as_caco3: 120,
-            wash_temperature_c: 50.0,
             cycle_duration_s: 1_800,
             stage_windows: vec![
                 StageWindow { stage: WashStage::Prewash, start_s: 0, end_s: 300, water_temperature_c: Some(40.0) },
