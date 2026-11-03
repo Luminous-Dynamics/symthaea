@@ -68,13 +68,25 @@
       "bound": "(L+1)^O_k(1) * 2^O_k(n*(log log n)^2/sqrt(log n))",
       "input_family": "canonically encoded k-CNF over n variables, fixed k >= 2",
       "input_encoding": "OpenAI math repository canonical CNF encoding; bit length L",
-      "output_contract": ["exact number of satisfying assignments", "SAT decision"],
+      "output_contract": [
+        "exact number of satisfying assignments",
+        "SAT decision"
+      ],
       "machine_model": "deterministic primitive machine as represented in the Lean development",
       "space_claim": "at every execution prefix, visited tape cells are polynomial in L (for fixed k)",
       "formal_theorem": "OAI.Algorithms.SubexponentialSAT.SqrtLogSpace.exact_count_and_sat",
-      "formal_source_ids": ["openai-eth-lean-final", "openai-eth-lean-scope"],
-      "comparator_manifest_source_ids": ["openai-eth-comparator"],
-      "permitted_axioms": ["propext", "Quot.sound", "Classical.choice"],
+      "formal_source_ids": [
+        "openai-eth-lean-final",
+        "openai-eth-lean-scope"
+      ],
+      "comparator_manifest_source_ids": [
+        "openai-eth-comparator"
+      ],
+      "permitted_axioms": [
+        "propext",
+        "Quot.sound",
+        "Classical.choice"
+      ],
       "source_scope_qualifier": "The Lean scope note explicitly describes this weaker squared-log-log exponent. The same file contains compiled_exact_count_and_sat and exact_count_eth declarations, but this ledger does not infer a stronger theorem from manuscript wording.",
       "not_established_here": [
         "Symthaea has not rebuilt the OpenAI Lean project in this environment.",
@@ -83,7 +95,12 @@
       ],
       "reproduction_status": "not_independently_rebuilt_by_symthaea",
       "external_review_status": "not_independently_adjudicated_here",
-      "last_audited": "2026-11-03"
+      "last_audited": "2026-11-03",
+      "formalized_scope_bound": "(L+1)^O_k(1) * 2^O_k(n*(log log n)^2/sqrt(log n))",
+      "formalized_scope_output_contract": [
+        "exact number of satisfying assignments",
+        "SAT decision"
+      ]
     },
     {
       "claim_id": "ETH-CLAIM-002",
@@ -92,11 +109,16 @@
       "bound": "(n+m)^O_k(1) * 2^O_k(n*log log n/sqrt(log n))",
       "input_family": "fixed-width k-CNF with n variables and m clauses",
       "input_encoding": "manuscript input model; details must be read from the paper before applying beyond stated scope",
-      "output_contract": ["exact SAT/counting as stated by manuscript"],
+      "output_contract": [
+        "exact SAT/counting as stated by manuscript"
+      ],
       "machine_model": "as stated in manuscript; not promoted to Lean theorem by this ledger",
       "formal_theorem": null,
       "formal_source_ids": [],
-      "manuscript_source_ids": ["openai-eth-paper-readme", "openai-eth-paper-pdf"],
+      "manuscript_source_ids": [
+        "openai-eth-paper-readme",
+        "openai-eth-paper-pdf"
+      ],
       "relationship_to_formalized_scope": "sharper manuscript statement; the linked Lean scope note documents the squared-log-log exponent instead",
       "not_established_here": [
         "No corresponding exact theorem declaration is linked by the comparator manifest supplied here.",
@@ -114,11 +136,16 @@
       "bound": "if m <= D*n for fixed D: (n+m)^O_{k,D}(1) * 2^O_{k,D}(n/sqrt(log n))",
       "input_family": "fixed-width k-CNF with an additional linear-clause promise m <= D*n",
       "input_encoding": "manuscript input model",
-      "output_contract": ["exact SAT/counting as stated by manuscript"],
+      "output_contract": [
+        "exact SAT/counting as stated by manuscript"
+      ],
       "machine_model": "as stated in manuscript; not promoted to Lean theorem by this ledger",
       "formal_theorem": null,
       "formal_source_ids": [],
-      "manuscript_source_ids": ["openai-eth-paper-readme", "openai-eth-paper-pdf"],
+      "manuscript_source_ids": [
+        "openai-eth-paper-readme",
+        "openai-eth-paper-pdf"
+      ],
       "relationship_to_formalized_scope": "sparse manuscript corollary; the linked Lean scope note does not list this sharper sparse exponent as the formalized theorem",
       "not_established_here": [
         "The linear-clause promise is an essential extra assumption.",
@@ -136,12 +163,16 @@
       "bound": "sparse weighted theorem reported with 2^O(n*(log log n)^2/sqrt(log n)) factor",
       "input_family": "weighted sparse constraint/counting and optimization instances subject to the preprint's hypotheses",
       "input_encoding": "preprint-specific; must be matched to its theorem hypotheses",
-      "output_contract": ["weighted distributions / exact optimization as specified by the preprint"],
+      "output_contract": [
+        "weighted distributions / exact optimization as specified by the preprint"
+      ],
       "coefficient_domain": "commutative Q-algebra",
       "machine_model": "as stated by preprint; no Lean machine theorem is linked here",
       "formal_theorem": null,
       "formal_source_ids": [],
-      "manuscript_source_ids": ["weighted-counting-preprint"],
+      "manuscript_source_ids": [
+        "weighted-counting-preprint"
+      ],
       "peer_review_status": "not_established_as_peer_reviewed",
       "provenance": "The v1 preprint describes mixed human/AI-generated text and identifies Claude, Claude Code and Python in its release metadata.",
       "not_established_here": [
