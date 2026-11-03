@@ -1286,6 +1286,71 @@ mod tests {
     }
 
     #[test]
+    fn expected_evsi_matches_a_binary_known_answer() {
+        let hypotheses = hypotheses(&[0.5, 0.5]);
+        let decisions = decisions(&[
+            ("repair-a", &[10.0, 0.0]),
+            ("repair-b", &[0.0, 10.0]),
+        ]);
+        let proposals = vec![proposal("probe", &["yes", "no"])];
+        let scenarios = vec![scenario(
+            "nominal",
+            1.0,
+            vec![matrix("probe", &[("h0", &[0.9, 0.1]), ("h1", &[0.1, 0.9])])],
+        )];
+
+        let result = plan(
+            &hypotheses,
+            &proposals,
+            &scenarios,
+            &decisions,
+            DecisionPlannerConfig::default(),
+        )
+        .unwrap();
+        let selected = result.selected.unwrap();
+
+        assert!((result.baseline_expected_utility.unwrap() - 5.0).abs() < 1.0e-12);
+        assert!((selected.expected_evsi - 4.0).abs() < 1.0e-12);
+        assert!((selected.expected_shared_policy_evsi - 4.0).abs() < 1.0e-12);
+        assert!(selected.expected_regret.abs() < 1.0e-12);
+        assert!((selected.decision_stability - 1.0).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn model_generated_support_cannot_ground_a_decision_plan() {
+        let mut evidence = evidence();
+        evidence[0].origin = super::super::EvidenceOrigin::ModelGenerated;
+        evidence[1].origin = super::super::EvidenceOrigin::Synthetic;
+        let hypotheses = hypotheses(&[0.5, 0.5]);
+        let decisions = decisions(&[("a", &[10.0, 0.0]), ("b", &[0.0, 10.0])]);
+        let proposals = vec![proposal("probe", &["yes", "no"])];
+        let scenarios = vec![scenario(
+            "nominal",
+            1.0,
+            vec![matrix("probe", &[("h0", &[0.9, 0.1]), ("h1", &[0.1, 0.9])])],
+        )];
+
+        let result = plan_next_experiment_decision_aware(
+            &evidence,
+            &hypotheses,
+            &proposals,
+            &scenarios,
+            &utility_model(),
+            &decisions,
+            DecisionPlannerConfig::default(),
+        )
+        .unwrap();
+
+        assert!(result.selected.is_none());
+        assert_eq!(
+            result.abstention,
+            Some(DecisionAbstentionReason::NoIndependentlyGroundedHypothesis)
+        );
+        assert!(result.baseline_decision_id.is_none());
+        assert!(result.baseline_expected_utility.is_none());
+    }
+
+    #[test]
     fn information_gain_without_action_change_has_zero_decision_value() {
         let hypotheses = hypotheses(&[0.5, 0.5]);
         let decisions = decisions(&[("keep", &[10.0, 10.0]), ("other", &[0.0, 0.0])]);
@@ -1357,7 +1422,9 @@ mod tests {
     #[test]
     fn shared_policy_minimax_regret_rejects_scenario_fragile_probe() {
         let hypotheses = hypotheses(&[0.5, 0.5]);
-        let decisions = decisions(&[("repair-a", &[10.0, 0.0]), ("repair-b", &[0.0, 10.0])]);
+        let mut decisions = decisions(&[("repair-a", &[10.0, 0.0]), ("repair-b", &[0.0, 10.0])]);
+        decisions[0].impact = DecisionImpact::ServiceDisruption;
+        decisions[1].impact = DecisionImpact::PhysicalActuation;
         let proposals = vec![
             proposal("fragile", &["yes", "no"]),
             proposal("stable", &["yes", "no"]),
@@ -1392,7 +1459,16 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(result.selected.unwrap().experiment_id, "stable");
+        let selected = result.selected.unwrap();
+        assert_eq!(selected.experiment_id, "stable");
+        assert_eq!(
+            selected.shared_policy.iter().map(|item| item.impact).collect::<Vec<_>>(),
+            vec![DecisionImpact::ServiceDisruption, DecisionImpact::PhysicalActuation]
+        );
+        assert_eq!(
+            selected.scenario_results[0].outcomes[0].shared_policy_decision_impact,
+            DecisionImpact::ServiceDisruption
+        );
     }
 
     #[test]
