@@ -779,7 +779,6 @@ mod tests {
         let summary = check_reported_dose_delivery(
             &event,
             &prewash_window(),
-&event,
             &delivery_calibration(),
             &delivery_measurement(&event),
         )
@@ -848,7 +847,6 @@ mod tests {
             check_reported_dose_delivery(
                 &event,
                 &prewash_window(),
-&event,
                 &delivery_calibration(),
                 &wrong_component
             ),
@@ -861,7 +859,6 @@ mod tests {
             check_reported_dose_delivery(
                 &event,
                 &prewash_window(),
-&event,
                 &delivery_calibration(),
                 &wrong_channel
             ),
