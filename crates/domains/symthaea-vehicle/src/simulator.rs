@@ -138,6 +138,55 @@ impl BicycleModelSimulator {
         &self.params
     }
 
+    /// Whether the complete simulator profile is finite and within configured scales.
+    pub fn dynamics_profile_is_valid(&self) -> bool {
+        let p = &self.params;
+        let params = [
+            p.mass,
+            p.yaw_inertia,
+            p.front_axle_dist,
+            p.rear_axle_dist,
+            p.cg_height,
+            p.front_cornering_stiffness,
+            p.rear_cornering_stiffness,
+            p.max_steering_angle,
+            p.steering_rate_limit,
+            p.max_engine_force,
+            p.max_power,
+            p.max_brake_force,
+            p.drag_coeff,
+            p.rolling_resistance,
+            p.air_density,
+            p.wheelbase,
+        ];
+        params.iter().all(|value| value.is_finite())
+            && p.mass > 0.0
+            && p.yaw_inertia > 0.0
+            && p.front_axle_dist > 0.0
+            && p.rear_axle_dist > 0.0
+            && p.cg_height >= 0.0
+            && p.front_cornering_stiffness > 0.0
+            && p.rear_cornering_stiffness > 0.0
+            && p.max_steering_angle > 0.0
+            && p.steering_rate_limit > 0.0
+            && p.max_engine_force > 0.0
+            && p.max_power > 0.0
+            && p.max_brake_force > 0.0
+            && p.drag_coeff >= 0.0
+            && p.rolling_resistance >= 0.0
+            && p.air_density > 0.0
+            && (p.wheelbase - p.front_axle_dist - p.rear_axle_dist).abs() < 1e-9
+            && self.friction_scale.is_finite()
+            && (0.0..=2.0).contains(&self.friction_scale)
+            && self.front_friction_scale.is_finite()
+            && (0.0..=2.0).contains(&self.front_friction_scale)
+            && self.rear_friction_scale.is_finite()
+            && (0.0..=2.0).contains(&self.rear_friction_scale)
+            && self.initial_speed.is_finite()
+            && self.initial_speed >= 0.0
+            && self.external_force.iter().all(|force| force.is_finite())
+    }
+
     /// Content identity for the named bicycle-model profile and current friction state.
     ///
     /// This binds serialized chassis parameters plus the simulator's friction
