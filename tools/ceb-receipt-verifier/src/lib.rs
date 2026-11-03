@@ -2322,7 +2322,7 @@ mod tests {
             task_id: "CEB-RUST-001".to_string(),
             source_tree_dir: source_root.clone(),
             result_tree_dir: result_root.clone(),
-            patch,
+            patch: patch.clone(),
             primary_envelope: primary_envelope.clone(),
             primary_artifacts_dir: primary_root.clone(),
             regrade_envelope: regrade_envelope.clone(),
@@ -2341,6 +2341,23 @@ mod tests {
         assert_eq!(report.regrade_signer_ids, vec!["regrade-test-key".to_string()]);
         assert_eq!(report.primary_check_evidence_sha256.len(), 2);
         assert_eq!(report.regrade_check_evidence_sha256.len(), 2);
+
+        let wrong_task_pin = verify_pair(PairInputs {
+            task_contract: task_bytes.clone(),
+            expected_task_contract_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
+            task_id: "CEB-RUST-001".to_string(),
+            source_tree_dir: source_root.clone(),
+            result_tree_dir: result_root.clone(),
+            patch: patch.clone(),
+            primary_envelope: primary_envelope.clone(),
+            primary_artifacts_dir: primary_root.clone(),
+            regrade_envelope: regrade_envelope.clone(),
+            regrade_artifacts_dir: regrade_root.clone(),
+            trust_policy: policy_bytes.clone(),
+            expected_trust_policy_sha256: policy_digest.clone(),
+        });
+        assert!(!wrong_task_pin.accepted);
+        assert_eq!(wrong_task_pin.status, "protocol_violation");
 
         // Re-signing a regrade that does not link the exact primary envelope must fail.
         let mut detached = regrade_statement.clone();
