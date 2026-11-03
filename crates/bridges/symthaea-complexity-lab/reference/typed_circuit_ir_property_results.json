@@ -1,0 +1,37 @@
+{
+  "suite": "ETH-026 randomized typed-circuit oracle conformance",
+  "execution_status": "executed_locally",
+  "environment": {
+    "python": "3.13.5",
+    "seed": "0xe7026",
+    "case_generation": "random full-assignment subsets compiled to deterministic decomposable product/sum circuit DAGs",
+    "coefficient_domains": ["Boolean", "exact Q", "exact Q(i)"],
+    "floating_point_used": false
+  },
+  "sources": {
+    "evaluator_path": "reference/typed_circuit_ir.py",
+    "evaluator_git_blob_sha": "1d22ecdc1a9d8ed5b174471ee204d9a8d6ac9350",
+    "property_test_path": "reference/typed_circuit_ir_property_tests.py",
+    "property_test_git_blob_sha": "eda62e58be1fdd25287b161dc08431299e2abd01"
+  },
+  "positive_cases": 5000,
+  "cases_per_contract": 1000,
+  "passed": 5000,
+  "failed": 0,
+  "passed_by_contract": {
+    "#sat": 1000,
+    "wmc": 1000,
+    "pmc": 1000,
+    "pwmc": 1000,
+    "amc-complex": 1000
+  },
+  "independent_oracle": "The property test computes expected outputs directly from generated assignment sets, independent of the circuit evaluator traversal.",
+  "negative_controls": {
+    "overlapping_product_scope_rejected": 1,
+    "false_determinism_claim_rejected": 1,
+    "contract_domain_mismatch_rejected": 1
+  },
+  "negative_rejected": 3,
+  "all_passed": true,
+  "claim_ceiling": "Five thousand random small deterministic/decomposable circuits agreed with an independent assignment-set oracle; three invalid structures/contracts were rejected. Not CPOG/VeriPB adapter, formal proof, solver binary differential, large-scale benchmark or SOTA result."
+}
