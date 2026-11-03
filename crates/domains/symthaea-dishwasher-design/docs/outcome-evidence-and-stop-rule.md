@@ -165,4 +165,4 @@ The 86.7% oatmeal-only fluorescence classification result is a replication basel
 5. Only then derive a process stop rule and a runtime assurance envelope.
 6. Keep cleaning, rinse, cross-transfer, drying and microbiology as independent claims.
 
-Related work: issue #10230.
+Related work: https://github.com/Luminous-Dynamics/symthaea/issues/10225.
