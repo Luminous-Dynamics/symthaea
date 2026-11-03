@@ -2359,6 +2359,27 @@ mod tests {
         assert!(!wrong_task_pin.accepted);
         assert_eq!(wrong_task_pin.status, "protocol_violation");
 
+        let tampered_result_root = root.join("tampered-result");
+        fs::create_dir_all(tampered_result_root.join("src")).unwrap();
+        fs::write(tampered_result_root.join("src/lib.rs"), b"pub fn verified() -> bool { false }").unwrap();
+        let tampered_result = verify_pair(PairInputs {
+            task_contract: task_bytes.clone(),
+            expected_task_contract_sha256: task_digest.clone(),
+            task_id: "CEB-RUST-001".to_string(),
+            source_tree_dir: source_root.clone(),
+            result_tree_dir: tampered_result_root.clone(),
+            patch: patch.clone(),
+            primary_envelope: primary_envelope.clone(),
+            primary_artifacts_dir: primary_root.clone(),
+            regrade_envelope: regrade_envelope.clone(),
+            regrade_artifacts_dir: regrade_root.clone(),
+            trust_policy: policy_bytes.clone(),
+            expected_trust_policy_sha256: policy_digest.clone(),
+        });
+        assert!(!tampered_result.accepted);
+        assert_eq!(tampered_result.status, "protocol_violation");
+        fs::remove_dir_all(&tampered_result_root).unwrap();
+
         // Re-signing a regrade that does not link the exact primary envelope must fail.
         let mut detached = regrade_statement.clone();
         detached["predicate"]["execution"]["regrade_of_receipt_sha256"] =
