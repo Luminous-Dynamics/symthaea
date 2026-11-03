@@ -8,9 +8,9 @@
 //! replay ledger before dispatching the command.
 
 use crate::mobile_tool_effects::{
-    EffectCeiling, MOBILE_DEVICE_READ_ONLY_POLICY_ID, MobileProviderCapabilityReport,
-    MobileTool, ProviderBoundToolAuthorization, ToolAuthorizationError,
-    authorize_mobile_device_observation, authorize_reported_mobile_tool, mobile_tool_catalog_sha256,
+    EffectCeiling, MOBILE_DEVICE_READ_ONLY_POLICY_ID, MobileProviderCapabilityReport, MobileTool,
+    ProviderBoundToolAuthorization, ToolAuthorizationError, authorize_mobile_device_observation,
+    authorize_reported_mobile_tool, mobile_tool_catalog_sha256,
 };
 use crate::{canonical_jcs_bytes, sha256_hex};
 use serde::{Deserialize, Serialize};
@@ -209,17 +209,31 @@ impl fmt::Display for MobileInvocationError {
             Self::InvalidTimestamp(field) => write!(f, "{field} is invalid"),
             Self::ConsentExpired => write!(f, "caller consent is expired or not yet valid"),
             Self::ConsentRevoked => write!(f, "caller consent has been revoked"),
-            Self::PolicyScopeMismatch => write!(f, "invocation is not restricted to the mobile read-only policy"),
-            Self::ReplayCapacityExceeded => write!(f, "process-local replay guard reached its bounded capacity"),
+            Self::PolicyScopeMismatch => write!(
+                f,
+                "invocation is not restricted to the mobile read-only policy"
+            ),
+            Self::ReplayCapacityExceeded => {
+                write!(f, "process-local replay guard reached its bounded capacity")
+            }
             Self::ConsentScopeMismatch(field) => write!(f, "consent does not authorize {field}"),
-            Self::SessionMismatch(field) => write!(f, "selected device session does not match {field}"),
+            Self::SessionMismatch(field) => {
+                write!(f, "selected device session does not match {field}")
+            }
             Self::InvocationExpired => write!(f, "invocation authorization has expired"),
-            Self::InvocationLifetimeExceeded => write!(f, "invocation lifetime exceeds the configured bound"),
-            Self::ToolNotConsented => write!(f, "requested tool is outside the caller-consented allowlist"),
+            Self::InvocationLifetimeExceeded => {
+                write!(f, "invocation lifetime exceeds the configured bound")
+            }
+            Self::ToolNotConsented => write!(
+                f,
+                "requested tool is outside the caller-consented allowlist"
+            ),
             Self::InvalidArguments => write!(f, "invocation arguments must be a JSON object"),
             Self::Replay(field) => write!(f, "replayed mobile invocation {field} rejected"),
             Self::Provider(error) => write!(f, "provider/tool authorization failed: {error}"),
-            Self::Canonicalization(error) => write!(f, "invocation receipt canonicalization failed: {error}"),
+            Self::Canonicalization(error) => {
+                write!(f, "invocation receipt canonicalization failed: {error}")
+            }
         }
     }
 }
@@ -264,7 +278,9 @@ pub fn prepare_mobile_invocation(
         return Err(MobileInvocationError::InvalidIdentifier("caller_id"));
     }
     if consent.verifier_id.trim().is_empty() {
-        return Err(MobileInvocationError::InvalidIdentifier("consent verifier_id"));
+        return Err(MobileInvocationError::InvalidIdentifier(
+            "consent verifier_id",
+        ));
     }
 
     if consent.issued_at_unix_ms > now_unix_ms
@@ -275,18 +291,25 @@ pub fn prepare_mobile_invocation(
     }
     if let Some(revoked_at) = consent.revoked_at_unix_ms {
         if revoked_at < consent.issued_at_unix_ms {
-            return Err(MobileInvocationError::InvalidTimestamp("revoked_at_unix_ms"));
+            return Err(MobileInvocationError::InvalidTimestamp(
+                "revoked_at_unix_ms",
+            ));
         }
         if revoked_at <= now_unix_ms {
             return Err(MobileInvocationError::ConsentRevoked);
         }
     }
     if session.generation == 0 {
-        return Err(MobileInvocationError::SessionMismatch("zero session generation"));
+        return Err(MobileInvocationError::SessionMismatch(
+            "zero session generation",
+        ));
     }
     let mut consented_tools = HashSet::new();
     if consent.allowed_tools.is_empty()
-        || !consent.allowed_tools.iter().all(|tool| consented_tools.insert(*tool))
+        || !consent
+            .allowed_tools
+            .iter()
+            .all(|tool| consented_tools.insert(*tool))
     {
         return Err(MobileInvocationError::ConsentScopeMismatch(
             "empty or duplicate tool allowlist",
@@ -294,12 +317,16 @@ pub fn prepare_mobile_invocation(
     }
 
     if request.issued_at_unix_ms > now_unix_ms.saturating_add(MOBILE_INVOCATION_MAX_CLOCK_SKEW_MS) {
-        return Err(MobileInvocationError::InvalidTimestamp("issued_at_unix_ms is in the future"));
+        return Err(MobileInvocationError::InvalidTimestamp(
+            "issued_at_unix_ms is in the future",
+        ));
     }
     if request.issued_at_unix_ms < consent.issued_at_unix_ms
         || request.issued_at_unix_ms > consent.expires_at_unix_ms
     {
-        return Err(MobileInvocationError::ConsentScopeMismatch("invocation issue time"));
+        return Err(MobileInvocationError::ConsentScopeMismatch(
+            "invocation issue time",
+        ));
     }
     if request.expires_at_unix_ms <= now_unix_ms {
         return Err(MobileInvocationError::InvocationExpired);
@@ -307,7 +334,9 @@ pub fn prepare_mobile_invocation(
     if request.expires_at_unix_ms <= request.issued_at_unix_ms
         || request.expires_at_unix_ms > consent.expires_at_unix_ms
     {
-        return Err(MobileInvocationError::InvalidTimestamp("expires_at_unix_ms"));
+        return Err(MobileInvocationError::InvalidTimestamp(
+            "expires_at_unix_ms",
+        ));
     }
     if request.expires_at_unix_ms - request.issued_at_unix_ms > MOBILE_INVOCATION_MAX_TTL_MS {
         return Err(MobileInvocationError::InvocationLifetimeExceeded);
@@ -332,11 +361,16 @@ pub fn prepare_mobile_invocation(
     if request.consent_id != consent.consent_id
         || request.consent_receipt_sha256 != consent.consent_receipt_sha256
     {
-        return Err(MobileInvocationError::ConsentScopeMismatch("consent receipt"));
+        return Err(MobileInvocationError::ConsentScopeMismatch(
+            "consent receipt",
+        ));
     }
 
-    let tool = MobileTool::parse(&request.tool_name)
-        .ok_or_else(|| MobileInvocationError::Provider(ToolAuthorizationError::UnknownTool(request.tool_name.clone())))?;
+    let tool = MobileTool::parse(&request.tool_name).ok_or_else(|| {
+        MobileInvocationError::Provider(ToolAuthorizationError::UnknownTool(
+            request.tool_name.clone(),
+        ))
+    })?;
     if !consent.allowed_tools.contains(&tool) {
         return Err(MobileInvocationError::ToolNotConsented);
     }
@@ -344,12 +378,8 @@ pub fn prepare_mobile_invocation(
         return Err(MobileInvocationError::InvalidArguments);
     }
 
-    let provider_authorization = authorize_reported_mobile_tool(
-        &request.tool_name,
-        provider,
-        policy_id,
-        ceiling,
-    )?;
+    let provider_authorization =
+        authorize_reported_mobile_tool(&request.tool_name, provider, policy_id, ceiling)?;
 
     let arguments_bytes = canonical_jcs_bytes(&request.arguments)
         .map_err(|error| MobileInvocationError::Canonicalization(error.to_string()))?;
@@ -401,8 +431,11 @@ pub fn mobile_invocation_receipt_sha256(
 ) -> Result<String, MobileInvocationError> {
     let mut value = serde_json::to_value(receipt)
         .map_err(|error| MobileInvocationError::Canonicalization(error.to_string()))?;
-    value.as_object_mut()
-        .ok_or_else(|| MobileInvocationError::Canonicalization("receipt must serialize as object".to_owned()))?
+    value
+        .as_object_mut()
+        .ok_or_else(|| {
+            MobileInvocationError::Canonicalization("receipt must serialize as object".to_owned())
+        })?
         .remove("receipt_sha256");
     let bytes = canonical_jcs_bytes(&value)
         .map_err(|error| MobileInvocationError::Canonicalization(error.to_string()))?;
@@ -416,16 +449,23 @@ pub fn verify_mobile_invocation_receipt(
     validate_opaque_id(&receipt.invocation_id, "invocation_id", "inv_")?;
     validate_opaque_id(&receipt.session_alias, "session_alias", "ds_")?;
     validate_opaque_id(&receipt.consent_id, "consent_id", "consent_")?;
-    if receipt.caller_id.trim().is_empty() || receipt.consent_verifier_id.trim().is_empty()
-        || receipt.provider_id.trim().is_empty() || receipt.provider_revision.trim().is_empty()
+    if receipt.caller_id.trim().is_empty()
+        || receipt.consent_verifier_id.trim().is_empty()
+        || receipt.provider_id.trim().is_empty()
+        || receipt.provider_revision.trim().is_empty()
     {
-        return Err(MobileInvocationError::InvalidIdentifier("receipt principal/provider"));
+        return Err(MobileInvocationError::InvalidIdentifier(
+            "receipt principal/provider",
+        ));
     }
     validate_sha256(&receipt.invocation_nonce_sha256, "invocation_nonce_sha256")?;
     validate_sha256(&receipt.session_nonce_sha256, "session_nonce_sha256")?;
     validate_sha256(&receipt.consent_receipt_sha256, "consent_receipt_sha256")?;
     validate_sha256(&receipt.arguments_sha256, "arguments_sha256")?;
-    validate_sha256(&receipt.capability_report_sha256, "capability_report_sha256")?;
+    validate_sha256(
+        &receipt.capability_report_sha256,
+        "capability_report_sha256",
+    )?;
     validate_sha256(&receipt.effect_catalog_sha256, "effect_catalog_sha256")?;
     validate_sha256(&receipt.policy_sha256, "policy_sha256")?;
     validate_sha256(&receipt.effect_sha256, "effect_sha256")?;
@@ -436,7 +476,9 @@ pub fn verify_mobile_invocation_receipt(
         || receipt.provider_revision.trim().is_empty()
         || receipt.policy_id.trim().is_empty()
     {
-        return Err(MobileInvocationError::InvalidIdentifier("receipt principal/provider/policy"));
+        return Err(MobileInvocationError::InvalidIdentifier(
+            "receipt principal/provider/policy",
+        ));
     }
     if let Some(executable_digest) = &receipt.provider_executable_sha256 {
         validate_sha256(executable_digest, "provider_executable_sha256")?;
@@ -450,8 +492,8 @@ pub fn verify_mobile_invocation_receipt(
     if receipt.policy_id != MOBILE_DEVICE_READ_ONLY_POLICY_ID {
         return Err(MobileInvocationError::PolicyScopeMismatch);
     }
-    let expected_catalog_sha256 = mobile_tool_catalog_sha256()
-        .map_err(|error| MobileInvocationError::Provider(error))?;
+    let expected_catalog_sha256 =
+        mobile_tool_catalog_sha256().map_err(|error| MobileInvocationError::Provider(error))?;
     if receipt.effect_catalog_sha256 != expected_catalog_sha256 {
         return Err(MobileInvocationError::Canonicalization(
             "effect catalog digest does not match the pinned mobile catalog".to_owned(),
@@ -469,9 +511,13 @@ pub fn verify_mobile_invocation_receipt(
         || receipt.expires_at_unix_ms - receipt.issued_at_unix_ms > MOBILE_INVOCATION_MAX_TTL_MS
         || receipt.prepared_at_unix_ms >= receipt.expires_at_unix_ms
         || receipt.issued_at_unix_ms
-            > receipt.prepared_at_unix_ms.saturating_add(MOBILE_INVOCATION_MAX_CLOCK_SKEW_MS)
+            > receipt
+                .prepared_at_unix_ms
+                .saturating_add(MOBILE_INVOCATION_MAX_CLOCK_SKEW_MS)
     {
-        return Err(MobileInvocationError::InvalidTimestamp("receipt time bounds"));
+        return Err(MobileInvocationError::InvalidTimestamp(
+            "receipt time bounds",
+        ));
     }
     if mobile_invocation_receipt_sha256(receipt)? != receipt.receipt_sha256 {
         return Err(MobileInvocationError::Canonicalization(
@@ -491,8 +537,10 @@ pub struct MobileInvocationReplayGuard {
 
 impl MobileInvocationReplayGuard {
     fn discard_expired(&mut self, now_unix_ms: u64) {
-        self.invocation_ids.retain(|_, expires_at| *expires_at > now_unix_ms);
-        self.nonce_digests.retain(|_, expires_at| *expires_at > now_unix_ms);
+        self.invocation_ids
+            .retain(|_, expires_at| *expires_at > now_unix_ms);
+        self.nonce_digests
+            .retain(|_, expires_at| *expires_at > now_unix_ms);
     }
 
     /// Validate first, then claim both the invocation ID and nonce in this
@@ -510,7 +558,13 @@ impl MobileInvocationReplayGuard {
         now_unix_ms: u64,
     ) -> Result<AuthorizedMobileInvocation, MobileInvocationError> {
         let prepared = prepare_mobile_invocation(
-            request, consent, session, provider, policy_id, ceiling, now_unix_ms,
+            request,
+            consent,
+            session,
+            provider,
+            policy_id,
+            ceiling,
+            now_unix_ms,
         )?;
         self.discard_expired(now_unix_ms);
         let nonce_digest = sha256_hex(request.invocation_nonce.as_bytes());
@@ -525,11 +579,10 @@ impl MobileInvocationReplayGuard {
         {
             return Err(MobileInvocationError::ReplayCapacityExceeded);
         }
-        self.invocation_ids.insert(
-            request.invocation_id.clone(),
-            request.expires_at_unix_ms,
-        );
-        self.nonce_digests.insert(nonce_digest, request.expires_at_unix_ms);
+        self.invocation_ids
+            .insert(request.invocation_id.clone(), request.expires_at_unix_ms);
+        self.nonce_digests
+            .insert(nonce_digest, request.expires_at_unix_ms);
         Ok(prepared)
     }
 
@@ -571,7 +624,7 @@ fn validate_sha256(value: &str, field: &'static str) -> Result<(), MobileInvocat
 mod tests {
     use super::*;
     use crate::mobile_tool_effects::{
-        MOBILE_TOOL_EFFECTS, MOBILE_DEVICE_READ_ONLY_POLICY_ID, MobileProviderCapabilityReport,
+        MOBILE_DEVICE_READ_ONLY_POLICY_ID, MOBILE_TOOL_EFFECTS, MobileProviderCapabilityReport,
         ProviderAvailability, ProviderOperationCapability, mobile_tool_catalog_sha256,
     };
     use serde_json::json;
@@ -626,7 +679,10 @@ mod tests {
         (session, consent)
     }
 
-    fn build_request(session: &MobileDeviceSessionSnapshot, consent: &MobileConsentGrant) -> MobileInvocationRequest {
+    fn build_request(
+        session: &MobileDeviceSessionSnapshot,
+        consent: &MobileConsentGrant,
+    ) -> MobileInvocationRequest {
         MobileInvocationRequest {
             invocation_id: format!("inv_{}", "5".repeat(64)),
             invocation_nonce: format!("nonce_{}", "6".repeat(64)),
@@ -648,22 +704,33 @@ mod tests {
         let (session, consent) = aliases();
         let request = build_request(&session, &consent);
         let authorized = prepare_mobile_invocation(
-            &request, &consent, &session, &report(),
+            &request,
+            &consent,
+            &session,
+            &report(),
             MOBILE_DEVICE_READ_ONLY_POLICY_ID,
             EffectCeiling::MOBILE_DEVICE_READ_ONLY,
             NOW,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(authorized.receipt.tool, MobileTool::InspectAdbDevice);
         assert_eq!(authorized.arguments(), &request.arguments);
         assert_eq!(authorized.receipt.session_alias, session.session_alias);
         assert_eq!(authorized.receipt.session_generation, 7);
-        assert_eq!(authorized.receipt.target_scope_sha256, Some(HASH_A.to_owned()));
+        assert_eq!(
+            authorized.receipt.target_scope_sha256,
+            Some(HASH_A.to_owned())
+        );
         assert_eq!(authorized.receipt.provider_id, "adb-local");
-        assert_eq!(authorized.receipt.arguments_sha256, sha256_hex(
-            &canonical_jcs_bytes(&request.arguments).unwrap()
-        ));
-        assert_eq!(authorized.receipt.session_nonce_sha256, sha256_hex(session.session_nonce.as_bytes()));
+        assert_eq!(
+            authorized.receipt.arguments_sha256,
+            sha256_hex(&canonical_jcs_bytes(&request.arguments).unwrap())
+        );
+        assert_eq!(
+            authorized.receipt.session_nonce_sha256,
+            sha256_hex(session.session_nonce.as_bytes())
+        );
         verify_mobile_invocation_receipt(&authorized.receipt).unwrap();
     }
 
@@ -682,9 +749,15 @@ mod tests {
         assert!(!request_debug.contains("include_properties"));
 
         let authorized = prepare_mobile_invocation(
-            &request, &consent, &session, &report(),
-            MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW,
-        ).unwrap();
+            &request,
+            &consent,
+            &session,
+            &report(),
+            MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+            EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+            NOW,
+        )
+        .unwrap();
         let authorized_debug = format!("{authorized:?}");
         assert!(!authorized_debug.contains(&session.session_nonce));
         assert!(!authorized_debug.contains("include_properties"));
@@ -696,24 +769,45 @@ mod tests {
         let mut request = build_request(&session, &consent);
         request.session_alias = format!("ds_{}", "9".repeat(64));
         assert!(matches!(
-            prepare_mobile_invocation(&request, &consent, &session, &report(),
-                MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW),
+            prepare_mobile_invocation(
+                &request,
+                &consent,
+                &session,
+                &report(),
+                MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+                EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+                NOW
+            ),
             Err(MobileInvocationError::SessionMismatch("session_alias"))
         ));
 
         let mut request = build_request(&session, &consent);
         request.session_generation += 1;
         assert!(matches!(
-            prepare_mobile_invocation(&request, &consent, &session, &report(),
-                MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW),
+            prepare_mobile_invocation(
+                &request,
+                &consent,
+                &session,
+                &report(),
+                MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+                EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+                NOW
+            ),
             Err(MobileInvocationError::SessionMismatch("session_generation"))
         ));
 
         let mut request = build_request(&session, &consent);
         request.session_nonce = format!("session_{}", "9".repeat(64));
         assert!(matches!(
-            prepare_mobile_invocation(&request, &consent, &session, &report(),
-                MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW),
+            prepare_mobile_invocation(
+                &request,
+                &consent,
+                &session,
+                &report(),
+                MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+                EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+                NOW
+            ),
             Err(MobileInvocationError::SessionMismatch("session_nonce"))
         ));
     }
@@ -724,16 +818,30 @@ mod tests {
         let mut request = build_request(&session, &consent);
         request.expires_at_unix_ms = NOW;
         assert!(matches!(
-            prepare_mobile_invocation(&request, &consent, &session, &report(),
-                MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW),
+            prepare_mobile_invocation(
+                &request,
+                &consent,
+                &session,
+                &report(),
+                MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+                EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+                NOW
+            ),
             Err(MobileInvocationError::InvocationExpired)
         ));
 
         let mut request = build_request(&session, &consent);
         request.expires_at_unix_ms = request.issued_at_unix_ms + MOBILE_INVOCATION_MAX_TTL_MS + 1;
         assert!(matches!(
-            prepare_mobile_invocation(&request, &consent, &session, &report(),
-                MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW),
+            prepare_mobile_invocation(
+                &request,
+                &consent,
+                &session,
+                &report(),
+                MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+                EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+                NOW
+            ),
             Err(MobileInvocationError::InvocationLifetimeExceeded)
         ));
 
@@ -741,8 +849,15 @@ mod tests {
         consent.expires_at_unix_ms = NOW;
         let request = build_request(&session, &consent);
         assert!(matches!(
-            prepare_mobile_invocation(&request, &consent, &session, &report(),
-                MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW),
+            prepare_mobile_invocation(
+                &request,
+                &consent,
+                &session,
+                &report(),
+                MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+                EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+                NOW
+            ),
             Err(MobileInvocationError::ConsentExpired)
         ));
     }
@@ -752,9 +867,15 @@ mod tests {
         let (session, mut consent) = aliases();
         consent.revoked_at_unix_ms = Some(NOW - 1);
         let error = prepare_mobile_invocation(
-            &build_request(&session, &consent), &consent, &session, &report(),
-            MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW,
-        ).unwrap_err();
+            &build_request(&session, &consent),
+            &consent,
+            &session,
+            &report(),
+            MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+            EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+            NOW,
+        )
+        .unwrap_err();
         assert_eq!(error, MobileInvocationError::ConsentRevoked);
     }
 
@@ -763,19 +884,31 @@ mod tests {
         let (session, consent) = aliases();
         let mut provider = report();
         provider.availability = ProviderAvailability::PartiallyAvailable;
-        let operation = provider.operations.iter_mut()
+        let operation = provider
+            .operations
+            .iter_mut()
             .find(|entry| entry.tool == MobileTool::InspectAdbDevice)
             .unwrap();
         operation.available = false;
         operation.reason = Some("adb transport disconnected".to_owned());
 
         let error = prepare_mobile_invocation(
-            &build_request(&session, &consent), &consent, &session, &provider,
-            MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW,
-        ).unwrap_err();
-        assert!(matches!(error, MobileInvocationError::Provider(
-            ToolAuthorizationError::ProviderOperationUnavailable { tool: MobileTool::InspectAdbDevice, .. }
-        )));
+            &build_request(&session, &consent),
+            &consent,
+            &session,
+            &provider,
+            MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+            EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+            NOW,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            MobileInvocationError::Provider(ToolAuthorizationError::ProviderOperationUnavailable {
+                tool: MobileTool::InspectAdbDevice,
+                ..
+            })
+        ));
     }
 
     #[test]
@@ -783,10 +916,17 @@ mod tests {
         let (session, consent) = aliases();
         let mut guard = MobileInvocationReplayGuard::default();
         let first = build_request(&session, &consent);
-        guard.prepare_once(
-            &first, &consent, &session, &report(),
-            MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW,
-        ).unwrap();
+        guard
+            .prepare_once(
+                &first,
+                &consent,
+                &session,
+                &report(),
+                MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+                EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+                NOW,
+            )
+            .unwrap();
         assert_eq!(guard.claimed_invocation_count(), 1);
 
         let mut second = build_request(&session, &consent);
@@ -794,10 +934,17 @@ mod tests {
         second.invocation_nonce = format!("nonce_{}", "8".repeat(64));
         second.issued_at_unix_ms = NOW + 6_000;
         second.expires_at_unix_ms = NOW + 11_000;
-        guard.prepare_once(
-            &second, &consent, &session, &report(),
-            MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW + 6_000,
-        ).unwrap();
+        guard
+            .prepare_once(
+                &second,
+                &consent,
+                &session,
+                &report(),
+                MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+                EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+                NOW + 6_000,
+            )
+            .unwrap();
         assert_eq!(guard.claimed_invocation_count(), 1);
     }
 
@@ -807,24 +954,45 @@ mod tests {
         let mut request = build_request(&session, &consent);
         request.caller_id = "different-caller".to_owned();
         assert!(matches!(
-            prepare_mobile_invocation(&request, &consent, &session, &report(),
-                MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW),
+            prepare_mobile_invocation(
+                &request,
+                &consent,
+                &session,
+                &report(),
+                MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+                EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+                NOW
+            ),
             Err(MobileInvocationError::ConsentScopeMismatch("caller_id"))
         ));
 
         let mut request = build_request(&session, &consent);
         request.tool_name = "pull_adb_package".to_owned();
         assert!(matches!(
-            prepare_mobile_invocation(&request, &consent, &session, &report(),
-                MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW),
+            prepare_mobile_invocation(
+                &request,
+                &consent,
+                &session,
+                &report(),
+                MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+                EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+                NOW
+            ),
             Err(MobileInvocationError::ToolNotConsented)
         ));
 
         let mut request = build_request(&session, &consent);
         request.arguments = json!([]);
         assert_eq!(
-            prepare_mobile_invocation(&request, &consent, &session, &report(),
-                MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW)
+            prepare_mobile_invocation(
+                &request,
+                &consent,
+                &session,
+                &report(),
+                MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+                EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+                NOW
+            )
             .unwrap_err(),
             MobileInvocationError::InvalidArguments
         );
@@ -845,9 +1013,15 @@ mod tests {
             allow_mutates_device: true,
         };
         let error = prepare_mobile_invocation(
-            &build_request(&session, &consent), &consent, &session, &report(),
-            "operator-custom-elevated", elevated, NOW,
-        ).unwrap_err();
+            &build_request(&session, &consent),
+            &consent,
+            &session,
+            &report(),
+            "operator-custom-elevated",
+            elevated,
+            NOW,
+        )
+        .unwrap_err();
         assert_eq!(error, MobileInvocationError::PolicyScopeMismatch);
     }
 
@@ -855,9 +1029,15 @@ mod tests {
     fn rejects_receipt_when_tool_or_policy_digest_is_rewritten() {
         let (session, consent) = aliases();
         let authorized = prepare_mobile_invocation(
-            &build_request(&session, &consent), &consent, &session, &report(),
-            MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW,
-        ).unwrap();
+            &build_request(&session, &consent),
+            &consent,
+            &session,
+            &report(),
+            MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+            EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+            NOW,
+        )
+        .unwrap();
         let mut forged = authorized.receipt.clone();
         forged.tool = MobileTool::InstallAdbPackage;
         forged.effect_sha256 = "8".repeat(64);
@@ -869,9 +1049,15 @@ mod tests {
     fn rejects_tampered_portable_receipt() {
         let (session, consent) = aliases();
         let mut authorized = prepare_mobile_invocation(
-            &build_request(&session, &consent), &consent, &session, &report(),
-            MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW,
-        ).unwrap();
+            &build_request(&session, &consent),
+            &consent,
+            &session,
+            &report(),
+            MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+            EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+            NOW,
+        )
+        .unwrap();
         authorized.receipt.arguments_sha256 = "9".repeat(64);
         assert!(verify_mobile_invocation_receipt(&authorized.receipt).is_err());
     }
@@ -882,15 +1068,29 @@ mod tests {
         let req = build_request(&session, &consent);
         let mut guard = MobileInvocationReplayGuard::default();
 
-        assert!(guard.prepare_once(
-            &req, &consent, &session, &report(),
-            MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW,
-        ).is_ok());
+        assert!(
+            guard
+                .prepare_once(
+                    &req,
+                    &consent,
+                    &session,
+                    &report(),
+                    MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+                    EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+                    NOW,
+                )
+                .is_ok()
+        );
         assert_eq!(guard.claimed_invocation_count(), 1);
         assert!(matches!(
             guard.prepare_once(
-                &req, &consent, &session, &report(),
-                MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW,
+                &req,
+                &consent,
+                &session,
+                &report(),
+                MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+                EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+                NOW,
             ),
             Err(MobileInvocationError::Replay("invocation_id"))
         ));
@@ -898,10 +1098,19 @@ mod tests {
         let mut invalid = build_request(&session, &consent);
         invalid.invocation_id = format!("inv_{}", "7".repeat(64));
         invalid.invocation_nonce = "bad".to_owned();
-        assert!(guard.prepare_once(
-            &invalid, &consent, &session, &report(),
-            MOBILE_DEVICE_READ_ONLY_POLICY_ID, EffectCeiling::MOBILE_DEVICE_READ_ONLY, NOW,
-        ).is_err());
+        assert!(
+            guard
+                .prepare_once(
+                    &invalid,
+                    &consent,
+                    &session,
+                    &report(),
+                    MOBILE_DEVICE_READ_ONLY_POLICY_ID,
+                    EffectCeiling::MOBILE_DEVICE_READ_ONLY,
+                    NOW,
+                )
+                .is_err()
+        );
         assert_eq!(guard.claimed_invocation_count(), 1);
     }
 }
