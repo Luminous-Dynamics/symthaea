@@ -383,7 +383,7 @@ pub fn score_temporal_grounding(
         _ => 0,
     };
     let abstained = matches!(
-        prediction.state,
+        &prediction.state,
         GroundingPredictionStateV1::Ambiguous { .. }
             | GroundingPredictionStateV1::NotEstimable { .. }
     ) || (truth.state == GroundTruthStateV1::Absent
