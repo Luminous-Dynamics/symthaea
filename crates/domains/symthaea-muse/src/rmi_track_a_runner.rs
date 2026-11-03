@@ -50,6 +50,8 @@ pub struct RmiTrackATrialV1 {
     pub seed: u64,
     pub target: RmiTargetFeatureV1,
     pub intervention_pair_sha256: String,
+    pub yoked_donor_trial_id: String,
+    pub yoked_donor_fixture_sha256: String,
     pub fixed_agent: Result<RmiEvaluationEnvelopeV1, String>,
     pub one_way_prompt_agent: Result<RmiEvaluationEnvelopeV1, String>,
     pub yoked_replay_agent: Result<RmiEvaluationEnvelopeV1, String>,
@@ -256,12 +258,28 @@ fn one_way_prompt_agent_v1() -> OneWayPromptPolicyV1 {
     }
 }
 
-fn yoked_replay_agent_v1() -> YokedReplayPolicyV1 {
-    YokedReplayPolicyV1 {
+fn yoked_replay_agent_v1(
+    target: RmiTargetFeatureV1,
+    trial_index: usize,
+    seed_root: u64,
+) -> Result<(YokedReplayPolicyV1, String, String), String> {
+    // Use a distinct, deterministic donor fixture from a matched trial.
+    // It is generated before evaluation and does not receive the current
+    // treatment observation; the same frozen donor response is replayed in
+    // both counterfactual arms.
+    let donor_index = (trial_index + 1) % RMI_TRACK_A_MAX_TRIALS_PER_TARGET_V1;
+    let donor = make_rmi_track_a_fixture_v1(target, donor_index, seed_root)?;
+    let donor_digest = digest_v1(&donor)?;
+    let donor_trial_id = donor.trial_id.clone();
+    let policy = YokedReplayPolicyV1 {
         id: "yoked-replay-agent-v1".into(),
         version: "1".into(),
-        replayed_response: fixed_agent_v1().response,
-    }
+        replayed_response: RmiAgentActionV1 {
+            action_id: format!("yoked-from-{}", donor.trial_id),
+            features: donor.control_observation.features,
+        },
+    };
+    Ok((policy, donor_trial_id, donor_digest))
 }
 
 fn contingent_agent_v1(target: RmiTargetFeatureV1) -> SyntheticContingentPolicyV1 {
@@ -367,8 +385,10 @@ pub fn run_rmi_track_a_suite_v1(
             let fixed_agent = capture(evaluate_rmi_pair(&fixed_agent_v1(), &pair));
             let one_way_prompt_agent =
                 capture(evaluate_rmi_pair(&one_way_prompt_agent_v1(), &pair));
+            let (yoked_policy, yoked_donor_trial_id, yoked_donor_fixture_sha256) =
+                yoked_replay_agent_v1(target, trial_index, seed_root)?;
             let yoked_replay_agent =
-                capture(evaluate_rmi_pair(&yoked_replay_agent_v1(), &pair));
+                capture(evaluate_rmi_pair(&yoked_policy, &pair));
             let imitation_agent = capture(evaluate_rmi_pair(&imitation_agent_v1(), &pair));
             let synthetic_contingent_agent =
                 capture(evaluate_rmi_pair(&contingent_agent_v1(target), &pair));
@@ -394,6 +414,8 @@ pub fn run_rmi_track_a_suite_v1(
                 seed: pair.seed,
                 target,
                 intervention_pair_sha256: pair_sha256,
+                yoked_donor_trial_id,
+                yoked_donor_fixture_sha256,
                 fixed_agent,
                 one_way_prompt_agent,
                 yoked_replay_agent,
@@ -538,6 +560,18 @@ mod tests {
             7
         )
         .is_err());
+    }
+
+    #[test]
+    fn yoked_replay_binds_a_distinct_donor_fixture() {
+        let pair = make_rmi_track_a_fixture_v1(RmiTargetFeatureV1::Motif, 4, 42).unwrap();
+        let (policy, donor_id, donor_digest) =
+            yoked_replay_agent_v1(RmiTargetFeatureV1::Motif, 4, 42).unwrap();
+        assert_ne!(donor_id, pair.trial_id);
+        assert_ne!(donor_digest, digest_v1(&pair).unwrap());
+        assert!(policy.replayed_response.action_id.contains(&donor_id));
+        let result = evaluate_rmi_pair(&policy, &pair).unwrap();
+        assert!(!result.payload.targeted_input_sensitivity);
     }
 
     #[test]
