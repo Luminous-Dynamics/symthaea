@@ -339,8 +339,15 @@ fn evaluate_decision(d:&ModelDecisionObservation)->DecisionAuditResult {
     let r=best_action(&feasible,|a|a.realized_utility,d.tie_tolerance);
     if selected.feasibility!=DiscrepancyFeasibility::Feasible { return base(DecisionAuditStatus::SelectedActionInfeasible,Some(p.action_id.clone()),Some(r.action_id.clone()),Some(p.action_id!=r.action_id),None,None); }
     let regret=(r.realized_utility-selected.realized_utility).max(0.0);
-    let optimism=(selected.predicted_utility-p.predicted_utility)-(selected.realized_utility-r.realized_utility);
-    base(DecisionAuditStatus::Comparable,Some(p.action_id.clone()),Some(r.action_id.clone()),Some(p.action_id!=r.action_id),Some(regret),Some(optimism))
+    let alternatives=feasible.iter().copied().filter(|a|a.action_id!=selected.action_id).collect::<Vec<_>>();
+    let optimism=if alternatives.is_empty(){None}else{
+        let predicted_alternative=best_action(&alternatives,|a|a.predicted_utility,d.tie_tolerance);
+        let realized_alternative=best_action(&alternatives,|a|a.realized_utility,d.tie_tolerance);
+        let predicted_advantage=selected.predicted_utility-predicted_alternative.predicted_utility;
+        let realized_advantage=selected.realized_utility-realized_alternative.realized_utility;
+        Some(predicted_advantage-realized_advantage)
+    };
+    base(DecisionAuditStatus::Comparable,Some(p.action_id.clone()),Some(r.action_id.clone()),Some(p.action_id!=r.action_id),Some(regret),optimism)
 }
 
 fn best_action<'a,F:Fn(&DiscrepancyActionOutcome)->f64>(actions:&[&'a DiscrepancyActionOutcome],value:F,tol:f64)->&'a DiscrepancyActionOutcome {
