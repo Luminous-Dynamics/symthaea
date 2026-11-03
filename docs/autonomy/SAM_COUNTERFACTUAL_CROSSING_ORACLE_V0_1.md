@@ -145,7 +145,7 @@ Use the public helpers for expected-schedule, action-set and decision-context di
 
 The decision's candidate set is complete for this finite two-action analytic problem. This makes regret exact over the declared set, not over every physically possible control trajectory.
 
-## 6. Falsification and negative controls
+## 7. Falsification and negative controls
 
 Each control must change the expected report in the specified way:
 
@@ -165,7 +165,7 @@ Each control must change the expected report in the specified way:
 
 The test corpus must retain both positive controls and negative controls. A test that only proves rejection is insufficient: legitimate complete analytic inputs must produce the exact expected report.
 
-## 7. Extension to ego-action-conditioned actors
+## 8. Extension to ego-action-conditioned actors
 
 The analytic oracle above uses a prescribed crossing occupancy. The next layer is Symtropy #3471's synthetic interactive actor adapter.
 
@@ -180,7 +180,7 @@ For the first causal actor extension, compare two ego histories (Continue and Yi
 
 The actor adapter should output a bounded kinematic target applied by the existing Symtropy Kinematic body path; it must not create a new physics engine or duplicate vehicle dynamics.
 
-## 8. Research and industry benchmark positioning
+## 9. Research and industry benchmark positioning
 
 This oracle is not a substitute for public benchmarks. It is the analytic gate before larger benchmark execution.
 
@@ -202,7 +202,7 @@ Sources:
 - https://leaderboard.carla.org/
 - https://www.nist.gov/programs-projects/measurement-science-automated-vehicles-0
 
-## 9. Milestones and acceptance
+## 10. Milestones and acceptance
 
 ### M0 — analytic oracle
 - Independent implementation of the equations above.
@@ -241,7 +241,7 @@ Sources:
 
 These are research targets, not current capabilities, safety thresholds or certification criteria.
 
-## 10. Claim ceiling
+## 11. Claim ceiling
 
 A passing M0/M1 result establishes that the specified analytic example and evaluator detect this particular model-induced ranking reversal under the declared assumptions. M2/M3 adds deterministic synthetic execution and causal actor response only. M4 adds benchmark-specific results only.
 
