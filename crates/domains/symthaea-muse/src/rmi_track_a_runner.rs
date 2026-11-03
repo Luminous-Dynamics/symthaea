@@ -10,8 +10,9 @@
 
 use crate::rmi_benchmark::{
     evaluate_rmi_pair, evaluate_rmi_reciprocal_pair, FixedPartnerResponsePolicyV1,
-    FixedResponsePolicyV1, ImitationOnlyPolicyV1, RmiAgentActionV1,
-    RmiEvaluationEnvelopeV1, RmiHistoryActorV1, RmiHistoryEventV1,
+    FixedResponsePolicyV1, ImitationOnlyPolicyV1, OneWayPromptPolicyV1,
+    RmiAgentActionV1, RmiEvaluationEnvelopeV1, RmiHistoryActorV1, RmiHistoryEventV1,
+    YokedReplayPolicyV1,
     RmiInterventionPairV1, RmiMusicalFeaturesV1, RmiPartnerObservationV1,
     RmiPartnerResponseV1, RmiReciprocalEvaluationEnvelopeV1, RmiRoleV1,
     RmiTargetFeatureV1,
@@ -50,6 +51,8 @@ pub struct RmiTrackATrialV1 {
     pub target: RmiTargetFeatureV1,
     pub intervention_pair_sha256: String,
     pub fixed_agent: Result<RmiEvaluationEnvelopeV1, String>,
+    pub one_way_prompt_agent: Result<RmiEvaluationEnvelopeV1, String>,
+    pub yoked_replay_agent: Result<RmiEvaluationEnvelopeV1, String>,
     pub imitation_agent: Result<RmiEvaluationEnvelopeV1, String>,
     pub synthetic_contingent_agent: Result<RmiEvaluationEnvelopeV1, String>,
     pub fixed_agent_with_responsive_partner: Result<RmiReciprocalEvaluationEnvelopeV1, String>,
@@ -62,8 +65,11 @@ pub struct RmiTrackASummaryV1 {
     pub trials: usize,
     pub evaluator_errors: usize,
     pub fixed_agent_zero_sensitivity: usize,
+    pub one_way_prompt_zero_sensitivity: usize,
+    pub yoked_replay_zero_sensitivity: usize,
     pub imitation_agent_target_sensitive: usize,
     pub positive_agent_target_sensitive: usize,
+    pub positive_agent_zero_collateral: usize,
     pub fixed_agent_did_not_influence_partner: usize,
     pub fixed_partner_did_not_respond: usize,
     pub reciprocal_positive_control_both_directions: usize,
@@ -242,6 +248,22 @@ fn imitation_agent_v1() -> ImitationOnlyPolicyV1 {
     }
 }
 
+fn one_way_prompt_agent_v1() -> OneWayPromptPolicyV1 {
+    OneWayPromptPolicyV1 {
+        id: "one-way-prompt-agent-v1".into(),
+        version: "1".into(),
+        frozen_response: fixed_agent_v1().response,
+    }
+}
+
+fn yoked_replay_agent_v1() -> YokedReplayPolicyV1 {
+    YokedReplayPolicyV1 {
+        id: "yoked-replay-agent-v1".into(),
+        version: "1".into(),
+        replayed_response: fixed_agent_v1().response,
+    }
+}
+
 fn contingent_agent_v1(target: RmiTargetFeatureV1) -> SyntheticContingentPolicyV1 {
     SyntheticContingentPolicyV1 {
         id: format!("synthetic-contingent-agent-{}", target_name_v1(target)),
@@ -314,6 +336,8 @@ pub fn run_rmi_track_a_suite_v1(
         targets: targets.clone(),
         agent_policy_ids: vec![
             "fixed-response-agent-v1".into(),
+            "one-way-prompt-agent-v1".into(),
+            "yoked-replay-agent-v1".into(),
             "imitation-only-agent-v1".into(),
             "synthetic-contingent-agent-motif".into(),
             "synthetic-contingent-agent-rhythm".into(),
@@ -341,6 +365,10 @@ pub fn run_rmi_track_a_suite_v1(
             let pair_sha256 = digest_v1(&pair)?;
 
             let fixed_agent = capture(evaluate_rmi_pair(&fixed_agent_v1(), &pair));
+            let one_way_prompt_agent =
+                capture(evaluate_rmi_pair(&one_way_prompt_agent_v1(), &pair));
+            let yoked_replay_agent =
+                capture(evaluate_rmi_pair(&yoked_replay_agent_v1(), &pair));
             let imitation_agent = capture(evaluate_rmi_pair(&imitation_agent_v1(), &pair));
             let synthetic_contingent_agent =
                 capture(evaluate_rmi_pair(&contingent_agent_v1(target), &pair));
@@ -367,6 +395,8 @@ pub fn run_rmi_track_a_suite_v1(
                 target,
                 intervention_pair_sha256: pair_sha256,
                 fixed_agent,
+                one_way_prompt_agent,
+                yoked_replay_agent,
                 imitation_agent,
                 synthetic_contingent_agent,
                 fixed_agent_with_responsive_partner,
@@ -383,6 +413,8 @@ pub fn run_rmi_track_a_suite_v1(
     for trial in &trials {
         let outcomes = [
             trial.fixed_agent.is_ok(),
+            trial.one_way_prompt_agent.is_ok(),
+            trial.yoked_replay_agent.is_ok(),
             trial.imitation_agent.is_ok(),
             trial.synthetic_contingent_agent.is_ok(),
             trial.fixed_agent_with_responsive_partner.is_ok(),
@@ -396,6 +428,16 @@ pub fn run_rmi_track_a_suite_v1(
                 usize::from(!result.payload.targeted_input_sensitivity);
             summary.agent_order_swap_verified += usize::from(result.payload.arm_order_swap_verified);
         }
+        if let Ok(result) = &trial.one_way_prompt_agent {
+            summary.one_way_prompt_zero_sensitivity +=
+                usize::from(!result.payload.targeted_input_sensitivity);
+            summary.agent_order_swap_verified += usize::from(result.payload.arm_order_swap_verified);
+        }
+        if let Ok(result) = &trial.yoked_replay_agent {
+            summary.yoked_replay_zero_sensitivity +=
+                usize::from(!result.payload.targeted_input_sensitivity);
+            summary.agent_order_swap_verified += usize::from(result.payload.arm_order_swap_verified);
+        }
         if let Ok(result) = &trial.imitation_agent {
             summary.imitation_agent_target_sensitive +=
                 usize::from(result.payload.targeted_input_sensitivity);
@@ -404,6 +446,8 @@ pub fn run_rmi_track_a_suite_v1(
         if let Ok(result) = &trial.synthetic_contingent_agent {
             summary.positive_agent_target_sensitive +=
                 usize::from(result.payload.targeted_input_sensitivity);
+            summary.positive_agent_zero_collateral +=
+                usize::from(result.payload.collateral_changed_feature_count == 0);
             summary.agent_order_swap_verified += usize::from(result.payload.arm_order_swap_verified);
         }
         if let Ok(result) = &trial.fixed_agent_with_responsive_partner {
@@ -434,8 +478,11 @@ pub fn run_rmi_track_a_suite_v1(
 
     summary.synthetic_fixture_expectations_satisfied = summary.evaluator_errors == 0
         && summary.fixed_agent_zero_sensitivity == summary.trials
+        && summary.one_way_prompt_zero_sensitivity == summary.trials
+        && summary.yoked_replay_zero_sensitivity == summary.trials
         && summary.imitation_agent_target_sensitive == summary.trials
         && summary.positive_agent_target_sensitive == summary.trials
+        && summary.positive_agent_zero_collateral == summary.trials
         && summary.fixed_agent_did_not_influence_partner == summary.trials
         && summary.fixed_partner_did_not_respond == summary.trials
         && summary.reciprocal_positive_control_both_directions == summary.trials
@@ -502,8 +549,11 @@ mod tests {
         assert_eq!(first.payload.summary.trials, 8);
         assert_eq!(first.payload.summary.evaluator_errors, 0);
         assert_eq!(first.payload.summary.fixed_agent_zero_sensitivity, 8);
+        assert_eq!(first.payload.summary.one_way_prompt_zero_sensitivity, 8);
+        assert_eq!(first.payload.summary.yoked_replay_zero_sensitivity, 8);
         assert_eq!(first.payload.summary.imitation_agent_target_sensitive, 8);
         assert_eq!(first.payload.summary.positive_agent_target_sensitive, 8);
+        assert_eq!(first.payload.summary.positive_agent_zero_collateral, 8);
         assert_eq!(first.payload.summary.reciprocal_positive_control_both_directions, 8);
     }
 }
