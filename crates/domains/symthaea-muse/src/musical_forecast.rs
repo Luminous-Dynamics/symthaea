@@ -211,7 +211,12 @@ impl MusicalForecastV1 {
 pub struct ForecastDisplayReceiptV1 {
     pub forecast_id: String,
     pub recipient_id: String,
+    pub display_surface_id: String,
     pub displayed_at_tick: u64,
+    /// Digest/reference to an independently retained presentation event.
+    /// This module does not authenticate the UI or prove that the recipient read it.
+    pub display_evidence_ref: String,
+    pub display_evidence_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -259,8 +264,11 @@ impl MusicalForecastLedgerV1 {
             let previous = self
                 .forecast(previous_id)
                 .ok_or_else(|| "superseded forecast must already exist in this ledger".to_owned())?;
-            if previous.session_id != forecast.session_id {
-                return Err("a forecast cannot supersede a different session".into());
+            if previous.session_id != forecast.session_id
+                || previous.turn_id != forecast.turn_id
+                || previous.clock_domain != forecast.clock_domain
+            {
+                return Err("supersession must remain within the same session, turn and clock domain".into());
             }
             if !self.is_active_at(previous_id, forecast.created_at_tick) {
                 return Err("a forecast can supersede only an active prior forecast".into());
@@ -286,8 +294,12 @@ impl MusicalForecastLedgerV1 {
         let forecast = self
             .forecast(&receipt.forecast_id)
             .ok_or_else(|| "display receipt references an unknown forecast".to_owned())?;
-        if receipt.recipient_id.trim().is_empty() {
-            return Err("display recipient ID must not be empty".into());
+        if receipt.recipient_id.trim().is_empty()
+            || receipt.display_surface_id.trim().is_empty()
+            || receipt.display_evidence_ref.trim().is_empty()
+            || !is_sha256(&receipt.display_evidence_sha256)
+        {
+            return Err("display receipt requires recipient, surface and digest-bound presentation evidence".into());
         }
         if receipt.displayed_at_tick < forecast.created_at_tick {
             return Err("display cannot precede forecast commitment".into());
@@ -393,8 +405,15 @@ pub struct RealizedMusicalEventV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ForecastEvaluationContextV1 {
     pub session_id: String,
+    pub clock_domain: String,
     pub input_history_sha256: String,
     pub immutable_policy_identity_sha256: String,
+    /// Exact score/MIDI/audio artifact whose event projection is being scored.
+    pub realization_artifact_ref: String,
+    pub realization_artifact_sha256: String,
+    /// Versioned projection specification and digest of its canonical event data.
+    pub event_projection_id: String,
+    pub event_projection_sha256: String,
     pub realization_tick: u64,
     pub realized_events: Vec<RealizedMusicalEventV1>,
 }
@@ -429,11 +448,16 @@ pub struct ForecastFieldOutcomeV1 {
 pub struct ForecastEvaluationV1 {
     pub forecast_id: String,
     pub forecast_sha256: String,
+    pub realization_artifact_ref: String,
+    pub realization_artifact_sha256: String,
+    pub event_projection_id: String,
+    pub event_projection_sha256: String,
+    pub realization_tick: u64,
     pub committed_before_realization: bool,
     pub displayed_before_realization: bool,
     pub predicted_event_count: usize,
     pub matched_event_count: usize,
-    pub missing_realized_event_count: usize,
+    pub unrealized_predicted_event_count: usize,
     pub unpredicted_realized_event_count: usize,
     pub correct_field_count: usize,
     pub scored_field_count: usize,
@@ -455,13 +479,29 @@ pub fn evaluate_musical_forecast_v1(
     if forecast.session_id != context.session_id {
         return Err("forecast session does not match realization session".into());
     }
+    if forecast.clock_domain != context.clock_domain {
+        return Err("forecast and realization use different monotonic clock domains".into());
+    }
     if forecast.input_history_sha256 != context.input_history_sha256 {
         return Err("input-history digest mismatch (non-contingent/yoked preview)".into());
     }
     if forecast.immutable_policy_identity_sha256 != context.immutable_policy_identity_sha256 {
         return Err("immutable policy identity digest mismatch".into());
     }
-    if forecast.created_at_tick >= context.realization_tick {
+    for (name, value) in [
+        ("realization artifact reference", context.realization_artifact_ref.as_str()),
+        ("event projection ID", context.event_projection_id.as_str()),
+    ] {
+        if value.trim().is_empty() {
+            return Err(format!("{name} must not be empty"));
+        }
+    }
+    if !is_sha256(&context.realization_artifact_sha256)
+        || !is_sha256(&context.event_projection_sha256)
+    {
+        return Err("realization artifact and event projection require lowercase SHA-256 digests".into());
+    }
+    if context.realization_tick < forecast.created_at_tick {
         return Err("post-hoc forecast cannot be scored as anticipatory".into());
     }
     if context.realization_tick < forecast.target_window_start_tick
@@ -553,7 +593,7 @@ pub fn evaluate_musical_forecast_v1(
         .map(|event| event.slot_id.as_str())
         .collect();
     let realized_ids: BTreeSet<&str> = actual_by_slot.keys().copied().collect();
-    let missing_realized_event_count = predicted_ids.difference(&realized_ids).count();
+    let unrealized_predicted_event_count = predicted_ids.difference(&realized_ids).count();
     let unpredicted_realized_event_count = realized_ids.difference(&predicted_ids).count();
     let mean_brier_score_millionths = if brier_count == 0 {
         None
@@ -564,11 +604,16 @@ pub fn evaluate_musical_forecast_v1(
     Ok(ForecastEvaluationV1 {
         forecast_id: forecast_id.to_owned(),
         forecast_sha256,
+        realization_artifact_ref: context.realization_artifact_ref.clone(),
+        realization_artifact_sha256: context.realization_artifact_sha256.clone(),
+        event_projection_id: context.event_projection_id.clone(),
+        event_projection_sha256: context.event_projection_sha256.clone(),
+        realization_tick: context.realization_tick,
         committed_before_realization: true,
         displayed_before_realization: ledger.displayed_before(forecast_id, context.realization_tick),
         predicted_event_count: forecast.predicted_events.len(),
         matched_event_count,
-        missing_realized_event_count,
+        unrealized_predicted_event_count,
         unpredicted_realized_event_count,
         correct_field_count,
         scored_field_count: outcomes.len(),
@@ -663,8 +708,13 @@ mod tests {
     fn context(realization_tick: u64) -> ForecastEvaluationContextV1 {
         ForecastEvaluationContextV1 {
             session_id: "session-1".into(),
+            clock_domain: "fixture-monotonic-v1".into(),
             input_history_sha256: digest("input-history"),
             immutable_policy_identity_sha256: digest("policy-identity"),
+            realization_artifact_ref: "sha256:realized-score".into(),
+            realization_artifact_sha256: digest("realized-score"),
+            event_projection_id: "symbolic-score-events-v1".into(),
+            event_projection_sha256: digest("projected-events"),
             realization_tick,
             realized_events: vec![realized_event()],
         }
@@ -680,7 +730,10 @@ mod tests {
                 ForecastDisplayReceiptV1 {
                     forecast_id: "forecast-1".into(),
                     recipient_id: "musician-1".into(),
+                    display_surface_id: "score-preview-panel".into(),
                     displayed_at_tick: 6,
+                    display_evidence_ref: "fixture://display-event-1".into(),
+                    display_evidence_sha256: digest("display-event-1"),
                 },
             )
             .unwrap();
