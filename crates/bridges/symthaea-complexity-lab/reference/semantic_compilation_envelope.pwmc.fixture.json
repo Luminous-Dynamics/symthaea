@@ -1,0 +1,154 @@
+{
+  "format": "symthaea.semantic-compilation-envelope",
+  "schema_version": 1,
+  "canonicalization": {
+    "profile_id": "symthaea-json-struct-v1",
+    "profile_version": 1
+  },
+  "problem": {
+    "source": {
+      "format_id": "dimacs-cnf",
+      "parser_profile_id": "dimacs-cnf-1",
+      "bytes_digest": "sha256:6a43e1ffb6566b3ccbdcc57f8bd5638294ac56b615fe617c58ded6ee6374b333"
+    },
+    "variables": {
+      "universe": [
+        "d",
+        "h"
+      ],
+      "visible": [
+        "d"
+      ],
+      "hidden": [
+        "h"
+      ]
+    },
+    "contract": "pwmc",
+    "quantifier_semantics": "exists_hidden_per_visible_assignment",
+    "coefficient_domain": "Q",
+    "weight_map": {
+      "domain": "Q",
+      "entries": [
+        {
+          "variable": "d",
+          "false_weight": {
+            "numerator": "1",
+            "denominator": "3"
+          },
+          "true_weight": {
+            "numerator": "2",
+            "denominator": "3"
+          }
+        }
+      ]
+    }
+  },
+  "stages": [
+    {
+      "stage_id": "project-visible-support",
+      "operation": "illustrative-projection-fixture",
+      "input": {
+        "kind": "source-instance",
+        "version": "dimacs-cnf-1",
+        "digest": "sha256:6a43e1ffb6566b3ccbdcc57f8bd5638294ac56b615fe617c58ded6ee6374b333"
+      },
+      "output": {
+        "kind": "projected-dnnf-fixture",
+        "version": "fixture-1",
+        "digest": "sha256:74861f0fb6965f2c22004a2281418a63f5722ab6372d71068386c46354cc33d9"
+      },
+      "relation": "projected_support_equivalence",
+      "obligations": [
+        {
+          "obligation_id": "projection-support",
+          "kind": "projected_support_equivalence",
+          "status": "tested_only",
+          "tests": {
+            "suite_id": "eth027-schema-fixture",
+            "artifact_digest": "sha256:af628947a7a1c07f4de9ed59c33607e7bb7f7d83e1919a83f8815b064b83f9d0",
+            "case_count": 1,
+            "claim_ceiling": "finite_test_evidence"
+          },
+          "note": "Illustrative only; no SCPOG compiler or checker was executed."
+        },
+        {
+          "obligation_id": "d-dnnf-structure",
+          "kind": "deterministic_disjunction",
+          "status": "tested_only",
+          "tests": {
+            "suite_id": "eth027-schema-fixture",
+            "artifact_digest": "sha256:af628947a7a1c07f4de9ed59c33607e7bb7f7d83e1919a83f8815b064b83f9d0",
+            "case_count": 1,
+            "claim_ceiling": "finite_test_evidence"
+          },
+          "note": "Structural placeholder; not a certified d-DNNF claim."
+        }
+      ]
+    },
+    {
+      "stage_id": "exact-visible-weight-evaluation",
+      "operation": "illustrative-pwmc-evaluation",
+      "input": {
+        "kind": "projected-dnnf-fixture",
+        "version": "fixture-1",
+        "digest": "sha256:74861f0fb6965f2c22004a2281418a63f5722ab6372d71068386c46354cc33d9"
+      },
+      "output": {
+        "kind": "exact-result",
+        "version": "fixture-result-v1",
+        "digest": "sha256:017fd896f8fd954a112cf80bcb03a847e3caa50f0bb8535dd0cb23a3921b13bf"
+      },
+      "relation": "support_to_scalar_evaluation",
+      "obligations": [
+        {
+          "obligation_id": "visible-weight-evaluation",
+          "kind": "weighted_value_preservation",
+          "status": "tested_only",
+          "tests": {
+            "suite_id": "eth027-schema-fixture",
+            "artifact_digest": "sha256:af628947a7a1c07f4de9ed59c33607e7bb7f7d83e1919a83f8815b064b83f9d0",
+            "case_count": 1,
+            "claim_ceiling": "finite_test_evidence"
+          },
+          "note": "Projected support contains d=true; hidden h is deliberately omitted from the PWMC weight map."
+        },
+        {
+          "obligation_id": "support-value-separation",
+          "kind": "exact_arithmetic_replay",
+          "status": "tested_only",
+          "tests": {
+            "suite_id": "eth027-schema-fixture",
+            "artifact_digest": "sha256:af628947a7a1c07f4de9ed59c33607e7bb7f7d83e1919a83f8815b064b83f9d0",
+            "case_count": 1,
+            "claim_ceiling": "finite_test_evidence"
+          },
+          "note": "Support cardinality and arithmetic value are distinct fields."
+        }
+      ]
+    }
+  ],
+  "result": {
+    "artifact_digest": "sha256:017fd896f8fd954a112cf80bcb03a847e3caa50f0bb8535dd0cb23a3921b13bf",
+    "support": {
+      "status": "computed_exact",
+      "cardinality": "1"
+    },
+    "arithmetic": {
+      "status": "computed_exact",
+      "domain": "Q",
+      "value": {
+        "numerator": "2",
+        "denominator": "3"
+      }
+    }
+  },
+  "independent_replay": {
+    "status": "not_run",
+    "input_representation_digest": "sha256:74861f0fb6965f2c22004a2281418a63f5722ab6372d71068386c46354cc33d9"
+  },
+  "provenance": {
+    "producer_id": "manual-pwmc-fixture",
+    "producer_version": "1",
+    "environment_id": "local-schema-test"
+  }
+}
