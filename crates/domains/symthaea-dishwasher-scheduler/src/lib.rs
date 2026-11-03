@@ -12,7 +12,7 @@
 
 pub mod resource_curve;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use symthaea_dishwasher_design::quality::{
     Endpoint, EndpointCriterion, PilotEvidenceEnvelope,
