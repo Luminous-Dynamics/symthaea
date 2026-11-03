@@ -318,11 +318,42 @@ fn derive_report(input: &VehicleModelDiscrepancyInput) -> Result<VehicleModelDis
             return Err(VehicleModelDiscrepancyError::InvalidUtility);
         }
         for a in &d.actions {
-            if a.action_id.trim().is_empty() || a.execution_receipt_id.trim().is_empty() || a.evaluator_receipt_id.trim().is_empty() { return Err(VehicleModelDiscrepancyError::InvalidActionReceipt); }
+            if a.action_id.trim().is_empty() { return Err(VehicleModelDiscrepancyError::InvalidActionReceipt); }
             if !action_ids.insert(a.action_id.as_str()) { return Err(VehicleModelDiscrepancyError::DuplicateActionId); }
-            if !receipt_ids.insert(a.execution_receipt_id.as_str()) || !receipt_ids.insert(a.evaluator_receipt_id.as_str()) { return Err(VehicleModelDiscrepancyError::DuplicateReceiptId); }
-            if !valid_digest(&a.command_digest) || !valid_digest(&a.execution_digest) { return Err(VehicleModelDiscrepancyError::InvalidDigest); }
-            if !a.predicted_utility.is_finite() || !a.realized_utility.is_finite() { return Err(VehicleModelDiscrepancyError::InvalidUtility); }
+            if !valid_digest(&a.command_digest) || !a.predicted_utility.is_finite() {
+                return Err(VehicleModelDiscrepancyError::InvalidUtility);
+            }
+            match a.reference_status {
+                ReferenceOutcomeStatus::Observed => {
+                    let (Some(exec_receipt), Some(exec_digest), Some(eval_receipt)) =
+                        (a.execution_receipt_id.as_deref(), a.execution_digest.as_deref(), a.evaluator_receipt_id.as_deref())
+                    else { return Err(VehicleModelDiscrepancyError::InvalidActionReceipt); };
+                    if exec_receipt.trim().is_empty() || eval_receipt.trim().is_empty() {
+                        return Err(VehicleModelDiscrepancyError::InvalidActionReceipt);
+                    }
+                    if !valid_digest(exec_digest) { return Err(VehicleModelDiscrepancyError::InvalidDigest); }
+                    if !receipt_ids.insert(exec_receipt) || !receipt_ids.insert(eval_receipt) {
+                        return Err(VehicleModelDiscrepancyError::DuplicateReceiptId);
+                    }
+                    match (a.feasibility, a.realized_utility) {
+                        (DiscrepancyFeasibility::Feasible, Some(value)) if value.is_finite() => {}
+                        (DiscrepancyFeasibility::Infeasible, None) => {}
+                        (DiscrepancyFeasibility::Indeterminate, None) => {}
+                        _ => return Err(VehicleModelDiscrepancyError::InconsistentReferenceOutcome),
+                    }
+                }
+                ReferenceOutcomeStatus::Missing | ReferenceOutcomeStatus::Censored
+                | ReferenceOutcomeStatus::TimedOut | ReferenceOutcomeStatus::Unsupported => {
+                    if a.feasibility != DiscrepancyFeasibility::Indeterminate
+                        || a.realized_utility.is_some()
+                        || a.execution_receipt_id.is_some()
+                        || a.execution_digest.is_some()
+                        || a.evaluator_receipt_id.is_some()
+                    {
+                        return Err(VehicleModelDiscrepancyError::InconsistentReferenceOutcome);
+                    }
+                }
+            }
             action_pairs.push((a.action_id.as_str(),a.command_digest.as_str()));
         }
         if !action_ids.contains(d.selected_action_id.as_str()) { return Err(VehicleModelDiscrepancyError::MissingSelectedAction); }
