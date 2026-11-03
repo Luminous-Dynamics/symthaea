@@ -39,10 +39,12 @@ pub enum TrafficRuleKind {
     SpeedLimit {
         maximum_speed_mps: f64,
         tolerance_mps: f64,
+        maximum_sample_gap_s: f64,
     },
     MandatoryDirection {
         required_heading_rad: f64,
         maximum_heading_error_rad: f64,
+        maximum_sample_gap_s: f64,
     },
     StopBeforeLine {
         stop_line_progress_m: f64,
@@ -89,6 +91,8 @@ pub enum RuleComplianceReason {
     EvidenceMalformed,
     RuleMalformed,
     TrajectoryMalformed,
+    TrajectorySamplingGap,
+    TrajectoryCoverageInsufficient,
     SpeedLimitExceeded,
     MandatoryDirectionNotFollowed,
     StopLinePassedWithoutRequiredStop,
@@ -282,11 +286,14 @@ fn evaluate_requirement(
         TrafficRuleKind::SpeedLimit {
             maximum_speed_mps,
             tolerance_mps,
+            maximum_sample_gap_s,
         } => {
             if !maximum_speed_mps.is_finite()
                 || maximum_speed_mps <= 0.0
                 || !tolerance_mps.is_finite()
                 || tolerance_mps < 0.0
+                || !maximum_sample_gap_s.is_finite()
+                || *maximum_sample_gap_s <= 0.0
             {
                 return indeterminate(RuleComplianceReason::RuleMalformed);
             }
@@ -298,8 +305,19 @@ fn evaluate_requirement(
                         && sample.route_progress_m <= requirement.active_end_progress_m
                 })
                 .collect::<Vec<_>>();
-            if applicable.is_empty() {
+            if !trajectory_range_overlaps_rule(trajectory, requirement) {
                 return not_encountered(requirement);
+            }
+            if applicable.len() < 2 {
+                return indeterminate(RuleComplianceReason::TrajectoryCoverageInsufficient);
+            }
+            if rule_zone_has_sampling_gap(
+                trajectory,
+                requirement.active_start_progress_m,
+                requirement.active_end_progress_m,
+                *maximum_sample_gap_s,
+            ) {
+                return indeterminate(RuleComplianceReason::TrajectorySamplingGap);
             }
             let minimum = applicable
                 .iter()
@@ -336,10 +354,13 @@ fn evaluate_requirement(
         TrafficRuleKind::MandatoryDirection {
             required_heading_rad,
             maximum_heading_error_rad,
+            maximum_sample_gap_s,
         } => {
             if !required_heading_rad.is_finite()
                 || !maximum_heading_error_rad.is_finite()
                 || !(0.0..=std::f64::consts::PI).contains(maximum_heading_error_rad)
+                || !maximum_sample_gap_s.is_finite()
+                || *maximum_sample_gap_s <= 0.0
             {
                 return indeterminate(RuleComplianceReason::RuleMalformed);
             }
@@ -542,11 +563,19 @@ fn requirement_numeric_fields_are_finite(requirement: &TrafficRuleRequirement) -
         TrafficRuleKind::SpeedLimit {
             maximum_speed_mps,
             tolerance_mps,
-        } => maximum_speed_mps.is_finite() && tolerance_mps.is_finite(),
+            maximum_sample_gap_s,
+        } => maximum_speed_mps.is_finite()
+            && tolerance_mps.is_finite()
+            && maximum_sample_gap_s.is_finite(),
         TrafficRuleKind::MandatoryDirection {
             required_heading_rad,
             maximum_heading_error_rad,
-        } => required_heading_rad.is_finite() && maximum_heading_error_rad.is_finite(),
+            maximum_sample_gap_s,
+        } => {
+            required_heading_rad.is_finite()
+                && maximum_heading_error_rad.is_finite()
+                && maximum_sample_gap_s.is_finite()
+        },
         TrafficRuleKind::Unsupported { .. } => true,
         TrafficRuleKind::StopBeforeLine {
             stop_line_progress_m,
@@ -564,6 +593,34 @@ fn requirement_numeric_fields_are_finite(requirement: &TrafficRuleRequirement) -
         .iter()
         .all(|value| value.is_finite()),
     }
+}
+
+fn trajectory_range_overlaps_rule(
+    trajectory: &[RuleTrajectorySample],
+    requirement: &TrafficRuleRequirement,
+) -> bool {
+    let Some(first) = trajectory.first() else {
+        return false;
+    };
+    let Some(last) = trajectory.last() else {
+        return false;
+    };
+    last.route_progress_m >= requirement.active_start_progress_m
+        && first.route_progress_m <= requirement.active_end_progress_m
+}
+
+fn rule_zone_has_sampling_gap(
+    trajectory: &[RuleTrajectorySample],
+    active_start_progress_m: f64,
+    active_end_progress_m: f64,
+    maximum_sample_gap_s: f64,
+) -> bool {
+    trajectory.windows(2).any(|pair| {
+        let segment_overlaps_zone = pair[1].route_progress_m >= active_start_progress_m
+            && pair[0].route_progress_m <= active_end_progress_m;
+        segment_overlaps_zone
+            && pair[1].timestamp_s - pair[0].timestamp_s > maximum_sample_gap_s
+    })
 }
 
 fn evidence_is_well_formed(evidence: &TrafficRuleEvidence) -> bool {
@@ -653,6 +710,7 @@ mod tests {
             kind: TrafficRuleKind::SpeedLimit {
                 maximum_speed_mps: 13.4,
                 tolerance_mps: 0.2,
+                maximum_sample_gap_s: 0.25,
             },
             evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
         };
@@ -684,6 +742,7 @@ mod tests {
                 kind: TrafficRuleKind::SpeedLimit {
                     maximum_speed_mps: 10.0,
                     tolerance_mps: 0.0,
+                    maximum_sample_gap_s: 0.25,
                 },
                 evidence: supplied_evidence,
             };
@@ -694,6 +753,50 @@ mod tests {
             .unwrap();
             assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::Indeterminate);
         }
+    }
+
+    #[test]
+    fn sparse_samples_inside_speed_zone_are_indeterminate() {
+        let rule = TrafficRuleRequirement {
+            rule_id: "speed-sparse".into(),
+            active_start_progress_m: 0.0,
+            active_end_progress_m: 100.0,
+            kind: TrafficRuleKind::SpeedLimit {
+                maximum_speed_mps: 13.4,
+                tolerance_mps: 0.2,
+                maximum_sample_gap_s: 0.25,
+            },
+            evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
+        };
+        let trajectory = vec![
+            sample(0.0, 1.0, 10.0, 0.0),
+            sample(1.0, 2.0, 10.0, 0.0),
+        ];
+        let report = evaluate_traffic_rules(&[rule], &trajectory).unwrap();
+        assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::Indeterminate);
+        assert_eq!(report.findings[0].reason, RuleComplianceReason::TrajectorySamplingGap);
+    }
+
+    #[test]
+    fn rule_zone_skipped_between_sparse_samples_is_not_not_encountered() {
+        let rule = TrafficRuleRequirement {
+            rule_id: "speed-skipped-zone".into(),
+            active_start_progress_m: 10.0,
+            active_end_progress_m: 20.0,
+            kind: TrafficRuleKind::SpeedLimit {
+                maximum_speed_mps: 13.4,
+                tolerance_mps: 0.2,
+                maximum_sample_gap_s: 0.25,
+            },
+            evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
+        };
+        let trajectory = vec![
+            sample(0.0, 5.0, 10.0, 0.0),
+            sample(0.1, 25.0, 10.0, 0.0),
+        ];
+        let report = evaluate_traffic_rules(&[rule], &trajectory).unwrap();
+        assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::Indeterminate);
+        assert_eq!(report.findings[0].reason, RuleComplianceReason::TrajectoryCoverageInsufficient);
     }
 
     #[test]
@@ -731,6 +834,7 @@ mod tests {
             kind: TrafficRuleKind::MandatoryDirection {
                 required_heading_rad: -std::f64::consts::PI + 0.05,
                 maximum_heading_error_rad: 0.1,
+                maximum_sample_gap_s: 0.25,
             },
             evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
         };
@@ -751,6 +855,7 @@ mod tests {
             kind: TrafficRuleKind::MandatoryDirection {
                 required_heading_rad: 1.0,
                 maximum_heading_error_rad: 0.2,
+                maximum_sample_gap_s: 0.25,
             },
             evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
         };
@@ -977,6 +1082,7 @@ mod tests {
             kind: TrafficRuleKind::SpeedLimit {
                 maximum_speed_mps: 10.0,
                 tolerance_mps: 0.0,
+                maximum_sample_gap_s: 0.25,
             },
             evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
         };
