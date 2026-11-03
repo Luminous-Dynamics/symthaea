@@ -74,7 +74,7 @@ A caller supplies EndpointCriterion records for the required endpoints. The crit
 Every OutcomeObservation is one item × endpoint × physical run. It includes:
 - run and item IDs;
 - endpoint and evidence class;
-- exact assay method / protocol;
+- exact criterion ID, metric ID, unit and assay method ID/version / protocol;
 - measured value, expanded uncertainty and unit;
 - immutable evidence reference and calibration-bundle digest.
 
