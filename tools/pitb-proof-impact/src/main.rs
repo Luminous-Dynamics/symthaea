@@ -897,3 +897,107 @@ fn main() -> ExitCode {
         Err(message) => fail(message),
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn registered_snapshot_contract_controls_pass() {
+        run_self_tests().expect("all proof-impact synthetic controls must pass");
+    }
+
+    #[test]
+    fn incomplete_dependency_inventory_never_produces_retain() {
+        let node = Node {
+            node_id: "target".into(),
+            kind: "formal_declaration".into(),
+            declaration_kind: "theorem".into(),
+            reducibility: "opaque".into(),
+            statement_sha256: Some("a".repeat(64)),
+            body_sha256: None,
+            proof_sha256: Some("b".repeat(64)),
+            axiom_manifest_sha256: Some("c".repeat(64)),
+            source_sha256: Some("d".repeat(64)),
+        };
+        let snapshot = Snapshot {
+            schema_version: SNAPSHOT_VERSION.into(),
+            snapshot_id: "snapshot".into(),
+            repository_commit: "1".repeat(40),
+            environment_sha256: "e".repeat(64),
+            dependency_inventory_complete: false,
+            nodes: vec![node],
+            edges: vec![],
+        };
+        let bytes = serde_json::to_vec(&snapshot).unwrap();
+        let report = analyze(&bytes, &bytes).unwrap();
+        assert_eq!(report.impacts.len(), 1);
+        assert_eq!(report.impacts[0].action, "unknown_conservative");
+        assert!(report.conservative_mode);
+    }
+
+    #[test]
+    fn opaque_body_changes_do_not_reprove_type_only_consumers() {
+        let old = Node {
+            node_id: "opaque".into(),
+            kind: "formal_declaration".into(),
+            declaration_kind: "opaque".into(),
+            reducibility: "opaque".into(),
+            statement_sha256: Some("a".repeat(64)),
+            body_sha256: Some("b".repeat(64)),
+            proof_sha256: Some("c".repeat(64)),
+            axiom_manifest_sha256: Some("d".repeat(64)),
+            source_sha256: Some("e".repeat(64)),
+        };
+        let new = Node { body_sha256: Some("f".repeat(64)), ..old.clone() };
+        let edge = Edge {
+            edge_id: "type-only".into(),
+            source_node_id: "consumer".into(),
+            target_node_id: "opaque".into(),
+            relation: "signature_reference".into(),
+        };
+        assert_eq!(node_change(&old, &new)[0].action, Action::Revalidate);
+        assert_eq!(
+            action_for_propagation("signature_reference", &new, Propagation::ProofEvidence),
+            None
+        );
+        assert_eq!(
+            direct_action_for_relation("signature_reference", &new),
+            Some(Action::Reprove)
+        );
+        assert_eq!(edge.target_node_id, "opaque");
+    }
+
+    #[test]
+    fn retrieval_edges_never_become_proof_invalidation_edges() {
+        assert_eq!(
+            direct_action_for_relation("documentation_reference", &Node {
+                node_id: "doc".into(),
+                kind: "document".into(),
+                declaration_kind: "document".into(),
+                reducibility: "not_applicable".into(),
+                statement_sha256: None,
+                body_sha256: None,
+                proof_sha256: None,
+                axiom_manifest_sha256: None,
+                source_sha256: None,
+            }),
+            Some(Action::RetrievalRefresh)
+        );
+        assert_eq!(
+            action_for_propagation("documentation_reference", &Node {
+                node_id: "doc".into(),
+                kind: "document".into(),
+                declaration_kind: "document".into(),
+                reducibility: "not_applicable".into(),
+                statement_sha256: None,
+                body_sha256: None,
+                proof_sha256: None,
+                axiom_manifest_sha256: None,
+                source_sha256: None,
+            }, Propagation::Retrieval),
+            Some(Action::RetrievalRefresh)
+        );
+    }
+}
