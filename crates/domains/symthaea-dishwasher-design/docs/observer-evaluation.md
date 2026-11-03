@@ -8,7 +8,7 @@ It expects each physical run to have:
 - a unique record in the grouped run manifest;
 - a complete item inventory;
 - one pass probability for every required item × endpoint;
-- one independently adjudicated assay decision for every required item × endpoint;
+- one independently adjudicated assay decision for every required item × endpoint, each explicitly bound to the same source physical-run ID;
 - one stable model ID, model SHA-256 and calibration-bundle SHA-256 shared across the evaluation.
 
 The supplied outcome records must already have been qualified upstream. An assay-record ID is a traceability reference only. This module cannot authenticate the archive, prove that a method is independent, or prove that the assay result is scientifically correct.
@@ -42,7 +42,7 @@ For a physical run:
 
 A failed endpoint makes the run nonconforming even if another endpoint is indeterminate. An unresolved run is never promoted to conforming.
 
-Every required item × endpoint must have exactly one prediction and exactly one assay decision. Duplicate, missing, unexpected or invalid rows are rejected rather than imputed.
+Every required item × endpoint must have exactly one prediction and exactly one assay decision. Duplicate, missing, unexpected or invalid rows are rejected rather than imputed. Each assay row carries a source run ID that must match the containing physical run.
 
 ## Reported metrics
 
@@ -90,13 +90,13 @@ Those must be added only with explicit calibration partitions, estimands, groupi
 
 ## Test coverage authored
 
-Unit tests cover:
+12 source-authored unit tests cover:
 - threshold sorting and run-level risk/coverage;
 - a false-accepting challenge run;
 - unresolved assay truth and unverifiable release;
 - suppression of the zero-event bound when any target truth is unresolved;
 - one physical run with multiple items remaining one trial;
-- complete item × endpoint matrix requirements;
+- complete item × endpoint matrix requirements and assay-to-run ID mismatch rejection;
 - group leakage rejection;
 - external replication requiring a locked-confirmation partition;
 - frozen model/calibration identity;
