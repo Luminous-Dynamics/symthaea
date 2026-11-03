@@ -1,0 +1,1 @@
+lean elaborator receipt: class inheritance edge to instExample
