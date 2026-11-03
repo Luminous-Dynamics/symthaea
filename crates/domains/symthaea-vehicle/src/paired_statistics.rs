@@ -12,7 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 pub const PAIRED_STATISTICS_SCHEMA: &str = "symthaea.vehicle.paired-statistics.v0.1";
-pub const MIN_PAIRED_BOOTSTRAP_REPLICATES: u32 = 100;
+pub const MIN_PAIRED_BOOTSTRAP_REPLICATES: u32 = 1_000;
 pub const MAX_PAIRED_BOOTSTRAP_REPLICATES: u32 = 100_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -61,6 +61,8 @@ pub struct PairedMetricSummary {
     pub bootstrap_replicates: u32,
     pub failure_family_count: usize,
     pub scenario_count: usize,
+    /// Exact paired observations used to reconstruct family aggregates.
+    pub observations: Vec<PairedMetricObservation>,
     /// Macro-average over family means; each failure family receives equal weight.
     pub mean_family_improvement: f64,
     pub median_family_improvement: f64,
@@ -90,9 +92,30 @@ impl PairedMetricSummary {
 
         let mut family_ids = BTreeSet::new();
         let mut scenario_ids = BTreeSet::new();
+        let mut grouped: BTreeMap<&str, Vec<&PairedMetricObservation>> = BTreeMap::new();
+        if self.observations.len() != self.scenario_count {
+            return false;
+        }
+        for observation in &self.observations {
+            if observation.failure_family_id.trim().is_empty()
+                || observation.scenario_id.trim().is_empty()
+                || !observation.advanced_value.is_finite()
+                || !observation.baseline_value.is_finite()
+                || !scenario_ids.insert(observation.scenario_id.as_str())
+            {
+                return false;
+            }
+            grouped
+                .entry(observation.failure_family_id.as_str())
+                .or_default()
+                .push(observation);
+        }
+        if grouped.len() != self.failure_family_count {
+            return false;
+        }
+
         let mut improvements = Vec::with_capacity(self.family_effects.len());
         let mut scenario_count = 0usize;
-
         for family in &self.family_effects {
             if family.failure_family_id.trim().is_empty()
                 || !family_ids.insert(family.failure_family_id.as_str())
@@ -103,16 +126,48 @@ impl PairedMetricSummary {
             {
                 return false;
             }
-            for scenario_id in &family.scenario_ids {
-                if scenario_id.trim().is_empty() || !scenario_ids.insert(scenario_id.as_str()) {
-                    return false;
-                }
+            let Some(observations) = grouped.get(family.failure_family_id.as_str()) else {
+                return false;
+            };
+            let mut expected_scenario_ids = observations
+                .iter()
+                .map(|observation| observation.scenario_id.as_str())
+                .collect::<Vec<_>>();
+            expected_scenario_ids.sort_unstable();
+            let mut declared_scenario_ids = family
+                .scenario_ids
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>();
+            declared_scenario_ids.sort_unstable();
+            let mean_advanced = arithmetic_mean(
+                &observations
+                    .iter()
+                    .map(|observation| observation.advanced_value)
+                    .collect::<Vec<_>>(),
+            );
+            let mean_baseline = arithmetic_mean(
+                &observations
+                    .iter()
+                    .map(|observation| observation.baseline_value)
+                    .collect::<Vec<_>>(),
+            );
+            let expected_improvement = match self.direction {
+                PairedMetricDirection::LowerIsBetter => mean_baseline - mean_advanced,
+                PairedMetricDirection::HigherIsBetter => mean_advanced - mean_baseline,
+            };
+            if declared_scenario_ids != expected_scenario_ids
+                || !approximately_equal(family.mean_advanced_value, mean_advanced)
+                || !approximately_equal(family.mean_baseline_value, mean_baseline)
+                || !approximately_equal(family.mean_improvement, expected_improvement)
+            {
+                return false;
             }
             scenario_count += family.scenario_ids.len();
             improvements.push(family.mean_improvement);
         }
 
-        if scenario_count != self.scenario_count {
+        if scenario_count != self.scenario_count || family_ids.len() != grouped.len() {
             return false;
         }
         let derived_mean = arithmetic_mean(&improvements);
@@ -243,6 +298,7 @@ pub fn summarize_paired_metric(
         bootstrap_replicates,
         failure_family_count: family_effects.len(),
         scenario_count: family_effects.iter().map(|family| family.scenario_ids.len()).sum(),
+        observations: observations.to_vec(),
         mean_family_improvement: arithmetic_mean(&improvements),
         median_family_improvement: percentile(&sorted, 0.5),
         family_win_fraction: improvements.iter().filter(|value| **value > 0.0).count() as f64
@@ -265,7 +321,7 @@ fn bootstrap_family_means(values: &[f64], seed: u64, replicates: u32) -> (f64, f
     for _ in 0..replicates {
         let mut total = 0.0;
         for _ in 0..values.len() {
-            let index = (rng.next_u64() % values.len() as u64) as usize;
+            let index = rng.index_below(values.len() as u64) as usize;
             total += values[index];
         }
         means.push(total / values.len() as f64);
@@ -298,6 +354,16 @@ fn approximately_equal(left: f64, right: f64) -> bool {
 struct SplitMix64(u64);
 
 impl SplitMix64 {
+    fn index_below(&mut self, upper_exclusive: u64) -> u64 {
+        let limit = u64::MAX - (u64::MAX % upper_exclusive);
+        loop {
+            let value = self.next_u64();
+            if value < limit {
+                return value % upper_exclusive;
+            }
+        }
+    }
+
     fn next_u64(&mut self) -> u64 {
         self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
         let mut value = self.0;
@@ -469,6 +535,7 @@ mod tests {
         )
         .unwrap();
         summary.mean_family_improvement += 1.0;
+        summary.family_effects[0].mean_advanced_value += 1.0;
         summary.summary_digest.clear();
         let bytes = serde_json::to_vec(&summary).unwrap();
         summary.summary_digest = blake3::hash(&bytes).to_hex().to_string();
