@@ -1092,6 +1092,11 @@ fn validate_report(
         "trusted_promotion": false,
         "claim_ceiling": "supplied reference challenge only; external worldset closure and pre-outcome freeze authentication are not verified by this tool",
         "canonicalizer_protocol": CANONICALIZER_PROTOCOL,
+        "evaluator_protocol_sha256": evaluator_protocol_sha256,
+        "rules_sha256": rules_sha256,
+        "canonicalizer_sha256": canonicalizer_sha256,
+        "report_schema_sha256": report_schema_sha256,
+        "structure_schema_sha256": structure_schema_sha256,
         "candidate_structure_manifest_sha256": candidate_manifest,
         "reference_structure_manifest_sha256": reference_manifest,
         "dispositions": {
@@ -1382,6 +1387,20 @@ mod tests {
         let bytes = serde_json::to_vec(&report).expect("serialized report");
         assert!(validate_report(
             &bytes,
+            OMITTED_CANDIDATE.as_bytes(),
+            OMITTED_REFERENCE.as_bytes()
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn rejects_report_schema_protocol_digest_mismatch() {
+        let mut report: Value = serde_json::from_str(OMITTED_REPORT).expect("valid fixture");
+        report["provenance"]["report_schema_sha256"] =
+            Value::String("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned());
+        let report_bytes = serde_json::to_vec(&report).expect("serialized report");
+        assert!(validate_report(
+            &report_bytes,
             OMITTED_CANDIDATE.as_bytes(),
             OMITTED_REFERENCE.as_bytes()
         )
