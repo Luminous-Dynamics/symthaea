@@ -19,6 +19,12 @@ use std::process;
 const REPORT_VERSION: &str = "0.1.0";
 const SIDECAR_VERSION: &str = "0.1.0";
 const CANONICALIZER_PROTOCOL: &str = "CONNECTOME-STRUCTURAL-GRAPH-CANONICAL-V1";
+const EVALUATOR_PROTOCOL_SHA256: &str =
+    "df83b9386deee6ed881e58b6aaa78919206233619571459c94c611dfccbb82e5";
+const RULES_PROTOCOL_SHA256: &str =
+    "60c1b8a20a774908f239160c0c9a7b816c22e4c4a8a40b3ed45b9d7f87ea08a4";
+const CANONICALIZER_PROTOCOL_SHA256: &str =
+    "578a939bfdf68a11f279fcce606f97d2c11dfd90cd569fa1edd1fc7e8e8c6a70";
 
 #[derive(Debug, Clone)]
 struct CandidateWorld {
@@ -390,15 +396,19 @@ fn validate_report(
     let provenance = report
         .get("provenance")
         .ok_or_else(|| "provenance missing".to_owned())?;
-    for key in [
-        "evaluator_sha256",
-        "rules_sha256",
-        "report_sha256",
-        "canonicalizer_sha256",
-        "candidate_structure_manifest_sha256",
-        "reference_structure_manifest_sha256",
-    ] {
-        digest_field(provenance, key, "provenance")?;
+    let evaluator_protocol_sha256 =
+        digest_field(provenance, "evaluator_protocol_sha256", "provenance")?;
+    let rules_sha256 = digest_field(provenance, "rules_sha256", "provenance")?;
+    let canonicalizer_sha256 =
+        digest_field(provenance, "canonicalizer_sha256", "provenance")?;
+    if evaluator_protocol_sha256 != EVALUATOR_PROTOCOL_SHA256 {
+        return Err("provenance.evaluator_protocol_sha256 does not match this verifier protocol".to_owned());
+    }
+    if rules_sha256 != RULES_PROTOCOL_SHA256 {
+        return Err("provenance.rules_sha256 does not match the pinned adequacy rules protocol".to_owned());
+    }
+    if canonicalizer_sha256 != CANONICALIZER_PROTOCOL_SHA256 {
+        return Err("provenance.canonicalizer_sha256 does not match the pinned graph canonicalizer".to_owned());
     }
 
     let candidate_manifest = digest_field(
@@ -619,17 +629,19 @@ fn validate_report(
     // Same canonical graph + same frozen query implementation must yield the same
     // determinate query state regardless of world ID or which manifest contains it.
     let mut state_by_structure = BTreeMap::<String, String>::new();
-    for (id, structural_sha256, state) in candidates
+    for (structural_sha256, state) in candidates
         .iter()
-        .map(|world| (&world.id, &world.structural_sha256, Some(world.state.clone())))
+        .map(|world| (&world.structural_sha256, Some(world.state.clone())))
         .chain(
             references
                 .iter()
-                .map(|world| (&world.id, &world.structural_sha256, world.state.clone())),
+                .map(|world| (&world.structural_sha256, world.state.clone())),
         )
     {
         if let Some(state) = state.filter(|state| state.as_str() != "NOT_ESTIMABLE") {
-            if let Some(previous) = state_by_structure.insert(structural_sha256.clone(), state.clone()) {
+            if let Some(previous) =
+                state_by_structure.insert(structural_sha256.clone(), state.clone())
+            {
                 if previous != state {
                     return Err(format!(
                         "canonical structure {structural_sha256} has inconsistent query states ({previous} vs {state})"
@@ -637,7 +649,6 @@ fn validate_report(
                 }
             }
         }
-        let _ = id;
     }
 
     let candidate_hashes: BTreeSet<String> = candidates
@@ -894,6 +905,7 @@ fn validate_report(
     Ok(json!({
         "schema_version": REPORT_VERSION,
         "evaluation_id": evaluation_id,
+        "source_report_sha256": sha256_hex(report_bytes),
         "status": "COUNTERS_RECOMPUTED",
         "trusted_promotion": false,
         "claim_ceiling": "supplied reference challenge only; external worldset closure and pre-outcome freeze authentication are not verified by this tool",
