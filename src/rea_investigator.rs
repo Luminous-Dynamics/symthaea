@@ -1,3 +1,10 @@
+//! Native, fail-closed planning over caller-supplied REA Evidence provenance.
+//!
+//! The planner selects and ranks proposed experiments and downstream decisions,
+//! but never executes experiments or terminal actions. Provenance classes,
+//! likelihood models, scenario weights and utility values are caller-supplied;
+//! they are not authenticated or calibrated by this module.
+
 pub use symthaea_rea_investigator::decision::{
     DecisionAbstentionReason,
     DecisionClaimCeiling,
@@ -16,12 +23,6 @@ pub use symthaea_rea_investigator::decision::{
     TerminalDecision,
     plan_next_experiment_decision_aware,
 };
-
-//! Native, fail-closed planning over caller-supplied REA Evidence provenance.
-//!
-//! The planner selects and ranks proposed experiments but never executes them.
-//! Provenance classes and likelihood models are caller-supplied and are not
-//! authenticated or calibrated by this module.
 
 pub use symthaea_rea_investigator::robust::{
     LikelihoodModelScenario,
