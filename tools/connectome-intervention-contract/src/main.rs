@@ -665,6 +665,80 @@ fn verify_interventions(value: &Value, model_families: &HashSet<String>, errors:
                     "selected_interventions[{index}]: missing protocol digest"
                 ));
             }
+            let protocol_semantics = item.get("protocol_semantics").and_then(Value::as_str);
+            let protocol_steps = item.get("protocol_steps").and_then(Value::as_array);
+            if protocol_semantics == Some("ordered_steps")
+                && protocol_steps.is_none_or(|steps| steps.len() < 2)
+            {
+                errors.push(format!(
+                    "selected_interventions[{index}]: ordered_steps requires at least two protocol steps"
+                ));
+            }
+            if protocol_steps.is_some() && protocol_semantics != Some("ordered_steps") {
+                errors.push(format!(
+                    "selected_interventions[{index}]: protocol_steps require protocol_semantics ordered_steps"
+                ));
+            }
+            if let Some(steps) = protocol_steps {
+                let mut ordered_targets = HashSet::new();
+                for (step_index, step) in steps.iter().enumerate() {
+                    if step.get("step_index").and_then(Value::as_u64) != Some(step_index as u64) {
+                        errors.push(format!(
+                            "selected_interventions[{index}].protocol_steps[{step_index}]: step indices must be contiguous and zero-based"
+                        ));
+                    }
+                    let targets = step.get("target_ids").and_then(Value::as_array);
+                    if targets.is_none_or(Vec::is_empty) {
+                        errors.push(format!(
+                            "selected_interventions[{index}].protocol_steps[{step_index}]: target list is empty"
+                        ));
+                    }
+                    if let Some(targets) = targets {
+                        let mut step_targets = HashSet::new();
+                        for target in targets.iter().filter_map(Value::as_str) {
+                            if !step_targets.insert(target.to_owned()) {
+                                errors.push(format!(
+                                    "selected_interventions[{index}].protocol_steps[{step_index}]: duplicate target {target}"
+                                ));
+                            }
+                            ordered_targets.insert(target.to_owned());
+                        }
+                    }
+                    match step.get("inter_step_interval_seconds").and_then(Value::as_f64) {
+                        Some(interval) if interval.is_finite() && interval >= 0.0 => {}
+                        _ => errors.push(format!(
+                            "selected_interventions[{index}].protocol_steps[{step_index}]: invalid inter-step interval"
+                        )),
+                    }
+                }
+                let declared_targets: HashSet<String> = item.get("target_ids")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
+                    .map(str::to_owned)
+                    .collect();
+                if declared_targets != ordered_targets {
+                    errors.push(format!(
+                        "selected_interventions[{index}]: parent target_ids must equal the union of ordered protocol-step targets"
+                    ));
+                }
+            }
+            let state_context_id = item.get("state_context_id").and_then(Value::as_str);
+            let state_digest = item.get("state_measurement_manifest_sha256").and_then(Value::as_str);
+            let has_step_state = protocol_steps.into_iter().flatten()
+                .any(|step| step.get("state_context_id").and_then(Value::as_str).is_some());
+            if state_context_id.is_some() || has_step_state {
+                if state_digest.is_none_or(|digest| !is_sha256(digest)) {
+                    errors.push(format!(
+                        "selected_interventions[{index}]: state-conditioned protocol requires a state-measurement manifest digest"
+                    ));
+                }
+            } else if state_digest.is_some() {
+                errors.push(format!(
+                    "selected_interventions[{index}]: state-measurement digest has no declared state context"
+                ));
+            }
         }
     }
     let controls: HashSet<&str> = arr_at(value, &["intervention_design", "required_controls"])
@@ -1715,6 +1789,58 @@ mod tests {
                 .iter()
                 .any(|e| e.contains("unresolved unresolved"))
         );
+    }
+
+    #[test]
+    fn ordered_protocol_steps_and_state_context_are_verified() {
+        let mut fixture = complete_fixture();
+        let intervention = &mut fixture["intervention_design"]["selected_interventions"][0];
+        intervention["target_ids"] = json!(["n-1", "n-2"]);
+        intervention["protocol_semantics"] = json!("ordered_steps");
+        intervention["state_context_id"] = json!("active-state");
+        intervention["state_measurement_manifest_sha256"] = json!(digest("state-measurement"));
+        let waveform = intervention["waveform"].clone();
+        intervention["protocol_steps"] = json!([
+            {
+                "step_index":0,
+                "target_ids":["n-1"],
+                "manipulation_type":"simulated_ablation",
+                "waveform":waveform,
+                "inter_step_interval_seconds":0.0,
+                "state_context_id":"active-state"
+            },
+            {
+                "step_index":1,
+                "target_ids":["n-2"],
+                "manipulation_type":"simulated_ablation",
+                "waveform":waveform,
+                "inter_step_interval_seconds":0.5,
+                "state_context_id":"active-state"
+            }
+        ]);
+        let report = verify_manifest(&fixture);
+        assert_eq!(report.disposition, "COMPLETE", "{:?}", report.errors);
+
+        fixture["intervention_design"]["selected_interventions"][0]["protocol_steps"][1]["step_index"] = json!(2);
+        let report = verify_manifest(&fixture);
+        assert_eq!(report.disposition, "INVALID");
+        assert!(report.errors.iter().any(|error| error.contains("contiguous and zero-based")));
+    }
+
+    #[test]
+    fn protocol_steps_cannot_disagree_with_parent_target_set() {
+        let mut fixture = complete_fixture();
+        let intervention = &mut fixture["intervention_design"]["selected_interventions"][0];
+        intervention["target_ids"] = json!(["n-1", "n-2"]);
+        intervention["protocol_semantics"] = json!("ordered_steps");
+        let waveform = intervention["waveform"].clone();
+        intervention["protocol_steps"] = json!([
+            {"step_index":0,"target_ids":["n-1"],"manipulation_type":"simulated_ablation","waveform":waveform,"inter_step_interval_seconds":0.0},
+            {"step_index":1,"target_ids":["n-3"],"manipulation_type":"simulated_ablation","waveform":waveform,"inter_step_interval_seconds":0.5}
+        ]);
+        let report = verify_manifest(&fixture);
+        assert_eq!(report.disposition, "INVALID");
+        assert!(report.errors.iter().any(|error| error.contains("parent target_ids must equal the union")));
     }
 
     #[test]
