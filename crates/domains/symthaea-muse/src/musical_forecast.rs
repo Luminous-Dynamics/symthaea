@@ -260,6 +260,16 @@ impl MusicalForecastLedgerV1 {
         if self.forecast(&forecast.forecast_id).is_some() {
             return Err("forecast IDs are immutable and may be committed only once".into());
         }
+        if let Some(existing) = self.events.iter().find_map(|item| match &item.event {
+            MusicalForecastLedgerEventKindV1::Committed { forecast } => Some(forecast),
+            _ => None,
+        }) {
+            if existing.session_id != forecast.session_id
+                || existing.clock_domain != forecast.clock_domain
+            {
+                return Err("a ledger is scoped to one session and monotonic clock domain".into());
+            }
+        }
         if let Some(previous_id) = &forecast.supersedes_forecast_id {
             let previous = self
                 .forecast(previous_id)
@@ -341,6 +351,37 @@ impl MusicalForecastLedgerV1 {
         Ok(())
     }
 
+    /// Replays the complete log and checks the serialized tail metadata. This
+    /// also rejects tampered/deserialized event histories before they are scored.
+    pub fn validate(&self) -> Result<(), String> {
+        let mut replay = Self::default();
+        for item in &self.events {
+            match &item.event {
+                MusicalForecastLedgerEventKindV1::Committed { forecast } => {
+                    if item.sequence != forecast.event_sequence
+                        || item.event_tick != forecast.created_at_tick
+                    {
+                        return Err("committed forecast disagrees with its ledger event envelope".into());
+                    }
+                    replay.append_forecast(forecast.clone())?;
+                }
+                MusicalForecastLedgerEventKindV1::Displayed { receipt } => {
+                    if item.event_tick != receipt.displayed_at_tick {
+                        return Err("display receipt disagrees with its ledger event tick".into());
+                    }
+                    replay.append_display_receipt(item.sequence, receipt.clone())?;
+                }
+                MusicalForecastLedgerEventKindV1::Invalidated { invalidation } => {
+                    replay.append_invalidation(item.sequence, item.event_tick, invalidation.clone())?;
+                }
+            }
+        }
+        if replay.last_sequence != self.last_sequence || replay.last_event_tick != self.last_event_tick {
+            return Err("ledger tail metadata does not match replayed append-only events".into());
+        }
+        Ok(())
+    }
+
     pub fn forecast(&self, forecast_id: &str) -> Option<&MusicalForecastV1> {
         self.events.iter().find_map(|item| match &item.event {
             MusicalForecastLedgerEventKindV1::Committed { forecast }
@@ -361,7 +402,15 @@ impl MusicalForecastLedgerV1 {
     }
 
     pub fn is_active_at(&self, forecast_id: &str, event_tick: u64) -> bool {
-        if self.forecast(forecast_id).is_none() {
+        let committed_at = self.events.iter().find_map(|item| match &item.event {
+            MusicalForecastLedgerEventKindV1::Committed { forecast }
+                if forecast.forecast_id == forecast_id => Some(item.event_tick),
+            _ => None,
+        });
+        let Some(committed_at) = committed_at else {
+            return false;
+        };
+        if committed_at > event_tick {
             return false;
         }
         !self.events.iter().any(|item| {
@@ -466,12 +515,25 @@ pub struct ForecastEvaluationV1 {
     pub field_outcomes: Vec<ForecastFieldOutcomeV1>,
 }
 
+/// Digest the canonical serialized symbolic event projection. This binds the
+/// exact event set used by the scorer; it does not authenticate the upstream
+/// renderer or the source artifact bytes.
+pub fn canonical_event_projection_sha256(
+    events: &[RealizedMusicalEventV1],
+) -> Result<String, String> {
+    let mut ordered = events.to_vec();
+    ordered.sort_by(|left, right| left.slot_id.cmp(&right.slot_id));
+    let bytes = serde_json::to_vec(&ordered).map_err(|error| error.to_string())?;
+    Ok(sha256_hex(&bytes))
+}
+
 pub fn evaluate_musical_forecast_v1(
     ledger: &MusicalForecastLedgerV1,
     forecast_id: &str,
     context: &ForecastEvaluationContextV1,
     scoring: ForecastScoringPolicyV1,
 ) -> Result<ForecastEvaluationV1, String> {
+    ledger.validate()?;
     let forecast = ledger
         .forecast(forecast_id)
         .ok_or_else(|| "forecast is not committed in the append-only ledger".to_owned())?;
@@ -500,6 +562,10 @@ pub fn evaluate_musical_forecast_v1(
         || !is_sha256(&context.event_projection_sha256)
     {
         return Err("realization artifact and event projection require lowercase SHA-256 digests".into());
+    }
+    let projected_events_sha256 = canonical_event_projection_sha256(&context.realized_events)?;
+    if projected_events_sha256 != context.event_projection_sha256 {
+        return Err("event projection digest does not match the supplied canonical realized events".into());
     }
     if context.realization_tick < forecast.created_at_tick {
         return Err("post-hoc forecast cannot be scored as anticipatory".into());
@@ -714,7 +780,7 @@ mod tests {
             realization_artifact_ref: "sha256:realized-score".into(),
             realization_artifact_sha256: digest("realized-score"),
             event_projection_id: "symbolic-score-events-v1".into(),
-            event_projection_sha256: digest("projected-events"),
+            event_projection_sha256: canonical_event_projection_sha256(&[realized_event()]).unwrap(),
             realization_tick,
             realized_events: vec![realized_event()],
         }
@@ -752,6 +818,9 @@ mod tests {
         assert_eq!(score.correct_field_count, 6);
         assert_eq!(score.scored_field_count, 6);
         assert_eq!(score.mean_brier_score_millionths, Some(10_000));
+        assert_eq!(score.realization_artifact_sha256, digest("realized-score"));
+        assert_eq!(score.event_projection_sha256, canonical_event_projection_sha256(&[realized_event()]).unwrap());
+        ledger.validate().unwrap();
     }
 
     #[test]
@@ -882,10 +951,51 @@ mod tests {
                 ForecastDisplayReceiptV1 {
                     forecast_id: "forecast-1".into(),
                     recipient_id: "musician-1".into(),
+                    display_surface_id: "score-preview-panel".into(),
                     displayed_at_tick: 4,
+                    display_evidence_ref: "fixture://too-early-display".into(),
+                    display_evidence_sha256: digest("too-early-display"),
                 },
             )
             .is_err());
+    }
+
+    #[test]
+    fn event_projection_digest_must_match_the_scored_event_set() {
+        let mut ledger = MusicalForecastLedgerV1::default();
+        ledger.append_forecast(forecast(1, 5, None)).unwrap();
+        let mut altered_projection = context(12);
+        altered_projection.realized_events[0].pitch_midi = 67;
+        let result = evaluate_musical_forecast_v1(
+            &ledger,
+            "forecast-1",
+            &altered_projection,
+            ForecastScoringPolicyV1::default(),
+        );
+        assert!(result.unwrap_err().contains("projection digest"));
+    }
+
+    #[test]
+    fn evaluation_rejects_different_clock_domains() {
+        let mut ledger = MusicalForecastLedgerV1::default();
+        ledger.append_forecast(forecast(1, 5, None)).unwrap();
+        let mut other_clock = context(12);
+        other_clock.clock_domain = "another-clock".into();
+        let result = evaluate_musical_forecast_v1(
+            &ledger,
+            "forecast-1",
+            &other_clock,
+            ForecastScoringPolicyV1::default(),
+        );
+        assert!(result.unwrap_err().contains("clock domains"));
+    }
+
+    #[test]
+    fn a_forecast_is_not_active_before_its_commit_time() {
+        let mut ledger = MusicalForecastLedgerV1::default();
+        ledger.append_forecast(forecast(1, 15, None)).unwrap();
+        assert!(!ledger.is_active_at("forecast-1", 12));
+        assert!(ledger.is_active_at("forecast-1", 16));
     }
 
     #[test]
