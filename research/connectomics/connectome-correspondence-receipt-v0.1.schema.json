@@ -234,7 +234,8 @@
         "correspondence_engine_sha256",
         "verifier_protocol_sha256",
         "verifier_sha256",
-        "report_schema_sha256"
+        "report_schema_sha256",
+        "world_manifest_schema_sha256"
       ],
       "properties": {
         "source_manifest_sha256": {
@@ -280,6 +281,9 @@
           ]
         },
         "report_schema_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "world_manifest_schema_sha256": {
           "$ref": "#/$defs/sha256"
         }
       }
@@ -438,7 +442,8 @@
         "cardinality",
         "support_status",
         "evidence",
-        "rationale_code"
+        "rationale_code",
+        "alternative_set_id"
       ],
       "properties": {
         "mapping_id": {
@@ -497,6 +502,17 @@
         "rationale_code": {
           "type": "string",
           "minLength": 1
+        },
+        "alternative_set_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "allOf": [
@@ -662,7 +678,53 @@
             "NOT_ESTIMABLE"
           ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "equivalence": {
+                "const": "SAME"
+              }
+            },
+            "required": [
+              "equivalence"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_output_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "target_output_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "equivalence": {
+                "const": "DIFFERENT"
+              }
+            },
+            "required": [
+              "equivalence"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_output_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "target_output_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        }
+      ]
     }
   },
   "$comment": "undefined In specification-only receipts, correspondence_engine_sha256 and verifier_sha256 may be null. A null implementation digest cannot support a CORRESPONDENCE_VERIFIED disposition."
