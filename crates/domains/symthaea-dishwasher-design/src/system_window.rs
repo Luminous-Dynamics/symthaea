@@ -140,7 +140,7 @@ pub struct SystemWindowReport {
     pub requests_completed_in_window: usize,
     pub unresolved_requests_at_window_end: usize,
     pub requested_items_in_accepted_cohort: usize,
-    pub items_in_unresolved_accepted_requests: usize,
+    pub items_without_verified_qualification_in_accepted_unresolved_requests: usize,
     pub verified_item_release_count: usize,
     pub unqualified_items_in_service_reports: usize,
     pub first_pass_verified_items_in_completed_cohort: usize,
@@ -709,8 +709,14 @@ pub fn account_system_window(
                 unresolved_count = unresolved_count.checked_add(1)
                     .ok_or(SystemWindowError::CounterOverflow("unresolved_requests"))?;
                 if accepted_in_window {
+                    let already_qualified = request.service_report.as_ref()
+                        .map(|report| report.verified_successful_item_count)
+                        .unwrap_or(0);
+                    let pending_qualification = request.requested_item_ids.len()
+                        .checked_sub(already_qualified)
+                        .ok_or(SystemWindowError::CounterOverflow("unresolved_item_count"))?;
                     unresolved_item_count = unresolved_item_count.checked_add(
-                        request.requested_item_ids.len()
+                        pending_qualification
                     ).ok_or(SystemWindowError::CounterOverflow("unresolved_item_count"))?;
                 }
             }
@@ -1024,7 +1030,7 @@ pub fn account_system_window(
         requests_completed_in_window: completed_count,
         unresolved_requests_at_window_end: unresolved_count,
         requested_items_in_accepted_cohort: requested_item_count,
-        items_in_unresolved_accepted_requests: unresolved_item_count,
+        items_without_verified_qualification_in_accepted_unresolved_requests: unresolved_item_count,
         verified_item_release_count,
         unqualified_items_in_service_reports: unqualified_item_count,
         first_pass_verified_items_in_completed_cohort: first_pass_item_count,
@@ -1337,7 +1343,7 @@ mod tests {
             &basic_resources(),
         ).unwrap();
         assert_eq!(result.unresolved_requests_at_window_end, 1);
-        assert_eq!(result.items_in_unresolved_accepted_requests, 1);
+        assert_eq!(result.items_without_verified_qualification_in_accepted_unresolved_requests, 1);
         assert_eq!(result.verified_item_release_count, 0);
         assert_eq!(result.verified_items_per_hour, 0.0);
         assert!(result.window_resources_per_verified_release.is_none());
@@ -1361,7 +1367,7 @@ mod tests {
             &basic_resources(),
         ).unwrap();
         assert_eq!(result.verified_item_release_count, 1);
-        assert_eq!(result.items_in_unresolved_accepted_requests, 2);
+        assert_eq!(result.items_without_verified_qualification_in_accepted_unresolved_requests, 1);
         assert_eq!(result.unresolved_requests_at_window_end, 1);
     }
 
