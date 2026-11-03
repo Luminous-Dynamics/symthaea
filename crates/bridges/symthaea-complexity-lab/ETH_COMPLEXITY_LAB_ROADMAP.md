@@ -31,6 +31,7 @@ Certified model counting, equality saturation, treewidth/hypertree-width algorit
 | ETH-022 | Can a compact trace be checked by deterministic replay without serializing all intermediate tables? | EXACT_REPLAY_CERTIFICATES.md, Q(i) trace/checker | Replay producer/checker source committed but not executed; no bounded-memory claim, Rust or Lean proof |
 | ETH-023 | Can an input auditor resolve MC/WMC/PMC/PWMC/AMC semantics before choosing an engine? | MC_INPUT_CONTRACT_AUDITOR.md, parser reference | 34 fixture expectations and malformed-input fuzz plan committed but not executed; explicit effective output contract added; official-corpus and Ganak differential tests open |
 | ETH-024 | Can every complexity claim be connected to theorem scope, output, encoding, machine and immutable evidence? | CLAIM_EVIDENCE_LEDGER.md, JSON ledger and validator | 4 claims/7 pinned sources; 8 claim-inflation mutations rejected by independent JS policy replay |
+| ETH-025 | Can semantics-preserving transformations test solver behavior when large-instance ground truth is unavailable? | SEMANTIC_METAMORPHIC_BENCHMARK.md, exact oracle and versioned relation schema | 3,000 exact relation checks + 200 hidden-witness checks actually executed across five contracts; zero failures; no solver-binary differential run yet |
 
 ## 3. Current exactness and implementation boundary
 
@@ -50,6 +51,7 @@ The environment audit for this pass found Python 3.13.5, but no cargo, rustc, la
 - Finish ETH-023's golden corpus, and differentially compare parsed type/output contracts against official MC2026 fixtures and Ganak's parser.
 - Preserve both raw declared mode and effective output contract; route the engine by the latter.
 - Finish ETH-024's ledger integration in benchmark outputs and PR templates. Any source SHA drift requires explicit re-audit.
+- Generalize ETH-025's six tested transformation families into a versioned relation graph, then run them against exact Ganak and Symthaea binaries. Keep small-oracle validation separate from solver differential results.
 
 ### P1 — Qualify the base exact computation path
 - Obtain a reproducible Rust/Lean build environment and capture toolchain versions, lockfile, target, exact commit SHA and full logs.
@@ -74,6 +76,7 @@ The environment audit for this pass found Python 3.13.5, but no cargo, rustc, la
 - Match CPU, memory, timeout, thread count, compiler flags and output contracts.
 - Include parse time, producer time, proof/trace generation, independent check time, peak RSS, largest intermediate, coefficient bit length, trace bytes, exact solved count and wrong-answer count.
 - Publish raw machine-readable per-instance results and exact commit/toolchain SHAs.
+- Add semantic metamorphic coverage, relation failures, minimized regressions and parser-routing mismatches as first-class benchmark dimensions.
 
 ## 5. Industry baselines and benchmark targets
 
@@ -106,6 +109,7 @@ Equality saturation (egg), rewrite inference and e-graphs are established. The e
 | Full polynomial profile | enumeration/treewidth DP/profile-specific tools | all coefficients exact | wider tractable frontier under the same memory/time limits |
 | Pareto frontier | exact multiobjective DP | exact nondominated vectors and multiplicities | lower verified cost and frontier growth on held-out cases |
 | Tensor contraction | opt_einsum, cotengra and compatible exact planners | same exact output tensors; verify contraction tree/slices | better verified FLOPs/memory Pareto set on a structured family |
+| Semantic metamorphic robustness | ETH-025 relations applied to Ganak and Symthaea binaries | 100% relation agreement on tractable cases; zero parser/output-contract misroutes | reusable cross-solver semantic graph with minimized regressions and reproducible raw outputs |
 
 The 10% targets are aspirations, not current results. A performance claim requires both producer and independent checker costs. Report exact and approximate tracks independently.
 
