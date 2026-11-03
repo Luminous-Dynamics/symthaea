@@ -237,6 +237,9 @@ pub struct EliminationStats {
     pub maximum_output_factor_entries: usize,
     pub semiring_additions: u128,
     pub semiring_multiplications: u128,
+    /// Extra exact support-count arithmetic performed by witness-aware MaxCount.
+    pub support_count_additions: u128,
+    pub support_count_multiplications: u128,
     pub generated_factors: usize,
 }
 
@@ -247,6 +250,9 @@ pub struct MaxCountBackpointerRow {
     pub separator_assignment: Vec<usize>,
     pub maximizing_states: Vec<usize>,
     pub branch_multiplicities: Vec<u128>,
+    /// Number of distinct partial assignments represented by each branch.
+    /// This is not the weighted semiring multiplicity above.
+    pub branch_assignment_counts: Vec<u128>,
 }
 
 /// All locally maximizing states for an eliminated variable, indexed by the
@@ -263,6 +269,10 @@ pub struct MaxCountBackpointer {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MaxCountWitnessResult {
     pub value: MaxCountValue,
+    /// Number of distinct full variable assignments attaining the optimum.
+    /// Unlike MaxCountTerm.count, local factor multiplicity weights do not
+    /// inflate this quantity.
+    pub distinct_optimal_assignments: u128,
     pub witness: Option<Vec<usize>>,
     pub backpointers: Vec<MaxCountBackpointer>,
     pub stats: EliminationStats,
@@ -389,6 +399,14 @@ impl<S: ExactSemiring> ExactFactorGraph<S> {
 /// re-solves. Backpointer multiplicities are distinct from assignment count:
 /// weighted factor multiplicity may exceed the number of variable assignments.
 impl ExactFactorGraph<MaxCountValue> {
+    /// Exact MaxCount elimination with one witness and all local argmax rows.
+    ///
+    /// Every original factor-table cell represents exactly one local
+    /// assignment, irrespective of its MaxCount multiplicity weight. During
+    /// elimination, support counts multiply only across disjoint sets of
+    /// previously eliminated variables and add across tied eliminated states.
+    /// This computes the number of distinct global optimal assignments in the
+    /// same pass as the weighted MaxCount multiplicity.
     pub fn evaluate_with_witness(&self, order: &[usize]) -> Result<MaxCountWitnessResult, EliminationError> {
         if order.len() != self.cardinalities.len() {
             return Err(EliminationError::InvalidEliminationOrder { reason: "must list every variable exactly once" });
@@ -402,6 +420,16 @@ impl ExactFactorGraph<MaxCountValue> {
         }
 
         let mut factors = self.factors.clone();
+        // Each feasible original table cell corresponds to one local
+        // assignment, even when its weighted multiplicity is greater than 1.
+        let mut support_factors: Vec<ExactFactor<u128>> = self.factors.iter().map(|factor| {
+            ExactFactor {
+                scope: factor.scope.clone(),
+                values: factor.values.iter()
+                    .map(|value| if value.optimum().is_some() { 1u128 } else { 0u128 })
+                    .collect(),
+            }
+        }).collect();
         let mut stats = EliminationStats::default();
         let mut backpointers = Vec::with_capacity(order.len());
 
@@ -426,47 +454,69 @@ impl ExactFactorGraph<MaxCountValue> {
             stats.maximum_output_factor_entries = stats.maximum_output_factor_entries.max(output_entries);
 
             let mut output = Vec::with_capacity(output_entries);
+            let mut output_support = Vec::with_capacity(output_entries);
             let mut rows = Vec::with_capacity(output_entries);
             for output_index in 0..output_entries {
                 let mut assignment = vec![0usize; self.cardinalities.len()];
                 decode_assignment(output_index, &output_scope, &self.cardinalities, &mut assignment);
                 let mut best_score: Option<i128> = None;
                 let mut best_count = 0u128;
+                let mut best_support = 0u128;
                 let mut maximizing_states = Vec::new();
                 let mut branch_multiplicities = Vec::new();
+                let mut branch_assignment_counts = Vec::new();
 
                 for state in 0..self.cardinalities[eliminated] {
                     assignment[eliminated] = state;
                     let mut product = self.one.clone();
+                    let mut support_product = 1u128;
                     for &factor_index in &bucket_indices {
                         let factor = &factors[factor_index];
-                        let value = &factor.values[factor.table_index(&assignment, &self.cardinalities)];
-                        product = product.checked_mul(value)?;
+                        let cell = factor.table_index(&assignment, &self.cardinalities);
+                        product = product.checked_mul(&factor.values[cell])?;
                         increment_u128(&mut stats.semiring_multiplications, "semiring multiplications")?;
+                        if product.optimum().is_none() {
+                            support_product = 0;
+                            break;
+                        }
+                        support_product = support_product.checked_mul(support_factors[factor_index].values[cell])
+                            .ok_or(SemiringError::CountOverflow { operation: "distinct assignment support multiplication" })?;
+                        increment_u128(&mut stats.support_count_multiplications, "support count multiplications")?;
                     }
+
                     if let Some(term) = product.optimum() {
                         match best_score {
                             None => {
                                 best_score = Some(term.score);
                                 best_count = term.count;
+                                best_support = support_product;
                                 maximizing_states.clear();
                                 branch_multiplicities.clear();
+                                branch_assignment_counts.clear();
                                 maximizing_states.push(state);
                                 branch_multiplicities.push(term.count);
+                                branch_assignment_counts.push(support_product);
                             }
                             Some(score) if term.score > score => {
                                 best_score = Some(term.score);
                                 best_count = term.count;
+                                best_support = support_product;
                                 maximizing_states.clear();
                                 branch_multiplicities.clear();
+                                branch_assignment_counts.clear();
                                 maximizing_states.push(state);
                                 branch_multiplicities.push(term.count);
+                                branch_assignment_counts.push(support_product);
                             }
                             Some(score) if term.score == score => {
                                 best_count = best_count.checked_add(term.count)
                                     .ok_or(SemiringError::CountOverflow { operation: "MaxCount witness tie aggregation" })?;
+                                best_support = best_support.checked_add(support_product)
+                                    .ok_or(SemiringError::CountOverflow { operation: "distinct assignment support tie aggregation" })?;
+                                increment_u128(&mut stats.support_count_additions, "support count additions")?;
                                 maximizing_states.push(state);
                                 branch_multiplicities.push(term.count);
+                                branch_assignment_counts.push(support_product);
                             }
                             Some(_) => {}
                         }
@@ -478,19 +528,27 @@ impl ExactFactorGraph<MaxCountValue> {
                     None => MaxCountValue::zero(),
                 };
                 output.push(value);
+                output_support.push(best_support);
                 rows.push(MaxCountBackpointerRow {
                     separator_assignment: output_scope.iter().map(|&v| assignment[v]).collect(),
                     maximizing_states,
                     branch_multiplicities,
+                    branch_assignment_counts,
                 });
             }
 
             let mut retained = Vec::with_capacity(factors.len() + 1);
+            let mut retained_support = Vec::with_capacity(support_factors.len() + 1);
             for (i, factor) in factors.into_iter().enumerate() {
-                if !bucket_indices.contains(&i) { retained.push(factor); }
+                if !bucket_indices.contains(&i) {
+                    retained.push(factor);
+                    retained_support.push(support_factors[i].clone());
+                }
             }
             retained.push(ExactFactor { scope: output_scope.clone(), values: output });
+            retained_support.push(ExactFactor { scope: output_scope.clone(), values: output_support });
             factors = retained;
+            support_factors = retained_support;
             backpointers.push(MaxCountBackpointer {
                 variable: eliminated,
                 separator: output_scope,
@@ -501,12 +559,20 @@ impl ExactFactorGraph<MaxCountValue> {
         }
 
         let mut result = self.one.clone();
-        for factor in factors {
-            if !factor.scope.is_empty() {
+        let mut distinct_optimal_assignments = 1u128;
+        for (factor, support_factor) in factors.iter().zip(support_factors.iter()) {
+            if !factor.scope.is_empty() || !support_factor.scope.is_empty() {
                 return Err(EliminationError::InvalidEliminationOrder { reason: "factor retained an uneliminated variable" });
             }
             result = result.checked_mul(&factor.values[0])?;
             increment_u128(&mut stats.semiring_multiplications, "semiring multiplications")?;
+            distinct_optimal_assignments = distinct_optimal_assignments
+                .checked_mul(support_factor.values[0])
+                .ok_or(SemiringError::CountOverflow { operation: "distinct assignment support scalar multiplication" })?;
+            increment_u128(&mut stats.support_count_multiplications, "support count multiplications")?;
+        }
+        if result.optimum().is_none() {
+            distinct_optimal_assignments = 0;
         }
 
         let witness = if result.optimum().is_none() {
@@ -534,9 +600,6 @@ impl ExactFactorGraph<MaxCountValue> {
                 .map(|state| state.ok_or(EliminationError::InvalidEliminationOrder { reason: "witness omitted a variable" }))
                 .collect::<Result<_, _>>()?;
 
-            // Independently check that the recovered assignment is feasible and
-            // attains the reported optimum. Its multiplicity need not equal the
-            // total MaxCount multiplicity because other assignments may tie.
             let mut witness_value = self.one.clone();
             for factor in &self.factors {
                 let value = &factor.values[factor.table_index(&assignment, &self.cardinalities)];
@@ -548,10 +611,9 @@ impl ExactFactorGraph<MaxCountValue> {
             }
         };
 
-        Ok(MaxCountWitnessResult { value: result, witness, backpointers, stats })
+        Ok(MaxCountWitnessResult { value: result, distinct_optimal_assignments, witness, backpointers, stats })
     }
 }
-
 
 fn decode_assignment(mut index: usize, scope: &[usize], cards: &[usize], assignment: &mut [usize]) {
     for &v in scope.iter().rev() {
@@ -594,6 +656,7 @@ pub enum OutputContract {
     WeightedPartitionFunction,
     OptimumWithMultiplicity,
     OptimumWithWitnessAndMultiplicity,
+    OptimumWithWitnessMultiplicityAndDistinctAssignmentCount,
     FixedLexicographicOptimumWithMultiplicity,
     FullObjectiveProfile,
     ParetoFrontierWithMultiplicity,
@@ -607,6 +670,7 @@ pub enum SuggestedAlgebra {
     NaturalCount,
     CommutativeQAlgebra,
     MaxCount,
+    MaxCountWithDistinctSupport,
     WeightProfile,
     ParetoCount,
 }
@@ -618,6 +682,7 @@ pub fn suggested_algebra(contract: OutputContract) -> SuggestedAlgebra {
         OutputContract::WeightedPartitionFunction => SuggestedAlgebra::CommutativeQAlgebra,
         OutputContract::OptimumWithMultiplicity => SuggestedAlgebra::MaxCount,
         OutputContract::OptimumWithWitnessAndMultiplicity => SuggestedAlgebra::MaxCount,
+        OutputContract::OptimumWithWitnessMultiplicityAndDistinctAssignmentCount => SuggestedAlgebra::MaxCountWithDistinctSupport,
         OutputContract::FixedLexicographicOptimumWithMultiplicity => SuggestedAlgebra::MaxCount,
         OutputContract::FullObjectiveProfile => SuggestedAlgebra::WeightProfile,
         OutputContract::ParetoFrontierWithMultiplicity => SuggestedAlgebra::ParetoCount,
@@ -731,6 +796,7 @@ mod tests {
         }
         let result = g.evaluate_with_witness(&[0,1,2]).unwrap();
         assert_eq!(result.value.optimum(), Some(MaxCountTerm { score: 2, count: 6 }));
+        assert_eq!(result.distinct_optimal_assignments, 6);
         let witness = result.witness.unwrap();
         let score: i128 = [(0,1),(1,2),(0,2)].iter()
             .map(|&(u,v)| if witness[u] != witness[v] { 1i128 } else { 0i128 }).sum();
@@ -819,9 +885,37 @@ mod tests {
         ]).unwrap();
         let result = g.evaluate_with_witness(&[0]).unwrap();
         assert_eq!(result.value.optimum(), Some(MaxCountTerm { score: 5, count: 4 }));
+        assert_eq!(result.distinct_optimal_assignments, 1);
         assert_eq!(result.witness, Some(vec![0]));
         assert_eq!(result.backpointers[0].rows[0].maximizing_states, vec![0]);
         assert_eq!(result.backpointers[0].rows[0].branch_multiplicities, vec![4]);
+        assert_eq!(result.backpointers[0].rows[0].branch_assignment_counts, vec![1]);
+    }
+
+
+    #[test]
+    fn max_count_witness_returns_distinct_support_for_unconstrained_variables() {
+        let graph = ExactFactorGraph::new(vec![2,3,4], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        let result = graph.evaluate_with_witness(&[0,1,2]).unwrap();
+        assert_eq!(result.value.optimum(), Some(MaxCountTerm { score: 0, count: 24 }));
+        assert_eq!(result.distinct_optimal_assignments, 24);
+        assert_eq!(result.witness.as_ref().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn max_count_support_count_overflow_fails_closed() {
+        let mut graph = ExactFactorGraph::new(vec![2], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        graph.add_factor(vec![0], vec![
+            MaxCountValue::candidate(5, 1),
+            MaxCountValue::candidate(5, 1),
+        ]).unwrap();
+        let result = graph.evaluate_with_witness(&[0]).unwrap();
+        assert_eq!(result.distinct_optimal_assignments, 2);
+        let mut counter = u128::MAX;
+        assert!(matches!(
+            increment_u128(&mut counter, "support overflow test"),
+            Err(EliminationError::StatisticsOverflow { metric: "support overflow test" })
+        ));
     }
 
     #[test]
@@ -968,6 +1062,10 @@ mod tests {
         assert_eq!(suggested_algebra(OutputContract::WeightedPartitionFunction), SuggestedAlgebra::CommutativeQAlgebra);
         assert_eq!(suggested_algebra(OutputContract::OptimumWithMultiplicity), SuggestedAlgebra::MaxCount);
         assert_eq!(suggested_algebra(OutputContract::OptimumWithWitnessAndMultiplicity), SuggestedAlgebra::MaxCount);
+        assert_eq!(
+            suggested_algebra(OutputContract::OptimumWithWitnessMultiplicityAndDistinctAssignmentCount),
+            SuggestedAlgebra::MaxCountWithDistinctSupport
+        );
         assert_eq!(suggested_algebra(OutputContract::FixedLexicographicOptimumWithMultiplicity), SuggestedAlgebra::MaxCount);
         assert_eq!(suggested_algebra(OutputContract::FullObjectiveProfile), SuggestedAlgebra::WeightProfile);
         assert_eq!(suggested_algebra(OutputContract::ParetoFrontierWithMultiplicity), SuggestedAlgebra::ParetoCount);
