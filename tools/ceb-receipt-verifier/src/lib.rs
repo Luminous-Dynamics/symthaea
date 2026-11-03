@@ -3467,4 +3467,53 @@ mod tests {
         assert!(verify_patch_reconstructs_result(&source, &result, wrong_patch).is_err());
         fs::remove_dir_all(root).unwrap();
     }
+    #[cfg(unix)]
+    #[test]
+    fn git_tree_reconstruction_rejects_executable_bit_change_after_enumeration() {
+        use std::fs;
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = tempfile::Builder::new()
+            .prefix("ceb-tree-mode-race-")
+            .tempdir()
+            .unwrap();
+        let snapshot = root.path().join("snapshot");
+        fs::create_dir_all(&snapshot).unwrap();
+        let source_file = snapshot.join("tool.sh");
+        fs::write(&source_file, b"#!/bin/sh\\nexit 0\\n").unwrap();
+        fs::set_permissions(&source_file, fs::Permissions::from_mode(0o644)).unwrap();
+
+        let entries = collect_snapshot_entries(&snapshot).unwrap();
+        fs::set_permissions(&source_file, fs::Permissions::from_mode(0o755)).unwrap();
+
+        let object_database = root.path().join("object-database");
+        let repository = git2::Repository::init_bare(&object_database).unwrap();
+        assert!(build_git_tree_from_entries(&repository, &entries, "").is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn git_tree_reconstruction_rejects_symlink_retarget_after_enumeration() {
+        use std::fs;
+        use std::os::unix::fs::symlink;
+
+        let root = tempfile::Builder::new()
+            .prefix("ceb-tree-link-race-")
+            .tempdir()
+            .unwrap();
+        let snapshot = root.path().join("snapshot");
+        fs::create_dir_all(&snapshot).unwrap();
+        fs::write(snapshot.join("target-a.txt"), b"same bytes").unwrap();
+        fs::write(snapshot.join("target-b.txt"), b"same bytes").unwrap();
+        symlink("target-a.txt", snapshot.join("current.txt")).unwrap();
+
+        let entries = collect_snapshot_entries(&snapshot).unwrap();
+        fs::remove_file(snapshot.join("current.txt")).unwrap();
+        symlink("target-b.txt", snapshot.join("current.txt")).unwrap();
+
+        let object_database = root.path().join("object-database");
+        let repository = git2::Repository::init_bare(&object_database).unwrap();
+        assert!(build_git_tree_from_entries(&repository, &entries, "").is_err());
+    }
+
 }
