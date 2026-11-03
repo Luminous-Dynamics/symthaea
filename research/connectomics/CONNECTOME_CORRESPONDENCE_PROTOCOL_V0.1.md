@@ -58,7 +58,7 @@ The cardinality label must be recomputed from source/target array lengths and mu
 
 Do not force split / merge lineage into bijections. A partial mapping can leave objects unresolved; every unmapped or unresolved source object is counted. Do not silently discard ambiguous alternatives.
 
-Every source and target object ID must exist in the corresponding pinned world manifest. A `NEURON_CORRESPONDENCE` mapping must reference neuron objects; a `SYNAPSE_CORRESPONDENCE` mapping must reference synapse objects; `SEGMENT_LINEAGE` must reference segment objects; `ARTIFACT_IDENTITY` must reference artifact objects. A source/target relation with mismatched object types is rejected.
+Every source and target object ID must exist in the corresponding pinned world manifest. Every target object may be consumed by at most one mapping row; many-to-one must be represented inside one row, not simulated with repeated target claims. Unmapped target objects are allowed and should be reported separately in a future target-coverage report. The semantic verifier rejects target reuse across mapping rows. A `NEURON_CORRESPONDENCE` mapping must reference neuron objects; a `SYNAPSE_CORRESPONDENCE` mapping must reference synapse objects; `SEGMENT_LINEAGE` must reference segment objects; `ARTIFACT_IDENTITY` must reference artifact objects. A source/target relation with mismatched object types is rejected.
 
 A `SEGMENT_LINEAGE` relation does not itself assert neuron identity. A neuron correspondence needs independent identity evidence (for example a stable source anchor or expert adjudication) under the declared evidence policy.
 
