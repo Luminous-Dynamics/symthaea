@@ -31,6 +31,7 @@ pub enum VehiclePairedRolloutError {
     EmptyCandidateId,
     EmptyRoadProfileId,
     InvalidRoadProfile,
+    InvalidStateDuringRollout,
     InvalidAdvancedControllerDigest,
     ControllerIdentityAliased,
     InvalidTargetSpeed,
@@ -48,6 +49,8 @@ pub struct VehiclePairedRolloutConfig {
     pub candidate_id: String,
     /// Caller-supplied identity for the exact Road profile used by the run.
     pub road_profile_id: String,
+    /// Digest of resolved road segments and projection semantics.
+    pub road_geometry_digest: String,
     /// Caller-supplied controller/config digest; not authenticated here.
     pub advanced_controller_digest: String,
     pub baseline_policy_id: String,
@@ -134,7 +137,6 @@ struct MetricsAccumulator {
     control_effort_sum: f64,
     max_abs_yaw_rate: f64,
     initial_progress_m: Option<f64>,
-    final_progress_m: f64,
 }
 
 impl MetricsAccumulator {
@@ -155,7 +157,6 @@ impl MetricsAccumulator {
         self.control_effort_sum += command.control_effort() as f64;
         self.max_abs_yaw_rate = self.max_abs_yaw_rate.max(plant_state.yaw_rate.abs());
         self.initial_progress_m.get_or_insert(projection.s);
-        self.final_progress_m = projection.s;
     }
 
     fn finish(
@@ -218,8 +219,11 @@ pub fn run_paired_lane_keep_rollout(
     if road_profile_id.trim().is_empty() {
         return Err(VehiclePairedRolloutError::EmptyRoadProfileId);
     }
-    if !road.total_length.is_finite() || road.total_length <= 0.0 {
-        return Err(VehiclePairedRolloutError::InvalidRoadProfile);
+    let road_geometry_digest = road
+        .profile_digest()
+        .ok_or(VehiclePairedRolloutError::InvalidRoadProfile)?;
+    if !simulator_params_are_usable(initial_simulator) {
+        return Err(VehiclePairedRolloutError::InvalidRolloutProfile);
     }
     if !digest_is_valid(&advanced_controller_digest) {
         return Err(VehiclePairedRolloutError::InvalidAdvancedControllerDigest);
@@ -250,6 +254,7 @@ pub fn run_paired_lane_keep_rollout(
     let mut profile = VehiclePairedRolloutConfig {
         candidate_id,
         road_profile_id,
+        road_geometry_digest,
         advanced_controller_digest,
         baseline_policy_id: crate::shadow_evaluation::PD_ROAD_BASELINE_POLICY_ID.into(),
         baseline_controller_digest,
@@ -264,6 +269,9 @@ pub fn run_paired_lane_keep_rollout(
     let profile_bytes = serde_json::to_vec(&profile)
         .map_err(|_| VehiclePairedRolloutError::InvalidRolloutProfile)?;
     profile.experiment_profile_digest = blake3::hash(&profile_bytes).to_hex().to_string();
+    if !profile.identity_is_valid() {
+        return Err(VehiclePairedRolloutError::InvalidRolloutProfile);
+    }
 
     let mut advanced_simulator = initial_simulator.clone();
     let mut baseline_simulator = initial_simulator.clone();
@@ -312,13 +320,13 @@ pub fn run_paired_lane_keep_rollout(
         }
 
         advanced_accumulator.observe(
-            &advanced_observation_for_metrics(&advanced_plant_before, road),
+            &advanced_plant_before,
             road,
             target_speed_mps,
             &advanced_command,
         );
         baseline_accumulator.observe(
-            &advanced_observation_for_metrics(&baseline_plant_before, road),
+            &baseline_plant_before,
             road,
             target_speed_mps,
             &baseline_command,
@@ -326,6 +334,11 @@ pub fn run_paired_lane_keep_rollout(
 
         advanced_simulator.step(&advanced_command, timestep_s);
         baseline_simulator.step(&baseline_command, timestep_s);
+        if !state_is_finite(advanced_simulator.state())
+            || !state_is_finite(baseline_simulator.state())
+        {
+            return Err(VehiclePairedRolloutError::InvalidStateDuringRollout);
+        }
 
         frames.push(VehiclePairedRolloutFrame {
             step_index,
@@ -374,17 +387,14 @@ impl VehiclePairedRolloutResult {
         let mut result = self.clone();
         let expected = result.run_output_digest.clone();
         result.run_output_digest.clear();
+        if !result.profile.identity_is_valid() {
+            return false;
+        }
         serde_json::to_vec(&result)
             .ok()
             .map(|bytes| blake3::hash(&bytes).to_hex().to_string() == expected)
             .unwrap_or(false)
     }
-}
-
-fn advanced_observation_for_metrics(state: &VehicleState, road: &Road) -> VehicleState {
-    let mut metric_state = state.clone();
-    road.apply(&mut metric_state);
-    metric_state
 }
 
 fn subtract_metrics(
@@ -410,6 +420,42 @@ fn subtract_metrics(
         final_heading_error_rad: advanced.final_heading_error_rad
             - baseline.final_heading_error_rad,
     }
+}
+
+fn simulator_params_are_usable(simulator: &BicycleModelSimulator) -> bool {
+    let params = simulator.params();
+    let values = [
+        params.mass,
+        params.yaw_inertia,
+        params.front_axle_dist,
+        params.rear_axle_dist,
+        params.cg_height,
+        params.front_cornering_stiffness,
+        params.rear_cornering_stiffness,
+        params.max_steering_angle,
+        params.steering_rate_limit,
+        params.max_engine_force,
+        params.max_power,
+        params.max_brake_force,
+        params.drag_coeff,
+        params.rolling_resistance,
+        params.air_density,
+        params.wheelbase,
+    ];
+    values.iter().all(|value| value.is_finite())
+        && params.mass > 0.0
+        && params.yaw_inertia > 0.0
+        && params.front_axle_dist > 0.0
+        && params.rear_axle_dist > 0.0
+        && params.front_cornering_stiffness > 0.0
+        && params.rear_cornering_stiffness > 0.0
+        && params.max_steering_angle > 0.0
+        && params.steering_rate_limit > 0.0
+        && params.max_engine_force > 0.0
+        && params.max_power > 0.0
+        && params.max_brake_force > 0.0
+        && params.air_density > 0.0
+        && (params.wheelbase - params.front_axle_dist - params.rear_axle_dist).abs() < 1e-9
 }
 
 fn digest_is_valid(value: &str) -> bool {
@@ -499,6 +545,7 @@ mod tests {
 
         assert!(result.profile.identity_is_valid());
         assert!(result.output_identity_is_valid());
+        assert_eq!(result.profile.road_geometry_digest, road.profile_digest().unwrap());
         assert_eq!(result.frames.len(), 8);
         assert_eq!(result.advanced_metrics.steps, 8);
         assert_eq!(result.baseline_metrics.steps, 8);
@@ -562,6 +609,30 @@ mod tests {
         .unwrap();
         result.frames[0].advanced_command.throttle = 0.99;
         assert!(!result.output_identity_is_valid());
+    }
+
+    #[test]
+    fn invalid_or_nonfinite_chassis_parameters_fail_closed() {
+        let mut params = crate::types::ChassisParams::default();
+        params.mass = f64::NAN;
+        let sim = BicycleModelSimulator::with_params(params);
+        let ( _, road, perturbations, mut controller, mut encoder) = setup();
+        assert_eq!(
+            run_paired_lane_keep_rollout(
+                "candidate",
+                "road",
+                "d".repeat(64),
+                &sim,
+                &road,
+                &perturbations,
+                10.0,
+                0.005,
+                2,
+                &mut controller,
+                &mut encoder,
+            ).err(),
+            Some(VehiclePairedRolloutError::InvalidRolloutProfile)
+        );
     }
 
     #[test]
