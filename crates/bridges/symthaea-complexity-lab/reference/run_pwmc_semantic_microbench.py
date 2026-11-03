@@ -62,6 +62,64 @@ def evaluate(case):
             "support_cardinality":str(len(support)),
             "pwmc":f"{total.numerator}/{total.denominator}"}
 
+def run_metamorphic_tests(corpus):
+    cases = {case["id"]: case for case in corpus["cases"]}
+    reuse = corpus["reusable_projection"]
+    output = []
+    for test in corpus["metamorphic_tests"]:
+        op = test["operation"]
+        source = json.loads(json.dumps(reuse if test["source"] == "reusable_projection" else cases[test["source"]]))
+        if test["source"] == "reusable_projection":
+            source["weights"] = reuse["weight_maps"][0]["weights"]
+        base = evaluate(source)
+        transformed = json.loads(json.dumps(source))
+        if op == "add_free_hidden":
+            transformed["variables"].append("h_added")
+            transformed["hidden"].append("h_added")
+        elif op == "permute_variable_order":
+            new_order = ["h", "u", "d"]
+            old = transformed["variables"]
+            new_index = {name: i + 1 for i, name in enumerate(new_order)}
+            transformed["clauses"] = [[(1 if lit > 0 else -1) * new_index[old[abs(lit)-1]] for lit in clause] for clause in transformed["clauses"]]
+            transformed["variables"] = new_order
+        elif op == "duplicate_clause_and_literal":
+            clause = transformed["clauses"][0]
+            transformed["clauses"] = [clause + [clause[0]], list(reversed(clause))]
+        elif op == "add_subsumed_clause":
+            transformed["clauses"].append([1, 2])
+        elif op == "add_free_visible":
+            transformed["variables"].append("x")
+            transformed["visible"].append("x")
+            transformed["weights"]["x"] = {"false":"2/1", "true":"3/1"}
+        elif op == "move_hidden_to_visible":
+            variable = transformed["hidden"].pop()
+            transformed["visible"].append(variable)
+            transformed["weights"][variable] = {"false":"1/1", "true":"1/1"}
+        else:
+            raise AssertionError(f"unknown metamorphic operation: {op}")
+        actual = evaluate(transformed)
+        expected = test["expected"]
+        if op == "add_free_hidden":
+            assert actual["projected_support"] == base["projected_support"]
+            assert actual["pwmc"] == base["pwmc"]
+            assert int(actual["full_model_count"]) == int(base["full_model_count"]) * int(expected["full_model_multiplier"])
+        elif op in {"permute_variable_order", "duplicate_clause_and_literal", "add_subsumed_clause"}:
+            for field in ("full_model_count", "projected_support", "pwmc"):
+                assert actual[field] == base[field], (test["id"], field, actual[field], base[field])
+        elif op == "add_free_visible":
+            assert int(actual["full_model_count"]) == int(base["full_model_count"]) * int(expected["full_model_multiplier"])
+            assert actual["support_cardinality"] == expected["support_cardinality"]
+            assert actual["pwmc"] == expected["pwmc"]
+        elif op == "move_hidden_to_visible":
+            assert actual["support_cardinality"] == expected["support_cardinality"]
+            assert actual["pwmc"] == expected["pwmc"]
+        output.append({"test_id":test["id"],"operation":op,"status":"exact_metamorphic_relation_passed",
+                       "base_full_model_count":base["full_model_count"],"transformed_full_model_count":actual["full_model_count"],
+                       "base_support_cardinality":base["support_cardinality"],"transformed_support_cardinality":actual["support_cardinality"],
+                       "base_pwmc":base["pwmc"],"transformed_pwmc":actual["pwmc"]})
+        print(f"PASS metamorphic {test['id']}: {base['pwmc']} -> {actual['pwmc']}")
+    return output
+
 def main():
     raw = INPUT.read_bytes()
     corpus = json.loads(raw)
@@ -100,6 +158,7 @@ def main():
     print("PASS independent projection: visible-first existential producer vs full-assignment verifier")
     print(f"PASS reusable support: one retained support, {len(replay_results)} exact weight maps, all independent replays matched")
 
+    metamorphic_results = run_metamorphic_tests(corpus)
     output={"format":"symthaea.pwmc-semantic-microbench-results","version":1,
       "input_sha256":digest,"method":"visible-first existential support compilation; independent full-assignment exact replay; Fraction arithmetic",
       "claim_ceiling":"finite_reference_oracle_not_solver_performance","case_count":len(results),
@@ -108,7 +167,7 @@ def main():
         "verifier":"full_universe_assignment_enumeration_then_visible_projection","agreement":"exact"},
       "reusable_projection":{"support_compilations_in_reuse_path":1,"weight_map_evaluations":len(replay_results),
         "independent_exhaustive_replays":len(replay_results),"retained_support":retained_support,"results":replay_results},
-      "results":results}
+      "results":results,"metamorphic_test_count":len(metamorphic_results),"metamorphic_tests":metamorphic_results}
     OUTPUT.write_text(json.dumps(output,indent=2,sort_keys=True)+"\n",encoding="utf-8")
     print(f"PASS all {len(results)} PWMC semantic microbench cases; input={digest}")
 
