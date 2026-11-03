@@ -287,7 +287,7 @@ const MAX_PATCH_RECONSTRUCTION_BYTES: u64 = 512 * 1024 * 1024;
 #[derive(Clone, Debug)]
 enum TreeEntryContent {
     File(PathBuf),
-    Symlink(Vec<u8>),
+    Symlink { path: PathBuf, target: Vec<u8> },
 }
 
 #[derive(Clone, Debug)]
@@ -427,7 +427,10 @@ fn collect_tree_entries(
             }
             entries.push(TreeEntry {
                 relative_path,
-                content: TreeEntryContent::Symlink(target_bytes),
+                content: TreeEntryContent::Symlink {
+                    path: absolute_path,
+                    target: target_bytes,
+                },
                 executable: false,
                 size,
             });
@@ -555,7 +558,7 @@ fn build_git_tree_from_entries(
                     })?;
                     (oid, if entry.executable { 0o100755 } else { 0o100644 })
                 }
-                TreeEntryContent::Symlink(target) => {
+                TreeEntryContent::Symlink { path, target } => {
                     let current_target = fs::read_link(path).map_err(|error| {
                         Failure::protocol(format!(
                             "cannot re-read snapshot symlink {}: {error}",
@@ -726,7 +729,7 @@ fn tree_entry_digest(entry: &TreeEntry) -> Result<String, Failure> {
             }
             hasher.update(content.finalize());
         }
-        TreeEntryContent::Symlink(target) => {
+        TreeEntryContent::Symlink { target, .. } => {
             hasher.update([b'L']);
             hasher.update([0]);
             hasher.update((target.len() as u64).to_be_bytes());
@@ -1011,7 +1014,7 @@ fn hash_source_tree_inner(root: &Path) -> Result<String, Failure> {
                     )));
                 }
             }
-            TreeEntryContent::Symlink(target) => {
+            TreeEntryContent::Symlink { target, .. } => {
                 tree_hasher.update([b'L']);
                 tree_hasher.update([0]);
                 content_hasher.update(target);
