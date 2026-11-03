@@ -74,6 +74,14 @@ Results (seed 20261103):
 
 All integer arithmetic uses Python arbitrary-precision integers. The checker has a separate replay implementation and recomputes local argmax sets; recomputing the certificate digest after mutation does not make a false trace acceptable.
 
+## Exact uniform sampling of optima
+
+The distinct-support counts permit exact uniform sampling without enumerating every optimum. At each reverse backpointer step, select a maximizing state with probability proportional to its branch-support count. The branch count is the product of distinct-support counts for disjoint child blocks in the bucket; prior backpointers then sample those child blocks conditionally. The probability products telescope to 1 / total distinct optimum support.
+
+Rust adds ExactFactorGraph<MaxCountValue>::sample_optimal_assignment. The caller supplies a uniform_below(bound) callback that must return an unbiased integer in [0,bound). This avoids a dependency on a specific RNG crate. The sampler validates the variable permutation, separator ordering, row encoding, parallel branch-array lengths, positive branch counts, root-support product, and the returned assignment's score. It trusts the supplied argmax/support contents; externally supplied results must be independently certificate-checked before sampling.
+
+The Python v2 reference checks 1,383 path probabilities exactly with fractions.Fraction: each tested optimum has probability exactly 1 / support_size; all six triangle MaxCut optima have probability 1/6. This is an exact finite probability check, not a runtime benchmark.
+
 ## Benchmarks and qualification targets
 
 Compare on identical frozen factor systems and budgets:
