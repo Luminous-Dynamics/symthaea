@@ -2070,6 +2070,7 @@ mod tests {
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
+        let _ = fs::remove_dir_all(&root);
         let source_root = root.join("source-snapshot");
         let result_root = root.join("result-snapshot");
         let primary_root = root.join("primary");
@@ -2182,6 +2183,68 @@ mod tests {
         });
         assert!(!detached_report.accepted);
         assert_eq!(detached_report.status, "protocol_violation");
+
+        // A task contract is not self-authenticating; its exact bytes must match
+        // the operator-provisioned pin before any snapshot hashing occurs.
+        let wrong_task_pin = verify_pair(PairInputs {
+            task_contract: task_bytes.clone(),
+            expected_task_contract_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
+            task_id: "CEB-RUST-001".to_string(),
+            source_tree_dir: source_root.clone(),
+            result_tree_dir: result_root.clone(),
+            patch: b"diff --git a/src/lib.rs b/src/lib.rs\\n+pub fn verified() -> bool { true }\\n".to_vec(),
+            primary_envelope: primary_envelope.clone(),
+            primary_artifacts_dir: primary_root.clone(),
+            regrade_envelope: regrade_envelope.clone(),
+            regrade_artifacts_dir: regrade_root.clone(),
+            trust_policy: build_test_trust_policy(&primary_key, &regrade_key),
+            expected_trust_policy_sha256: policy_digest.clone(),
+        });
+        assert!(!wrong_task_pin.accepted);
+        assert_eq!(wrong_task_pin.status, "protocol_violation");
+
+        // Recomputed source/result snapshots must match the pinned task and receipts.
+        let changed_source_root = root.join("changed-source");
+        fs::create_dir_all(changed_source_root.join("src")).unwrap();
+        fs::write(changed_source_root.join("src/lib.rs"), b"pub fn verified() -> bool { maybe }").unwrap();
+        let wrong_source = verify_pair(PairInputs {
+            task_contract: task_bytes.clone(),
+            expected_task_contract_sha256: task_digest.clone(),
+            task_id: "CEB-RUST-001".to_string(),
+            source_tree_dir: changed_source_root.clone(),
+            result_tree_dir: result_root.clone(),
+            patch: b"diff --git a/src/lib.rs b/src/lib.rs\\n+pub fn verified() -> bool { true }\\n".to_vec(),
+            primary_envelope: primary_envelope.clone(),
+            primary_artifacts_dir: primary_root.clone(),
+            regrade_envelope: regrade_envelope.clone(),
+            regrade_artifacts_dir: regrade_root.clone(),
+            trust_policy: build_test_trust_policy(&primary_key, &regrade_key),
+            expected_trust_policy_sha256: policy_digest.clone(),
+        });
+        assert!(!wrong_source.accepted);
+        assert_eq!(wrong_source.status, "protocol_violation");
+        fs::remove_dir_all(changed_source_root).unwrap();
+
+        let changed_result_root = root.join("changed-result");
+        fs::create_dir_all(changed_result_root.join("src")).unwrap();
+        fs::write(changed_result_root.join("src/lib.rs"), b"pub fn verified() -> bool { false }").unwrap();
+        let wrong_result = verify_pair(PairInputs {
+            task_contract: task_bytes.clone(),
+            expected_task_contract_sha256: task_digest.clone(),
+            task_id: "CEB-RUST-001".to_string(),
+            source_tree_dir: source_root.clone(),
+            result_tree_dir: changed_result_root.clone(),
+            patch: b"diff --git a/src/lib.rs b/src/lib.rs\\n+pub fn verified() -> bool { true }\\n".to_vec(),
+            primary_envelope: primary_envelope.clone(),
+            primary_artifacts_dir: primary_root.clone(),
+            regrade_envelope: regrade_envelope.clone(),
+            regrade_artifacts_dir: regrade_root.clone(),
+            trust_policy: build_test_trust_policy(&primary_key, &regrade_key),
+            expected_trust_policy_sha256: policy_digest.clone(),
+        });
+        assert!(!wrong_result.accepted);
+        assert_eq!(wrong_result.status, "protocol_violation");
+        fs::remove_dir_all(changed_result_root).unwrap();
 
         // A second run cannot reuse primary execution evidence.
         let mut reused = regrade_statement;
