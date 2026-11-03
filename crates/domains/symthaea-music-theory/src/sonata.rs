@@ -51,7 +51,8 @@ use crate::harmony::{Key, Progression};
 use crate::motif::Motif;
 use crate::motif_return::{MotifReturnEvidence, compare_melodic_regions};
 use crate::obligation::{
-    CompositionalObligation, ObligationKind, ObligationLedger, ReturnTransformation,
+    CompositionalObligation, MotifDevelopmentTransformation, ObligationKind,
+    ObligationLedger, ReturnTransformation,
 };
 use crate::phrase::Period;
 use crate::pitch::{Pitch, PitchClass};
@@ -159,7 +160,7 @@ pub enum SonataVerificationMetric {
     MotifDevelopment {
         source: SonataSectionKind,
         target: SonataSectionKind,
-        transformation: ReturnTransformation,
+        transformation: MotifDevelopmentTransformation,
         interval_similarity: f32,
         exact_pitch_similarity: f32,
         #[serde(default)]
@@ -340,7 +341,9 @@ pub fn plan_sonata(home_key: Key, meter: f64, motif: &Motif, seed: u64) -> Sonat
         0.85,
         ObligationKind::DevelopMotif {
             motif_id: "sonata.primary".into(),
-            transformation: ReturnTransformation::Transposed,
+            transformation: MotifDevelopmentTransformation::DiatonicTransposition {
+                degree_shift: 1,
+            },
         },
     ));
     obligations.add(CompositionalObligation::new(
@@ -516,6 +519,7 @@ fn compare_motif_development_regions(
     target_start: Duration,
     target_end: Duration,
     target_key: Key,
+    transformation: MotifDevelopmentTransformation,
 ) -> MotifDevelopmentEvidence {
     let mut source: Vec<&ScoreNote> = score.notes.iter().filter(|note| {
         note.role == VoiceRole::Melody
@@ -536,10 +540,23 @@ fn compare_motif_development_regions(
     } else {
         aligned as f32 / source.len().max(target.len()) as f32
     };
+    let source_degrees: Vec<Option<i32>> = source
+        .iter()
+        .map(|note| pitch_scale_degree(note.pitch, source_key))
+        .collect();
+    let pivot = source_degrees.first().copied().flatten();
     let mut degree_matches = 0usize;
     let mut duration_matches = 0usize;
     for index in 0..aligned {
-        if pitch_scale_degree(source[index].pitch, source_key)
+        let expected_degree = source_degrees[index].and_then(|degree| match transformation {
+            MotifDevelopmentTransformation::DiatonicTransposition { degree_shift } => {
+                Some(degree + degree_shift)
+            }
+            MotifDevelopmentTransformation::InversionAroundFirstNote => {
+                pivot.map(|first| 2 * first - degree)
+            }
+        });
+        if expected_degree
             == pitch_scale_degree(target[index].pitch, target_key)
         {
             degree_matches += 1;
@@ -621,6 +638,7 @@ fn metric_for_obligation(
                     target.start,
                     target.end,
                     target.key,
+                    *transformation,
                 )
             });
             let interval_similarity = development_evidence
@@ -1006,7 +1024,9 @@ mod tests {
             item.kind,
             ObligationKind::DevelopMotif {
                 motif_id,
-                transformation: ReturnTransformation::Transposed,
+                transformation: MotifDevelopmentTransformation::DiatonicTransposition {
+                    degree_shift: 1,
+                },
             } if motif_id == "sonata.primary"
         )));
         assert!(
@@ -1022,7 +1042,7 @@ mod tests {
         let target_key = Key::minor(PitchClass::E);
         let mut score = Score::new(source_key, 120.0, 4);
         let source = [60, 64, 67]; // C-E-G: scale degrees 1-3-5 in C major
-        let target = [64, 67, 71]; // E-G-B: scale degrees 1-3-5 in E minor
+        let target = [66, 69, 72]; // F#-A-C: scale degrees 2-4-6 in E minor
         for (index, midi) in source.into_iter().enumerate() {
             score.push(ScoreNote {
                 part: crate::score::PartId::UNASSIGNED,
@@ -1055,6 +1075,9 @@ mod tests {
             Duration::new(4, 1),
             Duration::new(7, 1),
             target_key,
+            MotifDevelopmentTransformation::DiatonicTransposition {
+                degree_shift: 1,
+            },
         );
         assert_eq!(evidence.scale_degree_similarity, 1.0);
         assert_eq!(evidence.duration_similarity, 1.0);
