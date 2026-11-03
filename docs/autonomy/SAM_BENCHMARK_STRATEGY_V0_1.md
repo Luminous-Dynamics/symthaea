@@ -29,7 +29,7 @@ Open-loop replay, non-reactive closed-loop simulation and reactive multi-agent c
 
 At minimum, evaluate:
 
-1. **Classical baseline:** the versioned PD road teacher and the new Stanley-style road tracker in `classical_baselines.rs`; use Pure Pursuit as a third path-tracking variant where the road representation supports it.
+1. **Classical baseline:** the versioned PD road teacher, Stanley-style tracker and Pure Pursuit tracker in `classical_baselines.rs`.
 2. **Model-predictive control:** a documented MPC implementation with fixed horizon, constraints, model and solver budget.
 3. **Imitation-learning baseline:** a reproducible behavior-cloning reference trained on an admitted dataset split.
 4. **Learning baseline:** a documented RL or learned planner on the same simulator/sensor track.
@@ -305,13 +305,13 @@ Treat simulator outputs as observations from a named model. Cross-check selected
 ### How to beat strong baselines
 
 1. First beat the project's existing PD teacher on frozen, held-out closed-loop tasks without trading away constraint margins, actor safety or reliability.
-2. Compare the new Stanley-style baseline against the PD teacher, then add constrained MPC and Pure Pursuit as distinct references. Do not call a PD-teacher comparison "state of the art".
+2. Compare Stanley and Pure Pursuit against the PD teacher, then add constrained MPC as another distinct reference. Do not call a PD-teacher comparison "state of the art".
 3. Compare HDC-LTC alone, HDC-LTC + RTA, classical + RTA, and cognitive proposal + classical execution + RTA. These ablations isolate which subsystem actually provides improvement.
 4. On long-tail tasks, compare WOD-E2E / Waymo datasets and matched simulator tracks; split by scenario family, geography, map and actor intent rather than by adjacent frames.
 5. Run random, stratified and AST scenario generators at identical budgets, then evaluate all methods on an independent held-out generator.
 6. Publish every failure, no-result, unsupported simulator feature and resource constraint. Treat confidence and calibration as first-class measurements.
 
-The implementation now includes same-observation shadow comparison, a paired closed-loop lane-keeping runner with PD/Stanley policy selection, and versioned baseline identities. It does not yet integrate the RTA monitor or actor-capable intersection simulator.
+The implementation now includes same-observation shadow comparison, a paired closed-loop lane-keeping runner with PD/Stanley/Pure Pursuit policy selection, and versioned baseline identities. It does not yet integrate the RTA monitor or actor-capable intersection simulator.
 
 ## 9. 2026 closed-loop generalization benchmarks to adopt
 
