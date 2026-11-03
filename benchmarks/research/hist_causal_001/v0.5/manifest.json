@@ -1,0 +1,32 @@
+{
+  "benchmark": "HIST-CAUSAL-001",
+  "version": "0.5",
+  "status": "seeded_development_task_generator",
+  "generator": "SplitMix64-derived deterministic recipe selection",
+  "development_seeds_validated": 100,
+  "candidate_models": [
+    "genuine_mechanism",
+    "latent_common_cause",
+    "primary_sensor_artefact",
+    "actuator_noncompliance",
+    "common_mode_reference_artefact",
+    "null_effect"
+  ],
+  "probes": [
+    "observational_primary",
+    "randomized_primary",
+    "secondary_reference",
+    "actuator_readback",
+    "sensor_self_test",
+    "blank_common_mode_control"
+  ],
+  "invariants": [
+    "exact rational probability normalization",
+    "full probe suite separates all 15 model pairs",
+    "observational mechanism/common-cause alias retained",
+    "primary outcome/actuator non-compliance alias retained until readback",
+    "evaluator-only target and latent parameters absent from agent view"
+  ],
+  "tests": 10,
+  "claim_ceiling": "seeded synthetic task generation only; not a sealed benchmark or empirical mechanism result"
+}

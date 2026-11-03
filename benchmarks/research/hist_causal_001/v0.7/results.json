@@ -1,0 +1,44 @@
+{
+  "benchmark": "HIST-CAUSAL-001",
+  "version": "0.7",
+  "method": "oracle pairwise likelihood-ratio reference; known OOD and nearest-candidate likelihoods",
+  "seed_count": 20,
+  "replicates_per_seed_per_truth_per_n": 250,
+  "independent_samples_per_probe": [1, 2, 5, 10, 20, 50],
+  "probe_count": 6,
+  "equal_prior_confident_posterior_threshold": "0.95",
+  "likelihood_ratio_threshold": 19,
+  "nearest_candidate_counts": {
+    "actuator_noncompliance": 18,
+    "primary_sensor_artefact": 2
+  },
+  "mean_nearest_pair_js_nats": 0.030297033469569978,
+  "outcomes": {
+    "1": {
+      "ood": {"n_trials":5000,"rates":{"correct_confident":0.2694,"wrong_confident":0.0,"abstain":0.7306}},
+      "candidate": {"n_trials":5000,"rates":{"correct_confident":0.0,"wrong_confident":0.0068,"abstain":0.9932}}
+    },
+    "2": {
+      "ood": {"n_trials":5000,"rates":{"correct_confident":0.4184,"wrong_confident":0.0012,"abstain":0.5804}},
+      "candidate": {"n_trials":5000,"rates":{"correct_confident":0.0096,"wrong_confident":0.0086,"abstain":0.9818}}
+    },
+    "5": {
+      "ood": {"n_trials":5000,"rates":{"correct_confident":0.7328,"wrong_confident":0.0162,"abstain":0.251}},
+      "candidate": {"n_trials":5000,"rates":{"correct_confident":0.6572,"wrong_confident":0.0048,"abstain":0.338}}
+    },
+    "10": {
+      "ood": {"n_trials":5000,"rates":{"correct_confident":0.9236,"wrong_confident":0.0034,"abstain":0.073}},
+      "candidate": {"n_trials":5000,"rates":{"correct_confident":0.9022,"wrong_confident":0.0012,"abstain":0.0966}}
+    },
+    "20": {
+      "ood": {"n_trials":5000,"rates":{"correct_confident":0.9926,"wrong_confident":0.0002,"abstain":0.0072}},
+      "candidate": {"n_trials":5000,"rates":{"correct_confident":0.9922,"wrong_confident":0.0,"abstain":0.0078}}
+    },
+    "50": {
+      "ood": {"n_trials":5000,"rates":{"correct_confident":1.0,"wrong_confident":0.0,"abstain":0.0}},
+      "candidate": {"n_trials":5000,"rates":{"correct_confident":1.0,"wrong_confident":0.0,"abstain":0.0}}
+    }
+  },
+  "trials_scored": 60000,
+  "claim_ceiling": "optimistic pairwise detection sensitivity with known likelihoods; not a solver result or general OOD guarantee"
+}
