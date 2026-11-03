@@ -227,6 +227,30 @@ impl VehicleRtaShadowReport {
         {
             return false;
         }
+
+        let mode_count = |mode| self.frames.iter().filter(|frame| frame.mode == mode).count();
+        if self.advanced_frames != mode_count(VehicleRtaMode::Advanced)
+            || self.baseline_frames != mode_count(VehicleRtaMode::Baseline)
+            || self.recovery_dwell_frames != mode_count(VehicleRtaMode::RecoveryDwell)
+            || self.transition_frames != mode_count(VehicleRtaMode::TransitionToAdvanced)
+            || self.no_admissible_fallback_frames != mode_count(VehicleRtaMode::NoAdmissibleFallback)
+            || self.command_proposal_frames
+                != self.frames.iter().filter(|frame| frame.command_proposal_present).count()
+        {
+            return false;
+        }
+
+        for (reason, declared_count) in &self.reason_counts {
+            let observed_count = self
+                .frames
+                .iter()
+                .flat_map(|frame| frame.reasons.iter())
+                .filter(|observed| *observed == reason)
+                .count();
+            if observed_count != *declared_count {
+                return false;
+            }
+        }
         let mut report = self.clone();
         let expected = report.report_digest.clone();
         report.report_digest.clear();
