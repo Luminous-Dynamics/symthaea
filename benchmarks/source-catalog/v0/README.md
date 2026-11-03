@@ -6,7 +6,7 @@ This directory provides a stable identity for each source pointer and groups rel
 
 ## Current boundary
 
-- All 13 entries are marked `split: development`.
+- All 14 entries are marked `split: development`.
 - All rights are `unknown`, `content_access: metadata_only`, and `rights_review: pending`.
 - All entries are `annotation_status: not_reviewed`.
 - No full source text is copied into this catalog or implied to be approved for ingestion.
