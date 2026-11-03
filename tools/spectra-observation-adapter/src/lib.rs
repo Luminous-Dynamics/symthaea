@@ -401,11 +401,11 @@ mod tests {
     fn perfect_fixture() -> (CandidateView, EvaluatorTruth) {
         let rows = vec![
             CandidateTrial { trial_id: 0, participant_id: 0, session_id: 0, stimulus_onset_ns: 1_000, decision_yes: Some(true), decision_time_ns: Some(1_100), confidence_level: Some(3), confidence_time_ns: Some(1_200), clock_resolution_ns: 1, onset_uncertainty_ns: 1, input_latency_uncertainty_ns: 1 },
-            CandidateTrial { trial_id: 1, participant_id: 0, session_id: 0, stimulus_onset_ns: 2_000, decision_yes: Some(true), decision_time_ns: Some(2_200), confidence_level: Some(2), confidence_time_ns: Some(2_300), clock_resolution_ns: 1, onset_uncertainty_ns: 1 },
-            CandidateTrial { trial_id: 2, participant_id: 0, session_id: 0, stimulus_onset_ns: 3_000, decision_yes: Some(true), decision_time_ns: Some(3_300), confidence_level: Some(1), confidence_time_ns: Some(3_400), clock_resolution_ns: 1, onset_uncertainty_ns: 1 },
-            CandidateTrial { trial_id: 3, participant_id: 0, session_id: 0, stimulus_onset_ns: 4_000, decision_yes: Some(false), decision_time_ns: Some(4_300), confidence_level: Some(1), confidence_time_ns: Some(4_400), clock_resolution_ns: 1, onset_uncertainty_ns: 1 },
-            CandidateTrial { trial_id: 4, participant_id: 0, session_id: 0, stimulus_onset_ns: 5_000, decision_yes: Some(false), decision_time_ns: Some(5_200), confidence_level: Some(2), confidence_time_ns: Some(5_300), clock_resolution_ns: 1, onset_uncertainty_ns: 1 },
-            CandidateTrial { trial_id: 5, participant_id: 0, session_id: 0, stimulus_onset_ns: 6_000, decision_yes: Some(false), decision_time_ns: Some(6_100), confidence_level: Some(3), confidence_time_ns: Some(6_200), clock_resolution_ns: 1, onset_uncertainty_ns: 1 },
+            CandidateTrial { trial_id: 1, participant_id: 0, session_id: 0, stimulus_onset_ns: 2_000, decision_yes: Some(true), decision_time_ns: Some(2_200), confidence_level: Some(2), confidence_time_ns: Some(2_300), clock_resolution_ns: 1, onset_uncertainty_ns: 1, input_latency_uncertainty_ns: 1 },
+            CandidateTrial { trial_id: 2, participant_id: 0, session_id: 0, stimulus_onset_ns: 3_000, decision_yes: Some(true), decision_time_ns: Some(3_300), confidence_level: Some(1), confidence_time_ns: Some(3_400), clock_resolution_ns: 1, onset_uncertainty_ns: 1, input_latency_uncertainty_ns: 1 },
+            CandidateTrial { trial_id: 3, participant_id: 0, session_id: 0, stimulus_onset_ns: 4_000, decision_yes: Some(false), decision_time_ns: Some(4_300), confidence_level: Some(1), confidence_time_ns: Some(4_400), clock_resolution_ns: 1, onset_uncertainty_ns: 1, input_latency_uncertainty_ns: 1 },
+            CandidateTrial { trial_id: 4, participant_id: 0, session_id: 0, stimulus_onset_ns: 5_000, decision_yes: Some(false), decision_time_ns: Some(5_200), confidence_level: Some(2), confidence_time_ns: Some(5_300), clock_resolution_ns: 1, onset_uncertainty_ns: 1, input_latency_uncertainty_ns: 1 },
+            CandidateTrial { trial_id: 5, participant_id: 0, session_id: 0, stimulus_onset_ns: 6_000, decision_yes: Some(false), decision_time_ns: Some(6_100), confidence_level: Some(3), confidence_time_ns: Some(6_200), clock_resolution_ns: 1, onset_uncertainty_ns: 1, input_latency_uncertainty_ns: 1 },
         ];
         let truth = EvaluatorTruth {
             trial_ids: (0..6).collect(),
