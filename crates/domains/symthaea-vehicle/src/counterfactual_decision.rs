@@ -280,13 +280,6 @@ fn derive_finding(
             None,
             None,
         )
-    } else if selected.feasibility == CounterfactualFeasibility::Infeasible {
-        (
-            CounterfactualDecisionOutcome::SelectedActionInfeasible,
-            CounterfactualDecisionReason::SelectedActionViolatesDeclaredFeasibility,
-            None,
-            None,
-        )
     } else {
         let best_action = feasible
             .iter()
@@ -307,32 +300,41 @@ fn derive_finding(
                 }
             })
             .expect("non-empty feasible set checked above");
-        let signed_regret = match input.direction {
-            CounterfactualMetricDirection::LowerIsBetter => {
-                selected.objective_value - best_action.objective_value
-            }
-            CounterfactualMetricDirection::HigherIsBetter => {
-                best_action.objective_value - selected.objective_value
-            }
-        };
-        if !signed_regret.is_finite() {
-            return Err(CounterfactualDecisionError::InvalidObjectiveValue);
-        }
-        let regret = signed_regret.max(0.0);
-        if regret > input.tie_tolerance {
+        if selected.feasibility == CounterfactualFeasibility::Infeasible {
             (
-                CounterfactualDecisionOutcome::BetterFeasibleActionFound,
-                CounterfactualDecisionReason::BetterFeasibleActionAvailable,
+                CounterfactualDecisionOutcome::SelectedActionInfeasible,
+                CounterfactualDecisionReason::SelectedActionViolatesDeclaredFeasibility,
                 Some(best_action),
-                Some(regret),
+                None,
             )
         } else {
-            (
-                CounterfactualDecisionOutcome::NoBetterFeasibleActionFound,
-                CounterfactualDecisionReason::NoBetterActionInDeclaredSet,
-                Some(best_action),
-                Some(0.0),
-            )
+            let signed_regret = match input.direction {
+                CounterfactualMetricDirection::LowerIsBetter => {
+                    selected.objective_value - best_action.objective_value
+                }
+                CounterfactualMetricDirection::HigherIsBetter => {
+                    best_action.objective_value - selected.objective_value
+                }
+            };
+            if !signed_regret.is_finite() {
+                return Err(CounterfactualDecisionError::InvalidObjectiveValue);
+            }
+            let regret = signed_regret.max(0.0);
+            if regret > input.tie_tolerance {
+                (
+                    CounterfactualDecisionOutcome::BetterFeasibleActionFound,
+                    CounterfactualDecisionReason::BetterFeasibleActionAvailable,
+                    Some(best_action),
+                    Some(regret),
+                )
+            } else {
+                (
+                    CounterfactualDecisionOutcome::NoBetterFeasibleActionFound,
+                    CounterfactualDecisionReason::NoBetterActionInDeclaredSet,
+                    Some(best_action),
+                    Some(0.0),
+                )
+            }
         }
     };
 
@@ -497,6 +499,10 @@ mod tests {
         assert_eq!(
             report.finding.outcome,
             CounterfactualDecisionOutcome::SelectedActionInfeasible
+        );
+        assert_eq!(
+            report.finding.best_feasible_action_id.as_deref(),
+            Some("alternative")
         );
         assert_eq!(report.finding.objective_regret, None);
     }
