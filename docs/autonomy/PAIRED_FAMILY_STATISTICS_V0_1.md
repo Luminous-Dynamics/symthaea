@@ -58,10 +58,10 @@ For broad robustness statements, SAM's proposed evaluation target remains at lea
 
 ## Controls
 
-Six unit tests are authored for:
+Seven unit tests are authored for:
 - sibling aggregation before bootstrap;
 - positive-improvement sign convention in both metric directions;
-- deterministic replay for a frozen seed;
+- deterministic replay for a frozen seed, independent of input row order;
 - duplicate scenario rejection;
 - insufficient-family and non-finite-value rejection;
 - inconsistent aggregate rejection even after the summary digest is recomputed.
