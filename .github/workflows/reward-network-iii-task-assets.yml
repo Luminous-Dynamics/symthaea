@@ -4,10 +4,12 @@ on:
   pull_request:
     paths:
       - "research/civbench-social-learning-core/scripts/hydrate_reward_network_task_assets.py"
+      - "research/civbench-social-learning-core/scripts/inspect_reward_network_source_layout.py"
       - ".github/workflows/reward-network-iii-task-assets.yml"
   push:
     paths:
       - "research/civbench-social-learning-core/scripts/hydrate_reward_network_task_assets.py"
+      - "research/civbench-social-learning-core/scripts/inspect_reward_network_source_layout.py"
       - ".github/workflows/reward-network-iii-task-assets.yml"
   workflow_dispatch:
 
@@ -27,6 +29,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Syntax-check source and LFS audit helpers
+        run: |
+          python -m py_compile research/civbench-social-learning-core/scripts/inspect_reward_network_source_layout.py
+          python -m py_compile research/civbench-social-learning-core/scripts/hydrate_reward_network_task_assets.py
 
       - name: Download and verify Zenodo v2.0 archive
         shell: bash
