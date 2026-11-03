@@ -13,7 +13,7 @@ The Rust module `experiment_manifest` validates the in-memory `PhysicalRunEviden
 
 A version-1 bundle comprises:
 
-1. One physical run row: unique run ID, exact machine/unit, programme and firmware, protocol, randomized block/treatment assignment, group identities, run start/end, partition, and top-level archive URI/digest.
+1. One physical run row: unique run ID, service-request ID, explicit compartment/cell ID, compartment-configuration digest, shared/isolated utility-topology ID, exact machine/unit, programme and firmware, protocol, randomized block/treatment assignment, group identities, run start/end, partition, and top-level archive URI/digest.
 2. Item rows: unique item IDs belonging to the run, with material, finish, geometry and location metadata.
 3. Instrument calibrations: instrument ID, calibration ID, calibration validity interval, certificate URI/digest and calibration-bundle digest.
 4. Sensor traces: instrument/channel/metric/unit, sample count/rate, start/end, calibration reference, source run ID and immutable raw archive reference/digest.
@@ -29,7 +29,7 @@ The tables are normalized: all child tables repeat the physical `run_id`. Never 
 - Run end must be strictly later than run start.
 - Sensor-trace and resource-measurement intervals must be contained within the physical run interval.
 - Assay measurements may occur after the wash ends, but must retain the exact source run ID and the assay timestamp.
-- Machine unit, session, soil lot, detergent lot, water batch, operator, laboratory and site IDs are opaque grouping keys. Their meaning and uniqueness must be governed by the acquisition protocol. IDs alone do not prove independence.
+- Machine unit, session, soil lot, detergent lot, water batch, operator, laboratory and site IDs are opaque grouping keys. Their meaning and uniqueness must be governed by the acquisition protocol. Include service request, compartment, compartment configuration and utility topology among possible dataset holdout axes. IDs alone do not prove independence.
 
 ## Calibration rules
 
@@ -89,6 +89,6 @@ A valid bundle is structurally complete, not necessarily scientifically valid. A
 
 ## Tests authored
 
-The Rust unit tests cover complete-bundle acceptance and resource summation; schema version rejection; source-run mismatch; duplicate items and assay pairs; missing item/endpoints; traces outside the run; stale calibration; assay-calibration digest mismatch; resource unit/value/provenance failures; required resource omission; manual-water rejection; and duplicate artifacts across tables.
+The 14 Rust unit tests cover complete-bundle acceptance and resource summation; schema version rejection; source-run mismatch; duplicate items and assay pairs; missing item/endpoints; traces outside the run; stale calibration; assay-calibration digest mismatch; resource unit/value/provenance failures; required resource omission; manual-water rejection; and duplicate artifacts across tables.
 
 Cargo execution, formatting and clippy are required on the exact PR head. The source-authored tests are not claimed to pass until run.
