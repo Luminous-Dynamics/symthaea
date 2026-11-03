@@ -1,0 +1,17 @@
+{
+  "suite": "ETH-020 reference prototype status",
+  "execution_status": "not_executed_in_this_session",
+  "source_status": "committed_research_prototype_unqualified",
+  "planned_test_design": {
+    "ring_trials": 1200,
+    "planned_ring_property_checks": 10800,
+    "random_factor_networks": 180,
+    "planned_direct_vs_ve_checks": 720,
+    "planned_cancellation_fixtures": 2,
+    "planned_malformed_encodings": 5,
+    "coefficient_domain": "Q(i)"
+  },
+  "actual_results": null,
+  "all_passed": null,
+  "claim_ceiling": "Test counts are planned corpus parameters only. The associated Python source was not executed in this session; no pass/reject/semantic-equivalence result is established."
+}
