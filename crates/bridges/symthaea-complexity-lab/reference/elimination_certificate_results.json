@@ -1,0 +1,50 @@
+{
+  "suite": "Proof-carrying exact bucket-elimination reference",
+  "format": "symthaea.exact-elimination-certificate/v1",
+  "positive_cases": {
+    "passed": 7,
+    "total": 7,
+    "cases": [
+      {"name":"triangle_independent_set_count","orders":3,"certificate_bytes_min":1904,"certificate_bytes_max":1904,"result":4,"passed":true},
+      {"name":"triangle_maxcut_maxcount","orders":1,"certificate_bytes":2067,"result":{"score":2,"count":6},"passed":true},
+      {"name":"triangle_maxcut_full_profile","orders":1,"certificate_bytes":2027,"result":{"0":2,"2":6},"passed":true},
+      {"name":"two_objective_pareto","orders":1,"certificate_bytes":1380,"result":[[[0,1],1],[[1,0],1]],"passed":true},
+      {"name":"triangle_boolean_feasibility","orders":1,"certificate_bytes":1930,"result":true,"passed":true},
+      {"name":"unconstrained_variables","orders":1,"certificate_bytes":1444,"result":24,"passed":true},
+      {"name":"zero_variables_scalar_factors","orders":1,"certificate_bytes":839,"result":6,"passed":true}
+    ]
+  },
+  "randomized_count_factor_graphs": {
+    "seed": 20261103,
+    "trials": 96,
+    "passed": 96,
+    "passed_all": true,
+    "max_variables": 5,
+    "certificate_bytes_total": 174608,
+    "certificate_bytes_mean": 1818.83,
+    "certificate_bytes_max": 3285,
+    "output_factor_entries_total": 690,
+    "max_steps": 5
+  },
+  "cross_process_checker": {"passed":5,"total":5,"separate_process":true},
+  "negative_controls": {
+    "rejected":13,
+    "total":13,
+    "cases": [
+      {"name":"output_cell_without_digest","rejected":true},
+      {"name":"rehashed_false_output_cell","rejected":true},
+      {"name":"wrong_bucket_membership","rejected":true},
+      {"name":"wrong_bucket_digest","rejected":true},
+      {"name":"duplicated_elimination_variable","rejected":true},
+      {"name":"missing_elimination_step","rejected":true},
+      {"name":"mutated_output_scope","rejected":true},
+      {"name":"altered_claimed_result","rejected":true},
+      {"name":"stale_certificate_digest","rejected":true},
+      {"name":"changed_algebra","rejected":true},
+      {"name":"wrong_reported_statistics","rejected":true},
+      {"name":"altered_final_factor_digest","rejected":true},
+      {"name":"changed_input_factor_instance","rejected":true}
+    ]
+  },
+  "claim_boundary": "Standard-library Python reference only. The checker replays every exact bucket reduction; this is not Rust execution, Lean proof, a succinct certificate, or a practical performance result."
+}
