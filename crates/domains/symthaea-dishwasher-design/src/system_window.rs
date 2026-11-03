@@ -140,7 +140,7 @@ pub struct SystemWindowReport {
     pub requests_completed_in_window: usize,
     pub unresolved_requests_at_window_end: usize,
     pub requested_items_in_accepted_cohort: usize,
-    pub unresolved_items_in_accepted_cohort: usize,
+    pub items_in_unresolved_accepted_requests: usize,
     pub verified_item_release_count: usize,
     pub unqualified_items_in_service_reports: usize,
     pub first_pass_verified_items_in_completed_cohort: usize,
@@ -623,6 +623,11 @@ pub fn account_system_window(
     let mut carry_in_count = 0_usize;
     let mut accepted_count = 0_usize;
     let mut started_count = 0_usize;
+    let mut physical_attempt_count_total = 0_usize;
+    let mut rewash_attempt_count_total = 0_usize;
+    let mut requests_with_rewash_attempts_total = 0_usize;
+    let mut item_attempt_visits_total = 0_usize;
+    let mut reattempted_item_visits_total = 0_usize;
     let mut completed_count = 0_usize;
     let mut unresolved_count = 0_usize;
     let mut requested_item_count = 0_usize;
@@ -711,6 +716,18 @@ pub fn account_system_window(
         }
 
         if let Some(report) = &request.service_report {
+            physical_attempt_count_total = physical_attempt_count_total.checked_add(report.attempt_count)
+                .ok_or(SystemWindowError::CounterOverflow("physical_attempt_count_total"))?;
+            rewash_attempt_count_total = rewash_attempt_count_total.checked_add(report.rewash_attempt_count)
+                .ok_or(SystemWindowError::CounterOverflow("rewash_attempt_count_total"))?;
+            item_attempt_visits_total = item_attempt_visits_total.checked_add(report.item_attempt_visits)
+                .ok_or(SystemWindowError::CounterOverflow("item_attempt_visits_total"))?;
+            reattempted_item_visits_total = reattempted_item_visits_total.checked_add(report.reattempted_item_visits)
+                .ok_or(SystemWindowError::CounterOverflow("reattempted_item_visits_total"))?;
+            if report.rewash_attempt_count > 0 {
+                requests_with_rewash_attempts_total = requests_with_rewash_attempts_total.checked_add(1)
+                    .ok_or(SystemWindowError::CounterOverflow("requests_with_rewash_attempts_total"))?;
+            }
             unqualified_item_count = unqualified_item_count.checked_add(report.unqualified_item_ids.len())
                 .ok_or(SystemWindowError::CounterOverflow("unqualified_item_count"))?;
         }
@@ -986,17 +1003,27 @@ pub fn account_system_window(
         }).collect()
     });
 
+    let compartment_stats = build_compartment_stats(spec, requests, releases)?;
+
     Ok(SystemWindowReport {
         window_id: spec.window_id.clone(),
+        machine_unit_id: spec.machine_unit_id.clone(),
+        system_configuration_sha256: spec.system_configuration_sha256.clone(),
+        utility_topology_id: spec.utility_topology_id.clone(),
         elapsed_wall_seconds,
         request_record_count: requests.len(),
+        physical_attempt_count_total,
+        rewash_attempt_count_total,
+        requests_with_rewash_attempts_total,
+        item_attempt_visits_total,
+        reattempted_item_visits_total,
         carry_in_requests_at_window_start: carry_in_count,
         requests_accepted_in_window: accepted_count,
         requests_started_in_window: started_count,
         requests_completed_in_window: completed_count,
         unresolved_requests_at_window_end: unresolved_count,
         requested_items_in_accepted_cohort: requested_item_count,
-        unresolved_items_in_accepted_cohort: unresolved_item_count,
+        items_in_unresolved_accepted_requests: unresolved_item_count,
         verified_item_release_count,
         unqualified_items_in_service_reports: unqualified_item_count,
         first_pass_verified_items_in_completed_cohort: first_pass_item_count,
@@ -1014,6 +1041,7 @@ pub fn account_system_window(
         total_resource_measurement_count: resources.len(),
         resource_totals,
         window_resources_per_verified_release: resources_per_verified_item,
+        compartment_stats,
     })
 }
 
@@ -1044,6 +1072,7 @@ mod tests {
             service_request_id: request_id.to_owned(),
             attempt_count: 1,
             physical_run_count: 1,
+            rewash_attempt_count: 0,
             unique_item_count,
             item_attempt_visits: unique_item_count,
             reattempted_item_visits: 0,
@@ -1074,6 +1103,8 @@ mod tests {
             state,
             service_report,
             requested_item_ids: item_ids.iter().map(|id| (*id).to_owned()).collect(),
+            compartment_id: "cell-01".to_owned(),
+            compartment_configuration_sha256: digest('c'),
         }
     }
 
@@ -1123,6 +1154,9 @@ mod tests {
             start_at_s: 0,
             end_at_s: 100,
             required_resources: required.to_vec(),
+            machine_unit_id: "machine-01".to_owned(),
+            system_configuration_sha256: digest('d'),
+            utility_topology_id: "two-cell-isolated-wet-loops-shared-thermal-bus-v1".to_owned(),
         }
     }
 
@@ -1302,7 +1336,7 @@ mod tests {
             &basic_resources(),
         ).unwrap();
         assert_eq!(result.unresolved_requests_at_window_end, 1);
-        assert_eq!(result.unresolved_items_in_accepted_cohort, 1);
+        assert_eq!(result.items_in_unresolved_accepted_requests, 1);
         assert_eq!(result.verified_item_release_count, 0);
         assert_eq!(result.verified_items_per_hour, 0.0);
         assert!(result.window_resources_per_verified_release.is_none());
@@ -1326,7 +1360,7 @@ mod tests {
             &basic_resources(),
         ).unwrap();
         assert_eq!(result.verified_item_release_count, 1);
-        assert_eq!(result.unresolved_items_in_accepted_cohort, 2);
+        assert_eq!(result.items_in_unresolved_accepted_requests, 2);
         assert_eq!(result.unresolved_requests_at_window_end, 1);
     }
 
@@ -1571,6 +1605,117 @@ mod tests {
         assert_eq!(result.items_in_completed_cohort, 2);
         assert_eq!(result.first_pass_yield, Some(0.5));
         assert_eq!(result.unresolved_requests_at_window_end, 1);
+    }
+
+    #[test]
+    fn reports_per_compartment_activity_and_release_counts() {
+        let requests = [
+            request(
+                "service-cell-a",
+                0,
+                Some(0),
+                WindowRequestState::Completed { closed_at_s: 60 },
+                &["cup-a"],
+                Some(report("service-cell-a", &["cup-a"], &[], &["cup-a"])),
+            ),
+            {
+                let mut second = request(
+                    "service-cell-b",
+                    10,
+                    Some(20),
+                    WindowRequestState::Completed { closed_at_s: 80 },
+                    &["cup-b"],
+                    Some(report("service-cell-b", &["cup-b"], &[], &["cup-b"])),
+                );
+                second.compartment_id = "cell-02".to_owned();
+                second.compartment_configuration_sha256 = digest('e');
+                second
+            },
+        ];
+        let result = account_system_window(
+            &spec(&REQUIRED),
+            &requests,
+            &[release("service-cell-a", "cup-a", 50), release("service-cell-b", "cup-b", 70)],
+            &basic_resources(),
+        ).unwrap();
+
+        assert_eq!(result.maximum_concurrent_requests, 2);
+        assert_eq!(result.compartment_stats.len(), 2);
+        let cell_a = result.compartment_stats.iter().find(|cell| cell.compartment_id == "cell-01").unwrap();
+        let cell_b = result.compartment_stats.iter().find(|cell| cell.compartment_id == "cell-02").unwrap();
+        assert_eq!(cell_a.verified_item_release_count, 1);
+        assert_eq!(cell_b.verified_item_release_count, 1);
+        assert_eq!(cell_a.maximum_concurrent_requests, 1);
+        assert_eq!(cell_b.maximum_concurrent_requests, 1);
+        assert_eq!(cell_a.compartment_configuration_sha256, digest('c'));
+        assert_eq!(cell_b.compartment_configuration_sha256, digest('e'));
+    }
+
+    #[test]
+    fn rejects_one_compartment_id_reused_with_different_configuration_digests() {
+        let requests = [
+            request(
+                "service-a",
+                0,
+                Some(0),
+                WindowRequestState::Completed { closed_at_s: 60 },
+                &["cup-a"],
+                Some(report("service-a", &["cup-a"], &[], &["cup-a"])),
+            ),
+            {
+                let mut second = request(
+                    "service-b",
+                    10,
+                    Some(20),
+                    WindowRequestState::Completed { closed_at_s: 80 },
+                    &["cup-b"],
+                    Some(report("service-b", &["cup-b"], &[], &["cup-b"])),
+                );
+                second.compartment_configuration_sha256 = digest('e');
+                second
+            },
+        ];
+        assert!(matches!(
+            account_system_window(&spec(&REQUIRED), &requests, &[], &basic_resources()),
+            Err(SystemWindowError::CompartmentConfigurationMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn aggregates_attempts_and_rewash_burden_across_requests() {
+        let requests = [
+            request(
+                "service-a",
+                0,
+                Some(0),
+                WindowRequestState::Completed { closed_at_s: 60 },
+                &["cup-a"],
+                Some(report("service-a", &["cup-a"], &[], &["cup-a"])),
+            ),
+            {
+                let mut service_report = report("service-b", &["cup-b"], &[], &[]);
+                service_report.attempt_count = 2;
+                service_report.physical_run_count = 2;
+                service_report.rewash_attempt_count = 1;
+                service_report.item_attempt_visits = 2;
+                service_report.reattempted_item_visits = 1;
+                let mut second = request(
+                    "service-b",
+                    10,
+                    Some(20),
+                    WindowRequestState::Completed { closed_at_s: 80 },
+                    &["cup-b"],
+                    Some(service_report),
+                );
+                second
+            },
+        ];
+        let result = account_system_window(&spec(&REQUIRED), &requests, &[], &basic_resources()).unwrap();
+        assert_eq!(result.physical_attempt_count_total, 3);
+        assert_eq!(result.rewash_attempt_count_total, 1);
+        assert_eq!(result.requests_with_rewash_attempts_total, 1);
+        assert_eq!(result.item_attempt_visits_total, 3);
+        assert_eq!(result.reattempted_item_visits_total, 1);
     }
 
     #[test]
