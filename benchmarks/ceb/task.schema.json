@@ -114,14 +114,16 @@
         "image",
         "toolchain_lock_sha256",
         "runner_profile",
-        "network_policy"
+        "network_policy",
+        "runner_policy_sha256"
       ],
       "properties": {
         "image": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "pattern": "^.*@sha256:[0-9a-f]{64}$"
         },
         "toolchain_lock_sha256": {
           "type": [
@@ -144,6 +146,13 @@
             "allowlisted",
             "unrestricted_not_qualifying"
           ]
+        },
+        "runner_policy_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
         }
       }
     },
@@ -405,7 +414,8 @@
             "properties": {
               "image": {
                 "type": "string",
-                "minLength": 1
+                "minLength": 1,
+                "pattern": "^.*@sha256:[0-9a-f]{64}$"
               },
               "toolchain_lock_sha256": {
                 "type": "string",
@@ -422,6 +432,10 @@
                   "disabled",
                   "allowlisted"
                 ]
+              },
+              "runner_policy_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
               }
             }
           },
