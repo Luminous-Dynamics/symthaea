@@ -92,6 +92,8 @@ pub struct SonataMotifDevelopmentBatchV1 {
     pub requested_transformation: ReturnTransformation,
     pub source_section: SonataSectionKind,
     pub target_section: SonataSectionKind,
+    pub source_key: Key,
+    pub target_key: Key,
     pub source_note_indices: Vec<usize>,
     pub target_note_indices: Vec<usize>,
     pub source_note_indices_sha256: String,
@@ -176,10 +178,20 @@ pub fn generate_sonata_motif_development_v1(
 
     // Region identities come from the plan. The adapter does not infer
     // source/target positions from approximate melodic similarity.
+    // Development is a planned head-fragment of the source theme. Extract
+    // the corresponding source prefix by the exact target duration, rather
+    // than comparing a complete exposition with a shorter development region.
+    let target_duration = target.end - target.start;
+    let proposed_source_end = source.start + target_duration;
+    let source_window_end = if proposed_source_end < source.end {
+        proposed_source_end
+    } else {
+        source.end
+    };
     let source_note_indices = melody_indices(
         &realization.score,
         source.start.beats(),
-        source.end.beats(),
+        source_window_end.beats(),
     );
     let target_note_indices = melody_indices(
         &realization.score,
@@ -212,7 +224,11 @@ pub fn generate_sonata_motif_development_v1(
         }
     }
 
-    let source_motif = motif_from_score_indices(&realization.score, &source_note_indices)
+    let source_motif = motif_from_score_indices(
+        &realization.score,
+        &source_note_indices,
+        source.key,
+    )
         .map_err(|source_note_index| {
             SonataMotifDevelopmentErrorV1::SourcePitchOutsideDiatonicScale {
                 source_note_index,
@@ -263,6 +279,7 @@ pub fn generate_sonata_motif_development_v1(
     let baseline_target_motif = motif_from_score_indices(
         &realization.score,
         &target_note_indices,
+        target.key,
     )
     .map_err(|target_note_index| {
         SonataMotifDevelopmentErrorV1::TargetPitchOutsideDiatonicScale {
@@ -313,9 +330,10 @@ pub fn generate_sonata_motif_development_v1(
         &realization.score,
         &target_note_indices,
         &transformed_motif,
+        target.key,
     )?;
     let transformed_target_motif =
-        motif_from_score_indices(&transformed_score, &target_note_indices).map_err(
+        motif_from_score_indices(&transformed_score, &target_note_indices, target.key).map_err(
             |target_note_index| {
                 SonataMotifDevelopmentErrorV1::TargetPitchOutsideDiatonicScale {
                     target_note_index,
@@ -343,6 +361,8 @@ pub fn generate_sonata_motif_development_v1(
         requested_transformation,
         source_section: source_kind,
         target_section: SonataSectionKind::Development,
+        source_key: source.key,
+        target_key: target.key,
         source_note_indices,
         target_note_indices,
         source_note_indices_sha256,
@@ -429,6 +449,7 @@ fn apply_pitch_motif(
     baseline: &Score,
     target_indices: &[usize],
     motif: &Motif,
+    target_key: Key,
 ) -> Result<Score, SonataMotifDevelopmentErrorV1> {
     if target_indices.len() != motif.notes.len() {
         return Err(SonataMotifDevelopmentErrorV1::SourceTargetCountMismatch {
@@ -437,7 +458,7 @@ fn apply_pitch_motif(
         });
     }
     let mut candidate = baseline.clone();
-    let scale = baseline.key.scale();
+    let scale = target_key.scale();
     for (ordinal, (&score_index, motif_note)) in target_indices
         .iter()
         .zip(&motif.notes)
@@ -464,13 +485,14 @@ fn apply_pitch_motif(
 fn motif_from_score_indices(
     score: &Score,
     indices: &[usize],
+    region_key: Key,
 ) -> Result<Motif, usize> {
     let mut notes = Vec::with_capacity(indices.len());
     for &index in indices {
         let Some(note) = score.notes.get(index) else {
             return Err(index);
         };
-        let Some(degree) = pitch_to_scale_degree(note.pitch, score.key) else {
+        let Some(degree) = pitch_to_scale_degree(note.pitch, region_key) else {
             return Err(index);
         };
         notes.push(MotifNote::new(degree, note.duration));
@@ -590,7 +612,7 @@ mod tests {
         let key = Key::major(PitchClass::C);
         let score = simple_score(key);
         let indices = vec![0, 1, 2];
-        let motif = motif_from_score_indices(&score, &indices).unwrap();
+        let motif = motif_from_score_indices(&score, &indices, key).unwrap();
         let source_score_sha256 = digest_json(&score).unwrap();
         let index_sha256 = digest_json(&indices).unwrap();
         let family = family_from_source(
@@ -605,7 +627,7 @@ mod tests {
             &source_score_sha256,
             "ExpositionPrimary",
             &index_sha256,
-            motif_from_score_indices(&score, &indices).unwrap(),
+            motif_from_score_indices(&score, &indices, key).unwrap(),
         );
         assert_eq!(
             digest_json(&family).unwrap(),
@@ -626,7 +648,7 @@ mod tests {
             MotifNote::new(4, Duration::quarter()),
             MotifNote::new(5, Duration::quarter()),
         ]);
-        let candidate = apply_pitch_motif(&score, &indices, &motif).unwrap();
+        let candidate = apply_pitch_motif(&score, &indices, &motif, score.key).unwrap();
         assert!(preserves_score_except_target_pitch(&score, &candidate, &indices));
         assert_eq!(score.notes[0], candidate.notes[0]);
         assert_eq!(score.notes[3].onset, candidate.notes[3].onset);
@@ -642,7 +664,7 @@ mod tests {
             &digest_json(&score).unwrap(),
             "ExpositionPrimary",
             &digest_json(&vec![0, 1, 2]).unwrap(),
-            motif_from_score_indices(&score, &[0, 1, 2]).unwrap(),
+            motif_from_score_indices(&score, &[0, 1, 2], score.key).unwrap(),
         );
         assert_eq!(
             validate_transformation_allowed(&family, Some(ReturnTransformation::Fragmented)),
