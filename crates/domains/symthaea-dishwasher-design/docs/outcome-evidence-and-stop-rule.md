@@ -65,6 +65,7 @@ A QualificationScope fixes:
 - exact machine model and programme;
 - soil class and surface;
 - item-set ID and every item ID whose result is required;
+- exact soil preparation batch and soil age at wash start;
 - detergent batch and water batch / hardness;
 - inlet and ambient conditions;
 - protocol identity and raw archive digest.
