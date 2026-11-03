@@ -27,6 +27,8 @@ These two policies produce different results. The auditor therefore has three ex
 
 The profile is required input to semantic resolution. The parser does not choose one interpretation silently. The PWMC profile requires an explicit projection set in this initial auditor.
 
+The result preserves both the raw declared mode and an explicit `effective_output_contract`. For PMC with no `show`: strict mode returns `ambiguous` and no effective contract; the v1.2 profile resolves to `sat_decision`; the Ganak compatibility profile resolves to `projected_model_count` with all variables projected. An explicit partial projection resolves to `projected_model_count`, while showing every variable resolves to `model_count`. Downstream execution must route on the effective contract, never the raw header alone.
+
 ## 3. Implemented reference
 
 File: reference/mc_input_contract_auditor.py
