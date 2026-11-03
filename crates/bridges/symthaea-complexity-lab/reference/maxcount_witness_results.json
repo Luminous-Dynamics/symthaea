@@ -1,0 +1,25 @@
+{
+  "suite": "Exact MaxCount witness/backpointer reference",
+  "seed": 20261103,
+  "randomized_instances": 240,
+  "randomized_certificates_checked": 240,
+  "optimal_solution_dag_support_matches": 240,
+  "positive_handcrafted_cases": 2,
+  "triangle_maxcut": {"optimum": 2, "multiplicity": 6, "witness": [1,0,0], "distinct_optimum_assignments": 6},
+  "weighted_case": {"optimum": 6, "semiring_multiplicity": 4, "canonical_witness": [0,2,0], "distinct_optimum_assignments": 1},
+  "negative_controls": {
+    "rejected": 8,
+    "total": 8,
+    "cases": [
+      "false_argmax_state_rehashed",
+      "missing_tied_argmax_rehashed",
+      "wrong_witness_state_rehashed",
+      "wrong_optimum_rehashed",
+      "altered_instance_digest_rehashed",
+      "duplicate_elimination_variable_rehashed",
+      "wrong_separator_rehashed",
+      "false_output_cell_rehashed"
+    ]
+  },
+  "claim_boundary": "Python exact reference only; backpointer trace and checker are not Rust, Lean, or performance-qualified."
+}
