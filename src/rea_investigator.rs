@@ -1,3 +1,22 @@
+pub use symthaea_rea_investigator::decision::{
+    DecisionAbstentionReason,
+    DecisionClaimCeiling,
+    DecisionImpact,
+    DecisionInvestigationPlan,
+    DecisionOutcomeResult,
+    DecisionPlannerConfig,
+    DecisionRankedExperiment,
+    DecisionRankingPolicy,
+    DecisionRejectedExperiment,
+    DecisionRejectionReason,
+    DecisionScenarioResult,
+    DecisionUtility,
+    DecisionUtilityModel,
+    OutcomeDecision,
+    TerminalDecision,
+    plan_next_experiment_decision_aware,
+};
+
 //! Native, fail-closed planning over caller-supplied REA Evidence provenance.
 //!
 //! The planner selects and ranks proposed experiments but never executes them.
