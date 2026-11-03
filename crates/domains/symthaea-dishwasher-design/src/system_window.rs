@@ -71,6 +71,7 @@ pub struct ItemReleaseEvent {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SystemWindowResourceMeasurement {
     pub source_window_id: String,
+    pub clock_domain_id: String,
     pub measurement_id: String,
     pub kind: SystemResourceKind,
     /// Stable declared physical scope. For active operator time use a
@@ -139,6 +140,8 @@ pub enum SystemWindowError {
     InvalidWindow,
     InvalidIdentity(&'static str),
     InvalidClockDomain { request_id: String },
+    InvalidResourceClockDomain { measurement_id: String },
+    EmptyRequests,
     DuplicateRequestId(String),
     EmptyRequestedItemSet(String),
     DuplicateRequestedItem { request_id: String, item_id: String },
@@ -172,6 +175,12 @@ pub enum SystemWindowError {
     OverlappingResourceBoundaryIntervals {
         kind: SystemResourceKind,
         boundary_id: String,
+        first_measurement_id: String,
+        second_measurement_id: String,
+    },
+    OverlappingInstrumentStreams {
+        kind: SystemResourceKind,
+        instrument_id: String,
         first_measurement_id: String,
         second_measurement_id: String,
     },
@@ -410,7 +419,7 @@ pub fn account_system_window(
         return Err(SystemWindowError::InvalidWindow);
     }
     if requests.is_empty() {
-        return Err(SystemWindowError::InvalidIdentity("requests"));
+        return Err(SystemWindowError::EmptyRequests);
     }
     if spec.required_resources.is_empty() {
         return Err(SystemWindowError::EmptyRequiredResources);
@@ -627,10 +636,24 @@ pub fn account_system_window(
         (SystemResourceKind, String),
         Vec<(u64, u64, String)>,
     > = BTreeMap::new();
+    // instrument_id identifies one calibrated metering stream, not a
+    // multi-channel DAQ chassis. A single stream cannot be summed over
+    // overlapping intervals assigned to different declared boundaries.
+    let mut instrument_intervals: BTreeMap<
+        (SystemResourceKind, String),
+        Vec<(u64, u64, String)>,
+    > = BTreeMap::new();
 
     for measurement in resources {
         if measurement.source_window_id != spec.window_id {
             return Err(SystemWindowError::InvalidIdentity("resource_source_window_id"));
+        }
+        if !canonical_non_empty(&measurement.clock_domain_id)
+            || measurement.clock_domain_id != spec.clock_domain_id
+        {
+            return Err(SystemWindowError::InvalidResourceClockDomain {
+                measurement_id: measurement.measurement_id.clone(),
+            });
         }
         for (field, value) in [
             ("measurement_id", measurement.measurement_id.as_str()),
@@ -691,6 +714,26 @@ pub fn account_system_window(
                     measurement.measurement_id.clone(),
                 ));
             }
+        }
+
+        if let Some(instrument) = &measurement.instrument_id {
+            let instrument_key = (measurement.kind, instrument.clone());
+            let stream_intervals = instrument_intervals.entry(instrument_key).or_default();
+            if let Some((_, _, first_id)) = stream_intervals.iter().find(|(start, end, _)| {
+                measurement.start_at_s < *end && *start < measurement.end_at_s
+            }) {
+                return Err(SystemWindowError::OverlappingInstrumentStreams {
+                    kind: measurement.kind,
+                    instrument_id: instrument.clone(),
+                    first_measurement_id: first_id.clone(),
+                    second_measurement_id: measurement.measurement_id.clone(),
+                });
+            }
+            stream_intervals.push((
+                measurement.start_at_s,
+                measurement.end_at_s,
+                measurement.measurement_id.clone(),
+            ));
         }
 
         let key = (measurement.kind, measurement.measurement_boundary_id.clone());
@@ -879,6 +922,7 @@ mod tests {
     ) -> SystemWindowResourceMeasurement {
         SystemWindowResourceMeasurement {
             source_window_id: "window-01".to_owned(),
+            clock_domain_id: CLOCK.to_owned(),
             measurement_id: id.to_owned(),
             kind,
             measurement_boundary_id: boundary.to_owned(),
@@ -1192,6 +1236,51 @@ mod tests {
         assert!(matches!(
             account_system_window(&spec(&REQUIRED), &requests, &[], &resources),
             Err(SystemWindowError::OverlappingResourceBoundaryIntervals { .. })
+        ));
+    }
+
+    #[test]
+    fn resource_meter_must_share_the_window_clock_domain() {
+        let requests = [request(
+            "service-one",
+            0,
+            Some(0),
+            WindowRequestState::Completed { closed_at_s: 60 },
+            &["cup-one"],
+            Some(report("service-one", &["cup-one"], &[], &["cup-one"])),
+        )];
+        let mut resources = basic_resources();
+        resources[0].clock_domain_id = "other-clock".to_owned();
+        assert!(matches!(
+            account_system_window(&spec(&REQUIRED), &requests, &[], &resources),
+            Err(SystemWindowError::InvalidResourceClockDomain { .. })
+        ));
+    }
+
+    #[test]
+    fn one_meter_stream_cannot_overlap_across_two_declared_boundaries() {
+        let requests = [request(
+            "service-one",
+            0,
+            Some(0),
+            WindowRequestState::Completed { closed_at_s: 60 },
+            &["cup-one"],
+            Some(report("service-one", &["cup-one"], &[], &["cup-one"])),
+        )];
+        let mut resources = basic_resources();
+        resources.push(measurement(
+            SystemResourceKind::ApplianceWallElectricity,
+            "power-second-boundary",
+            "secondary-feed",
+            0.02,
+            "kWh",
+            Some("power-meter-01"),
+            Some("power-cal-01"),
+            &[],
+        ));
+        assert!(matches!(
+            account_system_window(&spec(&REQUIRED), &requests, &[], &resources),
+            Err(SystemWindowError::OverlappingInstrumentStreams { .. })
         ));
     }
 
