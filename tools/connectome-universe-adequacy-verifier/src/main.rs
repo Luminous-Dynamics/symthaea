@@ -1028,11 +1028,15 @@ mod tests {
         )
         .expect("fixture should be internally consistent");
         assert_eq!(
-            result["dispositions"]["enumeration_closure"],
+            result["dispositions"]["claimed_enumeration_closure"],
             "CLOSED_VERIFIED"
         );
         assert_eq!(
-            result["dispositions"]["universe_adequacy"],
+            result["dispositions"]["worldset_closure_validation"],
+            "NOT_PERFORMED_BY_THIS_TOOL"
+        );
+        assert_eq!(
+            result["dispositions"]["universe_adequacy_against_supplied_challenge"],
             "ADEQUACY_FAILED"
         );
         assert_eq!(result["recomputed_summary"]["false_ambiguity_count"], 1);
