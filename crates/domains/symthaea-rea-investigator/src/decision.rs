@@ -839,9 +839,23 @@ pub fn plan_next_experiment_decision_aware(
 ) -> Result<DecisionInvestigationPlan, PlannerError> {
     validate_decision_config(config)?;
     validate_utility_model(utility_model)?;
-    validate_scenario_set(scenarios, proposals)?;
 
-    let catalog = validate_evidence_catalog(evidence)?;
+    let mut proposal_ids = HashSet::new();
+    for proposal in proposals {
+        if proposal.id.trim().is_empty() || !proposal_ids.insert(proposal.id.as_str()) {
+            return Err(decision_error(
+                PlannerErrorKind::DuplicateExperimentId,
+                format!("empty or duplicate decision-aware proposal ID: {}", proposal.id),
+            ));
+        }
+    }
+
+    let mut ordered_scenarios = scenarios.to_vec();
+    ordered_scenarios.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
+    let scenarios = ordered_scenarios.as_slice();
+    if !proposals.is_empty() {
+        validate_scenario_set(scenarios, proposals)?;
+    }
     let validation = validate_hypotheses(hypotheses, &catalog);
     let (priors, grounded_hypothesis_ids, support_evidence_ids, independent_root_evidence_ids) =
         match validation {
@@ -882,20 +896,58 @@ pub fn plan_next_experiment_decision_aware(
         entropy
     };
 
-    let mut proposal_ids = HashSet::new();
-    for proposal in proposals {
-        if proposal.id.trim().is_empty() || !proposal_ids.insert(proposal.id.as_str()) {
-            return Err(decision_error(
-                PlannerErrorKind::DuplicateExperimentId,
-                format!("empty or duplicate decision-aware proposal ID: {}", proposal.id),
-            ));
-        }
+    if !baseline_expected_utility.is_finite() {
+        return Err(decision_error(
+            PlannerErrorKind::InvalidDecisionMatrix,
+            "baseline expected utility overflowed the finite numeric range",
+        ));
+    }
+
+    if hypotheses.len() < 2 {
+        return Ok(DecisionInvestigationPlan {
+            selected: None,
+            ranked_experiments: Vec::new(),
+            rejected_experiments: Vec::new(),
+            abstention: Some(DecisionAbstentionReason::NoCompetingHypotheses),
+            baseline_decision_id: Some(decision_ids[baseline_index].clone()),
+            baseline_expected_utility: Some(baseline_expected_utility),
+            prior_entropy_bits,
+            grounded_hypothesis_ids,
+            scenario_ids: scenarios.iter().map(|scenario| scenario.scenario_id.clone()).collect(),
+            utility_model_id: utility_model.id.clone(),
+            utility_model_owner: utility_model.owner.clone(),
+            utility_model_scope: utility_model.scope.clone(),
+            utility_model_units: utility_model.units.clone(),
+            utility_model_exclusions: utility_model.declared_exclusions.clone(),
+            claim_ceiling: DecisionClaimCeiling::default(),
+        });
+    }
+
+    if proposals.is_empty() {
+        return Ok(DecisionInvestigationPlan {
+            selected: None,
+            ranked_experiments: Vec::new(),
+            rejected_experiments: Vec::new(),
+            abstention: Some(DecisionAbstentionReason::NoEligibleExperiment),
+            baseline_decision_id: Some(decision_ids[baseline_index].clone()),
+            baseline_expected_utility: Some(baseline_expected_utility),
+            prior_entropy_bits,
+            grounded_hypothesis_ids,
+            scenario_ids: scenarios.iter().map(|scenario| scenario.scenario_id.clone()).collect(),
+            utility_model_id: utility_model.id.clone(),
+            utility_model_owner: utility_model.owner.clone(),
+            utility_model_scope: utility_model.scope.clone(),
+            utility_model_units: utility_model.units.clone(),
+            utility_model_exclusions: utility_model.declared_exclusions.clone(),
+            claim_ceiling: DecisionClaimCeiling::default(),
+        });
     }
 
     let mut ranked_experiments = Vec::new();
     let mut rejected_experiments = Vec::new();
     let mut saw_decision_value = false;
     let mut saw_unstable = false;
+    let mut saw_eligible_candidate = false;
 
     for proposal in proposals {
         let mut rejection_reasons = Vec::new();
@@ -945,6 +997,7 @@ pub fn plan_next_experiment_decision_aware(
             continue;
         }
 
+        saw_eligible_candidate = true;
         let policy = if config.ranking_policy == DecisionRankingPolicy::MinimaxRegret {
             match minimax_regret_policy(
                 &evaluations,
@@ -1072,7 +1125,7 @@ pub fn plan_next_experiment_decision_aware(
         None
     } else if saw_unstable {
         Some(DecisionAbstentionReason::DecisionUnstable)
-    } else if !saw_decision_value {
+    } else if !saw_decision_value && saw_eligible_candidate {
         Some(DecisionAbstentionReason::NoDecisionValue)
     } else {
         Some(DecisionAbstentionReason::NoEligibleExperiment)
@@ -1278,7 +1331,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(result.baseline_decision_id, "mitigate");
+        assert_eq!(result.baseline_decision_id.as_deref(), Some("mitigate"));
         let benign = result.ranked_experiments.iter().find(|item| item.experiment_id == "benign-detail").unwrap();
         let critical = result.ranked_experiments.iter().find(|item| item.experiment_id == "rare-critical-fault").unwrap();
         assert!(benign.expected_evsi > critical.expected_evsi);
@@ -1436,6 +1489,11 @@ mod tests {
         let one = plan(&hypotheses, &proposals, &first, &decisions, DecisionPlannerConfig::default()).unwrap();
         let two = plan(&hypotheses, &proposals, &second, &decisions, DecisionPlannerConfig::default()).unwrap();
         assert_eq!(one.selected.as_ref().unwrap().experiment_id, two.selected.as_ref().unwrap().experiment_id);
-        assert!((one.selected.unwrap().expected_shared_policy_evsi - two.selected.unwrap().expected_shared_policy_evsi).abs() < 1.0e-12);
+        assert!(
+            (one.selected.unwrap().expected_shared_policy_evsi
+                - two.selected.unwrap().expected_shared_policy_evsi)
+                .abs()
+                < 1.0e-12
+        );
     }
 }
