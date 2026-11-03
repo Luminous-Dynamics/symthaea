@@ -61,7 +61,8 @@
                 "enum": [
                   "SEGMENT",
                   "NEURON",
-                  "SYNAPSE"
+                  "SYNAPSE",
+                  "ARTIFACT"
                 ]
               },
               "lineage_id": {
