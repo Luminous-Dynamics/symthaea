@@ -16,7 +16,10 @@ pub const VEHICLE_MODEL_DISCREPANCY_SCHEMA: &str = "symthaea.vehicle.model-discr
 pub enum DiscrepancyFeasibility { Feasible, Infeasible, Indeterminate }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DecisionAuditStatus { Comparable, IndeterminateFeasibility, SelectedActionInfeasible, NoFeasibleAction }
+pub enum ReferenceOutcomeStatus { Observed, Missing, Censored, TimedOut, Unsupported }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DecisionAuditStatus { Comparable, IncompleteReference, IndeterminateFeasibility, SelectedActionInfeasible, NoFeasibleAction }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ModelResidualObservation {
