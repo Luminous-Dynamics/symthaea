@@ -26,19 +26,11 @@ For PWMC in this reference, projected unary weights are exact rationals; negativ
 
 Do not sum hidden witnesses in natural-number or rational arithmetic and then call the result projected count. That computes a different quantity.
 
-## 3. Executed finite reference
+## 3. Prepared finite reference test plan — execution pending
 
-File: reference/projected_counting.py
-Results: reference/projected_counting_results.json
+Committed file: reference/projected_counting.py
 
-Seed 0xE7021:
-- 160 random finite Boolean-factor networks;
-- 480 exact direct-projection versus mixed-elimination comparisons;
-- three hidden-variable orders per instance: forward, reverse and random;
-- exact rational visible weights, including negative values;
-- a witness-multiplicity control where 2 full satisfying assignments map to 1 projected assignment.
-
-The reference performs exhaustive enumeration over finite instances. It is not a scalable solver, official competition parser, Rust implementation or formal proof.
+The intended corpus describes 160 random Boolean factor networks, 480 direct-projection versus mixed-elimination comparisons over three hidden-variable orders, exact rational projected weights and a multiple-witness control (two full satisfying assignments collapsing to one projection). These are planned fixtures and counts, not executed observations. The Python script was not run in this session, so its semantics and assertions remain unqualified.
 
 ## 4. Required proof and certificate obligations
 
