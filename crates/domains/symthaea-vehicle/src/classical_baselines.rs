@@ -128,11 +128,16 @@ impl VehicleClassicalBaseline {
     ) -> Option<VehicleCommand> {
         if !road_heading_rad.is_finite()
             || !target_speed_mps.is_finite()
-            || target_speed_mps < 0.0
+            || !(0.0..=80.0).contains(&target_speed_mps)
             || !chassis.max_steering_angle.is_finite()
             || chassis.max_steering_angle <= 0.0
             || !chassis.wheelbase.is_finite()
             || chassis.wheelbase <= 0.0
+            || !state.speed.is_finite()
+            || !(0.0..80.0).contains(&state.speed)
+            || !state.heading.is_finite()
+            || !state.lateral_offset.is_finite()
+            || !state.curvature_ahead.is_finite()
         {
             return None;
         }
@@ -245,8 +250,9 @@ mod tests {
         second.cross_track_gain += 0.1;
         assert_eq!(first.digest(), first.digest());
         assert_ne!(first.digest(), second.digest());
+        let pd_baseline = VehicleClassicalBaseline::PdRoadTeacher;
         assert_eq!(
-            VehicleClassicalBaseline::PdRoadTeacher.controller_digest(),
+            pd_baseline.controller_digest(),
             Some(pd_road_baseline_digest())
         );
     }
