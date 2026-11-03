@@ -46,8 +46,10 @@ A passing run means only:
 - edge evidence and review artifact bytes match their declared SHA-256 digests;
 - typed relations, endpoint kinds, status fields and reference joins are internally consistent.
 
+The graph manifest itself is also **not authenticated** by this CLI. An attacker who can replace the manifest and all referenced files can construct a different internally consistent snapshot. The caller must pin the manifest digest or verify an externally signed manifest envelope against an out-of-band key registry before relying on its claimed origin. The current CLI only verifies internal byte joins under the supplied root.
+
 A passing run does **not**:
-- prove that an extractor receipt truthfully describes a Lean elaboration event;
+- authenticate the graph manifest or prove that an extractor receipt truthfully describes a Lean elaboration event;
 - prove source-to-statement or informal-to-formal semantic correspondence;
 - authenticate reviewer signatures or reviewer-key revocation;
 - prove that a proof-term dependency is logically necessary;
