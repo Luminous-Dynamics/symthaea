@@ -255,3 +255,12 @@ cargo test --locked --manifest-path research/civbench-social-learning-core/Cargo
 cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin adaptive-transmission-sweep > adaptive-transmission-sweep.csv
 ```
 
+
+
+## Cross-project adaptive-transmission event contract
+
+The proposed event envelope and JSON Schema are:
+- [ADAPTIVE_TRANSMISSION_INTERCHANGE_V0_1.md](ADAPTIVE_TRANSMISSION_INTERCHANGE_V0_1.md)
+- [ADAPTIVE_TRANSMISSION_EVENT_V0_1.schema.json](ADAPTIVE_TRANSMISSION_EVENT_V0_1.schema.json)
+
+The event references existing skill capsules and claim/run receipts. It records sender/recipient references, exact payload digest and scope, policy identity, consent mode, minimized recipient-need signal reference, route/budget and separate lifecycle outcomes (delivery, observation, acquisition, integration, execution, retention, correction and transfer). It does not require a central service to receive full private agent inventories and is not a second general-purpose evidence ledger. This is a proposed contract; runtime authorization and rights enforcement remain separate implementation work.
