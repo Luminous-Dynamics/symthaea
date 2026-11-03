@@ -82,6 +82,30 @@ impl Road {
             return None;
         }
 
+        let mut cumulative_length = 0.0;
+        for segment in &self.segments {
+            let expected_length = match &segment.kind {
+                RoadSegment::Straight { length } => *length,
+                RoadSegment::Arc {
+                    radius,
+                    sweep_angle,
+                } => radius * sweep_angle.abs(),
+            };
+            let tolerance = 1e-9 * expected_length.abs().max(1.0);
+            if !expected_length.is_finite()
+                || expected_length <= 0.0
+                || (segment.s_start - cumulative_length).abs() > tolerance
+                || (segment.length - expected_length).abs() > tolerance
+            {
+                return None;
+            }
+            cumulative_length += expected_length;
+        }
+        let total_tolerance = 1e-9 * self.total_length.abs().max(1.0);
+        if (cumulative_length - self.total_length).abs() > total_tolerance {
+            return None;
+        }
+
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea.vehicle.road-profile.v1");
         hasher.update(&self.total_length.to_bits().to_le_bytes());
@@ -630,6 +654,10 @@ mod tests {
         assert_ne!(first.profile_digest(), changed_lookahead.profile_digest());
 
         assert!(Road::from_segments(&[]).profile_digest().is_none());
+
+        let mut inconsistent_length = first.clone();
+        inconsistent_length.total_length += 1.0;
+        assert!(inconsistent_length.profile_digest().is_none());
     }
 
     #[test]
