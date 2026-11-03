@@ -172,10 +172,10 @@ impl CollaborativeComposer {
         let mut state = MusicalState::default();
         state.harmony_activations = self.collective_harmonies;
         state.consciousness_level = self.collective_phi;
-        // Arousal from variance (disagreement = tension)
-        state.arousal = self.compute_disagreement();
-        // Valence from collective phi direction
-        state.valence = (self.collective_phi - 0.5) * 2.0;
+        // This contribution schema contains no participant-level affect signal.
+        // Do not infer valence or arousal from Phi proxies or profile divergence.
+        state.arousal = 0.0;
+        state.valence = 0.0;
         state
     }
 
@@ -233,21 +233,42 @@ impl CollaborativeComposer {
         (harmonies, phi)
     }
 
-    /// Compute disagreement (variance) across participants.
-    /// High disagreement → high arousal in the collective state.
-    fn compute_disagreement(&self) -> f32 {
-        if self.contributions.len() < 2 {
+    /// Normalized RMS spread of participant harmony-activation vectors.
+    ///
+    /// This is a descriptive contribution-divergence statistic, not a measure
+    /// of conflict, musical quality, merit, authority, or emotional arousal.
+    /// It is normalized to [0, 1] using the maximum possible standard
+    /// deviation of values constrained to [0, 1].
+    pub fn contribution_divergence(&self) -> f32 {
+        let participant_count = self.contributions.len();
+        if participant_count < 2 {
             return 0.0;
         }
-        let n = self.contributions.len() as f32;
-        let mean_phi: f32 = self.contributions.iter().map(|c| c.phi).sum::<f32>() / n;
-        let variance: f32 = self
+
+        let mut means = [0.0f32; 8];
+        for contribution in &self.contributions {
+            for (mean, activation) in means.iter_mut().zip(contribution.harmonies.iter()) {
+                *mean += activation;
+            }
+        }
+        for mean in &mut means {
+            *mean /= participant_count as f32;
+        }
+
+        let squared_error = self
             .contributions
             .iter()
-            .map(|c| (c.phi - mean_phi).powi(2))
-            .sum::<f32>()
-            / n;
-        (variance.sqrt() * 3.0).clamp(0.0, 1.0) // scale to [0, 1]
+            .flat_map(|contribution| {
+                contribution
+                    .harmonies
+                    .iter()
+                    .zip(means.iter())
+                    .map(|(activation, mean)| (activation - mean).powi(2))
+            })
+            .sum::<f32>();
+        let mean_squared_error = squared_error / (participant_count * 8) as f32;
+
+        (mean_squared_error.sqrt() * 2.0).clamp(0.0, 1.0)
     }
 
     /// Number of active participants.
@@ -419,18 +440,35 @@ mod tests {
     }
 
     #[test]
-    fn disagreement_increases_arousal() {
+    fn contribution_divergence_tracks_harmony_vector_spread() {
         let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
-        // Very different Phi values = high disagreement
+        composer.contribute(make_contribution(1, 0.5, [0.1; 8])).expect("valid test contribution");
+        composer.contribute(make_contribution(2, 0.5, [0.9; 8])).expect("valid test contribution");
+
+        assert!(
+            (composer.contribution_divergence() - 0.8).abs() < 1e-6,
+            "divergence should reflect the spread in musical contribution vectors"
+        );
+    }
+
+    #[test]
+    fn phi_difference_does_not_change_contribution_divergence() {
+        let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
+        composer.contribute(make_contribution(1, 0.1, [0.5; 8])).expect("valid test contribution");
+        composer.contribute(make_contribution(2, 0.9, [0.5; 8])).expect("valid test contribution");
+
+        assert_eq!(composer.contribution_divergence(), 0.0);
+    }
+
+    #[test]
+    fn missing_affect_inputs_remain_neutral() {
+        let mut composer = CollaborativeComposer::new(BlendStrategy::Mean);
         composer.contribute(make_contribution(1, 0.1, [0.5; 8])).expect("valid test contribution");
         composer.contribute(make_contribution(2, 0.9, [0.5; 8])).expect("valid test contribution");
         let state = composer.blend();
 
-        assert!(
-            state.arousal > 0.3,
-            "disagreement should increase arousal: {}",
-            state.arousal
-        );
+        assert_eq!(state.valence, 0.0);
+        assert_eq!(state.arousal, 0.0);
     }
 
     #[test]
