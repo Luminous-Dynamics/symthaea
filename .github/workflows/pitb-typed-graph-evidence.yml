@@ -31,11 +31,23 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/jsonschema-venv"
           "$RUNNER_TEMP/jsonschema-venv/bin/pip" install "jsonschema==4.25.1"
 
-      - name: Validate formatting and compile/test Rust verifier
+      - name: Stage verifier outside the production workspace
+        shell: bash
         run: |
           set -euo pipefail
-          cargo fmt --check --manifest-path tools/pitb-graph-evidence/Cargo.toml
-          cargo test --manifest-path tools/pitb-graph-evidence/Cargo.toml
+          staged="$RUNNER_TEMP/pitb-graph-evidence"
+          mkdir -p "$staged/src"
+          cp tools/pitb-graph-evidence/Cargo.toml "$staged/Cargo.toml"
+          cp tools/pitb-graph-evidence/src/main.rs "$staged/src/main.rs"
+          echo "PITB_GRAPH_EVIDENCE_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+          echo "PITB_GRAPH_EVIDENCE_DIR=$staged" >> "$GITHUB_ENV"
+
+      - name: Validate formatting and compile/test isolated Rust verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --check --manifest-path "$PITB_GRAPH_EVIDENCE_MANIFEST"
+          cargo test --manifest-path "$PITB_GRAPH_EVIDENCE_MANIFEST"
 
       - name: Validate schema and synthetic fixture
         run: |
@@ -57,7 +69,7 @@ jobs:
       - name: Run evidence-byte and adversarial self-tests
         run: |
           set -euo pipefail
-          cargo run --manifest-path tools/pitb-graph-evidence/Cargo.toml -- \
+          cargo run --manifest-path "$PITB_GRAPH_EVIDENCE_MANIFEST" -- \
             --self-test \
             tools/pitb-graph-evidence/fixtures/graph-evidence.synthetic.json \
             tools/pitb-graph-evidence/fixtures/evidence
@@ -65,7 +77,7 @@ jobs:
       - name: Emit canonical synthetic summary
         run: |
           set -euo pipefail
-          cargo run --manifest-path tools/pitb-graph-evidence/Cargo.toml -- \
+          cargo run --manifest-path "$PITB_GRAPH_EVIDENCE_MANIFEST" -- \
             --verify \
             tools/pitb-graph-evidence/fixtures/graph-evidence.synthetic.json \
             tools/pitb-graph-evidence/fixtures/evidence \
