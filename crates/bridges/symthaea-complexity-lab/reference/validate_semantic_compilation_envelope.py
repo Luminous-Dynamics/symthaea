@@ -38,15 +38,18 @@ def semantic_errors(x):
     if visible & hidden: errors.append("visible/hidden sets overlap")
     if visible | hidden != universe: errors.append("visible/hidden do not partition universe")
     contracts = {
-        "#sat": ("all_assignments", "N", None),
-        "wmc": ("all_assignments", "Q", "universe"),
-        "pmc": ("exists_hidden_per_visible_assignment", "N", None),
-        "pwmc": ("exists_hidden_per_visible_assignment", "Q", "visible"),
-        "amc-complex": ("all_assignments", "Q(i)", "universe"),
+        "#sat": ("all_assignments", "N", None, ("none", "count")),
+        "wmc": ("all_assignments", "Q", "universe", ("none", "weighted_sum")),
+        "pmc": ("exists_hidden_per_visible_assignment", "N", None, ("exists", "count")),
+        "pwmc": ("exists_hidden_per_visible_assignment", "Q", "visible", ("exists", "weighted_sum")),
+        "amc-complex": ("all_assignments", "Q(i)", "universe", ("none", "weighted_sum")),
     }
-    q, domain, scope = contracts[p["contract"]]
+    q, domain, scope, aggregation = contracts[p["contract"]]
     if (p["quantifier_semantics"], p["coefficient_domain"]) != (q, domain):
         errors.append("contract/quantifier/domain mismatch")
+    plan = p["aggregation_plan"]
+    if (plan["projection"], plan["final"]) != aggregation:
+        errors.append("contract/aggregation-plan mismatch")
     if q == "all_assignments" and (hidden or visible != universe):
         errors.append("full-assignment contract must expose the entire universe")
     wm = p.get("weight_map")
@@ -147,8 +150,9 @@ def main():
     a=copy.deepcopy(fixture); a["independent_replay"]["input_representation_digest"]="sha256:"+"f"*64; cases.append(("replay bound to wrong input",a))
     a=copy.deepcopy(fixture); a["stages"][0]["relation"]="satisfiability_equivalence"; a["stages"][0]["obligations"]=[{"obligation_id":"sat-only","kind":"satisfiability_equivalence","status":"tested_only","tests":{"suite_id":"negative-control","artifact_digest":fixture["stages"][0]["obligations"][0]["tests"]["artifact_digest"],"case_count":1,"claim_ceiling":"finite_test_evidence","input_representation_digest":a["stages"][0]["input"]["digest"],"output_representation_digest":a["stages"][0]["output"]["digest"]}}]; cases.append(("SAT-only proof used for projected count",a))
     a=copy.deepcopy(fixture); a["stages"][0]["obligations"][0]["tests"]["output_representation_digest"]="sha256:"+"e"*64; cases.append(("evidence bound to wrong stage output",a))
+    a=copy.deepcopy(fixture); a["problem"]["aggregation_plan"]["final"]="count"; cases.append(("PWMC uses wrong final aggregation operator",a))
     for name, case in cases: reject(name,case,schema)
-    print(f"PASS: 13 semantic-contract checks (2 positive cases, {len(cases)} negative controls)")
+    print(f"PASS: 14 semantic-contract checks (2 positive cases, {len(cases)} negative controls)")
     return 0
 
 if __name__ == "__main__": sys.exit(main())
