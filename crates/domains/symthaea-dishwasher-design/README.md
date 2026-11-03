@@ -10,6 +10,9 @@ First-principles and calibration-bounded engineering primitives for Luminous Ins
 - `hydraulic_network`: steady parallel-branch network solver using a measured quadratic pump curve and equivalent branch resistances.
 - `kinetics`: bounded empirical first-order soil-removal response with temperature, detergent-dose and shear covariates.
 - `pareto`: non-dominated candidate extraction over residual-soil fraction, energy, fresh water and duration.
+- `chemistry`: evidence-bounded validation of phase-resolved detergent release schedules against exact formulation, soil/surface, stage-temperature, water-hardness, per-release/per-cycle/total-dose and component-interaction calibrations. It validates a proposed plan; it does not formulate detergent, choose a dose, measure actual delivery or certify cleaning.
+
+See [phase-resolved chemistry benchmark](docs/phase-resolved-chemistry-benchmark.md) and the experiment [per-release dose event schema](experiments/dose-events-template.csv).
 
 ## Run
 
