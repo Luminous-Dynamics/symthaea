@@ -114,6 +114,14 @@ Ogino et al. (eLife version of record, 13 October 2026; DOI 10.7554/eLife.110030
 
 All selectors receive the same intervention and compute budget. Feasibility checks must fail closed; do not silently clip invalid waveform amplitudes or durations.
 
+### Protocol sequences and state-conditioned experiments
+
+Interventions now optionally support ordered multi-step protocols. Each step binds its order index, target IDs, manipulation, waveform, inter-step interval and optional state-context ID. The parent intervention's target list must equal the union of step targets. The semantic verifier checks contiguous order indices, target-set consistency and the state-measurement receipt. Simultaneous combinations remain represented by one intervention with multiple target IDs.
+
+This contract makes it possible to preregister order-sensitive and state-gated perturbations rather than flattening them into an unordered target set. It does not imply that the assay can physically deliver the protocol; feasibility and safety receipts remain mandatory.
+
+The metric catalogue now explicitly accepts EVSI, D-/A-optimal Fisher gains, persistent-excitation rank and condition number. These remain separate metric families and units; do not combine them into one unqualified “information” score.
+
 ## 7. Metrics: keep the scorecard vector-valued
 
 Do not collapse the benchmark into one composite scalar. Keep at least the following metric families separate:
