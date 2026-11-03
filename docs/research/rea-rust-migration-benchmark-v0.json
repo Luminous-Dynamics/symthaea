@@ -1,7 +1,7 @@
 {
   "schema": "luminous.rea-rust-migration-benchmark.v0",
   "status": "proposal_not_results",
-  "as_of": "2026-11-02",
+  "as_of": "2026-11-03",
   "upstream": {
     "repository": "https://github.com/morluto/rea",
     "source_commit": "8250bf2320ea57aab4e664db4b4d44b8abd2004e",
@@ -638,10 +638,11 @@
       "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10026",
       "source_url": "https://daplab.cs.columbia.edu/benchmarks/sre-bench/",
       "published_baseline_snapshot": {
-        "as_of": "2026-11-02",
+        "as_of": "2026-10",
         "private_programs": 19,
         "binary_instances": 262,
         "graded_tasks": 1572,
+        "tasks_per_binary": 6,
         "average_source_lines": 16900,
         "domains": [
           "firmware",
@@ -657,13 +658,62 @@
           "Go"
         ],
         "anti_analysis_mechanisms": 44,
-        "leading_public_facing_reference": {
-          "model": "GPT-6-Astra",
-          "mean_score_out_of_6": 5.55,
-          "fully_solved_fraction": 0.823,
-          "graded_instances": 181,
-          "corpus_instances": 262
-        }
+        "public_facing_leaderboard": [
+          {
+            "model": "GPT-6-Astra",
+            "mean_score_out_of_6": 5.55,
+            "graded_instances": 181,
+            "eligible_instances": 262,
+            "graded_coverage": 0.6908396946564885,
+            "fully_solved": 149,
+            "full_solve_rate_on_graded": 0.8232044198895028,
+            "full_solve_rate_on_eligible": 0.5687022900763359,
+            "zero_credit": 7,
+            "zero_credit_rate_on_graded": 0.03867403314917127
+          },
+          {
+            "model": "GPT-5.6-Sol",
+            "mean_score_out_of_6": 3.69,
+            "graded_instances": 254,
+            "eligible_instances": 262,
+            "graded_coverage": 0.9694656488549618,
+            "fully_solved": 80,
+            "full_solve_rate_on_graded": 0.31496062992125984,
+            "full_solve_rate_on_eligible": 0.3053435114503817,
+            "zero_credit": 41,
+            "zero_credit_rate_on_graded": 0.16141732283464566
+          },
+          {
+            "model": "Claude-Fable-5.1",
+            "mean_score_out_of_6": 2.58,
+            "graded_instances": 223,
+            "eligible_instances": 262,
+            "graded_coverage": 0.851145038167939,
+            "fully_solved": 60,
+            "full_solve_rate_on_graded": 0.26905829596412556,
+            "full_solve_rate_on_eligible": 0.22900763358778625,
+            "zero_credit": 96,
+            "zero_credit_rate_on_graded": 0.4304932735426009
+          },
+          {
+            "model": "Claude-Opus-5",
+            "mean_score_out_of_6": 1.91,
+            "graded_instances": 256,
+            "eligible_instances": 262,
+            "graded_coverage": 0.9770992366412213,
+            "fully_solved": 32,
+            "full_solve_rate_on_graded": 0.125,
+            "full_solve_rate_on_eligible": 0.12213740458015267,
+            "zero_credit": 118,
+            "zero_credit_rate_on_graded": 0.4609375
+          }
+        ],
+        "evaluation_settings": {
+          "public_facing": "model-side cyber safeguards enabled",
+          "unconstrained": "no model-side cyber safeguards or budget limits; never pool with public-facing results"
+        },
+        "score_definition": "mean tasks passed per binary out of six; fully solved and zero-credit counts use the graded subset",
+        "note": "Full-solve rate on the full eligible corpus is an internal derived coverage-adjusted statistic, not an official SRE-Bench leaderboard metric."
       },
       "evaluation_arms": [
         "REA_only",
@@ -672,15 +722,21 @@
         "specialist_tools_as_applicable"
       ],
       "metrics": [
-        "mean_tasks_passed_per_binary",
-        "fully_solved_rate",
-        "zero_credit_rate",
-        "graded_coverage_and_refusal_rate",
+        "official_mean_tasks_passed_per_graded_binary",
+        "fully_solved_rate_on_graded_instances",
+        "zero_credit_rate_on_graded_instances",
+        "eligible_instance_coverage",
+        "coverage_adjusted_full_solve_rate_derived_not_official",
+        "eligible_attempted_completed_graded_refused_abstained_unsupported_timeout_counts",
         "per_domain_score",
         "per_language_score",
         "per_hardening_family_score",
-        "time_and_compute_cost",
+        "cost_per_passed_task",
+        "p50_p95_wall_clock",
         "tool_calls",
+        "model_tokens",
+        "cpu_hours",
+        "peak_memory_bytes",
         "evidence_traceability"
       ],
       "target": "match_or_exceed_the_best_public_facing_baseline_on_matched_instances_and_budget; publish coverage_and_safety_refusal_denominator_separately",
@@ -688,7 +744,8 @@
         "benchmark instances are private; obey maintainer access and publication terms",
         "do not mirror or redistribute private binaries/tasks",
         "reproduce task/tool/budget/safety settings before comparison"
-      ]
+      ],
+      "reporting_invariant": "Preserve the official score and graded denominator unchanged; report eligible coverage and derived coverage-adjusted yield separately. Never treat ungraded, refused or not-attempted cases as passed."
     },
     {
       "id": "decompile_bench_external_function_decompilation",
@@ -741,10 +798,71 @@
         "static_to_runtime_claim_upgrade_count",
         "false_positive_rate",
         "false_negative_rate",
-        "time_to_correct_finding"
+        "time_to_correct_finding",
+        "mastg_test_graph_edge_coverage",
+        "raw_observation_evaluation_separation_rate",
+        "environment_prerequisite_satisfaction_rate",
+        "inconclusive_and_not_tested_rates"
       ],
       "target": "100_percent_selected_control_to_test_mapping_or_explicit_oracle_gap; zero automated_scanner_claims_as_full_control_verification",
-      "constraint": "Automated tools alone do not complete MASVS verification; contextual/manual assessment is a separate evidence class."
+      "constraint": "Automated tools alone do not complete MASVS verification; contextual/manual assessment is a separate evidence class.",
+      "standards_versions": {
+        "masvs": "pin current OWASP MASVS revision per run",
+        "maswe": "v1.0.0",
+        "mastg": "v2.0.0"
+      },
+      "catalogue_snapshot_observed_on": "2026-11-03",
+      "current_published_mastg_counts": {
+        "tests": 285,
+        "demos": 152,
+        "techniques": 167,
+        "tools": 135,
+        "knowledge_articles": 140,
+        "best_practices": 72,
+        "note": "Dynamic published index counts; pin the exact MASTG repository commit for a benchmark run."
+      },
+      "evidence_graph": [
+        "MASVS_control",
+        "MASWE_weakness",
+        "MASTG_test",
+        "technique_tool_prerequisite",
+        "raw_observation",
+        "versioned_evaluation_rule",
+        "REA_Evidence",
+        "independent_control_claim_receipt"
+      ],
+      "required_test_metadata": [
+        "mastg_test_id",
+        "mastg_catalogue_revision",
+        "platform",
+        "test_type",
+        "related_maswe_ids",
+        "related_masvs_controls",
+        "environment_prerequisites",
+        "technique_and_tool_ids"
+      ],
+      "required_outcomes": [
+        "not_tested",
+        "not_applicable_with_reason",
+        "unavailable_or_unsupported",
+        "inconclusive",
+        "observed_not_evaluated",
+        "evaluated_pass",
+        "evaluated_fail"
+      ],
+      "evaluation_invariants": [
+        "raw_observation_is_separate_from_evaluation",
+        "no_missing_or_unsupported_test_can_become_pass",
+        "one_MASVS_control_may_require_multiple_tests_or_manual_context",
+        "automated_scan_finding_is_not_a_control_pass",
+        "pin_exact_catalogue_revision_for_each_run"
+      ],
+      "source_urls": [
+        "https://mas.owasp.org/news/2026/07/04/mastg-v200-release/",
+        "https://mas.owasp.org/news/archive/2026/",
+        "https://github.com/OWASP/mastg/releases/tag/v2.0.0",
+        "https://mas.owasp.org/MASWE/"
+      ]
     },
     {
       "id": "benchmark_run_receipt_accounting",
@@ -808,14 +926,20 @@
           ],
           "anti_analysis_mechanisms": 44,
           "current_public_scoreboard_snapshot": {
+            "as_of": "2026-10",
+            "evaluation_setting": "public-facing",
             "model": "GPT-6-Astra",
             "mean_tasks_passed_per_graded_binary": 5.55,
             "tasks_possible_per_binary": 6,
+            "eligible_binaries": 262,
             "graded_binaries": 181,
-            "total_binaries": 262,
+            "graded_coverage_fraction": 0.6908396946564885,
             "fully_solved": 149,
+            "full_solve_rate_on_graded": 0.8232044198895028,
+            "full_solve_rate_on_eligible": 0.5687022900763359,
             "zero_credit": 7,
-            "graded_coverage_fraction": 0.6908396946564885
+            "zero_credit_rate_on_graded": 0.03867403314917127,
+            "note": "The eligible-denominator solve fraction is derived for coverage accounting; the official headline full-solve rate is conditional on graded binaries."
           },
           "reporting_requirements": [
             "eligible",
@@ -881,7 +1005,7 @@
           "claim_ceiling": "public mobile reverse-engineering challenge performance only; not general MASVS certification"
         }
       ],
-      "reporting_invariant": "Every result publishes coverage/denominator, refusals, unsupported, timeouts, abstentions and graded-subset scores. Never count ungraded/refused cases as solved or silently drop them."
+      "reporting_invariant": "Official score uses its original graded denominator. Also disclose eligible/attempted/completed/graded/refused/unsupported/timeout/abstained and any coverage-adjusted metric as non-official."
     },
     {
       "id": "agentre_bench_v3_1_external",
