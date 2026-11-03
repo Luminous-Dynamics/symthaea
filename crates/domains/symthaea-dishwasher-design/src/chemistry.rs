@@ -48,9 +48,9 @@ pub struct DoseEvent {
     pub stage: WashStage,
     /// Elapsed seconds from the beginning of the complete cycle.
     pub elapsed_s: u32,
-    /// Component mass in grams. Volumetric ingredients must be converted using
-    /// a measured batch density and archived as part of the formulation protocol.
-    pub dose_g: f64,
+    /// Commanded component mass in integer milligrams. Volumetric ingredients
+    /// must be converted using a measured batch density and archived in the protocol.
+    pub dose_mg: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -66,9 +66,9 @@ pub struct ComponentCalibration {
     pub maximum_temperature_c: f64,
     pub minimum_water_hardness_ppm_as_caco3: u16,
     pub maximum_water_hardness_ppm_as_caco3: u16,
-    pub minimum_release_g: f64,
-    pub maximum_release_g: f64,
-    pub maximum_cycle_g: f64,
+    pub minimum_release_mg: u64,
+    pub maximum_release_mg: u64,
+    pub maximum_cycle_mg: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -85,7 +85,7 @@ pub struct ComponentInteraction {
 pub struct FormulationCalibrationProfile {
     pub formulation_id: String,
     pub formulation_evidence_sha256: String,
-    pub maximum_total_dose_g: f64,
+    pub maximum_total_dose_mg: u64,
     pub components: Vec<ComponentCalibration>,
     pub interactions: Vec<ComponentInteraction>,
 }
@@ -104,7 +104,7 @@ pub struct DosePlanRequest {
 pub struct ValidatedDoseSummary {
     pub event_count: usize,
     pub component_count: usize,
-    pub total_dose_g: f64,
+    pub total_dose_mg: u64,
     pub cycle_duration_s: u32,
 }
 
@@ -113,6 +113,10 @@ pub enum ChemistryError {
     InvalidFormulationId,
     InvalidEvidenceDigest(&'static str),
     InvalidMaximumTotalDose,
+    ComponentDoseOverflow {
+        component_id: String,
+    },
+    TotalDoseOverflow,
     NoCalibratedComponents,
     DuplicateComponentId(String),
     InvalidComponentCalibration {
@@ -189,9 +193,7 @@ fn validate_formulation(formulation: &FormulationCalibrationProfile) -> Result<(
     if !valid_digest(&formulation.formulation_evidence_sha256) {
         return Err(ChemistryError::InvalidEvidenceDigest("formulation"));
     }
-    if !formulation.maximum_total_dose_g.is_finite()
-        || formulation.maximum_total_dose_g <= 0.0
-    {
+    if formulation.maximum_total_dose_mg == 0 {
         return Err(ChemistryError::InvalidMaximumTotalDose);
     }
     if formulation.components.is_empty() {
@@ -253,12 +255,9 @@ fn validate_formulation(formulation: &FormulationCalibrationProfile) -> Result<(
                 field: "water hardness range",
             });
         }
-        if !component.minimum_release_g.is_finite()
-            || !component.maximum_release_g.is_finite()
-            || !component.maximum_cycle_g.is_finite()
-            || component.minimum_release_g <= 0.0
-            || component.maximum_release_g < component.minimum_release_g
-            || component.maximum_cycle_g < component.minimum_release_g
+        if component.minimum_release_mg == 0
+            || component.maximum_release_mg < component.minimum_release_mg
+            || component.maximum_cycle_mg < component.minimum_release_mg
         {
             return Err(ChemistryError::InvalidComponentCalibration {
                 component_id: component.component_id.clone(),
@@ -378,7 +377,7 @@ pub fn validate_dose_plan(
     if !non_empty(&request.surface_material) {
         return Err(ChemistryError::InvalidRequestScope("surface_material"));
     }
-request temp check    if request.events.is_empty() {
+    if request.events.is_empty() {
         return Err(ChemistryError::EmptyDosePlan);
     }
 
@@ -390,8 +389,8 @@ request temp check    if request.events.is_empty() {
         .collect();
 
     let mut event_ids: HashSet<String> = HashSet::with_capacity(request.events.len());
-    let mut component_totals: HashMap<String, f64> = HashMap::new();
-    let mut total_dose_g = 0.0_f64;
+    let mut component_totals: HashMap<String, u64> = HashMap::new();
+    let mut total_dose_mg = 0_u64;
 
     for event in &request.events {
         if !non_empty(&event.event_id) || !event_ids.insert(event.event_id.clone()) {
@@ -459,9 +458,8 @@ request temp check    if request.events.is_empty() {
                 component_id: event.component_id.clone(),
             });
         }
-        if !event.dose_g.is_finite()
-            || event.dose_g < calibration.minimum_release_g
-            || event.dose_g > calibration.maximum_release_g
+        if event.dose_mg < calibration.minimum_release_mg
+            || event.dose_mg > calibration.maximum_release_mg
         {
             return Err(ChemistryError::DoseOutsideCalibration {
                 event_id: event.event_id.clone(),
@@ -470,15 +468,21 @@ request temp check    if request.events.is_empty() {
 
         let component_total = component_totals
             .entry(calibration.component_id.clone())
-            .or_insert(0.0);
-        *component_total += event.dose_g;
-        total_dose_g += event.dose_g;
-        if !component_total.is_finite() || *component_total > calibration.maximum_cycle_g {
+            .or_insert(0_u64);
+        *component_total = component_total
+            .checked_add(event.dose_mg)
+            .ok_or_else(|| ChemistryError::ComponentDoseOverflow {
+                component_id: calibration.component_id.clone(),
+            })?;
+        total_dose_mg = total_dose_mg
+            .checked_add(event.dose_mg)
+            .ok_or(ChemistryError::TotalDoseOverflow)?;
+        if *component_total > calibration.maximum_cycle_mg {
             return Err(ChemistryError::ComponentCycleLimitExceeded {
                 component_id: calibration.component_id.clone(),
             });
         }
-        if !total_dose_g.is_finite() || total_dose_g > formulation.maximum_total_dose_g {
+        if total_dose_mg > formulation.maximum_total_dose_mg {
             return Err(ChemistryError::TotalDoseLimitExceeded);
         }
     }
@@ -511,7 +515,7 @@ request temp check    if request.events.is_empty() {
     Ok(ValidatedDoseSummary {
         event_count: request.events.len(),
         component_count: component_totals.len(),
-        total_dose_g,
+        total_dose_mg,
         cycle_duration_s: request.cycle_duration_s,
     })
 }
@@ -524,7 +528,7 @@ mod tests {
         component_id: &str,
         kind: ComponentKind,
         stages: Vec<WashStage>,
-        max_cycle: f64,
+        max_cycle: u64,
     ) -> ComponentCalibration {
         ComponentCalibration {
             component_id: component_id.to_owned(),
@@ -542,9 +546,9 @@ mod tests {
             maximum_temperature_c: 65.0,
             minimum_water_hardness_ppm_as_caco3: 50,
             maximum_water_hardness_ppm_as_caco3: 250,
-            minimum_release_g: 0.1,
-            maximum_release_g: 2.0,
-            maximum_cycle_g: max_cycle,
+            minimum_release_mg: 100,
+            maximum_release_mg: 2_000,
+            maximum_cycle_mg: max_cycle,
         }
     }
 
@@ -552,25 +556,25 @@ mod tests {
         FormulationCalibrationProfile {
             formulation_id: "test-formulation-v1".to_owned(),
             formulation_evidence_sha256: "b".repeat(64),
-            maximum_total_dose_g: 3.0,
+            maximum_total_dose_mg: 3_000,
             components: vec![
                 calibration(
                     "enzyme",
                     ComponentKind::EnzymeBlend,
                     vec![WashStage::Prewash, WashStage::MainWash],
-                    2.0,
+                    2_000,
                 ),
                 calibration(
                     "bleach",
                     ComponentKind::OxidizingBleach,
                     vec![WashStage::MainWash],
-                    1.0,
+                    1_000,
                 ),
                 calibration(
                     "rinse-aid",
                     ComponentKind::RinseAid,
                     vec![WashStage::FinalRinse],
-                    0.5,
+                    500,
                 ),
             ],
             interactions: vec![ComponentInteraction {
@@ -601,21 +605,21 @@ mod tests {
                     component_id: "enzyme".to_owned(),
                     stage: WashStage::Prewash,
                     elapsed_s: 120,
-                    dose_g: 0.5,
+                    dose_mg: 500,
                 },
                 DoseEvent {
                     event_id: "bleach-main".to_owned(),
                     component_id: "bleach".to_owned(),
                     stage: WashStage::MainWash,
                     elapsed_s: 600,
-                    dose_g: 0.4,
+                    dose_mg: 400,
                 },
                 DoseEvent {
                     event_id: "rinse-aid-final".to_owned(),
                     component_id: "rinse-aid".to_owned(),
                     stage: WashStage::FinalRinse,
                     elapsed_s: 1_350,
-                    dose_g: 0.2,
+                    dose_mg: 200,
                 },
             ],
         }
@@ -626,7 +630,7 @@ mod tests {
         let result = validate_dose_plan(&formulation(), &request()).unwrap();
         assert_eq!(result.event_count, 3);
         assert_eq!(result.component_count, 3);
-        assert!((result.total_dose_g - 1.1).abs() < 1e-12);
+        assert_eq!(result.total_dose_mg, 1_100);
     }
 
     #[test]
@@ -676,7 +680,7 @@ mod tests {
     #[test]
     fn rejects_temperature_outside_calibration() {
         let mut input = request();
-        input.wash_temperature_c = 70.0;
+        input.stage_windows[2].water_temperature_c = Some(70.0);
         assert!(matches!(
             validate_dose_plan(&formulation(), &input),
             Err(ChemistryError::TemperatureOutsideCalibration { .. })
@@ -717,25 +721,55 @@ mod tests {
     #[test]
     fn rejects_per_event_and_total_component_overdose() {
         let mut input = request();
-        input.events[0].dose_g = 2.1;
+        input.events[0].dose_mg = 2_100;
         assert!(matches!(
             validate_dose_plan(&formulation(), &input),
             Err(ChemistryError::DoseOutsideCalibration { .. })
         ));
 
         let mut input = request();
-        input.events[0].dose_g = 1.1;
+        input.events[0].dose_mg = 1_100;
         input.events.push(DoseEvent {
             event_id: "enzyme-pre-2".to_owned(),
             component_id: "enzyme".to_owned(),
             stage: WashStage::Prewash,
             elapsed_s: 240,
-            dose_g: 1.0,
+            dose_mg: 1_000,
         });
         input.events[1].elapsed_s = 700;
         assert!(matches!(
             validate_dose_plan(&formulation(), &input),
             Err(ChemistryError::ComponentCycleLimitExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_integer_dose_accumulator_overflow() {
+        let mut profile = formulation();
+        profile.maximum_total_dose_mg = u64::MAX;
+        profile.components[0].maximum_release_mg = u64::MAX;
+        profile.components[0].maximum_cycle_mg = u64::MAX;
+        let mut input = request();
+        input.events = vec![
+            DoseEvent {
+                event_id: "max-one".to_owned(),
+                component_id: "enzyme".to_owned(),
+                stage: WashStage::Prewash,
+                elapsed_s: 10,
+                dose_mg: u64::MAX,
+            },
+            DoseEvent {
+                event_id: "max-two".to_owned(),
+                component_id: "enzyme".to_owned(),
+                stage: WashStage::Prewash,
+                elapsed_s: 20,
+                dose_mg: 1,
+            },
+        ];
+        assert!(matches!(
+            validate_dose_plan(&profile, &input),
+            Err(ChemistryError::ComponentDoseOverflow { .. })
+                | Err(ChemistryError::TotalDoseOverflow)
         ));
     }
 
@@ -753,7 +787,7 @@ mod tests {
     #[test]
     fn rejects_total_formulation_limit() {
         let mut profile = formulation();
-        profile.maximum_total_dose_g = 0.8;
+        profile.maximum_total_dose_mg = 800;
         assert!(matches!(
             validate_dose_plan(&profile, &request()),
             Err(ChemistryError::TotalDoseLimitExceeded)
