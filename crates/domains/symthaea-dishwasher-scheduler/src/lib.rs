@@ -1419,7 +1419,7 @@ mod evidence_bound_mode_tests {
     #[test]
     fn soil_batch_and_age_must_match_across_each_soil_occupancy_ladder() {
         let make = |occupancy, batch: &str, age| {
-            let mut pilot = envelope(
+            let pilot = envelope(
                 "full-load-v1",
                 SoilClass::Starch,
                 occupancy,
