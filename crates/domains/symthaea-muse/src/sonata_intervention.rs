@@ -1,13 +1,11 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Narrow, auditable Sonata intervention for returning thematic material.
+//! Capability-qualified symbolic interventions over plan-bearing Sonata scores.
 //!
-//! This is deliberately not a general note-writing agent. It handles one
-//! product path: a [`SymbolicAction::ReturnOpeningMaterial`] proposal over an
-//! existing, plan-bearing Sonata realization. The theory plan identifies the
-//! source and target regions; deterministic strategies produce several score
-//! candidates; independent obligation verification and symbolic measurements
-//! rank them through an explicit policy that is separate from outcome prediction.
+//! This module provides the thematic-return adapter. Pitch-only named-motif
+//! development is implemented separately in sonata_motif_development with
+//! its own transformation and provenance contract. Neither adapter is a
+//! general note-writing agent; unsupported actions must remain unsupported.
 
 use crate::adaptive_prediction::{
     AdaptiveLearningError, AdaptiveOutcomeModel, InterventionCalibrationEvidence,
@@ -60,6 +58,9 @@ pub enum SonataActionEvidenceV1 {
     OutsideTargetSkeletonComparison,
     SymbolicOutcomeMeasurement,
     InterventionPrediction,
+    MotifFamilyIdentityVerdict,
+    ExactTargetOnlyDiff,
+    CandidateScoreArtifactDigest,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -124,22 +125,32 @@ impl SonataActionQualificationV1 {
                     evidence,
                 },
             ) => {
-                if self.action != SymbolicAction::ReturnOpeningMaterial {
-                    return Err("the Sonata-return adapter cannot qualify a different action".into());
-                }
-                if realizer_id.as_str() != SONATA_RETURN_REALIZER_ID_V1
+                let (expected_realizer, expected_evidence) = match self.action {
+                    SymbolicAction::ReturnOpeningMaterial => (
+                        SONATA_RETURN_REALIZER_ID_V1,
+                        sonata_return_evidence_v1(),
+                    ),
+                    SymbolicAction::DevelopMotif => (
+                        SONATA_MOTIF_DEVELOPMENT_REALIZER_ID_V1,
+                        sonata_motif_development_evidence_v1(),
+                    ),
+                    _ => return Err("no registered Sonata realizer for this supported action".into()),
+                };
+                if realizer_id.as_str() != expected_realizer
                     || *input_modality != SonataActionInputModalityV1::PlanBearingSonataRealization
                     || *output_modality != SonataActionOutputModalityV1::SymbolicScore
-                    || evidence != &sonata_return_evidence_v1()
+                    || evidence != &expected_evidence
                 {
-                    return Err("Sonata-return capability does not match its registered contract".into());
+                    return Err("Sonata action capability does not match its registered contract".into());
                 }
                 Ok(())
             }
             (
                 SonataActionExecutionModeV1::Execute,
                 SonataActionQualificationStatusV1::Unsupported { reason },
-            ) if !reason.trim().is_empty() && self.action != SymbolicAction::ReturnOpeningMaterial => {
+            ) if !reason.trim().is_empty()
+                && self.action != SymbolicAction::ReturnOpeningMaterial
+                && self.action != SymbolicAction::DevelopMotif => {
                 Ok(())
             }
             _ => Err("action qualification mode/status combination is invalid".into()),
@@ -165,6 +176,7 @@ impl SonataActionQualificationV1 {
 }
 
 pub const SONATA_RETURN_REALIZER_ID_V1: &str = "sonata-thematic-return-v1";
+pub const SONATA_MOTIF_DEVELOPMENT_REALIZER_ID_V1: &str = "sonata-motif-development-v1";
 
 /// Conservative serde default for historical return batches created before
 /// action-qualification receipts existed. The legacy object may be inspected,
@@ -190,8 +202,18 @@ fn sonata_return_evidence_v1() -> Vec<SonataActionEvidenceV1> {
     ]
 }
 
+fn sonata_motif_development_evidence_v1() -> Vec<SonataActionEvidenceV1> {
+    vec![
+        SonataActionEvidenceV1::TheoryValidationReport,
+        SonataActionEvidenceV1::ObligationVerification,
+        SonataActionEvidenceV1::MotifFamilyIdentityVerdict,
+        SonataActionEvidenceV1::ExactTargetOnlyDiff,
+        SonataActionEvidenceV1::CandidateScoreArtifactDigest,
+    ]
+}
+
 /// Qualify one requested action against the exact current Sonata adapter
-/// registry. Only ReturnOpeningMaterial has an executable realization path.
+/// registry. ReturnOpeningMaterial and DevelopMotif have separate executable realization paths.
 /// ShadowOnly is an explicit caller choice and never dispatches a realizer.
 pub fn qualify_sonata_action_v1(
     action: SymbolicAction,
@@ -210,6 +232,14 @@ pub fn qualify_sonata_action_v1(
                     input_modality: SonataActionInputModalityV1::PlanBearingSonataRealization,
                     output_modality: SonataActionOutputModalityV1::SymbolicScore,
                     evidence: sonata_return_evidence_v1(),
+                }
+            }
+            SymbolicAction::DevelopMotif => {
+                SonataActionQualificationStatusV1::Supported {
+                    realizer_id: SONATA_MOTIF_DEVELOPMENT_REALIZER_ID_V1.into(),
+                    input_modality: SonataActionInputModalityV1::PlanBearingSonataRealization,
+                    output_modality: SonataActionOutputModalityV1::SymbolicScore,
+                    evidence: sonata_motif_development_evidence_v1(),
                 }
             }
             unsupported => SonataActionQualificationStatusV1::Unsupported {
@@ -538,6 +568,7 @@ fn descriptor_for(
 fn obligation_class(kind: &ObligationKind) -> ObligationClass {
     match kind {
         ObligationKind::ReturnMotif { .. } => ObligationClass::ReturnMotif,
+        ObligationKind::DevelopMotif { .. } => ObligationClass::MotifDevelopment,
         ObligationKind::ReachKey { .. } => ObligationClass::ReachKey,
         ObligationKind::RestoreIdentity { .. } => ObligationClass::RestoreIdentity,
         ObligationKind::ResolveAlteredDegree { .. } => ObligationClass::ResolveAlteredDegree,
@@ -907,7 +938,7 @@ mod tests {
                 qualify_sonata_action_v1(action, SonataActionExecutionModeV1::Execute);
             qualification.validate().unwrap();
             match action {
-                SymbolicAction::ReturnOpeningMaterial => {
+                SymbolicAction::ReturnOpeningMaterial | SymbolicAction::DevelopMotif => {
                     assert!(qualification.is_executable());
                     assert!(matches!(
                         &qualification.status,
@@ -924,6 +955,26 @@ mod tests {
             }
             assert_eq!(qualification.digest_sha256().unwrap().len(), 64);
         }
+    }
+
+    #[test]
+    fn motif_development_capability_names_its_own_adapter_and_evidence() {
+        let qualification = qualify_sonata_action_v1(
+            SymbolicAction::DevelopMotif,
+            SonataActionExecutionModeV1::Execute,
+        );
+        qualification.validate().unwrap();
+        let SonataActionQualificationStatusV1::Supported {
+            realizer_id,
+            evidence,
+            ..
+        } = qualification.status else {
+            panic!("DevelopMotif should have its own supported realizer");
+        };
+        assert_eq!(realizer_id, SONATA_MOTIF_DEVELOPMENT_REALIZER_ID_V1);
+        assert!(evidence.contains(&SonataActionEvidenceV1::MotifFamilyIdentityVerdict));
+        assert!(evidence.contains(&SonataActionEvidenceV1::ExactTargetOnlyDiff));
+        assert!(evidence.contains(&SonataActionEvidenceV1::CandidateScoreArtifactDigest));
     }
 
     #[test]

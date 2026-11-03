@@ -26,6 +26,16 @@ pub enum ReturnTransformation {
     Restored,
 }
 
+/// Typed scale-relative transformation requested for a new motif
+/// development. Unlike ReturnTransformation::Transposed (a return-identity
+/// relation), a diatonic shift is measured in the target section's scale.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "kind")]
+pub enum MotifDevelopmentTransformation {
+    DiatonicTransposition { degree_shift: i32 },
+    InversionAroundFirstNote,
+}
+
 /// A long-range musical promise.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ObligationKind {
@@ -33,6 +43,13 @@ pub enum ObligationKind {
     ReturnMotif {
         motif_id: String,
         transformation: ReturnTransformation,
+    },
+    /// Develop a named motif in a new region without promising a literal
+    /// return. This is distinct from ReturnMotif so the cognitive bridge can
+    /// choose DevelopMotif rather than ReturnOpeningMaterial.
+    DevelopMotif {
+        motif_id: String,
+        transformation: MotifDevelopmentTransformation,
     },
     /// Establish a destination key or tonal center.
     ReachKey { key: Key },
@@ -286,6 +303,29 @@ mod tests {
         let pending = ledger.pending();
         assert_eq!(pending[0].id, 2);
         assert_eq!(pending[1].id, 1);
+    }
+
+    #[test]
+    fn motif_development_obligation_round_trips_without_becoming_a_return() {
+        let obligation = CompositionalObligation::new(
+            44,
+            Duration::zero(),
+            Duration::new(16, 1),
+            0.8,
+            ObligationKind::DevelopMotif {
+                motif_id: "sonata.primary".into(),
+                transformation: MotifDevelopmentTransformation::DiatonicTransposition {
+                    degree_shift: 1,
+                },
+            },
+        );
+        let bytes = serde_json::to_vec(&obligation).unwrap();
+        let restored: CompositionalObligation = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(restored, obligation);
+        assert!(matches!(
+            restored.kind,
+            ObligationKind::DevelopMotif { .. }
+        ));
     }
 
     #[test]

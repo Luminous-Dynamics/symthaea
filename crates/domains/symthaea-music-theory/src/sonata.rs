@@ -51,7 +51,8 @@ use crate::harmony::{Key, Progression};
 use crate::motif::Motif;
 use crate::motif_return::{MotifReturnEvidence, compare_melodic_regions};
 use crate::obligation::{
-    CompositionalObligation, ObligationKind, ObligationLedger, ReturnTransformation,
+    CompositionalObligation, MotifDevelopmentTransformation, ObligationKind,
+    ObligationLedger, ReturnTransformation,
 };
 use crate::phrase::Period;
 use crate::pitch::{Pitch, PitchClass};
@@ -102,6 +103,32 @@ pub struct SonataRealization {
     pub verification: Vec<SonataObligationEvidence>,
 }
 
+/// Independent evidence for a motif developed across two planned keys.
+/// This compares scale-degree identity, not absolute semitone intervals, so a
+/// major-to-relative-minor shift is not incorrectly scored as a failed
+/// chromatic transposition.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MotifDevelopmentEvidence {
+    pub source_note_count: usize,
+    pub target_note_count: usize,
+    pub aligned_note_count: usize,
+    pub scale_degree_similarity: f32,
+    pub duration_similarity: f32,
+    pub onset_interval_similarity: f32,
+    pub coverage: f32,
+}
+
+impl MotifDevelopmentEvidence {
+    pub fn meets_threshold(&self, threshold: f32) -> bool {
+        self.source_note_count == self.target_note_count
+            && self.aligned_note_count >= 2
+            && self.coverage >= 0.999
+            && self.scale_degree_similarity >= threshold
+            && self.duration_similarity >= threshold
+            && self.onset_interval_similarity >= threshold
+    }
+}
+
 /// Structured evidence emitted by the score-side sonata verifier.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SonataObligationEvidence {
@@ -130,6 +157,15 @@ pub enum SonataVerificationMetric {
         #[serde(default)]
         return_evidence: Option<MotifReturnEvidence>,
     },
+    MotifDevelopment {
+        source: SonataSectionKind,
+        target: SonataSectionKind,
+        transformation: MotifDevelopmentTransformation,
+        interval_similarity: f32,
+        exact_pitch_similarity: f32,
+        #[serde(default)]
+        development_evidence: Option<MotifDevelopmentEvidence>,
+    },
     ClimaxLocation {
         section: SonataSectionKind,
         section_peak_intensity: f32,
@@ -152,6 +188,7 @@ const RETURN_PRIMARY_SUBJECT: u64 = 3;
 const RETURN_HOME_KEY: u64 = 4;
 const RETURN_SECONDARY_SUBJECT: u64 = 5;
 const CLOSE_IN_HOME_KEY: u64 = 6;
+const DEVELOP_PRIMARY_MOTIF: u64 = 7;
 
 struct SectionBlueprint {
     kind: SonataSectionKind,
@@ -296,6 +333,18 @@ pub fn plan_sonata(home_key: Key, meter: f64, motif: &Motif, seed: u64) -> Sonat
         development.end,
         0.8,
         ObligationKind::ReachClimax,
+    ));
+    obligations.add(CompositionalObligation::new(
+        DEVELOP_PRIMARY_MOTIF,
+        Duration::zero(),
+        development.end,
+        0.85,
+        ObligationKind::DevelopMotif {
+            motif_id: "sonata.primary".into(),
+            transformation: MotifDevelopmentTransformation::DiatonicTransposition {
+                degree_shift: 1,
+            },
+        },
     ));
     obligations.add(CompositionalObligation::new(
         RETURN_PRIMARY_SUBJECT,
@@ -459,12 +508,154 @@ pub fn verify_sonata_obligations(
     (resolution, evidence)
 }
 
+/// Compare a named source motif and the Development target in each
+/// section's own planned key. The exact event projection is aligned by score
+/// order/onset; no key-independent pitch-class normalization is guessed.
+fn compare_motif_development_regions(
+    score: &Score,
+    source_start: Duration,
+    source_end: Duration,
+    source_key: Key,
+    target_start: Duration,
+    target_end: Duration,
+    target_key: Key,
+    transformation: MotifDevelopmentTransformation,
+) -> MotifDevelopmentEvidence {
+    let mut source: Vec<&ScoreNote> = score.notes.iter().filter(|note| {
+        note.role == VoiceRole::Melody
+            && note.onset >= source_start
+            && note.onset < source_end
+    }).collect();
+    let mut target: Vec<&ScoreNote> = score.notes.iter().filter(|note| {
+        note.role == VoiceRole::Melody
+            && note.onset >= target_start
+            && note.onset < target_end
+    }).collect();
+    source.sort_by(|left, right| left.onset.beats().total_cmp(&right.onset.beats()));
+    target.sort_by(|left, right| left.onset.beats().total_cmp(&right.onset.beats()));
+
+    let aligned = source.len().min(target.len());
+    let coverage = if source.len().max(target.len()) == 0 {
+        0.0
+    } else {
+        aligned as f32 / source.len().max(target.len()) as f32
+    };
+    let source_degrees: Vec<Option<i32>> = source
+        .iter()
+        .map(|note| pitch_scale_degree(note.pitch, source_key))
+        .collect();
+    let pivot = source_degrees.first().copied().flatten();
+    let mut degree_matches = 0usize;
+    let mut duration_matches = 0usize;
+    for index in 0..aligned {
+        let expected_degree = source_degrees[index].and_then(|degree| match transformation {
+            MotifDevelopmentTransformation::DiatonicTransposition { degree_shift } => {
+                Some(degree + degree_shift)
+            }
+            MotifDevelopmentTransformation::InversionAroundFirstNote => {
+                pivot.map(|first| 2 * first - degree)
+            }
+        });
+        if expected_degree
+            == pitch_scale_degree(target[index].pitch, target_key)
+        {
+            degree_matches += 1;
+        }
+        if source[index].duration == target[index].duration {
+            duration_matches += 1;
+        }
+    }
+    let interval_count = aligned.saturating_sub(1);
+    let mut onset_interval_matches = 0usize;
+    for index in 0..interval_count {
+        let source_gap =
+            source[index + 1].onset.beats() - source[index].onset.beats();
+        let target_gap =
+            target[index + 1].onset.beats() - target[index].onset.beats();
+        if (source_gap - target_gap).abs() <= 1e-9 {
+            onset_interval_matches += 1;
+        }
+    }
+
+    let ratio = |matches: usize, total: usize| {
+        if total == 0 { 0.0 } else { matches as f32 / total as f32 }
+    };
+    MotifDevelopmentEvidence {
+        source_note_count: source.len(),
+        target_note_count: target.len(),
+        aligned_note_count: aligned,
+        scale_degree_similarity: ratio(degree_matches, aligned),
+        duration_similarity: ratio(duration_matches, aligned),
+        onset_interval_similarity: ratio(onset_interval_matches, interval_count),
+        coverage,
+    }
+}
+
+fn pitch_scale_degree(pitch: Pitch, key: Key) -> Option<i32> {
+    let scale = key.scale();
+    let degree_count = scale.mode.degree_count() as i32;
+    let octave_offset = pitch.octave() - 4;
+    (1..=degree_count)
+        .find(|degree| scale.degree_pitch_class(*degree) == pitch.pitch_class())
+        .map(|degree| degree + octave_offset * degree_count)
+}
+
 fn metric_for_obligation(
     score: &Score,
     plan: &SonataPlan,
     obligation: &CompositionalObligation,
 ) -> SonataVerificationMetric {
     match &obligation.kind {
+        ObligationKind::DevelopMotif {
+            motif_id,
+            transformation,
+        } => {
+            let source_kind = match motif_id.as_str() {
+                "sonata.primary" => SonataSectionKind::ExpositionPrimary,
+                "sonata.secondary" => SonataSectionKind::ExpositionSecondary,
+                _ => {
+                    return SonataVerificationMetric::Unsupported {
+                        obligation: format!("DevelopMotif({motif_id})"),
+                    };
+                }
+            };
+            let target_kind = SonataSectionKind::Development;
+            let source = planned_section(plan, source_kind);
+            let target = planned_section(plan, target_kind);
+            let development_evidence = source.zip(target).map(|(source, target)| {
+                let target_duration = target.end - target.start;
+                let proposed_source_end = source.start + target_duration;
+                let source_window_end = if proposed_source_end < source.end {
+                    proposed_source_end
+                } else {
+                    source.end
+                };
+                compare_motif_development_regions(
+                    score,
+                    source.start,
+                    source_window_end,
+                    source.key,
+                    target.start,
+                    target.end,
+                    target.key,
+                    *transformation,
+                )
+            });
+            let interval_similarity = development_evidence
+                .as_ref()
+                .map_or(0.0, |evidence| evidence.scale_degree_similarity);
+            let exact_pitch_similarity = development_evidence
+                .as_ref()
+                .map_or(0.0, |evidence| evidence.scale_degree_similarity);
+            SonataVerificationMetric::MotifDevelopment {
+                source: source_kind,
+                target: target_kind,
+                transformation: *transformation,
+                interval_similarity,
+                exact_pitch_similarity,
+                development_evidence,
+            }
+        }
         ObligationKind::ReturnMotif {
             motif_id,
             transformation,
@@ -609,6 +800,12 @@ fn metric_is_verified(metric: &SonataVerificationMetric) -> bool {
                 evidence.meets_threshold(threshold)
             },
         ),
+        SonataVerificationMetric::MotifDevelopment {
+            development_evidence,
+            ..
+        } => development_evidence
+            .as_ref()
+            .is_some_and(|evidence| evidence.meets_threshold(0.999)),
         SonataVerificationMetric::ClimaxLocation {
             section_peak_intensity,
             global_peak_intensity,
@@ -822,7 +1019,16 @@ mod tests {
             SonataSectionKind::RecapitulationPrimary
         );
         assert_eq!(plan.sections[3].key, home);
-        assert_eq!(plan.obligations.pending().len(), 6);
+        assert_eq!(plan.obligations.pending().len(), 7);
+        assert!(plan.obligations.pending().iter().any(|item| matches!(
+            item.kind,
+            ObligationKind::DevelopMotif {
+                motif_id,
+                transformation: MotifDevelopmentTransformation::DiatonicTransposition {
+                    degree_shift: 1,
+                },
+            } if motif_id == "sonata.primary"
+        )));
         assert!(
             plan.sections
                 .windows(2)
@@ -831,12 +1037,92 @@ mod tests {
     }
 
     #[test]
-    fn planned_realization_resolves_every_form_obligation() {
+    fn scale_relative_identity_recognizes_major_to_relative_minor_development() {
+        let source_key = Key::major(PitchClass::C);
+        let target_key = Key::minor(PitchClass::E);
+        let mut score = Score::new(source_key, 120.0, 4);
+        let source = [60, 64, 67]; // C-E-G: scale degrees 1-3-5 in C major
+        let target = [66, 69, 72]; // F#-A-C: scale degrees 2-4-6 in E minor
+        for (index, midi) in source.into_iter().enumerate() {
+            score.push(ScoreNote {
+                part: crate::score::PartId::UNASSIGNED,
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new(index as i64, 1),
+                duration: Duration::quarter(),
+                velocity: 0.7,
+                role: VoiceRole::Melody,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        for (index, midi) in target.into_iter().enumerate() {
+            score.push(ScoreNote {
+                part: crate::score::PartId::UNASSIGNED,
+                pitch: Pitch::from_midi(midi),
+                onset: Duration::new((index + 4) as i64, 1),
+                duration: Duration::quarter(),
+                velocity: 0.7,
+                role: VoiceRole::Melody,
+                emphasis: Emphasis::Normal,
+                section_intensity: 1.0,
+            });
+        }
+        let evidence = compare_motif_development_regions(
+            &score,
+            Duration::zero(),
+            Duration::new(3, 1),
+            source_key,
+            Duration::new(4, 1),
+            Duration::new(7, 1),
+            target_key,
+            MotifDevelopmentTransformation::DiatonicTransposition {
+                degree_shift: 1,
+            },
+        );
+        assert_eq!(evidence.scale_degree_similarity, 1.0);
+        assert_eq!(evidence.duration_similarity, 1.0);
+        assert_eq!(evidence.onset_interval_similarity, 1.0);
+        assert!(evidence.meets_threshold(0.999));
+    }
+
+    #[test]
+    fn sonata_development_obligation_has_separate_score_side_evidence() {
+        let home = Key::major(PitchClass::C);
+        let realized = realize_sonata_with_plan(home, 100.0, 4.0, &theme(), 31, &intent());
+        let evidence = realized
+            .verification
+            .iter()
+            .find(|item| item.obligation_id == DEVELOP_PRIMARY_MOTIF)
+            .expect("development motif obligation must be scored");
+        assert!(matches!(
+            &evidence.metric,
+            SonataVerificationMetric::MotifDevelopment {
+                source: SonataSectionKind::ExpositionPrimary,
+                target: SonataSectionKind::Development,
+                transformation: MotifDevelopmentTransformation::DiatonicTransposition {
+                    degree_shift: 1,
+                },
+                ..
+            }
+        ));
+        assert!(
+            !evidence.verified,
+            "the generic composer is not permitted to claim it executed the explicit one-degree development transform"
+        );
+    }
+
+    #[test]
+    fn planned_realization_leaves_unrealized_motif_development_pending() {
         let home = Key::major(PitchClass::C);
         let realized = realize_sonata_with_plan(home, 100.0, 4.0, &theme(), 17, &intent());
 
-        assert!(realized.resolution.all_fulfilled());
-        assert!(realized.resolution.unresolved().is_empty());
+        assert!(!realized.resolution.all_fulfilled());
+        assert_eq!(realized.resolution.unresolved().len(), 1);
+        assert_eq!(
+            realized.resolution.unresolved()[0].id,
+            DEVELOP_PRIMARY_MOTIF,
+            "the generic Sonata composer must not claim the explicit motif-development action"
+        );
         assert_eq!(realized.score.total_beats, realized.plan.sections[4].end);
     }
 
@@ -849,7 +1135,17 @@ mod tests {
             realized.verification.len(),
             realized.plan.obligations.items().len()
         );
-        assert!(realized.verification.iter().all(|item| item.verified));
+        let development = realized.verification.iter()
+            .find(|item| item.obligation_id == DEVELOP_PRIMARY_MOTIF)
+            .unwrap();
+        assert!(!development.verified);
+        assert!(matches!(
+            &development.metric,
+            SonataVerificationMetric::MotifDevelopment { .. }
+        ));
+        assert!(realized.verification.iter()
+            .filter(|item| item.obligation_id != DEVELOP_PRIMARY_MOTIF)
+            .all(|item| item.verified));
         assert!(realized.resolution.fulfilled().iter().all(|item| {
             item.resolution_note
                 .as_deref()
