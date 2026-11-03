@@ -189,6 +189,11 @@ def main():
     mutate_factors(c["source"],noncanonical_rational);c["source_sha256"]=sha(c["source"]);negatives.append(c)
     c=json.loads(json.dumps(positive[0]));c["source"]["body"]["left"]["scope"]=["x","x"]
     c["source_sha256"]=sha(c["source"]);negatives.append(c)
+    c=json.loads(json.dumps(positive[291]))
+    def dominated_pareto_point(f):
+        if f["values"]: f["values"][0]=[[0,0,1],[1,0,1]]
+    mutate_factors(c["source"],dominated_pareto_point);mutate_factors(c["target"],dominated_pareto_point)
+    c["source_sha256"]=sha(c["source"]);c["target_sha256"]=sha(c["target"]);negatives.append(c)
     payload=positive+negatives
     checker=Path(__file__).with_name("algebraic_rewrite_checker.py")
     p=subprocess.run([sys.executable,str(checker)],input=json.dumps(payload),text=True,capture_output=True,check=True)
