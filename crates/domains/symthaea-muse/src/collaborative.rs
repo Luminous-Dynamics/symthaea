@@ -172,10 +172,9 @@ impl CollaborativeComposer {
         let mut state = MusicalState::default();
         state.harmony_activations = self.collective_harmonies;
         state.consciousness_level = self.collective_phi;
-        // This contribution schema contains no participant-level affect signal.
-        // Do not infer valence or arousal from Phi proxies or profile divergence.
-        state.arousal = 0.0;
-        state.valence = 0.0;
+        // HarmonyContribution contains no participant-level affect signal.
+        // Retain MusicalState's neutral defaults; do not infer affect from Phi
+        // proxies or musical-profile divergence.
         state
     }
 
