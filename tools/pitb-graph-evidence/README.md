@@ -27,9 +27,13 @@ All edges have a source and target. The relation determines the direction semant
 
 | Relation | Evidence class | Derived role | Can become a hard scheduler edge in v0? |
 |---|---|---|---|
-| `type_reference` | `lean_elaborator` | Formal type-dependency observation | No |
+| `signature_reference` / `type_reference` | `lean_elaborator` | Elaborated declaration type/signature references | No |
 | `proof_term_reference` | `lean_elaborator` | Observed proof support, not logical necessity | No |
+| `definition_body_reference` | `lean_elaborator` | Non-Prop definition-body references | No |
+| `structure_field_reference` | `lean_elaborator` | Structure field type references | No |
+| `inheritance_reference` | `lean_elaborator` | Structure/class extension and inheritance | No |
 | `instance_synthesis` | `lean_instance_trace` | Environment/instance dependency observation | No |
+| `documentation_reference` | `lean_doc_parser` | Observed docstring reference; retrieval only | No |
 | `module_environment_dependency` | `lean_build_graph` | Build/environment dependency observation | No |
 | `blueprint_dependency` | `blueprint_curated` | Candidate or reviewed search prior | No |
 | `informal_candidate_dependency` | `informal_extractor` | Candidate retrieval hint | No |
@@ -83,4 +87,4 @@ DAPS reports dependency-aware group-level premise selection and two-hop bidirect
 
 ## Evidence status
 
-The checked-in sample is a synthetic contract fixture, not a measured snapshot. No live Lean graph has been imported, no DAPS/TheoremGraph retrieval run has been compared, and no scheduler has consumed edges from this tool. A Cargo lockfile and exact-head runner qualification remain outstanding; the dependency versions are exact-pinned in `Cargo.toml`.
+The checked-in sample is a synthetic contract fixture, not a measured snapshot. No live Lean graph has been imported, no DAPS/TheoremGraph retrieval run has been compared, and no scheduler has consumed edges from this tool. The dependency versions are exact-pinned in `Cargo.toml`, the generated `Cargo.lock` is committed, and the isolated exact-head workflow has qualified the previous seven-relation fixture; the expanded TheoremGraph-compatible relation set and unit tests are awaiting their own exact-head run.
