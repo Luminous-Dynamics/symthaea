@@ -704,6 +704,8 @@ mod tests {
     }
     fn set_residual_schedule(sample: &mut VehicleModelDiscrepancyInput, rows: Vec<ModelResidualObservation>) {
         sample.expected_residual_slots = rows.iter().map(expected_slot).collect();
+        sample.expected_schedule_artifact_digest =
+            model_discrepancy_expected_schedule_digest(&sample.expected_residual_slots).unwrap();
         sample.residual_observations = rows;
     }
     fn input()->VehicleModelDiscrepancyInput {
