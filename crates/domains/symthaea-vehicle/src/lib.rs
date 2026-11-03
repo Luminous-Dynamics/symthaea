@@ -114,9 +114,12 @@ pub use paired_rollout::{
 pub use reward::{episode_reward, follow_distance_reward, safety_reward, speed_reward};
 pub use road::{Road, RoadSegment};
 pub use scenario_discovery::{
-    CrossingActor, IntersectionGenerationError, IntersectionScenarioCandidate,
-    ScenarioRangeSemantics, generate_seeded_random_intersection_candidates,
-    generate_stratified_intersection_candidates,
+    CounterexampleMinimizationError, CounterexampleMinimizationTermination, CrossingActor,
+    IntersectionCounterexampleMinimization, IntersectionFactorChange,
+    IntersectionGenerationError, IntersectionScenarioCandidate, ScenarioRangeSemantics,
+    MAX_COUNTEREXAMPLE_MINIMIZATION_EVALUATIONS,
+    generate_seeded_random_intersection_candidates,
+    generate_stratified_intersection_candidates, minimize_intersection_counterexample,
 };
 pub use shadow_evaluation::{
     PD_ROAD_BASELINE_POLICY_ID, VEHICLE_SHADOW_SCHEMA, VehicleShadowError,
