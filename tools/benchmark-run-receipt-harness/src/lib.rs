@@ -967,7 +967,12 @@ fn validate_resource_objects(
     Ok(())
 }
 
-fn validate_official_and_derived(value: &Value, derived: &Value) -> Result<(), ReceiptError> {
+fn validate_official_and_derived(
+    value: &Value,
+    derived: &Value,
+    access_class: &str,
+    counts: Counts,
+) -> Result<(), ReceiptError> {
     let score = obj(value, "official_score")?;
     strict_keys(
         score,
@@ -1000,28 +1005,80 @@ fn validate_official_and_derived(value: &Value, derived: &Value) -> Result<(), R
         "official_score.unit",
         false,
     )?;
-    if !bool_value(
+
+    let is_official = bool_value(
         required(score, "is_official", "official_score")?,
         "official_score.is_official",
-    )? {
-        return Err(error(
-            ReceiptErrorKind::SchemaViolation,
-            "official_score.is_official must be true",
-        ));
-    }
-    sha256_field(
-        required(score, "source_output_sha256", "official_score")?,
-        "official_score.source_output_sha256",
     )?;
     let score_value = required(score, "value", "official_score")?;
     let numerator = required(score, "numerator", "official_score")?;
     let denominator = required(score, "denominator", "official_score")?;
+    let source_output = required(score, "source_output_sha256", "official_score")?;
     let unavailable_reason = required(score, "unavailable_reason", "official_score")?;
-    if score_value.is_null() {
-        if !numerator.is_null() || !denominator.is_null() {
+
+    if is_official {
+        if access_class == "synthetic" {
             return Err(error(
                 ReceiptErrorKind::SchemaViolation,
-                "unavailable official score requires null numerator and denominator",
+                "synthetic receipts cannot claim a benchmark-owner official score",
+            ));
+        }
+        sha256_value(source_output, "official_score.source_output_sha256")?;
+        if score_value.is_null() {
+            if !numerator.is_null() || !denominator.is_null() {
+                return Err(error(
+                    ReceiptErrorKind::SchemaViolation,
+                    "unavailable official score requires null numerator and denominator",
+                ));
+            }
+            string(
+                unavailable_reason,
+                "official_score.unavailable_reason",
+                false,
+            )?;
+        } else {
+            if score_value.as_f64().is_none_or(|number| !number.is_finite()) {
+                return Err(error(
+                    ReceiptErrorKind::SchemaViolation,
+                    "official_score.value must be finite or null",
+                ));
+            }
+            if denominator.is_null()
+                || denominator
+                    .as_f64()
+                    .is_none_or(|number| !number.is_finite() || number <= 0.0)
+            {
+                return Err(error(
+                    ReceiptErrorKind::SchemaViolation,
+                    "official_score.denominator must be positive and finite for a reported score",
+                ));
+            }
+            if !numerator.is_null()
+                && numerator
+                    .as_f64()
+                    .is_none_or(|number| !number.is_finite())
+            {
+                return Err(error(
+                    ReceiptErrorKind::SchemaViolation,
+                    "official_score.numerator must be finite or null",
+                ));
+            }
+            if !unavailable_reason.is_null() {
+                return Err(error(
+                    ReceiptErrorKind::SchemaViolation,
+                    "official_score.unavailable_reason must be null for a reported score",
+                ));
+            }
+        }
+    } else {
+        if !score_value.is_null()
+            || !numerator.is_null()
+            || !denominator.is_null()
+            || !source_output.is_null()
+        {
+            return Err(error(
+                ReceiptErrorKind::SchemaViolation,
+                "a non-official score record must not contain an official value, numerator, denominator, or grader-output digest",
             ));
         }
         string(
@@ -1029,37 +1086,9 @@ fn validate_official_and_derived(value: &Value, derived: &Value) -> Result<(), R
             "official_score.unavailable_reason",
             false,
         )?;
-    } else {
-        if score_value.as_f64().is_none_or(|n| !n.is_finite()) {
-            return Err(error(
-                ReceiptErrorKind::SchemaViolation,
-                "official_score.value must be finite or null",
-            ));
-        }
-        if denominator.is_null()
-            || denominator
-                .as_f64()
-                .is_none_or(|n| !n.is_finite() || n <= 0.0)
-        {
-            return Err(error(
-                ReceiptErrorKind::SchemaViolation,
-                "official_score.denominator must be positive and finite for a reported score",
-            ));
-        }
-        if !numerator.is_null() && numerator.as_f64().is_none_or(|n| !n.is_finite()) {
-            return Err(error(
-                ReceiptErrorKind::SchemaViolation,
-                "official_score.numerator must be finite or null",
-            ));
-        }
-        if !unavailable_reason.is_null() {
-            return Err(error(
-                ReceiptErrorKind::SchemaViolation,
-                "official_score.unavailable_reason must be null for a reported score",
-            ));
-        }
     }
 
+    let mut seen_metric_ids = HashSet::new();
     for (index, item) in arr(derived, "derived_metrics")?.iter().enumerate() {
         let context = format!("derived_metrics[{index}]");
         let map = obj(item, &context)?;
@@ -1076,17 +1105,23 @@ fn validate_official_and_derived(value: &Value, derived: &Value) -> Result<(), R
             &[],
             &context,
         )?;
-        string(
+        let metric_id = string(
             required(map, "metric_id", &context)?,
             &format!("{context}.metric_id"),
             false,
         )?;
-        string(
+        if !seen_metric_ids.insert(metric_id.to_owned()) {
+            return Err(error(
+                ReceiptErrorKind::SchemaViolation,
+                format!("duplicate derived metric id '{metric_id}'"),
+            ));
+        }
+        let unit = string(
             required(map, "unit", &context)?,
             &format!("{context}.unit"),
             false,
         )?;
-        string(
+        let formula = string(
             required(map, "formula", &context)?,
             &format!("{context}.formula"),
             false,
@@ -1105,7 +1140,7 @@ fn validate_official_and_derived(value: &Value, derived: &Value) -> Result<(), R
         if metric_value.is_null() {
             string(reason, &format!("{context}.unavailable_reason"), false)?;
         } else {
-            if metric_value.as_f64().is_none_or(|n| !n.is_finite()) {
+            if metric_value.as_f64().is_none_or(|number| !number.is_finite()) {
                 return Err(error(
                     ReceiptErrorKind::SchemaViolation,
                     format!("{context}.value must be finite or null"),
@@ -1116,6 +1151,48 @@ fn validate_official_and_derived(value: &Value, derived: &Value) -> Result<(), R
                     ReceiptErrorKind::SchemaViolation,
                     format!("{context}.unavailable_reason must be null for measured values"),
                 ));
+            }
+        }
+
+        // Recompute common coverage/yield metrics from the validated denominator.
+        // Caller-supplied formulas and values are not accepted as their own oracle.
+        let known = match metric_id {
+            "eligible-coverage" => Some((counts.attempted, counts.eligible, "attempted / eligible")),
+            "graded-coverage" => Some((counts.graded, counts.eligible, "graded / eligible")),
+            "coverage-adjusted-task-yield" => {
+                Some((counts.passed, counts.eligible, "passed / eligible"))
+            }
+            "conditional-success" => Some((counts.passed, counts.graded, "passed / graded")),
+            _ => None,
+        };
+        if let Some((numerator, denominator, expected_formula)) = known {
+            if formula != expected_formula || unit != "fraction" {
+                return Err(error(
+                    ReceiptErrorKind::SchemaViolation,
+                    format!("{context} does not use the canonical formula/unit for '{metric_id}'"),
+                ));
+            }
+            if denominator == 0 {
+                if !metric_value.is_null() || reason.is_null() {
+                    return Err(error(
+                        ReceiptErrorKind::AccountingMismatch,
+                        format!("{context} must be null with a reason when its denominator is zero"),
+                    ));
+                }
+            } else {
+                let expected = numerator as f64 / denominator as f64;
+                let actual = metric_value.as_f64().ok_or_else(|| {
+                    error(
+                        ReceiptErrorKind::AccountingMismatch,
+                        format!("{context}.value does not match task accounting"),
+                    )
+                })?;
+                if (actual - expected).abs() > 1e-12 || !reason.is_null() {
+                    return Err(error(
+                        ReceiptErrorKind::AccountingMismatch,
+                        format!("{context}.value does not match recomputed task accounting"),
+                    ));
+                }
             }
         }
     }
@@ -1370,6 +1447,8 @@ pub fn verify_receipt_value(value: &Value) -> Result<VerifiedReceipt, ReceiptErr
     validate_official_and_derived(
         required(top, "official_score", "receipt")?,
         required(top, "derived_metrics", "receipt")?,
+        access,
+        computed,
     )?;
 
     let provenance = obj(required(top, "provenance", "receipt")?, "provenance")?;
@@ -1707,7 +1786,7 @@ mod tests {
             "budget_caps":{"wall_time_ms":1000,"cpu_time_ms":1000,"peak_memory_bytes":1000000,"model_calls":10,"input_tokens":10000,"output_tokens":10000,"tool_calls":20},
             "actual_usage":{"wall_time_ms":100,"cpu_time_ms":50,"peak_memory_bytes":10000,"model_calls":1,"input_tokens":100,"output_tokens":50,"tool_calls":2},
             "unavailable_usage":{},
-            "official_score":{"metric_id":"pass-rate","formula_version":"1","value":1.0,"unit":"fraction","numerator":1,"denominator":1,"is_official":true,"source_output_sha256":C,"unavailable_reason":null},
+            "official_score":{"metric_id":"benchmark-owner-official-score","formula_version":"not-applicable-synthetic","value":null,"unit":"fraction","numerator":null,"denominator":null,"is_official":false,"source_output_sha256":null,"unavailable_reason":"Synthetic fixture has no benchmark-owner official score."},
             "derived_metrics":[
                 {"metric_id":"eligible-task-yield","value":0.5,"unit":"fraction","formula":"passed/eligible","is_official":false,"unavailable_reason":null}
             ],
@@ -1832,6 +1911,34 @@ mod tests {
         let mut receipt = base_receipt();
         receipt["actual_usage"]["cpu_time_ms"] = Value::Null;
         receipt["unavailable_usage"]["cpu_time_ms"] = json!("runner did not expose CPU accounting");
+        assert!(verify_receipt_value(&receipt).is_ok());
+    }
+
+    #[test]
+    fn rejects_synthetic_receipts_claiming_an_official_score() {
+        let mut receipt = base_receipt();
+        receipt["official_score"]["is_official"] = json!(true);
+        receipt["official_score"]["value"] = json!(1.0);
+        receipt["official_score"]["numerator"] = json!(1);
+        receipt["official_score"]["denominator"] = json!(1);
+        receipt["official_score"]["source_output_sha256"] = json!(C);
+        receipt["official_score"]["unavailable_reason"] = Value::Null;
+        assert_eq!(
+            verify_receipt_value(&receipt).unwrap_err().kind,
+            ReceiptErrorKind::SchemaViolation
+        );
+    }
+
+    #[test]
+    fn accepts_official_score_only_for_non_synthetic_receipt() {
+        let mut receipt = base_receipt();
+        receipt["benchmark"]["access_class"] = json!("public");
+        receipt["official_score"]["is_official"] = json!(true);
+        receipt["official_score"]["value"] = json!(1.0);
+        receipt["official_score"]["numerator"] = json!(1);
+        receipt["official_score"]["denominator"] = json!(1);
+        receipt["official_score"]["source_output_sha256"] = json!(C);
+        receipt["official_score"]["unavailable_reason"] = Value::Null;
         assert!(verify_receipt_value(&receipt).is_ok());
     }
 
