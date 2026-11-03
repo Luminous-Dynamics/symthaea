@@ -1,0 +1,29 @@
+{
+  "suite": "ETH-024 claim evidence ledger policy validation",
+  "schema": "symthaea.complexity-claim-evidence-ledger/v1",
+  "audit_date": "2026-11-03",
+  "sources": 7,
+  "claims": 4,
+  "status_counts": {
+    "lean_formalization_scope_documented": 1,
+    "manuscript_only": 3,
+    "experiment_only": 0,
+    "independently_reproduced": 0,
+    "externally_reviewed": 0
+  },
+  "independent_policy_replay": {
+    "language": "JavaScript",
+    "ledger_blob_sha256": "a22ddf1b5910217fbe8baaf0d38f3bdfb5627917",
+    "validator_blob_sha256": "067c5cd338802fa95f27d6eee9ba68b562599c81",
+    "mutation_tests": 6,
+    "mutations_rejected": 6,
+    "promotion_controls": {
+      "formal_claim_accepted_as_lean": true,
+      "manuscript_general_rejected_as_lean": true,
+      "sparse_corollary_rejected_as_lean": true,
+      "weighted_preprint_rejected_as_lean": true
+    }
+  },
+  "claim_ceiling": "Independent JavaScript policy replay over the committed JSON. The committed Python validator source has been reviewed but was not executed in this environment. No Lean project rebuild, external mathematical adjudication or solver benchmark is claimed.",
+  "all_passed": true
+}
