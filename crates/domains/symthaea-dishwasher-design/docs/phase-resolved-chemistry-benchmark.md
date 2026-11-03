@@ -157,4 +157,4 @@ These are research targets, not expected results:
 4. Validate the Rust plan checker with synthetic fixtures, then compile/test exact head; do not call fixtures physical evidence.
 5. Run matched fixed-dose vs automatic-dosing vs phase-aware control experiments only after independent endpoints and calibration are frozen.
 
-Related issue: https://github.com/Luminous-Dynamics/symthaea/issues/10216
+Related issues: https://github.com/Luminous-Dynamics/symthaea/issues/10216 ; FTO/prior-art review https://github.com/Luminous-Dynamics/symthaea/issues/10219. See [detergent-control-prior-art.md](detergent-control-prior-art.md) before making novelty or commercialization claims.
