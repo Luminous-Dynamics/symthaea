@@ -115,9 +115,15 @@ impl PairedMetricSummary {
         }
 
         if self.observations.windows(2).any(|pair| {
-            pair[0].failure_family_id > pair[1].failure_family_id
-                || (pair[0].failure_family_id == pair[1].failure_family_id
-                    && pair[0].scenario_id >= pair[1].scenario_id)
+            let previous_family = pair[0].failure_family_id.as_str();
+            let current_family = pair[1].failure_family_id.as_str();
+            let previous_scenario = pair[0].scenario_id.as_str();
+            let current_scenario = pair[1].scenario_id.as_str();
+            previous_family > current_family
+                || (previous_family == current_family
+                    && previous_scenario >= current_scenario)
+        }) || self.family_effects.windows(2).any(|pair| {
+            pair[0].failure_family_id >= pair[1].failure_family_id
         }) {
             return false;
         }
@@ -487,6 +493,32 @@ mod tests {
         assert_eq!(first.summary_digest, second.summary_digest);
         assert_eq!(first.percentile_95_low, second.percentile_95_low);
         assert_eq!(first.percentile_95_high, second.percentile_95_high);
+    }
+
+    #[test]
+    fn input_order_does_not_change_canonical_summary() {
+        let input = observations();
+        let mut reversed = input.clone();
+        reversed.reverse();
+        let first = summarize_paired_metric(
+            "error",
+            PairedMetricDirection::LowerIsBetter,
+            &input,
+            77,
+            1000,
+        )
+        .unwrap();
+        let second = summarize_paired_metric(
+            "error",
+            PairedMetricDirection::LowerIsBetter,
+            &reversed,
+            77,
+            1000,
+        )
+        .unwrap();
+        assert_eq!(first.summary_digest, second.summary_digest);
+        assert!(first.identity_is_valid());
+        assert!(second.identity_is_valid());
     }
 
     #[test]
