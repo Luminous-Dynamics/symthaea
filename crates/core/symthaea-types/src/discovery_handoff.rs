@@ -22,7 +22,7 @@ fn validate_digest(label: &str, value: &str) -> Result<(), String> {
     Ok(())
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScientificHypothesisHandoff {
     pub schema_revision: String,
     /// Digest of the canonical candidate/model representation.
