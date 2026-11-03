@@ -32,7 +32,7 @@ When a factor changes:
 - disconnected components remain reusable;
 - a changed scope/domain/algebra/checker version changes keys and cannot silently hit.
 
-The content-addressed key is a correctness boundary, not a heuristic invalidation guess. A downstream message may be reusable even if an upstream key changed, but only when the newly computed upstream output has exactly the same canonical digest.
+The content-addressed key is a correctness boundary, not a heuristic invalidation guess. Same-scope factor splitting/merging and insertion/removal of exact unit factors can now preserve the normalized bucket key. A downstream message may be reusable even if an upstream key changed, but only when the newly computed upstream output has exactly the same canonical digest. The normalizer identity is included in every key so a future normalization rule change cannot silently reuse old receipts.
 
 ## Reuse trust model
 
@@ -62,7 +62,7 @@ Seed: `20261103`.
 | Randomized edits: cache hits / misses | 509 / 259 |
 | Randomized edits: invalidated message steps | 253 |
 
-Across the 128 randomized edits, the cached producer executed 2,182 additions and 4,870 multiplications versus 7,168 additions and 16,384 multiplications for cold recomputation. This is a reduction of roughly 69.6% and 70.3% in **producer operation counts** on this specific fixture/seed. It is not wall-time speedup: Python object/digest/HMAC costs, fresh-message checker replay, serialization, cache memory and public benchmark behaviour are not included in that comparison.
+Across the 128 randomized edits, the cached producer executed 1,964 additions and 3,804 multiplications versus 7,098 additions and 13,136 multiplications for cold recomputation. This is a reduction of roughly 72.3% and 71.0% in **producer operation counts** on this specific fixture/seed. It is not wall-time speedup: Python object/digest/HMAC costs, fresh-message checker replay, serialization, cache memory and public benchmark behaviour are not included in that comparison.
 
 The checker is a separate implementation path in the same Python reference file, not yet a separately compiled/audited binary. The finite suite is not a Lean proof.
 
