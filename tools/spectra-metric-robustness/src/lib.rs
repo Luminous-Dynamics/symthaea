@@ -898,6 +898,68 @@ mod tests {
     }
 
     #[test]
+    fn severity_one_preserves_the_default_generation_contract() {
+        for world in StressWorld::ALL {
+            let default_bundle = simulate(world, design(0x5EED_2026)).unwrap();
+            let full_strength = simulate_with_severity(world, design(0x5EED_2026), 1.0).unwrap();
+            assert_eq!(default_bundle, full_strength, "world: {}", world.as_str());
+        }
+    }
+
+    #[test]
+    fn zero_severity_removes_selected_injected_departures() {
+        for world in [
+            StressWorld::UnequalVariance,
+            StressWorld::HeavyTailed,
+            StressWorld::ContaminatedMixture,
+            StressWorld::SerialDependence,
+            StressWorld::SensitivityDrift,
+            StressWorld::CriterionDrift,
+            StressWorld::ParticipantHeterogeneity,
+            StressWorld::MissingAtRandomBySession,
+            StressWorld::OutcomeDependentMissingness,
+            StressWorld::CovariateLeakage,
+        ] {
+            let bundle = simulate_with_severity(world, design(0x5EED_2026), 0.0).unwrap();
+            let result = evaluate(&bundle.candidate, &bundle.evaluator).unwrap();
+            assert_eq!(result.disposition, MetricDisposition::NoConfiguredConcern, "world: {}", world.as_str());
+            assert!(result.flags.is_empty(), "world: {}", world.as_str());
+            assert_eq!(result.severity, 0.0);
+        }
+    }
+
+    #[test]
+    fn unequal_variance_dose_response_is_monotone() {
+        let mut previous = 0.0;
+        for severity in [0.0, 0.10, 0.25, 0.50, 0.75, 1.0] {
+            let bundle = simulate_with_severity(
+                StressWorld::UnequalVariance,
+                design(0x5EED_2026),
+                severity,
+            )
+            .unwrap();
+            let report = evaluate(&bundle.candidate, &bundle.evaluator).unwrap();
+            assert!(report.signal_noise_variance_ratio >= previous);
+            assert_eq!(report.severity, severity);
+            previous = report.signal_noise_variance_ratio;
+        }
+    }
+
+    #[test]
+    fn invalid_severity_fails_closed() {
+        for severity in [f64::NAN, f64::INFINITY, -0.01, 1.01] {
+            assert_eq!(
+                simulate_with_severity(
+                    StressWorld::UnequalVariance,
+                    design(7),
+                    severity
+                ),
+                Err(RobustnessError::InvalidSeverity)
+            );
+        }
+    }
+
+    #[test]
     fn gaussian_reference_is_replayable_and_has_no_configured_flag() {
         let bundle = simulate(StressWorld::GaussianReference, design(0x5EED_2026)).unwrap();
         let replay = simulate(StressWorld::GaussianReference, design(0x5EED_2026)).unwrap();
