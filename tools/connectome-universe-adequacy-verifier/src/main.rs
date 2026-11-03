@@ -1425,4 +1425,88 @@ mod tests {
     }
 
 
+    #[test]
+    fn candidate_abstention_suppresses_false_invariance_and_forces_not_estimable() {
+        let mut report: Value =
+            serde_json::from_str(FALSE_AMBIGUITY_REPORT).expect("valid report fixture");
+        report["candidate_worlds"][1]["query_state"] =
+            Value::String("NOT_ESTIMABLE".to_owned());
+        report["summary"]["candidate_not_estimable_count"] = Value::from(1);
+        report["summary"]["false_ambiguity_count"] = Value::from(0);
+        report["family_summaries"][1]["candidate_not_estimable_count"] = Value::from(1);
+        report["family_summaries"][1]["false_ambiguity_count"] = Value::from(0);
+        report["dispositions"]["universe_adequacy"] =
+            Value::String("ADEQUACY_NOT_ESTIMABLE".to_owned());
+
+        let report_bytes = serde_json::to_vec(&report).expect("serialized report");
+        let result = validate_report(
+            &report_bytes,
+            FALSE_AMBIGUITY_CANDIDATE.as_bytes(),
+            FALSE_AMBIGUITY_REFERENCE.as_bytes(),
+        )
+        .expect("abstention case should recompute");
+        assert_eq!(result["recomputed_summary"]["candidate_not_estimable_count"], 1);
+        assert_eq!(result["recomputed_summary"]["false_ambiguity_count"], 0);
+        assert_eq!(result["recomputed_summary"]["false_invariance_count"], 0);
+        assert_eq!(
+            result["dispositions"]["universe_adequacy_against_supplied_challenge"],
+            "ADEQUACY_NOT_ESTIMABLE"
+        );
+    }
+
+    #[test]
+    fn canonicalizer_is_sensitive_to_edge_direction_and_attributes() {
+        let mut sidecar: Value =
+            serde_json::from_str(OMITTED_CANDIDATE).expect("valid candidate sidecar");
+        let structure = sidecar["worlds"][0]["structure"].clone();
+        let original =
+            canonical_structure_sha256(&structure, "test.graph").expect("valid graph");
+
+        sidecar["worlds"][0]["structure"]["edges"][0]["source"] =
+            Value::String("n2".to_owned());
+        sidecar["worlds"][0]["structure"]["edges"][0]["target"] =
+            Value::String("n1".to_owned());
+        let reversed =
+            canonical_structure_sha256(&sidecar["worlds"][0]["structure"], "test.graph")
+                .expect("reversed edge is valid");
+        assert_ne!(original, reversed);
+
+        sidecar["worlds"][0]["structure"] = structure;
+        sidecar["worlds"][0]["structure"]["edges"][0]["attributes"]["kind"] =
+            Value::String("gap_junction".to_owned());
+        let retyped =
+            canonical_structure_sha256(&sidecar["worlds"][0]["structure"], "test.graph")
+                .expect("attributed edge is valid");
+        assert_ne!(original, retyped);
+    }
+
+    #[test]
+    fn rejects_duplicate_node_ids_and_dangling_edge_endpoints() {
+        let mut sidecar: Value =
+            serde_json::from_str(OMITTED_CANDIDATE).expect("valid candidate sidecar");
+        let graph = &mut sidecar["worlds"][0]["structure"];
+        graph["nodes"][1]["node_id"] = Value::String("n1".to_owned());
+        assert!(canonical_structure_sha256(graph, "test.graph").is_err());
+
+        let mut sidecar: Value =
+            serde_json::from_str(OMITTED_CANDIDATE).expect("valid candidate sidecar");
+        let graph = &mut sidecar["worlds"][0]["structure"];
+        graph["edges"][0]["target"] = Value::String("missing-node".to_owned());
+        assert!(canonical_structure_sha256(graph, "test.graph").is_err());
+    }
+
+    #[test]
+    fn duplicate_structure_group_count_counts_groups_not_extra_rows() {
+        let digests = vec![
+            "a".to_owned(),
+            "a".to_owned(),
+            "a".to_owned(),
+            "b".to_owned(),
+            "c".to_owned(),
+            "c".to_owned(),
+        ];
+        assert_eq!(duplicate_group_count(digests.into_iter()), 2);
+    }
+
+
 }
