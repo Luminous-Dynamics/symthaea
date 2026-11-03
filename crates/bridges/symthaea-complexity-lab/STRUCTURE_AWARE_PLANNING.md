@@ -1,6 +1,6 @@
 # ETH-019: structure-aware exact computation planning
 
-**Status:** Research specification plus a finite Python component-decomposition reference prototype. The broader structural portfolio and all performance claims remain open.
+**Status:** Research specification plus Python producer/checker source committed; the finite reference suite was not executed in this session. The broader structural portfolio and all performance claims remain open.
 
 ## 1. Research objective
 
