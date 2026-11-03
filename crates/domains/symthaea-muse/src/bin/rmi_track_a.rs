@@ -34,9 +34,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         .unwrap_or_else(|| PathBuf::from("rmi-track-a-report.json"));
 
     if args.next().is_some() {
-        return Err(
-            "usage: rmi_track_a [trials_per_target] [seed_root] [report.json]".into(),
-        );
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "usage: rmi_track_a [trials_per_target] [seed_root] [report.json]",
+        )
+        .into());
     }
 
     let report = run_rmi_track_a_suite_v1(trials_per_target, seed_root)?;
@@ -77,7 +79,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Report written to: {}", output_path.display());
 
     if !report.payload.summary.synthetic_fixture_expectations_satisfied {
-        return Err("one or more synthetic fixture expectations failed".into());
+        return Err(std::io::Error::other(
+            "one or more synthetic fixture expectations failed",
+        )
+        .into());
     }
     Ok(())
 }
