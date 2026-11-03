@@ -469,6 +469,33 @@ fn insert_change(changes: &mut Vec<Change>, change_id: String, kind: &str, old: 
     });
 }
 
+fn apply_edge_impact(
+    edge: &Edge,
+    target: Option<&Node>,
+    event: &str,
+    actions: &mut BTreeMap<String, Action>,
+    reasons: &mut BTreeMap<String, BTreeSet<String>>,
+    queue: &mut VecDeque<(String, Propagation)>,
+    queued: &mut BTreeSet<(String, Propagation)>,
+) {
+    let action = relation_event_action(edge, target);
+    add_reason(
+        actions,
+        reasons,
+        &edge.source_node_id,
+        action,
+        format!("{event}:{}", edge.relation),
+    );
+    match action {
+        Action::Rebuild => enqueue(queue, queued, &edge.source_node_id, Propagation::Environment),
+        Action::RetrievalRefresh => enqueue(queue, queued, &edge.source_node_id, Propagation::Retrieval),
+        Action::Reprove | Action::Revalidate => {
+            enqueue(queue, queued, &edge.source_node_id, Propagation::ProofEvidence);
+        }
+        Action::Retain | Action::SourceRevalidate | Action::UnknownConservative => {}
+    }
+}
+
 fn analyze(old_bytes: &[u8], new_bytes: &[u8]) -> Result<Report, String> {
     let old: Snapshot = serde_json::from_slice(old_bytes)
         .map_err(|error| format!("old snapshot JSON invalid: {error}"))?;
@@ -563,38 +590,55 @@ fn analyze(old_bytes: &[u8], new_bytes: &[u8]) -> Result<Report, String> {
     let old_edges: BTreeMap<String, &Edge> = old.edges.iter().map(|edge| (edge.edge_id.clone(), edge)).collect();
     let new_edges: BTreeMap<String, &Edge> = new.edges.iter().map(|edge| (edge.edge_id.clone(), edge)).collect();
     for (id, old_edge) in &old_edges {
-        let maybe_new = new_edges.get(id);
-        if maybe_new.is_none() || maybe_new.is_some_and(|new_edge| *new_edge != *old_edge) {
-            insert_change(&mut changes, id.clone(), "edge_removed_or_changed", None, None);
-            let target = old_nodes.get(&old_edge.target_node_id).copied();
-            let action = relation_event_action(old_edge, target);
-            add_reason(
-                &mut actions,
-                &mut reasons,
-                &old_edge.source_node_id,
-                action,
-                format!("dependency_edge_removed_or_changed:{}", old_edge.relation),
-            );
-            if action == Action::Reprove || action == Action::Revalidate {
-                enqueue(&mut queue, &mut queued, &old_edge.source_node_id, Propagation::ProofEvidence);
+        match new_edges.get(id) {
+            None => {
+                insert_change(&mut changes, id.clone(), "edge_removed", None, None);
+                apply_edge_impact(
+                    old_edge,
+                    old_nodes.get(&old_edge.target_node_id).copied(),
+                    "dependency_edge_removed",
+                    &mut actions,
+                    &mut reasons,
+                    &mut queue,
+                    &mut queued,
+                );
             }
+            Some(new_edge) if *new_edge != *old_edge => {
+                insert_change(&mut changes, id.clone(), "edge_changed", None, None);
+                apply_edge_impact(
+                    old_edge,
+                    old_nodes.get(&old_edge.target_node_id).copied(),
+                    "old_dependency_edge_removed",
+                    &mut actions,
+                    &mut reasons,
+                    &mut queue,
+                    &mut queued,
+                );
+                apply_edge_impact(
+                    new_edge,
+                    new_nodes.get(&new_edge.target_node_id).copied(),
+                    "new_dependency_edge_added",
+                    &mut actions,
+                    &mut reasons,
+                    &mut queue,
+                    &mut queued,
+                );
+            }
+            Some(_) => {}
         }
     }
     for (id, new_edge) in &new_edges {
         if !old_edges.contains_key(id) {
             insert_change(&mut changes, id.clone(), "edge_added", None, None);
-            let target = new_nodes.get(&new_edge.target_node_id).copied();
-            let action = relation_event_action(new_edge, target);
-            add_reason(
+            apply_edge_impact(
+                new_edge,
+                new_nodes.get(&new_edge.target_node_id).copied(),
+                "dependency_edge_added",
                 &mut actions,
                 &mut reasons,
-                &new_edge.source_node_id,
-                action,
-                format!("dependency_edge_added:{}", new_edge.relation),
+                &mut queue,
+                &mut queued,
             );
-            if action == Action::Reprove || action == Action::Revalidate {
-                enqueue(&mut queue, &mut queued, &new_edge.source_node_id, Propagation::ProofEvidence);
-            }
         }
     }
 
