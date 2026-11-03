@@ -128,11 +128,11 @@ The statement binds at least two subjects: the candidate patch and the source tr
 - Task contract, fixture revision and source-tree digest.
 - Base tree, patch digest, result tree and changed paths.
 - Model, harness, prompt and agent configuration digests.
-- Runner profile, immutable image digest, network policy and execution times.
+- Runner profile, immutable OCI image digest, network policy, runner-policy digest, toolchain-lock digest and execution times. The verifier requires each runtime value to equal the environment commitment in the task contract.
 - Grader identity/digest, trust domain and hidden-test visibility.
 - The exact task-declared acceptance-check set, authorities, outcomes and evidence digests. The verifier rejects omitted, extra, retyped or weakened checks.
 - Recomputed resource totals (including turns and tool calls) and the run-level verdict. The task-contract digest commits the declared budget; the verifier checks measured wall time, turns, tool calls, input/output tokens and cost against that exact task budget.
-- Artifact paths, roles, byte counts and content hashes. Each receipt must retain the exact submitted patch plus execution evidence; paths are root-relative, traversal/symlinks are rejected, each artifact is re-hashed, and primary/regrade execution evidence must be disjoint.
+- Artifact paths, roles, byte counts and content hashes. Each receipt must retain the exact submitted patch, at least one execution artifact and exactly one stage-specific report (`primary_report` or `regrade_report`); paths are root-relative, traversal/symlinks are rejected, each artifact is re-hashed, the total artifact budget is capped at 512 MiB, and primary/regrade execution evidence must be disjoint.
 - The relationship to the prior primary receipt for a pristine regrade.
 
 The DSSE envelope carries the serialized statement as base64 with payload type `application/vnd.in-toto+json` and one or more signatures. Verify the DSSE pre-authentication encoding and signatures against an explicit trust-root policy; a key ID by itself is not authentication. The signing key must remain in the host control plane and must never be mounted into the guest or candidate process.
