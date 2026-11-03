@@ -158,6 +158,66 @@
       "confidence": 0.92,
       "review_artifact_id": null,
       "reviewer_key_id": null
+    },
+    {
+      "edge_id": "edge-signature",
+      "source_node_id": "target-main",
+      "target_node_id": "helper-normalize",
+      "relation": "signature_reference",
+      "evidence_class": "lean_elaborator",
+      "status": "observed",
+      "evidence_artifact_id": "edge-signature",
+      "confidence": null,
+      "review_artifact_id": null,
+      "reviewer_key_id": null
+    },
+    {
+      "edge_id": "edge-definition-body",
+      "source_node_id": "target-main",
+      "target_node_id": "helper-normalize",
+      "relation": "definition_body_reference",
+      "evidence_class": "lean_elaborator",
+      "status": "observed",
+      "evidence_artifact_id": "edge-definition-body",
+      "confidence": null,
+      "review_artifact_id": null,
+      "reviewer_key_id": null
+    },
+    {
+      "edge_id": "edge-structure-field",
+      "source_node_id": "target-main",
+      "target_node_id": "instance-example",
+      "relation": "structure_field_reference",
+      "evidence_class": "lean_elaborator",
+      "status": "observed",
+      "evidence_artifact_id": "edge-structure-field",
+      "confidence": null,
+      "review_artifact_id": null,
+      "reviewer_key_id": null
+    },
+    {
+      "edge_id": "edge-inheritance",
+      "source_node_id": "target-main",
+      "target_node_id": "instance-example",
+      "relation": "inheritance_reference",
+      "evidence_class": "lean_elaborator",
+      "status": "observed",
+      "evidence_artifact_id": "edge-inheritance",
+      "confidence": null,
+      "review_artifact_id": null,
+      "reviewer_key_id": null
+    },
+    {
+      "edge_id": "edge-documentation",
+      "source_node_id": "target-main",
+      "target_node_id": "helper-normalize",
+      "relation": "documentation_reference",
+      "evidence_class": "lean_doc_parser",
+      "status": "observed",
+      "evidence_artifact_id": "edge-documentation",
+      "confidence": null,
+      "review_artifact_id": null,
+      "reviewer_key_id": null
     }
   ],
   "artifacts": [
@@ -250,6 +310,36 @@
       "kind": "review_attestation",
       "path": "reviews/blueprint-review.txt",
       "sha256": "ed12cabbb7214c951946162c51cdecb9a1ef30f5866e3839ed10121bc3996ae5"
+    },
+    {
+      "artifact_id": "edge-signature",
+      "kind": "edge_evidence",
+      "path": "edges/signature-reference.txt",
+      "sha256": "303fd41ac16166e1cccd41642d49997d7c2aea79cb39e827be64a2cc58640a00"
+    },
+    {
+      "artifact_id": "edge-definition-body",
+      "kind": "edge_evidence",
+      "path": "edges/definition-body-reference.txt",
+      "sha256": "93ca3c28e71f61202581a5d67a57d4701e6900cdcc3c8af840a84fe67e3d4fcf"
+    },
+    {
+      "artifact_id": "edge-structure-field",
+      "kind": "edge_evidence",
+      "path": "edges/structure-field-reference.txt",
+      "sha256": "0f733222da9e2340357edab20d1bf6a3b4b314a679b87087d426df588ba60718"
+    },
+    {
+      "artifact_id": "edge-inheritance",
+      "kind": "edge_evidence",
+      "path": "edges/inheritance-reference.txt",
+      "sha256": "c7af4ed485f8cc169989e9a8e8a07ed6e3dd4edd24f472c403fb17dfa2f70b0c"
+    },
+    {
+      "artifact_id": "edge-documentation",
+      "kind": "edge_evidence",
+      "path": "edges/documentation-reference.txt",
+      "sha256": "518515c8fc89db17c5498c56bd7c87efa85aaa5e9f3828fe0960c4c60a74df49"
     }
   ]
 }
