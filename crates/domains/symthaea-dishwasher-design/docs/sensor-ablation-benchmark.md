@@ -144,7 +144,7 @@ Use the service-accounting contract to charge all attempts, failed runs, interru
 - fresh water, including fills/rinses/purges/rewashes and manual pre-treatment;
 - actual delivered detergent and rinse aid;
 - active operator time, elapsed time and time-to-release;
-- maintenance/fouling and material-damage burden;
+- sensor and actuator power, calibration time/consumables, sensor fouling/cleaning, maintenance, material damage and replacement burden;
 - accepted items/hour at declared utilization for batch products.
 
 A quality/safety failure cannot be compensated by a lower resource score. Publish raw Pareto points after feasibility filtering; do not hide a candidate behind an arbitrary weighted scalar.
