@@ -21,14 +21,17 @@ A raw bucket is first transformed using a versioned normalizer:
 - an independent normalizer checker reconstructs the grouped products from the raw inputs;
 - the message checker replays the generated message against the raw bucket, including any separator axes removed with identity factors.
 
+After producing a message, a second versioned canonicalizer removes any separator axis along which the entire exact output table is constant. It checks every assignment of the retained axes and every state of the candidate dropped axis. The message checker then independently replays against every assignment of the original raw separator scope and accepts the smaller output scope only if it represents exactly the same table function. Both the normalizer and message-canonicalizer identities are included in the cache key and authentication receipt.
+
 The message key binds:
 1. schema/protocol version;
-2. normalizer identity/version;
-3. exact algebra identity and semantics version;
-4. variable cardinalities;
-5. eliminated variable;
-6. the **multiset** of canonical normalized input-factor/message digests (duplicates are significant);
-7. checker identity.
+2. input normalizer identity/version;
+3. output message-canonicalizer identity/version;
+4. exact algebra identity and semantics version;
+5. variable cardinalities;
+6. eliminated variable;
+7. the **multiset** of canonical normalized input-factor/message digests (duplicates are significant);
+8. checker identity.
 
 A factor's content digest binds its sorted scope and all exact table cells. The key intentionally does not bind factor IDs or input-list order, so semantically identical inputs reuse the same message. The bucket inputs are sorted by digest while preserving duplicates.
 
@@ -63,15 +66,17 @@ Seed: `20261103`.
 | Reordering original factor list | 6/6 message hits |
 | Same-scope split/merge plus unit-factor elision | 2/2 NaturalCount hits and 2/2 MaxCount hits |
 | Incorrect normalized same-scope product | Rejected by independent normalizer checker |
+| Exact message scope minimization | 1 axis removed under NaturalCount and 1 under MaxCount |
+| Same output after a different upstream graph shape | 1 upstream miss and 2 downstream hits under each algebra |
 | Factor-scope edit | Recomputed safely; exact agreement |
 | Forged/rehashed payload without valid HMAC | Rejected and recomputed |
 | Cache copied under wrong auth key | Entries rejected and recomputed |
 | Cross-algebra cache namespace | 0 cross-algebra hits |
 | Randomized mixed-cardinality updates | 64 graphs × 2 algebras = 128/128 exact matches |
-| Randomized edits: cache hits / misses | 538 / 230 |
-| Randomized edits: invalidated message steps | 230 |
+| Randomized edits: cache hits / misses | 520 / 248 |
+| Randomized edits: invalidated message steps | 248 |
 
-Across the 128 randomized edits, the cached producer executed 1,964 additions and 3,804 multiplications versus 7,098 additions and 13,136 multiplications for cold recomputation. This is a reduction of roughly 72.3% and 71.0% in **producer operation counts** on this specific fixture/seed. It is not wall-time speedup: Python object/digest/HMAC costs, fresh-message checker replay, serialization, cache memory and public benchmark behaviour are not included in that comparison.
+Across the 128 randomized edits, the cached producer executed 2,016 additions and 3,820 multiplications versus 6,999 additions and 12,994 multiplications for cold recomputation. This is a reduction of roughly 71.2% and 70.6% in **producer operation counts** on this specific fixture/seed. It is not wall-time speedup: Python object/digest/HMAC costs, fresh-message checker replay, serialization, cache memory and public benchmark behaviour are not included in that comparison.
 
 The checker is a separate implementation path in the same Python reference file, not yet a separately compiled/audited binary. The finite suite is not a Lean proof.
 
