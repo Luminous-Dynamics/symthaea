@@ -1,0 +1,188 @@
+{
+  "schema_version": "pitb.dependency-aware-formalization-protocol.v0",
+  "protocol_id": "pitb-dependency-aware-formalization-v0.1-2026-11-03",
+  "status": "design",
+  "benchmark": {
+    "name": "AutoformBench",
+    "repository": "facebookresearch/autoformbench",
+    "release_commit": "af1aa38fd44e019e566bce0b5a168609a886d8e6",
+    "tasks": 341,
+    "source_groups": 24,
+    "graded_declarations": 1155,
+    "task_level_data_only": true
+  },
+  "observed_workload": {
+    "proxy_field": "target_count",
+    "proxy_limitation": "Count of graded declarations; it is not a complete measure of helper lemmas, proof-route size, environment requirements, or true dependency complexity.",
+    "strata": [
+      {
+        "id": "single",
+        "tasks": 230
+      },
+      {
+        "id": "two_to_four",
+        "tasks": 53
+      },
+      {
+        "id": "five_plus",
+        "tasks": 58
+      }
+    ],
+    "published_models": [
+      {
+        "model": "gpt-6-astra",
+        "single": {
+          "tasks": 230,
+          "solved": 208
+        },
+        "two_to_four": {
+          "tasks": 53,
+          "solved": 41
+        },
+        "five_plus": {
+          "tasks": 58,
+          "solved": 32
+        }
+      },
+      {
+        "model": "opus-5",
+        "single": {
+          "tasks": 230,
+          "solved": 172
+        },
+        "two_to_four": {
+          "tasks": 53,
+          "solved": 25
+        },
+        "five_plus": {
+          "tasks": 58,
+          "solved": 14
+        }
+      },
+      {
+        "model": "gpt-5.6-sol",
+        "single": {
+          "tasks": 230,
+          "solved": 163
+        },
+        "two_to_four": {
+          "tasks": 53,
+          "solved": 24
+        },
+        "five_plus": {
+          "tasks": 58,
+          "solved": 14
+        }
+      },
+      {
+        "model": "deepseek-v4.1-flash",
+        "single": {
+          "tasks": 230,
+          "solved": 148
+        },
+        "two_to_four": {
+          "tasks": 53,
+          "solved": 21
+        },
+        "five_plus": {
+          "tasks": 58,
+          "solved": 11
+        }
+      }
+    ],
+    "within_source_comparison": {
+      "model": "gpt-6-astra",
+      "overlapping_source_groups": 13,
+      "high_tasks": 58,
+      "high_unresolved": 26,
+      "under_five_tasks": 191,
+      "under_five_unresolved": 29,
+      "risk_difference": 0.29644340133598124,
+      "risk_ratio": 2.9524375743162903,
+      "bootstrap_replicates": 50000,
+      "seed": "8badf00d"
+    }
+  },
+  "arms": [
+    {
+      "id": "F0",
+      "stack": "Direct formalization with no retrieval and no persistent declaration DAG.",
+      "isolation_question": "What is the matched fixed-budget baseline?"
+    },
+    {
+      "id": "F1",
+      "stack": "F0 plus BM25/name/signature and LeanSearch v2 retrieval.",
+      "isolation_question": "Does conventional semantic retrieval help?"
+    },
+    {
+      "id": "F2",
+      "stack": "F1 plus LeanGraphSearch multi-hop traversal.",
+      "isolation_question": "Does dependency expansion improve route recall and solve/cost?"
+    },
+    {
+      "id": "F3a",
+      "stack": "F1 plus pinned DAPS group-level premise selector.",
+      "isolation_question": "Does group-aware graph retrieval help on this cohort?"
+    },
+    {
+      "id": "F3b",
+      "stack": "F1 plus TheoremGraph/LeanGraph typed edge expansion.",
+      "isolation_question": "Does the larger formal graph improve retrieval and downstream proof completion?"
+    },
+    {
+      "id": "F4",
+      "stack": "Best validation-selected retrieval arm plus PITB typed AND/OR support bundles and instance-aware context.",
+      "isolation_question": "Does bundle composition beat ranked premise lists?"
+    },
+    {
+      "id": "F5",
+      "stack": "F4 plus declaration-DAG planning, incremental elaboration and selective rollback.",
+      "isolation_question": "Does explicit infrastructure planning close the multi-declaration hard tail?"
+    },
+    {
+      "id": "F6",
+      "stack": "F5 plus calibrated multi-resource control and bounded parallel branches.",
+      "isolation_question": "Does adaptive allocation improve the success-cost-latency frontier?"
+    }
+  ],
+  "controls": {
+    "same_base_prover": true,
+    "same_task_and_budget": true,
+    "exact_target": true,
+    "environment_pinned": true,
+    "independent_replay": true,
+    "no_test_tuning": true,
+    "complete_denominator": true
+  },
+  "inference": {
+    "cluster_unit": "source_group",
+    "cluster_count": 24,
+    "paired": true,
+    "multiple_comparison_correction": "holm",
+    "small_cluster_caveat": true,
+    "public_cohort_role": "development_and_external_reference_not_blind_confirmation"
+  },
+  "primary_endpoint": {
+    "name": "verified_exact_target_completion_rate",
+    "fixed_denominator": true,
+    "kernel_replay_required": true,
+    "semantic_target_gate_required": true
+  },
+  "qualification_gates": {
+    "published_baseline_solved": 281,
+    "overall_competitive_solved": 299,
+    "overall_stretch_solved": 316,
+    "hard_tail_minimum_risk_difference": 0.1,
+    "simple_task_max_regression_pp": 1,
+    "cost_per_verified_task_reduction": 0.2,
+    "reliability": {
+      "zero_false_accepts": true,
+      "all_counted_successes_independently_replayed": true
+    }
+  },
+  "evidence_status": {
+    "pitb_runs": false,
+    "sota_gain_claimed": false,
+    "interpretation": "preregistered_experiment_design_only"
+  }
+}
