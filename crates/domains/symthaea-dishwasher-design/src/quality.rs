@@ -92,6 +92,65 @@ pub struct OutcomeObservation {
     pub calibration_bundle_sha256: String,
 }
 
+/// Exact one-sided Clopper-Pearson planning result for a validation set with
+/// zero observed false-pass events, under an IID Bernoulli-trial assumption.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ZeroFailureSamplePlan {
+    /// Type-I tail probability (0.05 gives a one-sided 95% upper bound).
+    pub alpha: f64,
+    pub maximum_upper_failure_probability: f64,
+    pub minimum_independent_trials: usize,
+    pub achieved_upper_failure_probability: f64,
+}
+
+/// Compute the minimum independent trial count needed so that zero observed
+/// false-pass events imply a one-sided exact binomial upper bound no larger
+/// than the requested probability.
+///
+/// For zero events in n trials, the one-sided Clopper-Pearson upper bound is
+/// 1 - alpha^(1/n). This planner assumes independent physical runs. Multiple
+/// dishes, images, sensor frames or assays from the same cycle are NOT separate
+/// independent trials. This does not adjust for multiple soil/material/endpoint
+/// strata; apply a family-wise correction or plan each pre-registered stratum.
+pub fn plan_zero_failure_validation(
+    alpha: f64,
+    maximum_upper_failure_probability: f64,
+) -> Result<ZeroFailureSamplePlan, QualityError> {
+    if !alpha.is_finite()
+        || alpha <= 0.0
+        || alpha >= 1.0
+        || !maximum_upper_failure_probability.is_finite()
+        || maximum_upper_failure_probability <= 0.0
+        || maximum_upper_failure_probability >= 1.0
+    {
+        return Err(QualityError::InvalidZeroFailureSamplePlan);
+    }
+
+    let required = (alpha.ln() / (1.0 - maximum_upper_failure_probability).ln()).ceil();
+    if !required.is_finite() || required < 1.0 || required > usize::MAX as f64 {
+        return Err(QualityError::InvalidZeroFailureSamplePlan);
+    }
+    let mut trials = required as usize;
+    let upper = |n: usize| 1.0 - alpha.powf(1.0 / n as f64);
+
+    // Correct any floating-point rounding around the integer boundary.
+    while upper(trials) > maximum_upper_failure_probability {
+        trials = trials
+            .checked_add(1)
+            .ok_or(QualityError::InvalidZeroFailureSamplePlan)?;
+    }
+    while trials > 1 && upper(trials - 1) <= maximum_upper_failure_probability {
+        trials -= 1;
+    }
+
+    Ok(ZeroFailureSamplePlan {
+        alpha,
+        maximum_upper_failure_probability,
+        minimum_independent_trials: trials,
+        achieved_upper_failure_probability: upper(trials),
+    })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PilotPolicy {
     // Five independent runs is a pilot floor, not a confirmatory sample size.
@@ -106,6 +165,7 @@ pub enum QualityError {
     InvalidScope(&'static str),
     InvalidItemSet,
     InvalidPilotRunCount,
+    InvalidZeroFailureSamplePlan,
     MissingRequiredCriterion(Endpoint),
     DuplicateCriterion(Endpoint),
     InvalidCriterion(Endpoint, &'static str),
@@ -605,6 +665,45 @@ mod tests {
             }
         }
         result
+    }
+
+    #[test]
+    fn exact_zero_failure_sample_planner_returns_known_one_sided_bounds() {
+        let one_percent = plan_zero_failure_validation(0.05, 0.01).unwrap();
+        assert_eq!(one_percent.minimum_independent_trials, 299);
+        assert!(one_percent.achieved_upper_failure_probability <= 0.01);
+
+        let one_per_thousand = plan_zero_failure_validation(0.05, 0.001).unwrap();
+        assert_eq!(one_per_thousand.minimum_independent_trials, 2_995);
+        assert!(one_per_thousand.achieved_upper_failure_probability <= 0.001);
+    }
+
+    #[test]
+    fn stricter_confidence_and_false_pass_bounds_require_more_trials() {
+        let baseline = plan_zero_failure_validation(0.05, 0.01).unwrap();
+        let stricter_confidence = plan_zero_failure_validation(0.01, 0.01).unwrap();
+        let stricter_error = plan_zero_failure_validation(0.05, 0.001).unwrap();
+        assert!(stricter_confidence.minimum_independent_trials
+            > baseline.minimum_independent_trials);
+        assert!(stricter_error.minimum_independent_trials
+            > baseline.minimum_independent_trials);
+    }
+
+    #[test]
+    fn rejects_invalid_zero_failure_sample_plans() {
+        for (alpha, bound) in [
+            (0.0, 0.01),
+            (1.0, 0.01),
+            (f64::NAN, 0.01),
+            (0.05, 0.0),
+            (0.05, 1.0),
+            (0.05, f64::INFINITY),
+        ] {
+            assert_eq!(
+                plan_zero_failure_validation(alpha, bound),
+                Err(QualityError::InvalidZeroFailureSamplePlan)
+            );
+        }
     }
 
     #[test]
