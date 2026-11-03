@@ -73,8 +73,9 @@ def validate_instance(instance):
         if not isinstance(factor, dict) or set(factor) != {"id", "scope", "values"}:
             raise ValueError("factor shape")
         fid, scope, values = factor["id"], factor["scope"], factor["values"]
-        if not isinstance(fid, str) or not fid or fid in seen:
-            raise ValueError("factor ID")
+        if (not isinstance(fid, str) or not fid or fid in seen or
+                fid.startswith(("free:", "join:", "sum:"))):
+            raise ValueError("factor ID is duplicate or collides with a generated ID")
         seen.add(fid)
         if (not isinstance(scope, list) or
                 any(not isinstance(v, str) for v in scope) or
