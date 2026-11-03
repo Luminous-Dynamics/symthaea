@@ -17,7 +17,7 @@ use std::process;
 
 const SCHEMA_VERSION: &str = "0.1.0";
 const REPORT_SCHEMA_SHA256: &str =
-    "399a5d1a6a0f7f81f9310c150e8f6f0032d99680f739bf4353dbb79b93d724f1";
+    "10c3eb5ab6deb5d4044897501a97336e8ae3ec2a6a3520e9d19e5f313dccad9c";
 const WORLD_SCHEMA_SHA256: &str =
     "b8bbc20a6e581232b7439a1fbbbecf65bbcb6b6b702732c98720a2dce8575f06";
 const PROTOCOL_SHA256: &str =
@@ -430,7 +430,7 @@ fn count_summary(value: &Value, expected: &Summary) -> Result<(), String> {
         value,
         &[
             "mapping_count",
-            "verified_count",
+            "claimed_verified_count",
             "ambiguous_count",
             "not_estimable_count",
             "rejected_count",
@@ -446,7 +446,7 @@ fn count_summary(value: &Value, expected: &Summary) -> Result<(), String> {
     )?;
     let expected_fields = [
         ("mapping_count", expected.mapping_count),
-        ("verified_count", expected.verified_count),
+        ("claimed_verified_count", expected.verified_count),
         ("ambiguous_count", expected.ambiguous_count),
         ("not_estimable_count", expected.not_estimable_count),
         ("rejected_count", expected.rejected_count),
@@ -645,7 +645,7 @@ fn verify_receipt(
 
         let support_status = string_field(mapping, "support_status", &context)?;
         match support_status.as_str() {
-            "VERIFIED" => summary.verified_count += 1,
+            "CLAIMED_VERIFIED" => summary.verified_count += 1,
             "AMBIGUOUS" => summary.ambiguous_count += 1,
             "NOT_ESTIMABLE" => summary.not_estimable_count += 1,
             "REJECTED" => summary.rejected_count += 1,
@@ -860,6 +860,12 @@ fn verify_receipt(
         "claimed_disposition": claimed_disposition,
         "recomputed_disposition": recomputed_disposition,
         "trusted_promotion": false,
+        "support_status_claim_counts": {
+            "claimed_verified_mapping_count": summary.verified_count,
+            "ambiguous_mapping_count": summary.ambiguous_count,
+            "not_estimable_mapping_count": summary.not_estimable_count,
+            "rejected_mapping_count": summary.rejected_count
+        },
         "trust_boundaries": {
             "evidence_artifact_bytes": "NOT_AUTHENTICATED",
             "edit_history_and_lineage": "NOT_AUTHENTICATED",
@@ -872,7 +878,6 @@ fn verify_receipt(
         "registration_claim": registration_claim,
         "recomputed_summary": {
             "mapping_count": summary.mapping_count,
-            "verified_count": summary.verified_count,
             "ambiguous_count": summary.ambiguous_count,
             "not_estimable_count": summary.not_estimable_count,
             "rejected_count": summary.rejected_count,
