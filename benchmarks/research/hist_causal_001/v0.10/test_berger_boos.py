@@ -18,7 +18,12 @@ class BergerBoosTests(unittest.TestCase):
             self.assertLessEqual(size,F(1,20))
 
     def test_empty_confidence_set_fails_conservatively(self):
-        self.assertEqual(b.berger_boos_pvalue(4,0,4,0,grid=tuple()),F(1))
+        # A non-empty parameter grid can yield an empty confidence set for
+        # an extreme pilot result at a deliberately large beta.
+        self.assertEqual(
+            b.berger_boos_pvalue(4,0,4,0,grid=b.THETA_GRID,beta=F(9,10)),
+            F(1)
+        )
 
     def test_adjustment_dominates_all_pvalues_in_confidence_set(self):
         n1,n2,x,y=12,12,5,3
