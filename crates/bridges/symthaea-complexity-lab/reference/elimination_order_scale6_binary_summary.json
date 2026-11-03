@@ -1,16 +1,177 @@
 {
-  "suite":"Six-binary-variable exhaustive order pilot",
-  "cards":[2,2,2,2,2,2],
-  "scopes":[[0,1],[1,2],[2,3],[3,4],[4,5],[0,5],[0,3],[1,4],[2,5]],
-  "orders_per_algebra":720,
-  "exact_order_algebra_executions":2160,
-  "all_orders_result_invariant":true,
-  "direct_oracle_cases":3,
-  "selected_certificate_replays":8,
-  "algebras":{
-    "maxcount":{"best_order":[1,5,0,2,3,4],"best_work_proxy":592,"min_fill_regret_pct":21.453,"stochastic_32_order":[1,5,0,2,3,4],"stochastic_32_regret_pct":0.0,"pareto_cost_frontier_size":16},
-    "pareto":{"best_order":[5,1,4,2,0,3],"best_work_proxy":821,"min_fill_regret_pct":35.688,"stochastic_32_order":[1,5,2,0,3,4],"stochastic_32_regret_pct":5.116,"pareto_cost_frontier_size":1},
-    "poly":{"best_order":[1,3,5,0,4,2],"best_work_proxy":727,"min_fill_regret_pct":21.733,"stochastic_32_order":[1,5,0,2,3,4],"stochastic_32_regret_pct":10.867,"pareto_cost_frontier_size":12}
+  "suite": "Six-binary-variable exhaustive order pilot",
+  "cards": [
+    2,
+    2,
+    2,
+    2,
+    2,
+    2
+  ],
+  "scopes": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      2
+    ],
+    [
+      2,
+      3
+    ],
+    [
+      3,
+      4
+    ],
+    [
+      4,
+      5
+    ],
+    [
+      0,
+      5
+    ],
+    [
+      0,
+      3
+    ],
+    [
+      1,
+      4
+    ],
+    [
+      2,
+      5
+    ]
+  ],
+  "orders_per_algebra": 720,
+  "exact_order_algebra_executions": 2160,
+  "all_orders_result_invariant": true,
+  "direct_oracle_cases": 3,
+  "selected_certificate_replays": 11,
+  "algebras": {
+    "maxcount": {
+      "best_order": [
+        1,
+        5,
+        0,
+        2,
+        3,
+        4
+      ],
+      "best_work_proxy": 592,
+      "min_fill": {
+        "work_proxy": 719,
+        "regret_pct": 21.453
+      },
+      "static_selector_32": {
+        "order": [
+          0,
+          2,
+          1,
+          3,
+          5,
+          4
+        ],
+        "work_proxy": 716,
+        "regret_pct": 20.946
+      },
+      "oracle_best_32_hindsight": {
+        "order": [
+          1,
+          5,
+          0,
+          2,
+          3,
+          4
+        ],
+        "work_proxy": 592,
+        "regret_pct": 0
+      },
+      "pareto_cost_frontier_size": 16
+    },
+    "pareto": {
+      "best_order": [
+        5,
+        1,
+        4,
+        2,
+        0,
+        3
+      ],
+      "best_work_proxy": 821,
+      "min_fill": {
+        "work_proxy": 1114,
+        "regret_pct": 35.688
+      },
+      "static_selector_32": {
+        "order": [
+          0,
+          2,
+          1,
+          3,
+          5,
+          4
+        ],
+        "work_proxy": 1100,
+        "regret_pct": 33.983
+      },
+      "oracle_best_32_hindsight": {
+        "order": [
+          1,
+          5,
+          2,
+          0,
+          3,
+          4
+        ],
+        "work_proxy": 863,
+        "regret_pct": 5.116
+      },
+      "pareto_cost_frontier_size": 1
+    },
+    "poly": {
+      "best_order": [
+        1,
+        3,
+        5,
+        0,
+        4,
+        2
+      ],
+      "best_work_proxy": 727,
+      "min_fill": {
+        "work_proxy": 885,
+        "regret_pct": 21.733
+      },
+      "static_selector_32": {
+        "order": [
+          0,
+          2,
+          1,
+          3,
+          5,
+          4
+        ],
+        "work_proxy": 880,
+        "regret_pct": 21.045
+      },
+      "oracle_best_32_hindsight": {
+        "order": [
+          1,
+          5,
+          0,
+          2,
+          3,
+          4
+        ],
+        "work_proxy": 806,
+        "regret_pct": 10.867
+      },
+      "pareto_cost_frontier_size": 12
+    }
   },
-  "claim_boundary":"One six-variable binary synthetic factor graph; Python exact reference only; no hardware runtime or SOTA claim."
+  "claim_boundary": "One six-variable binary synthetic factor graph; Python exact reference only; no hardware runtime or SOTA claim."
 }
