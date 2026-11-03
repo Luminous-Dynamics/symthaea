@@ -136,6 +136,9 @@ pub struct ServiceAccountingReport {
     pub reattempted_item_visits: usize,
     pub verified_successful_item_count: usize,
     pub verified_successful_item_ids: Vec<String>,
+    /// Items that passed every required endpoint on their first physical attempt.
+    pub first_pass_verified_item_count: usize,
+    pub first_pass_verified_item_ids: Vec<String>,
     pub unqualified_item_ids: Vec<String>,
     /// Includes every failed, interrupted and rewash attempt.
     pub total_resources: AttemptResources,
@@ -174,6 +177,7 @@ pub fn account_service(
     let mut service_request_id: Option<&str> = None;
     let mut seen_items = BTreeSet::new();
     let mut qualified_items = BTreeSet::new();
+    let mut first_pass_qualified_items = BTreeSet::new();
     let mut item_attempt_visits = 0_usize;
     let mut total_resources = AttemptResources::default();
     let mut earliest_start = u64::MAX;
@@ -243,6 +247,7 @@ pub fn account_service(
         latest_finish = latest_finish.max(attempt.finished_at_s);
 
         let mut items_in_attempt = HashSet::new();
+        let mut first_seen_in_attempt = HashSet::new();
         for item_id in &attempt.item_ids {
             if !canonical_non_empty(item_id) {
                 return Err(ServiceAccountingError::InvalidIdentity("item_id"));
@@ -258,6 +263,9 @@ pub fn account_service(
                     item_id: item_id.clone(),
                     attempt_id: attempt.attempt_id.clone(),
                 });
+            }
+            if !seen_items.contains(item_id.as_str()) {
+                first_seen_in_attempt.insert(item_id.as_str());
             }
             seen_items.insert(item_id.clone());
             item_attempt_visits = item_attempt_visits.checked_add(1)
@@ -315,6 +323,9 @@ pub fn account_service(
                 });
                 if all_required_pass {
                     qualified_items.insert(item_id.clone());
+                    if first_seen_in_attempt.contains(item_id.as_str()) {
+                        first_pass_qualified_items.insert(item_id.clone());
+                    }
                 }
             }
         }
@@ -322,6 +333,7 @@ pub fn account_service(
 
     let unique_item_count = seen_items.len();
     let verified_successful_item_count = qualified_items.len();
+    let first_pass_verified_item_count = first_pass_qualified_items.len();
     let unqualified_item_ids = seen_items.difference(&qualified_items).cloned().collect();
     let resources_per_verified_item = (verified_successful_item_count > 0)
         .then(|| total_resources.divided_by(verified_successful_item_count));
@@ -337,6 +349,8 @@ pub fn account_service(
         reattempted_item_visits: item_attempt_visits.saturating_sub(unique_item_count),
         verified_successful_item_count,
         verified_successful_item_ids: qualified_items.into_iter().collect(),
+        first_pass_verified_item_count,
+        first_pass_verified_item_ids: first_pass_qualified_items.into_iter().collect(),
         unqualified_item_ids,
         total_resources,
         resources_per_verified_item,
@@ -443,6 +457,8 @@ mod tests {
             outcomes("run-1", "cup-1", Decision::Pass),
         )], &REQUIRED).unwrap();
         assert_eq!(report.verified_successful_item_ids, vec!["cup-1"]);
+        assert_eq!(report.first_pass_verified_item_ids, vec!["cup-1"]);
+        assert_eq!(report.first_pass_verified_item_count, 1);
         assert_eq!(report.resources_per_verified_item.unwrap().fresh_water_l, 0.7);
     }
 
@@ -457,6 +473,8 @@ mod tests {
         let report = account_service(&attempts, &REQUIRED).unwrap();
         assert_eq!(report.unique_item_count, 1);
         assert_eq!(report.verified_successful_item_count, 1);
+        assert!(report.first_pass_verified_item_ids.is_empty());
+        assert_eq!(report.first_pass_verified_item_count, 0);
         assert_eq!(report.item_attempt_visits, 2);
         assert_eq!(report.reattempted_item_visits, 1);
         assert!((report.total_resources.appliance_electricity_kwh - 0.09).abs() < 1e-12);
@@ -487,6 +505,7 @@ mod tests {
             resources(0.1, 1.4), evidence,
         )], &REQUIRED).unwrap();
         assert_eq!(report.verified_successful_item_ids, vec!["cup-pass"]);
+        assert_eq!(report.first_pass_verified_item_ids, vec!["cup-pass"]);
         assert_eq!(report.unqualified_item_ids, vec!["cup-fail"]);
         assert_eq!(report.resources_per_verified_item.unwrap().fresh_water_l, 1.4);
     }
