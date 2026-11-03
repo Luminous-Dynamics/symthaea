@@ -56,7 +56,7 @@ The Rust `symthaea_dishwasher_design::chemistry::validate_dose_plan` validates a
 
 ## Independent per-item outcome evidence
 
-The outcome qualification constructor also requires balanced physical run coverage: every expected item and every required endpoint must be represented in the same set of distinct run IDs. A result for one item cannot be substituted for a missing result on another item, and item observations from different cycles cannot be mixed to create a false cross-contamination pass. Each reading is bound to the exact criterion ID, metric ID, unit, method and protocol.
+The outcome qualification constructor also requires balanced physical run coverage: every expected item and every required endpoint must be represented in the same set of distinct run IDs. A result for one item cannot be substituted for a missing result on another item, and item observations from different cycles cannot be mixed to create a false cross-contamination pass. Each reading is bound to the exact criterion ID, metric ID, unit, method and protocol. The pilot envelope retains the exact endpoint criteria and assay-method identities so the scheduler adapter can enforce criterion/method consistency across occupancies for each soil class.
 
 
 Use `outcome-evidence-template.csv` for one item × endpoint × physical run measurement. Every observation binds to:
