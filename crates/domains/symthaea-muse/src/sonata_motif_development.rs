@@ -613,6 +613,91 @@ mod tests {
     use symthaea_music_theory::{Duration, PitchClass};
 
     #[test]
+    fn typed_develop_motif_obligation_generates_a_verified_score_candidate() {
+        use crate::cognitive_bridge::{
+            CognitiveObligationDemand, CognitiveSection, MusicAction, MusicInferenceResult,
+            SymbolicMusicObservation, propose_symbolic_action,
+        };
+        use symthaea_music_theory::{
+            Duration, Key, Motif, MotifNote, MusicalIntent, ObligationKind, PitchClass,
+            realize_sonata_with_plan,
+        };
+
+        let home = Key::major(PitchClass::C);
+        let theme = Motif::new(vec![
+            MotifNote::new(1, Duration::quarter()),
+            MotifNote::new(3, Duration::quarter()),
+            MotifNote::new(5, Duration::quarter()),
+            MotifNote::new(3, Duration::quarter()),
+        ]);
+        let realization =
+            realize_sonata_with_plan(home, 100.0, 4.0, &theme, 31, &MusicalIntent::default());
+
+        let obligation_id = 7;
+        let observation = SymbolicMusicObservation {
+            section: CognitiveSection::Development,
+            active_goal: None,
+            goal_urgency: 0.1,
+            valence: 0.0,
+            arousal: 0.5,
+            prediction_error: 0.2,
+            consciousness_level: 0.5,
+            dominant_harmony: 0,
+            dominant_harmony_activation: 0.8,
+            pending_obligations: 1,
+            overdue_obligations: vec![obligation_id],
+            obligation_demands: vec![CognitiveObligationDemand {
+                id: obligation_id,
+                priority: 0.9,
+                due_by: Duration::zero(),
+                overdue: true,
+                kind: ObligationKind::DevelopMotif {
+                    motif_id: "sonata.primary".into(),
+                    transformation: MotifDevelopmentTransformation::DiatonicTransposition {
+                        degree_shift: 1,
+                    },
+                },
+            }],
+            obligation_pressure: 1.0,
+        };
+        let inference = MusicInferenceResult {
+            action: MusicAction::Maintain,
+            free_energy: 0.2,
+            prediction_error: 0.3,
+            surprise: 0.4,
+            is_surprised: false,
+            learning_rate_mod: 1.0,
+            sensory_precision: 1.0,
+            prior_precision: 1.2,
+        };
+        let trace = propose_symbolic_action(&inference, observation);
+        assert_eq!(trace.proposal.action, SymbolicAction::DevelopMotif);
+        assert_eq!(trace.proposal.driving_obligation_id, Some(obligation_id));
+
+        let batch = generate_sonata_motif_development_v1(&realization, &trace).unwrap();
+        assert_eq!(
+            batch.requested_transformation,
+            MotifDevelopmentTransformation::DiatonicTransposition {
+                degree_shift: 1,
+            }
+        );
+        assert_eq!(batch.candidates.len(), 2);
+        assert!(batch.selected_candidate_id.is_none());
+        assert!(batch.candidates.iter().all(|candidate| {
+            candidate.target_only_pitch_diff_verified
+        }));
+        let baseline = &batch.candidates[0];
+        assert_eq!(baseline.target_pitch_changed_count, 0);
+        assert!(batch.candidates[1].target_pitch_changed_count > 0);
+        let development_obligation = batch.candidates[1]
+            .obligation_verification
+            .iter()
+            .find(|item| item.obligation_id == obligation_id)
+            .expect("candidate must retain the score-side development verdict");
+        assert!(development_obligation.verified);
+    }
+
+    #[test]
     fn pitch_to_scale_degree_round_trips_diatonic_octaves() {
         let key = Key::major(PitchClass::C);
         assert_eq!(pitch_to_scale_degree(Pitch::from_midi(60), key), Some(1));
