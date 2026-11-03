@@ -19,7 +19,8 @@
         "kind": "synthetic_fixture",
         "uri": null,
         "revision": null,
-        "tree_sha256": null
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
       },
       "environment": {
         "image": null,
@@ -78,7 +79,8 @@
         "kind": "synthetic_fixture",
         "uri": null,
         "revision": null,
-        "tree_sha256": null
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
       },
       "environment": {
         "image": null,
@@ -137,7 +139,8 @@
         "kind": "synthetic_fixture",
         "uri": null,
         "revision": null,
-        "tree_sha256": null
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
       },
       "environment": {
         "image": null,
@@ -196,7 +199,8 @@
         "kind": "synthetic_fixture",
         "uri": null,
         "revision": null,
-        "tree_sha256": null
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
       },
       "environment": {
         "image": null,
@@ -255,7 +259,8 @@
         "kind": "synthetic_fixture",
         "uri": null,
         "revision": null,
-        "tree_sha256": null
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
       },
       "environment": {
         "image": null,
@@ -314,7 +319,8 @@
         "kind": "synthetic_fixture",
         "uri": null,
         "revision": null,
-        "tree_sha256": null
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
       },
       "environment": {
         "image": null,
@@ -373,7 +379,8 @@
         "kind": "synthetic_fixture",
         "uri": null,
         "revision": null,
-        "tree_sha256": null
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
       },
       "environment": {
         "image": null,
@@ -432,7 +439,8 @@
         "kind": "synthetic_fixture",
         "uri": null,
         "revision": null,
-        "tree_sha256": null
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
       },
       "environment": {
         "image": null,
@@ -491,7 +499,8 @@
         "kind": "synthetic_fixture",
         "uri": null,
         "revision": null,
-        "tree_sha256": null
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
       },
       "environment": {
         "image": null,
@@ -554,7 +563,8 @@
         "kind": "synthetic_fixture",
         "uri": null,
         "revision": null,
-        "tree_sha256": null
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
       },
       "environment": {
         "image": null,
