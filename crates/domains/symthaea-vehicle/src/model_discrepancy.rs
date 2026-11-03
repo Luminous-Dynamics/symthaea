@@ -47,11 +47,13 @@ pub struct DiscrepancyActionOutcome {
     pub action_id: String,
     pub command_digest: String,
     pub feasibility: DiscrepancyFeasibility,
+    pub reference_status: ReferenceOutcomeStatus,
     pub predicted_utility: f64,
-    pub realized_utility: f64,
-    pub execution_receipt_id: String,
-    pub execution_digest: String,
-    pub evaluator_receipt_id: String,
+    /// Present only when a feasible action has a complete reference outcome.
+    pub realized_utility: Option<f64>,
+    pub execution_receipt_id: Option<String>,
+    pub execution_digest: Option<String>,
+    pub evaluator_receipt_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -105,7 +107,7 @@ pub enum VehicleModelDiscrepancyError {
     InvalidDecisionIdentity, InvalidDecisionContextDigest, InvalidActionSetDigest,
     InvalidTieTolerance, TooFewActions, DuplicateDecisionId, DuplicateActionId,
     DuplicateReceiptId, MissingSelectedAction, OutcomeLeakage, InvalidUtility,
-    InvalidActionReceipt,
+    InvalidActionReceipt, InconsistentReferenceOutcome,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -164,6 +166,7 @@ pub struct DecisionAuditResult {
 pub struct DecisionAuditSummary {
     pub decision_count: usize,
     pub comparable_decision_count: usize,
+    pub incomplete_reference_decision_count: usize,
     pub indeterminate_decision_count: usize,
     pub selected_action_infeasible_count: usize,
     pub no_feasible_action_count: usize,
