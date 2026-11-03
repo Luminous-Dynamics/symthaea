@@ -1,0 +1,209 @@
+{
+  "schema_version": "0.1",
+  "initial_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "events": [
+    {
+      "event_type": "EDIT",
+      "sequence": 1,
+      "submission": {
+        "transaction_id": "tx-stale",
+        "idempotency_key": "idem-stale",
+        "parent_transaction_id": null,
+        "operation": "Merge",
+        "affected_object_ids": [
+          "segment-1",
+          "segment-2"
+        ],
+        "operation_parameters_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "base_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "patch_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "resulting_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "reversible": true,
+        "inverse_patch_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "preconditions": [
+          {
+            "invariant_id": "base-topology",
+            "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "observed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ],
+        "postconditions": [
+          {
+            "invariant_id": "post-topology",
+            "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "observed_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        ],
+        "proposer_id": "model-agent",
+        "reviewer_id": "human-reviewer",
+        "verifier_id": "independent-verifier",
+        "review_disposition": "Approved",
+        "verification_outcome": "Passed",
+        "verifier_artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "verifier_config_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "annotation_propagation": {
+          "manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "expected_annotation_state_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "observed_annotation_state_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      },
+      "decision": {
+        "status": "REJECTED",
+        "reason": "StaleBaseSnapshot",
+        "resulting_snapshot_sha256": null
+      }
+    },
+    {
+      "event_type": "EDIT",
+      "sequence": 2,
+      "submission": {
+        "transaction_id": "tx-1",
+        "idempotency_key": "idem-tx-1",
+        "parent_transaction_id": null,
+        "operation": "Merge",
+        "affected_object_ids": [
+          "segment-1",
+          "segment-2"
+        ],
+        "operation_parameters_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "base_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "patch_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "resulting_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "reversible": true,
+        "inverse_patch_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "preconditions": [
+          {
+            "invariant_id": "base-topology",
+            "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "observed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ],
+        "postconditions": [
+          {
+            "invariant_id": "post-topology",
+            "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "observed_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        ],
+        "proposer_id": "model-agent",
+        "reviewer_id": "human-reviewer",
+        "verifier_id": "independent-verifier",
+        "review_disposition": "Approved",
+        "verification_outcome": "Passed",
+        "verifier_artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "verifier_config_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "annotation_propagation": {
+          "manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "expected_annotation_state_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "observed_annotation_state_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      },
+      "decision": {
+        "status": "COMMITTED",
+        "reason": null,
+        "resulting_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    },
+    {
+      "event_type": "EDIT",
+      "sequence": 3,
+      "submission": {
+        "transaction_id": "tx-quarantine",
+        "idempotency_key": "idem-quarantine",
+        "parent_transaction_id": "tx-1",
+        "operation": "Merge",
+        "affected_object_ids": [
+          "segment-1",
+          "segment-2"
+        ],
+        "operation_parameters_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "base_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "patch_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "resulting_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "reversible": true,
+        "inverse_patch_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "preconditions": [
+          {
+            "invariant_id": "base-topology",
+            "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "observed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ],
+        "postconditions": [
+          {
+            "invariant_id": "post-topology",
+            "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "observed_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        ],
+        "proposer_id": "model-agent",
+        "reviewer_id": "human-reviewer",
+        "verifier_id": "independent-verifier",
+        "review_disposition": "Approved",
+        "verification_outcome": "Inconclusive",
+        "verifier_artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "verifier_config_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "annotation_propagation": {
+          "manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "expected_annotation_state_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "observed_annotation_state_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      },
+      "decision": {
+        "status": "QUARANTINED",
+        "reason": "VerifierInconclusive",
+        "resulting_snapshot_sha256": null
+      }
+    },
+    {
+      "event_type": "ROLLBACK",
+      "sequence": 4,
+      "submission": {
+        "rollback_id": "rb-1",
+        "idempotency_key": "idem-rb-1",
+        "target_transaction_id": "tx-1",
+        "base_snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "inverse_patch_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "restored_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "proposer_id": "rollback-agent",
+        "reviewer_id": "rollback-human",
+        "verifier_id": "rollback-verifier",
+        "review_disposition": "Approved",
+        "verification_outcome": "Passed",
+        "verifier_artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "verifier_config_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "preconditions": [
+          {
+            "invariant_id": "rollback-base",
+            "expected_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "observed_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        ],
+        "postconditions": [
+          {
+            "invariant_id": "restored-base",
+            "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "observed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ],
+        "annotation_propagation": {
+          "manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "expected_annotation_state_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "observed_annotation_state_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      },
+      "decision": {
+        "status": "ROLLED_BACK",
+        "reason": null,
+        "resulting_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    }
+  ],
+  "expected_final_state": {
+    "current_snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "committed_transaction_ids": [],
+    "event_count": 4,
+    "next_event_sequence": 5
+  },
+  "synthetic_only": true
+}
