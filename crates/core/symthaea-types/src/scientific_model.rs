@@ -13,7 +13,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{ModelMaturity, PhysicalType, ScalarDomain, TypeJudgement};
 
-pub const SCIENTIFIC_MODEL_SCHEMA: &str = "SCIENTIFIC_MODEL.v0.1";
+pub const SCIENTIFIC_MODEL_SCHEMA_V0_1: &str = "SCIENTIFIC_MODEL.v0.1";
+pub const SCIENTIFIC_MODEL_SCHEMA_V0_2: &str = "SCIENTIFIC_MODEL.v0.2";
+/// Legacy constructor default retained for source and digest compatibility.
+pub const SCIENTIFIC_MODEL_SCHEMA: &str = SCIENTIFIC_MODEL_SCHEMA_V0_1;
 
 /// A small, solver-independent expression language for canonical scientific
 /// models. It is intentionally narrower than the physics-bridge AST: backend
@@ -46,7 +49,7 @@ impl ScientificExpression {
         Ok(Self::Rational { numerator, denominator })
     }
 
-    fn validate(&self, symbols: &std::collections::BTreeSet<String>) -> Result<(), String> {
+    pub(crate) fn validate(&self, symbols: &std::collections::BTreeSet<String>) -> Result<(), String> {
         match self {
             Self::Symbol(name) => {
                 validate_identifier(name)?;
@@ -83,9 +86,235 @@ impl ScientificExpression {
         Ok(())
     }
 
+}
+
+/// A named physical quantity/field in the model.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScientificQuantity {
+    pub name: String,
+    pub physical_type: PhysicalType,
+    pub scalar_domain: ScalarDomain,
+    pub role: QuantityRole,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum QuantityRole {
+    Coordinate,
+    State,
+    Parameter,
+    Constant,
+    Observable,
+    Auxiliary,
+}
+
+impl ScientificQuantity {
     pub fn validate(&self) -> Result<(), String> {
-        if self.schema_revision != SCIENTIFIC_MODEL_SCHEMA {
-            return Err("unsupported scientific-model schema revision".into());
+        validate_identifier(&self.name)?;
+        self.physical_type
+            .validate()
+            .map_err(|error| format!("quantity {:?}: {}", self.name, error.reason))?;
+        if self.physical_type.scalar != self.scalar_domain {
+            return Err(format!(
+                "quantity {:?} has conflicting scalar domains",
+                self.name
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// An equation is semantic content, not a solver instruction.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScientificEquation {
+    pub name: String,
+    pub left: ScientificExpression,
+    pub right: ScientificExpression,
+}
+
+impl ScientificEquation {
+    pub fn validate(
+        &self,
+        symbols: &std::collections::BTreeSet<String>,
+    ) -> Result<(), String> {
+        validate_identifier(&self.name)?;
+        self.left.validate(symbols)?;
+        self.right.validate(symbols)?;
+        Ok(())
+    }
+}
+
+/// Explicit statement of a condition assumed by the model.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ModelAssumption {
+    pub id: String,
+    pub statement: String,
+}
+
+impl ModelAssumption {
+    pub fn validate(&self) -> Result<(), String> {
+        validate_identifier(&self.id)?;
+        if self.statement.trim().is_empty() {
+            return Err(format!("assumption {:?} has an empty statement", self.id));
+        }
+        Ok(())
+    }
+}
+
+/// Numerical intent is declarative. It does not assert that a requested
+/// property was achieved.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SolverIntent {
+    pub backend_family: Option<String>,
+    pub conservation_required: bool,
+    pub positivity_required: bool,
+    pub invariant_domain_required: bool,
+    pub monotonicity_required: bool,
+    pub target_accuracy_order: Option<u8>,
+}
+
+impl SolverIntent {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.target_accuracy_order == Some(0) {
+            return Err("solver target accuracy order must be greater than zero".into());
+        }
+        if let Some(backend) = &self.backend_family
+            && backend.trim().is_empty()
+        {
+            return Err("solver backend family cannot be empty when specified".into());
+        }
+        Ok(())
+    }
+}
+
+/// A requirement that must be discharged by a future formal, numerical, or
+/// empirical evaluator. Status is intentionally absent from the model itself.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ModelEvidenceRequirement {
+    pub id: String,
+    pub class: EvidenceClass,
+    pub statement: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EvidenceClass {
+    Formal,
+    Numerical,
+    Empirical,
+}
+
+impl ModelEvidenceRequirement {
+    pub fn validate(&self) -> Result<(), String> {
+        validate_identifier(&self.id)?;
+        if self.statement.trim().is_empty() {
+            return Err(format!(
+                "evidence requirement {:?} has an empty statement",
+                self.id
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// A deliberate non-claim prevents downstream code from interpreting model
+/// identity as a truth certificate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ModelNonClaim {
+    pub id: String,
+    pub statement: String,
+}
+
+impl ModelNonClaim {
+    pub fn validate(&self) -> Result<(), String> {
+        validate_identifier(&self.id)?;
+        if self.statement.trim().is_empty() {
+            return Err(format!("non-claim {:?} has an empty statement", self.id));
+        }
+        Ok(())
+    }
+}
+
+/// Solver-independent canonical scientific model.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScientificModel {
+    pub schema_revision: String,
+    pub model_id: String,
+    pub domain: String,
+    pub maturity: ModelMaturity,
+    pub quantities: Vec<ScientificQuantity>,
+    pub equations: Vec<ScientificEquation>,
+    pub assumptions: Vec<ModelAssumption>,
+    pub solver_intent: SolverIntent,
+    pub evidence_requirements: Vec<ModelEvidenceRequirement>,
+    pub non_claims: Vec<ModelNonClaim>,
+    pub provenance: Vec<String>,
+    /// Optional hybrid-dynamics semantics. Omitted for legacy v0.1 models so
+    /// their serialized bytes and canonical digests remain unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hybrid_dynamics: Option<crate::hybrid_model::HybridDynamicsV0_1>,
+}
+
+impl ScientificModel {
+    // Preserve the stable constructor while callers migrate to staged builders.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        model_id: impl Into<String>,
+        domain: impl Into<String>,
+        maturity: ModelMaturity,
+        mut quantities: Vec<ScientificQuantity>,
+        mut equations: Vec<ScientificEquation>,
+        mut assumptions: Vec<ModelAssumption>,
+        solver_intent: SolverIntent,
+        mut evidence_requirements: Vec<ModelEvidenceRequirement>,
+        mut non_claims: Vec<ModelNonClaim>,
+        mut provenance: Vec<String>,
+    ) -> Result<Self, String> {
+        let model = Self {
+            schema_revision: SCIENTIFIC_MODEL_SCHEMA.into(),
+            model_id: model_id.into(),
+            domain: domain.into(),
+            maturity,
+            quantities: {
+                quantities.sort_by(|a, b| a.name.cmp(&b.name));
+                quantities
+            },
+            equations: {
+                equations.sort_by(|a, b| a.name.cmp(&b.name));
+                equations
+            },
+            assumptions: {
+                assumptions.sort_by(|a, b| a.id.cmp(&b.id));
+                assumptions
+            },
+            solver_intent,
+            evidence_requirements: {
+                evidence_requirements.sort_by(|a, b| a.id.cmp(&b.id));
+                evidence_requirements
+            },
+            non_claims: {
+                non_claims.sort_by(|a, b| a.id.cmp(&b.id));
+                non_claims
+            },
+            provenance: {
+                provenance.sort();
+                provenance
+            },
+            hybrid_dynamics: None,
+        };
+        model.validate()?;
+        Ok(model)
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        match self.schema_revision.as_str() {
+            SCIENTIFIC_MODEL_SCHEMA_V0_1 if self.hybrid_dynamics.is_none() => {}
+            SCIENTIFIC_MODEL_SCHEMA_V0_1 => {
+                return Err("ScientificModel v0.1 cannot carry hybrid-dynamics semantics".into());
+            }
+            SCIENTIFIC_MODEL_SCHEMA_V0_2 if self.hybrid_dynamics.is_some() => {}
+            SCIENTIFIC_MODEL_SCHEMA_V0_2 => {
+                return Err("ScientificModel v0.2 requires hybrid-dynamics semantics".into());
+            }
+            _ => return Err("unsupported scientific-model schema revision".into()),
         }
         validate_identifier(&self.model_id)?;
         if self.domain.trim().is_empty() {
@@ -143,7 +372,28 @@ impl ScientificExpression {
             );
         }
 
+        if let Some(hybrid) = &self.hybrid_dynamics {
+            if self.schema_revision != SCIENTIFIC_MODEL_SCHEMA_V0_2 {
+                return Err("hybrid dynamics requires ScientificModel v0.2".into());
+            }
+            hybrid.validate(self)?;
+        }
+
         Ok(())
+    }
+
+    /// Add canonical hybrid semantics and promote this model to v0.2.
+    ///
+    /// A v0.1 model without hybrid semantics retains its original schema and
+    /// serialized representation. Promotion is explicit and changes identity.
+    pub fn with_hybrid_dynamics(
+        mut self,
+        hybrid_dynamics: crate::hybrid_model::HybridDynamicsV0_1,
+    ) -> Result<Self, String> {
+        self.schema_revision = SCIENTIFIC_MODEL_SCHEMA_V0_2.into();
+        self.hybrid_dynamics = Some(hybrid_dynamics);
+        self.validate()?;
+        Ok(self)
     }
 
     pub fn type_judgment(&self) -> TypeJudgement<()> {
@@ -157,7 +407,11 @@ impl ScientificExpression {
     }
 
     pub fn canonical_bytes(&self) -> Vec<u8> {
-        serde_json::to_vec(self).expect("ScientificModel serialization is infallible")
+        let mut canonical = self.clone();
+        if let Some(hybrid) = &mut canonical.hybrid_dynamics {
+            hybrid.canonicalize();
+        }
+        serde_json::to_vec(&canonical).expect("ScientificModel serialization is infallible")
     }
 
     pub fn digest(&self) -> [u8; 32] {
@@ -169,7 +423,7 @@ impl ScientificExpression {
     }
 }
 
-fn validate_identifier(value: &str) -> Result<(), String> {
+pub(crate) fn validate_identifier(value: &str) -> Result<(), String> {
     if value.trim().is_empty() {
         return Err("scientific-model identifiers cannot be empty".into());
     }
