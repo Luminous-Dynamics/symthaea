@@ -10,3 +10,4 @@ keywords = ["dishwasher", "scheduling", "simulation", "optimization"]
 categories = ["simulation", "science"]
 
 [dependencies]
+symthaea-dishwasher-design = { path = "../symthaea-dishwasher-design" }
