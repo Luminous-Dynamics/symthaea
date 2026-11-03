@@ -245,7 +245,9 @@
         "omitted_query_flipping_count",
         "false_invariance_count",
         "not_estimable_count",
-        "false_ambiguity_count"
+        "false_ambiguity_count",
+        "candidate_duplicate_structure_group_count",
+        "reference_duplicate_structure_group_count"
       ],
       "properties": {
         "candidate_world_count": {
@@ -293,6 +295,14 @@
           "minimum": 0
         },
         "false_ambiguity_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidate_duplicate_structure_group_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reference_duplicate_structure_group_count": {
           "type": "integer",
           "minimum": 0
         }
