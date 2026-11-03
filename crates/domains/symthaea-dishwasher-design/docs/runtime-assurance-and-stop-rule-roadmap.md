@@ -140,3 +140,4 @@ Related work:
 - Outcome evidence: https://github.com/Luminous-Dynamics/symthaea/issues/10225
 - Physical occupancy data: https://github.com/Luminous-Dynamics/symthaea/issues/10136
 - Adaptive observer benchmark: https://github.com/Luminous-Dynamics/symthaea/issues/10157
+- Runtime assurance implementation issue: https://github.com/Luminous-Dynamics/symthaea/issues/10226
