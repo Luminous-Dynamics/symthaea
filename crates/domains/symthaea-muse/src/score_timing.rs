@@ -434,6 +434,47 @@ mod tests {
     }
 
     #[test]
+    fn dense_decoy_onsets_exceed_the_declared_maximum() {
+        let report = verify_score_timing_v1(
+            &score(),
+            &contract(ScoreTimingCheckV1::OnsetCount {
+                selector: ScoreEventSelectorV1::VoiceRole {
+                    role: VoiceRole::Melody,
+                },
+                window: ScoreTimeWindowV1::Beats { start: 0.0, end: 2.0 },
+                min_count: 1,
+                max_count: Some(1),
+            }),
+        )
+        .unwrap();
+        assert_eq!(report.verdict, ScoreTimingVerdictV1::Fail);
+        assert_eq!(report.results[0].matching_note_indices, vec![0, 1]);
+        assert_eq!(report.results[0].observed_event_count, 2);
+        assert!(!report.results[0].passed);
+    }
+
+    #[test]
+    fn requested_event_window_beyond_score_is_rejected() {
+        let result = verify_score_timing_v1(
+            &score(),
+            &contract(ScoreTimingCheckV1::OnsetCount {
+                selector: ScoreEventSelectorV1::VoiceRole {
+                    role: VoiceRole::Melody,
+                },
+                window: ScoreTimeWindowV1::Beats { start: 2.5, end: 3.5 },
+                min_count: 1,
+                max_count: Some(1),
+            }),
+        );
+        assert!(matches!(
+            result,
+            Err(issues) if issues.contains(&ScoreTimingIssueV1::WindowExceedsScore {
+                requirement_id: "event-window-1".into()
+            })
+        ));
+    }
+
+    #[test]
     fn unassigned_part_identity_is_rejected() {
         let result = verify_score_timing_v1(
             &score(),
