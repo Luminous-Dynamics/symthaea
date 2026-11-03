@@ -1,0 +1,14 @@
+{
+  "all_passed": true,
+  "claim_ceiling": "Small finite structural witness and Boolean/natural/MaxCount exhaustive semantic tests. Not generalized/fractional hypertree width, tensor planner, Rust, Lean proof, or performance claim.",
+  "max_components_seen": 11,
+  "negative_controls": ["stale instance digest", "unknown variable", "missing component coverage", "unknown algebra", "duplicate factor assignment", "noncanonical component order"],
+  "seed": "0xE7019",
+  "semantic_algebra_checks": 720,
+  "semantic_algebras": ["bool", "nat", "maxcount"],
+  "semantic_random_instances": 240,
+  "separate_process_checker": {"accepted": 1729, "negative_total": 6, "positive_total": 1729, "rejected": 6},
+  "special_semantic_controls": 9,
+  "structural_random_instances": 1000,
+  "suite": "ETH-019 canonical factor-component witness reference"
+}
