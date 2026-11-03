@@ -121,7 +121,11 @@ Expected decision audit:
 
 The values are analytic fixture outputs, not observed vehicle performance. Utility units are synthetic and must not be relabeled as safety, collision probability, severity or physical risk.
 
-## 5. Expected evaluator input contract
+## 5. Machine-readable golden fixture
+
+The corresponding JSON fixture is [`fixtures/SAM_CROSSING_ORACLE_V0_1.json`](fixtures/SAM_CROSSING_ORACLE_V0_1.json). It records the SI-unit inputs, predictor bias, reference intervals, synthetic utilities, expected decision audit and digest-helper policy. The equations in this document remain the normative derivation; the JSON is the machine-readable expected-output companion.
+
+## 6. Expected evaluator input contract
 
 Use `symthaea_vehicle::model_discrepancy` from PR #10276.
 
