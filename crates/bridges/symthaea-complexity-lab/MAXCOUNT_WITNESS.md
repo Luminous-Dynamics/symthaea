@@ -82,6 +82,14 @@ Rust adds ExactFactorGraph<MaxCountValue>::sample_optimal_assignment. The caller
 
 The Python v2 reference checks 1,389 path probabilities exactly with fractions.Fraction: each tested optimum has probability exactly 1 / support_size; all six triangle MaxCut optima have probability 1/6. This is an exact finite probability check, not a runtime benchmark.
 
+### Exact probability argument
+
+For a reached backpointer row r, let B_r(a) be the distinct support count of the branch choosing state a, and let S_r = sum_a B_r(a) be that row's support. The sampler selects a with probability B_r(a)/S_r.
+
+Each B_r(a) is a product of support totals for the disjoint child factors in that bucket. When the algorithm later samples each child block, its conditional path probability contributes the reciprocal of that child's support total. Those child denominators cancel the corresponding factors in B_r(a). Repeating this over the elimination forest leaves one denominator per empty-separator root row. Distinct components have disjoint variable sets, so their root supports multiply to the global distinct optimum count N. Thus every complete optimal assignment has probability exactly 1/N.
+
+The proof depends on the disjoint hidden-variable-block invariant from the dual-count section. It is invalid for pre-aggregated factors with overlapping hidden assignment provenance. It is also conditional on the bounded-integer callback being unbiased; modulo-biased or adversarial draws do not give exact uniformity.
+
 ## Benchmarks and qualification targets
 
 Compare on identical frozen factor systems and budgets:
