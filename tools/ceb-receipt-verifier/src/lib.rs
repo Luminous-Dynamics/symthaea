@@ -538,9 +538,12 @@ fn build_git_tree_from_entries(
                             path.display()
                         ))
                     })?;
-                    if !metadata.file_type().is_file() || metadata.len() != entry.size {
+                    if !metadata.file_type().is_file()
+                        || metadata.len() != entry.size
+                        || is_executable(&metadata) != entry.executable
+                    {
                         return Err(Failure::unresolved(format!(
-                            "snapshot file changed or is no longer regular: {}",
+                            "snapshot file type, size or executable bit changed during patch reconstruction: {}",
                             path.display()
                         )));
                     }
@@ -553,6 +556,24 @@ fn build_git_tree_from_entries(
                     (oid, if entry.executable { 0o100755 } else { 0o100644 })
                 }
                 TreeEntryContent::Symlink(target) => {
+                    let current_target = fs::read_link(path).map_err(|error| {
+                        Failure::protocol(format!(
+                            "cannot re-read snapshot symlink {}: {error}",
+                            path.display()
+                        ))
+                    })?;
+                    let current_target = current_target.to_str().ok_or_else(|| {
+                        Failure::unresolved(format!(
+                            "snapshot symlink target became non-UTF-8: {}",
+                            path.display()
+                        ))
+                    })?;
+                    if current_target.as_bytes() != target.as_slice() {
+                        return Err(Failure::unresolved(format!(
+                            "snapshot symlink target changed during patch reconstruction: {}",
+                            path.display()
+                        )));
+                    }
                     let oid = repository.blob(target).map_err(|error| {
                         Failure::unresolved(format!("cannot store symlink target blob: {error}"))
                     })?;
