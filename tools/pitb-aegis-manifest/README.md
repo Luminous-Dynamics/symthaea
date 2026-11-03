@@ -7,11 +7,11 @@ A small, standalone Rust CLI for validating the *identity and byte integrity* of
 From this directory:
 
 ```sh
-cargo test --locked
-cargo run --locked -- <manifest.json> <artifact-root>
+cargo test
+cargo run -- <manifest.json> <artifact-root>
 ```
 
-The manifest is JSON and must conform to `schema/pitb-aegis-manifest-v0.1.schema.json`. The CLI uses strict Serde structs with unknown-field rejection and validates required metadata, digest syntax, unique category/path entries, relative artifact paths, symlink rejection, and SHA-256 equality for source Rust, translated Lean, and statement files. If a Lake manifest artifact is supplied, its digest must match the pinned toolchain identity.
+Dependency versions are pinned in Cargo.toml. Commit the generated Cargo.lock after the first dependency resolution, then use `--locked` in CI. The manifest is JSON and must conform to `schema/pitb-aegis-manifest-v0.1.schema.json`. The CLI uses strict Serde structs with unknown-field rejection and validates required metadata, digest syntax, unique category/path entries, relative artifact paths, symlink rejection, and SHA-256 equality for source Rust, translated Lean, and statement files. If a Lake manifest artifact is supplied, its digest must match the pinned toolchain identity.
 
 ## Important boundaries
 
