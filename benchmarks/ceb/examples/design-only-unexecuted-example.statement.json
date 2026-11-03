@@ -86,7 +86,9 @@
       "output_bytes": 0,
       "input_tokens": null,
       "output_tokens": null,
-      "cost_usd": null
+      "cost_usd": null,
+      "turns": 0,
+      "tool_calls": 0
     },
     "artifacts": []
   }
