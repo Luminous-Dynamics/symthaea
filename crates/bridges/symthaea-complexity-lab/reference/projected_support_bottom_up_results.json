@@ -9,7 +9,7 @@
   },
   "sources": {
     "source_path": "reference/projected_support_bottom_up.py",
-    "source_git_blob_sha": "e3b14fe2f544999c62ac297329f0d03807832e1c"
+    "source_git_blob_sha": "4f35cc8e20f82a070fd4444687e2f3e317b2d69b"
   },
   "contracts": [
     "#sat",
@@ -56,6 +56,11 @@
       "support": 3,
       "has_non_smooth_sum": true
     },
+    "non_smooth_completion_mutant_detected": {
+      "correct": "19/28",
+      "mutant_without_scope_completion": "17/14",
+      "detected": true
+    },
     "free_variable_completion": {
       "root_scope": [
         "x"
@@ -63,6 +68,16 @@
       "exact_output": "864",
       "oracle": "864",
       "support": 4
+    },
+    "free_variable_completion_mutant_detected": {
+      "correct": "864",
+      "mutant_without_completion": "3",
+      "detected": true
+    },
+    "hidden_witness_multiplier_mutant_detected": {
+      "correct_pwmc": "2/3",
+      "wrong_hidden_witness_sum": "4/3",
+      "detected": true
     },
     "signed_q_cancellation": {
       "exact_output": "0",
@@ -76,7 +91,7 @@
     "false_determinism_rejected": true,
     "inexact_float_weights_rejected": true
   },
-  "elapsed_seconds": 5.492116,
+  "elapsed_seconds": 5.974389,
   "all_passed": true,
   "claim_ceiling": "Small finite research prototype only. Shannon compilation and extensional determinism validation are exhaustive; arithmetic evaluation is bottom-up with explicit non-smooth scope completion. Not a scalable proof checker, SCPOG implementation, CNF compiler, Rust implementation, or solver differential."
 }
