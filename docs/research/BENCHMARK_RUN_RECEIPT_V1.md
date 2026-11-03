@@ -128,3 +128,8 @@ For SRE-Bench public-facing results, preserve the official metric over graded in
 For AgentRE-Bench, preserve its fixed 25-tool-call episode budget, isolated Docker environment, no network and read-only workspace; do not compare an arm using a different toolset or budget as though it were matched. [AgentRE-Bench protocol](https://github.com/agentrebench/AgentRE-Bench).
 
 For from-scratch firmware tasks, use the phase receipt extension from #10298: CVE/product identity → firmware acquisition → extraction/lineage → binary/root-cause identification → rehosting fidelity → safe target validation. A mock rehost cannot be counted as real firmware reproduction.
+
+
+### Independent schema audit environment
+
+The CI structural validator runs Python `jsonschema` 4.26.0 with all direct and transitive dependencies pinned in `tools/benchmark-run-receipt-harness/requirements-ci.txt`. The schema uses `date-time`; the pinned `rfc3339-validator` dependency is installed so `FormatChecker` validates timestamps rather than silently skipping that optional format. The Python audit rejects duplicate object keys and disallows external schema references. The Rust validator remains the semantic/accounting authority.
