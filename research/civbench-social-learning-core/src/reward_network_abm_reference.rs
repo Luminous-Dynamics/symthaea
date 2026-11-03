@@ -848,7 +848,7 @@ mod tests {
         };
         let run = simulate(human_only, 10).unwrap();
         let metrics = run.generations[0].metrics();
-        assert_eq!(metrics.human_optimal_prevalence, Some(metrics.human_optimal_prevalence.unwrap()));
+        assert!(metrics.human_optimal_prevalence.is_some());
         assert_eq!(metrics.machine_optimal_prevalence, None);
         assert_eq!(metrics.social_learning_rate_observed, None);
         assert_eq!(metrics.human_social_optimal_acquisition_rate, None);
