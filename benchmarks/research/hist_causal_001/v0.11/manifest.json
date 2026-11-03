@@ -1,0 +1,27 @@
+{
+  "benchmark":"HIST-CAUSAL-001",
+  "version":"0.11",
+  "issue":10184,
+  "status":"persistent_cluster_confounding_stress_test",
+  "randomization_unit":"cluster/family",
+  "clusters":64,
+  "treated_clusters":32,
+  "participants_per_cluster":16,
+  "repeated_probes_per_participant":3,
+  "persistent_random_effects":{
+    "cluster_sd":1.0,
+    "participant_sd":0.5,
+    "measurement_sd":1.0
+  },
+  "monte_carlo":{
+    "null_replicates":1000,
+    "randomization_permutations_per_replicate":999,
+    "seed":20261103
+  },
+  "observed_null_rejection_rates":{
+    "participant_level_invalid":0.682,
+    "cluster_mean_welch":0.05,
+    "cluster_randomization":0.049
+  },
+  "claim_ceiling":"finite synthetic Gaussian cluster model only; cross-cluster interference and nonstationary regimes not covered"
+}
