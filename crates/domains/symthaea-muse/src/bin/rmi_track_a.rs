@@ -64,6 +64,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             - report.payload.summary.yoked_replay_zero_sensitivity
     );
     println!(
+        "Wrong-feature target-sensitivity false positives: {}",
+        report.payload.summary.trials
+            - report.payload.summary.unrelated_feature_zero_target_sensitivity
+    );
+    println!(
         "Imitation sensitivity: {}/{}",
         report.payload.summary.imitation_agent_target_sensitive,
         report.payload.summary.trials
