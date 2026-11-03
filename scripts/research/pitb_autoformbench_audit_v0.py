@@ -192,7 +192,7 @@ def audit(repo: Path) -> dict[str, object]:
     raw_files, observed = {}, {}
     for path, expected in FILES.items():
         raw = read_git_file(repo, path)
-        digest = hashlib.sha1(f"blob {len(raw)}\\0".encode("ascii") + raw).hexdigest()
+        digest = hashlib.sha1(f"blob {len(raw)}\0".encode("ascii") + raw).hexdigest()
         if digest != expected:
             raise AuditError(f"Git blob mismatch for {path}: {digest}")
         raw_files[path], observed[path] = raw, digest
