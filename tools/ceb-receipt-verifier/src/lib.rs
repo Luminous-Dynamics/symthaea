@@ -997,6 +997,9 @@ fn verify_pair_inner(inputs: &PairInputs) -> Result<VerificationReport, Failure>
     if inputs.patch.len() > MAX_PATCH_BYTES {
         return Err(Failure::protocol("candidate patch exceeds the maximum size"));
     }
+    if inputs.patch.is_empty() {
+        return Err(Failure::rejected("empty candidate patch cannot satisfy the CEB positive control"));
+    }
     if inputs.primary_envelope.len() > MAX_JSON_BYTES || inputs.regrade_envelope.len() > MAX_JSON_BYTES {
         return Err(Failure::protocol("a DSSE envelope exceeds the maximum JSON size"));
     }
