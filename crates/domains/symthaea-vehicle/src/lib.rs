@@ -148,8 +148,9 @@ pub use model_discrepancy::{
     DecisionAuditResult, DecisionAuditStatus, DecisionAuditSummary, DiscrepancyActionOutcome,
     DiscrepancyFeasibility, FamilyHorizonResidualSummary, HorizonResidualSummary,
     ModelDecisionObservation, ModelResidualObservation, PairedHorizonResidualGrowth,
-    VehicleModelDiscrepancyError, VehicleModelDiscrepancyInput,
+    ReferenceOutcomeStatus, VehicleModelDiscrepancyError, VehicleModelDiscrepancyInput,
     VehicleModelDiscrepancyReport, VEHICLE_MODEL_DISCREPANCY_SCHEMA,
+    model_discrepancy_action_set_digest, model_discrepancy_decision_context_digest,
     summarize_vehicle_model_discrepancy,
 };
 pub use model_stability::{
