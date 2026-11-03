@@ -764,5 +764,66 @@
         "expected_pwmc": "1157/1224"
       }
     ]
-  }
+  },
+  "metamorphic_tests": [
+    {
+      "id": "free-hidden-addition-invariance",
+      "operation": "add_free_hidden",
+      "source": "single-hidden-witness-scope",
+      "expected": {
+        "full_model_multiplier": "2",
+        "projected_support": "unchanged",
+        "pwmc": "unchanged"
+      }
+    },
+    {
+      "id": "variable-order-permutation-invariance",
+      "operation": "permute_variable_order",
+      "source": "reusable_projection",
+      "expected": {
+        "full_model_count": "unchanged",
+        "projected_support": "unchanged",
+        "pwmc": "unchanged"
+      }
+    },
+    {
+      "id": "clause-and-literal-idempotence",
+      "operation": "duplicate_clause_and_literal",
+      "source": "reusable_projection",
+      "expected": {
+        "full_model_count": "unchanged",
+        "projected_support": "unchanged",
+        "pwmc": "unchanged"
+      }
+    },
+    {
+      "id": "subsumed-clause-invariance",
+      "operation": "add_subsumed_clause",
+      "source": "single-hidden-witness-scope",
+      "expected": {
+        "full_model_count": "unchanged",
+        "projected_support": "unchanged",
+        "pwmc": "unchanged"
+      }
+    },
+    {
+      "id": "free-visible-expansion-law",
+      "operation": "add_free_visible",
+      "source": "single-hidden-witness-scope",
+      "expected": {
+        "full_model_multiplier": "2",
+        "support_cardinality": "2",
+        "pwmc": "10/3"
+      }
+    },
+    {
+      "id": "projection-boundary-is-semantic-input",
+      "operation": "move_hidden_to_visible",
+      "source": "single-hidden-witness-scope",
+      "expected": {
+        "support_cardinality": "2",
+        "pwmc": "4/3"
+      }
+    }
+  ]
 }
