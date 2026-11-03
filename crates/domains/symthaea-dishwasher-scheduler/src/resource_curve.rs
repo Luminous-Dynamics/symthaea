@@ -18,6 +18,8 @@ pub struct CurveScope {
     pub surface_material: String,
     pub load_set_id: String,
     pub soil_batch_id: String,
+    /// Time between soil application and wash start, fixed by protocol.
+    pub soil_age_s: u64,
     pub detergent_batch_id: String,
     pub water_batch_id: String,
     pub water_hardness_ppm_as_caco3: u16,
@@ -184,14 +186,14 @@ impl OccupancyObservation {
             });
         }
 
-        let mut ids = HashSet::with_capacity(runs.len());
+        let mut ids: HashSet<String> = HashSet::with_capacity(runs.len());
         let mut cleaning_failures = 0_usize;
         let mut rinse_failures = 0_usize;
         for run in &runs {
             if run.run_id.trim().is_empty() {
                 return Err(CurveError::InvalidReplicateId);
             }
-            if !ids.insert(run.run_id.as_str()) {
+            if !ids.insert(run.run_id.clone()) {
                 return Err(CurveError::DuplicateReplicateId { occupancy });
             }
             for (field, value) in [
@@ -394,11 +396,11 @@ impl MeasuredOccupancyCurve {
             return Err(CurveError::TooFewOccupancyPoints);
         }
         points.sort_by_key(|point| point.occupancy);
-        let mut all_run_ids = HashSet::new();
+        let mut all_run_ids: HashSet<String> = HashSet::new();
         for point in &points {
             point.validate()?;
             for run_id in &point.replicate_ids {
-                if !all_run_ids.insert(run_id.as_str()) {
+                if !all_run_ids.insert(run_id.clone()) {
                     return Err(CurveError::ReplicateIdReusedAcrossOccupancies {
                         run_id: run_id.clone(),
                     });
@@ -483,6 +485,7 @@ mod tests {
             surface_material: "ceramic".to_owned(),
             load_set_id: "standardized-ceramic-load-v1".to_owned(),
             soil_batch_id: "soil-lot-2026-01".to_owned(),
+            soil_age_s: 21_600,
             detergent_batch_id: "detergent-lot-2026-01".to_owned(),
             water_batch_id: "water-lot-2026-01".to_owned(),
             water_hardness_ppm_as_caco3: 120,
