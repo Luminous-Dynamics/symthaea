@@ -711,7 +711,8 @@ fn verify_interventions(value: &Value, model_families: &HashSet<String>, errors:
                         )),
                     }
                 }
-                let declared_targets: HashSet<String> = item.get("target_ids")
+                let declared_targets: HashSet<String> = item
+                    .get("target_ids")
                     .and_then(Value::as_array)
                     .into_iter()
                     .flatten()
@@ -725,9 +726,14 @@ fn verify_interventions(value: &Value, model_families: &HashSet<String>, errors:
                 }
             }
             let state_context_id = item.get("state_context_id").and_then(Value::as_str);
-            let state_digest = item.get("state_measurement_manifest_sha256").and_then(Value::as_str);
-            let has_step_state = protocol_steps.into_iter().flatten()
-                .any(|step| step.get("state_context_id").and_then(Value::as_str).is_some());
+            let state_digest = item
+                .get("state_measurement_manifest_sha256")
+                .and_then(Value::as_str);
+            let has_step_state = protocol_steps.into_iter().flatten().any(|step| {
+                step.get("state_context_id")
+                    .and_then(Value::as_str)
+                    .is_some()
+            });
             if state_context_id.is_some() || has_step_state {
                 if state_digest.is_none_or(|digest| !is_sha256(digest)) {
                     errors.push(format!(
@@ -1821,10 +1827,16 @@ mod tests {
         let report = verify_manifest(&fixture);
         assert_eq!(report.disposition, "COMPLETE", "{:?}", report.errors);
 
-        fixture["intervention_design"]["selected_interventions"][0]["protocol_steps"][1]["step_index"] = json!(2);
+        fixture["intervention_design"]["selected_interventions"][0]["protocol_steps"][1]["step_index"] =
+            json!(2);
         let report = verify_manifest(&fixture);
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|error| error.contains("contiguous and zero-based")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("contiguous and zero-based"))
+        );
     }
 
     #[test]
@@ -1840,7 +1852,12 @@ mod tests {
         ]);
         let report = verify_manifest(&fixture);
         assert_eq!(report.disposition, "INVALID");
-        assert!(report.errors.iter().any(|error| error.contains("parent target_ids must equal the union")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("parent target_ids must equal the union"))
+        );
     }
 
     #[test]
