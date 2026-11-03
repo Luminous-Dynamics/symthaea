@@ -24,16 +24,23 @@
     "manifest_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
     "generator_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
     "freeze_receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
-    "oracle_boundary": "EVALUATOR_ONLY_VERIFIED"
+    "oracle_boundary": "EVALUATOR_ONLY_VERIFIED",
+    "required_error_families": [
+      "merge_split",
+      "continuation_loss",
+      "registration_uncertainty"
+    ]
   },
   "candidate_worlds": [
     {
       "world_id": "world-merge-split-a",
-      "query_state": "BELOW_THRESHOLD"
+      "query_state": "BELOW_THRESHOLD",
+      "canonical_structural_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     {
       "world_id": "world-merge-split-b",
-      "query_state": "BELOW_THRESHOLD"
+      "query_state": "BELOW_THRESHOLD",
+      "canonical_structural_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
   ],
   "reference_worlds": [
@@ -42,28 +49,32 @@
       "error_family": "merge_split",
       "evidence_compatibility": "COMPATIBLE",
       "query_state": "BELOW_THRESHOLD",
-      "material_to_query": false
+      "material_to_query": false,
+      "canonical_structural_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     {
       "world_id": "world-merge-split-b",
       "error_family": "merge_split",
       "evidence_compatibility": "COMPATIBLE",
       "query_state": "BELOW_THRESHOLD",
-      "material_to_query": false
+      "material_to_query": false,
+      "canonical_structural_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     },
     {
       "world_id": "world-continuation-loss-c",
       "error_family": "continuation_loss",
       "evidence_compatibility": "COMPATIBLE",
       "query_state": "AT_OR_ABOVE_THRESHOLD",
-      "material_to_query": true
+      "material_to_query": true,
+      "canonical_structural_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "world_id": "world-registration-unknown-d",
       "error_family": "registration_uncertainty",
       "evidence_compatibility": "INDETERMINATE",
       "query_state": null,
-      "material_to_query": true
+      "material_to_query": true,
+      "canonical_structural_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
     }
   ],
   "summary": {
@@ -77,7 +88,8 @@
     "query_flipping_reference_count": 1,
     "omitted_query_flipping_count": 1,
     "false_invariance_count": 1,
-    "not_estimable_count": 1
+    "not_estimable_count": 1,
+    "false_ambiguity_count": 0
   },
   "family_summaries": [
     {
@@ -87,7 +99,8 @@
       "query_flipping_reference_count": 0,
       "omitted_query_flipping_count": 0,
       "false_invariance_count": 0,
-      "not_estimable_count": 0
+      "not_estimable_count": 0,
+      "false_ambiguity_count": 0
     },
     {
       "error_family": "continuation_loss",
@@ -96,7 +109,8 @@
       "query_flipping_reference_count": 1,
       "omitted_query_flipping_count": 1,
       "false_invariance_count": 1,
-      "not_estimable_count": 0
+      "not_estimable_count": 0,
+      "false_ambiguity_count": 0
     },
     {
       "error_family": "registration_uncertainty",
@@ -105,7 +119,8 @@
       "query_flipping_reference_count": 0,
       "omitted_query_flipping_count": 0,
       "false_invariance_count": 0,
-      "not_estimable_count": 1
+      "not_estimable_count": 1,
+      "false_ambiguity_count": 0
     }
   ],
   "dispositions": {
