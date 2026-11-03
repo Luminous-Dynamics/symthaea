@@ -347,7 +347,10 @@ def audit(repo: Path) -> dict[str, object]:
         models[name] = index_model(parse_csv(raw_files[path], path), manifest, name)
     primary = models["gpt-6-astra"]
     residual = residual_by_group(primary)
-    complexity = target_complexity_analysis(manifest, primary)
+    complexity_by_model = {
+        name: target_complexity_analysis(manifest, rows)
+        for name, rows in sorted(models.items())
+    }
     n_failed = sum(int(x["unresolved"]) for x in residual)
     top6 = sum(int(x["unresolved"]) for x in residual[:6])
     return {
@@ -362,7 +365,7 @@ def audit(repo: Path) -> dict[str, object]:
             k: paired(primary, v) for k, v in models.items() if k != "gpt-6-astra"
         },
         "gpt_6_astra_residuals_by_source_group": residual,
-        "gpt_6_astra_target_count_complexity_analysis": complexity,
+        "target_count_complexity_by_model": complexity_by_model,
         "residual_concentration": {"unresolved_tasks": n_failed, "top_six_groups_unresolved": top6,
                                    "top_six_share": top6 / n_failed if n_failed else 0},
         "warning": "Cross-model outcome and cost differences are descriptive, not causal or matched-budget comparisons.",
