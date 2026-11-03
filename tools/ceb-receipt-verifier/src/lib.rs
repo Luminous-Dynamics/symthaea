@@ -263,7 +263,7 @@ fn schema_digests() -> SchemaDigests {
 }
 
 
-const TREE_DIGEST_ALGORITHM: &str = "ceb-tree-v1";
+pub const TREE_DIGEST_ALGORITHM: &str = "ceb-tree-v1";
 const MAX_TREE_FILES: usize = 200_000;
 const MAX_TREE_ENTRIES: usize = 250_000;
 const MAX_TREE_DEPTH: usize = 128;
