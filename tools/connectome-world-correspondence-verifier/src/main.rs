@@ -1020,7 +1020,7 @@ mod tests {
         let mut receipt: Value = serde_json::from_str(RECEIPT).expect("fixture JSON");
         receipt["mappings"].as_array_mut().expect("mappings").remove(7);
         receipt["summary"]["mapping_count"] = Value::from(7);
-        receipt["summary"]["verified_count"] = Value::from(3);
+        receipt["summary"]["claimed_verified_count"] = Value::from(3);
         let bytes = serde_json::to_string(&receipt).expect("serialize altered receipt");
         assert!(verify(&bytes, SOURCE, TARGET).is_err());
     }
