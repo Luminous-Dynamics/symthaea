@@ -740,6 +740,7 @@ mod tests {
     #[test]
     fn rejects_incompatible_component_timing() {
         let mut input = request();
+        input.events[0].stage = WashStage::MainWash;
         input.events[0].elapsed_s = 590;
         assert!(matches!(
             validate_dose_plan(&formulation(), &input),
