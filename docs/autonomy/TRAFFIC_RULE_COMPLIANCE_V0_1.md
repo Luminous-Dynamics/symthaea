@@ -18,7 +18,7 @@ Reference:
 The v0.1 evaluator supports three rule primitives:
 - **SpeedLimit:** compare sampled speed against a declared maximum plus an explicit measurement tolerance.
 - **MandatoryDirection:** compare wrapped trajectory heading against a declared heading and angular tolerance.
-- **StopBeforeLine:** require low-speed samples before line crossing for a minimum dwell duration, with bounded sample gaps and plausible route-progress movement during the stationary sequence.
+- **StopBeforeLine:** require low-speed samples before line crossing for a minimum observed dwell duration, with bounded sample gaps and plausible route-progress movement during the stationary sequence.
 
 Other rule families can be retained as `Unsupported` and yield `Indeterminate`. An empty unsupported-family name is malformed and also remains indeterminate. They must not be silently dropped or counted as compliant. Initial unsupported families include yield/right-of-way, crosswalk priority, signal phase, no-entry, prohibited turns and other route-direction signs.
 
@@ -46,7 +46,7 @@ Conflicted or unavailable evidence yields `Indeterminate`, not `Compliant`. Unsu
 - `NotEncountered`: the rule's active route interval was not entered in the supplied trajectory.
 - `Pending`: the episode entered a stop-control zone but ended before crossing the stop line; no compliance or violation is claimed yet.
 
-Non-finite numeric input is rejected explicitly because it cannot be represented faithfully in the JSON report. Finite but malformed trajectories (e.g. non-monotonic time or route progress) are retained as indeterminate findings. Route progress must be unwrapped and monotonic; a loop-wrap must be normalized by the caller.
+Non-finite numeric input is rejected explicitly because it cannot be represented faithfully in the JSON report. Finite but malformed trajectories (e.g. non-monotonic time or route progress) are retained as indeterminate findings. Speed-limit and mandatory-direction evaluations additionally require the trace to bracket the complete declared active route-progress interval, at least two samples inside it, and no intersecting segment whose time gap exceeds the rule's maximum. A trace that overlaps only part of the rule zone or skips the full zone between samples is `Indeterminate`, not `Compliant` or `NotEncountered`. Route progress must be unwrapped and monotonic; a loop-wrap must be normalized by the caller.
 
 ## Stop-line sampling conditions
 
@@ -54,7 +54,11 @@ A stop is not inferred from one low-speed point or from widely separated samples
 - each consecutive low-speed sample gap no larger than the declared maximum;
 - route progress remains before the line within the declared tolerance;
 - sampled progress displacement remains compatible with the speed threshold and tolerance;
-- total observed sampled dwell reaches the required duration before line crossing. The final low-speed-sample-to-crossing gap must be within the declared maximum but is not counted as stopped dwell.
+- the trace begins at or before the declared approach-zone start;
+- total observed sampled dwell between qualifying low-speed samples reaches the required duration before line crossing;
+- the final low-speed-sample-to-crossing gap is within the declared maximum but is not counted as stopped dwell.
+
+A large gap or speed/route-progress inconsistency that prevents determining the stop sequence yields `Indeterminate`, not `Violation`. A trace that starts after the approach-zone boundary is also indeterminate because the earlier stop history is missing.
 
 This is a discrete trajectory check, not proof of continuous physical standstill. The maximum sample gap and position tolerance are part of the rule profile and must be calibrated to the data source.
 
