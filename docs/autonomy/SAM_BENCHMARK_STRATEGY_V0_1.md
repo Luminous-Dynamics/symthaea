@@ -503,6 +503,6 @@ This is a model-sensitivity diagnostic, not proof that the profile family spans 
 
 Candidate model perturbations should be explicit and bounded: friction/axle grip, brake and steering delays, localization bias/staleness, actor timing/speed and independently justified parameter alternatives. Execute the same actions from the same conditions under each profile through Symtropy #3387. Measure rank reversals and regret shifts, then use those cases to prioritize higher-fidelity validation.
 
-Nine unit tests are authored but not compiled/run. No vehicle model-ensemble results have been produced.
+Ten unit tests are authored but not compiled/run. No vehicle model-ensemble results have been produced.
 
 Protocol: [CROSS_MODEL_COUNTERFACTUAL_STABILITY_V0_1.md](./CROSS_MODEL_COUNTERFACTUAL_STABILITY_V0_1.md).
