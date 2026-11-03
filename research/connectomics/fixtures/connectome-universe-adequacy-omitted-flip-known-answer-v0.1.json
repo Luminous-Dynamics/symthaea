@@ -91,7 +91,9 @@
     "omitted_query_flipping_count": 1,
     "false_invariance_count": 1,
     "not_estimable_count": 1,
-    "false_ambiguity_count": 0
+    "false_ambiguity_count": 0,
+    "candidate_duplicate_structure_group_count": 0,
+    "reference_duplicate_structure_group_count": 0
   },
   "family_summaries": [
     {
