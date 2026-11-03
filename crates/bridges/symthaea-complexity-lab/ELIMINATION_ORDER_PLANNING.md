@@ -50,17 +50,18 @@ The first aggregate used an incorrectly normalized percentage: `(heuristic - exh
 | Min-weight | 20.46% | 22.84% | 69.33% | 1/30 |
 | Weighted min-fill | 20.46% | 22.84% | 69.33% | 1/30 |
 | Algebra-independent min-bucket-work | 2.37% | 6.84% | 61.81% | 6/30 |
-| 32-start stochastic min-fill, best measured order per algebra | 1.99% | 4.98% | 35.91% | 10/30 |
+| 32-start min-fill, selected by cheap static score | 4.84% | 9.66% | 73.71% | 4/30 |
+| 32-start min-fill, oracle-best candidate (hindsight ceiling only) | 1.99% | 4.98% | 35.91% | 10/30 |
 
-Among the six heuristic families evaluated, min-bucket-work had the lowest regret in 14/30 cases, 32-start stochastic min-fill in 15/30, and ordinary min-fill in 1/30. The conventional graph heuristics produced the same order on this particular five-variable fixture set; that is a dataset property, not a general equivalence. The stochastic portfolio is allowed to choose its best candidate **after** evaluating the algebra-specific proxy, so its online selection cost must be included in a production comparison.
+Among deployable heuristic families, min-bucket-work had the lowest regret in 14/30 cases; ordinary min-fill did so in 1/30, while the static-score 32-candidate portfolio did not win any case under this proxy. The conventional graph heuristics produced the same order on this particular five-variable fixture set; that is a dataset property, not a general equivalence. The oracle-best-of-32 line is a hindsight candidate-coverage ceiling, not a deployable selector, because it chooses using exact proxy evaluations from the exhaustive run.
 
 The exact order minimizing the algebra-work proxy differed among MaxCount, ParetoCount and polynomial profiles on 9 of the 10 graphs. Across cases, cost-vector Pareto frontiers ranged from 1 to 23 orders. Certificate-size and cost-vector objectives often disagreed; a planner should expose non-dominated plans and respect caller constraints rather than collapse everything into a hidden scalar score.
 
-These numbers compare heuristics to exhaustive best on the same tiny synthetic cases under a model-specific proxy. They are not runtime speedups. The algebra-work proxy charges support operations, approximate coefficient-bit work and, for the reference Pareto implementation, quadratic dominance comparisons. The reference certificate byte count is exact UTF-8 JSON size under certificate v1, not production Rust trace size. The stochastic method's 1.99% median regret includes 32 independent greedy starts in candidate generation, but not yet a separately measured planning-runtime overhead.
+These numbers compare heuristics to exhaustive best on the same tiny synthetic cases under a model-specific proxy. They are not runtime speedups. The algebra-work proxy charges support operations, approximate coefficient-bit work and, for the reference Pareto implementation, quadratic dominance comparisons. The reference certificate byte count is exact UTF-8 JSON size under certificate v1, not production Rust trace size. The static 32-start portfolio uses a cheap ranking score; its candidate-generation overhead has not yet been measured. The 1.99% hindsight figure assumes the exact algebra-work proxy is known for all 32 candidates and is not online planner performance.
 
 ## Six-variable extension (3 Nov 2026)
 
-A bounded larger-state pilot used one six-variable binary graph with scopes `[[0,1],[1,2],[2,3],[3,4],[4,5],[0,5],[0,3],[1,4],[2,5]]`. All 720 elimination orders were executed under MaxCount, two-objective ParetoCount and a bounded polynomial profile: **2,160 exact order/algebra executions**. All orders preserved the exact result in each algebra, the direct assignment oracle agreed in 3/3 cases, and 11 selected certificates passed the independent checker.
+A bounded larger-state pilot used one six-variable binary graph with scopes `[[0,1],[1,2],[2,3],[3,4],[4,5],[0,5],[0,3],[1,4],[2,5]]`. All 720 elimination orders were executed under MaxCount, two-objective ParetoCount and a bounded polynomial profile: **2,160 exact order/algebra executions**. All orders preserved the exact result in each algebra, the direct assignment oracle agreed in 3/3 cases, and **11 selected certificates** passed the independent checker.
 
 | Algebra | Exhaustive-best order | Min-fill regret | 32-start static-score regret | Oracle-best-of-32 regret (hindsight) | Cost-frontier size |
 |---|---|---:|---:|---:|---:|
@@ -68,9 +69,7 @@ A bounded larger-state pilot used one six-variable binary graph with scopes `[[0
 | ParetoCount | `[5,1,4,2,0,3]` | 35.69% | 33.98% | 5.12% | 1 |
 | Polynomial profile | `[1,3,5,0,4,2]` | 21.73% | 21.05% | 10.87% | 12 |
 
-On this one six-variable graph, all three algebras selected different exhaustive-best work-proxy orders. Min-fill and min-bucket-work happened to return the same candidate on this graph. The cheap structural selector marginally improves the min-fill order on this graph, but the oracle-best-of-32 column uses exhaustive exact proxy scores and is hindsight only. This is proxy regret versus exhaustive enumeration on one small synthetic graph—not measured runtime and not a general heuristic guarantee.
-
-An exploratory four-graph mixed-cardinality six-variable exhaustive run (8,640 intended order/algebra cases) exceeded a 300-second execution limit before completion. It is an incomplete attempt and is **not** included as successful evidence. The completed binary run is recorded in `src/elimination_order_scale6_binary.py` and `src/elimination_order_scale6_binary_results.json`.
+On this one six-variable graph, all three algebras selected different exhaustive-best work-proxy orders. The cheap static-score selector marginally improves upon min-fill but leaves 20.95%–33.98% proxy regret. The oracle-best-of-32 column selects by exact scores already known from exhaustive enumeration; it is a hindsight ceiling, not an online heuristic. An exploratory four-graph mixed-cardinality six-variable exhaustive run (8,640 intended order/algebra cases) exceeded a 300-second limit before completion and produced no accepted run; it is not counted as evidence.
 
 ## What this proves and does not prove
 
