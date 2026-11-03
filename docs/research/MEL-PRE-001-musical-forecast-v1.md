@@ -22,7 +22,7 @@ Move from a black-box response to an **inspectable future commitment**:
 5. Delivery/display is logged separately from forecast generation. A display record does not prove the musician read, understood or acted on it.
 6. The collaborator can accept, steer, veto, branch, ignore or abstain. Departing from a preview is not disobedience or an agent failure.
 
-The V1 Rust module provides the symbolic event ledger and evaluator. It does not yet wire the forecast object into the live Studio candidate/score path or a UI.
+The V1 Rust module provides the symbolic event ledger and evaluator. Each ledger event is SHA-256 hash-linked to its predecessor; the evaluation receipt binds the ledger prefix at the realization tick, excluding later events. Publishing or signing that head outside the ledger is still required to anchor the history against a full rewrite. It does not yet wire the forecast object into the live Studio candidate/score path or a UI.
 
 ## V1 invariants
 
