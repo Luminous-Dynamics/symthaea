@@ -248,3 +248,48 @@ fn main() -> ExitCode {
         Err(message) => fail(message),
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{fs, time::{SystemTime, UNIX_EPOCH}};
+
+    #[test]
+    fn accepts_lowercase_sha256_shape() {
+        assert!(valid_sha256(&"a".repeat(64)));
+        assert!(valid_sha256(&"0123456789abcdef".repeat(4)));
+    }
+
+    #[test]
+    fn rejects_bad_sha256_shape() {
+        assert!(!valid_sha256("abc"));
+        assert!(!valid_sha256(&"A".repeat(64)));
+        assert!(!valid_sha256(&"g".repeat(64)));
+    }
+
+    #[test]
+    fn rejects_parent_and_absolute_paths() {
+        let root = Path::new("/tmp");
+        assert!(resolve_artifact(root, "../outside").is_err());
+        assert!(resolve_artifact(root, "/etc/passwd").is_err());
+        assert!(resolve_artifact(root, "").is_err());
+    }
+
+    #[test]
+    fn verifies_regular_file_and_rejects_symlink() {
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let root = env::temp_dir().join(format!("pitb-aegis-test-{}-{nonce}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        fs::write(root.join("source.rs"), b"fn main() {}").unwrap();
+        assert!(resolve_artifact(&root, "source.rs").is_ok());
+
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(root.join("source.rs"), root.join("linked.rs")).unwrap();
+            assert!(resolve_artifact(&root, "linked.rs").is_err());
+        }
+
+        fs::remove_dir_all(&root).unwrap();
+    }
+}
