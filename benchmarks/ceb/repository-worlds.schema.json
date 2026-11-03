@@ -88,10 +88,11 @@
           "id",
           "target_os",
           "target_triple",
-          "enabled_features",
           "expected_active_nodes",
           "expected_inactive_nodes",
-          "default_features_enabled"
+          "default_features_enabled",
+          "explicit_features",
+          "effective_features"
         ],
         "properties": {
           "id": {
@@ -107,16 +108,6 @@
           "target_triple": {
             "type": "string",
             "minLength": 1
-          },
-          "enabled_features": {
-            "type": "array",
-            "uniqueItems": true,
-            "items": {
-              "enum": [
-                "audit",
-                "windows-native"
-              ]
-            }
           },
           "expected_active_nodes": {
             "type": "array",
@@ -136,6 +127,26 @@
           },
           "default_features_enabled": {
             "type": "boolean"
+          },
+          "explicit_features": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "audit",
+                "windows-native"
+              ]
+            }
+          },
+          "effective_features": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "audit",
+                "windows-native"
+              ]
+            }
           }
         }
       }
