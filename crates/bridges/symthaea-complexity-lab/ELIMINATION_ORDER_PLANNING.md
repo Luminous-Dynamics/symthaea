@@ -41,20 +41,22 @@ For each graph, every one of its 120 variable permutations was executed under Ma
 
 ### Aggregate observed results
 
-| Metric across 30 graph/algebra cases | Result |
-|---|---:|
-| Deterministic min-fill regret vs exhaustive best algebra-work proxy, median | 16.96% |
-| Same regret, mean | 17.07% |
-| Same regret, maximum | 40.94% |
-| 32-start stochastic min-fill gain vs deterministic min-fill, median | 10.47% |
-| Same stochastic gain, mean | 13.33% |
-| Minimum certificate-size reduction vs min-fill, median | 5.54% |
-| Same certificate-size reduction, maximum | 16.27% |
-| Graphs where best work-proxy order differs across the three algebras | 9/10 |
+The first aggregate used an incorrectly normalized percentage: `(heuristic - exhaustive_best) / heuristic`. That describes the fraction of baseline work removable, but is not conventional regret. The corrected denominator below is the exhaustive-best proxy; do not quote the earlier 16.96% / 40.94% values as standard regret.
 
-The exact order minimizing the algebra-work proxy differed among MaxCount, ParetoCount and polynomial profiles on 9 of the 10 graphs. The 32-start stochastic min-fill pool narrowed the gap on average but did not consistently recover the exhaustive best. Across cases, cost-vector Pareto frontiers ranged from 1 to 23 orders.
+| Heuristic proxy regret against exhaustive best | Median | Mean | Maximum | Exact best cases |
+|---|---:|---:|---:|---:|
+| Min-neighbors | 20.46% | 22.84% | 69.33% | 1/30 |
+| Min-fill | 20.46% | 22.84% | 69.33% | 1/30 |
+| Min-weight | 20.46% | 22.84% | 69.33% | 1/30 |
+| Weighted min-fill | 20.46% | 22.84% | 69.33% | 1/30 |
+| Algebra-independent min-bucket-work | 2.37% | 6.84% | 61.81% | 6/30 |
+| 32-start stochastic min-fill, best measured order per algebra | 1.99% | 4.98% | 35.91% | 10/30 |
 
-These differences compare deterministic min-fill (variable-ID tie-break) with the best of all 120 orders **under this proxy on these tiny synthetic instances**. They are not runtime speedups. The algebra-work proxy is transparent but model-dependent: it charges support operations, approximate coefficient-bit work and, for the reference Pareto implementation, quadratic dominance comparisons. The reference certificate byte count is exact UTF-8 JSON size under certificate v1, not production Rust trace size.
+Among the six heuristic families evaluated, min-bucket-work had the lowest regret in 14/30 cases, 32-start stochastic min-fill in 15/30, and ordinary min-fill in 1/30. The conventional graph heuristics produced the same order on this particular five-variable fixture set; that is a dataset property, not a general equivalence. The stochastic portfolio is allowed to choose its best candidate **after** evaluating the algebra-specific proxy, so its online selection cost must be included in a production comparison.
+
+The exact order minimizing the algebra-work proxy differed among MaxCount, ParetoCount and polynomial profiles on 9 of the 10 graphs. Across cases, cost-vector Pareto frontiers ranged from 1 to 23 orders. Certificate-size and cost-vector objectives often disagreed; a planner should expose non-dominated plans and respect caller constraints rather than collapse everything into a hidden scalar score.
+
+These numbers compare heuristics to exhaustive best on the same tiny synthetic cases under a model-specific proxy. They are not runtime speedups. The algebra-work proxy charges support operations, approximate coefficient-bit work and, for the reference Pareto implementation, quadratic dominance comparisons. The reference certificate byte count is exact UTF-8 JSON size under certificate v1, not production Rust trace size. The stochastic method's 1.99% median regret includes 32 independent greedy starts in candidate generation, but not yet a separately measured planning-runtime overhead.
 
 ## What this proves and does not prove
 
