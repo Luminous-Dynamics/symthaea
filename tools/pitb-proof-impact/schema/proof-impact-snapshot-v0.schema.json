@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/proof-impact-snapshot-v0.schema.json",
+  "title": "PITB proof-maintenance snapshot v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "snapshot_id",
+    "repository_commit",
+    "environment_sha256",
+    "dependency_inventory_complete",
+    "nodes",
+    "edges"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.proof-impact-snapshot.v0"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repository_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "environment_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "dependency_inventory_complete": {
+      "type": "boolean"
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "node_id",
+          "kind",
+          "declaration_kind",
+          "reducibility",
+          "statement_sha256",
+          "body_sha256",
+          "proof_sha256",
+          "axiom_manifest_sha256",
+          "source_sha256"
+        ],
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "formal_declaration",
+              "module",
+              "environment_artifact",
+              "document",
+              "blueprint_node",
+              "informal_statement"
+            ]
+          },
+          "declaration_kind": {
+            "enum": [
+              "theorem",
+              "opaque",
+              "definition",
+              "instance",
+              "class",
+              "structure",
+              "inductive",
+              "module",
+              "environment",
+              "document",
+              "blueprint",
+              "informal",
+              "other"
+            ]
+          },
+          "reducibility": {
+            "enum": [
+              "transparent",
+              "opaque",
+              "not_applicable"
+            ]
+          },
+          "statement_sha256": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            ]
+          },
+          "body_sha256": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            ]
+          },
+          "proof_sha256": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            ]
+          },
+          "axiom_manifest_sha256": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            ]
+          },
+          "source_sha256": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "edge_id",
+          "source_node_id",
+          "target_node_id",
+          "relation"
+        ],
+        "properties": {
+          "edge_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_node_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target_node_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "relation": {
+            "enum": [
+              "type_reference",
+              "signature_reference",
+              "proof_term_reference",
+              "definition_body_reference",
+              "structure_field_reference",
+              "inheritance_reference",
+              "instance_synthesis",
+              "module_environment_dependency",
+              "documentation_reference",
+              "blueprint_dependency",
+              "informal_candidate_dependency",
+              "cross_formality_match"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
