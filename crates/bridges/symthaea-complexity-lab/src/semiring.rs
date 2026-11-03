@@ -1179,6 +1179,29 @@ mod tests {
     }
 
     #[test]
+    fn exact_uniform_optimum_sampler_multiplies_disconnected_component_supports() {
+        let mut graph = ExactFactorGraph::new(vec![2,3], MaxCountValue::zero(), MaxCountValue::one()).unwrap();
+        graph.add_factor(vec![0], vec![
+            MaxCountValue::candidate(0, 2),
+            MaxCountValue::candidate(0, 3),
+        ]).unwrap();
+        graph.add_factor(vec![1], vec![
+            MaxCountValue::candidate(0, 1),
+            MaxCountValue::candidate(0, 4),
+            MaxCountValue::candidate(0, 5),
+        ]).unwrap();
+        let result = graph.evaluate_with_witness(&[0,1]).unwrap();
+        assert_eq!(result.value.optimum(), Some(MaxCountTerm { score: 0, count: 50 }));
+        assert_eq!(result.distinct_optimal_assignments, 6);
+        let first = graph.sample_optimal_assignment(&result, |_| 0).unwrap().unwrap();
+        let last = graph.sample_optimal_assignment(&result, |bound| bound - 1).unwrap().unwrap();
+        assert_ne!(first, last);
+        for assignment in [first, last] {
+            assert!(assignment[0] < 2 && assignment[1] < 3);
+        }
+    }
+
+    #[test]
     fn max_count_dual_factor_tables_reject_scope_and_feasibility_misalignment() {
         let weighted = vec![ExactFactor {
             scope: vec![0],
