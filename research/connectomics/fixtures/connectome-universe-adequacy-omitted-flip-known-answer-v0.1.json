@@ -35,13 +35,13 @@
     {
       "world_id": "world-merge-split-a",
       "query_state": "BELOW_THRESHOLD",
-      "canonical_structural_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "canonical_structural_sha256": "f4979c0986a297aca4e97be92cfeb3ee06096b6a0e09eba08b04d84ff39686dc",
       "error_family": "merge_split"
     },
     {
       "world_id": "world-merge-split-b",
       "query_state": "BELOW_THRESHOLD",
-      "canonical_structural_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "canonical_structural_sha256": "26bb0d3c3acbdd1c0feab01e943fd64fcbffad10e1a4e828bdc2472bde389417",
       "error_family": "merge_split"
     }
   ],
@@ -52,7 +52,7 @@
       "evidence_compatibility": "COMPATIBLE",
       "query_state": "BELOW_THRESHOLD",
       "material_to_query": false,
-      "canonical_structural_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      "canonical_structural_sha256": "f4979c0986a297aca4e97be92cfeb3ee06096b6a0e09eba08b04d84ff39686dc"
     },
     {
       "world_id": "world-merge-split-b",
@@ -60,7 +60,7 @@
       "evidence_compatibility": "COMPATIBLE",
       "query_state": "BELOW_THRESHOLD",
       "material_to_query": false,
-      "canonical_structural_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      "canonical_structural_sha256": "26bb0d3c3acbdd1c0feab01e943fd64fcbffad10e1a4e828bdc2472bde389417"
     },
     {
       "world_id": "world-continuation-loss-c",
@@ -68,7 +68,7 @@
       "evidence_compatibility": "COMPATIBLE",
       "query_state": "AT_OR_ABOVE_THRESHOLD",
       "material_to_query": true,
-      "canonical_structural_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      "canonical_structural_sha256": "b197153da419139e021a1ba672d4ea744683622ca98d93c94581e48281428953"
     },
     {
       "world_id": "world-registration-unknown-d",
@@ -76,7 +76,7 @@
       "evidence_compatibility": "INDETERMINATE",
       "query_state": null,
       "material_to_query": true,
-      "canonical_structural_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      "canonical_structural_sha256": "fb2888168c8b9d2504147a31a43e54678ac84a3a67210ea640e6d74da65b07b2"
     }
   ],
   "summary": {
@@ -135,6 +135,9 @@
     "evaluator_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
     "rules_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
     "report_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "truth_separation_verified": true
+    "truth_separation_verified": true,
+    "canonicalizer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "candidate_structure_manifest_sha256": "402324df481fb6743c3c5a07bd9c7a6707e626a7848bfa24bc43afae402deb4c",
+    "reference_structure_manifest_sha256": "4736c11291392f78514cda666cc47ab1bf448c04eaf73dd1c88093ec03529e8e"
   }
 }
