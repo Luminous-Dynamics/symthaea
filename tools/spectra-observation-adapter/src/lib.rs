@@ -129,8 +129,18 @@ pub struct Type1CategoryCount {
     pub noise_trials: u64,
 }
 
-/// Descriptive adapter result. A missing curve means its route did not
-/// contain both event classes with usable observations; it is not a zero AUC.
+/// Category counts stratified at the participant/session analysis unit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StratifiedType1CategoryCount {
+    pub participant_id: u32,
+    pub session_id: u32,
+    pub evidence_order: i16,
+    pub signal_trials: u64,
+    pub noise_trials: u64,
+}
+
+/// Descriptive adapter result. Pooled curves are exploratory summaries; a
+/// subject/session UVSD model must consume the stratified raw category counts.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ObservationReport {
     pub total_trials: usize,
@@ -150,6 +160,12 @@ pub struct ObservationReport {
     pub confidence_category_counts: Vec<Type1CategoryCount>,
     /// RT response-category counts for future likelihood fitting.
     pub rt_category_counts: Vec<Type1CategoryCount>,
+    /// Confidence categories preserving participant/session identity.
+    pub confidence_category_counts_by_stratum: Vec<StratifiedType1CategoryCount>,
+    /// RT categories preserving participant/session identity.
+    pub rt_category_counts_by_stratum: Vec<StratifiedType1CategoryCount>,
+    /// Pooled across all participants/sessions; do not fit a subject-level UVSD
+    /// model to this curve when participant heterogeneity is decision-relevant.
     pub confidence_type1_roc: Option<RocCurve>,
     pub rt_type1_roc: Option<RocCurve>,
     pub confidence_roc_auc: Option<f64>,
@@ -196,6 +212,7 @@ pub fn evaluate(
     let mut decision_trials = 0usize;
     let mut confidence_trials = 0usize;
     let mut rt_trials = 0usize;
+    let mut confidence_scores_by_index = vec![None::<i16>; total];
     let mut confidence_observations = Vec::new();
     let mut confidence_categories = BTreeSet::new();
 
@@ -216,6 +233,7 @@ pub fn evaluate(
             confidence_trials += 1;
             let score = confidence_score(decision_yes, level, profile.confidence_levels);
             confidence_categories.insert(score);
+            confidence_scores_by_index[candidate.trials.iter().position(|trial| trial.trial_id == row.trial_id).ok_or(ObservationError::MisalignedTruth)?] = Some(score);
             confidence_observations.push(RocObservation {
                 score: score as f64,
                 is_signal,
@@ -227,8 +245,9 @@ pub fn evaluate(
         }
     }
 
-    let (rt_observations, rt_usable_trials, rt_resolution_limited_trials) =
-        build_rt_observations(candidate, truth, profile)?;
+    let (rt_scores_by_index, rt_usable_trials, rt_resolution_limited_trials) =
+        build_rt_scores(candidate, profile)?;
+    let rt_observations = observations_from_scores(&rt_scores_by_index, truth);
     let rt_categories: BTreeSet<_> = rt_observations
         .iter()
         .map(|observation| observation.score.to_bits())
@@ -236,6 +255,10 @@ pub fn evaluate(
 
     let confidence_category_counts = category_counts(&confidence_observations);
     let rt_category_counts = category_counts(&rt_observations);
+    let confidence_category_counts_by_stratum =
+        stratified_category_counts(candidate, truth, &confidence_scores_by_index);
+    let rt_category_counts_by_stratum =
+        stratified_category_counts(candidate, truth, &rt_scores_by_index);
     let confidence_curve = optional_roc(&confidence_observations)?;
     let rt_curve = optional_roc(&rt_observations)?;
     let binary_signal_detection = decision_counts.metrics();
@@ -256,6 +279,8 @@ pub fn evaluate(
         binary_signal_detection,
         confidence_category_counts,
         rt_category_counts,
+        confidence_category_counts_by_stratum,
+        rt_category_counts_by_stratum,
         confidence_roc_auc: confidence_curve.as_ref().map(|curve| curve.auc),
         rt_roc_auc: rt_curve.as_ref().map(|curve| curve.auc),
         confidence_type1_roc: confidence_curve,
@@ -321,11 +346,10 @@ fn confidence_score(decision_yes: bool, level: u8, levels: u8) -> i16 {
 /// responses have the highest score; slow yes responses are next; slow no
 /// responses are closer to the decision boundary; fast no responses have the
 /// lowest score. Equal RTs receive the same bin.
-fn build_rt_observations(
+fn build_rt_scores(
     candidate: &CandidateView,
-    truth: &EvaluatorTruth,
     profile: ObservationProfile,
-) -> Result<(Vec<RocObservation>, usize, usize), ObservationError> {
+) -> Result<(Vec<Option<i16>>, usize, usize), ObservationError> {
     let mut by_participant: BTreeMap<u32, Vec<(usize, u64)>> = BTreeMap::new();
     let mut rt_usable_trials = 0usize;
     let mut rt_resolution_limited_trials = 0usize;
@@ -383,16 +407,53 @@ fn build_rt_observations(
         }
     }
 
-    let mut result = Vec::new();
-    for (index, score) in scores_by_index.into_iter().enumerate() {
-        if let Some(score) = score {
-            result.push(RocObservation {
-                score: f64::from(score),
+    Ok((scores_by_index, rt_usable_trials, rt_resolution_limited_trials))
+}
+
+fn observations_from_scores(
+    scores: &[Option<i16>],
+    truth: &EvaluatorTruth,
+) -> Vec<RocObservation> {
+    scores
+        .iter()
+        .enumerate()
+        .filter_map(|(index, score)| {
+            score.map(|value| RocObservation {
+                score: f64::from(value),
                 is_signal: truth.event_present[index],
-            });
+            })
+        })
+        .collect()
+}
+
+fn stratified_category_counts(
+    candidate: &CandidateView,
+    truth: &EvaluatorTruth,
+    scores: &[Option<i16>],
+) -> Vec<StratifiedType1CategoryCount> {
+    let mut counts = BTreeMap::<(u32, u32, i16), (u64, u64)>::new();
+    for (index, score) in scores.iter().enumerate() {
+        let Some(score) = score else { continue; };
+        let row = candidate.trials[index];
+        let entry = counts.entry((row.participant_id, row.session_id, *score)).or_default();
+        if truth.event_present[index] {
+            entry.0 += 1;
+        } else {
+            entry.1 += 1;
         }
     }
-    Ok((result, rt_usable_trials, rt_resolution_limited_trials))
+    counts
+        .into_iter()
+        .map(|((participant_id, session_id, evidence_order), (signal_trials, noise_trials))| {
+            StratifiedType1CategoryCount {
+                participant_id,
+                session_id,
+                evidence_order,
+                signal_trials,
+                noise_trials,
+            }
+        })
+        .collect()
 }
 
 fn category_counts(observations: &[RocObservation]) -> Vec<Type1CategoryCount> {
