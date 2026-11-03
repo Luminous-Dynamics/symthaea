@@ -108,12 +108,11 @@
     "universe_adequacy": "ADEQUACY_FAILED"
   },
   "provenance": {
-    "evaluator_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
-    "rules_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
-    "report_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "rules_sha256": "60c1b8a20a774908f239160c0c9a7b816c22e4c4a8a40b3ed45b9d7f87ea08a4",
     "truth_separation_verified": true,
-    "canonicalizer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "canonicalizer_sha256": "578a939bfdf68a11f279fcce606f97d2c11dfd90cd569fa1edd1fc7e8e8c6a70",
     "candidate_structure_manifest_sha256": "87aa58ffa12750e9d859e4ed2d9499198f0f2e2fe4d0c4da98528ab050ec52c1",
-    "reference_structure_manifest_sha256": "b6ef7f098f9186b5908bd1f2b678f0f33f588365c2baf25a9e064b191c8a48a0"
+    "reference_structure_manifest_sha256": "b6ef7f098f9186b5908bd1f2b678f0f33f588365c2baf25a9e064b191c8a48a0",
+    "evaluator_protocol_sha256": "df83b9386deee6ed881e58b6aaa78919206233619571459c94c611dfccbb82e5"
   }
 }
