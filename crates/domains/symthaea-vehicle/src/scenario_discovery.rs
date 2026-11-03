@@ -174,25 +174,23 @@ impl IntersectionCounterexampleMinimization {
             || self.evaluation_receipts.len() != self.evaluations as usize
             || self.evaluation_receipts.is_empty()
             || self.evaluation_receipts[0].candidate_id != self.parent_candidate_id
+            || self.evaluation_receipts[0].candidate != self.parent_candidate
             || !self.evaluation_receipts[0].predicate_holds
             || !self.evaluation_receipts.iter().all(|receipt| {
                 !receipt.evaluator_id.trim().is_empty()
                     && !receipt.execution_receipt_id.trim().is_empty()
-                    && receipt.candidate_id == receipt.candidate.candidate_id
-                    && receipt.candidate.identity_is_valid()
-                    && receipt.predicate_id == self.predicate_id
-                    && receipt.execution_digest.len() == 64
-                    && receipt.execution_digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+                    && receipt.is_valid_for(&receipt.candidate, &self.predicate_id)
             })
             || !self.evaluation_receipts.iter().any(|receipt| {
                 receipt.candidate_id == self.minimized_candidate.candidate_id
+                    && receipt.candidate == self.minimized_candidate
                     && receipt.predicate_holds
             })
-            || self.termination != if self.evaluations >= self.evaluation_budget {
+            || self.termination != (if self.evaluations >= self.evaluation_budget {
                 CounterexampleMinimizationTermination::EvaluationBudgetExhausted
             } else {
                 CounterexampleMinimizationTermination::CoordinatePassCompleted
-            }
+            })
             || !factor_changes_are_consistent(
                 &self.parent_candidate,
                 &self.minimized_candidate,
@@ -499,7 +497,7 @@ fn factor_changes_are_consistent(
     }
     expected.len() == changes.len()
         && expected.iter().zip(changes).all(|(expected, change)| {
-            change.factor_name == expected.0
+            change.factor_name.as_str() == expected.0
                 && change.original_value.to_bits() == expected.1.to_bits()
                 && change.minimized_value.to_bits() == expected.2.to_bits()
         })
