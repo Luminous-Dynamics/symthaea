@@ -25,11 +25,11 @@ Each scored window also freezes the machine-unit ID, whole-system configuration 
 - **Unresolved request:** not closed or cancelled at the window boundary. It is right-censored at `end_at_s`; it cannot be silently dropped from the denominator or counted as a complete request.
 - **Verified item release:** an item with an explicit release event whose identity is present in the upstream service report's independently verified item IDs. A timer, turbidity, model prediction or process proxy cannot authorize release.
 - **Carry-in request:** accepted before the observation window and still queued or active at its start. It is reported separately to expose the boundary condition.
-- **Maximum request concurrency:** peak number of started service requests active at the same instant. Service intervals are half-open; a request ending at the same timestamp another starts does not create overlap.
-- **Maximum concurrent compartments:** peak number of distinct physical cells with at least one active request. Two overlapping request records in one cell count as one active compartment, not two.
-- **Active request seconds:** sum of each started request's intersection with the observation window. This can exceed elapsed wall time under concurrency and is not the window duration.
-- **Active compartment seconds:** the union of active request intervals within each compartment, summed across compartments. It measures physical cell occupancy; it is not inflated by overlapping request records inside one cell.
-- **Compartment utilization:** active compartment seconds divided by (number of installed compartments declared for the scored window × elapsed wall seconds).
+- **Maximum concurrent open requests:** peak number of started service requests still open at the same instant. Service intervals are half-open; a request ending at the same timestamp another starts does not create overlap.
+- **Maximum concurrently reserved compartments:** peak number of distinct physical cells with at least one open service request. Two overlapping request records in one cell reserve one compartment, not two.
+- **Open request seconds:** sum of each started request's intersection with the observation window. This can exceed elapsed wall time under concurrent requests and is not the window duration.
+- **Reserved compartment seconds:** the union of open request intervals within each configured compartment, summed across installed compartments. It measures cell reservation, not pump, heater, valve, dosing or drying actuator on-time. Overlapping requests within one cell do not double-count its reservation interval.
+- **Compartment reservation fraction:** total reserved compartment seconds divided by (number of installed compartments declared for the scored window × elapsed wall seconds). Idle installed cells remain in this denominator.
 
 ## Reported metrics
 
@@ -40,8 +40,8 @@ Each scored window also freezes the machine-unit ID, whole-system configuration 
 - Request latency p50/p95 over completed requests accepted during the window, and queue-wait p50/p95 over requests accepted in-window that actually started (including requests still in service at window end). Both use nearest-rank percentiles. Right-censored request latency is reported separately and is not imputed into percentiles.
 - First-pass yield: first-attempt verified items divided by requested items in completed requests accepted during the window. The service ledger reports first-pass IDs; an item first qualified after a re-wash is not first-pass.
 - Physical attempt count, rewash-attempt count, requests with any rewash attempt, item-attempt visits and reattempted item visits.
-- Unqualified items reported by the service ledgers, active request seconds and maximum concurrency.
-- Per-compartment request counts, cancellations/reasons, independently verified releases, active request seconds, active compartment seconds, cell utilization, peak within-cell request concurrency and the configuration digest. The complete configured cell set is reported, including idle cells.
+- Unqualified items reported by the service ledgers, open request seconds, reserved compartment seconds, reservation fraction and maximum concurrent open requests / reserved compartments.
+- Per-compartment request counts, cancellations/reasons, independently verified releases, open request seconds, reserved compartment seconds, reservation fraction, peak within-cell open-request concurrency and the configuration digest. The complete configured cell set is reported, including idle cells.
 - System-level resource totals by canonical unit, plus window resource totals per verified release when at least one item was released. The field is a window-intensity ratio, not the full lifecycle resource cost for one service request.
 
 A release count is event-based. An item qualified in a service report but not released in the scored window is not counted as a release in that window. A request accepted before the window can still contribute a release during it; this is why carry-in is surfaced.
@@ -60,13 +60,15 @@ A zero resource measurement must be represented by an explicit row. A missing re
 
 **Window resource totals per release are period-intensity metrics, not full lifecycle resource costs for a particular item.** Carry-in work may have consumed resources before the window, and unresolved work may consume resources but produce no release before it ends. For fair comparisons, use a predeclared warm-up / scored / drain protocol, publish carry-in and unresolved counts, run sufficiently long steady-state windows, and separately retain each complete service-request ledger for lifecycle resources per verified item.
 
+**Physical actuator-time limitation:** request-open and compartment-reservation intervals are service-capacity occupancy proxies. A request may remain open while waiting for qualification, between attempts, or during a pause; the cell may not be actively pumping, heating, dosing or drying for that entire interval. Do not report reservation fraction as motor duty cycle, energy-on fraction or true physical actuator utilization. Those require a separate per-physical-attempt, phase/actuator timeline with calibrated current, power, flow, temperature and valve/dosing state traces; that work is tracked in #10313.
+
 ## Multi-compartment scale-efficiency target
 
 For a matched service class, protocol, item/soil mix, arrival trace and system boundary, measure quality-qualified throughput with one cell (Q1), two cells (Q2) and four cells (Q4). Define scale efficiency as:
 
 `eta_n = Q_n / (n * Q_1)`
 
-where Q is independently verified released items per wall-clock hour. Initial aspirational gates are eta_2 >= 0.90 (at least 1.8x one-cell throughput) and eta_4 >= 0.85 (at least 3.4x one-cell throughput). These are targets for experiments, not measured results. The denominator uses the full installed cell count, including idle cells. A scale-efficiency pass also requires no regression in per-verified-item energy/water/chemical/operator resources, non-inferior cleaning/rinse/cross-transfer endpoints, and no loss of reliability or maintainability. Report maximum concurrent requests and maximum active physical compartments separately; a second queued request in the same cell does not count as additional hardware parallelism.
+where Q is independently verified released items per wall-clock hour. Initial aspirational gates are eta_2 >= 0.90 (at least 1.8x one-cell throughput) and eta_4 >= 0.85 (at least 3.4x one-cell throughput). These are targets for experiments, not measured results. The denominator uses the full installed cell count, including idle cells. Reservation fraction is a service occupancy metric, not physical actuator duty cycle. A scale-efficiency pass also requires no regression in per-verified-item energy/water/chemical/operator resources, non-inferior cleaning/rinse/cross-transfer endpoints, and no loss of reliability or maintainability. Report maximum concurrent requests and maximum active physical compartments separately; a second queued request in the same cell does not count as additional hardware parallelism.
 
 ## Experimental protocol: one cell, concurrent cells, commercial racks
 
@@ -80,7 +82,7 @@ For each condition:
 6. Score a fixed wall-clock window. Report carry-in, unresolved, queue, throughput, latency and all resources. Do not sum overlapping request durations to form the denominator.
 7. Repeat with one compartment active, two compartments simultaneous, all compartments active, injected isolation/valve/filter/sensor faults, and an external operator/site where feasible.
 
-Primary system-level results are verified items/hour, first-pass yield, physical attempt count, physical rewash-attempt count, number of requests containing a rewash, reattempted item visits, time-to-first-release, p50/p95 request latency, maximum request concurrency, maximum concurrent compartments, active compartment seconds, compartment utilization, cancellation counts/reasons, resource totals per window and window resource totals per verified release. Report per-compartment request/release counts, active time and concurrency, plus exact machine/configuration/topology IDs. Also report per-request lifecycle resources from complete service ledgers; the two denominators answer different questions.
+Primary system-level results are verified items/hour, first-pass yield, physical attempt count, physical rewash-attempt count, number of requests containing a rewash, reattempted item visits, time-to-first-release, p50/p95 request latency, maximum concurrent open requests, maximum concurrently reserved compartments, open request seconds, reserved compartment seconds, compartment reservation fraction, cancellation counts/reasons, resource totals per window and window resource totals per verified release. Report per-compartment request/release counts, active time and concurrency, plus exact machine/configuration/topology IDs. Also report per-request lifecycle resources from complete service ledgers; the two denominators answer different questions.
 
 ## Benchmark standards and scope separation
 
