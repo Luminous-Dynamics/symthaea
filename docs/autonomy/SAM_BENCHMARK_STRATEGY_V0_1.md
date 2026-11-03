@@ -363,3 +363,13 @@ The adapter does not manufacture margins or health evidence. Every `VehicleRtaOb
 The adapter is not yet integrated into the paired closed-loop runner. When integrating, record its decisions alongside each controller trajectory but do not let a shadow decision modify either branch's command. Evaluate monitor quality against preregistered seeded controls, with explicit false-safe and false-intervention definitions.
 
 Reference protocol: [RTA_SHADOW_AUDIT_V0_1.md](./RTA_SHADOW_AUDIT_V0_1.md).
+
+## 11. Counterexample minimization implementation
+
+The scenario-search module now provides a bounded coordinate shrinker for the seven-factor synthetic crossing candidate. The caller supplies a stable predicate ID and an evaluator callback; the intended callback submits exact candidates to Symtropy #3387 and returns whether the same registered failure predicate still occurs.
+
+The minimizer tests the original candidate, shrinks factors toward declared nominal values, applies up to 12 deterministic bisection evaluations when a target removes the predicate, and stops at a fixed evaluation budget (maximum 256). It emits a new candidate ID, parent candidate ID, predicate ID, factor-change list, evaluation count, and report digest.
+
+This is deliberately a local minimizer, not a global minimality proof. Bisection assumes useful local monotonicity along one factor; non-monotonic/disconnected failure regions may be missed. The final candidate is only as trustworthy as the caller's exact execution/predicate evaluator. No simulator is run inside Symthaea.
+
+Protocol: [COUNTEREXAMPLE_MINIMIZATION_V0_1.md](./COUNTEREXAMPLE_MINIMIZATION_V0_1.md).
