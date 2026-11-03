@@ -349,6 +349,9 @@ pub enum CurveError {
     DuplicateReplicateId {
         occupancy: usize,
     },
+    ReplicateIdReusedAcrossOccupancies {
+        run_id: String,
+    },
     TooFewOccupancyPoints,
     ZeroOccupancy,
     InsufficientReplicates {
@@ -391,8 +394,16 @@ impl MeasuredOccupancyCurve {
             return Err(CurveError::TooFewOccupancyPoints);
         }
         points.sort_by_key(|point| point.occupancy);
+        let mut all_run_ids = HashSet::new();
         for point in &points {
             point.validate()?;
+            for run_id in &point.replicate_ids {
+                if !all_run_ids.insert(run_id.as_str()) {
+                    return Err(CurveError::ReplicateIdReusedAcrossOccupancies {
+                        run_id: run_id.clone(),
+                    });
+                }
+            }
         }
         if points
             .windows(2)
@@ -707,6 +718,17 @@ mod tests {
                 vec![point(1, 0.2, 2.0, 900.0), blank],
             ),
             Err(CurveError::InvalidReplicateId)
+        ));
+    }
+
+    #[test]
+    fn a_physical_run_cannot_be_reused_at_two_occupancies() {
+        let mut one = point(1, 0.20, 2.0, 900.0);
+        let mut two = point(2, 0.24, 2.5, 1_000.0);
+        two.replicate_ids[0] = one.replicate_ids[0].clone();
+        assert!(matches!(
+            MeasuredOccupancyCurve::new(scope(), vec![one, two]),
+            Err(CurveError::ReplicateIdReusedAcrossOccupancies { .. })
         ));
     }
 
