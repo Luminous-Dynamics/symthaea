@@ -31,7 +31,7 @@ Executed locally with Python standard-library exact \`Fraction\` arithmetic:
 - four elimination orders per network (forward, reverse, degree-like, random);
 - 480 direct enumeration vs variable elimination exact comparisons;
 - a separately implemented checker executed as a subprocess accepted 481/481 valid certificates (the 480 random executions plus the canonical mutation fixture);
-- the checker rejected 7/7 negative controls: stale instance digest, forged intermediate output digest, forged bucket membership, tampered result, unbound elimination variable, missing final scalar binding and forged joined scope.
+- the checker rejected 8/8 negative controls: stale instance digest, forged intermediate output digest, forged bucket membership, tampered result, unbound elimination variable, missing final scalar binding and forged joined scope; and a reserved generated-factor identifier collision.
 
 The producer computes join then sum-out. The verifier independently fuses the bucket multiplication and finite sum in a direct nested-loop traversal, then hashes the resulting factor. The verifier imports no producer code.
 
