@@ -809,6 +809,51 @@ mod tests {
     #[test] fn rejects_mismatched_context_pair(){let mut x=input();x.residual_observations[1].environment_digest=h('9');assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::MismatchedResidualContext);}
     #[test] fn rejects_duplicate_scenario_actor_action_horizon(){let mut x=input();x.residual_observations.push(residual(1000,2.0,0.0));assert_eq!(summarize_vehicle_model_discrepancy(&x).unwrap_err(),VehicleModelDiscrepancyError::DuplicateResidualKey);}
     #[test]
+    fn rejects_expected_schedule_digest_mismatch() {
+        let mut sample = input();
+        sample.expected_residual_slots[0].environment_digest = h('9');
+        assert_eq!(
+            summarize_vehicle_model_discrepancy(&sample).unwrap_err(),
+            VehicleModelDiscrepancyError::InvalidExpectedScheduleDigest
+        );
+    }
+
+    #[test]
+    fn expected_schedule_digest_is_order_invariant() {
+        let sample = input();
+        let forward = model_discrepancy_expected_schedule_digest(&sample.expected_residual_slots).unwrap();
+        let mut reversed = sample.expected_residual_slots.clone();
+        reversed.reverse();
+        let backward = model_discrepancy_expected_schedule_digest(&reversed).unwrap();
+        assert_eq!(forward, backward);
+    }
+
+    #[test]
+    fn rejects_outcome_row_not_in_frozen_schedule() {
+        let mut sample = input();
+        sample.residual_observations.push(residual(3_000, 1.0, 0.0));
+        assert_eq!(
+            summarize_vehicle_model_discrepancy(&sample).unwrap_err(),
+            VehicleModelDiscrepancyError::UnexpectedResidualOutcomeSlot
+        );
+    }
+
+    #[test]
+    fn missing_only_horizon_has_counts_but_no_numeric_residual() {
+        let mut sample = input();
+        set_residual_schedule(&mut sample, vec![
+            incomplete_residual(1_000, ReferenceOutcomeStatus::Missing),
+            incomplete_residual(2_000, ReferenceOutcomeStatus::TimedOut),
+        ]);
+        let report = summarize_vehicle_model_discrepancy(&sample).unwrap();
+        assert_eq!(report.horizon_summaries[0].outcome_count, 1);
+        assert_eq!(report.horizon_summaries[0].missing_count, 1);
+        assert_eq!(report.horizon_summaries[0].mean_signed_residual, None);
+        assert_eq!(report.horizon_summaries[1].timed_out_count, 1);
+        assert_eq!(report.horizon_summaries[1].p95_absolute_residual, None);
+    }
+
+    #[test]
     fn omitted_expected_horizon_slot_is_rejected() {
         let mut sample = input();
         sample.residual_observations.truncate(1);
