@@ -665,6 +665,7 @@ mod tests {
                 stop_line_progress_m: 10.0,
                 stop_speed_threshold_mps: 0.1,
                 required_stationary_duration_s: 1.0,
+                maximum_sample_gap_s: 0.6,
                 progress_tolerance_m: 0.05,
             },
             evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
@@ -751,6 +752,7 @@ mod tests {
         let invalid = vec![sample(0.0, 1.0, 10.0, 0.0), sample(0.0, 2.0, 10.0, 0.0)];
         let report = evaluate_traffic_rules(&[rule], &invalid).unwrap();
         assert_eq!(report.findings[0].outcome, RuleComplianceOutcome::Indeterminate);
+        assert!(report.identity_is_valid());
     }
 
     #[test]
@@ -773,6 +775,25 @@ mod tests {
             evaluate_traffic_rules(&[rule.clone(), rule], &[sample(0.0, 0.0, 1.0, 0.0)])
                 .unwrap_err(),
             RuleEvaluationError::DuplicateRuleId
+        );
+        let mut empty_id = TrafficRuleRequirement {
+            rule_id: String::new(),
+            active_start_progress_m: 0.0,
+            active_end_progress_m: 10.0,
+            kind: TrafficRuleKind::SpeedLimit {
+                maximum_speed_mps: 10.0,
+                tolerance_mps: 0.0,
+            },
+            evidence: evidence(TrafficRuleEvidenceStatus::Uncontradicted),
+        };
+        empty_id.rule_id.clear();
+        assert_eq!(
+            evaluate_traffic_rules(
+                &[empty_id],
+                &[sample(0.0, 0.0, 1.0, 0.0)]
+            )
+            .unwrap_err(),
+            RuleEvaluationError::EmptyRuleId
         );
     }
 
