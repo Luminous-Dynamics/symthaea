@@ -995,6 +995,27 @@ mod tests {
     }
 
     #[test]
+    fn initial_seed_agents_receive_distinct_recipe_partitions() {
+        let task = InnovationTask::family_task(TaskFamily::Layered);
+        let config = Config {
+            population_size: 6,
+            steps: 1,
+            initial_seed_agents: 2,
+            initial_seed_recipes_per_agent: 3,
+            individual_attempts_per_agent_step: 0,
+            individual_discovery_probability: 0.0,
+            policy: TransmissionPolicy::NoSocial,
+            ..Config::default()
+        };
+        let run = simulate(&task, config, 919).unwrap();
+        let first = &run.agents[0].known_recipes;
+        let second = &run.agents[1].known_recipes;
+        assert_eq!(first.len(), 3);
+        assert_eq!(second.len(), 3);
+        assert!(first.is_disjoint(second));
+    }
+
+    #[test]
     fn closure_derives_outputs_only_when_all_inputs_are_known() {
         let task = InnovationTask::family_task(TaskFamily::Layered);
         let mut agent = AgentKnowledge::new(&task);
