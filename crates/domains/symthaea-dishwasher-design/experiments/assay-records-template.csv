@@ -1,0 +1,1 @@
+record_id,source_run_id,item_id,endpoint,criterion_id,metric_id,evidence_kind,method_id,protocol_id,measured_value,expanded_uncertainty,unit,instrument_id,calibration_id,assayed_at_utc_s,archive_uri,archive_sha256,calibration_bundle_sha256
