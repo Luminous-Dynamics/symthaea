@@ -1,0 +1,52 @@
+name: Connectome Intervention Contract Verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/neuroscience/CONNECTOME_INTERVENTION_BENCHMARK_*.json"
+      - "docs/neuroscience/CONNECTOME_INTERVENTION_BENCHMARK_SCORECARD_V1.md"
+      - "tools/connectome-intervention-contract/**"
+      - ".github/workflows/connectome-intervention-contract-v1.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main, "feat/connectome-intervention-scorecard-v1"]
+    paths:
+      - "docs/neuroscience/CONNECTOME_INTERVENTION_BENCHMARK_*.json"
+      - "docs/neuroscience/CONNECTOME_INTERVENTION_BENCHMARK_SCORECARD_V1.md"
+      - "tools/connectome-intervention-contract/**"
+      - ".github/workflows/connectome-intervention-contract-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: connectome-intervention-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  semantic-contract:
+    name: Exact-source semantic contract tests
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/connectome-intervention-contract/Cargo.toml -- --check
+      - name: Install pinned JSON Schema validator (CI-only)
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate Draft 2020-12 schema and adversarial examples
+        run: python3 tools/connectome-intervention-contract/validate_schema.py
+      - name: Run semantic verifier tests
+        run: cargo test --manifest-path tools/connectome-intervention-contract/Cargo.toml --locked --all-targets
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path tools/connectome-intervention-contract/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Verify the published example remains explicitly incomplete
+        run: |
+          cargo run --manifest-path tools/connectome-intervention-contract/Cargo.toml --locked > verifier-report.json
+          grep -F '"disposition":"INCOMPLETE"' verifier-report.json

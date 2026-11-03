@@ -1,0 +1,554 @@
+{
+  "schema_version": "CONNECTOME-INTERVENTION-RUN-V1",
+  "run_id": "synthetic-schema-complete-001",
+  "run_state": "complete",
+  "evidence_tier": "synthetic_known_answer",
+  "claim_ceiling": "synthetic_only",
+  "created_at_utc": "2026-11-02T00:00:00Z",
+  "parent_run_id": null,
+  "source": {
+    "source_kind": "synthetic",
+    "dataset_id": "synthetic-fixture-only",
+    "dataset_version": "1",
+    "immutable_reference": "fixture://synthetic-only",
+    "source_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "rights_state": "synthetic",
+    "permission_receipt_sha256": null,
+    "provenance_notes": "This fixture exercises the complete schema branch only. It contains no biological source data."
+  },
+  "connectome": {
+    "taxon_id": "synthetic",
+    "taxon_name": "synthetic graph",
+    "connectome_id": "synthetic-graph-1",
+    "reconstruction_version": "1",
+    "neuron_id_namespace": "synthetic-neuron-v1",
+    "row_axis_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "column_axis_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "canonical_identity_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "structural_edge_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "edge_semantics": "synthetic_graph",
+    "coverage_statement": "Synthetic graph only; no biological coverage claim.",
+    "source_artifacts": []
+  },
+  "observation_model": {
+    "observation_model_id": "obs-synthetic",
+    "modality": "synthetic_latent",
+    "observation_kernel_id": "identity",
+    "observation_kernel_parameters_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "sampling_interval_seconds": 0.01,
+    "time_origin": "synthetic t0",
+    "preprocessing_manifest_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "latent_observation_separation": true,
+    "units": [
+      "arbitrary synthetic units"
+    ],
+    "indicator_or_sensor_id": null
+  },
+  "split": {
+    "split_id": "synthetic-split-1",
+    "split_strategy": "synthetic_known_answer",
+    "generalization_axes": [
+      "target_combination"
+    ],
+    "split_manifest_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "train_membership_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "validation_membership_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "test_membership_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "preprocessing_fit_on_train_only": true,
+    "feature_selection_fit_on_train_only": true,
+    "model_selection_blind_to_test": true,
+    "target_identity_split_before_preprocessing": true,
+    "overlap_audit_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "status": "qualified",
+    "grouping_keys": [
+      "synthetic_target_combination"
+    ],
+    "leakage_notes": "Synthetic tokens only.",
+    "unit_tokenization": {
+      "algorithm": "HMAC-SHA256",
+      "key_commitment_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "canonicalization_version": "UNIT-TOKEN-V1"
+    },
+    "train_unit_tokens": [
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "2222222222222222222222222222222222222222222222222222222222222222"
+    ],
+    "validation_unit_tokens": [
+      "8888888888888888888888888888888888888888888888888888888888888888"
+    ],
+    "test_unit_tokens": [
+      "3333333333333333333333333333333333333333333333333333333333333333",
+      "4444444444444444444444444444444444444444444444444444444444444444"
+    ]
+  },
+  "hypothesis_set": [
+    {
+      "hypothesis_id": "H_SYN_GRAPH",
+      "model_family": "graph_constrained_state_space",
+      "mechanistic_channels": [
+        "direct_anatomical"
+      ],
+      "prior_probability": 0.5,
+      "prior_source": "synthetic fixture",
+      "frozen_before_test": true,
+      "prediction_manifest_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+    },
+    {
+      "hypothesis_id": "H_SYN_LINEAR",
+      "model_family": "linear_lds_var_glm",
+      "mechanistic_channels": [
+        "shared_input"
+      ],
+      "prior_probability": 0.5,
+      "prior_source": "synthetic fixture",
+      "frozen_before_test": true,
+      "prediction_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "models": [
+    {
+      "model_id": "candidate-graph",
+      "role": "candidate",
+      "model_family": "graph_constrained_state_space",
+      "hypothesis_id": "H_SYN_GRAPH",
+      "code_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "config_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "parameter_count": 8,
+      "training_data_scope_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "training_budget": {
+        "compute_units": 100,
+        "wall_time_seconds": 10,
+        "energy_joules": 2,
+        "memory_bytes": 4096,
+        "training_samples": 100,
+        "notes": "Synthetic matched budget only"
+      },
+      "observation_model_id": "obs-synthetic",
+      "structural_channel_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "latent_channel_sha256": null,
+      "model_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "training_seed": 1,
+      "training_complete": true,
+      "notes": "Synthetic schema validation fixture; not a biological model."
+    },
+    {
+      "model_id": "baseline-activity",
+      "role": "baseline",
+      "model_family": "activity_only",
+      "hypothesis_id": null,
+      "code_commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "config_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "parameter_count": 8,
+      "training_data_scope_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "training_budget": {
+        "compute_units": 100,
+        "wall_time_seconds": 10,
+        "energy_joules": 2,
+        "memory_bytes": 4096,
+        "training_samples": 100,
+        "notes": "Synthetic matched budget only"
+      },
+      "observation_model_id": "obs-synthetic",
+      "structural_channel_sha256": null,
+      "latent_channel_sha256": null,
+      "model_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "training_seed": 1,
+      "training_complete": true,
+      "notes": "Synthetic schema validation fixture; not a biological model."
+    },
+    {
+      "model_id": "baseline-linear",
+      "role": "baseline",
+      "model_family": "linear_lds_var_glm",
+      "hypothesis_id": "H_SYN_LINEAR",
+      "code_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
+      "config_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "parameter_count": 8,
+      "training_data_scope_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "training_budget": {
+        "compute_units": 100,
+        "wall_time_seconds": 10,
+        "energy_joules": 2,
+        "memory_bytes": 4096,
+        "training_samples": 100,
+        "notes": "Synthetic matched budget only"
+      },
+      "observation_model_id": "obs-synthetic",
+      "structural_channel_sha256": null,
+      "latent_channel_sha256": null,
+      "model_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "training_seed": 1,
+      "training_complete": true,
+      "notes": "Synthetic schema validation fixture; not a biological model."
+    },
+    {
+      "model_id": "negative-rewired",
+      "role": "negative_control",
+      "model_family": "degree_type_rewired",
+      "hypothesis_id": null,
+      "code_commit_sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "config_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "parameter_count": 8,
+      "training_data_scope_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "training_budget": {
+        "compute_units": 100,
+        "wall_time_seconds": 10,
+        "energy_joules": 2,
+        "memory_bytes": 4096,
+        "training_samples": 100,
+        "notes": "Synthetic matched budget only"
+      },
+      "observation_model_id": "obs-synthetic",
+      "structural_channel_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "latent_channel_sha256": null,
+      "model_artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "training_seed": 1,
+      "training_complete": true,
+      "notes": "Synthetic schema validation fixture; not a biological model."
+    }
+  ],
+  "intervention_design": {
+    "candidate_pool_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "selector": "manual_preregistered",
+    "selection_objective": "model_discrimination",
+    "preregistered_before_test": true,
+    "experiment_budget": {
+      "compute_units": 10,
+      "wall_time_seconds": 5,
+      "energy_joules": 1,
+      "memory_bytes": 1024,
+      "training_samples": 0,
+      "notes": "Synthetic budget."
+    },
+    "selected_interventions": [
+      {
+        "intervention_id": "synthetic-primary",
+        "target_ids": [
+          "n1"
+        ],
+        "target_namespace": "synthetic-neuron-v1",
+        "manipulation_type": "simulated_ablation",
+        "waveform": {
+          "shape": "not_applicable",
+          "amplitude": null,
+          "amplitude_unit": null,
+          "duration_seconds": 0,
+          "onset_seconds": 0,
+          "frequency_hz": null,
+          "duty_cycle": null,
+          "waveform_sha256": null
+        },
+        "protocol_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "randomization_block": "synthetic-block-1",
+        "control_role": "intervention",
+        "feasibility_status": "feasible",
+        "safety_constraints_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      {
+        "intervention_id": "synthetic-sham",
+        "target_ids": [
+          "n1"
+        ],
+        "target_namespace": "synthetic-neuron-v1",
+        "manipulation_type": "simulated_ablation",
+        "waveform": {
+          "shape": "not_applicable",
+          "amplitude": null,
+          "amplitude_unit": null,
+          "duration_seconds": 0,
+          "onset_seconds": 0,
+          "frequency_hz": null,
+          "duty_cycle": null,
+          "waveform_sha256": null
+        },
+        "protocol_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "randomization_block": "synthetic-block-1",
+        "control_role": "sham",
+        "feasibility_status": "feasible",
+        "safety_constraints_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      {
+        "intervention_id": "synthetic-single-control",
+        "target_ids": [
+          "n1"
+        ],
+        "target_namespace": "synthetic-neuron-v1",
+        "manipulation_type": "simulated_ablation",
+        "waveform": {
+          "shape": "not_applicable",
+          "amplitude": null,
+          "amplitude_unit": null,
+          "duration_seconds": 0,
+          "onset_seconds": 0,
+          "frequency_hz": null,
+          "duty_cycle": null,
+          "waveform_sha256": null
+        },
+        "protocol_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "randomization_block": "synthetic-block-1",
+        "control_role": "single_target_control",
+        "feasibility_status": "feasible",
+        "safety_constraints_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      {
+        "intervention_id": "synthetic-combination-control",
+        "target_ids": [
+          "n1",
+          "n2"
+        ],
+        "target_namespace": "synthetic-neuron-v1",
+        "manipulation_type": "simulated_ablation",
+        "waveform": {
+          "shape": "not_applicable",
+          "amplitude": null,
+          "amplitude_unit": null,
+          "duration_seconds": 0,
+          "onset_seconds": 0,
+          "frequency_hz": null,
+          "duty_cycle": null,
+          "waveform_sha256": null
+        },
+        "protocol_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "randomization_block": "synthetic-block-1",
+        "control_role": "combination_control",
+        "feasibility_status": "feasible",
+        "safety_constraints_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      }
+    ],
+    "required_controls": [
+      "sham",
+      "single_target",
+      "combined_target",
+      "rewired_graph",
+      "activity_only"
+    ],
+    "feasibility_audit_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "stopping_rule": "Fixed synthetic fixture."
+  },
+  "budgets": {
+    "comparison_mode": "matched_budget",
+    "training_budget_policy": "matched",
+    "evaluation_budget_policy": "matched",
+    "hardware": "synthetic test environment",
+    "wall_time_seconds_limit": 60,
+    "energy_joules_limit": 10,
+    "memory_bytes_limit": 1048576,
+    "budget_exception_rationale": "None; synthetic fixture only."
+  },
+  "evaluation": {
+    "task_ids": [
+      "synthetic-intervention-task"
+    ],
+    "primary_metric_ids": [
+      "synthetic-nll"
+    ],
+    "metrics": [
+      {
+        "metric_id": "synthetic-nll",
+        "metric_family": "negative_log_predictive_density",
+        "definition_version": "1",
+        "unit": "nats per synthetic unit",
+        "direction": "lower_is_better",
+        "aggregation": "per_trial",
+        "primary": true,
+        "formula_reference": null
+      },
+      {
+        "metric_id": "synthetic-coverage",
+        "metric_family": "predictive_interval_coverage",
+        "definition_version": "1",
+        "unit": "proportion",
+        "direction": "target_range",
+        "aggregation": "per_trial",
+        "primary": false,
+        "formula_reference": null
+      }
+    ],
+    "uncertainty": {
+      "method_id": "cluster_bootstrap_percentile",
+      "confidence_level": 0.95,
+      "resampling_unit": "intervention_block",
+      "cluster_keys": [
+        "synthetic-animal-token",
+        "synthetic-session-token"
+      ],
+      "two_sided": true,
+      "minimum_independent_units": 2,
+      "seed": 1
+    },
+    "strata": [
+      "overall"
+    ],
+    "promotion_targets": [
+      {
+        "metric_id": "synthetic-nll",
+        "target_value": 0.1,
+        "comparison": "at_least",
+        "absolute_tolerance": null,
+        "status": "aspirational_not_measured"
+      }
+    ],
+    "baseline_matrix": {
+      "required_families": [
+        "activity_only",
+        "linear_lds_var_glm",
+        "graph_constrained_state_space",
+        "degree_type_rewired",
+        "pairwise_additive"
+      ],
+      "unavailable_families": [
+        {
+          "family": "pairwise_additive",
+          "reason": "Not applicable to this minimal synthetic schema fixture."
+        }
+      ],
+      "coverage_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  },
+  "results": {
+    "status": "complete",
+    "observed_outcomes_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "heldout_prediction_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "scorecards": [
+      {
+        "model_id": "candidate-graph",
+        "metric_id": "synthetic-nll",
+        "stratum": "overall",
+        "n_independent_units": 2,
+        "score": 0.8,
+        "ci_low": 0.7000000000000001,
+        "ci_high": 0.9,
+        "score_state": "measured",
+        "unit_tokens": [
+          "3333333333333333333333333333333333333333333333333333333333333333",
+          "4444444444444444444444444444444444444444444444444444444444444444"
+        ],
+        "unit_manifest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      {
+        "model_id": "baseline-activity",
+        "metric_id": "synthetic-nll",
+        "stratum": "overall",
+        "n_independent_units": 2,
+        "score": 1,
+        "ci_low": 0.9,
+        "ci_high": 1.1,
+        "score_state": "measured",
+        "unit_tokens": [
+          "3333333333333333333333333333333333333333333333333333333333333333",
+          "4444444444444444444444444444444444444444444444444444444444444444"
+        ],
+        "unit_manifest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      {
+        "model_id": "baseline-linear",
+        "metric_id": "synthetic-nll",
+        "stratum": "overall",
+        "n_independent_units": 2,
+        "score": 1.2,
+        "ci_low": 1.0999999999999999,
+        "ci_high": 1.3,
+        "score_state": "measured",
+        "unit_tokens": [
+          "3333333333333333333333333333333333333333333333333333333333333333",
+          "4444444444444444444444444444444444444444444444444444444444444444"
+        ],
+        "unit_manifest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      {
+        "model_id": "negative-rewired",
+        "metric_id": "synthetic-nll",
+        "stratum": "overall",
+        "n_independent_units": 2,
+        "score": 1.4,
+        "ci_low": 1.2999999999999998,
+        "ci_high": 1.5,
+        "score_state": "measured",
+        "unit_tokens": [
+          "3333333333333333333333333333333333333333333333333333333333333333",
+          "4444444444444444444444444444444444444444444444444444444444444444"
+        ],
+        "unit_manifest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      }
+    ],
+    "paired_comparisons": [
+      {
+        "candidate_model_id": "candidate-graph",
+        "baseline_model_id": "baseline-activity",
+        "metric_id": "synthetic-nll",
+        "stratum": "overall",
+        "paired_unit_manifest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "n_independent_units": 2,
+        "mean_candidate_minus_baseline": -0.2,
+        "ci_low": -0.3,
+        "ci_high": -0.1,
+        "minimum_meaningful_effect": 0.05,
+        "non_inferiority_margin": 0.1,
+        "outcome": "outperforms_by_margin",
+        "paired_unit_tokens": [
+          "3333333333333333333333333333333333333333333333333333333333333333",
+          "4444444444444444444444444444444444444444444444444444444444444444"
+        ]
+      },
+      {
+        "candidate_model_id": "candidate-graph",
+        "baseline_model_id": "baseline-linear",
+        "metric_id": "synthetic-nll",
+        "stratum": "overall",
+        "paired_unit_manifest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "n_independent_units": 2,
+        "mean_candidate_minus_baseline": -0.4,
+        "ci_low": -0.5,
+        "ci_high": -0.3,
+        "minimum_meaningful_effect": 0.05,
+        "non_inferiority_margin": 0.1,
+        "outcome": "outperforms_by_margin",
+        "paired_unit_tokens": [
+          "3333333333333333333333333333333333333333333333333333333333333333",
+          "4444444444444444444444444444444444444444444444444444444444444444"
+        ]
+      },
+      {
+        "candidate_model_id": "candidate-graph",
+        "baseline_model_id": "negative-rewired",
+        "metric_id": "synthetic-nll",
+        "stratum": "overall",
+        "paired_unit_manifest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "n_independent_units": 2,
+        "mean_candidate_minus_baseline": -0.6,
+        "ci_low": -0.7,
+        "ci_high": -0.5,
+        "minimum_meaningful_effect": 0.05,
+        "non_inferiority_margin": 0.1,
+        "outcome": "outperforms_by_margin",
+        "paired_unit_tokens": [
+          "3333333333333333333333333333333333333333333333333333333333333333",
+          "4444444444444444444444444444444444444444444444444444444444444444"
+        ]
+      }
+    ],
+    "calibration": [
+      {
+        "model_id": "candidate-graph",
+        "metric_id": "synthetic-coverage",
+        "stratum": "overall",
+        "nominal_coverage": 0.95,
+        "observed_coverage": 0.95,
+        "interval_sharpness": 0.1,
+        "n_independent_units": 2
+      }
+    ],
+    "failures": []
+  },
+  "artifacts": {
+    "run_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "resolved_config_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "environment_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "raw_output_manifest_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "logs_manifest_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "artifact_references": []
+  },
+  "limitations": [
+    "Synthetic schema validation fixture only; not biological evidence or a completed empirical run."
+  ]
+}
