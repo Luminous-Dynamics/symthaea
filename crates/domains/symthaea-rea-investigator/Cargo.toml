@@ -7,3 +7,6 @@ description = "Deterministic, fail-closed hypothesis and next-experiment planner
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+sha2 = { workspace = true }
