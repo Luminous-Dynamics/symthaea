@@ -1,0 +1,18 @@
+{
+  "suite": "Graph-only static order selector over 32 stochastic min-fill candidates",
+  "seed_stream": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31],
+  "graphs": 10,
+  "variables_per_graph": 5,
+  "variable_cardinalities": [2,3,2,3,2],
+  "candidate_orders_per_graph": 32,
+  "exact_selected_order_algebra_executions": 30,
+  "all_selected_orders_match_direct_oracle": true,
+  "independent_certificate_replays": 30,
+  "selected_order_regret_percent": {
+    "median": 4.837551,
+    "mean": 9.655912,
+    "max": 73.714286,
+    "exact_best_cases": 4
+  },
+  "claim_boundary": "Graph/cardinality-only ranking; exact selected orders and certificates were evaluated in Python. Tiny synthetic instances only; not hardware runtime or SOTA evidence."
+}
