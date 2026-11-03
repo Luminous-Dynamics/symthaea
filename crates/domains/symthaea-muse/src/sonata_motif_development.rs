@@ -21,7 +21,6 @@ use crate::sonata_intervention::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
 use std::fmt::Write as FmtWrite;
 use symthaea_music_theory::motif_family::{
     IdentityVerdict, MotifFamily, MotifInvariant, MotifProvenance, PhraseRole,
@@ -29,9 +28,9 @@ use symthaea_music_theory::motif_family::{
 };
 use symthaea_music_theory::{
     Emphasis, Key, Motif, MotifNote, ObligationKind, PartId, Pitch, ReturnTransformation,
-    Score, ScoreNote, ScoreValidationConfig, SonataPlan, SonataRealization,
-    SonataSectionKind, Style, TheoryValidationReport, VoiceRole, validate_score,
-    verify_sonata_obligations,
+    Score, ScoreNote, ScoreValidationConfig, SonataObligationEvidence, SonataPlan,
+    SonataRealization, SonataSectionKind, TheoryValidationReport, VoiceRole,
+    validate_score, verify_sonata_obligations,
 };
 
 pub const SONATA_MOTIF_DEVELOPMENT_SCHEMA_VERSION_V1: u32 = 1;
@@ -80,7 +79,7 @@ pub struct SonataMotifDevelopmentCandidateV1 {
     pub target_pitch_changed_count: usize,
     pub target_only_pitch_diff_verified: bool,
     pub theory_validation: TheoryValidationReport,
-    pub obligation_verification: Vec<symthaea_music_theory::SonataObligationEvidence>,
+    pub obligation_verification: Vec<SonataObligationEvidence>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -235,7 +234,7 @@ pub fn generate_sonata_motif_development_v1(
         ],
         // The Sonata style does not yet have a Style enum value. An empty
         // compatibility list is more honest than asserting Classical fit.
-        Vec::<Style>::new(),
+        Vec::new(),
         MotifProvenance {
             source: ProvenanceSource::ScoreRegionExtraction {
                 source_score_sha256: source_score_sha256.clone(),
@@ -273,6 +272,7 @@ pub fn generate_sonata_motif_development_v1(
         &target_note_indices,
         &family,
         &baseline_target_motif,
+        &realization.plan,
     )?);
 
     let transposed = source_motif.transpose(1);
@@ -298,6 +298,7 @@ pub fn generate_sonata_motif_development_v1(
         &target_note_indices,
         &family,
         &transposed_target_motif,
+        &realization.plan,
     )?);
 
     let pivot = source_motif
@@ -330,6 +331,7 @@ pub fn generate_sonata_motif_development_v1(
         &target_note_indices,
         &family,
         &inverted_target_motif,
+        &realization.plan,
     )?);
 
     Ok(SonataMotifDevelopmentBatchV1 {
@@ -377,14 +379,9 @@ fn build_candidate(
     target_indices: &[usize],
     family: &MotifFamily,
     candidate_motif: &Motif,
+    plan: &SonataPlan,
 ) -> Result<SonataMotifDevelopmentCandidateV1, SonataMotifDevelopmentErrorV1> {
-    if let Some(transform) = transformation {
-        if !family.permitted_transforms.contains(&transform) {
-            return Err(SonataMotifDevelopmentErrorV1::UnsupportedTransformation {
-                transformation: transform,
-            });
-        }
-    }
+    validate_transformation_allowed(family, transformation)?;
     let target_pitch_changed_count = target_indices
         .iter()
         .filter(|index| baseline.notes[**index].pitch != score.notes[**index].pitch)
@@ -396,13 +393,7 @@ fn build_candidate(
     let event_projection_sha256 = digest_json(&score.notes)
         .map_err(SonataMotifDevelopmentErrorV1::SerializationFailure)?;
     let theory_validation = validate_score(&score, ScoreValidationConfig::default());
-    let (_, obligation_verification) = verify_sonata_obligations(
-        &score,
-        // The plan is supplied by the caller through the original candidate
-        // score and retained by the batch; this helper is replaced below by a
-        // plan-aware version before dispatch.
-        return_plan_placeholder(),
-    );
+    let (_, obligation_verification) = verify_sonata_obligations(&score, plan);
 
     Ok(SonataMotifDevelopmentCandidateV1 {
         candidate_id: candidate_id.to_owned(),
@@ -417,6 +408,20 @@ fn build_candidate(
         theory_validation,
         obligation_verification,
     })
+}
+
+fn validate_transformation_allowed(
+    family: &MotifFamily,
+    transformation: Option<ReturnTransformation>,
+) -> Result<(), SonataMotifDevelopmentErrorV1> {
+    if let Some(transformation) = transformation {
+        if !family.permitted_transforms.contains(&transformation) {
+            return Err(SonataMotifDevelopmentErrorV1::UnsupportedTransformation {
+                transformation,
+            });
+        }
+    }
+    Ok(())
 }
 
 fn apply_pitch_motif(
@@ -594,9 +599,16 @@ mod tests {
             &index_sha256,
             motif,
         );
+        let independently_derived = family_from_source(
+            "sonata.primary",
+            &source_score_sha256,
+            "ExpositionPrimary",
+            &index_sha256,
+            motif_from_score_indices(&score, &indices).unwrap(),
+        );
         assert_eq!(
             digest_json(&family).unwrap(),
-            digest_json(&family).unwrap()
+            digest_json(&independently_derived).unwrap()
         );
         assert!(matches!(
             family.provenance.source,
@@ -631,20 +643,16 @@ mod tests {
             &digest_json(&vec![0, 1, 2]).unwrap(),
             motif_from_score_indices(&score, &[0, 1, 2]).unwrap(),
         );
-        let result = build_candidate(
-            "bad",
-            SonataMotifDevelopmentStrategyV1::TransposedUpOneDiatonicDegree,
-            Some(ReturnTransformation::Fragmented),
-            score.clone(),
-            &score,
-            &[3, 4, 5],
-            &family,
-            &motif_from_score_indices(&score, &[3, 4, 5]).unwrap(),
-            &SonataPlan { sections: vec![], obligations: vec![] },
+        assert_eq!(
+            validate_transformation_allowed(&family, Some(ReturnTransformation::Fragmented)),
+            Err(SonataMotifDevelopmentErrorV1::UnsupportedTransformation {
+                transformation: ReturnTransformation::Fragmented,
+            })
         );
-        assert!(result.unwrap_err() == SonataMotifDevelopmentErrorV1::UnsupportedTransformation {
-            transformation: ReturnTransformation::Fragmented
-        });
+        assert!(validate_transformation_allowed(
+            &family,
+            Some(ReturnTransformation::Transposed),
+        ).is_ok());
     }
 
     fn family_from_source(
