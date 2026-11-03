@@ -18,7 +18,7 @@ use crate::perturbations::{PerturbationSchedule, VehiclePerturbation};
 use crate::road::Road;
 use crate::simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
 use crate::types::{
-    VehicleCommand, VehicleState, pd_cruise_baseline_with_road,
+    VehicleCommand, VehicleState,
 };
 
 pub const VEHICLE_PAIRED_ROLLOUT_SCHEMA: &str = "symthaea.vehicle.paired-rollout.v0.1";
