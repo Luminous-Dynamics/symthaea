@@ -620,7 +620,7 @@ fn self_test(manifest_path: &Path, evidence_root: &Path) -> Result<(), String> {
         .map_err(|error| format!("fixture JSON is invalid: {error}"))?;
     let (graph, summary) = validate_value(&value)?;
     verify_artifact_bytes(&graph, evidence_root)?;
-    if summary.node_count != 6
+    if summary.node_count != 7
         || summary.edge_count != 7
         || summary.formal_dependency_edge_count != 4
         || summary.retrieval_hint_edge_count != 3
