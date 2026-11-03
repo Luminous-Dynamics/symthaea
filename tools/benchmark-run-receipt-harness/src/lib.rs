@@ -371,7 +371,12 @@ impl Counts {
     }
 }
 
-fn validate_grade(value: &Value, grading_mode: &str, context: &str) -> Result<(), ReceiptError> {
+fn validate_grade(
+    value: &Value,
+    grading_mode: &str,
+    expected_grader_version: &str,
+    context: &str,
+) -> Result<(), ReceiptError> {
     let map = obj(value, context)?;
     strict_keys(map, &["kind", "value", "grader_version", "grader_output_sha256"], &[], context)?;
     let kind = string(required(map, "kind", context)?, &format!("{context}.kind"), false)?;
@@ -403,16 +408,33 @@ fn validate_grade(value: &Value, grading_mode: &str, context: &str) -> Result<()
             format!("{context}.value has the wrong type for grading_mode"),
         ));
     }
-    string(required(map, "grader_version", context)?, &format!("{context}.grader_version"), false)?;
+    let grade_grader_version = string(
+        required(map, "grader_version", context)?,
+        &format!("{context}.grader_version"),
+        false,
+    )?;
+    if grade_grader_version != expected_grader_version {
+        return Err(error(
+            ReceiptErrorKind::NonComparable,
+            format!("{context}.grader_version does not match the benchmark grader version"),
+        ));
+    }
     sha256_field(required(map, "grader_output_sha256", context)?, &format!("{context}.grader_output_sha256"))?;
     Ok(())
+}
+
+#[derive(Default, Clone, Copy)]
+struct TaskUsage {
+    tool_calls: u64,
+    model_calls: u64,
 }
 
 fn validate_task_results(
     value: &Value,
     eligible_ids: &[String],
     grading_mode: &str,
-) -> Result<Counts, ReceiptError> {
+    grader_version: &str,
+) -> Result<(Counts, TaskUsage), ReceiptError> {
     let rows = arr(value, "task_results")?;
     let eligible: HashSet<&str> = eligible_ids.iter().map(String::as_str).collect();
     let mut seen = HashSet::new();
@@ -420,6 +442,7 @@ fn validate_task_results(
         eligible: eligible_ids.len() as u64,
         ..Counts::default()
     };
+    let mut usage = TaskUsage::default();
 
     for (index, row) in rows.iter().enumerate() {
         let context = format!("task_results[{index}]");
@@ -457,6 +480,12 @@ fn validate_task_results(
         let tool_calls = nonnegative_u64(required(map, "tool_calls", &context)?, &format!("{context}.tool_calls"))?;
         let model_calls = nonnegative_u64(required(map, "model_calls", &context)?, &format!("{context}.model_calls"))?;
         let _wall_time = nonnegative_u64(required(map, "wall_time_ms", &context)?, &format!("{context}.wall_time_ms"))?;
+        usage.tool_calls = usage.tool_calls.checked_add(tool_calls).ok_or_else(|| {
+            error(ReceiptErrorKind::AccountingMismatch, "per-task tool-call count overflow")
+        })?;
+        usage.model_calls = usage.model_calls.checked_add(model_calls).ok_or_else(|| {
+            error(ReceiptErrorKind::AccountingMismatch, "per-task model-call count overflow")
+        })?;
         for (output_index, output) in arr(required(map, "output_sha256", &context)?, &format!("{context}.output_sha256"))?.iter().enumerate() {
             sha256_field(output, &format!("{context}.output_sha256[{output_index}]"))?;
         }
@@ -516,7 +545,12 @@ fn validate_task_results(
                                 format!("{context} graded terminal disposition requires a grade"),
                             ));
                         }
-                        validate_grade(grade, grading_mode, &format!("{context}.grade"))?;
+                        validate_grade(
+                            grade,
+                            grading_mode,
+                            grader_version,
+                            &format!("{context}.grade"),
+                        )?;
                         counts.graded += 1;
                         if grading_mode == "binary" {
                             let grade_map = obj(grade, &format!("{context}.grade"))?;
@@ -554,7 +588,7 @@ fn validate_task_results(
             format!("task_results omit {} eligible tasks: {}", missing.len(), missing.join(", ")),
         ));
     }
-    Ok(counts)
+    Ok((counts, usage))
 }
 
 fn validate_accounting(value: &Value, actual: Counts) -> Result<BTreeMap<String, u64>, ReceiptError> {
@@ -599,6 +633,7 @@ fn validate_resource_objects(
     caps_value: &Value,
     actual_value: &Value,
     unavailable_value: &Value,
+    task_usage: TaskUsage,
 ) -> Result<(), ReceiptError> {
     let fields = [
         "wall_time_ms","cpu_time_ms","peak_memory_bytes","model_calls","input_tokens","output_tokens","tool_calls",
@@ -642,6 +677,24 @@ fn validate_resource_objects(
         if let Some(reason) = reason {
             string(reason, &format!("unavailable_usage.{field}"), false)?;
         }
+    }
+    let measured_tool_calls = required(actual, "tool_calls", "actual_usage")?;
+    if !measured_tool_calls.is_null()
+        && nonnegative_u64(measured_tool_calls, "actual_usage.tool_calls")? < task_usage.tool_calls
+    {
+        return Err(error(
+            ReceiptErrorKind::AccountingMismatch,
+            "run-level tool_calls is lower than the sum of task-level tool_calls",
+        ));
+    }
+    let measured_model_calls = required(actual, "model_calls", "actual_usage")?;
+    if !measured_model_calls.is_null()
+        && nonnegative_u64(measured_model_calls, "actual_usage.model_calls")? < task_usage.model_calls
+    {
+        return Err(error(
+            ReceiptErrorKind::AccountingMismatch,
+            "run-level model_calls is lower than the sum of task-level model_calls",
+        ));
     }
     for key in unavailable.keys() {
         if !fields.contains(&key.as_str()) {
@@ -796,10 +849,16 @@ pub fn verify_receipt_value(value: &Value) -> Result<VerifiedReceipt, ReceiptErr
     if !["binary","numeric","categorical","custom"].contains(&grading_mode) {
         return Err(error(ReceiptErrorKind::SchemaViolation, "grading_mode is unsupported"));
     }
-    let mut computed = validate_task_results(
+    let grader_version = string(
+        required(benchmark, "grader_version", "benchmark")?,
+        "benchmark.grader_version",
+        false,
+    )?;
+    let (mut computed, task_usage) = validate_task_results(
         required(top, "task_results", "receipt")?,
         &eligible_ids,
         grading_mode,
+        grader_version,
     )?;
     computed.universe = universe_count;
     computed.excluded = excluded_count;
@@ -821,6 +880,7 @@ pub fn verify_receipt_value(value: &Value) -> Result<VerifiedReceipt, ReceiptErr
         required(top, "budget_caps", "receipt")?,
         required(top, "actual_usage", "receipt")?,
         required(top, "unavailable_usage", "receipt")?,
+        task_usage,
     )?;
     validate_official_and_derived(
         required(top, "official_score", "receipt")?,
@@ -856,6 +916,7 @@ pub fn validate_comparable_arms(receipts: &[VerifiedReceipt]) -> Result<(), Rece
     }
     let first_benchmark = obj(required(first_top, "benchmark", "receipt")?, "benchmark")?;
     let first_grading_mode = required(first_top, "grading_mode", "receipt")?;
+    let first_task_inputs = task_input_digests(first_top)?;
     for receipt in receipts.iter().skip(1) {
         let top = obj(&receipt.value, "receipt")?;
         let benchmark = obj(required(top, "benchmark", "receipt")?, "benchmark")?;
@@ -881,8 +942,32 @@ pub fn validate_comparable_arms(receipts: &[VerifiedReceipt]) -> Result<(), Rece
                 format!("run '{}' differs in grading_mode", receipt.run_id),
             ));
         }
+        if task_input_digests(top)? != first_task_inputs {
+            return Err(error(
+                ReceiptErrorKind::NonComparable,
+                format!("run '{}' does not use the same task input digests", receipt.run_id),
+            ));
+        }
     }
     Ok(())
+}
+
+fn task_input_digests(top: &Map<String, Value>) -> Result<BTreeMap<String, String>, ReceiptError> {
+    let rows = arr(required(top, "task_results", "receipt")?, "task_results")?;
+    let mut inputs = BTreeMap::new();
+    for (index, row) in rows.iter().enumerate() {
+        let context = format!("task_results[{index}]");
+        let map = obj(row, &context)?;
+        let id = string(required(map, "task_id", &context)?, &format!("{context}.task_id"), false)?.to_owned();
+        let digest = sha256_field(required(map, "input_sha256", &context)?, &format!("{context}.input_sha256"))?.to_owned();
+        if inputs.insert(id.clone(), digest).is_some() {
+            return Err(error(
+                ReceiptErrorKind::AccountingMismatch,
+                format!("duplicate task input digest row for '{id}'"),
+            ));
+        }
+    }
+    Ok(inputs)
 }
 
 /// Parse raw JSON with duplicate-key rejection and return separate raw and
