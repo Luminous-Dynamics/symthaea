@@ -1,0 +1,446 @@
+{
+  "schema": "symthaea.spectra.synthetic_suite.v0.1",
+  "claim_ceiling": "synthetic_only",
+  "scenarios": [
+    {
+      "scenario_id": "null-balanced-ranks",
+      "world": "null",
+      "injected_leakage_modality": null,
+      "expected_acceptance": true,
+      "expected_score": {
+        "target_rank_sum": 10,
+        "judge_count": 4,
+        "candidate_count": 4,
+        "twice_chance_minus_observed_rank_sum": 0
+      },
+      "trial": {
+        "trial_id": "trial-null",
+        "participant_id": "participant-01",
+        "operator_id": "operator-01",
+        "target_custodian_id": "custodian-01",
+        "evaluator_id": "evaluator-01",
+        "candidate_ids": [
+          "candidate-02",
+          "candidate-01",
+          "candidate-03",
+          "candidate-04"
+        ],
+        "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "target_pool_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "target_selection_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "response_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "apparatus_locked_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 100,
+          "latest_ns": 101
+        },
+        "target_selected_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 150,
+          "latest_ns": 151
+        },
+        "response_sealed_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 300,
+          "latest_ns": 301
+        },
+        "target_revealed_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 400,
+          "latest_ns": 401
+        },
+        "judge_rankings": [
+          {
+            "judge_id": "judge-1",
+            "ranked_candidate_ids": [
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
+            ]
+          },
+          {
+            "judge_id": "judge-2",
+            "ranked_candidate_ids": [
+              "candidate-01",
+              "candidate-02",
+              "candidate-03",
+              "candidate-04"
+            ]
+          },
+          {
+            "judge_id": "judge-3",
+            "ranked_candidate_ids": [
+              "candidate-01",
+              "candidate-03",
+              "candidate-02",
+              "candidate-04"
+            ]
+          },
+          {
+            "judge_id": "judge-4",
+            "ranked_candidate_ids": [
+              "candidate-01",
+              "candidate-03",
+              "candidate-04",
+              "candidate-02"
+            ]
+          }
+        ]
+      },
+      "evaluator_truth": {
+        "target_id": "candidate-02"
+      }
+    },
+    {
+      "scenario_id": "signal-injected",
+      "world": "signal_injected",
+      "injected_leakage_modality": null,
+      "expected_acceptance": true,
+      "expected_score": {
+        "target_rank_sum": 4,
+        "judge_count": 4,
+        "candidate_count": 4,
+        "twice_chance_minus_observed_rank_sum": 12
+      },
+      "trial": {
+        "trial_id": "trial-signal",
+        "participant_id": "participant-01",
+        "operator_id": "operator-01",
+        "target_custodian_id": "custodian-01",
+        "evaluator_id": "evaluator-01",
+        "candidate_ids": [
+          "candidate-02",
+          "candidate-01",
+          "candidate-03",
+          "candidate-04"
+        ],
+        "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "target_pool_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "target_selection_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "response_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "apparatus_locked_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 100,
+          "latest_ns": 101
+        },
+        "target_selected_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 150,
+          "latest_ns": 151
+        },
+        "response_sealed_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 300,
+          "latest_ns": 301
+        },
+        "target_revealed_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 400,
+          "latest_ns": 401
+        },
+        "judge_rankings": [
+          {
+            "judge_id": "judge-1",
+            "ranked_candidate_ids": [
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
+            ]
+          },
+          {
+            "judge_id": "judge-2",
+            "ranked_candidate_ids": [
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
+            ]
+          },
+          {
+            "judge_id": "judge-3",
+            "ranked_candidate_ids": [
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
+            ]
+          },
+          {
+            "judge_id": "judge-4",
+            "ranked_candidate_ids": [
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
+            ]
+          }
+        ]
+      },
+      "evaluator_truth": {
+        "target_id": "candidate-02"
+      }
+    },
+    {
+      "scenario_id": "known-rf-leakage-injected",
+      "world": "known_leakage_injected",
+      "injected_leakage_modality": "rf",
+      "expected_acceptance": true,
+      "expected_score": {
+        "target_rank_sum": 4,
+        "judge_count": 4,
+        "candidate_count": 4,
+        "twice_chance_minus_observed_rank_sum": 12
+      },
+      "trial": {
+        "trial_id": "trial-rf-leakage",
+        "participant_id": "participant-01",
+        "operator_id": "operator-01",
+        "target_custodian_id": "custodian-01",
+        "evaluator_id": "evaluator-01",
+        "candidate_ids": [
+          "candidate-02",
+          "candidate-01",
+          "candidate-03",
+          "candidate-04"
+        ],
+        "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "target_pool_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "target_selection_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "response_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "apparatus_locked_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 100,
+          "latest_ns": 101
+        },
+        "target_selected_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 150,
+          "latest_ns": 151
+        },
+        "response_sealed_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 300,
+          "latest_ns": 301
+        },
+        "target_revealed_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 400,
+          "latest_ns": 401
+        },
+        "judge_rankings": [
+          {
+            "judge_id": "judge-1",
+            "ranked_candidate_ids": [
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
+            ]
+          },
+          {
+            "judge_id": "judge-2",
+            "ranked_candidate_ids": [
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
+            ]
+          },
+          {
+            "judge_id": "judge-3",
+            "ranked_candidate_ids": [
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
+            ]
+          },
+          {
+            "judge_id": "judge-4",
+            "ranked_candidate_ids": [
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
+            ]
+          }
+        ]
+      },
+      "evaluator_truth": {
+        "target_id": "candidate-02"
+      }
+    },
+    {
+      "scenario_id": "response-sealed-after-target-reveal",
+      "world": "adversarial_mutation",
+      "injected_leakage_modality": null,
+      "expected_acceptance": false,
+      "expected_score": null,
+      "trial": {
+        "trial_id": "trial-post-reveal",
+        "participant_id": "participant-01",
+        "operator_id": "operator-01",
+        "target_custodian_id": "custodian-01",
+        "evaluator_id": "evaluator-01",
+        "candidate_ids": [
+          "candidate-02",
+          "candidate-01",
+          "candidate-03",
+          "candidate-04"
+        ],
+        "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "target_pool_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "target_selection_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "response_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "apparatus_locked_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 100,
+          "latest_ns": 101
+        },
+        "target_selected_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 150,
+          "latest_ns": 151
+        },
+        "response_sealed_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 300,
+          "latest_ns": 500
+        },
+        "target_revealed_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 490,
+          "latest_ns": 491
+        },
+        "judge_rankings": [
+          {
+            "judge_id": "judge-1",
+            "ranked_candidate_ids": [
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
+            ]
+          },
+          {
+            "judge_id": "judge-2",
+            "ranked_candidate_ids": [
+              "candidate-01",
+              "candidate-02",
+              "candidate-03",
+              "candidate-04"
+            ]
+          },
+          {
+            "judge_id": "judge-3",
+            "ranked_candidate_ids": [
+              "candidate-01",
+              "candidate-03",
+              "candidate-02",
+              "candidate-04"
+            ]
+          },
+          {
+            "judge_id": "judge-4",
+            "ranked_candidate_ids": [
+              "candidate-01",
+              "candidate-03",
+              "candidate-04",
+              "candidate-02"
+            ]
+          }
+        ]
+      },
+      "evaluator_truth": {
+        "target_id": "candidate-02"
+      }
+    },
+    {
+      "scenario_id": "operator-colludes-with-custodian",
+      "world": "adversarial_mutation",
+      "injected_leakage_modality": null,
+      "expected_acceptance": false,
+      "expected_score": null,
+      "trial": {
+        "trial_id": "trial-role-collision",
+        "participant_id": "participant-01",
+        "operator_id": "custodian-01",
+        "target_custodian_id": "custodian-01",
+        "evaluator_id": "evaluator-01",
+        "candidate_ids": [
+          "candidate-02",
+          "candidate-01",
+          "candidate-03",
+          "candidate-04"
+        ],
+        "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "target_pool_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "target_selection_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "response_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "apparatus_locked_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 100,
+          "latest_ns": 101
+        },
+        "target_selected_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 150,
+          "latest_ns": 151
+        },
+        "response_sealed_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 300,
+          "latest_ns": 301
+        },
+        "target_revealed_at": {
+          "clock_domain_id": "lab-clock-01",
+          "earliest_ns": 400,
+          "latest_ns": 401
+        },
+        "judge_rankings": [
+          {
+            "judge_id": "judge-1",
+            "ranked_candidate_ids": [
+              "candidate-02",
+              "candidate-01",
+              "candidate-03",
+              "candidate-04"
+            ]
+          },
+          {
+            "judge_id": "judge-2",
+            "ranked_candidate_ids": [
+              "candidate-01",
+              "candidate-02",
+              "candidate-03",
+              "candidate-04"
+            ]
+          },
+          {
+            "judge_id": "judge-3",
+            "ranked_candidate_ids": [
+              "candidate-01",
+              "candidate-03",
+              "candidate-02",
+              "candidate-04"
+            ]
+          },
+          {
+            "judge_id": "judge-4",
+            "ranked_candidate_ids": [
+              "candidate-01",
+              "candidate-03",
+              "candidate-04",
+              "candidate-02"
+            ]
+          }
+        ]
+      },
+      "evaluator_truth": {
+        "target_id": "candidate-02"
+      }
+    }
+  ]
+}
