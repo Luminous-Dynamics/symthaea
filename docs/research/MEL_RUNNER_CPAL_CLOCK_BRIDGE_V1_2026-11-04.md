@@ -77,9 +77,10 @@ It checks stream instance, CPAL configuration digest, output-fit descriptor vali
 ## Synthetic fixtures
 
 The checked-in fixtures cover:
-- exact nominal mapping;
+- exact nominal mapping to the predicted-playback clock;
 - +25 ppm and -25 ppm in-policy drift;
 - callback-time monotonicity and predicted-playback-time monotonicity as distinct checks;
+- exact runner-to-predicted-playback-to-output-frame composition with matching descriptor identity;
 - exact runner → predicted-playback → output-frame composition with matching stream/configuration identity;
 - missing pair records with continuous clock progression;
 - over-wide observation bracket rejection;
