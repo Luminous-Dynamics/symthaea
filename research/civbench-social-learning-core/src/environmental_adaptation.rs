@@ -31,6 +31,7 @@ pub enum EnvironmentRegime {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MessageKind {
+    NoMessage,
     Procedure,
     OutcomeGoal,
     CausalModel,
@@ -38,6 +39,7 @@ pub enum MessageKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EncodingPolicy {
+    NoTransmission,
     AlwaysProcedure,
     AlwaysOutcomeGoal,
     AlwaysCausalModel,
@@ -86,6 +88,7 @@ impl EnvironmentMap {
 /// mapping means the teacher did not have enough observations for that action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TeachingMessage {
+    NoMessage,
     Procedure {
         recommended_action: u8,
     },
@@ -101,6 +104,7 @@ pub enum TeachingMessage {
 impl TeachingMessage {
     pub fn kind(self) -> MessageKind {
         match self {
+            Self::NoMessage => MessageKind::NoMessage,
             Self::Procedure { .. } => MessageKind::Procedure,
             Self::OutcomeGoal { .. } => MessageKind::OutcomeGoal,
             Self::CausalModel { .. } => MessageKind::CausalModel,
@@ -111,6 +115,7 @@ impl TeachingMessage {
     /// wire-protocol measurement.
     pub fn payload_bits(self) -> usize {
         match self {
+            Self::NoMessage => 0,
             Self::Procedure { .. } => 2,
             Self::OutcomeGoal { .. } => 2,
             Self::CausalModel { outcome_by_action, .. } => {
@@ -340,6 +345,7 @@ impl LearnerMemory {
             causal_conflicts: 0,
         };
         match message {
+            Some(TeachingMessage::NoMessage) | None => {}
             Some(TeachingMessage::Procedure { recommended_action }) => {
                 memory.procedure_action = Some(recommended_action);
             }
@@ -446,6 +452,9 @@ fn choose_action(
     memory: LearnerMemory,
 ) -> u8 {
     match message {
+        Some(TeachingMessage::NoMessage) | None => {
+            choose_unexplored_action(offered, memory)
+        }
         Some(TeachingMessage::Procedure { recommended_action }) => {
             if offered.contains(&recommended_action) {
                 recommended_action
@@ -477,6 +486,7 @@ fn encode_message(
     config: Config,
 ) -> TeachingMessage {
     match policy {
+        EncodingPolicy::NoTransmission => TeachingMessage::NoMessage,
         EncodingPolicy::AlwaysProcedure => TeachingMessage::Procedure {
             recommended_action: memory.best_empirical_action(),
         },
@@ -693,6 +703,27 @@ mod tests {
         assert_eq!(run.metrics.len(), GENERATIONS);
         assert!(run.metrics.iter().all(|m| m.trials == TRIALS_PER_GENERATION));
         assert_eq!(run.trials.len(), GENERATIONS * TRIALS_PER_GENERATION);
+    }
+
+    #[test]
+    fn no_transmission_has_zero_payload_and_no_social_message() {
+        let message = TeachingMessage::NoMessage;
+        assert_eq!(message.kind(), MessageKind::NoMessage);
+        assert_eq!(message.payload_bits(), 0);
+        let run = simulate(
+            EnvironmentRegime::Stable,
+            EncodingPolicy::NoTransmission,
+            Config::default(),
+            8,
+        ).unwrap();
+        assert!(run.metrics.iter().all(|metric| {
+            metric.incoming_message == Some(MessageKind::NoMessage)
+                || metric.incoming_message.is_none()
+        }));
+        assert!(run.metrics.iter().all(|metric| {
+            metric.outgoing_message == MessageKind::NoMessage
+                && metric.outgoing_payload_bits == 0
+        }));
     }
 
     #[test]
