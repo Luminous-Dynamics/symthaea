@@ -12,8 +12,11 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
+#[cfg(unix)]
 use sha2::{Digest, Sha256};
+#[cfg(unix)]
 use zipcore::error::Kind as ZipErrorKind;
+#[cfg(unix)]
 use zipcore::{Archive as DecoderArchive, ReadOptions as DecoderReadOptions};
 
 const EOCD_SIGNATURE: u32 = 0x0605_4b50;
@@ -37,6 +40,7 @@ const ENCRYPTED_FLAG: u16 = 1;
 const UNIX_FILE_TYPE_MASK: u32 = 0o170000;
 const UNIX_DIRECTORY: u32 = 0o040000;
 const UNIX_SYMLINK: u32 = 0o120000;
+#[cfg(unix)]
 const MAX_CONTENT_READ_BUFFER_BYTES: usize = 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -76,6 +80,7 @@ impl std::fmt::Display for ReaderError {
 
 impl std::error::Error for ReaderError {}
 
+#[cfg(unix)]
 fn map_zipcore_error(context: &str, error: zipcore::Error) -> ReaderError {
     let kind = match error.kind() {
         ZipErrorKind::LimitExceeded => ReaderErrorKind::LimitExceeded,
@@ -352,6 +357,7 @@ impl ZipArtifactReader {
         &self.inventory
     }
 
+    #[cfg(unix)]
     /// Stream and hash one central-directory occurrence without extracting or writing it.
     ///
     /// The custom inventory remains the policy authority. A separately implemented decoder is
@@ -591,6 +597,21 @@ impl ZipArtifactReader {
             verified_crc32: true,
             compression_method: expected.compression_method,
         })
+    }
+
+    #[cfg(not(unix))]
+    /// Refuse content verification when the platform identity fallback cannot bind the held
+    /// descriptor to the originally admitted filesystem object.
+    pub fn verify_entry_content(
+        &self,
+        _occurrence_index: u64,
+        _limits: ContentVerificationLimits,
+    ) -> Result<VerifiedEntryContent, ReaderError> {
+        self.verify_source()?;
+        Err(ReaderError::new(
+            ReaderErrorKind::Unsupported,
+            "content verification requires a qualified held-file identity; non-Unix identity is currently best-effort (see REA-RUST-023)",
+        ))
     }
 
     /// Revalidate both the held descriptor and the currently selected path.
@@ -1981,6 +2002,7 @@ mod tests {
         )
     }
 
+    #[cfg(unix)]
     #[test]
     fn verifies_stored_member_content_and_sha256_to_eof() {
         let path = write_temp(&single_entry(b"asset.bin", b"hello world"));
@@ -2002,6 +2024,7 @@ mod tests {
         fs::remove_file(path).unwrap();
     }
 
+    #[cfg(unix)]
     #[test]
     fn verifies_duplicate_names_by_distinct_central_directory_occurrence() {
         let path = write_temp(&build_zip(
@@ -2038,6 +2061,7 @@ mod tests {
         fs::remove_file(path).unwrap();
     }
 
+    #[cfg(unix)]
     #[test]
     fn rejects_crc_mismatch_in_member_payload() {
         let mut bytes = single_entry(b"asset.bin", b"hello world");
@@ -2052,6 +2076,7 @@ mod tests {
         fs::remove_file(path).unwrap();
     }
 
+    #[cfg(unix)]
     #[test]
     fn enforces_content_budget_before_decompression() {
         let path = write_temp(&single_entry(b"asset.bin", b"hello world"));
@@ -2069,6 +2094,7 @@ mod tests {
         fs::remove_file(path).unwrap();
     }
 
+    #[cfg(unix)]
     #[test]
     fn refuses_encrypted_and_unsupported_compression_members() {
         let encrypted_path = write_temp(&build_zip(
@@ -2108,6 +2134,7 @@ mod tests {
         fs::remove_file(unsupported_path).unwrap();
     }
 
+    #[cfg(unix)]
     #[test]
     fn verifies_data_descriptor_member_to_eof() {
         let path = write_temp(&build_zip(
@@ -2129,6 +2156,7 @@ mod tests {
         fs::remove_file(path).unwrap();
     }
 
+    #[cfg(unix)]
     #[test]
     fn verifies_prepended_stub_zip64_member_content() {
         let archive = build_zip64(
@@ -2153,6 +2181,7 @@ mod tests {
         fs::remove_file(path).unwrap();
     }
 
+    #[cfg(unix)]
     #[test]
     fn verifies_deflate_member_stream() {
         let mut writer = zipcore::ZipWriter::new(std::io::Cursor::new(Vec::new())).unwrap();
@@ -2178,6 +2207,7 @@ mod tests {
         fs::remove_file(path).unwrap();
     }
 
+    #[cfg(unix)]
     #[test]
     fn rejects_invalid_content_buffer_and_missing_occurrence() {
         let path = write_temp(&single_entry(b"asset.bin", b"hello"));
@@ -2196,6 +2226,18 @@ mod tests {
             .verify_entry_content(1, ContentVerificationLimits::default())
             .unwrap_err();
         assert_eq!(missing.kind, ReaderErrorKind::InvalidArchive);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(not(unix))]
+    #[test]
+    fn content_verification_fails_closed_without_qualified_source_identity() {
+        let path = write_temp(&single_entry(b"asset.bin", b"payload"));
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let error = reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap_err();
+        assert_eq!(error.kind, ReaderErrorKind::Unsupported);
         fs::remove_file(path).unwrap();
     }
 
@@ -2295,6 +2337,7 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     #[test]
     fn concurrent_content_verification_uses_independent_file_cursors() {
         let payload = vec![0x5au8; 2 * 1024 * 1024];
@@ -2328,6 +2371,7 @@ mod tests {
         fs::remove_file(path).unwrap();
     }
 
+    #[cfg(unix)]
     #[test]
     fn verifies_empty_stored_member() {
         let path = write_temp(&single_entry(b"empty.bin", b""));
@@ -2344,6 +2388,7 @@ mod tests {
         fs::remove_file(path).unwrap();
     }
 
+    #[cfg(unix)]
     #[test]
     fn refuses_directory_and_symlink_content_verification() {
         let path = write_temp(&build_zip(
@@ -2377,6 +2422,7 @@ mod tests {
         fs::remove_file(path).unwrap();
     }
 
+    #[cfg(unix)]
     #[test]
     fn rejects_deflate_output_that_exceeds_declared_uncompressed_size() {
         let payload = vec![0u8; 4096];
@@ -2403,6 +2449,7 @@ mod tests {
         fs::remove_file(path).unwrap();
     }
 
+    #[cfg(unix)]
     #[test]
     fn content_verification_refuses_a_source_changed_after_inventory() {
         let path = write_temp(&single_entry(b"asset.bin", b"payload"));
