@@ -472,6 +472,37 @@ fn partial_fraction(route: &[String], retrieved: &BTreeSet<String>) -> f64 {
     route.iter().filter(|declaration| retrieved.contains(*declaration)).count() as f64 / route.len() as f64
 }
 
+fn declaration_first_rank(
+    declaration: &str,
+    candidates: &[RankedCandidate],
+    graph_sha: &str,
+    mappings: &BTreeMap<(String, String), &Mapping>,
+    limit: usize,
+) -> Option<usize> {
+    candidates.iter().take(limit).filter_map(|candidate| {
+        let key = (graph_sha.to_owned(), candidate.node_id.clone());
+        mappings.get(&key)
+            .filter(|mapping| mapping.mapping_status == "exact")
+            .and_then(|mapping| mapping.declaration_id.as_deref())
+            .filter(|id| *id == declaration)
+            .map(|_| candidate.rank)
+    }).min()
+}
+
+fn route_completion_rank(
+    route: &[String],
+    candidates: &[RankedCandidate],
+    graph_sha: &str,
+    mappings: &BTreeMap<(String, String), &Mapping>,
+    limit: usize,
+) -> Option<usize> {
+    let mut ranks = Vec::with_capacity(route.len());
+    for declaration in route {
+        ranks.push(declaration_first_rank(declaration, candidates, graph_sha, mappings, limit)?);
+    }
+    ranks.into_iter().max()
+}
+
 fn build_coverage(
     receipt: &Receipt,
     group: &SupportGroup,
@@ -482,7 +513,6 @@ fn build_coverage(
     let mut retrieved = BTreeSet::<String>::new();
     let mut mapped_outside = 0usize;
     let mut unresolved = 0usize;
-    let mut mapped_node_to_declaration = BTreeMap::<String, String>::new();
     for candidate in &receipt.ranking.candidates {
         let key = (graph_sha.clone(), candidate.node_id.clone());
         let mapping = mappings.get(&key)
@@ -493,11 +523,6 @@ fn build_coverage(
         match mapping.mapping_status.as_str() {
             "exact" => {
                 let declaration = mapping.declaration_id.as_ref().ok_or("exact mapping lost declaration ID")?;
-                if let Some(previous) = mapped_node_to_declaration.insert(candidate.node_id.clone(), declaration.clone()) {
-                    if previous != *declaration {
-                        return Err("same graph node maps to multiple declaration IDs".into());
-                    }
-                }
                 if universe.contains(declaration) {
                     retrieved.insert(declaration.clone());
                 } else {
@@ -533,22 +558,17 @@ fn build_coverage(
         partial_sum += partial_fraction(route, &retrieved);
         if route_covered(route, &retrieved) {
             complete += 1;
-            best = Some(best.map_or(route.iter().filter_map(|d| {
-                receipt.ranking.candidates.iter().find(|candidate| {
-                    mappings.get(&(graph_sha.clone(), candidate.node_id.clone()))
-                        .and_then(|m| m.declaration_id.as_ref())
-                        == Some(d)
-                }).map(|c| c.rank)
-            }).max().unwrap_or(0), |current| current.min(
-                route.iter().filter_map(|d| {
-                    receipt.ranking.candidates.iter().find(|candidate| {
-                        mappings.get(&(graph_sha.clone(), candidate.node_id.clone()))
-                            .and_then(|m| m.declaration_id.as_ref())
-                            == Some(d)
-                    }).map(|c| c.rank)
-                }).max().unwrap_or(0)
-            )));
-            if route.len() == retrieved.len() {
+            if let Some(completion_rank) = route_completion_rank(
+                route,
+                &receipt.ranking.candidates,
+                graph_sha,
+                mappings,
+                receipt.ranking.candidates.len(),
+            ) {
+                best = Some(best.map_or(completion_rank, |current| current.min(completion_rank)));
+            }
+            let route_set: BTreeSet<String> = route.iter().cloned().collect();
+            if route_set == retrieved {
                 exact = true;
             }
         }
@@ -574,13 +594,13 @@ fn build_coverage(
         let covered = group.minimal_sufficient_support_antichain.iter()
             .filter(|route| route_covered(route, &prefix_set)).count();
         let best_rank = group.minimal_sufficient_support_antichain.iter()
-            .filter(|route| route_covered(route, &prefix_set))
-            .map(|route| route.iter().filter_map(|declaration| {
-                receipt.ranking.candidates.iter().take(effective_k).find(|candidate| {
-                    mappings.get(&(graph_sha.clone(), candidate.node_id.clone()))
-                        .and_then(|m| m.declaration_id.as_ref()) == Some(declaration)
-                }).map(|candidate| candidate.rank)
-            }).max().unwrap_or(0))
+            .filter_map(|route| route_completion_rank(
+                route,
+                &receipt.ranking.candidates,
+                graph_sha,
+                mappings,
+                effective_k,
+            ))
             .min();
         coverage_at_k.push(KCoverage {
             k,
