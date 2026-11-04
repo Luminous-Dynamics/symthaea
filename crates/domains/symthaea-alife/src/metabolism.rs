@@ -1,47 +1,46 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Metabolism: thermodynamic grounding, per `ALIFE_PLAN_2026-07-08.md` Phase 3.
+//! Metabolism: dimensionless resource-cost policies for ALife simulations.
 //!
-//! Turns homeostasis from a soft FEP *preference* into a hard *energy-budget constraint* --
-//! Schrödinger's "negative entropy" framing: an organism must import free energy and export
-//! entropy to maintain internal order, or it dies.
+//! This module applies Landauer- and Prigogine-inspired formula shapes as
+//! configurable costs in the simulated organism energy budget. These are
+//! model rules, not SI thermodynamic measurements or evidence that physical
+//! memory erasure / entropy production has been measured.
 //!
-//! Ports the actual physics from `src/cognitive_loop/thermodynamic_physics_bridge.rs` (the main
-//! crate's `ThermodynamicPhysicsBridge`) -- the Landauer and Prigogine *formulas*, not the
-//! `ConsciousnessPhase`/`ThermodynamicRegime` coupling those live inside there (per the plan's
-//! explicit instruction: "port the math, not the coupling").
-//!
-//! **On units**: like the main crate's own `K_CONSCIOUSNESS_BOLTZMANN = 0.01`
-//! (`thresholds/consciousness.rs`), [`K_ALIFE_BOLTZMANN`] is a dimensionless analog scaled to
-//! this crate's `[0, 1]` energy/observation units, **not** the true physical Boltzmann constant
-//! (1.380649×10⁻²³ J/K). Landauer's bound is real physics; the specific numeric constant here is
-//! a deliberate, documented rescaling to a dimensionless system, matching how the main crate
-//! already handles this rather than inventing a new convention.
+//! The coefficient used below is deliberately dimensionless and scaled to
+//! this crate's resource units. Consequently the returned values are ALife
+//! model costs, not joules and not physical lower bounds. Keep the legacy API
+//! names for compatibility while preserving this claim boundary.
 
-/// Dimensionless Boltzmann-constant analog for alife energy units. See module docs. Chosen (with
-/// `OrganismConfig::dissipation_rate`) so the combined Landauer+Prigogine floor is a real,
-/// measurable addition to existing per-tick costs without swamping them -- a traced diagnostic
-/// at the original 0.01 found mean physical_cost≈0.0104/tick, roughly *doubling*
-/// `OrganismConfig::default().metabolic_cost` (0.01) outright, which crashed every Phase 0/1/2
-/// organism's energy to zero within ~10 ticks. Scaled down ~10x to land around ~10% of that
-/// baseline instead.
+/// Dimensionless coefficient for the ALife information/order cost policy.
+/// It was selected to make the added model cost affect simulated energy
+/// budgets without overwhelming existing costs. It is not a rescaled SI
+/// Boltzmann constant or a measured biological/physical parameter.
 pub const K_ALIFE_BOLTZMANN: f64 = 0.0005;
 
-/// Landauer's bound (1961): erasing/writing `bits` of information costs at least
-/// `k_B * T * ln(2)` per bit. This is a real physical lower bound, not a heuristic -- any
-/// physically-realizable irreversible computation must dissipate at least this much energy.
+/// Legacy Landauer-inspired model cost for a nominal information quantity
+/// and a dimensionless effective temperature.
 ///
-/// `bits` should be non-negative (irreversible information written/erased this step); negative
-/// or NaN inputs are clamped to 0. `temperature` is floored away from zero to avoid a divide/
-/// blowup at T=0 (which real physics disallows -- absolute zero is unreachable).
+/// This is not an SI Landauer lower bound: the coefficient is dimensionless,
+/// and the input is supplied by simulation telemetry rather than a measured
+/// count of physical bit erasures. The result is an ALife resource cost, not
+/// joules or a thermodynamic impossibility test. The legacy function name is
+/// retained for source compatibility.
+///
+/// Negative or NaN bit counts are handled by the existing model policy and
+/// the effective temperature is floored at 1e-6. These are simulation
+/// safeguards, not statements about absolute-zero thermodynamics.
 pub fn landauer_minimum(bits: f64, temperature: f64) -> f64 {
     bits.max(0.0) * K_ALIFE_BOLTZMANN * temperature.max(1e-6) * std::f64::consts::LN_2
 }
 
-/// Shannon entropy, in bits, of a probability distribution. Used to quantify how many bits of
-/// uncertainty are *resolved* (erased, in Landauer's sense) when an agent commits to one action
-/// out of a distribution over several -- `H(p) = -Σ p_i log2(p_i)`, zero contribution from any
-/// `p_i <= 0`. Bounded above by `log2(n)` for `n` equiprobable outcomes.
+/// Shannon entropy, in bits, of a probability distribution:
+/// H(p) = -Σ p_i log2(p_i). It measures uncertainty in the modeled action
+/// distribution; it does not establish that this many physical memory bits
+/// were irreversibly erased when the agent selected an action. Using this
+/// quantity in the ALife cost policy is a modeling choice. Terms with
+/// p_i <= 0 contribute zero; the maximum is log2(n) for n equiprobable
+/// outcomes.
 pub fn shannon_entropy_bits(probabilities: &[f64]) -> f64 {
     probabilities
         .iter()
@@ -51,17 +50,16 @@ pub fn shannon_entropy_bits(probabilities: &[f64]) -> f64 {
         .max(0.0)
 }
 
-/// Prigogine (1947/1977): a dissipative structure maintaining order far from equilibrium must
-/// continuously export entropy production, at a rate that grows with how much order is being
-/// maintained. Standard near-equilibrium linear-response form: entropy production
-/// `σ = J·X` with flux `J` proportional to thermodynamic force `X` near equilibrium, and `X`
-/// itself proportional to the deviation from the disordered (zero-order) state -- giving a
-/// quadratic-in-order dissipation cost, scaled by temperature and a dissipation-rate constant
-/// analogous to a transport coefficient.
+/// Prigogine-inspired quadratic model penalty for maintaining simulated order.
 ///
-/// `order_maintained` is expected in `[0, 1]` (0 = no order kept, 1 = maximal); values outside
-/// that range are not clamped here (callers are expected to pass a genuine `[0,1]` quantity --
-/// see `Organism::tick`'s use, which derives it from homeostatic deficit).
+/// The current expression is dissipation_rate * order_maintained^2 *
+/// temperature. It is an ALife scenario rule, not a derived entropy-production
+/// measurement or a universal statement that far-from-equilibrium systems
+/// minimize entropy production. The minimum-entropy-production result has
+/// restricted near-equilibrium assumptions; this model does not estimate
+/// conjugate fluxes and forces here.
+///
+/// order_maintained is expected in [0, 1]; this function does not clamp it.
 pub fn prigogine_dissipation_cost(
     order_maintained: f64,
     temperature: f64,
@@ -70,14 +68,11 @@ pub fn prigogine_dissipation_cost(
     dissipation_rate.max(0.0) * order_maintained.powi(2) * temperature.max(1e-6)
 }
 
-/// Bits of resolution encoded by observing a `[0,1]` quantity with bucket width `grain` --
-/// `log2(number_of_distinguishable_buckets)` = `log2(1/grain)`. Feeds [`landauer_minimum`] to
-/// charge a real energy cost for how much perceptual detail a strategy actually resolves, per
-/// Mark, Marion & Hoffman (2010) "Natural selection and veridical perceptions" (J. Theoretical
-/// Biology): their central result is that truth-tracking perception is never beaten by a coarser
-/// "interface" strategy *unless* resolving detail carries a real cost -- prior to this function,
-/// `symthaea-alife` charged none. `grain` is clamped away from zero: an unboundedly fine bucket
-/// would need unboundedly many bits, which is not a claim this crate makes.
+/// Modelled resolution capacity for a [0,1] observation with bucket width
+/// grain: log2(1/grain). This estimates the number of distinguishable
+/// buckets, not the number of physical bits erased by a memory-reset
+/// operation. The value feeds the ALife dimensionless information-cost policy;
+/// it is not a measured physical energy cost. grain is clamped away from zero.
 pub fn perceptual_resolution_bits(grain: f64) -> f64 {
     (1.0 / grain.max(1e-6)).log2().max(0.0)
 }
