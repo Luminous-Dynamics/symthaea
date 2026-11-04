@@ -4,8 +4,7 @@ on:
   pull_request:
     paths:
       - "tools/pitb-graph-evidence/**"
-      - "tools/pitb-sorrydb-audit/**"
-      - "tools/pitb-sorrydb-evidence-closure/**"
+      - "tools/pitb-sorrydb-integrity/**"
       - ".github/workflows/pitb-typed-graph-evidence.yml"
   workflow_dispatch:
 
@@ -146,9 +145,9 @@ jobs:
           retention-days: 30
 
 
-  sorrydb-snapshot-integrity:
+  sorrydb-static-snapshot-integrity:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 30
     steps:
       - name: Check out exact pull request head
         uses: actions/checkout@v4
@@ -166,498 +165,90 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/pitb-sorrydb-venv"
           "$RUNNER_TEMP/pitb-sorrydb-venv/bin/pip" install "jsonschema==4.25.1"
 
-      - name: Fetch exact SorryDB upstream commit
+      - name: Stage the standalone Rust verifier outside the production workspace
         shell: bash
         run: |
           set -euo pipefail
-          source_dir="$RUNNER_TEMP/sorrydb-upstream"
-          mkdir -p "$source_dir"
-          git -C "$source_dir" init
-          git -C "$source_dir" remote add origin https://github.com/SorryDB/SorryDB.git
-          git -C "$source_dir" fetch --depth=1 origin 74b3b63f8ba890d675f362924b21ac55db410383
-          git -C "$source_dir" checkout --detach FETCH_HEAD
-          actual_commit="$(git -C "$source_dir" rev-parse HEAD)"
-          test "$actual_commit" = "74b3b63f8ba890d675f362924b21ac55db410383"
-          full_path="data/SorryDB_2601/SorryDB_2601.json"
-          split_path="data/SorryDB_2601/SorryDB_2601_1000_evaluation_split.json"
-          full_blob="$(git -C "$source_dir" rev-parse "HEAD:$full_path")"
-          split_blob="$(git -C "$source_dir" rev-parse "HEAD:$split_path")"
-          test "$full_blob" = "5fafddac467af6d30d8f5c8731d6edec9c273a47"
-          test "$split_blob" = "af3b663429dc4689ee728d2fb5c7d8d5034476f7"
-          mkdir -p "$RUNNER_TEMP/sorrydb-input"
-          cp "$source_dir/$full_path" "$RUNNER_TEMP/sorrydb-input/full.json"
-          cp "$source_dir/$split_path" "$RUNNER_TEMP/sorrydb-input/evaluation-split.json"
-          echo "PITB_SORRYDB_UPSTREAM_COMMIT_PASS $actual_commit"
-          echo "PITB_SORRYDB_FULL_BLOB_PASS $full_blob"
-          echo "PITB_SORRYDB_EVALUATION_BLOB_PASS $split_blob"
-          echo "PITB_SORRYDB_INPUT_DIR=$RUNNER_TEMP/sorrydb-input" >> "$GITHUB_ENV"
-
-      - name: Stage the isolated Rust auditor
-        shell: bash
-        run: |
-          set -euo pipefail
-          staged="$RUNNER_TEMP/pitb-sorrydb-audit"
+          staged="$RUNNER_TEMP/pitb-sorrydb-integrity"
           mkdir -p "$staged/src"
-          cp tools/pitb-sorrydb-audit/Cargo.toml "$staged/Cargo.toml"
-          cp tools/pitb-sorrydb-audit/Cargo.lock "$staged/Cargo.lock"
-          cp tools/pitb-sorrydb-audit/src/main.rs "$staged/src/main.rs"
+          cp tools/pitb-sorrydb-integrity/Cargo.toml "$staged/Cargo.toml"
+          cp tools/pitb-sorrydb-integrity/Cargo.lock "$staged/Cargo.lock"
+          cp tools/pitb-sorrydb-integrity/src/main.rs "$staged/src/main.rs"
           echo "PITB_SORRYDB_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
           echo "PITB_SORRYDB_DIR=$staged" >> "$GITHUB_ENV"
 
-      - name: Format and test Rust audit tool
+      - name: Format, compile and run synthetic negative controls
         shell: bash
         run: |
           set -euo pipefail
           rustfmt --edition 2021 "$PITB_SORRYDB_DIR/src/main.rs"
           cargo fmt --check --manifest-path "$PITB_SORRYDB_MANIFEST"
           cargo test --locked --manifest-path "$PITB_SORRYDB_MANIFEST"
+          cargo run --locked --manifest-path "$PITB_SORRYDB_MANIFEST" -- --self-test
 
-      - name: Generate immutable-source checkout receipt
+      - name: Fetch the exact published SorryDB-2601 assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          source="https://raw.githubusercontent.com/SorryDB/SorryDB/74b3b63f8ba890d675f362924b21ac55db410383/data/SorryDB_2601"
+          mkdir -p "$RUNNER_TEMP/sorrydb-input"
+          curl --fail --location --retry 3 "$source/SorryDB_2601.json" \
+            -o "$RUNNER_TEMP/sorrydb-input/SorryDB_2601.json"
+          curl --fail --location --retry 3 "$source/SorryDB_2601_1000_evaluation_split.json" \
+            -o "$RUNNER_TEMP/sorrydb-input/SorryDB_2601_1000_evaluation_split.json"
+          echo "PITB_SORRYDB_INPUT_DIR=$RUNNER_TEMP/sorrydb-input" >> "$GITHUB_ENV"
+
+      - name: Validate exact snapshot blobs, all record IDs and evaluation membership
         shell: bash
         run: |
           set -euo pipefail
           cargo run --locked --manifest-path "$PITB_SORRYDB_MANIFEST" -- \
-            --self-test-checkout-report "$RUNNER_TEMP/sorrydb-source-checkout.json"
+            --validate \
+            "$PITB_SORRYDB_INPUT_DIR/SorryDB_2601.json" \
+            "$PITB_SORRYDB_INPUT_DIR/SorryDB_2601_1000_evaluation_split.json" \
+            "$RUNNER_TEMP/sorrydb-integrity-report.json"
 
-      - name: Validate source checkout receipt schema
+      - name: Validate report schema and qualification boundary
         shell: bash
         run: |
           set -euo pipefail
-          "$RUNNER_TEMP/pitb-sorrydb-venv/bin/python" - "$RUNNER_TEMP/sorrydb-source-checkout.json" <<'PY'
+          "$RUNNER_TEMP/pitb-sorrydb-venv/bin/python" - "$RUNNER_TEMP/sorrydb-integrity-report.json" <<'PY'
           import json
           import sys
           from pathlib import Path
           from jsonschema import Draft202012Validator
 
-          schema = json.loads(Path("tools/pitb-sorrydb-audit/schema/sorrydb-source-checkout-v0.schema.json").read_text())
+          schema = json.loads(Path("tools/pitb-sorrydb-integrity/schema/sorrydb-snapshot-integrity-report-v0.schema.json").read_text())
           Draft202012Validator.check_schema(schema)
-          receipt = json.loads(Path(sys.argv[1]).read_text())
-          errors = list(Draft202012Validator(schema).iter_errors(receipt))
-          if errors:
-              raise SystemExit("source checkout receipt schema errors: " + "; ".join(e.message for e in errors))
-          if receipt["source_span"] != "sorry" or receipt["source_span_verified_as_sorry"] is not True:
-              raise SystemExit("committed source token span was not verified")
-          if receipt["scoring_admission"] is not False:
-              raise SystemExit("source-only receipt cannot admit a proof result")
-          print("PITB_SORRYDB_SOURCE_CHECKOUT_SCHEMA_PASS")
-          PY
-
-      - name: Generate schema-checkable audit report and proof-run JSONL
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo run --locked --manifest-path "$PITB_SORRYDB_MANIFEST" -- \
-            --self-test-report \
-            "$RUNNER_TEMP/sorrydb-audit.synthetic.json" \
-            "$RUNNER_TEMP/sorrydb-audit.synthetic-runs.jsonl"
-
-      - name: Validate audit report and proof-run schemas
-        shell: bash
-        run: |
-          set -euo pipefail
-          "$RUNNER_TEMP/pitb-sorrydb-venv/bin/python" - \
-            "$RUNNER_TEMP/sorrydb-audit.synthetic.json" \
-            "$RUNNER_TEMP/sorrydb-audit.synthetic-runs.jsonl" <<'PY'
-          import hashlib
-          import json
-          import sys
-          from pathlib import Path
-          from jsonschema import Draft202012Validator
-
-          root = Path("tools/pitb-sorrydb-audit/schema")
-          report_schema = json.loads((root / "sorrydb-snapshot-audit-report-v0.schema.json").read_text())
-          run_schema = json.loads((root / "sorrydb-proof-run-v0.schema.json").read_text())
-          Draft202012Validator.check_schema(report_schema)
-          Draft202012Validator.check_schema(run_schema)
-          report = json.loads(Path(sys.argv[1]).read_text())
-          errors = list(Draft202012Validator(report_schema).iter_errors(report))
-          if errors:
-              raise SystemExit("synthetic report schema errors: " + "; ".join(e.message for e in errors))
-          runs = [
-              json.loads(line)
-              for line in Path(sys.argv[2]).read_text().splitlines()
-              if line.strip()
-          ]
-          for run in runs:
-              errors = list(Draft202012Validator(run_schema).iter_errors(run))
-              if errors:
-                  raise SystemExit("synthetic proof-run schema errors: " + "; ".join(e.message for e in errors))
-          run_bytes = Path(sys.argv[2]).read_bytes()
-          if report["run_input_sha256"] != hashlib.sha256(run_bytes).hexdigest():
-              raise SystemExit("synthetic proof-run report digest differs from JSONL bytes")
-          if len(runs) != 2 or report["run_count"] != 2 or report["verified_success_run_count"] != 1 or report["unique_successful_task_count"] != 1:
-              raise SystemExit("synthetic proof-run denominators changed")
-          summary = report["strategy_summaries"][0]
-          if summary["attempts"] != 2 or summary["verified_success_attempts"] != 1:
-              raise SystemExit("synthetic per-strategy attempt denominator changed")
-          if summary["unique_tasks_solved"] != 1 or summary["unique_task_success_rate"] != 0.5:
-              raise SystemExit("synthetic per-strategy unique task coverage changed")
-          if abs(summary["cost_per_unique_verified_task_usd"] - 0.01) > 1e-12:
-              raise SystemExit("synthetic cost per unique verified task changed")
-          print("PITB_SORRYDB_REPORT_AND_PROOF_RUN_SCHEMA_PASS")
-          PY
-
-      - name: Audit real pinned SorryDB snapshot and evaluation split
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo run --locked --manifest-path "$PITB_SORRYDB_MANIFEST" -- \
-            --verify \
-            "$PITB_SORRYDB_INPUT_DIR/full.json" \
-            "$PITB_SORRYDB_INPUT_DIR/evaluation-split.json" \
-            "$RUNNER_TEMP/sorrydb-audit.json" \
-            --pinned-source SorryDB/SorryDB@74b3b63f8ba890d675f362924b21ac55db410383
-
-      - name: Validate real audit report and frozen denominators
-        shell: bash
-        run: |
-          set -euo pipefail
-          "$RUNNER_TEMP/pitb-sorrydb-venv/bin/python" - "$RUNNER_TEMP/sorrydb-audit.json" <<'PY'
-          import json
-          import sys
-          from pathlib import Path
-          from jsonschema import Draft202012Validator
-
-          schema = json.loads(Path("tools/pitb-sorrydb-audit/schema/sorrydb-snapshot-audit-report-v0.schema.json").read_text())
           report = json.loads(Path(sys.argv[1]).read_text())
           errors = list(Draft202012Validator(schema).iter_errors(report))
           if errors:
-              raise SystemExit("real audit report schema errors: " + "; ".join(e.message for e in errors))
-          expected = {
-              "full_task_count": 5663,
-              "evaluation_task_count": 1000,
-              "evaluation_exact_record_matches_in_full_snapshot": 1000,
-              "repository_count_full": 78,
-              "repository_count_evaluation": 78,
-              "zero_based_start_column_task_count_full": 19,
-              "zero_based_start_column_task_count_evaluation": 2,
-              "full_count_documentation_drift": True,
-              "run_count": 0,
-              "verified_success_run_count": 0,
-              "unique_successful_task_count": 0,
-              "strategy_summaries": [],
-              "run_input_sha256": None,
-          }
-          for key, value in expected.items():
-              if report[key] != value:
-                  raise SystemExit(f"{key}: expected {value!r}, got {report[key]!r}")
-          clusters = report["cluster_summary_evaluation"]
-          if clusters["source_file_count"] != 339:
-              raise SystemExit(f"expected 339 repository/file clusters, got {clusters['source_file_count']}")
-          if clusters["tasks_per_repository_max"] != 21 or clusters["tasks_per_source_file_max"] != 20:
-              raise SystemExit("evaluation cluster maxima changed")
-          if report["full_dataset_git_blob_sha1"] != "5fafddac467af6d30d8f5c8731d6edec9c273a47":
-              raise SystemExit("full snapshot Git blob identity changed")
-          if report["evaluation_split_git_blob_sha1"] != "af3b663429dc4689ee728d2fb5c7d8d5034476f7":
-              raise SystemExit("evaluation split Git blob identity changed")
-          print("PITB_SORRYDB_REAL_SNAPSHOT_AUDIT_PASS")
-          print(json.dumps(report, sort_keys=True))
+              raise SystemExit("SorryDB report schema errors: " + "; ".join(e.message for e in errors))
+          if report["full_snapshot"]["record_count"] != 2601 or report["evaluation_split"]["record_count"] != 1000:
+              raise SystemExit("SorryDB-2601 denominators changed")
+          if report["full_snapshot"]["computed_id_match_count"] != 2601 or report["evaluation_split"]["computed_id_match_count"] != 1000:
+              raise SystemExit("SorryDB canonical task-ID audit was incomplete")
+          if not report["evaluation_ids_subset_of_snapshot"] or not report["split_repositories_subset_of_snapshot"]:
+              raise SystemExit("evaluation split is not a subset of the frozen snapshot")
+          if report["source_checkout_reproduction_verified"] or report["goal_to_source_semantic_fidelity_verified"] or report["proof_solution_integrity_verified"]:
+              raise SystemExit("structural snapshot validation cannot claim Lean/source/proof qualification")
+          print("PITB_SORRYDB_STATIC_SNAPSHOT_INTEGRITY_PASS")
+          print(json.dumps({
+              "full_tasks": report["full_snapshot"]["record_count"],
+              "evaluation_tasks": report["evaluation_split"]["record_count"],
+              "repositories": report["full_snapshot"]["unique_repository_count"],
+              "unique_goals": report["full_snapshot"]["unique_goal_count"]
+          }, sort_keys=True))
           PY
 
-      - name: Prepare one frozen SorryDB source task
-        shell: bash
-        run: |
-          set -euo pipefail
-          "$RUNNER_TEMP/pitb-sorrydb-venv/bin/python" - \
-            "$PITB_SORRYDB_INPUT_DIR/evaluation-split.json" \
-            "$RUNNER_TEMP/sorrydb-source-task.json" <<'PY'
-          import json
-          import sys
-          from pathlib import Path
-
-          dataset = json.loads(Path(sys.argv[1]).read_text())
-          expected = "7956fe8e4946a9ddf7098ee84c69669db5bc902715dad6e7cdf0db121aa5bfce"
-          record = next((row for row in dataset["sorries"] if row["id"] == expected), None)
-          if record is None:
-              raise SystemExit("pinned source sample is missing from frozen SorryDB evaluation split")
-          if record["repo"]["commit"] != "ddcb6542f2b62883c8642d3db4ecc115afcce33e":
-              raise SystemExit("pinned source sample repository commit changed")
-          Path(sys.argv[2]).write_text(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
-          print("PITB_SORRYDB_REAL_TASK_SELECTED", record["id"])
-          PY
-
-      - name: Checkout one real SorryDB source at its exact commit
-        shell: bash
-        run: |
-          set -euo pipefail
-          repo_dir="$RUNNER_TEMP/sorrydb-real-source"
-          mkdir -p "$repo_dir"
-          git -C "$repo_dir" init -q
-          git -C "$repo_dir" remote add origin https://github.com/AlexKontorovich/PrimeNumberTheoremAnd.git
-          git -C "$repo_dir" fetch --depth=1 origin ddcb6542f2b62883c8642d3db4ecc115afcce33e
-          git -C "$repo_dir" checkout --detach FETCH_HEAD
-          actual_commit="$(git -C "$repo_dir" rev-parse HEAD)"
-          test "$actual_commit" = "ddcb6542f2b62883c8642d3db4ecc115afcce33e"
-          toolchain_blob="$(git -C "$repo_dir" rev-parse HEAD:lean-toolchain)"
-          source_blob="$(git -C "$repo_dir" rev-parse HEAD:PrimeNumberTheoremAnd/FioriKadiriSwidinsky.lean)"
-          manifest_blob="$(git -C "$repo_dir" rev-parse HEAD:lake-manifest.json)"
-          test "$toolchain_blob" = "2654c20bb16bfd3a12f77a6cdeb73d48bf3b8359"
-          test "$source_blob" = "6214f90ce5f8c61aca4a4d696ff5687d872dfc0e"
-          test "$manifest_blob" = "c0405e3c9643b00b1ce6a8120516ca482e6fe4ec"
-          git -C "$repo_dir" show HEAD:lean-toolchain
-          echo "PITB_SORRYDB_REAL_SOURCE_COMMIT_PASS $actual_commit"
-          echo "PITB_SORRYDB_REAL_SOURCE_FILE_BLOB_PASS $source_blob"
-          echo "PITB_SORRYDB_REAL_SOURCE_TOOLCHAIN_BLOB_PASS $toolchain_blob"
-          echo "PITB_SORRYDB_REAL_SOURCE_LAKE_MANIFEST_BLOB_PASS $manifest_blob"
-          echo "PITB_SORRYDB_REAL_SOURCE_DIR=$repo_dir" >> "$GITHUB_ENV"
-
-      - name: Verify real SorryDB task source coordinates from Git objects
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo run --locked --manifest-path "$PITB_SORRYDB_MANIFEST" -- \
-            --verify-checkout \
-            "$RUNNER_TEMP/sorrydb-source-task.json" \
-            "$PITB_SORRYDB_REAL_SOURCE_DIR" \
-            "$RUNNER_TEMP/sorrydb-real-source-checkout.json"
-
-      - name: Validate real source checkout receipt
-        shell: bash
-        run: |
-          set -euo pipefail
-          "$RUNNER_TEMP/pitb-sorrydb-venv/bin/python" - "$RUNNER_TEMP/sorrydb-real-source-checkout.json" <<'PY'
-          import json
-          import sys
-          from pathlib import Path
-          from jsonschema import Draft202012Validator
-
-          schema = json.loads(Path("tools/pitb-sorrydb-audit/schema/sorrydb-source-checkout-v0.schema.json").read_text())
-          receipt = json.loads(Path(sys.argv[1]).read_text())
-          errors = list(Draft202012Validator(schema).iter_errors(receipt))
-          if errors:
-              raise SystemExit("real source checkout receipt schema errors: " + "; ".join(e.message for e in errors))
-          if receipt["source_database_task_id"] != "7956fe8e4946a9ddf7098ee84c69669db5bc902715dad6e7cdf0db121aa5bfce":
-              raise SystemExit("source checkout receipt task ID changed")
-          if receipt["repository_commit"] != "ddcb6542f2b62883c8642d3db4ecc115afcce33e":
-              raise SystemExit("source checkout receipt commit changed")
-          if receipt["source_span"] != "sorry" or receipt["source_span_verified_as_sorry"] is not True:
-              raise SystemExit("real source coordinates do not select exactly the sorry token")
-          if receipt["scoring_admission"] is not False:
-              raise SystemExit("source-only check cannot admit a scored proof result")
-          print("PITB_SORRYDB_REAL_SOURCE_CHECKOUT_PASS")
-          print(json.dumps(receipt, sort_keys=True))
-          PY
-
-      - name: Build pinned Lean project with its own toolchain
-        uses: leanprover/lean-action@8fc2853fe07aa43fa70b509ee91926147759ba2b
-        with:
-          lake-package-directory: ${{ runner.temp }}/sorrydb-real-source
-          auto-config: "false"
-          build: "true"
-          use-mathlib-cache: "true"
-          use-github-cache: "false"
-
-      - name: Replay the live SorryDB goal under the pinned Lean environment
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo run --locked --manifest-path "$PITB_SORRYDB_MANIFEST" -- \
-            --replay-goal \
-            "$RUNNER_TEMP/sorrydb-source-task.json" \
-            "$PITB_SORRYDB_REAL_SOURCE_DIR" \
-            "$RUNNER_TEMP/sorrydb-goal-replay.json" \
-            "$RUNNER_TEMP/sorrydb-goal-replay.log" \
-            "$RUNNER_TEMP/sorrydb-goal-replay-instrumented.lean"
-
-      - name: Validate exact live goal replay receipt
-        shell: bash
-        run: |
-          set -euo pipefail
-          "$RUNNER_TEMP/pitb-sorrydb-venv/bin/python" - \
-            "$RUNNER_TEMP/sorrydb-goal-replay.json" \
-            "$RUNNER_TEMP/sorrydb-source-task.json" \
-            "$PITB_SORRYDB_REAL_SOURCE_DIR" \
-            "$RUNNER_TEMP/sorrydb-goal-replay-instrumented.lean" <<'PY'
-          import hashlib
-          import json
-          import subprocess
-          import sys
-          from pathlib import Path
-          from jsonschema import Draft202012Validator
-
-          receipt_path, task_path, repo_path, instrumented_path = map(Path, sys.argv[1:])
-          receipt = json.loads(receipt_path.read_text())
-          task = json.loads(task_path.read_text())
-          schema_path = Path("tools/pitb-sorrydb-audit/schema/sorrydb-goal-replay-v0.schema.json")
-          schema = json.loads(schema_path.read_text())
-          Draft202012Validator.check_schema(schema)
-          errors = list(Draft202012Validator(schema).iter_errors(receipt))
-          if errors:
-              raise SystemExit("goal replay receipt schema errors: " + "; ".join(e.message for e in errors))
-
-          def git_blob(path):
-              return subprocess.check_output(["git", "-C", str(repo_path), "show", f"HEAD:{path}"])
-
-          source_path = task["location"]["path"]
-          source_bytes = git_blob(source_path)
-          manifest_bytes = git_blob("lake-manifest.json")
-          toolchain_bytes = git_blob("lean-toolchain")
-          tree = subprocess.check_output(["git", "-C", str(repo_path), "rev-parse", "HEAD^{tree}"], text=True).strip()
-          checks = {
-              "task identity": receipt["source_database_task_id"] == task["id"],
-              "repository commit": receipt["repository_commit"] == task["repo"]["commit"],
-              "Lean version": receipt["lean_version"] == task["repo"]["lean_version"],
-              "source path": receipt["source_path"] == source_path,
-              "goal digest": receipt["goal_sha256"] == hashlib.sha256(task["debug_info"]["goal"].encode()).hexdigest(),
-              "source bytes": receipt["source_file_sha256"] == hashlib.sha256(source_bytes).hexdigest(),
-              "instrumented source artifact": receipt["instrumented_source_sha256"] == hashlib.sha256(instrumented_path.read_bytes()).hexdigest(),
-              "Lake manifest": receipt["lake_manifest_sha256"] == hashlib.sha256(manifest_bytes).hexdigest(),
-              "toolchain file": receipt["toolchain_file_sha256"] == hashlib.sha256(toolchain_bytes).hexdigest(),
-              "repository tree": receipt["repository_tree_sha256"] == tree,
-              "actual live goal": receipt["goal_reproduced"] is True and receipt["replay_exit_code"] == 0,
-              "scoring boundary": receipt["scoring_admission"] is False,
-          }
-          failed = [name for name, passed in checks.items() if not passed]
-          if failed:
-              raise SystemExit("goal replay receipt checks failed: " + ", ".join(failed))
-          print("PITB_SORRYDB_LIVE_GOAL_REPLAY_PASS")
-          print(json.dumps(receipt, sort_keys=True))
-          PY
-      - name: Retain SorryDB audit evidence
+      - name: Retain pinned SorryDB integrity report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pitb-sorrydb-snapshot-audit
+          name: pitb-sorrydb-static-integrity
           path: |
-            ${{ runner.temp }}/sorrydb-audit.json
-            ${{ runner.temp }}/sorrydb-audit.synthetic.json
-            ${{ runner.temp }}/sorrydb-audit.synthetic-runs.jsonl
-            ${{ runner.temp }}/sorrydb-source-checkout.json
-            ${{ runner.temp }}/sorrydb-real-source-checkout.json
-            ${{ runner.temp }}/sorrydb-goal-replay.json
-            ${{ runner.temp }}/sorrydb-goal-replay.log
-            ${{ runner.temp }}/sorrydb-goal-replay-instrumented.lean
-            ${{ runner.temp }}/sorrydb-source-task.json
-            ${{ runner.temp }}/sorrydb-real-source/
-            ${{ runner.temp }}/sorrydb-input/
-            ${{ runner.temp }}/pitb-sorrydb-audit/src/main.rs
-            ${{ runner.temp }}/pitb-sorrydb-audit/Cargo.lock
-          if-no-files-found: warn
-          retention-days: 30
-
-
-  sorrydb-evidence-closure-contract:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Check out exact pull request head
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
-
-      - name: Install stable Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-
-      - name: Install JSON Schema validator
-        run: |
-          python3 -m venv "$RUNNER_TEMP/pitb-sorrydb-closure-venv"
-          "$RUNNER_TEMP/pitb-sorrydb-closure-venv/bin/pip" install "jsonschema==4.25.1"
-
-      - name: Stage isolated evidence-closure validator
-        shell: bash
-        run: |
-          set -euo pipefail
-          staged="$RUNNER_TEMP/pitb-sorrydb-evidence-closure"
-          mkdir -p "$staged/src"
-          cp tools/pitb-sorrydb-evidence-closure/Cargo.toml "$staged/Cargo.toml"
-          cp tools/pitb-sorrydb-evidence-closure/Cargo.lock "$staged/Cargo.lock"
-          cp tools/pitb-sorrydb-evidence-closure/src/main.rs "$staged/src/main.rs"
-          echo "PITB_SORRYDB_CLOSURE_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
-          echo "PITB_SORRYDB_CLOSURE_DIR=$staged" >> "$GITHUB_ENV"
-
-      - name: Format and test evidence-closure validator
-        shell: bash
-        run: |
-          set -euo pipefail
-          rustfmt --edition 2021 "$PITB_SORRYDB_CLOSURE_DIR/src/main.rs"
-          cargo fmt --check --manifest-path "$PITB_SORRYDB_CLOSURE_MANIFEST"
-          cargo test --locked --manifest-path "$PITB_SORRYDB_CLOSURE_MANIFEST"
-
-      - name: Generate complete synthetic proof evidence bundle
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo run --locked --manifest-path "$PITB_SORRYDB_CLOSURE_MANIFEST" -- \
-            --self-test-report \
-            "$RUNNER_TEMP/sorrydb-evidence-closure-report.json" \
-            "$RUNNER_TEMP/sorrydb-evidence-bundle"
-          echo "PITB_SORRYDB_EVIDENCE_BUNDLE=$RUNNER_TEMP/sorrydb-evidence-bundle" >> "$GITHUB_ENV"
-
-      - name: Validate proof-run, sidecar receipt and closure report schemas
-        shell: bash
-        run: |
-          set -euo pipefail
-          "$RUNNER_TEMP/pitb-sorrydb-closure-venv/bin/python" - \
-            "$PITB_SORRYDB_EVIDENCE_BUNDLE" \
-            "$RUNNER_TEMP/sorrydb-evidence-closure-report.json" <<'PY'
-          import json
-          import sys
-          from pathlib import Path
-          from jsonschema import Draft202012Validator
-
-          bundle = Path(sys.argv[1])
-          report_path = Path(sys.argv[2])
-          schemas = {
-              "proof-run": Path("tools/pitb-sorrydb-audit/schema/sorrydb-proof-run-v0.schema.json"),
-              "source-binding": Path("tools/pitb-sorrydb-evidence-closure/schema/sorrydb-source-binding-receipt-v1.schema.json"),
-              "checker": Path("tools/pitb-sorrydb-evidence-closure/schema/sorrydb-checker-receipt-v1.schema.json"),
-              "semantic-gate": Path("tools/pitb-sorrydb-evidence-closure/schema/sorrydb-semantic-gate-receipt-v1.schema.json"),
-              "closure-report": Path("tools/pitb-sorrydb-evidence-closure/schema/sorrydb-evidence-closure-report-v0.schema.json"),
-          }
-          validators = {}
-          for name, path in schemas.items():
-              schema = json.loads(path.read_text())
-              Draft202012Validator.check_schema(schema)
-              validators[name] = Draft202012Validator(schema)
-
-          run_rows = [
-              json.loads(line)
-              for line in (bundle / "proof-runs.jsonl").read_text().splitlines()
-              if line.strip()
-          ]
-          if len(run_rows) != 1:
-              raise SystemExit("synthetic closure must contain exactly one proof-run row")
-          errors = list(validators["proof-run"].iter_errors(run_rows[0]))
-          if errors:
-              raise SystemExit("proof-run schema errors: " + "; ".join(e.message for e in errors))
-
-          evidence_dir = bundle / run_rows[0]["run_id"]
-          receipts = (
-              ("source-binding", "source-binding-receipt.json"),
-              ("checker", "checker-receipt.json"),
-              ("semantic-gate", "semantic-gate-receipt.json"),
-          )
-          for schema_name, filename in receipts:
-              value = json.loads((evidence_dir / filename).read_text())
-              errors = list(validators[schema_name].iter_errors(value))
-              if errors:
-                  raise SystemExit(f"{filename} schema errors: " + "; ".join(e.message for e in errors))
-
-          report = json.loads(report_path.read_text())
-          errors = list(validators["closure-report"].iter_errors(report))
-          if errors:
-              raise SystemExit("closure report schema errors: " + "; ".join(e.message for e in errors))
-          if report["attempt_count"] != 1 or report["verified_success_run_count"] != 1:
-              raise SystemExit("synthetic closure denominators changed")
-          if report["closed_verified_success_run_count"] != 1 or report["closed_unique_task_count"] != 1:
-              raise SystemExit("synthetic evidence bundle did not close")
-          if report["run_closures"][0]["closure_status"] != "closed_verified_success":
-              raise SystemExit("synthetic proof success was not byte-closed")
-          print("PITB_SORRYDB_EVIDENCE_CLOSURE_SCHEMAS_PASS")
-          PY
-
-      - name: Retain complete synthetic evidence-closure bundle
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pitb-sorrydb-evidence-closure
-          path: |
-            ${{ runner.temp }}/sorrydb-evidence-closure-report.json
-            ${{ runner.temp }}/sorrydb-evidence-bundle/
-            ${{ runner.temp }}/pitb-sorrydb-evidence-closure/src/main.rs
-            ${{ runner.temp }}/pitb-sorrydb-evidence-closure/Cargo.lock
+            ${{ runner.temp }}/sorrydb-integrity-report.json
+            ${{ runner.temp }}/pitb-sorrydb-integrity/src/main.rs
+            ${{ runner.temp }}/pitb-sorrydb-integrity/Cargo.lock
           if-no-files-found: warn
           retention-days: 30
