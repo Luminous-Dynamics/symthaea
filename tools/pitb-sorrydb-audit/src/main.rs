@@ -970,6 +970,11 @@ fn synthetic_report() -> Result<Value, String> {
     };
     let full_bytes = serde_json::to_vec(&full).map_err(|e| e.to_string())?;
     let evaluation_bytes = serde_json::to_vec(&evaluation).map_err(|e| e.to_string())?;
+    let proof_runs = synthetic_proof_runs();
+    let (verified_success_count, strategy_summaries) =
+        summarize_proof_runs(&proof_runs, &evaluation)?;
+    let run_bytes = serde_json::to_vec(&proof_runs).map_err(|e| e.to_string())?;
+    let run_input_sha256 = sha256(&run_bytes);
     let mut report = json!({
         "schema_version": REPORT_SCHEMA,
         "upstream_repository": UPSTREAM_REPOSITORY,
@@ -980,6 +985,10 @@ fn synthetic_report() -> Result<Value, String> {
         "evaluation_split_git_blob_sha1": git_blob_sha1(&evaluation_bytes),
         "full_dataset_raw_sha256": sha256(&full_bytes),
         "evaluation_split_raw_sha256": sha256(&evaluation_bytes),
+        "run_input_sha256": run_input_sha256,
+        "run_count": proof_runs.len(),
+        "verified_success_count": verified_success_count,
+        "strategy_summaries": strategy_summaries,
         "full_task_count": 3,
         "evaluation_task_count": 2,
         "documented_full_task_count": DOCUMENTED_FULL_COUNT,
@@ -1021,12 +1030,23 @@ fn execute() -> Result<(), String> {
         println!("PITB_SORRYDB_AUDIT_SELF_TEST_PASS");
         return Ok(());
     }
-    if args.len() == 3 && args[1] == "--self-test-report" {
+    if (args.len() == 3 || args.len() == 4) && args[1] == "--self-test-report" {
         run_self_tests()?;
         let report = synthetic_report()?;
         let bytes = serde_json::to_vec_pretty(&report)
             .map_err(|e| format!("serialize synthetic audit report: {e}"))?;
         fs::write(&args[2], bytes).map_err(|e| format!("write synthetic audit report: {e}"))?;
+        if args.len() == 4 {
+            let runs = synthetic_proof_runs();
+            let mut jsonl = Vec::new();
+            for run in &runs {
+                jsonl.extend_from_slice(
+                    &serde_json::to_vec(run).map_err(|e| format!("serialize synthetic proof run: {e}"))?
+                );
+                jsonl.push(b'\n');
+            }
+            fs::write(&args[3], jsonl).map_err(|e| format!("write synthetic proof-run JSONL: {e}"))?;
+        }
         println!("PITB_SORRYDB_AUDIT_SYNTHETIC_REPORT_OK");
         return Ok(());
     }
