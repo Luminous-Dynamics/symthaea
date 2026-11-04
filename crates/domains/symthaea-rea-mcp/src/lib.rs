@@ -14,8 +14,8 @@ use rmcp::{
 use serde::{Deserialize, Serialize};
 use symthaea_rea_compat::{
     EvidenceErrorKind, sha256_hex, verify_evidence_json,
-    bundle::{BundleErrorKind, verify_evidence_bundle_json},
 };
+use symthaea_rea_compat::bundle::{BundleErrorKind, verify_evidence_bundle_json};
 
 /// Maximum inline JSON payload accepted by an MCP tool invocation.
 pub const MAX_MCP_JSON_BYTES: usize = 8 * 1024 * 1024;
