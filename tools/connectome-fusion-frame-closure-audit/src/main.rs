@@ -740,6 +740,55 @@ mod tests {
     }
 
     #[test]
+    fn frame_assertion_for_wrong_operation_is_a_reconciliation_conflict() {
+        let (mut input, raw) = parse_fixture();
+        input.declared_frame.assertions[0].left_evidence_id = "evidence-B".to_string();
+        input.declared_frame.assertions[0].right_evidence_id = "evidence-C".to_string();
+        input.declared_frame.frame_sha256 =
+            domain_hash("connectome-fusion-frame-v0.1", &input.declared_frame.assertions)
+                .expect("frame digest");
+        let report = verify(&input, &raw);
+        assert_eq!(report.disposition, "RECONCILIATION_CONFLICT");
+        assert_eq!(report.orphan_assertions.len(), 1);
+        assert_eq!(report.missing_assertions.len(), 2);
+    }
+
+    #[test]
+    fn event_outside_frozen_time_scope_is_not_estimable() {
+        let (mut input, raw) = parse_fixture();
+        input.source_exports[0].events[0].event_at = "2026-11-05T01:00:00Z".to_string();
+        input.source_exports[0].ordered_events_sha256 =
+            domain_hash("connectome-fusion-events-v0.1", &input.source_exports[0].events)
+                .expect("event digest");
+        let report = verify(&input, &raw);
+        assert_eq!(report.disposition, "NOT_ESTIMABLE");
+        assert!(report.errors.iter().any(|e| e.starts_with("EVENT_OUTSIDE_DECLARED_SCOPE")));
+    }
+
+    #[test]
+    fn same_custodian_cannot_be_counted_as_independent_source_coverage() {
+        let (mut input, raw) = parse_fixture();
+        input.source_exports[1].custodian_ref = input.source_exports[0].custodian_ref.clone();
+        let report = verify(&input, &raw);
+        assert_eq!(report.disposition, "SOURCE_COVERAGE_UNKNOWN");
+        assert!(!report.promotion_authorized);
+    }
+
+    #[test]
+    fn conflicting_source_event_sets_are_not_estimable_as_closed() {
+        let (mut input, raw) = parse_fixture();
+        let event = &mut input.source_exports[1].events[1];
+        event.evidence_ids = vec!["evidence-B".to_string(), "evidence-D".to_string()];
+        event.canonical_use_key = use_key(&input, event).expect("recomputed use key");
+        input.source_exports[1].ordered_events_sha256 =
+            domain_hash("connectome-fusion-events-v0.1", &input.source_exports[1].events)
+                .expect("event digest");
+        let report = verify(&input, &raw);
+        assert_eq!(report.disposition, "RECONCILIATION_CONFLICT");
+        assert!(report.errors.iter().any(|e| e == "SOURCE_POPULATION_RECONCILIATION_MISMATCH"));
+    }
+
+    #[test]
     fn unknown_fields_are_rejected_by_strict_decoder() {
         let raw = FIXTURE.replace("\"audit_id\":", "\"unrecognized\": \"x\",\n  \"audit_id\":");
         let parsed = serde_json::from_str::<Input>(&raw);
