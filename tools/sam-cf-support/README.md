@@ -20,7 +20,7 @@ From the repository root:
 
 ## Fixtures
 
-- fixtures/identification-cases-v0.1.tsv contains eleven cases covering point/set identification, action-support holes, sensitivity-driven ranking reversal, missing episode abduction, incomplete evidence, out-of-scope mechanisms and false precision.
+- fixtures/identification-cases-v0.1.tsv contains twelve cases covering point/set identification, action-support holes, sensitivity-driven ranking reversal, missing episode abduction, incomplete evidence, out-of-scope mechanisms and false precision.
 - fixtures/cross-world-couplings-v0.1.tsv contains two joint distributions with identical factual and alternative marginals but different episode-conditional counterfactual outcomes.
 
 The coupling fixture is deliberately minimal: under the POSITIVE coupling, factual outcome 0 pairs with alternative outcome 0; under the NEGATIVE coupling, the same factual outcome pairs with alternative outcome 3. Both couplings have exactly the same marginals. Without a justified coupling assumption or additional episode-specific structural evidence, selecting either point is unjustified.
