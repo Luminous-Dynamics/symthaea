@@ -208,6 +208,7 @@ impl LiveMuseOutput {
         let mut stream_origin: Option<cpal::StreamInstant> = None;
         let mut output_frame_cursor = 0_u64;
         let mut anchor_index = 0_u64;
+        let mut frame_sequence_valid = true;
         let running_audio = running.clone();
         let anchor_drop_counter = clock_anchor_dropped_callbacks.clone();
         let stream = device
@@ -232,9 +233,18 @@ impl LiveMuseOutput {
                     let frame_count = data.len() / channels;
                     let frame_shape_valid = data.len() % channels == 0;
                     let frame_count_u32 = u32::try_from(frame_count).ok();
-                    let mut anchor_dropped = !frame_shape_valid || frame_count == 0;
+                    let mut anchor_dropped =
+                        !frame_shape_valid || frame_count == 0 || frame_count_u32.is_none();
 
-                    if let (Some(frame_count), true) = (frame_count_u32, frame_shape_valid) {
+                    if !frame_shape_valid || frame_count == 0 || frame_count_u32.is_none() {
+                        // A malformed callback buffer makes the cumulative
+                        // frame clock ambiguous. Do not resume this segment
+                        // silently with a guessed frame offset.
+                        frame_sequence_valid = false;
+                    }
+
+                    if let (Some(frame_count), true, true) =
+                        (frame_count_u32, frame_shape_valid, frame_sequence_valid) {
                         let callback_instant = timestamp.callback;
                         let playback_instant = timestamp.playback;
                         let origin = stream_origin.get_or_insert(callback_instant);
