@@ -923,6 +923,10 @@ mod tests {
         assert_eq!(analysis.roots.len(), 2);
         assert!((analysis.roots[0] - 0.10).abs() < 1e-7);
         assert!((analysis.roots[1] - 0.20).abs() < 1e-7);
+        assert!(matches!(
+            xirr(&flows),
+            Err(EconomicsError::AmbiguousSolution { .. })
+        ));
     }
 
     #[test]
