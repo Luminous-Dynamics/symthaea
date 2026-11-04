@@ -165,8 +165,9 @@ pub fn evaluate_batch(
 ) -> Result<BatchReport, EvaluationError> {
     let water_bytes = serde_json::to_vec(water_corpus)
         .map_err(|error| EvaluationError::new("water_fixture_canonical_json", error.to_string()))?;
-    let repair_bytes = serde_json::to_vec(repair_corpus)
-        .map_err(|error| EvaluationError::new("repair_fixture_canonical_json", error.to_string()))?;
+    let repair_bytes = serde_json::to_vec(repair_corpus).map_err(|error| {
+        EvaluationError::new("repair_fixture_canonical_json", error.to_string())
+    })?;
     evaluate_batch_with_sources(
         water_corpus,
         repair_corpus,
@@ -1324,10 +1325,7 @@ mod tests {
             "HOME-UTILITY-COORD-001-WATER-CONTINUITY-SYNTHETIC-001"
         );
         assert_eq!(report.report_schema_version, "0.2");
-        assert_eq!(
-            report.evidence_class,
-            EvidenceClass::SyntheticFixtureOnly
-        );
+        assert_eq!(report.evidence_class, EvidenceClass::SyntheticFixtureOnly);
         assert_eq!(
             report.water_source.digest_scope,
             DigestScope::CanonicalizedJsonValue
@@ -1395,20 +1393,17 @@ mod tests {
         changed_water.push(b' ');
         let changed = evaluate_batch_from_bytes(&changed_water, repair).unwrap();
 
-        assert_eq!(original.water_source.digest_scope, DigestScope::ExactSourceBytes);
-        assert_eq!(original.water_source.source_byte_length, water.len());
         assert_eq!(
-            original.water_source.source_sha256,
-            sha256_hex(water)
+            original.water_source.digest_scope,
+            DigestScope::ExactSourceBytes
         );
+        assert_eq!(original.water_source.source_byte_length, water.len());
+        assert_eq!(original.water_source.source_sha256, sha256_hex(water));
         assert_ne!(
             original.water_source.source_sha256,
             changed.water_source.source_sha256
         );
-        assert_eq!(
-            changed.water_source.source_byte_length,
-            water.len() + 1
-        );
+        assert_eq!(changed.water_source.source_byte_length, water.len() + 1);
         assert_eq!(
             original.repair_source.source_sha256,
             changed.repair_source.source_sha256
@@ -1424,15 +1419,9 @@ mod tests {
             serde_json::to_value(command).unwrap()["value"],
             serde_json::Value::Bool(true)
         );
-        assert_eq!(
-            serde_json::to_value(command).unwrap()["kind"],
-            "boolean"
-        );
+        assert_eq!(serde_json::to_value(command).unwrap()["kind"], "boolean");
         let flow = &report.receipts[8].derived_metrics["measured_inlet_flow_l_min"];
-        assert_eq!(
-            serde_json::to_value(flow).unwrap()["unit"],
-            "L/min"
-        );
+        assert_eq!(serde_json::to_value(flow).unwrap()["unit"], "L/min");
         assert!(matches!(
             &report.receipts[8].derived_metrics["commanded_refill"],
             DerivedMetric::Boolean { value: true, .. }
