@@ -1,0 +1,167 @@
+{
+  "schema_version": "0.1.0",
+  "audit_id": "synthetic-frame-omission-v0.1",
+  "scope": {
+    "scope_id": "synthetic-connectome-closure-scope-v0.1",
+    "start_at": "2026-11-04T00:00:00Z",
+    "end_at": "2026-11-05T00:00:00Z",
+    "event_time_basis": "EVENT_TIME",
+    "query_ids": [
+      "query-circuit-01"
+    ],
+    "release_ids": [
+      "connectome-release-r17"
+    ]
+  },
+  "scope_sha256": "c7765429a91fb7a76915b24613c286300376f04c6340a045e262ed7b95a48eba",
+  "fusion_policy_projection": {
+    "projection_id": "pairwise-evidence-use-v0.1",
+    "projection_sha256": "98cebf3ffd51f84474793b8813bf741ddf4ee3492803d6d80c8acd261c2d8c77",
+    "rule": "ALL_UNORDERED_EVIDENCE_PAIRS"
+  },
+  "source_exports": [
+    {
+      "source_id": "source-exec",
+      "source_role": "FUSION_EXECUTION_LEDGER",
+      "custodian_ref": "synthetic-custodian-A",
+      "scope_sha256": "c7765429a91fb7a76915b24613c286300376f04c6340a045e262ed7b95a48eba",
+      "extraction_sha256": "a5d019a6fdf7fd6c3893545f22b58077835a84342c7d5df46c856300cf4e342d",
+      "sequence_start": 1,
+      "sequence_end": 2,
+      "record_count": 2,
+      "unique_use_count": 2,
+      "ordered_events_sha256": "52876860b6e4f42dcde66badd59a0352c355518350e8e332078d817f8e81b407",
+      "coverage_disposition": "QUALIFIED_COMPLETE_WITHIN_DECLARED_SCOPE",
+      "shared_controls": [],
+      "events": [
+        {
+          "event_id": "exec-event-001",
+          "sequence": 1,
+          "canonical_use_key": "47b23720d0109570a037ae12712a9770cfdd90a362ec10895b42cfd3b366652e",
+          "operation_id": "fusion-op-001",
+          "claim_id": "claim-001",
+          "query_id": "query-circuit-01",
+          "certificate_id": "cert-001",
+          "fusion_policy_sha256": "e93da1fd2b8c92e79600a4d255e98ca29b5ae57d889079a2e725adeaf9c1fbe7",
+          "verifier_sha256": "4e2d06f2e1b6e9ca64911c4915ac6d7882371aedf456ced99705a52447c79ce7",
+          "dependence_bundle_sha256": "7903a7dc9887144d5669b7bb7d23def77e6c8ac3bc9a8d0ad8972e218a9b2be1",
+          "source_release_ids": [
+            "connectome-release-r17"
+          ],
+          "evidence_ids": [
+            "evidence-A",
+            "evidence-B"
+          ],
+          "outcome": "CONTRIBUTED",
+          "event_at": "2026-11-04T14:10:00Z",
+          "ingested_at": "2026-11-04T14:10:05Z"
+        },
+        {
+          "event_id": "exec-event-002",
+          "sequence": 2,
+          "canonical_use_key": "b793d36b6d328a351e6ea5a2d5dc99c1db8f55330d39326b24ead653561943b9",
+          "operation_id": "fusion-op-002",
+          "claim_id": "claim-002",
+          "query_id": "query-circuit-01",
+          "certificate_id": "cert-002",
+          "fusion_policy_sha256": "e93da1fd2b8c92e79600a4d255e98ca29b5ae57d889079a2e725adeaf9c1fbe7",
+          "verifier_sha256": "4e2d06f2e1b6e9ca64911c4915ac6d7882371aedf456ced99705a52447c79ce7",
+          "dependence_bundle_sha256": "7903a7dc9887144d5669b7bb7d23def77e6c8ac3bc9a8d0ad8972e218a9b2be1",
+          "source_release_ids": [
+            "connectome-release-r17"
+          ],
+          "evidence_ids": [
+            "evidence-B",
+            "evidence-C"
+          ],
+          "outcome": "CONTRIBUTED",
+          "event_at": "2026-11-04T14:11:00Z",
+          "ingested_at": "2026-11-04T14:11:05Z"
+        }
+      ]
+    },
+    {
+      "source_id": "source-claim",
+      "source_role": "CLAIM_CERTIFICATE_LEDGER",
+      "custodian_ref": "synthetic-custodian-B",
+      "scope_sha256": "c7765429a91fb7a76915b24613c286300376f04c6340a045e262ed7b95a48eba",
+      "extraction_sha256": "4b1bcc8c72e13998f36450ad0663f1ba62f3e954aac0c9c4df390ad3883699da",
+      "sequence_start": 1,
+      "sequence_end": 2,
+      "record_count": 2,
+      "unique_use_count": 2,
+      "ordered_events_sha256": "e38ebeba105f210715c5a6ff9b4eb31e29d5913b7759b1ff5949cf13214624a5",
+      "coverage_disposition": "QUALIFIED_COMPLETE_WITHIN_DECLARED_SCOPE",
+      "shared_controls": [],
+      "events": [
+        {
+          "event_id": "claim-ledger-event-9001",
+          "sequence": 1,
+          "canonical_use_key": "82ecba20f50da8cbd3c34eb52018b880074a15b8f45a77f818f1f1f777d3c848",
+          "operation_id": "fusion-op-001",
+          "claim_id": "claim-001",
+          "query_id": "query-circuit-01",
+          "certificate_id": "cert-001",
+          "fusion_policy_sha256": "e93da1fd2b8c92e79600a4d255e98ca29b5ae57d889079a2e725adeaf9c1fbe7",
+          "verifier_sha256": "4e2d06f2e1b6e9ca64911c4915ac6d7882371aedf456ced99705a52447c79ce7",
+          "dependence_bundle_sha256": "7903a7dc9887144d5669b7bb7d23def77e6c8ac3bc9a8d0ad8972e218a9b2be1",
+          "source_release_ids": [
+            "connectome-release-r17"
+          ],
+          "evidence_ids": [
+            "evidence-A",
+            "evidence-B"
+          ],
+          "outcome": "CONTRIBUTED",
+          "event_at": "2026-11-04T14:10:00Z",
+          "ingested_at": "2026-11-04T14:10:05Z"
+        },
+        {
+          "event_id": "claim-ledger-event-9002",
+          "sequence": 2,
+          "canonical_use_key": "a14d430b06228f1784c7e89f23cb5b140ce603bc6332378f926c645b17e34a48",
+          "operation_id": "fusion-op-002",
+          "claim_id": "claim-002",
+          "query_id": "query-circuit-01",
+          "certificate_id": "cert-002",
+          "fusion_policy_sha256": "e93da1fd2b8c92e79600a4d255e98ca29b5ae57d889079a2e725adeaf9c1fbe7",
+          "verifier_sha256": "4e2d06f2e1b6e9ca64911c4915ac6d7882371aedf456ced99705a52447c79ce7",
+          "dependence_bundle_sha256": "7903a7dc9887144d5669b7bb7d23def77e6c8ac3bc9a8d0ad8972e218a9b2be1",
+          "source_release_ids": [
+            "connectome-release-r17"
+          ],
+          "evidence_ids": [
+            "evidence-B",
+            "evidence-C"
+          ],
+          "outcome": "CONTRIBUTED",
+          "event_at": "2026-11-04T14:11:00Z",
+          "ingested_at": "2026-11-04T14:11:05Z"
+        }
+      ]
+    }
+  ],
+  "declared_frame": {
+    "frame_sha256": "b39db635cbb00eeafdd1b9e8f4df19f965f3f4972aa101e5a2fc10cbc43f13b8",
+    "assertion_count": 1,
+    "assertions": [
+      {
+        "assertion_id": "assertion-001",
+        "canonical_use_key": "82ecba20f50da8cbd3c34eb52018b880074a15b8f45a77f818f1f1f777d3c848",
+        "claim_id": "claim-001",
+        "query_id": "query-circuit-01",
+        "left_evidence_id": "evidence-A",
+        "right_evidence_id": "evidence-B",
+        "fusion_policy_sha256": "e93da1fd2b8c92e79600a4d255e98ca29b5ae57d889079a2e725adeaf9c1fbe7",
+        "dependence_bundle_sha256": "7903a7dc9887144d5669b7bb7d23def77e6c8ac3bc9a8d0ad8972e218a9b2be1"
+      }
+    ]
+  },
+  "reconciliation_policy": {
+    "required_source_roles": [
+      "FUSION_EXECUTION_LEDGER",
+      "CLAIM_CERTIFICATE_LEDGER"
+    ],
+    "shared_control_policy": "FAIL_CLOSED_ON_DECLARED_SHARED_CONTROL"
+  }
+}

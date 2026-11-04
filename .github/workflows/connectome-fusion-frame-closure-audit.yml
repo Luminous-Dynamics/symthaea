@@ -1,0 +1,60 @@
+name: Connectome Fusion Frame Closure Audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/connectome-fusion-frame-closure-audit/**"
+      - ".github/workflows/connectome-fusion-frame-closure-audit.yml"
+      - "research/connectomics/reference/**"
+      - "research/connectomics/CONNECTOME_FUSION_FRAME_CLOSURE_*.md"
+      - "research/connectomics/connectome-fusion-frame-closure-input-v0.1.schema.json"
+      - "research/connectomics/fixtures/connectome-fusion-frame-closure-omitted-use-v0.1.json"
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/connectome-fusion-frame-closure-audit/**"
+      - ".github/workflows/connectome-fusion-frame-closure-audit.yml"
+      - "research/connectomics/reference/**"
+      - "research/connectomics/CONNECTOME_FUSION_FRAME_CLOSURE_*.md"
+      - "research/connectomics/connectome-fusion-frame-closure-input-v0.1.schema.json"
+      - "research/connectomics/fixtures/connectome-fusion-frame-closure-omitted-use-v0.1.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: connectome-frame-closure-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier:
+    name: Rust 1.96 locked verifier qualification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/connectome-fusion-frame-closure-audit/Cargo.toml -- --check
+
+      - name: Run locked tests
+        run: cargo test --locked --manifest-path tools/connectome-fusion-frame-closure-audit/Cargo.toml
+
+      - name: Run strict Clippy
+        run: cargo clippy --locked --manifest-path tools/connectome-fusion-frame-closure-audit/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run independent stdlib reference tests
+        run: python3 research/connectomics/reference/verify_connectome_fusion_frame_closure.py --self-test
+
+      - name: Evaluate synthetic omitted-use fixture
+        run: |
+          cargo run --locked --manifest-path tools/connectome-fusion-frame-closure-audit/Cargo.toml -- research/connectomics/fixtures/connectome-fusion-frame-closure-omitted-use-v0.1.json > frame-closure-report.json
+          grep -q '"disposition": "FRAME_GAP_DETECTED"' frame-closure-report.json
+          grep -q '"promotion_authorized": false' frame-closure-report.json
+          python3 research/connectomics/reference/verify_connectome_fusion_frame_closure.py --assert-report frame-closure-report.json research/connectomics/fixtures/connectome-fusion-frame-closure-omitted-use-v0.1.json
