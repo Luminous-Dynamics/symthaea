@@ -756,6 +756,40 @@ mod tests {
     }
 
     #[test]
+    fn risk_coverage_excludes_ask_and_abstain_but_keeps_intentional_wait() {
+        let set = fixture_set();
+        let predictions = vec![
+            vec![
+                prediction(MusicalParticipationDecisionV1::Respond, 0.9, 0.9),
+                prediction(MusicalParticipationDecisionV1::Wait, 0.9, 0.1),
+            ],
+            vec![
+                prediction(MusicalParticipationDecisionV1::Continue, 0.85, 0.9),
+                prediction(MusicalParticipationDecisionV1::Ask, 0.7, 0.1),
+            ],
+            vec![
+                prediction(MusicalParticipationDecisionV1::Respond, 0.9, 0.9),
+                prediction(MusicalParticipationDecisionV1::Abstain, 0.8, 0.1),
+            ],
+            vec![
+                prediction(MusicalParticipationDecisionV1::Yield, 0.9, 0.9),
+                prediction(MusicalParticipationDecisionV1::Wait, 0.9, 0.1),
+            ],
+        ];
+        let score = score_musical_participation_set_v1(&set, &predictions).unwrap();
+        let zero_threshold = score.risk_coverage[0];
+        let ninety_threshold = score.risk_coverage[3];
+
+        assert_eq!(zero_threshold.confidence_threshold, 0.0);
+        assert_eq!(zero_threshold.covered_member_count, 6);
+        assert!((zero_threshold.coverage - 0.75).abs() < 1e-12);
+        assert_eq!(zero_threshold.selective_risk, Some(0.0));
+        assert_eq!(ninety_threshold.confidence_threshold, 0.9);
+        assert_eq!(ninety_threshold.covered_member_count, 5);
+        assert!((ninety_threshold.coverage - 0.625).abs() < 1e-12);
+    }
+
+    #[test]
     fn invalid_decision_for_requirement_is_rejected() {
         let mut set = fixture_set();
         set.families[0].members[0].valid_decisions =
