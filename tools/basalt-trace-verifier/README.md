@@ -1,6 +1,8 @@
 # BASALT trace and observation verifier
 
-**Status:** reference-model reducer, bounded history search and first typed backend-observation ingest prototype. A passing result means that the submitted evidence is internally well-formed and admits a bounded legal sequential interpretation under the BASALT model. It is not a physical durability or end-to-end anti-rollback proof.
+**Status:** design/reference contract only in this checkout. `tools/basalt-trace-verifier/Cargo.toml` and its Rust source files are absent; the commands below are intended interfaces only and are not currently runnable. This README describes target semantics, not an implemented or executed verifier. No passing result is claimed.
+
+A future verifier result would mean only that submitted evidence is internally well-formed and admits a bounded legal sequential interpretation under the BASALT model. It would not by itself prove physical durability or end-to-end anti-rollback.
 
 ## Run the standalone Rust package
 
