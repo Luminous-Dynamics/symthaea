@@ -13,7 +13,7 @@ use ceb_receipt_verifier::{
 #[command(
     name = "ceb-receipt-verifier",
     version,
-    about = "Offline verifier for signed CEB primary/regrade receipt pairs"
+    about = "Offline verifier for CEB source inventories and signed receipt pairs"
 )]
 struct Cli {
     #[command(subcommand)]
