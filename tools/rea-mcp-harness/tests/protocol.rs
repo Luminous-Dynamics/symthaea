@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
-use symthaea_rea_mcp::{MAX_MCP_JSON_BYTES, ReaEvidenceMcpServer};
 use rmcp::{
     RoleClient, ServiceExt,
     model::{CallToolRequestParams, CallToolResponse},
 };
 use serde_json::{Value, json};
+use symthaea_rea_mcp::{MAX_MCP_JSON_BYTES, ReaEvidenceMcpServer};
 
 fn fixture_dir() -> Option<PathBuf> {
     std::env::var_os("REA_UPSTREAM_EVIDENCE_FIXTURE_DIR").map(PathBuf::from)
@@ -21,7 +21,10 @@ async fn start_server() -> (
             .serve(server_transport)
             .await
             .expect("start in-memory MCP server");
-        service.waiting().await.expect("MCP server shuts down cleanly");
+        service
+            .waiting()
+            .await
+            .expect("MCP server shuts down cleanly");
     });
     let client = ()
         .serve(client_transport)
@@ -44,7 +47,10 @@ async fn server_exposes_only_two_read_only_verification_tools() {
     let mut tools = client.list_all_tools().await.unwrap();
     tools.sort_by(|left, right| left.name.cmp(&right.name));
     assert_eq!(
-        tools.iter().map(|tool| tool.name.as_ref()).collect::<Vec<_>>(),
+        tools
+            .iter()
+            .map(|tool| tool.name.as_ref())
+            .collect::<Vec<_>>(),
         vec![
             "rea_verify_evidence_bundle_json",
             "rea_verify_evidence_json"
@@ -135,8 +141,7 @@ async fn bundle_tool_uses_the_upstream_generated_bundle_when_available() {
         return;
     };
     let manifest: Value =
-        serde_json::from_slice(&std::fs::read(directory.join("manifest.json")).unwrap())
-            .unwrap();
+        serde_json::from_slice(&std::fs::read(directory.join("manifest.json")).unwrap()).unwrap();
     let file = manifest["evidence_bundle"]["file"].as_str().unwrap();
     let expected = &manifest["evidence_bundle"];
     let bundle = std::fs::read_to_string(directory.join(file)).unwrap();
