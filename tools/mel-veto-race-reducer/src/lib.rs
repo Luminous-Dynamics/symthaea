@@ -30,6 +30,35 @@ pub enum RaceError {
     RevokedAuthorization {
         authorization_id: String,
     },
+    AuthorizationExpired {
+        authorization_id: String,
+        at_ns: u64,
+        expires_at_ns: u64,
+    },
+    InvalidAuthorizationTime {
+        authorized_at_ns: u64,
+        expires_at_ns: u64,
+    },
+    ProducerTimeBeforeAuthorization {
+        producer_id: String,
+        started_at_ns: u64,
+        authorized_at_ns: u64,
+    },
+    ProducerTimeAfterExpiry {
+        producer_id: String,
+        started_at_ns: u64,
+        expires_at_ns: u64,
+    },
+    RenderCompletionBeforeProducerStart {
+        producer_id: String,
+        started_at_ns: u64,
+        completed_at_ns: u64,
+    },
+    EnqueueBeforeRenderCompletion {
+        frame_id: u64,
+        completed_at_ns: u64,
+        enqueued_at_ns: u64,
+    },
     ControlSequenceRegression {
         previous: u64,
         received: u64,
@@ -131,6 +160,7 @@ pub struct Authorization {
     pub plan_sha256: String,
     pub epoch: u64,
     pub control_sequence: u64,
+    pub authorized_at_ns: u64,
     pub expires_at_ns: u64,
     pub revoked: bool,
 }
@@ -148,6 +178,8 @@ pub struct RenderedFrameRange {
     pub authorization_id: String,
     pub plan_sha256: String,
     pub captured_epoch: u64,
+    pub completed_at_ns: u64,
+    pub enqueued_at_ns: Option<u64>,
     pub enqueued: bool,
     pub disposition: Option<FrameDisposition>,
 }
@@ -159,6 +191,8 @@ pub struct ProducerOperation {
     pub plan_sha256: String,
     pub captured_epoch: u64,
     pub started_order: u64,
+    pub started_at_ns: u64,
+    pub completed_at_ns: Option<u64>,
     pub completed: bool,
 }
 
@@ -172,6 +206,7 @@ pub enum EventKind {
         plan_sha256: String,
         epoch: u64,
         control_sequence: u64,
+        authorized_at_ns: u64,
         expires_at_ns: u64,
     },
     ProducerStarted {
@@ -179,14 +214,17 @@ pub enum EventKind {
         authorization_id: String,
         plan_sha256: String,
         captured_epoch: u64,
+        started_at_ns: u64,
     },
     RenderCompleted {
         producer_id: String,
         frame_id: u64,
         range: FrameRange,
+        completed_at_ns: u64,
     },
     Enqueue {
         frame_id: u64,
+        enqueued_at_ns: u64,
     },
     Veto {
         authorization_id: String,
@@ -314,6 +352,7 @@ impl RaceLedger {
                 plan_sha256,
                 epoch,
                 control_sequence,
+                authorized_at_ns,
                 expires_at_ns,
             } => {
                 require_identity(authorization_id)?;
@@ -334,8 +373,11 @@ impl RaceLedger {
                         received: *epoch,
                     });
                 }
-                if *expires_at_ns == 0 {
-                    return Err(RaceError::EmptyIdentity);
+                if authorized_at_ns >= expires_at_ns {
+                    return Err(RaceError::InvalidAuthorizationTime {
+                        authorized_at_ns: *authorized_at_ns,
+                        expires_at_ns: *expires_at_ns,
+                    });
                 }
 
                 self.last_control_sequence = *control_sequence;
@@ -349,6 +391,7 @@ impl RaceLedger {
                         plan_sha256: plan_sha256.clone(),
                         epoch: *epoch,
                         control_sequence: *control_sequence,
+                        authorized_at_ns: *authorized_at_ns,
                         expires_at_ns: *expires_at_ns,
                         revoked: false,
                     },
@@ -359,6 +402,7 @@ impl RaceLedger {
                 authorization_id,
                 plan_sha256,
                 captured_epoch,
+                started_at_ns,
             } => {
                 require_identity(producer_id)?;
                 if self.producers.contains_key(producer_id) {
@@ -372,6 +416,25 @@ impl RaceLedger {
                     }
                 })?;
                 if auth.revoked {
+                    return Err(RaceError::RevokedAuthorization {
+                        authorization_id: authorization_id.clone(),
+                    });
+                }
+                if *started_at_ns < auth.authorized_at_ns {
+                    return Err(RaceError::ProducerTimeBeforeAuthorization {
+                        producer_id: producer_id.clone(),
+                        started_at_ns: *started_at_ns,
+                        authorized_at_ns: auth.authorized_at_ns,
+                    });
+                }
+                if *started_at_ns >= auth.expires_at_ns {
+                    return Err(RaceError::ProducerTimeAfterExpiry {
+                        producer_id: producer_id.clone(),
+                        started_at_ns: *started_at_ns,
+                        expires_at_ns: auth.expires_at_ns,
+                    });
+                }
+                if auth.control_sequence != self.last_control_sequence {
                     return Err(RaceError::RevokedAuthorization {
                         authorization_id: authorization_id.clone(),
                     });
@@ -392,6 +455,8 @@ impl RaceLedger {
                         plan_sha256: plan_sha256.clone(),
                         captured_epoch: *captured_epoch,
                         started_order: event_order,
+                        started_at_ns: *started_at_ns,
+                        completed_at_ns: None,
                         completed: false,
                     },
                 );
@@ -400,6 +465,7 @@ impl RaceLedger {
                 producer_id,
                 frame_id,
                 range,
+                completed_at_ns,
             } => {
                 if !range.is_valid() {
                     return Err(RaceError::InvalidFrameRange);
@@ -423,6 +489,14 @@ impl RaceLedger {
                 let authorization_id = producer.authorization_id.clone();
                 let plan_sha256 = producer.plan_sha256.clone();
                 let captured_epoch = producer.captured_epoch;
+                let started_at_ns = producer.started_at_ns;
+                if *completed_at_ns < started_at_ns {
+                    return Err(RaceError::RenderCompletionBeforeProducerStart {
+                        producer_id: producer_id.clone(),
+                        started_at_ns,
+                        completed_at_ns: *completed_at_ns,
+                    });
+                }
                 // Completion is allowed after veto only because this producer
                 // captured the active authorization/epoch before revocation.
                 if let Some((existing_frame_id, _)) = self.frames.iter().find(|(_, existing)| {
@@ -434,6 +508,7 @@ impl RaceLedger {
                     });
                 }
                 producer.completed = true;
+                producer.completed_at_ns = Some(*completed_at_ns);
                 self.frames.insert(
                     *frame_id,
                     RenderedFrameRange {
@@ -442,26 +517,62 @@ impl RaceLedger {
                         authorization_id,
                         plan_sha256,
                         captured_epoch,
+                        completed_at_ns: *completed_at_ns,
+                        enqueued_at_ns: None,
                         enqueued: false,
                         disposition: None,
                     },
                 );
             }
-            EventKind::Enqueue { frame_id } => {
-                let frame = self
-                    .frames
-                    .get_mut(frame_id)
-                    .ok_or(RaceError::UnknownFrame {
-                        frame_id: *frame_id,
-                    })?;
-                if frame.enqueued {
+            EventKind::Enqueue {
+                frame_id,
+                enqueued_at_ns,
+            } => {
+                let (authorization_id, completed_at_ns, already_enqueued) = {
+                    let frame = self
+                        .frames
+                        .get(frame_id)
+                        .ok_or(RaceError::UnknownFrame {
+                            frame_id: *frame_id,
+                        })?;
+                    (
+                        frame.authorization_id.clone(),
+                        frame.completed_at_ns,
+                        frame.enqueued,
+                    )
+                };
+                if already_enqueued {
                     return Err(RaceError::FrameAlreadyEnqueued {
                         frame_id: *frame_id,
                     });
                 }
-                // Do not reject post-veto enqueue: recording the stale fact is
-                // necessary to account for late completion of in-flight work.
+                if *enqueued_at_ns < completed_at_ns {
+                    return Err(RaceError::EnqueueBeforeRenderCompletion {
+                        frame_id: *frame_id,
+                        completed_at_ns,
+                        enqueued_at_ns: *enqueued_at_ns,
+                    });
+                }
+                let auth = self
+                    .authorizations
+                    .get(&authorization_id)
+                    .ok_or_else(|| RaceError::UnknownAuthorization {
+                        authorization_id: authorization_id.clone(),
+                    })?;
+                // A producer that finishes after veto may still publish its
+                // captured old-epoch work so the callback can explicitly drain
+                // and account for it. Ordinary expiry rejects enqueue rather
+                // than silently extending authorization.
+                if !auth.revoked && *enqueued_at_ns >= auth.expires_at_ns {
+                    return Err(RaceError::AuthorizationExpired {
+                        authorization_id,
+                        at_ns: *enqueued_at_ns,
+                        expires_at_ns: auth.expires_at_ns,
+                    });
+                }
+                let frame = self.frames.get_mut(frame_id).expect("frame checked above");
                 frame.enqueued = true;
+                frame.enqueued_at_ns = Some(*enqueued_at_ns);
             }
             EventKind::Veto {
                 authorization_id,
@@ -664,6 +775,7 @@ mod tests {
                 plan_sha256: PLAN_A.into(),
                 epoch: if control_sequence == 1 { 0 } else { 1 },
                 control_sequence,
+                authorized_at_ns: 100,
                 expires_at_ns: 10_000_000_000,
             },
         )
@@ -678,6 +790,7 @@ mod tests {
                 authorization_id: "auth-1".into(),
                 plan_sha256: PLAN_A.into(),
                 captured_epoch: epoch,
+                started_at_ns: 200,
             },
         )
     }
@@ -693,6 +806,7 @@ mod tests {
                     start: frame_id * 100,
                     end: frame_id * 100 + 100,
                 },
+                completed_at_ns: 300,
             },
         )
     }
@@ -701,7 +815,10 @@ mod tests {
         event(
             order,
             &format!("enqueue-{frame_id}"),
-            EventKind::Enqueue { frame_id },
+            EventKind::Enqueue {
+                frame_id,
+                enqueued_at_ns: 400,
+            },
         )
     }
 
@@ -829,6 +946,7 @@ mod tests {
                 authorization_id: "auth-1".into(),
                 plan_sha256: PLAN_A.into(),
                 captured_epoch: 1,
+                started_at_ns: 500,
             },
         ));
         assert_eq!(
@@ -856,6 +974,7 @@ mod tests {
             plan_sha256: PLAN_A.into(),
             epoch: 0,
             control_sequence: 1,
+            authorized_at_ns: 100,
             expires_at_ns: 10_000_000_000,
         };
         assert!(matches!(
@@ -972,6 +1091,7 @@ mod tests {
                     start: 150,
                     end: 250,
                 },
+                completed_at_ns: 300,
             },
         );
         assert_eq!(
@@ -996,11 +1116,98 @@ mod tests {
                         start: 200,
                         end: 300,
                     },
+                    completed_at_ns: 300,
                 },
             ))
             .unwrap();
         assert!(ledger.producer("producer-2").unwrap().completed);
         assert_eq!(ledger.summary().rendered_frames, 200);
+    }
+
+    #[test]
+    fn producer_cannot_start_before_authorization_or_at_expiry() {
+        let mut ledger = authorized_ledger();
+        let before_authorization = ledger.apply(event(
+            2,
+            "producer-too-early",
+            EventKind::ProducerStarted {
+                producer_id: "producer-early".into(),
+                authorization_id: "auth-1".into(),
+                plan_sha256: PLAN_A.into(),
+                captured_epoch: 0,
+                started_at_ns: 99,
+            },
+        ));
+        assert_eq!(
+            before_authorization,
+            Err(RaceError::ProducerTimeBeforeAuthorization {
+                producer_id: "producer-early".into(),
+                started_at_ns: 99,
+                authorized_at_ns: 100,
+            })
+        );
+
+        let at_expiry = ledger.apply(event(
+            2,
+            "producer-at-expiry",
+            EventKind::ProducerStarted {
+                producer_id: "producer-expired".into(),
+                authorization_id: "auth-1".into(),
+                plan_sha256: PLAN_A.into(),
+                captured_epoch: 0,
+                started_at_ns: 10_000_000_000,
+            },
+        ));
+        assert_eq!(
+            at_expiry,
+            Err(RaceError::ProducerTimeAfterExpiry {
+                producer_id: "producer-expired".into(),
+                started_at_ns: 10_000_000_000,
+                expires_at_ns: 10_000_000_000,
+            })
+        );
+    }
+
+    #[test]
+    fn producer_may_finish_after_expiry_but_cannot_enqueue_without_revocation() {
+        let mut ledger = authorized_ledger();
+        ledger
+            .apply(producer_start_event(2, "producer-7", 0))
+            .unwrap();
+        ledger
+            .apply(event(
+                3,
+                "complete-after-expiry",
+                EventKind::RenderCompleted {
+                    producer_id: "producer-7".into(),
+                    frame_id: 7,
+                    range: FrameRange {
+                        start: 700,
+                        end: 800,
+                    },
+                    completed_at_ns: 10_000_000_001,
+                },
+            ))
+            .unwrap();
+
+        let enqueue = event(
+            4,
+            "enqueue-after-expiry",
+            EventKind::Enqueue {
+                frame_id: 7,
+                enqueued_at_ns: 10_000_000_002,
+            },
+        );
+        assert_eq!(
+            ledger.apply(enqueue),
+            Err(RaceError::AuthorizationExpired {
+                authorization_id: "auth-1".into(),
+                at_ns: 10_000_000_002,
+                expires_at_ns: 10_000_000_000,
+            })
+        );
+        assert!(!ledger.frame(7).unwrap().enqueued);
+        assert_eq!(ledger.summary().rendered_not_enqueued_frames, 100);
     }
 
     #[test]
@@ -1018,6 +1225,7 @@ mod tests {
                     plan_sha256: PLAN_A.into(),
                     epoch: u64::MAX,
                     control_sequence: 1,
+                    authorized_at_ns: 1,
                     expires_at_ns: 10,
                 },
             ))
