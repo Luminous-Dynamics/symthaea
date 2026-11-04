@@ -70,14 +70,15 @@
       },
       "ceb_integration": {
         "task_contract_owner": "CEB v0 task schema and catalog in PR #10115; external registry/reproduction owner #10117",
-        "receipt_owner": "CEB receipts and evidence convergence #10370 / #10115 / #10167",
+        "receipt_owner": "Benchmark-neutral accounting #10314 + evidence convergence #10370; CEB DSSE #10167/#10212 only for patch-bearing tasks",
         "custody_owner": "CEB task custody #10436",
         "isolation_blocker": "Symthaea #10064",
         "notes": [
           "This registry entry records metadata only. It does not define a second CEB task schema or receipt format.",
           "Official PLE verifiers remain the scoring authority; CEB binds the Luminous harness/run provenance and external score artifacts.",
           "No task execution is authorized until the isolation and evaluator-custody gates have been independently qualified.",
-          "The official dataset access gate must be satisfied through the authorized Hugging Face account. No access token belongs in source control or public logs."
+          "The official dataset access gate must be satisfied through the authorized Hugging Face account. No access token belongs in source control or public logs.",
+          "PLE produces deliverables rather than source patches. Do not fabricate a patch digest or force PLE outputs into CEB v0's patch-centric receipt; use the canonical generic accounting/artifact mapping defined by #10314/#10370."
         ]
       }
     }
