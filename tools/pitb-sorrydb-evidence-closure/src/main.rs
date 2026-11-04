@@ -148,10 +148,48 @@ struct SemanticGateReceipt {
     vacuity_audit_status: String,
     reviewer_decision: String,
     reviewer_id: String,
+    reviewer_key_id: String,
     reviewer_attestation_sha256: String,
     semantic_log_sha256: String,
     semantic_gate_passed: bool,
     vacuity_gate_passed: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReviewerAttestation {
+    schema_version: String,
+    canonicalization: String,
+    key_id: String,
+    reviewer_id: String,
+    run_id: String,
+    task_id: String,
+    goal_sha256: String,
+    declaration_signature_sha256: String,
+    source_binding_receipt_sha256: String,
+    source_correspondence_status: String,
+    hypothesis_audit_status: String,
+    vacuity_audit_status: String,
+    reviewer_decision: String,
+    semantic_log_sha256: String,
+    signature_ed25519_hex: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReviewerKey {
+    key_id: String,
+    reviewer_id: String,
+    public_key_pem: String,
+    status: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReviewerKeyRegistry {
+    schema_version: String,
+    registry_id: String,
+    keys: Vec<ReviewerKey>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -348,6 +386,138 @@ fn check_run_task(run: &ProofRun, task: &SorryRecord) -> Result<(), String> {
             return Err(format!("run {} changes the target declaration signature", run.run_id));
         }
     }
+    Ok(())
+}
+
+
+fn decode_hex(value: &str) -> Result<Vec<u8>, String> {
+    if value.len() % 2 != 0 || !value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+        return Err("signature must be even-length lowercase hexadecimal".into());
+    }
+    (0..value.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&value[i..i + 2], 16).map_err(|e| format!("decode signature: {e}")))
+        .collect()
+}
+
+fn openssl_verify_ed25519(public_key_pem: &str, payload: &[u8], signature: &[u8], temp_dir: &Path) -> Result<(), String> {
+    fs::create_dir_all(temp_dir).map_err(|e| format!("create reviewer signature temp directory: {e}"))?;
+    let public_key_path = temp_dir.join("reviewer-public-key.pem");
+    let payload_path = temp_dir.join("reviewer-attestation-payload.json");
+    let signature_path = temp_dir.join("reviewer-attestation-signature.bin");
+    fs::write(&public_key_path, public_key_pem.as_bytes()).map_err(|e| format!("write reviewer public key: {e}"))?;
+    fs::write(&payload_path, payload).map_err(|e| format!("write reviewer signed payload: {e}"))?;
+    fs::write(&signature_path, signature).map_err(|e| format!("write reviewer signature: {e}"))?;
+    let output = Command::new("openssl")
+        .args([
+            "pkeyutl", "-verify", "-pubin", "-inkey",
+            public_key_path.to_str().ok_or("reviewer public key path is not UTF-8")?,
+            "-rawin", "-in",
+            payload_path.to_str().ok_or("reviewer payload path is not UTF-8")?,
+            "-sigfile",
+            signature_path.to_str().ok_or("reviewer signature path is not UTF-8")?,
+        ])
+        .output()
+        .map_err(|e| format!("run OpenSSL Ed25519 verifier: {e}"))?;
+    let _ = fs::remove_dir_all(temp_dir);
+    if !output.status.success() {
+        return Err(format!(
+            "reviewer Ed25519 signature verification failed: {}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    Ok(())
+}
+
+fn verify_reviewer_attestation(
+    semantic: &SemanticGateReceipt,
+    attestation_bytes: &[u8],
+    registry_bytes: &[u8],
+    expected_registry_sha256: &str,
+    temp_root: &Path,
+    run_id: &str,
+) -> Result<(), String> {
+    digest(expected_registry_sha256, "out-of-band reviewer key-registry SHA-256")?;
+    let actual_registry_sha256 = sha256(registry_bytes);
+    if actual_registry_sha256 != expected_registry_sha256 {
+        return Err("reviewer key registry differs from the out-of-band pinned SHA-256".into());
+    }
+    let registry: ReviewerKeyRegistry = serde_json::from_slice(registry_bytes)
+        .map_err(|e| format!("parse reviewer key registry: {e}"))?;
+    if registry.schema_version != "pitb.sorrydb-reviewer-key-registry.v1" || registry.registry_id.trim().is_empty() {
+        return Err("unsupported or unnamed reviewer key registry".into());
+    }
+    if registry.keys.is_empty() {
+        return Err("reviewer key registry cannot be empty".into());
+    }
+    let mut previous_key_id: Option<&str> = None;
+    let mut matching_key: Option<&ReviewerKey> = None;
+    for key in &registry.keys {
+        if key.key_id.trim().is_empty() || key.reviewer_id.trim().is_empty()
+            || !key.public_key_pem.contains("-----BEGIN PUBLIC KEY-----")
+            || !key.public_key_pem.contains("-----END PUBLIC KEY-----")
+        {
+            return Err("reviewer key registry contains an invalid key entry".into());
+        }
+        if previous_key_id.is_some_and(|previous| previous >= key.key_id.as_str()) {
+            return Err("reviewer key registry must be sorted and unique by key_id".into());
+        }
+        previous_key_id = Some(&key.key_id);
+        if !matches!(key.status.as_str(), "active" | "revoked") {
+            return Err(format!("reviewer key {} has unknown status", key.key_id));
+        }
+    }
+
+    let attestation: ReviewerAttestation = serde_json::from_slice(attestation_bytes)
+        .map_err(|e| format!("parse reviewer attestation: {e}"))?;
+    if attestation.schema_version != "pitb.sorrydb-reviewer-attestation.v1"
+        || attestation.canonicalization != "serde-json-map-sorted-compact-v0"
+        || attestation.key_id.trim().is_empty()
+        || attestation.reviewer_id.trim().is_empty()
+        || attestation.run_id != semantic.run_id
+        || attestation.task_id != semantic.task_id
+        || attestation.goal_sha256 != semantic.goal_sha256
+        || attestation.declaration_signature_sha256 != semantic.declaration_signature_sha256
+        || attestation.source_binding_receipt_sha256 != semantic.source_binding_receipt_sha256
+        || attestation.source_correspondence_status != semantic.source_correspondence_status
+        || attestation.hypothesis_audit_status != semantic.hypothesis_audit_status
+        || attestation.vacuity_audit_status != semantic.vacuity_audit_status
+        || attestation.reviewer_decision != semantic.reviewer_decision
+        || attestation.reviewer_id != semantic.reviewer_id
+        || attestation.key_id != semantic.reviewer_key_id
+        || attestation.semantic_log_sha256 != semantic.semantic_log_sha256
+    {
+        return Err(format!("run {} reviewer attestation does not bind the semantic-gate receipt", run_id));
+    }
+
+    for key in &registry.keys {
+        if key.key_id == attestation.key_id {
+            matching_key = Some(key);
+            break;
+        }
+    }
+    let key = matching_key.ok_or("reviewer attestation key ID is absent from pinned registry")?;
+    if key.status != "active" {
+        return Err(format!("reviewer key {} is revoked", key.key_id));
+    }
+    if key.reviewer_id != attestation.reviewer_id {
+        return Err("reviewer identity does not match pinned key registry".into());
+    }
+
+    let mut payload_value: Value = serde_json::from_slice(attestation_bytes)
+        .map_err(|e| format!("parse reviewer attestation for canonicalization: {e}"))?;
+    payload_value.as_object_mut()
+        .ok_or("reviewer attestation must be a JSON object")?
+        .remove("signature_ed25519_hex");
+    let payload = serde_json::to_vec(&payload_value)
+        .map_err(|e| format!("canonicalize reviewer attestation: {e}"))?;
+    let signature = decode_hex(&attestation.signature_ed25519_hex)?;
+    if signature.len() != 64 {
+        return Err("Ed25519 signature must contain exactly 64 bytes".into());
+    }
+    let temp_dir = temp_root.join(format!("reviewer-verify-{}", sha256(run_id.as_bytes())));
+    openssl_verify_ed25519(&key.public_key_pem, &payload, &signature, &temp_dir)?;
     Ok(())
 }
 
