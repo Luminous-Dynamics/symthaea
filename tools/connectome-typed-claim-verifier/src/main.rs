@@ -362,6 +362,15 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
         ) {
             return Err(format!("{context}.result_status invalid"));
         }
+        if result_status == "CLAIMED_NOT_ESTIMABLE" {
+            if query.get("result_sha256") != Some(&Value::Null) {
+                return Err(format!(
+                    "{context}: CLAIMED_NOT_ESTIMABLE query must not bind a result digest"
+                ));
+            }
+        } else {
+            digest_field(query, "result_sha256", &context)?;
+        }
         let allowed_rows = array(
             query
                 .get("allowed_relation_type_paths")
@@ -399,6 +408,11 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                 .ok_or_else(|| format!("{context}.path_results missing"))?,
             &format!("{context}.path_results"),
         )?;
+        if path_results.is_empty() && result_status != "CLAIMED_NOT_ESTIMABLE" {
+            return Err(format!(
+                "{context}: a query without path results must be explicitly NOT_ESTIMABLE"
+            ));
+        }
         let mut seen_path_results = BTreeSet::new();
         for (result_index, result) in path_results.iter().enumerate() {
             let result_context = format!("{context}.path_results[{result_index}]");
@@ -556,18 +570,10 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                     reasons.push("one or more producer claims are conditional".to_owned());
                 }
             }
-            if claimed_result_status == "CLAIMED_NOT_ESTIMABLE" {
-                let digest = query.get("result_sha256");
-                if digest != Some(&Value::Null) {
-                    return Err(format!(
-                        "{context}: NOT_ESTIMABLE result must not bind an output digest"
-                    ));
-                }
-                if disposition == "ACCEPTED_WITHIN_TYPED_SCOPE" {
-                    disposition = "NOT_ESTIMABLE";
-                }
-            } else {
-                digest_field(query, "result_sha256", &context)?;
+            if claimed_result_status == "CLAIMED_NOT_ESTIMABLE"
+                && disposition == "ACCEPTED_WITHIN_TYPED_SCOPE"
+            {
+                disposition = "NOT_ESTIMABLE";
             }
             outputs.push(json!({
                 "query_id": query_id,
