@@ -80,7 +80,7 @@ impl TestGenerator {
                 return GeneratedTestSuite {
                     function_name: request.name.clone(),
                     tests: Vec::new(),
-                    source: "// No tests generated: invalid Rust function identifier.\\n".into(),
+                    source: "// No tests generated: invalid Rust function identifier.\n".into(),
                     unsupported_reasons: vec![
                         "Requested function name is not a valid Rust identifier; no test source was generated."
                             .into(),
@@ -374,9 +374,9 @@ impl TestGenerator {
     }
 
     /// Render tests into a Rust `#[cfg(test)] mod tests` block.
-    fn render_test_module(fn_name: &str, tests: &[GeneratedTest]) -> String {
+    fn render_test_module(tests: &[GeneratedTest]) -> String {
         if tests.is_empty() {
-            return format!("// No tests generated for {fn_name}\n");
+            return "// No tests generated: no supported examples or invocation probes.\n".into();
         }
 
         let mut source = String::new();
@@ -417,7 +417,7 @@ mod tests {
     fn test_invalid_function_name_fails_closed_without_source_injection() {
         let request = SynthesisRequest::new(
             "rust",
-            "double\\n#[test] fn injected() {}",
+            "double\n#[test] fn injected() {}",
             "Double an integer",
         )
         .with_example("double(2)", "4");
@@ -426,7 +426,7 @@ mod tests {
         assert!(suite.tests.is_empty());
         assert_eq!(
             suite.source,
-            "// No tests generated: invalid Rust function identifier.\\n"
+            "// No tests generated: invalid Rust function identifier.\n"
         );
         assert!(!suite.source.contains("injected"));
         assert!(suite
