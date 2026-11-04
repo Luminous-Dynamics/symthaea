@@ -47,7 +47,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             continue;
         };
 
-        for field in ["input_disposition", "risk_disposition", "decision_authority", "blockers"] {
+        for field in ["input_disposition", "risk_disposition", "decision_authority", "blockers", "warnings"] {
             if actual.get(field) != expected_case.get(field) {
                 mismatches.push(json!({
                     "case_id": actual["case_id"],
