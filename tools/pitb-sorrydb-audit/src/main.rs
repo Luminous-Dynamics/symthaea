@@ -526,7 +526,7 @@ fn parse_proof_runs(bytes: &[u8]) -> Result<Vec<ProofRun>, String> {
 fn summarize_proof_runs(
     runs: &[ProofRun],
     evaluation: &Dataset,
-) -> Result<(usize, Vec<StrategySummary>), String> {
+) -> Result<(usize, usize, Vec<StrategySummary>), String> {
     let evaluation_by_id: BTreeMap<&str, &SorryRecord> = evaluation
         .sorries
         .iter()
@@ -989,7 +989,7 @@ fn synthetic_report() -> Result<Value, String> {
     let full_bytes = serde_json::to_vec(&full).map_err(|e| e.to_string())?;
     let evaluation_bytes = serde_json::to_vec(&evaluation).map_err(|e| e.to_string())?;
     let proof_runs = synthetic_proof_runs();
-    let (verified_success_count, strategy_summaries) =
+    let (verified_success_run_count, unique_successful_task_count, strategy_summaries) =
         summarize_proof_runs(&proof_runs, &evaluation)?;
     let mut run_bytes = Vec::new();
     for run in &proof_runs {
