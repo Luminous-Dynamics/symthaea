@@ -758,6 +758,23 @@ fn discovery_succeeds(
     Rng::new(seed).bernoulli(probability)
 }
 
+fn acquisition_draw_seed(
+    master_seed: u64,
+    step: usize,
+    sender: usize,
+    receiver: usize,
+    route_slot: usize,
+) -> u64 {
+    keyed_stream_seed(
+        master_seed,
+        STREAM_ACQUISITION,
+        step,
+        sender as u64,
+        receiver as u64,
+        route_slot as u64,
+    )
+}
+
 fn acquisition_succeeds(
     master_seed: u64,
     step: usize,
@@ -766,15 +783,14 @@ fn acquisition_succeeds(
     route_slot: usize,
     probability: f64,
 ) -> bool {
-    let seed = keyed_stream_seed(
+    Rng::new(acquisition_draw_seed(
         master_seed,
-        STREAM_ACQUISITION,
         step,
-        sender as u64,
-        receiver as u64,
-        route_slot as u64,
-    );
-    Rng::new(seed).bernoulli(probability)
+        sender,
+        receiver,
+        route_slot,
+    ))
+    .bernoulli(probability)
 }
 
 impl Rng {
@@ -1715,12 +1731,14 @@ mod tests {
         let first_payload = 6_u16;
         let shuffled_payload = 12_u16;
         assert_ne!(first_payload, shuffled_payload);
-        let original_draw = acquisition_succeeds(2026, 5, 1, 4, 0, 0.5);
-        let shuffled_draw = acquisition_succeeds(2026, 5, 1, 4, 0, 0.5);
-        assert_eq!(original_draw, shuffled_draw);
-        assert_ne!(
+        let original_key = acquisition_draw_seed(2026, 5, 1, 4, 0);
+        let shuffled_content_key = acquisition_draw_seed(2026, 5, 1, 4, 0);
+        let next_route_slot_key = acquisition_draw_seed(2026, 5, 1, 4, 1);
+        assert_eq!(original_key, shuffled_content_key);
+        assert_ne!(original_key, next_route_slot_key);
+        assert_eq!(
             acquisition_succeeds(2026, 5, 1, 4, 0, 0.5),
-            acquisition_succeeds(2026, 5, 1, 4, 1, 0.5)
+            acquisition_succeeds(2026, 5, 1, 4, 0, 0.5)
         );
     }
 
