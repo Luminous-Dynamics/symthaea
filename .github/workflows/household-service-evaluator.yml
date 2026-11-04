@@ -51,7 +51,7 @@ jobs:
           cargo run --locked --manifest-path tools/household-service-evaluator/Cargo.toml -- \
             --water docs/research/household-services/fixtures/water-continuity-scenarios-v0.1.json \
             --repair docs/research/household-services/fixtures/repairability-scenarios-v0.1.json \
-            --output target/household-service-batch-report.json \\
+            --output target/household-service-batch-report.json \
             --digest-output target/household-service-batch-report.json.sha256
 
       - name: Upload synthetic batch report
