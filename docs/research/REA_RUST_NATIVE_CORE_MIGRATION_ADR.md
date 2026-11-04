@@ -899,3 +899,29 @@ A source-level review found that `File::try_clone()` may share an underlying fil
 
 A deterministic 256-sample corruption smoke test has also been added to #10368: each sample applies three reproducible bit flips to a frozen minimal archive, then exercises inventory admission and content verification when admitted under panic capture. The manifest records the seed, mutation schedule, panic count and structured rejection rate as required reporting. This is a smoke test only; coverage-guided fuzzing, minimized regression fixtures and independent oracle comparisons remain promotion gates.
 
+## 19. 2026-11-04 — independent parser oracle and fuzz programme
+
+A test-only `zip = 9.3.0` dependency has been added to the isolated artifact-reader harness, not to the production reader crate. The first fixture compares central-directory order, duplicate raw names, local-header offsets, declared sizes, CRC values and Stored payload bytes. It also calls zip-rs header-consistency and overlapping-entry checks as distinct observations. The test-only dependency is intentionally excluded from the production dependency graph.
+
+The current three-part design separates responsibilities:
+- Symthaea custom inventory: policy and admitted occurrence authority.
+- `zipcore = 0.10.2`: bounded Stored/Deflate streaming candidate with CRC/size verification.
+- `zip = 9.3.0`: mature structural/Stored-stream differential oracle.
+- Pinned REA TypeScript: behavioral compatibility oracle.
+- `rawzip = 0.5.2`: future low-level structural candidate; not adopted as a dependency.
+
+Do not assume parser diversity equals independent evidence. The decoder, CRC, checksum and compression dependency graph must be recorded for each method. In particular, a Stored-only parser comparison makes a stronger claim about structural parsing than about codec independence.
+
+A new fuzz qualification owner is opened as [#10451 — differential ZIP corpus and coverage-guided fuzz qualification](https://github.com/Luminous-Dynamics/symthaea/issues/10451). It owns content-addressed seed fixtures, independent versioned oracle arms, mutation minimization, cargo-fuzz targets and permanent regressions. The deterministic mutation test in #10368 remains a smoke test—not a replacement for coverage-guided fuzzing.
+
+### External library capability comparison
+
+As of 2026-11-04:
+- `zip 9.3.0` exposes indexed access, raw filename bytes, duplicate-name observations, header consistency and overlap checks. Its API warns that extraction is not atomic, so this programme uses it as an in-memory oracle, never as an extraction mechanism.
+- `rawzip 0.5.2` offers a low-level, zero-dependency, zero-unsafe structural reader with a verifying-reader abstraction. Its own security guide assigns the consumer responsibility for zip-bomb budgets, overlap checking, duplicate-name handling and expected-entry-count reconciliation. Those omissions are useful explicit test cases, not reasons to bypass the custom policy layer.
+- `zipcore 0.10.2` supports bounded streaming CRC/size checks, but the newness of the crate means its own tests do not replace independent qualification.
+
+References: [zip 9.3.0 crate docs](https://docs.rs/zip/9.3.0/zip/), [ZipArchive 9.3.0 API](https://docs.rs/zip/9.3.0/zip/read/struct.ZipArchive.html), [rawzip 0.5.2 security guide](https://docs.rs/rawzip/0.5.2/rawzip/), [zipcore 0.10.2 crate docs](https://docs.rs/zipcore/0.10.2/zipcore/).
+
+No cross-parser test is claimed to have passed until the exact-head workflow runs. No fuzz qualification result is claimed.
+
