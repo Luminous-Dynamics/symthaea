@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/grounded-participation-cases-v1.schema.json",
+  "title": "Melothaea evidence-to-action conformance cases v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-grounded-participation-cases-v1"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "expected_disposition",
+        "evidence",
+        "decision",
+        "policy"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_disposition": {
+          "enum": [
+            "accept",
+            "reject_veto"
+          ]
+        },
+        "evidence": {
+          "$ref": "grounded-participation-evidence-v1.schema.json"
+        },
+        "decision": {
+          "$ref": "grounded-participation-receipt-v1.schema.json"
+        },
+        "policy": {
+          "$ref": "grounded-participation-policy-v1.schema.json"
+        }
+      }
+    }
+  }
+}

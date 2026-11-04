@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/grounded-participation-receipt-v1.schema.json",
+  "title": "Melothaea grounded musical decision receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "session_id",
+    "turn_id",
+    "decision_id",
+    "sequence",
+    "artifact",
+    "runner_clock_domain_id",
+    "runner_origin_id",
+    "evidence_claim_set_sha256",
+    "evidence_bundle_sha256",
+    "observed_through_frame",
+    "decision_at_ns",
+    "action",
+    "cited_claim_ids",
+    "effect_window",
+    "collaborator_veto_active",
+    "policy_version"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-grounded-participation-receipt-v1"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "turn_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "audio_sha256",
+        "sample_rate_hz",
+        "channels",
+        "total_frames"
+      ],
+      "properties": {
+        "audio_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "channels": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "total_frames": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "evidence_claim_set_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evidence_bundle_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "observed_through_frame": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "decision_at_ns": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "action": {
+      "enum": [
+        "WAIT",
+        "RESPOND",
+        "CONTINUE",
+        "YIELD",
+        "ASK",
+        "ABSTAIN"
+      ]
+    },
+    "cited_claim_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "effect_window": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "not_before_runner_time_ns",
+        "expires_at_runner_time_ns",
+        "authorization_id"
+      ],
+      "properties": {
+        "authorization_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "not_before_runner_time_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expires_at_runner_time_ns": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "collaborator_veto_active": {
+      "type": "boolean"
+    },
+    "policy_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runner_clock_domain_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runner_origin_id": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
