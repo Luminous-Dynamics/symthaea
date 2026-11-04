@@ -9,9 +9,7 @@
       "risk_disposition": "scenario_model_qualified_for_synthetic_use",
       "decision_authority": "none",
       "blockers": [],
-      "warnings": [
-        "Synthetic inputs only; no real-project inference."
-      ]
+      "warnings": []
     },
     {
       "case_id": "grid-assertion-only-002",
@@ -71,6 +69,7 @@
       "risk_disposition": "not_evaluated",
       "decision_authority": "none",
       "blockers": [
+        "GRID_EVIDENCE_BELOW_REQUIRED_CLASS",
         "MATERIAL_SOURCE_CONFLICT"
       ],
       "warnings": [
