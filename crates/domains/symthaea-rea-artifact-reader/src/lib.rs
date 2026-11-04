@@ -470,7 +470,7 @@ impl ZipArtifactReader {
 
         // Keep all decoder setup and streaming in one result scope so the descriptors and
         // selected path are revalidated even when the secondary parser rejects metadata.
-        let stream_result = (|| {
+        let stream_result = (move || {
             let mut archive = DecoderArchive::new_with_options(decoder_file, options)
                 .map_err(|error| map_zipcore_error("secondary ZIP parser rejected archive", error))?;
 
