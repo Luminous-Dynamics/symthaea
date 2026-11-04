@@ -253,13 +253,16 @@
           "model_id",
           "model_version",
           "attempts",
-          "verified_successes",
           "non_solves",
           "infrastructure_failures",
           "invalid_targets",
           "success_rate_per_attempt",
           "mean_success_wall_time_ms",
-          "total_cost_usd"
+          "total_cost_usd",
+          "verified_success_attempts",
+          "unique_tasks_solved",
+          "unique_task_success_rate",
+          "cost_per_unique_verified_task_usd"
         ],
         "properties": {
           "strategy_name": {
@@ -296,10 +299,6 @@
             "type": "integer",
             "minimum": 1
           },
-          "verified_successes": {
-            "type": "integer",
-            "minimum": 0
-          },
           "non_solves": {
             "type": "integer",
             "minimum": 0
@@ -331,6 +330,30 @@
           "total_cost_usd": {
             "type": "number",
             "minimum": 0
+          },
+          "verified_success_attempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unique_tasks_solved": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unique_task_success_rate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "cost_per_unique_verified_task_usd": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "number",
+                "minimum": 0
+              }
+            ]
           }
         }
       }
