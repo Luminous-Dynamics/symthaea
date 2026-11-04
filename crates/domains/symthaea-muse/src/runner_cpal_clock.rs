@@ -867,6 +867,16 @@ mod tests {
                     "{} must fail the descriptor-identity gate",
                     fixture.fixture_id
                 ),
+                "reject_drift" => assert!(
+                    matches!(result, Err(RunnerCpalClockFitErrorV1::DriftOutsidePolicy { .. })),
+                    "{} must fail the drift gate",
+                    fixture.fixture_id
+                ),
+                "reject_residual" => assert!(
+                    matches!(result, Err(RunnerCpalClockFitErrorV1::ResidualOutsidePolicy { .. })),
+                    "{} must fail the residual gate",
+                    fixture.fixture_id
+                ),
                 other => panic!(
                     "{} has unsupported expected disposition {other}",
                     fixture.fixture_id
