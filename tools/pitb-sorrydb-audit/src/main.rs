@@ -452,6 +452,33 @@ struct SourceCheckoutReceipt {
     limitation: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+struct GoalReplayReceipt {
+    schema_version: String,
+    source_database_task_id: String,
+    repository_remote: String,
+    repository_commit: String,
+    lean_version: String,
+    source_path: String,
+    start_line: u64,
+    start_column: u64,
+    end_line: u64,
+    end_column: u64,
+    goal_sha256: String,
+    source_file_sha256: String,
+    instrumented_source_sha256: String,
+    toolchain_file_sha256: String,
+    lake_manifest_sha256: String,
+    repository_tree_sha256: String,
+    replay_command: String,
+    replay_command_sha256: String,
+    replay_log_sha256: String,
+    replay_exit_code: i32,
+    goal_reproduced: bool,
+    scoring_admission: bool,
+    limitation: String,
+}
+
 fn git_output(repo: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
     let output = Command::new("git")
         .args(args)
@@ -596,6 +623,131 @@ fn verify_source_checkout(
         scoring_admission: false,
         limitation: "This receipt verifies only immutable Git identity, the committed Lean toolchain and the exact sorry source span. It does not run Lake/Lean, reproduce the elaborated Prop goal, verify a proof, or audit informal-to-formal specification fidelity.".into(),
     })
+}
+
+fn normalized_goal(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn instrument_sorry_span(
+    source: &str,
+    start_line: u64,
+    start_column: u64,
+    end_line: u64,
+    end_column: u64,
+) -> Result<String, String> {
+    let start = position_to_byte_index(source, start_line, start_column)?;
+    let end = position_to_byte_index(source, end_line, end_column)?;
+    if end <= start || source.get(start..end) != Some("sorry") {
+        return Err("pinned source coordinates do not select exactly the sorry token".into());
+    }
+    let mut instrumented = String::with_capacity(source.len() + 32);
+    instrumented.push_str(&source[..start]);
+    instrumented.push_str("trace_state\n  sorry");
+    instrumented.push_str(&source[end..]);
+    Ok(instrumented)
+}
+
+fn replay_goal_with_lake(
+    record: &SorryRecord,
+    repo_root: &Path,
+    receipt_path: &Path,
+    log_path: &Path,
+) -> Result<GoalReplayReceipt, String> {
+    let checkout = verify_source_checkout(record, repo_root)?;
+    let source_spec = format!("HEAD:{}", record.location.path);
+    let source_bytes = git_output(repo_root, &["show", source_spec.as_str()])?;
+    let source = std::str::from_utf8(&source_bytes)
+        .map_err(|e| format!("committed Lean source is not UTF-8: {e}"))?;
+    let instrumented = instrument_sorry_span(
+        source,
+        record.location.start_line,
+        record.location.start_column,
+        record.location.end_line,
+        record.location.end_column,
+    )?;
+    let manifest_bytes = git_output(repo_root, &["show", "HEAD:lake-manifest.json"])?;
+    let toolchain_bytes = git_output(repo_root, &["show", "HEAD:lean-toolchain"])?;
+    let tree_bytes = git_output(repo_root, &["rev-parse", "HEAD^{tree}"])?;
+    let repository_tree = String::from_utf8(tree_bytes)
+        .map_err(|e| format!("repository tree SHA is not UTF-8: {e}"))?
+        .trim().to_owned();
+
+    let source_relative = Path::new(&record.location.path);
+    let parent = source_relative.parent().unwrap_or_else(|| Path::new(""));
+    let stem = source_relative.file_stem().and_then(|x| x.to_str())
+        .ok_or("SorryDB source path has no valid UTF-8 file stem")?;
+    let task_suffix = record.id.chars().take(8).collect::<String>();
+    let replay_filename = format!("{stem}.PITBReplay{task_suffix}.lean");
+    let replay_relative = parent.join(replay_filename);
+    let replay_absolute = repo_root.join(&replay_relative);
+    if replay_absolute.exists() {
+        return Err(format!("goal replay temporary source already exists: {}", replay_relative.display()));
+    }
+    if !replay_absolute.starts_with(repo_root) {
+        return Err("goal replay temporary source escaped repository root".into());
+    }
+    fs::write(&replay_absolute, instrumented.as_bytes())
+        .map_err(|e| format!("write instrumented Lean source: {e}"))?;
+
+    let replay_relative_string = replay_relative.to_string_lossy().into_owned();
+    let replay_command = format!("lake env lean {replay_relative_string}");
+    let output_result = Command::new("lake")
+        .args(["env", "lean", replay_relative_string.as_str()])
+        .current_dir(repo_root)
+        .output()
+        .map_err(|e| format!("start lake env lean ({replay_command}): {e}"));
+    let _ = fs::remove_file(&replay_absolute);
+    let output = output_result?;
+    let mut log_bytes = Vec::with_capacity(output.stdout.len() + output.stderr.len());
+    log_bytes.extend_from_slice(&output.stdout);
+    log_bytes.extend_from_slice(&output.stderr);
+    fs::write(log_path, &log_bytes)
+        .map_err(|e| format!("write Lean goal-replay log: {e}"))?;
+    let log_text = String::from_utf8_lossy(&log_bytes);
+    let expected_goal = normalized_goal(&record.debug_info.goal);
+    let actual_log = normalized_goal(&log_text);
+    let goal_reproduced = output.status.success() && actual_log.contains(&expected_goal);
+
+    let receipt = GoalReplayReceipt {
+        schema_version: "pitb.sorrydb-goal-replay.v0".into(),
+        source_database_task_id: record.id.clone(),
+        repository_remote: record.repo.remote.clone(),
+        repository_commit: record.repo.commit.clone(),
+        lean_version: record.repo.lean_version.clone(),
+        source_path: record.location.path.clone(),
+        start_line: record.location.start_line,
+        start_column: record.location.start_column,
+        end_line: record.location.end_line,
+        end_column: record.location.end_column,
+        goal_sha256: sha256(record.debug_info.goal.as_bytes()),
+        source_file_sha256: checkout.source_file_sha256,
+        instrumented_source_sha256: sha256(instrumented.as_bytes()),
+        toolchain_file_sha256: sha256(&toolchain_bytes),
+        lake_manifest_sha256: sha256(&manifest_bytes),
+        repository_tree_sha256: repository_tree,
+        replay_command,
+        replay_command_sha256: sha256(replay_command.as_bytes()),
+        replay_log_sha256: sha256(&log_bytes),
+        replay_exit_code: output.status.code().unwrap_or(-1),
+        goal_reproduced,
+        scoring_admission: false,
+        limitation: "The instrumented source emits the live Lean tactic state at the pinned sorry span and compares its normalized rendering with SorryDB debug_info.goal. It is a reproduction receipt, not a proof result or semantic-fidelity review.".into(),
+    };
+    let receipt_bytes = serde_json::to_vec_pretty(&receipt)
+        .map_err(|e| format!("serialize Lean goal-replay receipt: {e}"))?;
+    fs::write(receipt_path, receipt_bytes)
+        .map_err(|e| format!("write Lean goal-replay receipt: {e}"))?;
+    if !goal_reproduced {
+        return Err(format!(
+            "Lean goal replay failed for {} (exit={}); expected goal digest {}. Inspect {}",
+            record.id,
+            receipt.replay_exit_code,
+            receipt.goal_sha256,
+            log_path.display()
+        ));
+    }
+    Ok(receipt)
 }
 
 fn build_synthetic_checkout_receipt() -> Result<SourceCheckoutReceipt, String> {
@@ -1015,7 +1167,7 @@ fn audit(
 fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, PathBuf, Option<PathBuf>), String> {
     if args.len() < 7 || args[1] != "--verify" {
         return Err(format!(
-            "usage: {} --verify <full-snapshot.json> <evaluation-split.json> <report.json> [--runs proof-runs.jsonl] --pinned-source SorryDB/SorryDB@74b3b63f8ba890d675f362924b21ac55db410383 | --verify-checkout <sorry-record.json> <repo-root> <receipt.json> | --self-test-checkout-report <receipt.json>",
+            "usage: {} --verify <full-snapshot.json> <evaluation-split.json> <report.json> [--runs proof-runs.jsonl] --pinned-source SorryDB/SorryDB@74b3b63f8ba890d675f362924b21ac55db410383 | --verify-checkout <sorry-record.json> <repo-root> <receipt.json> | --replay-goal <sorry-record.json> <repo-root> <receipt.json> <replay.log> | --self-test-checkout-report <receipt.json>",
             args.first().map(String::as_str).unwrap_or("pitb-sorrydb-audit")
         ));
     }
@@ -1401,6 +1553,27 @@ fn execute() -> Result<(), String> {
         println!("PITB_SORRYDB_AUDIT_SYNTHETIC_REPORT_OK");
         return Ok(());
     }
+    if args.len() == 6 && args[1] == "--replay-goal" {
+        let record_bytes = fs::read(&args[2])
+            .map_err(|e| format!("read SorryDB task record: {e}"))?;
+        let record: SorryRecord = serde_json::from_slice(&record_bytes)
+            .map_err(|e| format!("parse SorryDB task record: {e}"))?;
+        let receipt = replay_goal_with_lake(
+            &record,
+            Path::new(&args[3]),
+            Path::new(&args[4]),
+            Path::new(&args[5]),
+        )?;
+        println!("PITB_SORRYDB_GOAL_REPLAY_OK");
+        println!(
+            "task={} goal_sha256={} manifest_sha256={} log_sha256={}",
+            receipt.source_database_task_id,
+            receipt.goal_sha256,
+            receipt.lake_manifest_sha256,
+            receipt.replay_log_sha256
+        );
+        return Ok(());
+    }
     if args.len() == 5 && args[1] == "--verify-checkout" {
         let record_bytes = fs::read(&args[2])
             .map_err(|e| format!("read SorryDB task record: {e}"))?;
@@ -1488,6 +1661,17 @@ mod tests {
             .map(|(_, version)| version.trim())
             .unwrap_or(toolchain);
         assert_eq!(normalized, "v4.26.0");
+    }
+
+    #[test]
+    fn instrumentation_replaces_exact_unicode_aware_sorry_span() {
+        let source = "theorem sample (α : Nat) : True := by sorry\n";
+        let line = source.lines().next().unwrap();
+        let start = line.find("sorry").unwrap() as u64;
+        let instrumented = instrument_sorry_span(source, 1, start, 1, start + 5).unwrap();
+        assert!(instrumented.contains("by trace_state\n  sorry"));
+        assert_eq!(source.matches("sorry").count(), 1);
+        assert_eq!(instrumented.matches("sorry").count(), 1);
     }
 
     #[test]
