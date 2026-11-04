@@ -701,7 +701,7 @@ fn self_test(manifest_path: &Path, evidence_root: &Path) -> Result<(), String> {
     reverse_type["target_node_id"] = Value::String("target-main".into());
     mutual["edges"].as_array_mut().ok_or("fixture edges must be an array")?.push(reverse_type);
     let (_, mutual_summary) = validate_value(&mutual)?;
-    if mutual_summary.formal_dependency_edge_count != 5 {
+    if mutual_summary.formal_dependency_edge_count != 9 {
         return Err("mutual formal declaration references were not preserved".into());
     }
     println!("MUTUAL_FORMAL_REFERENCE_PASS: observed declaration SCCs remain representable");
