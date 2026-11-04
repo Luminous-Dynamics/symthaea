@@ -89,7 +89,7 @@
           "mapped_out_of_universe_count",
           "unresolved_or_ambiguous_candidate_count",
           "useful_route_candidate_count",
-          "useful_novel_premise_rate",
+          "useful_route_premise_rate",
           "necessary_declaration_count",
           "necessary_declaration_recall",
           "minimal_route_count",
@@ -196,7 +196,7 @@
             "type": "integer",
             "minimum": 0
           },
-          "useful_novel_premise_rate": {
+          "useful_route_premise_rate": {
             "oneOf": [
               {
                 "type": "null"
@@ -350,7 +350,7 @@
           "any_complete_route_covered_count",
           "any_complete_route_coverage",
           "mean_minimal_route_coverage",
-          "mean_useful_novel_premise_rate",
+          "mean_useful_route_premise_rate",
           "mean_necessary_declaration_recall",
           "total_cost_microusd",
           "total_retrieval_wall_ms",
@@ -391,7 +391,7 @@
             "minimum": 0,
             "maximum": 1
           },
-          "mean_useful_novel_premise_rate": {
+          "mean_useful_route_premise_rate": {
             "oneOf": [
               {
                 "type": "null"
