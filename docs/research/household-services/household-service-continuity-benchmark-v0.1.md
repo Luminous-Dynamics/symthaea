@@ -131,6 +131,30 @@ Start with deterministic known-answer scenarios. Do not assign failure probabili
 
 Every scenario binds exact initial configuration, demand profile, disturbance onset/magnitude, duration or stop rule, recovery condition, source profile, expected claim ceiling and exact clock semantics.
 
+### Reuse the existing water-continuity fixture; do not fork it
+
+The existing synthetic-only water corpus is already present on the household charter branch in [PR #10386](https://github.com/Luminous-Dynamics/symthaea/pull/10386) (original fixture work also appears in [PR #10344](https://github.com/Luminous-Dynamics/symthaea/pull/10344)): `docs/research/household-services/fixtures/water-continuity-scenarios-v0.1.json`, corpus ID `HOME-UTILITY-COORD-001-WATER-CONTINUITY-SYNTHETIC-001`. It contains 10 frozen WCONT cases. This HSC profile must compose those cases rather than create a second, overlapping 10-case water fixture.
+
+| HSC profile | Existing WCONT coverage | Remaining gap / rule |
+|---|---|---|
+| HSC-001 low/intermittent inlet pressure | WCONT-002, WCONT-003 | Extend only if a distinct pressure/demand trace is needed |
+| HSC-002 complete municipal interruption | WCONT-002, WCONT-006 | Confirm zero-inlet and outage-duration semantics before reusing |
+| HSC-003 grid outage with municipal water | None exact | New case required; do not infer from combined outage |
+| HSC-004 combined water + grid outage | WCONT-006 | Reuse |
+| HSC-005 pump failure with water reserve present | None exact | New case required; separate pump fault from grid failure |
+| HSC-006 stored volume but inadequate fixture head/pressure | None exact | New case required; delivery-boundary pressure must be measured |
+| HSC-007 peak concurrent water/thermal demand | None exact | New demand-trace case required |
+| HSC-008 staggered water/electricity restoration | WCONT-003, WCONT-010 | Existing cases cover staggered water recovery / unstable pressure, not two independently timed utilities |
+| HSC-009 unstable pressure restoration | WCONT-010 | Reuse |
+| HSC-010 leak under essential demand | WCONT-005 | Reuse; demand-interaction details may need an extension |
+| HSC-011 sensor stuck/drift/stale/conflict | WCONT-004, WCONT-007, WCONT-008, WCONT-009 | Reuse the applicable fault-specific control; do not merge their dispositions |
+| HSC-012 communications outage | None exact | New case required; local appliance operation must remain independently specified |
+| HSC-013 end-use evidence expires | WCONT-007 | Reuse |
+| HSC-014 apparent redundant feeds share upstream dependency | None exact | New topology/common-mode case required; compose CIV-PLACE #6600 |
+| HSC-015 in-envelope demand shift | None exact | New demand-shift case required; no invented occurrence probabilities |
+
+The WCONT corpus' `expected_disposition` values are synthetic semantic expectations, not measured physical outcomes. A future candidate-policy comparison must keep confirmatory expected outcomes under independent evaluator custody; a public conformance fixture is not a hidden or independent policy-scoring oracle.
+
 ## 7. Outcome vector
 
 Report per service, per scenario and per comparator arm:
@@ -178,6 +202,8 @@ Qualification semantics:
 - a mandatory gate is known to fail: q_qual = [0,0] for the affected use class, while q_phys remains reported;
 - a mandatory gate is unknown, stale or contradictory: retain the state as Unknown and use a conservative lower qualified-delivery bound of zero; do not rewrite Unknown as a physical failure or a pass;
 - quality/pressure/temperature failures should also be reported as distinct hard-constraint violations, not hidden inside the integral.
+
+For example (illustrative synthetic values only), suppose demand is bounded by [1.8, 2.2] L/min and physical fixture flow by [1.7, 1.9] L/min for 30 minutes. If the mandatory end-use qualification is Unknown, use q_qual = [0, 1.9] L/min: the deficit bound is [0, 66] L over that interval. If that end-use gate is known to fail, q_qual = [0,0] and the deficit bound is [54, 66] L. The physical flow remains separately reported in both cases. These examples assume no independence between the bound components and do not convert Unknown into a known failure.
 
 For discrete services (such as an accepted dishwasher request), do not force a continuous-rate integral. Report request count, acceptance, deadline, latency, failure/deferral and rework directly.
 
