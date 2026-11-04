@@ -1089,10 +1089,19 @@ fn safe_agent_view_relative_path(path: &str) -> bool {
         return false;
     }
     path.split('/').all(|component| {
-        if component.ends_with('.') || component.ends_with(' ') {
+        if component.ends_with('.') || component.ends_with(' ')
+            || component.bytes().any(|byte| {
+                byte < 0x20 || matches!(byte, b'<' | b'>' | b'"' | b'|' | b'?' | b'*')
+            })
+        {
             return false;
         }
-        let stem = component.split('.').next().unwrap_or("").to_ascii_uppercase();
+        let stem = component
+            .split('.')
+            .next()
+            .unwrap_or("")
+            .trim_end_matches([' ', '.'])
+            .to_ascii_uppercase();
         !matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
             && !(stem.len() == 4
                 && (stem.starts_with("COM") || stem.starts_with("LPT"))
@@ -3495,7 +3504,18 @@ mod tests {
     #[test]
     fn agent_view_manifest_rejects_unsafe_and_case_colliding_paths() {
         use std::fs;
-        for path in ["../secret", "/etc/passwd", "src\\escape.rs", "CON.txt", "src/trailing."] {
+        for path in [
+            "../secret",
+            "/etc/passwd",
+            "src\\escape.rs",
+            "CON.txt",
+            "CON .txt",
+            "nul ",
+            "src/trailing.",
+            "src/line\nfeed.rs",
+            "src/question?.rs",
+            "src/pipe|name.rs",
+        ] {
             assert!(!safe_agent_view_relative_path(path), "accepted {path:?}");
         }
         assert!(safe_agent_view_relative_path("src/lib.rs"));
