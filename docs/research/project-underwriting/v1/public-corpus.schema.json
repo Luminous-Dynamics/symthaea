@@ -74,7 +74,11 @@
         "source_family_id",
         "source_ref",
         "valid_time",
-        "known_at"
+        "known_at",
+        "subject_id",
+        "boundary_id",
+        "issuer_id",
+        "issuer_role"
       ],
       "properties": {
         "evidence_id": {
@@ -164,6 +168,30 @@
         "model_id": {
           "type": "string",
           "minLength": 1
+        },
+        "subject_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "boundary_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issuer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issuer_role": {
+          "enum": [
+            "developer",
+            "system_operator",
+            "offtaker",
+            "independent_verifier",
+            "model_registry",
+            "epc_contractor",
+            "central_bank",
+            "other"
+          ]
         }
       }
     },
