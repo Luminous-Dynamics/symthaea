@@ -18,6 +18,16 @@ use serde::{Deserialize, Serialize};
 pub const OUTPUT_CLOCK_ANCHOR_SCHEMA_V1: &str = "mel-output-clock-anchor-v1";
 pub const OUTPUT_CLOCK_FIT_SCHEMA_V1: &str = "mel-output-clock-fit-v1";
 
+
+/// Versioned schema identity for a callback anchor. An enum rather than a
+/// String makes the record Copy and safe to enqueue from a real-time callback
+/// without heap allocation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum OutputClockAnchorSchemaV1 {
+    #[serde(rename = "mel-output-clock-anchor-v1")]
+    V1,
+}
+
 /// Provenance for one output callback's native clock observation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -32,10 +42,10 @@ pub enum OutputClockAnchorSourceV1 {
 /// All stream timestamps are nanoseconds relative to the first callback
 /// timestamp in this stream instance. The CPAL playback timestamp is a
 /// backend prediction, not an independently observed DAC/acoustic event.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OutputClockAnchorV1 {
-    pub schema_version: String,
+    pub schema_version: OutputClockAnchorSchemaV1,
     pub source: OutputClockAnchorSourceV1,
     pub stream_instance_id: u64,
     pub anchor_index: u64,
@@ -209,7 +219,7 @@ pub fn fit_output_clock_v1(
     }
 
     for (index, anchor) in anchors.iter().enumerate() {
-        if anchor.schema_version != OUTPUT_CLOCK_ANCHOR_SCHEMA_V1 {
+        if anchor.schema_version != OutputClockAnchorSchemaV1::V1 {
             return Err(OutputClockFitErrorV1::InvalidAnchorSchema { index });
         }
         if anchor.sample_rate_hz == 0 {
@@ -363,7 +373,7 @@ mod tests {
 
     fn anchor(index: u64, first_frame: u64, playback_ns: u64) -> OutputClockAnchorV1 {
         OutputClockAnchorV1 {
-            schema_version: OUTPUT_CLOCK_ANCHOR_SCHEMA_V1.to_owned(),
+            schema_version: OutputClockAnchorSchemaV1::V1,
             source: OutputClockAnchorSourceV1::SyntheticFixtureV1,
             stream_instance_id: 7,
             anchor_index: index,
