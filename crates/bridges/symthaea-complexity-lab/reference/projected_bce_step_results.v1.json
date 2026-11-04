@@ -18,16 +18,16 @@
   "source_digest": "sha256:830b54bf96367013edf6d8a50b9c1eec2cfa4bdd1c73787c30ccd0e9f08e5f8b",
   "target_digest": "sha256:941121948294a17ba002c6549ee65c2f365459f623f7de612c582ddc5375913b",
   "certificate_git_blob_sha1": "747732281992d62929aad686632a3705749e8fdf",
-  "checker_git_blob_sha1": "8bf663a393e89f07ff4b7e2bef31015c4d419824",
+  "checker_git_blob_sha1": "28bef6ac12990cc34193747cf78e07928b945302",
   "local_reference_variant_check": "passed",
   "uploaded_checker_execution": "passed",
-  "execution_note": "Exact uploaded checker bytes were reconstructed locally and their Git blob SHA-1 matched the fetched GitHub blob. Executed with Python 3.13.5. Valid receipt accepted; source/target oracle matched 2->3 full models with unchanged projected support [0,1] and PWMC 1/1; all 9 negative controls rejected.",
+  "execution_note": "The exact uploaded checker bytes match the fetched GitHub blob SHA-1 and were executed under Python 3.13.5. The certificate bytes also match the fetched GitHub blob. The valid receipt was accepted, the exhaustive oracle reproduced 2 -> 3 full models with unchanged visible support and PWMC 1/1, and all nine negative controls were rejected.",
   "certificate_sha256": "sha256:fb6ea66db3ddd76e3a211e2b02b46a9afcc37f3d8392dbdef0b598bd429d25d3",
-  "checker_sha256": "sha256:a1f8e7a047a39635eed2c130183191d7b74eee7d4ac466c09df51ce2f04947e7",
+  "checker_sha256": "sha256:01def09afae51544236a91b9f7c0ad7db9586553b932d4c57d218fe9b7a1d9b8",
   "execution_environment": {
     "python": "3.13.5",
     "execution_date": "2026-11-04",
-    "method": "exact GitHub blob reconstruction; Git blob SHA-1 verified before execution"
+    "method": "exact GitHub file bytes reconstructed locally; Git blob SHA-1 verified before execution"
   },
   "execution_summary": {
     "valid_receipt": "accepted",
