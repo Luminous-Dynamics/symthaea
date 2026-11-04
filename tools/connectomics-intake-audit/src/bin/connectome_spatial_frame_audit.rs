@@ -1039,6 +1039,9 @@ mod tests {
         // checked u128 volume multiplication rather than failing the
         // earlier i64 coordinate-bound check.
         frame.extent_voxels = [i64::MAX as u64, i64::MAX as u64, i64::MAX as u64];
+        // Keep origin + extent inside i64 so checked volume multiplication is
+        // the first failing invariant.
+        frame.origin_voxel = [i64::MIN, i64::MIN, i64::MIN];
         frame.tile_shape_voxels = [1, 1, 1];
         assert!(validate(&frame).unwrap_err().contains("voxel count overflows u128"));
     }
