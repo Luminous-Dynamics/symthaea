@@ -270,10 +270,7 @@ pub fn canonical_evidence_bundle_bytes(bundle: &Value) -> Result<Vec<u8>, Bundle
 /// mutation record explicitly listed in `mutation_evidence_ids`. Relationship
 /// closure is preserved by removing histories whose related histories are not
 /// retained, then recursively removing their dependents.
-pub fn evidence_bundle_for_target(
-    bundle: &Value,
-    sha256: &str,
-) -> Result<Value, BundleError> {
+pub fn evidence_bundle_for_target(bundle: &Value, sha256: &str) -> Result<Value, BundleError> {
     let verified = verify_evidence_bundle_value(bundle)?;
     let bundle = verified.bundle;
     let root = as_object(&bundle, "EvidenceBundle")?;
@@ -372,16 +369,16 @@ pub fn evidence_bundle_for_target(
             .collect();
         relationships.insert(id.clone(), related_ids.clone());
         for related_id in related_ids {
-            dependents
-                .entry(related_id)
-                .or_default()
-                .insert(id.clone());
+            dependents.entry(related_id).or_default().insert(id.clone());
         }
     }
 
     let mut pending = Vec::<String>::new();
     for (id, related_ids) in &relationships {
-        if related_ids.iter().any(|related_id| !retained.contains(related_id)) {
+        if related_ids
+            .iter()
+            .any(|related_id| !retained.contains(related_id))
+        {
             pending.push(id.clone());
         }
     }
@@ -400,8 +397,7 @@ pub fn evidence_bundle_for_target(
     let selected_unknowns: Vec<Value> = unknowns
         .iter()
         .filter(|unknown| {
-            string_field(unknown, "unknown_id")
-                .is_some_and(|id| retained.contains(id))
+            string_field(unknown, "unknown_id").is_some_and(|id| retained.contains(id))
         })
         .cloned()
         .collect();
