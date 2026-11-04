@@ -23,10 +23,34 @@
         ],
         [
           "WAIT"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "WAIT",
+          "WAIT"
+        ],
+        [
+          "CONTINUE",
+          "CONTINUE"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "WAIT",
+          "WAIT"
         ]
       ],
       "expected": {
-        "member_action_accuracy": 0.7777777777777778,
+        "member_action_accuracy": 0.6666666666666666,
         "context_sensitivity_rate": 0,
         "surface_invariance_rate": 1,
         "ambiguous_valid_action_rate": 1
@@ -54,10 +78,34 @@
         ],
         [
           "WAIT"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "WAIT",
+          "WAIT"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "WAIT",
+          "RESPOND"
         ]
       ],
       "expected": {
-        "member_action_accuracy": 0.5555555555555556,
+        "member_action_accuracy": 0.5238095238095238,
         "context_sensitivity_rate": 0,
         "surface_invariance_rate": 0,
         "ambiguous_valid_action_rate": 1
@@ -84,6 +132,30 @@
           "WAIT"
         ],
         [
+          "WAIT"
+        ],
+        [
+          "RESPOND",
+          "CONTINUE"
+        ],
+        [
+          "RESPOND",
+          "CONTINUE"
+        ],
+        [
+          "RESPOND",
+          "WAIT"
+        ],
+        [
+          "CONTINUE",
+          "RESPOND"
+        ],
+        [
+          "RESPOND",
+          "WAIT"
+        ],
+        [
+          "WAIT",
           "WAIT"
         ]
       ],
