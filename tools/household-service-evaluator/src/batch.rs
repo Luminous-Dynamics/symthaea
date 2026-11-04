@@ -4,6 +4,7 @@ use crate::{
 };
 use serde::Serialize;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
@@ -62,24 +63,67 @@ pub enum BatchDisposition {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum DerivedMetric {
+    Quantity {
+        value: f64,
+        unit: String,
+        derivation: String,
+    },
+    Boolean {
+        value: bool,
+        semantics: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct BatchReceipt {
     pub domain: ServiceDomain,
     pub scenario_id: String,
     /// Retained as fixture metadata, never treated as the evaluator's result.
     pub fixture_expected_disposition: String,
     pub disposition: BatchDisposition,
-    /// Deterministic metrics derived only from the synthetic fixture inputs.
-    pub derived_metrics: BTreeMap<String, f64>,
+    /// Typed quantities and booleans; no bool-as-number coercion.
+    pub derived_metrics: BTreeMap<String, DerivedMetric>,
     pub evidence_notes: Vec<String>,
     pub unresolved_claims: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DigestScope {
+    ExactSourceBytes,
+    CanonicalizedJsonValue,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EvidenceClass {
+    SyntheticFixtureOnly,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SourceCorpusManifest {
+    pub corpus_id: String,
+    pub schema_version: String,
+    pub status: String,
+    pub scenario_set_revision: String,
+    pub source_byte_length: usize,
+    pub source_sha256: String,
+    pub digest_scope: DigestScope,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct BatchReport {
     pub report_schema_version: String,
     pub evaluator_version: String,
+    pub adapter_version: String,
+    pub evidence_class: EvidenceClass,
+    pub source_repository: String,
     pub water_corpus_id: String,
     pub repair_corpus_id: String,
+    pub water_source: SourceCorpusManifest,
+    pub repair_source: SourceCorpusManifest,
     pub water_receipt_count: usize,
     pub repair_receipt_count: usize,
     pub total_receipt_count: usize,
@@ -88,15 +132,73 @@ pub struct BatchReport {
     pub claim_ceiling: Vec<String>,
 }
 
-/// Evaluate every expected scenario in the two frozen v0.1 corpora.
-///
-/// The fixture's expected disposition is copied into each receipt as reference
-/// metadata only. The actual disposition is selected from validated input
-/// fields and bounded deterministic calculations. Unknown, duplicate, missing
-/// or additional scenarios are rejected rather than silently skipped.
+/// The report digest covers the compact, deterministic serialization of the
+/// report only; the envelope is intentionally outside that digest.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct BatchOutputEnvelope {
+    pub report_sha256: String,
+    pub report_byte_length: usize,
+    pub report_serialization: String,
+    pub report: BatchReport,
+}
+
+impl BatchOutputEnvelope {
+    pub fn from_report(report: BatchReport) -> Result<Self, EvaluationError> {
+        let report_bytes = serde_json::to_vec(&report)
+            .map_err(|error| EvaluationError::new("report_serialization", error.to_string()))?;
+        Ok(Self {
+            report_sha256: sha256_hex(&report_bytes),
+            report_byte_length: report_bytes.len(),
+            report_serialization: "serde_json_compact_struct_order_btree_maps_v1".to_owned(),
+            report,
+        })
+    }
+}
+
+/// Evaluate parsed JSON values. Source digests cover canonicalized Serde JSON,
+/// not the original byte representation. Use evaluate_batch_from_bytes or
+/// evaluate_batch_from_paths when exact file-byte binding is required.
 pub fn evaluate_batch(
     water_corpus: &Value,
     repair_corpus: &Value,
+) -> Result<BatchReport, EvaluationError> {
+    let water_bytes = serde_json::to_vec(water_corpus)
+        .map_err(|error| EvaluationError::new("water_fixture_canonical_json", error.to_string()))?;
+    let repair_bytes = serde_json::to_vec(repair_corpus)
+        .map_err(|error| EvaluationError::new("repair_fixture_canonical_json", error.to_string()))?;
+    evaluate_batch_with_sources(
+        water_corpus,
+        repair_corpus,
+        &water_bytes,
+        &repair_bytes,
+        DigestScope::CanonicalizedJsonValue,
+    )
+}
+
+/// Parse and evaluate source corpora while binding the exact supplied bytes.
+pub fn evaluate_batch_from_bytes(
+    water_bytes: &[u8],
+    repair_bytes: &[u8],
+) -> Result<BatchReport, EvaluationError> {
+    let water_corpus: Value = serde_json::from_slice(water_bytes)
+        .map_err(|error| EvaluationError::new("water_fixture_json", error.to_string()))?;
+    let repair_corpus: Value = serde_json::from_slice(repair_bytes)
+        .map_err(|error| EvaluationError::new("repair_fixture_json", error.to_string()))?;
+    evaluate_batch_with_sources(
+        &water_corpus,
+        &repair_corpus,
+        water_bytes,
+        repair_bytes,
+        DigestScope::ExactSourceBytes,
+    )
+}
+
+fn evaluate_batch_with_sources(
+    water_corpus: &Value,
+    repair_corpus: &Value,
+    water_source_bytes: &[u8],
+    repair_source_bytes: &[u8],
+    digest_scope: DigestScope,
 ) -> Result<BatchReport, EvaluationError> {
     let water_corpus_id = validate_corpus_header(
         water_corpus,
@@ -106,6 +208,9 @@ pub fn evaluate_batch(
         repair_corpus,
         "HOME-REPAIR-QUAL-001-SYNTHETIC-REPAIR-TASKS-001",
     )?;
+
+    let water_source = source_manifest(water_corpus, water_source_bytes, digest_scope)?;
+    let repair_source = source_manifest(repair_corpus, repair_source_bytes, digest_scope)?;
 
     let water_scenarios = validate_scenarios(water_corpus, "scenarios", &WATER_IDS)?;
     let repair_scenarios = validate_scenarios(repair_corpus, "task_profiles", &REPAIR_IDS)?;
@@ -138,10 +243,15 @@ pub fn evaluate_batch(
         .collect();
 
     Ok(BatchReport {
-        report_schema_version: "0.1".to_owned(),
+        report_schema_version: "0.2".to_owned(),
         evaluator_version: env!("CARGO_PKG_VERSION").to_owned(),
+        adapter_version: "water-continuity-v0.1+repairability-v0.1".to_owned(),
+        evidence_class: EvidenceClass::SyntheticFixtureOnly,
+        source_repository: "Luminous-Dynamics/symthaea".to_owned(),
         water_corpus_id,
         repair_corpus_id,
+        water_source,
+        repair_source,
         water_receipt_count: WATER_IDS.len(),
         repair_receipt_count: REPAIR_IDS.len(),
         total_receipt_count: receipts.len(),
@@ -151,7 +261,7 @@ pub fn evaluate_batch(
     })
 }
 
-/// Read two JSON corpus files and evaluate them without network or clock input.
+/// Read two JSON corpus files and bind the exact bytes used by the evaluator.
 pub fn evaluate_batch_from_paths(
     water_path: impl AsRef<Path>,
     repair_path: impl AsRef<Path>,
@@ -160,13 +270,70 @@ pub fn evaluate_batch_from_paths(
         .map_err(|error| EvaluationError::new("water_fixture", error.to_string()))?;
     let repair_bytes = fs::read(repair_path)
         .map_err(|error| EvaluationError::new("repair_fixture", error.to_string()))?;
+    evaluate_batch_from_bytes(&water_bytes, &repair_bytes)
+}
 
-    let water_corpus: Value = serde_json::from_slice(&water_bytes)
-        .map_err(|error| EvaluationError::new("water_fixture_json", error.to_string()))?;
-    let repair_corpus: Value = serde_json::from_slice(&repair_bytes)
-        .map_err(|error| EvaluationError::new("repair_fixture_json", error.to_string()))?;
+fn source_manifest(
+    corpus: &Value,
+    source_bytes: &[u8],
+    digest_scope: DigestScope,
+) -> Result<SourceCorpusManifest, EvaluationError> {
+    let corpus_id = required_str(corpus, "corpus_id", "corpus_manifest")?.to_owned();
+    let schema_version = required_str(corpus, "schema_version", "corpus_manifest")?.to_owned();
+    let status = required_str(corpus, "status", "corpus_manifest")?.to_owned();
 
-    evaluate_batch(&water_corpus, &repair_corpus)
+    Ok(SourceCorpusManifest {
+        corpus_id,
+        schema_version: schema_version.clone(),
+        status,
+        scenario_set_revision: schema_version,
+        source_byte_length: source_bytes.len(),
+        source_sha256: sha256_hex(source_bytes),
+        digest_scope,
+    })
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn insert_quantity(
+    metrics: &mut BTreeMap<String, DerivedMetric>,
+    name: &str,
+    value: f64,
+    unit: &str,
+    derivation: &str,
+) -> Result<(), EvaluationError> {
+    if !value.is_finite() {
+        return Err(EvaluationError::new(
+            "derived_metric",
+            format!("derived quantity {name} is not finite"),
+        ));
+    }
+    metrics.insert(
+        name.to_owned(),
+        DerivedMetric::Quantity {
+            value,
+            unit: unit.to_owned(),
+            derivation: derivation.to_owned(),
+        },
+    );
+    Ok(())
+}
+
+fn insert_boolean(
+    metrics: &mut BTreeMap<String, DerivedMetric>,
+    name: &str,
+    value: bool,
+    semantics: &str,
+) {
+    metrics.insert(
+        name.to_owned(),
+        DerivedMetric::Boolean {
+            value,
+            semantics: semantics.to_owned(),
+        },
+    );
 }
 
 fn validate_corpus_header(
