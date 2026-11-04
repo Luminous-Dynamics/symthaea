@@ -949,6 +949,7 @@ mod tests {
             include_str!("../../../../benchmarks/mel/clock/mel-runner-cpal-descriptor-mismatch-001.json"),
             include_str!("../../../../benchmarks/mel/clock/mel-runner-cpal-drift-outside-policy-001.json"),
             include_str!("../../../../benchmarks/mel/clock/mel-runner-cpal-residual-outlier-001.json"),
+            include_str!("../../../../benchmarks/mel/clock/mel-runner-cpal-playback-regression-001.json"),
         ];
 
         for fixture_json in fixtures {
@@ -1007,6 +1008,11 @@ mod tests {
                 "reject_residual" => assert!(
                     matches!(result, Err(RunnerCpalClockFitErrorV1::ResidualOutsidePolicy { .. })),
                     "{} must fail the residual gate",
+                    fixture.fixture_id
+                ),
+                "reject_non_monotonic_playback" => assert!(
+                    matches!(result, Err(RunnerCpalClockFitErrorV1::NonMonotonicPlaybackTime { .. })),
+                    "{} must fail the predicted-playback monotonicity gate",
                     fixture.fixture_id
                 ),
                 other => panic!(
