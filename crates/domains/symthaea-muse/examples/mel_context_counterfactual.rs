@@ -43,7 +43,7 @@ struct BaselineV1 {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct BaselineExpectedV1 {
-    member_action_accuracy: f64,
+    member_valid_action_support_rate: f64,
     context_sensitivity_rate: f64,
     surface_invariance_rate: f64,
     ambiguous_valid_action_rate: f64,
@@ -84,13 +84,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &baseline.predictions_by_family,
         )?;
         let actual = [
-            metrics.member_action_accuracy,
+            metrics.member_valid_action_support_rate,
             metrics.context_sensitivity_rate.unwrap_or(f64::NAN),
             metrics.surface_invariance_rate.unwrap_or(f64::NAN),
             metrics.ambiguous_valid_action_rate.unwrap_or(f64::NAN),
         ];
         let expected = [
-            baseline.expected.member_action_accuracy,
+            baseline.expected.member_valid_action_support_rate,
             baseline.expected.context_sensitivity_rate,
             baseline.expected.surface_invariance_rate,
             baseline.expected.ambiguous_valid_action_rate,
