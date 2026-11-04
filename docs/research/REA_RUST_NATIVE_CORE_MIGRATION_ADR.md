@@ -893,3 +893,7 @@ The benchmark should report correctness before speed:
 
 No throughput advantage, production suitability or cross-implementation parity is claimed yet. The generated dependency lock must be committed and the exact-head formatting, tests and Clippy workflow must pass before the draft can be promoted.
 
+### Concurrency review addendum
+
+A source-level review found that `File::try_clone()` may share an underlying file cursor on Unix. Sharing the metadata reader's descriptor with parallel content-verification calls would therefore introduce a seek/read race even when each individual stream is correct. The draft implementation now opens an independent descriptor per verification call, checks that descriptor against the admitted source identity before parsing, and revalidates both that descriptor and the currently selected path after the attempt. A concurrent same-reader, eight-worker fixture has been authored. This adds a distinct benchmark control for cross-call cursor interference; it is not yet a passing test result.
+
