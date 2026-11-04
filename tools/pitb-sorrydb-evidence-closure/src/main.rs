@@ -713,7 +713,7 @@ fn verify_bundle(
         || semantic.vacuity_audit_status != "pass"
         || semantic.reviewer_decision != "pass"
         || semantic.reviewer_id.trim().is_empty()
-        || !is_sha256(&semantic.reviewer_attestation_sha256)
+        || !valid_hex(&semantic.reviewer_attestation_sha256, 64)
         || semantic.reviewer_attestation_sha256 != reviewer_attestation_digest
         || !semantic.semantic_gate_passed
         || !semantic.vacuity_gate_passed
@@ -756,6 +756,8 @@ fn verify_all(
     evaluation_bytes: &[u8],
     runs_bytes: &[u8],
     evidence_root: &Path,
+    reviewer_registry_bytes: &[u8],
+    reviewer_registry_sha256: &str,
     enforce_pin: bool,
 ) -> Result<Report, String> {
     let evaluation_blob = git_blob_sha1(evaluation_bytes)?;
@@ -790,7 +792,9 @@ fn verify_all(
         check_run_task(run, task)?;
         if run.outcome == "verified_success" {
             verified_successes += 1;
-            closures.push(verify_bundle(run, task, evidence_root)?);
+            closures.push(verify_bundle(
+                run, task, evidence_root, reviewer_registry_bytes, reviewer_registry_sha256,
+            )?);
             closed_unique_tasks.insert(run.task_id.clone());
         } else {
             closures.push(RunClosure {
@@ -817,7 +821,7 @@ fn verify_all(
         closed_unique_task_count: closed_unique_tasks.len(),
         non_success_run_count: runs.len() - verified_successes,
         run_closures: closures,
-        admission_boundary: "This report verifies byte-level evidence closure and cross-binding among the pinned SorryDB task, exact source-before/source-after replacement, proof/patch artifacts, source-binding receipt, checker receipt, semantic-gate receipt and logs. It does not execute Lean, re-run the checker, authenticate reviewer identity/signatures, or establish informal mathematical truth. Public scoring still requires independent replay of the retained commands and reviewer credentials.".into(),
+        admission_boundary: "This report verifies byte-level evidence closure and cross-binding among the pinned SorryDB task, exact source-before/source-after replacement, proof/patch artifacts, source-binding receipt, checker receipt, semantic-gate receipt, reviewer-attestation bytes, reviewer Ed25519 signature and externally pinned reviewer key registry. It does not execute Lean or re-run the checker. Public scoring still requires independent replay of the retained commands and source/specification review.".into(),
     })
 }
 
