@@ -466,7 +466,8 @@ jobs:
           "$RUNNER_TEMP/pitb-sorrydb-venv/bin/python" - \
             "$RUNNER_TEMP/sorrydb-goal-replay.json" \
             "$RUNNER_TEMP/sorrydb-source-task.json" \
-            "$PITB_SORRYDB_REAL_SOURCE_DIR" <<'PY'
+            "$PITB_SORRYDB_REAL_SOURCE_DIR" \
+            "$RUNNER_TEMP/sorrydb-goal-replay-instrumented.lean" <<'PY'
           import hashlib
           import json
           import subprocess
@@ -474,7 +475,7 @@ jobs:
           from pathlib import Path
           from jsonschema import Draft202012Validator
 
-          receipt_path, task_path, repo_path = map(Path, sys.argv[1:])
+          receipt_path, task_path, repo_path, instrumented_path = map(Path, sys.argv[1:])
           receipt = json.loads(receipt_path.read_text())
           task = json.loads(task_path.read_text())
           schema_path = Path("tools/pitb-sorrydb-audit/schema/sorrydb-goal-replay-v0.schema.json")
@@ -499,7 +500,7 @@ jobs:
               "source path": receipt["source_path"] == source_path,
               "goal digest": receipt["goal_sha256"] == hashlib.sha256(task["debug_info"]["goal"].encode()).hexdigest(),
               "source bytes": receipt["source_file_sha256"] == hashlib.sha256(source_bytes).hexdigest(),
-              "instrumented source artifact": receipt["instrumented_source_sha256"] == hashlib.sha256(Path(str(repo_path) + "/PrimeNumberTheoremAnd/FioriKadiriSwidinsky.PITBReplay7956fe8e.lean").read_bytes()).hexdigest(),
+              "instrumented source artifact": receipt["instrumented_source_sha256"] == hashlib.sha256(instrumented_path.read_bytes()).hexdigest(),
               "Lake manifest": receipt["lake_manifest_sha256"] == hashlib.sha256(manifest_bytes).hexdigest(),
               "toolchain file": receipt["toolchain_file_sha256"] == hashlib.sha256(toolchain_bytes).hexdigest(),
               "repository tree": receipt["repository_tree_sha256"] == tree,
