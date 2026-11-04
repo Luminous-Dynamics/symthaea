@@ -657,6 +657,21 @@ mod tests {
     }
 
     #[test]
+    fn complete_plan_is_reported_but_marked_over_budget_when_cost_exceeds_limit() {
+        let mut input = fixture();
+        input.max_total_effort_units = 3;
+        let bytes = serde_json::to_vec(&input).unwrap();
+        let report = evaluate(&input, &bytes).unwrap();
+        assert_eq!(report.minimum_disambiguation_effort_units, Some(4));
+        assert_eq!(report.minimum_plan_count, 2);
+        assert_eq!(report.minimum_plan_within_budget, Some(false));
+        assert_eq!(
+            report.status,
+            "MINIMUM_COST_DISAMBIGUATION_EXCEEDS_BUDGET"
+        );
+    }
+
+    #[test]
     fn scenario_order_and_action_order_do_not_change_canonical_digests() {
         let mut input = fixture();
         let scenario_hash = canonical_scenario_set_sha256(&input.scenarios);
