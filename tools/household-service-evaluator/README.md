@@ -1,6 +1,6 @@
 # Household Service Evaluator
 
-A small, offline Rust evaluation core with Serde-serializable evidence inputs and result receipts for two bounded household-service questions:
+A small offline Rust evaluation core with Serde-serializable evidence inputs and result receipts. It hashes exact fixture bytes with pinned RustCrypto SHA-256 and requires no network access at runtime.
 
 1. Is a metered water balance compatible with its declared residual error bound, calibration evidence and topology-audit reference?
 2. Does a repair attempt meet its declared prerequisites, post-repair qualification and follow-up gate?
@@ -82,3 +82,19 @@ Selected software-only calculations:
 - REPAIR-006/007/009 remain blocked; REPAIR-008 preserves observed recurrence; REPAIR-010 remains held; REPAIR-005 records that offline artifacts are available but does not claim a rollback was performed.
 
 The CI workflow runs this command and uploads the resulting JSON as a synthetic batch-report artifact. Artifact existence is not physical validation.
+
+
+## Receipt schema 0.2 and content binding
+
+The batch report records each corpus ID, schema version, synthetic-only status, scenario-set revision, exact source-byte length and SHA-256 digest. It also records the explicit adapter version, evaluator version, source repository and optional full Git commit. The focused CI workflow passes the exact commit SHA that it checked out.
+
+The path-based CLI hashes the same source byte buffers that it parses. The parsed-Value API instead labels its digest scope as canonicalized JSON; that digest does not represent original whitespace or source-byte layout. Prefer the path/byte API when preserving exact fixture provenance.
+
+Derived numeric metrics are now typed quantities with explicit units and derivation descriptions. Boolean observations remain JSON booleans with semantic descriptions. They are no longer encoded as 0.0/1.0.
+
+The CLI wraps the report in an output envelope. Its report_sha256 hashes the compact deterministic serialization of the report body only; report_byte_length records that body's length. The envelope is excluded from its own digest to avoid a self-reference. The serialization identifier declares the struct-field and BTreeMap ordering contract.
+
+These SHA-256 digests establish byte identity only. They do not authenticate the source author, signer, calibration record, topology auditor, physical measurement boundary or truth of the input. The evidence class remains synthetic-only and cannot be promoted to E1/E2/E3/E4 by a software run.
+
+
+Each source manifest carries both a digest of the exact corpus bytes and a separate SHA-256 of the canonicalized scenario array. The latter changes when scenario content changes even if the schema version remains the same, and remains stable when only whitespace outside the parsed JSON value changes. It is a content revision, not a claim about authorship.

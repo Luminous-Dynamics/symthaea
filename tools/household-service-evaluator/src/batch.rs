@@ -4,6 +4,7 @@ use crate::{
 };
 use serde::Serialize;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
@@ -62,24 +63,69 @@ pub enum BatchDisposition {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum DerivedMetric {
+    Quantity {
+        value: f64,
+        unit: String,
+        derivation: String,
+    },
+    Boolean {
+        value: bool,
+        semantics: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct BatchReceipt {
     pub domain: ServiceDomain,
     pub scenario_id: String,
     /// Retained as fixture metadata, never treated as the evaluator's result.
     pub fixture_expected_disposition: String,
     pub disposition: BatchDisposition,
-    /// Deterministic metrics derived only from the synthetic fixture inputs.
-    pub derived_metrics: BTreeMap<String, f64>,
+    /// Typed quantities and booleans; no bool-as-number coercion.
+    pub derived_metrics: BTreeMap<String, DerivedMetric>,
     pub evidence_notes: Vec<String>,
     pub unresolved_claims: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DigestScope {
+    ExactSourceBytes,
+    CanonicalizedJsonValue,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EvidenceClass {
+    SyntheticFixtureOnly,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SourceCorpusManifest {
+    pub corpus_id: String,
+    pub schema_version: String,
+    pub status: String,
+    pub scenario_set_revision: String,
+    pub scenario_set_sha256: String,
+    pub source_byte_length: usize,
+    pub source_sha256: String,
+    pub digest_scope: DigestScope,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct BatchReport {
     pub report_schema_version: String,
     pub evaluator_version: String,
+    pub adapter_version: String,
+    pub evidence_class: EvidenceClass,
+    pub source_repository: String,
+    pub source_commit: Option<String>,
     pub water_corpus_id: String,
     pub repair_corpus_id: String,
+    pub water_source: SourceCorpusManifest,
+    pub repair_source: SourceCorpusManifest,
     pub water_receipt_count: usize,
     pub repair_receipt_count: usize,
     pub total_receipt_count: usize,
@@ -88,15 +134,88 @@ pub struct BatchReport {
     pub claim_ceiling: Vec<String>,
 }
 
-/// Evaluate every expected scenario in the two frozen v0.1 corpora.
-///
-/// The fixture's expected disposition is copied into each receipt as reference
-/// metadata only. The actual disposition is selected from validated input
-/// fields and bounded deterministic calculations. Unknown, duplicate, missing
-/// or additional scenarios are rejected rather than silently skipped.
+/// The report digest covers the compact, deterministic serialization of the
+/// report only; the envelope is intentionally outside that digest.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct BatchOutputEnvelope {
+    pub report_sha256: String,
+    pub report_byte_length: usize,
+    pub report_serialization: String,
+    pub report: BatchReport,
+}
+
+impl BatchOutputEnvelope {
+    pub fn from_report(report: BatchReport) -> Result<Self, EvaluationError> {
+        let report_bytes = serde_json::to_vec(&report)
+            .map_err(|error| EvaluationError::new("report_serialization", error.to_string()))?;
+        Ok(Self {
+            report_sha256: sha256_hex(&report_bytes),
+            report_byte_length: report_bytes.len(),
+            report_serialization: "serde_json_compact_struct_order_btree_maps_v1".to_owned(),
+            report,
+        })
+    }
+}
+
+/// Evaluate parsed JSON values. Source digests cover canonicalized Serde JSON,
+/// not the original byte representation. Use evaluate_batch_from_bytes or
+/// evaluate_batch_from_paths when exact file-byte binding is required.
 pub fn evaluate_batch(
     water_corpus: &Value,
     repair_corpus: &Value,
+) -> Result<BatchReport, EvaluationError> {
+    let water_bytes = serde_json::to_vec(water_corpus)
+        .map_err(|error| EvaluationError::new("water_fixture_canonical_json", error.to_string()))?;
+    let repair_bytes = serde_json::to_vec(repair_corpus).map_err(|error| {
+        EvaluationError::new("repair_fixture_canonical_json", error.to_string())
+    })?;
+    evaluate_batch_with_sources(
+        water_corpus,
+        repair_corpus,
+        &water_bytes,
+        &repair_bytes,
+        DigestScope::CanonicalizedJsonValue,
+        None,
+    )
+}
+
+/// Parse and evaluate source corpora while binding the exact supplied bytes.
+pub fn evaluate_batch_from_bytes(
+    water_bytes: &[u8],
+    repair_bytes: &[u8],
+) -> Result<BatchReport, EvaluationError> {
+    evaluate_batch_from_bytes_with_source_commit(water_bytes, repair_bytes, None)
+}
+
+/// Parse and evaluate exact source bytes while recording the exact Git commit
+/// that supplied the evaluator build, when the caller has that provenance.
+pub fn evaluate_batch_from_bytes_with_source_commit(
+    water_bytes: &[u8],
+    repair_bytes: &[u8],
+    source_commit: Option<&str>,
+) -> Result<BatchReport, EvaluationError> {
+    let source_commit = source_commit.map(validate_source_commit).transpose()?;
+    let water_corpus: Value = serde_json::from_slice(water_bytes)
+        .map_err(|error| EvaluationError::new("water_fixture_json", error.to_string()))?;
+    let repair_corpus: Value = serde_json::from_slice(repair_bytes)
+        .map_err(|error| EvaluationError::new("repair_fixture_json", error.to_string()))?;
+    evaluate_batch_with_sources(
+        &water_corpus,
+        &repair_corpus,
+        water_bytes,
+        repair_bytes,
+        DigestScope::ExactSourceBytes,
+        source_commit,
+    )
+}
+
+fn evaluate_batch_with_sources(
+    water_corpus: &Value,
+    repair_corpus: &Value,
+    water_source_bytes: &[u8],
+    repair_source_bytes: &[u8],
+    digest_scope: DigestScope,
+    source_commit: Option<String>,
 ) -> Result<BatchReport, EvaluationError> {
     let water_corpus_id = validate_corpus_header(
         water_corpus,
@@ -105,6 +224,15 @@ pub fn evaluate_batch(
     let repair_corpus_id = validate_corpus_header(
         repair_corpus,
         "HOME-REPAIR-QUAL-001-SYNTHETIC-REPAIR-TASKS-001",
+    )?;
+
+    let water_source =
+        source_manifest(water_corpus, "scenarios", water_source_bytes, digest_scope)?;
+    let repair_source = source_manifest(
+        repair_corpus,
+        "task_profiles",
+        repair_source_bytes,
+        digest_scope,
     )?;
 
     let water_scenarios = validate_scenarios(water_corpus, "scenarios", &WATER_IDS)?;
@@ -138,10 +266,16 @@ pub fn evaluate_batch(
         .collect();
 
     Ok(BatchReport {
-        report_schema_version: "0.1".to_owned(),
+        report_schema_version: "0.2".to_owned(),
         evaluator_version: env!("CARGO_PKG_VERSION").to_owned(),
+        adapter_version: "water-continuity-v0.1+repairability-v0.1".to_owned(),
+        evidence_class: EvidenceClass::SyntheticFixtureOnly,
+        source_repository: "Luminous-Dynamics/symthaea".to_owned(),
+        source_commit,
         water_corpus_id,
         repair_corpus_id,
+        water_source,
+        repair_source,
         water_receipt_count: WATER_IDS.len(),
         repair_receipt_count: REPAIR_IDS.len(),
         total_receipt_count: receipts.len(),
@@ -151,22 +285,108 @@ pub fn evaluate_batch(
     })
 }
 
-/// Read two JSON corpus files and evaluate them without network or clock input.
+/// Read two JSON corpus files and bind the exact bytes used by the evaluator.
 pub fn evaluate_batch_from_paths(
     water_path: impl AsRef<Path>,
     repair_path: impl AsRef<Path>,
+) -> Result<BatchReport, EvaluationError> {
+    evaluate_batch_from_paths_with_source_commit(water_path, repair_path, None)
+}
+
+pub fn evaluate_batch_from_paths_with_source_commit(
+    water_path: impl AsRef<Path>,
+    repair_path: impl AsRef<Path>,
+    source_commit: Option<&str>,
 ) -> Result<BatchReport, EvaluationError> {
     let water_bytes = fs::read(water_path)
         .map_err(|error| EvaluationError::new("water_fixture", error.to_string()))?;
     let repair_bytes = fs::read(repair_path)
         .map_err(|error| EvaluationError::new("repair_fixture", error.to_string()))?;
+    evaluate_batch_from_bytes_with_source_commit(&water_bytes, &repair_bytes, source_commit)
+}
 
-    let water_corpus: Value = serde_json::from_slice(&water_bytes)
-        .map_err(|error| EvaluationError::new("water_fixture_json", error.to_string()))?;
-    let repair_corpus: Value = serde_json::from_slice(&repair_bytes)
-        .map_err(|error| EvaluationError::new("repair_fixture_json", error.to_string()))?;
+fn validate_source_commit(value: &str) -> Result<String, EvaluationError> {
+    if value.len() != 40 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(EvaluationError::new(
+            "source_commit",
+            "source commit must be a full 40-character hexadecimal Git object ID",
+        ));
+    }
+    Ok(value.to_ascii_lowercase())
+}
 
-    evaluate_batch(&water_corpus, &repair_corpus)
+fn source_manifest(
+    corpus: &Value,
+    scenario_collection: &'static str,
+    source_bytes: &[u8],
+    digest_scope: DigestScope,
+) -> Result<SourceCorpusManifest, EvaluationError> {
+    let corpus_id = required_str(corpus, "corpus_id", "corpus_manifest")?.to_owned();
+    let schema_version = required_str(corpus, "schema_version", "corpus_manifest")?.to_owned();
+    let status = required_str(corpus, "status", "corpus_manifest")?.to_owned();
+    let scenario_set = corpus[scenario_collection].as_array().ok_or_else(|| {
+        EvaluationError::new(
+            "corpus.scenario_set",
+            format!("{scenario_collection} must be an array"),
+        )
+    })?;
+    let scenario_set_bytes = serde_json::to_vec(scenario_set)
+        .map_err(|error| EvaluationError::new("corpus.scenario_set", error.to_string()))?;
+    let scenario_set_sha256 = sha256_hex(&scenario_set_bytes);
+
+    Ok(SourceCorpusManifest {
+        corpus_id,
+        schema_version,
+        status,
+        scenario_set_revision: format!("sha256:{scenario_set_sha256}"),
+        scenario_set_sha256,
+        source_byte_length: source_bytes.len(),
+        source_sha256: sha256_hex(source_bytes),
+        digest_scope,
+    })
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn insert_quantity(
+    metrics: &mut BTreeMap<String, DerivedMetric>,
+    name: &str,
+    value: f64,
+    unit: &str,
+    derivation: &str,
+) -> Result<(), EvaluationError> {
+    if !value.is_finite() {
+        return Err(EvaluationError::new(
+            "derived_metric",
+            format!("derived quantity {name} is not finite"),
+        ));
+    }
+    metrics.insert(
+        name.to_owned(),
+        DerivedMetric::Quantity {
+            value,
+            unit: unit.to_owned(),
+            derivation: derivation.to_owned(),
+        },
+    );
+    Ok(())
+}
+
+fn insert_boolean(
+    metrics: &mut BTreeMap<String, DerivedMetric>,
+    name: &str,
+    value: bool,
+    semantics: &str,
+) {
+    metrics.insert(
+        name.to_owned(),
+        DerivedMetric::Boolean {
+            value,
+            semantics: semantics.to_owned(),
+        },
+    );
 }
 
 fn validate_corpus_header(
@@ -287,10 +507,13 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
         "WCONT-001" => {
             let flow = required_number(input, "municipal_inlet_flow_l_min")?;
             let duration = required_number(input, "duration_h")?;
-            metrics.insert(
-                "synthetic_inlet_volume_l".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "synthetic_inlet_volume_l",
                 flow * duration * 60.0,
-            );
+                "L",
+                "constant synthetic inlet flow multiplied by duration in minutes",
+            )?;
             notes.push(
                 "Inlet volume is integrated from the fixture's constant synthetic flow assumption."
                     .to_owned(),
@@ -302,14 +525,20 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
             BatchDisposition::ProcessAccountingOnly
         }
         "WCONT-002" => {
-            metrics.insert(
-                "gross_tank_sensor_inventory_l".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "gross_tank_sensor_inventory_l",
                 required_number(input, "tank_level_sensor_l")?,
-            );
-            metrics.insert(
-                "municipal_inlet_flow_l_min".to_owned(),
+                "L",
+                "synthetic tank-level sensor reading; not usable deliverable reserve",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "municipal_inlet_flow_l_min",
                 required_number(input, "municipal_inlet_flow_l_min")?,
-            );
+                "L/min",
+                "synthetic fixture inlet flow",
+            )?;
             notes.push(
                 "Zero municipal inflow is preserved for the declared 48-hour interruption."
                     .to_owned(),
@@ -323,14 +552,20 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
         "WCONT-003" => {
             let flow = required_number(input, "municipal_inlet_flow_l_min")?;
             let duration = required_number(input, "duration_h")?;
-            metrics.insert(
-                "synthetic_inlet_volume_l_under_constant_flow".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "synthetic_inlet_volume_l_under_constant_flow",
                 flow * duration * 60.0,
-            );
-            metrics.insert(
-                "gross_tank_sensor_inventory_l".to_owned(),
+                "L",
+                "constant-flow synthetic inlet integration over the declared duration",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "gross_tank_sensor_inventory_l",
                 required_number(input, "tank_level_sensor_l")?,
-            );
+                "L",
+                "synthetic tank-level sensor reading; not usable deliverable reserve",
+            )?;
             notes.push(
                 "The 576 L inlet figure assumes the fixture's 0.8 L/min flow remains constant for all 12 hours."
                     .to_owned(),
@@ -344,12 +579,27 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
         "WCONT-004" => {
             let sensor = required_number(input, "tank_level_sensor_l")?;
             let reference = required_number(input, "independent_reference_tank_level_l")?;
-            metrics.insert("tank_sensor_l".to_owned(), sensor);
-            metrics.insert("independent_reference_l".to_owned(), reference);
-            metrics.insert(
-                "absolute_sensor_disagreement_l".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "tank_sensor_l",
+                sensor,
+                "L",
+                "synthetic tank sensor observation; not selected as truth",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "independent_reference_l",
+                reference,
+                "L",
+                "synthetic independent reference observation; not selected as truth",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "absolute_sensor_disagreement_l",
                 (sensor - reference).abs(),
-            );
+                "L",
+                "absolute difference between the two synthetic observations",
+            )?;
             notes.push(
                 "The sensor and independent reference remain separate observations; neither is silently selected as truth."
                     .to_owned(),
@@ -363,10 +613,13 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
         "WCONT-005" => {
             let flow = required_number(input, "measured_unexplained_flow_l_min")?;
             let duration = required_number(input, "duration_h")?;
-            metrics.insert(
-                "unexplained_flow_volume_l_under_constant_rate".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "unexplained_flow_volume_l_under_constant_rate",
                 flow * duration * 60.0,
-            );
+                "L",
+                "unexplained synthetic flow integrated under a constant-rate assumption; not proven leakage",
+            )?;
             notes.push(
                 "The unexplained 0.5 L/min signal integrates to 240 L over the synthetic 8-hour window if constant."
                     .to_owned(),
@@ -378,10 +631,13 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
             BatchDisposition::HumanReviewRequired
         }
         "WCONT-006" => {
-            metrics.insert(
-                "gross_tank_sensor_inventory_l".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "gross_tank_sensor_inventory_l",
                 required_number(input, "tank_level_sensor_l")?,
-            );
+                "L",
+                "synthetic tank-level sensor reading; pump/power delivery is unavailable",
+            )?;
             let grid = required_bool(input, "grid_available")?;
             let pump = required_bool(input, "pump_available")?;
             let backup = required_bool(input, "backup_power_available")?;
@@ -395,14 +651,20 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
             BatchDisposition::DeliveryUnavailable
         }
         "WCONT-007" => {
-            metrics.insert(
-                "stored_water_age_h".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "stored_water_age_h",
                 required_number(input, "stored_water_age_h")?,
-            );
-            metrics.insert(
-                "gross_tank_sensor_inventory_l".to_owned(),
+                "h",
+                "synthetic stored-water age",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "gross_tank_sensor_inventory_l",
                 required_number(input, "tank_level_sensor_l")?,
-            );
+                "L",
+                "synthetic tank-level sensor reading; does not establish end-use quality",
+            )?;
             notes.push(format!(
                 "Water-quality evidence state: {}.",
                 required_str(input, "water_quality_evidence", "WCONT-007.input")?
@@ -455,23 +717,41 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
                 ),
                 topology_audit: None::<TopologyAuditReference>,
             })?;
-            metrics.insert("mass_balance_residual_l".to_owned(), balance.residual_l);
-            metrics.insert(
-                "mass_balance_residual_lower_l".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "mass_balance_residual_l",
+                balance.residual_l,
+                "L",
+                "inlet minus tank storage delta minus delivered outlet minus purge/overflow",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "mass_balance_residual_lower_l",
                 balance.residual_lower_l,
-            );
-            metrics.insert(
-                "mass_balance_residual_upper_l".to_owned(),
+                "L",
+                "residual minus evaluator-derived worst-case aggregate absolute error bound",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "mass_balance_residual_upper_l",
                 balance.residual_upper_l,
-            );
-            metrics.insert(
-                "assumed_per_term_absolute_error_bound_l".to_owned(),
+                "L",
+                "residual plus evaluator-derived worst-case aggregate absolute error bound",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "assumed_per_term_absolute_error_bound_l",
                 per_term_bound,
-            );
-            metrics.insert(
-                "conservative_aggregate_absolute_error_bound_l".to_owned(),
+                "L",
+                "synthetic fixture field conservatively mapped to each of the four meter terms",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "conservative_aggregate_absolute_error_bound_l",
                 balance.aggregate_absolute_error_bound_l,
-            );
+                "L",
+                "sum of the four typed per-measurement absolute error bounds",
+            )?;
             notes.push(
                 "meter_uncertainty_l has ambiguous scope; the software-only negative control conservatively sums four per-term absolute bounds."
                     .to_owned(),
@@ -489,8 +769,19 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
         "WCONT-009" => {
             let command = required_bool(input, "commanded_refill")?;
             let flow = required_number(input, "municipal_inlet_flow_l_min")?;
-            metrics.insert("commanded_refill".to_owned(), bool_as_f64(command));
-            metrics.insert("measured_inlet_flow_l_min".to_owned(), flow);
+            insert_boolean(
+                &mut metrics,
+                "commanded_refill",
+                command,
+                "whether the synthetic controller command requested refill; not proof of inflow",
+            );
+            insert_quantity(
+                &mut metrics,
+                "measured_inlet_flow_l_min",
+                flow,
+                "L/min",
+                "synthetic measured inlet flow; zero despite the refill command",
+            )?;
             notes.push(
                 "Open-valve feedback and a refill command are not treated as proof of physical inflow."
                     .to_owned(),
@@ -502,10 +793,13 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
             BatchDisposition::CommandObservationMismatch
         }
         "WCONT-010" => {
-            metrics.insert(
-                "observation_duration_h".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "observation_duration_h",
                 required_number(input, "duration_h")?,
-            );
+                "h",
+                "synthetic scenario observation duration",
+            )?;
             notes.push(
                 "The fixture describes unstable flow and a surge-then-decay pressure profile without numerical time series."
                     .to_owned(),
@@ -545,18 +839,27 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
 
     let disposition = match id {
         "REPAIR-001" => {
-            metrics.insert(
-                "access_fasteners".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "access_fasteners",
                 required_number(baseline, "access_fasteners")?,
-            );
-            metrics.insert(
-                "disassembly_steps".to_owned(),
+                "count",
+                "synthetic count of access fasteners",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "disassembly_steps",
                 required_number(baseline, "disassembly_steps")?,
-            );
-            metrics.insert(
-                "synthetic_part_lead_time_days".to_owned(),
+                "count",
+                "synthetic count of disassembly steps; not measured repair time",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "synthetic_part_lead_time_days",
                 required_number(baseline, "part_lead_time_days")?,
-            );
+                "d",
+                "synthetic target-market lead-time assumption",
+            )?;
             notes.push(
                 "Fixture documents a user-serviceable access path and offline instructions; no physical replacement task was executed."
                     .to_owned(),
@@ -568,18 +871,27 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
             BatchDisposition::RepairNotExecuted
         }
         "REPAIR-002" => {
-            metrics.insert(
-                "access_fasteners".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "access_fasteners",
                 required_number(baseline, "access_fasteners")?,
-            );
-            metrics.insert(
-                "disassembly_steps".to_owned(),
+                "count",
+                "synthetic count of access fasteners",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "disassembly_steps",
                 required_number(baseline, "disassembly_steps")?,
-            );
-            metrics.insert(
-                "synthetic_part_lead_time_days".to_owned(),
+                "count",
+                "synthetic count of disassembly steps; not measured repair time",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "synthetic_part_lead_time_days",
                 required_number(baseline, "part_lead_time_days")?,
-            );
+                "d",
+                "synthetic part lead-time assumption",
+            )?;
             notes.push(
                 "This is a trained-technician pump-module task; fixture counts describe access complexity, not measured repair time."
                     .to_owned(),
@@ -591,20 +903,25 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
             BatchDisposition::RepairHeld
         }
         "REPAIR-003" => {
-            metrics.insert(
-                "access_fasteners".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "access_fasteners",
                 required_number(baseline, "access_fasteners")?,
-            );
-            metrics.insert(
-                "disassembly_steps".to_owned(),
+                "count",
+                "synthetic count of access fasteners",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "disassembly_steps",
                 required_number(baseline, "disassembly_steps")?,
-            );
-            metrics.insert(
-                "adhesive_or_destructive_disassembly".to_owned(),
-                bool_as_f64(required_bool(
-                    baseline,
-                    "adhesive_or_destructive_disassembly",
-                )?),
+                "count",
+                "synthetic count of disassembly steps; not measured repair time",
+            )?;
+            insert_boolean(
+                &mut metrics,
+                "adhesive_or_destructive_disassembly",
+                required_bool(baseline, "adhesive_or_destructive_disassembly")?,
+                "whether the fixture declares adhesive or destructive disassembly",
             );
             notes.push(
                 "The synthetic task declares non-destructive access; it does not demonstrate an actual seal replacement."
@@ -617,13 +934,18 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
             BatchDisposition::RepairHeld
         }
         "REPAIR-004" => {
-            metrics.insert(
-                "synthetic_part_lead_time_days".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "synthetic_part_lead_time_days",
                 required_number(baseline, "part_lead_time_days")?,
-            );
-            metrics.insert(
-                "calibration_required".to_owned(),
-                bool_as_f64(required_bool(baseline, "calibration_required")?),
+                "d",
+                "synthetic part lead-time assumption",
+            )?;
+            insert_boolean(
+                &mut metrics,
+                "calibration_required",
+                required_bool(baseline, "calibration_required")?,
+                "whether the repair task requires calibration",
             );
             notes.push(
                 "Calibration is explicitly required by the synthetic task profile.".to_owned(),
@@ -637,13 +959,17 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
         "REPAIR-005" => {
             let signed_image = required_bool(baseline, "signed_image_available")?;
             let previous_image = required_bool(baseline, "previous_known_good_image_available")?;
-            metrics.insert(
-                "signed_image_available".to_owned(),
-                bool_as_f64(signed_image),
+            insert_boolean(
+                &mut metrics,
+                "signed_image_available",
+                signed_image,
+                "whether the fixture declares a signed recovery image available",
             );
-            metrics.insert(
-                "previous_known_good_image_available".to_owned(),
-                bool_as_f64(previous_image),
+            insert_boolean(
+                &mut metrics,
+                "previous_known_good_image_available",
+                previous_image,
+                "whether the fixture declares a previous known-good image available",
             );
             notes.push(
                 "Both offline recovery artifacts are declared available while internet access is absent."
@@ -673,13 +999,17 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
                 recurrence_observed: false,
             };
             let result = evaluate_repair_attempt(&attempt, 30)?;
-            metrics.insert(
-                "catalog_part_exists".to_owned(),
-                bool_as_f64(required_bool(baseline, "catalog_part_exists")?),
+            insert_boolean(
+                &mut metrics,
+                "catalog_part_exists",
+                required_bool(baseline, "catalog_part_exists")?,
+                "whether the fixture says a catalogue entry exists; not evidence of local supply",
             );
-            metrics.insert(
-                "local_stock".to_owned(),
-                bool_as_f64(required_bool(baseline, "local_stock")?),
+            insert_boolean(
+                &mut metrics,
+                "local_stock",
+                required_bool(baseline, "local_stock")?,
+                "whether the fixture declares target-market local stock",
             );
             notes.push(
                 "Catalog presence is kept separate from target-market stock; unknown quoted lead time is not coerced to zero."
@@ -718,17 +1048,23 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
                 recurrence_observed: false,
             };
             let result = evaluate_repair_attempt(&attempt, 30)?;
-            metrics.insert(
-                "physical_fit".to_owned(),
-                bool_as_f64(required_bool(baseline, "physical_fit")?),
+            insert_boolean(
+                &mut metrics,
+                "physical_fit",
+                required_bool(baseline, "physical_fit")?,
+                "whether the fixture declares physical fit; not qualified compatibility",
             );
-            metrics.insert(
-                "electrical_interface_match".to_owned(),
-                bool_as_f64(required_bool(baseline, "electrical_interface_match")?),
+            insert_boolean(
+                &mut metrics,
+                "electrical_interface_match",
+                required_bool(baseline, "electrical_interface_match")?,
+                "whether the fixture declares a matching electrical interface; not qualified compatibility",
             );
-            metrics.insert(
-                "material_grade_known".to_owned(),
-                bool_as_f64(required_bool(baseline, "material_grade_known")?),
+            insert_boolean(
+                &mut metrics,
+                "material_grade_known",
+                required_bool(baseline, "material_grade_known")?,
+                "whether the replacement material grade is known",
             );
             notes.push(
                 "Physical fit and an electrical connector match are not treated as qualified compatibility."
@@ -765,10 +1101,18 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
                 recurrence_observed: required_bool(baseline, "recurrence_observed_after_30_days")?,
             };
             let result = evaluate_repair_attempt(&attempt, 30)?;
-            metrics.insert("follow_up_days_observed".to_owned(), 30.0);
-            metrics.insert(
-                "recurrence_observed".to_owned(),
-                bool_as_f64(attempt.recurrence_observed),
+            insert_quantity(
+                &mut metrics,
+                "follow_up_days_observed",
+                30.0,
+                "d",
+                "synthetic follow-up interval; not lifetime exposure",
+            )?;
+            insert_boolean(
+                &mut metrics,
+                "recurrence_observed",
+                attempt.recurrence_observed,
+                "whether recurrence is recorded during the specified 30-day synthetic follow-up",
             );
             notes.push(
                 "Initial function restoration and later fault recurrence are represented as distinct outcomes."
@@ -805,17 +1149,23 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
                 recurrence_observed: false,
             };
             let result = evaluate_repair_attempt(&attempt, 30)?;
-            metrics.insert(
-                "vendor_cloud_available".to_owned(),
-                bool_as_f64(required_bool(baseline, "vendor_cloud_available")?),
+            insert_boolean(
+                &mut metrics,
+                "vendor_cloud_available",
+                required_bool(baseline, "vendor_cloud_available")?,
+                "whether the vendor cloud service is available",
             );
-            metrics.insert(
-                "offline_diagnostics_available".to_owned(),
-                bool_as_f64(required_bool(baseline, "offline_diagnostics_available")?),
+            insert_boolean(
+                &mut metrics,
+                "offline_diagnostics_available",
+                required_bool(baseline, "offline_diagnostics_available")?,
+                "whether offline diagnostics are available",
             );
-            metrics.insert(
-                "manual_available".to_owned(),
-                bool_as_f64(required_bool(baseline, "manual_available")?),
+            insert_boolean(
+                &mut metrics,
+                "manual_available",
+                required_bool(baseline, "manual_available")?,
+                "whether a service manual is available",
             );
             notes.push(
                 "A manual is present, but the declared diagnostic workflow requires a vendor cloud account."
@@ -855,13 +1205,17 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
                 recurrence_observed: false,
             };
             let result = evaluate_repair_attempt(&attempt, 30)?;
-            metrics.insert(
-                "critical_interface_changed".to_owned(),
-                bool_as_f64(required_bool(baseline, "critical_interface_changed")?),
+            insert_boolean(
+                &mut metrics,
+                "critical_interface_changed",
+                required_bool(baseline, "critical_interface_changed")?,
+                "whether the repair changed a critical safety or hygiene interface",
             );
-            metrics.insert(
-                "post_repair_test_available".to_owned(),
-                bool_as_f64(required_bool(baseline, "post_repair_test_available")?),
+            insert_boolean(
+                &mut metrics,
+                "post_repair_test_available",
+                required_bool(baseline, "post_repair_test_available")?,
+                "whether the product-specific post-repair test is available",
             );
             notes.push(
                 "A critical safety/hygiene interface change reopens the affected qualification."
@@ -934,10 +1288,6 @@ fn required_bool(object: &Value, key: &'static str) -> Result<bool, EvaluationEr
     })
 }
 
-fn bool_as_f64(value: bool) -> f64 {
-    if value { 1.0 } else { 0.0 }
-}
-
 fn disposition_name(disposition: BatchDisposition) -> &'static str {
     match disposition {
         BatchDisposition::ProcessAccountingOnly => "process_accounting_only",
@@ -992,17 +1342,27 @@ mod tests {
             report.water_corpus_id,
             "HOME-UTILITY-COORD-001-WATER-CONTINUITY-SYNTHETIC-001"
         );
+        assert_eq!(report.report_schema_version, "0.2");
+        assert_eq!(report.evidence_class, EvidenceClass::SyntheticFixtureOnly);
         assert_eq!(
-            report.receipts[7].derived_metrics["mass_balance_residual_l"],
+            report.water_source.digest_scope,
+            DigestScope::CanonicalizedJsonValue
+        );
+        assert_eq!(
+            quantity_value(&report.receipts[7], "mass_balance_residual_l"),
             -200.0
         );
         assert_eq!(
-            report.receipts[7].derived_metrics["mass_balance_residual_lower_l"],
+            quantity_value(&report.receipts[7], "mass_balance_residual_lower_l"),
             -220.0
         );
         assert_eq!(
-            report.receipts[7].derived_metrics["mass_balance_residual_upper_l"],
+            quantity_value(&report.receipts[7], "mass_balance_residual_upper_l"),
             -180.0
+        );
+        assert_eq!(
+            metric_unit(&report.receipts[7], "mass_balance_residual_l"),
+            "L"
         );
         assert_eq!(
             report.receipts[7].disposition,
@@ -1021,6 +1381,140 @@ mod tests {
         let second = serde_json::to_vec(&evaluate_batch(&water, &repair).unwrap()).unwrap();
         assert_eq!(first, second, "batch report must be byte-deterministic");
         assert_eq!(report.disposition_counts.values().sum::<usize>(), 20);
+    }
+
+    fn quantity_value(receipt: &BatchReceipt, name: &str) -> f64 {
+        match &receipt.derived_metrics[name] {
+            DerivedMetric::Quantity { value, .. } => *value,
+            other => panic!("expected quantity metric, found {other:?}"),
+        }
+    }
+
+    fn metric_unit<'a>(receipt: &'a BatchReceipt, name: &str) -> &'a str {
+        match &receipt.derived_metrics[name] {
+            DerivedMetric::Quantity { unit, .. } => unit,
+            other => panic!("expected quantity metric, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn exact_source_bytes_are_bound_and_a_one_byte_change_changes_the_digest() {
+        let water = include_bytes!(
+            "../../../docs/research/household-services/fixtures/water-continuity-scenarios-v0.1.json"
+        );
+        let repair = include_bytes!(
+            "../../../docs/research/household-services/fixtures/repairability-scenarios-v0.1.json"
+        );
+        let original = evaluate_batch_from_bytes(water, repair).unwrap();
+        let mut changed_water = water.to_vec();
+        changed_water.push(b' ');
+        let changed = evaluate_batch_from_bytes(&changed_water, repair).unwrap();
+
+        assert_eq!(
+            original.water_source.digest_scope,
+            DigestScope::ExactSourceBytes
+        );
+        assert_eq!(original.water_source.source_byte_length, water.len());
+        assert_eq!(original.water_source.source_sha256, sha256_hex(water));
+        assert_eq!(
+            original.water_source.scenario_set_sha256,
+            changed.water_source.scenario_set_sha256
+        );
+        assert_ne!(
+            original.water_source.source_sha256,
+            changed.water_source.source_sha256
+        );
+        assert_eq!(changed.water_source.source_byte_length, water.len() + 1);
+        assert_eq!(
+            original.repair_source.source_sha256,
+            changed.repair_source.source_sha256
+        );
+    }
+
+    #[test]
+    fn scenario_set_digest_changes_when_a_scenario_value_changes() {
+        let (water, repair) = fixtures();
+        let before = evaluate_batch(&water, &repair).unwrap();
+        let mut altered = water.clone();
+        altered["scenarios"][0]["input"]["municipal_inlet_flow_l_min"] = json!(9.0);
+        let after = evaluate_batch(&altered, &repair).unwrap();
+
+        assert_eq!(
+            before.water_source.schema_version,
+            after.water_source.schema_version
+        );
+        assert_ne!(
+            before.water_source.scenario_set_sha256,
+            after.water_source.scenario_set_sha256
+        );
+        assert_ne!(
+            before.water_source.scenario_set_revision,
+            after.water_source.scenario_set_revision
+        );
+    }
+
+    #[test]
+    fn boolean_metrics_remain_json_booleans_and_quantities_retain_units() {
+        let (water, repair) = fixtures();
+        let report = evaluate_batch(&water, &repair).unwrap();
+        let command = &report.receipts[8].derived_metrics["commanded_refill"];
+        assert_eq!(
+            serde_json::to_value(command).unwrap()["value"],
+            serde_json::Value::Bool(true)
+        );
+        assert_eq!(serde_json::to_value(command).unwrap()["kind"], "boolean");
+        let flow = &report.receipts[8].derived_metrics["measured_inlet_flow_l_min"];
+        assert_eq!(serde_json::to_value(flow).unwrap()["unit"], "L/min");
+        assert!(matches!(
+            &report.receipts[8].derived_metrics["commanded_refill"],
+            DerivedMetric::Boolean { value: true, .. }
+        ));
+    }
+
+    #[test]
+    fn output_envelope_hashes_report_body_without_self_reference() {
+        let (water, repair) = fixtures();
+        let report = evaluate_batch(&water, &repair).unwrap();
+        let expected_bytes = serde_json::to_vec(&report).unwrap();
+        let envelope = BatchOutputEnvelope::from_report(report.clone()).unwrap();
+        assert_eq!(envelope.report_sha256, sha256_hex(&expected_bytes));
+        assert_eq!(envelope.report_byte_length, expected_bytes.len());
+        assert_eq!(
+            envelope.report_serialization,
+            "serde_json_compact_struct_order_btree_maps_v1"
+        );
+        assert_eq!(envelope.report, report);
+    }
+
+    #[test]
+    fn sha256_helper_matches_published_known_answer() {
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn source_commit_is_recorded_only_when_a_valid_full_object_id_is_supplied() {
+        let water = include_bytes!(
+            "../../../docs/research/household-services/fixtures/water-continuity-scenarios-v0.1.json"
+        );
+        let repair = include_bytes!(
+            "../../../docs/research/household-services/fixtures/repairability-scenarios-v0.1.json"
+        );
+        let report = evaluate_batch_from_bytes_with_source_commit(
+            water,
+            repair,
+            Some("0123456789abcdef0123456789abcdef01234567"),
+        )
+        .unwrap();
+        assert_eq!(
+            report.source_commit.as_deref(),
+            Some("0123456789abcdef0123456789abcdef01234567")
+        );
+        assert!(
+            evaluate_batch_from_bytes_with_source_commit(water, repair, Some("short")).is_err()
+        );
     }
 
     #[test]
