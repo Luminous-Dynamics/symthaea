@@ -187,31 +187,57 @@ jobs:
           cargo fmt --check --manifest-path "$PITB_SUPPORT_ANTICHAIN_MANIFEST"
           cargo test --locked --manifest-path "$PITB_SUPPORT_ANTICHAIN_MANIFEST"
 
-      - name: Run exhaustive support controls and emit report
+      - name: Run exhaustive support controls and emit report/outcomes
         shell: bash
         run: |
           set -euo pipefail
           cargo run --locked --manifest-path "$PITB_SUPPORT_ANTICHAIN_MANIFEST" -- \
             --self-test-report "$RUNNER_TEMP/pitb-support-antichain-report.json"
+          cargo run --locked --manifest-path "$PITB_SUPPORT_ANTICHAIN_MANIFEST" -- \
+            --self-test-outcomes "$RUNNER_TEMP/pitb-support-antichain-outcomes.jsonl"
 
-      - name: Validate support schemas and synthetic report
+      - name: Validate support schemas and synthetic report/outcomes
         shell: bash
         run: |
           set -euo pipefail
-          "$RUNNER_TEMP/pitb-antichain-venv/bin/python" - "$RUNNER_TEMP/pitb-support-antichain-report.json" <<'PY'
+          "$RUNNER_TEMP/pitb-antichain-venv/bin/python" - \
+            "$RUNNER_TEMP/pitb-support-antichain-report.json" \
+            "$RUNNER_TEMP/pitb-support-antichain-outcomes.jsonl" <<'PY'
+          import copy
           import json
           import sys
           from pathlib import Path
           from jsonschema import Draft202012Validator
 
           root = Path("tools/pitb-support-antichain/schema")
-          for name in (
-              "support-ablation-outcome-v0.schema.json",
-              "support-antichain-prediction-v0.schema.json",
-              "support-antichain-report-v0.schema.json",
-          ):
-              Draft202012Validator.check_schema(json.loads((root / name).read_text()))
-          schema = json.loads((root / "support-antichain-report-v0.schema.json").read_text())
+          outcome_schema = json.loads((root / "support-ablation-outcome-v0.schema.json").read_text())
+          prediction_schema = json.loads((root / "support-antichain-prediction-v0.schema.json").read_text())
+          report_schema = json.loads((root / "support-antichain-report-v0.schema.json").read_text())
+          for schema in (outcome_schema, prediction_schema, report_schema):
+              Draft202012Validator.check_schema(schema)
+          outcome_validator = Draft202012Validator(outcome_schema)
+          outcome_rows = [
+              json.loads(line)
+              for line in Path(sys.argv[2]).read_text().splitlines()
+              if line.strip()
+          ]
+          if len(outcome_rows) != 16:
+              raise SystemExit(f"synthetic outcome count changed: {len(outcome_rows)}")
+          for row in outcome_rows:
+              errors = list(outcome_validator.iter_errors(row))
+              if errors:
+                  raise SystemExit("synthetic outcome schema errors: " + "; ".join(e.message for e in errors))
+          budget_non_solve = next(row for row in outcome_rows if row["outcome"] == "non_solve")
+          interrupted = copy.deepcopy(budget_non_solve)
+          interrupted["terminal_reason"] = "interrupted"
+          if not list(outcome_validator.iter_errors(interrupted)):
+              raise SystemExit("interrupted attempt was schema-accepted as a support non-solve")
+          unfinished = copy.deepcopy(budget_non_solve)
+          unfinished["attempt_finished"] = False
+          if not list(outcome_validator.iter_errors(unfinished)):
+              raise SystemExit("unfinished attempt was schema-accepted as a support non-solve")
+          print("PITB_SUPPORT_OUTCOME_TERMINAL_SCHEMA_PASS")
+          schema = report_schema
           report = json.loads(Path(sys.argv[1]).read_text())
           errors = list(Draft202012Validator(schema).iter_errors(report))
           if errors:
@@ -235,6 +261,7 @@ jobs:
           name: pitb-support-antichain-report
           path: |
             ${{ runner.temp }}/pitb-support-antichain-report.json
+            ${{ runner.temp }}/pitb-support-antichain-outcomes.jsonl
             ${{ runner.temp }}/pitb-support-antichain/src/main.rs
             ${{ runner.temp }}/pitb-support-antichain/Cargo.lock
           if-no-files-found: warn
