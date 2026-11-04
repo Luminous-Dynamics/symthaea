@@ -319,7 +319,11 @@
         "shared_crc32fast_dependency_common_mode_not_independent_checksum_evidence",
         "libfuzzer_admission_and_content_target_seeded_zip",
         "fuzz_harness_temp_path_symlink_prevention_create_new",
-        "content_addressed_starter_seed_reproducibility"
+        "content_addressed_starter_seed_reproducibility",
+        "non_unix_best_effort_source_identity_content_verification_explicit_unsupported",
+        "unix_device_inode_size_mode_mtime_ctime_source_identity_parity",
+        "same_size_rewrite_timestamp_restore_source_identity_rejection",
+        "held_descriptor_vs_selected_path_file_object_identity"
       ],
       "metrics": [
         "entry_occurrence_precision_recall",
@@ -356,7 +360,10 @@
         "fuzz_smoke_elapsed_seconds",
         "fuzz_peak_rss_mib",
         "starter_seed_digest_reproducibility",
-        "fuzz_target_crash_and_timeout_counts"
+        "fuzz_target_crash_and_timeout_counts",
+        "source_identity_false_accept_rate_by_platform",
+        "unsupported_platform_content_verification_rate",
+        "held_descriptor_selected_path_identity_mismatch_rate"
       ],
       "target": "100_percent supported-subset parity against pinned upstream REA and separately pinned decoder oracles; zero false accepts for CRC/size corruption, partial streams, metadata disagreement, source mutation or actual-output limit violations; bounded memory independent of member size; performance scored only after correctness gates pass.",
       "boundaries": {
@@ -368,7 +375,9 @@
         "whole_archive_coverage": "one verified member does not upgrade archive traversal from partial to complete",
         "cross_parser_disagreement": "preserve each parser's versioned result and dependency lineage; never majority-vote away disagreement",
         "source_race": "a changed held descriptor or selected path suppresses any would-be content result",
-        "resource_bound": "read buffer 1..=1 MiB; decoder state measured separately; never claim constant memory without peak RSS evidence"
+        "resource_bound": "read buffer 1..=1 MiB; decoder state measured separately; never claim constant memory without peak RSS evidence",
+        "source_identity_platform_scope": "Unix content verification uses device/inode/size/mode/mtime/ctime descriptor and path checks. Non-Unix content verification is explicitly Unsupported until handle-bound identity is independently qualified in #10452; metadata inventory remains best-effort.",
+        "file_identity_claim": "File identity is not content immutability, producer authenticity, or proof no malicious writer exists."
       },
       "library_candidates": {
         "zipcore": "zipcore 0.10.2 pinned candidate for bounded streaming, CRC/size verification and by-index duplicate occurrence access; audit source and dependency graph before promotion",
@@ -381,7 +390,8 @@
       "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10368",
       "related_owners": [
         "https://github.com/Luminous-Dynamics/symthaea/issues/10410",
-        "https://github.com/Luminous-Dynamics/symthaea/issues/10451"
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10451",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10452"
       ],
       "protocol": [
         "freeze archive fixture bytes and hashes before runs; preserve per-occurrence central-directory identity",
@@ -400,7 +410,10 @@
         "report independent parser, codec and checksum ancestry separately",
         "run the standalone REA ZIP libFuzzer target on Linux x86-64/nightly with a content-addressed seed and bounded input/output/RSS/time budgets",
         "the fuzz target must create unique temporary input files with create_new and never extract entries; remove temp files through an RAII guard",
-        "report bounded smoke status separately from sustained coverage-guided fuzz qualification; persist fuzz artifacts and lockfile"
+        "report bounded smoke status separately from sustained coverage-guided fuzz qualification; persist fuzz artifacts and lockfile",
+        "separate Unix strong file identity from non-Unix best-effort metadata identity; content verification must fail closed on platforms lacking qualified held-handle identity",
+        "report platform, filesystem, kernel, toolchain and file-id API used; test same-size rewrite with restored timestamp and same-size path replacement",
+        "do not claim the non-Unix fallback has Unix-equivalent protection; keep content verification explicitly unsupported until #10452 is resolved"
       ],
       "fuzz_qualification": {
         "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10451",
