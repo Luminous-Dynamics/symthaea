@@ -1328,39 +1328,45 @@ mod tests {
     }
 
     #[test]
-    fn sender_local_shuffle_changes_recipient_mapping_without_changing_payload_set() {
-        let mut actions = vec![
+    fn sender_local_shuffle_preserves_schedule_and_per_sender_payload_multisets() {
+        let original = vec![
             TransmissionAction { sender: 0, receiver: 1, recipe_id: 3 },
             TransmissionAction { sender: 0, receiver: 2, recipe_id: 7 },
             TransmissionAction { sender: 1, receiver: 2, recipe_id: 9 },
         ];
-        let original_pairs: Vec<_> = actions.iter()
+        let original_pairs: Vec<_> = original.iter()
             .map(|action| (action.sender, action.receiver))
             .collect();
-        let original_payloads: Vec<_> = actions.iter()
+        let original_payloads: Vec<_> = original.iter()
             .map(|action| (action.sender, action.recipe_id))
             .collect();
-        let mut rng = Rng::new(77);
-        shuffle_sender_payloads(&mut actions, &mut rng);
 
-        let shuffled_pairs: Vec<_> = actions.iter()
-            .map(|action| (action.sender, action.receiver))
-            .collect();
-        let shuffled_payloads: Vec<_> = actions.iter()
-            .map(|action| (action.sender, action.recipe_id))
-            .collect();
-        assert_eq!(original_pairs, shuffled_pairs);
+        let mut at_least_one_non_identity_permutation = false;
+        for seed in 0..64 {
+            let mut actions = original.clone();
+            let mut rng = Rng::new(seed);
+            shuffle_sender_payloads(&mut actions, &mut rng);
 
-        let mut before = original_payloads;
-        let mut after = shuffled_payloads;
-        before.sort_unstable();
-        after.sort_unstable();
-        assert_eq!(before, after);
+            let shuffled_pairs: Vec<_> = actions.iter()
+                .map(|action| (action.sender, action.receiver))
+                .collect();
+            let shuffled_payloads: Vec<_> = actions.iter()
+                .map(|action| (action.sender, action.recipe_id))
+                .collect();
+            assert_eq!(original_pairs, shuffled_pairs);
 
-        // The fixed seed swaps the two payloads sent by agent 0.
-        assert_ne!(actions[0].recipe_id, 3);
-        assert_ne!(actions[1].recipe_id, 7);
-        assert_eq!(actions[2].recipe_id, 9);
+            let mut before = original_payloads.clone();
+            let mut after = shuffled_payloads;
+            before.sort_unstable();
+            after.sort_unstable();
+            assert_eq!(before, after);
+
+            at_least_one_non_identity_permutation |= actions
+                .iter()
+                .zip(&original)
+                .any(|(shuffled, initial)| shuffled.recipe_id != initial.recipe_id);
+        }
+        assert!(at_least_one_non_identity_permutation);
     }
 
     #[test]
