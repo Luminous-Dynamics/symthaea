@@ -1062,10 +1062,12 @@ fn build_paired_comparisons(assessments: &[RouteAssessment]) -> Vec<PairedCompar
 }
 
 fn analyze(
+    graph_bytes: &[u8],
     support_bytes: &[u8],
     retrieval_bytes: &[u8],
     mapping_bytes: &[u8],
 ) -> Result<Report, String> {
+    let graph = load_graph_manifest(graph_bytes)?;
     let support: SupportReport = serde_json::from_slice(support_bytes)
         .map_err(|e| format!("parse support antichain report: {e}"))?;
     if support.schema_version != SUPPORT_REPORT_SCHEMA {
@@ -1091,6 +1093,7 @@ fn analyze(
     let mut mapping_index = BTreeMap::<(String, String), &Mapping>::new();
     for (index, mapping) in mappings.iter().enumerate() {
         validate_mapping(mapping, index)?;
+        validate_mapping_against_graph(mapping, &graph)?;
         let key = (mapping.graph_manifest_sha256.clone(), mapping.node_id.clone());
         if mapping_index.insert(key.clone(), mapping).is_some() {
             return Err(format!("duplicate declaration mapping for graph {} node {}", key.0, key.1));
@@ -1102,6 +1105,16 @@ fn analyze(
     let mut unmatched = 0usize;
     for (index, receipt) in receipts.iter().enumerate() {
         validate_receipt(receipt, index)?;
+        if receipt.graph.snapshot_id != graph.snapshot_id
+            || receipt.graph.repository_commit != graph.repository_commit
+            || receipt.graph.environment_sha256 != graph.environment_sha256
+            || receipt.graph.graph_manifest_sha256 != graph.manifest_sha256
+        {
+            return Err(format!(
+                "retrieval receipt {} graph snapshot/repository/environment/manifest does not match supplied graph bytes",
+                index + 1
+            ));
+        }
         let target_sha = receipt.query.target_statement_sha256.as_ref().unwrap();
         let key = (target_sha.clone(), receipt.query.target_environment_sha256.clone());
         let target_groups = groups_by_target.get(&key)
@@ -1416,18 +1429,19 @@ fn execute() -> Result<(), String> {
         println!("PITB_ROUTE_COVERAGE_SYNTHETIC_REPORT_OK");
         return Ok(());
     }
-    if args.len() != 6 || args[1] != "--analyze" {
+    if args.len() != 7 || args[1] != "--analyze" {
         return Err(format!(
-            "usage: {} --analyze <support-antichain-report.json> <retrieval-runs.jsonl> <declaration-mappings.jsonl> <report.json> | --self-test | --self-test-report <report.json>",
+            "usage: {} --analyze <graph-manifest.json> <support-antichain-report.json> <retrieval-runs.jsonl> <declaration-mappings.jsonl> <report.json> | --self-test | --self-test-report <report.json>",
             args.first().map(String::as_str).unwrap_or("pitb-route-coverage")
         ));
     }
-    let support_bytes = fs::read(&args[2]).map_err(|e| format!("read support antichain report: {e}"))?;
-    let retrieval_bytes = fs::read(&args[3]).map_err(|e| format!("read retrieval receipts: {e}"))?;
-    let mapping_bytes = fs::read(&args[4]).map_err(|e| format!("read declaration mappings: {e}"))?;
-    let report = analyze(&support_bytes,&retrieval_bytes,&mapping_bytes)?;
+    let graph_bytes = fs::read(&args[2]).map_err(|e| format!("read graph manifest: {e}"))?;
+    let support_bytes = fs::read(&args[3]).map_err(|e| format!("read support antichain report: {e}"))?;
+    let retrieval_bytes = fs::read(&args[4]).map_err(|e| format!("read retrieval receipts: {e}"))?;
+    let mapping_bytes = fs::read(&args[5]).map_err(|e| format!("read declaration mappings: {e}"))?;
+    let report = analyze(&graph_bytes,&support_bytes,&retrieval_bytes,&mapping_bytes)?;
     let bytes = serde_json::to_vec_pretty(&report).map_err(|e| format!("serialize route coverage report: {e}"))?;
-    fs::write(&args[5],bytes).map_err(|e| format!("write route coverage report: {e}"))?;
+    fs::write(&args[6],bytes).map_err(|e| format!("write route coverage report: {e}"))?;
     println!("PITB_ROUTE_COVERAGE_ANALYSIS_OK assessments={} retrievers={}", report.matched_assessment_count, report.comparison_summaries.len());
     Ok(())
 }
