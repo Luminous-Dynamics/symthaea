@@ -446,12 +446,15 @@ fn validate_semantics(receipt: &Value) -> Result<(), ReceiptError> {
     let local_header_offset = decimal_at(occurrence, &["local_header_offset_absolute"])?;
     let data_offset = decimal_at(occurrence, &["data_offset_absolute"])?;
     let declared_compressed = decimal_at(occurrence, &["declared_compressed_bytes"])?;
-    if local_header_offset > data_offset
+    let compressed_end = data_offset.checked_add(declared_compressed).ok_or_else(|| {
+        ReceiptError::SemanticViolation("compressed member extent overflows u64".into())
+    })?;
+    if local_header_offset >= data_offset
         || data_offset > archive_size
-        || declared_compressed > archive_size
+        || compressed_end > archive_size
     {
         return Err(ReceiptError::SemanticViolation(
-            "member offsets or compressed length are inconsistent with the admitted archive size"
+            "member offsets or compressed extent are inconsistent with the admitted archive size"
                 .into(),
         ));
     }
