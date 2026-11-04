@@ -257,14 +257,13 @@ This order is deliberately executable without running task-controlled code:
 - Record every missing API explicitly; do not invent a dependency that does not exist.
 
 **N1 — Pure typed ledger model (prototype authored; compilation pending)**
-- A standalone, dependency-free Rust crate now exists at `tools/ceb-causal-ledger/` with typed task bindings, immutable hypothesis revisions, evidence provenance, typed action/authorization, forecasts, outcomes, ablations, repairs and grade records.
+- A standalone, dependency-free Rust crate now exists at `tools/ceb-causal-ledger/` with typed task bindings, version-linked hypothesis revisions, evidence provenance, typed action/authorization, forecasts, outcomes, ablations, repairs and grade records.
 - Its deterministic validator checks identity/order/reference constraints, evidence-origin double counting, causal-authority ceilings, missingness, exact repair/grade patch linkage, and primary-to-regrade ordering.
-- It is outside the production workspace and is not a production dependency. Seventeen unit tests are authored, but have not been compiled or executed in this environment.
+- It is outside the production workspace and is not a production dependency. Twenty unit tests are authored, but have not been compiled or executed in this environment. The model validates a supplied revision history; it does not provide a persistent append-only store.
 - Digests are opaque caller-supplied values; this crate does not hash, sign, authenticate or prove runner isolation. Keep DSSE verification and trusted-root policy in the existing verifier work.
 
 **N2 — Synthetic record tests (authored; execution pending)**
-- The current crate includes inert-struct unit tests for valid records, accepted repair with unresolved diagnosis, missing assumptions, action authorization, post-hoc forecasts, task/source mismatch, dream-only causal promotion, duplicate evidence origin, missing-versus-zero outcomes, denied actions, exact patch linkage, action-type authority, and evidence-parent ordering.
-- Additional version-chain and primary/regrade-ordering controls are included.
+- The current crate includes 20 inert-struct unit tests for valid records, accepted repair with unresolved diagnosis, missing assumptions, action authorization, post-hoc forecasts, task/source mismatch, dream-only causal promotion, duplicate evidence origin, missing-versus-zero outcomes, denied actions, exact patch linkage, action-type authority, evidence-parent ordering, correlation authority, duplicate parent rejection, hypothesis revision continuity/fork prevention, and primary/regrade ordering.
 - These tests have not run because no Rust compiler/toolchain is available in this environment. They must be executed with the pinned toolchain before the prototype is treated as compiled or tested.
 - The validator does not yet implement JSON serialization, hash-chain recomputation, DSSE, trusted-root verification, grader isolation or runner attestations.
 
