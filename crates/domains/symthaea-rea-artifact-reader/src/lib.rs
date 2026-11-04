@@ -2192,7 +2192,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn verifies_prepended_stub_zip64_member_content() {
+    fn fails_closed_when_secondary_decoder_rejects_prefixed_zip64() {
         let archive = build_zip64(
             &[TestEntry {
                 name: b"Payload/App",
@@ -2207,11 +2207,17 @@ mod tests {
         bytes.extend_from_slice(&archive);
         let path = write_temp(&bytes);
         let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
-        let verified = reader
+
+        // The custom inventory understands the prefixed ZIP64 structure, but the pinned
+        // secondary decoder currently rejects this ZIP64 EOCD locator layout. Do not turn
+        // metadata admission into a content-verification claim.
+        assert!(reader.inventory().regions.zip64);
+        assert_eq!(reader.inventory().regions.leading_bytes, 11);
+        let error = reader
             .verify_entry_content(0, ContentVerificationLimits::default())
-            .unwrap();
-        assert_eq!(verified.observed_uncompressed_bytes, 13);
-        assert!(verified.verified_crc32);
+            .unwrap_err();
+        assert_eq!(error.kind, ReaderErrorKind::InvalidArchive);
+        assert!(error.message.contains("bad ZIP64 EOCD signature"));
         fs::remove_file(path).unwrap();
     }
 
@@ -2324,17 +2330,17 @@ mod tests {
     }
 
     #[test]
-    fn differential_zip_rs_93_metadata_and_stream_match_preserved_occurrences() {
+    fn differential_zip_rs_93_metadata_and_stream_match_unique_occurrences() {
         let fixtures = [
             TestEntry {
-                name: b"duplicate.bin",
+                name: b"first.bin",
                 data: b"first archive occurrence",
                 flags: 0,
                 method: 0,
                 external_attributes: 0,
             },
             TestEntry {
-                name: b"duplicate.bin",
+                name: b"second.bin",
                 data: b"second archive occurrence",
                 flags: 0,
                 method: 0,
@@ -2354,6 +2360,7 @@ mod tests {
         let mut oracle = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
 
         assert_eq!(oracle.len(), reader.inventory().entries.len());
+        assert!(!oracle.has_duplicate_names());
         oracle.validate_header_consistency().unwrap();
         assert!(!oracle.has_overlapping_entries().unwrap());
 
@@ -2380,6 +2387,47 @@ mod tests {
             assert_eq!(file.crc32(), expected.declared_crc32);
             assert_eq!(observed, fixtures[index].data);
         }
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn zip_rs_reports_duplicate_names_but_is_not_occurrence_preserving() {
+        let fixtures = [
+            TestEntry {
+                name: b"same.bin",
+                data: b"first occurrence",
+                flags: 0,
+                method: 0,
+                external_attributes: 0,
+            },
+            TestEntry {
+                name: b"same.bin",
+                data: b"second occurrence",
+                flags: 0,
+                method: 0,
+                external_attributes: 0,
+            },
+            TestEntry {
+                name: b"unique.bin",
+                data: b"third occurrence",
+                flags: 0,
+                method: 0,
+                external_attributes: 0,
+            },
+        ];
+        let bytes = build_zip(&fixtures, &[]);
+        let path = write_temp(&bytes);
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let oracle = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+
+        assert_eq!(reader.inventory().entries.len(), 3);
+        assert_eq!(oracle.len(), 2);
+        assert!(oracle.has_duplicate_names());
+        assert_eq!(reader.inventory().entries[0].raw_name, b"same.bin");
+        assert_eq!(reader.inventory().entries[1].raw_name, b"same.bin");
+        // zip-rs deliberately stores entries in a name-keyed IndexMap; it exposes the
+        // duplicate condition but its indexed view is unique-name-oriented. Preserve this
+        // disagreement and never use zip-rs indexes as the authoritative occurrence map.
         fs::remove_file(path).unwrap();
     }
 
