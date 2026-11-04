@@ -65,14 +65,14 @@
       "claim_id": "stat-edge-activity",
       "relation_type": "STATISTICAL_DEPENDENCE_EDGE",
       "source": {
-        "object_id": "activity-A",
-        "object_kind": "VARIABLE",
-        "world_id": "recording-session-1"
+        "object_id": "neuron-B",
+        "object_kind": "NEURON",
+        "world_id": "world-release-2"
       },
       "target": {
-        "object_id": "activity-B",
-        "object_kind": "VARIABLE",
-        "world_id": "recording-session-1"
+        "object_id": "neuron-C",
+        "object_kind": "NEURON",
+        "world_id": "world-release-2"
       },
       "claim_status": "CLAIMED_SUPPORTED",
       "evidence": [
