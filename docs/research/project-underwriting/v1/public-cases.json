@@ -38,7 +38,11 @@
           },
           "known_at": "2026-06-03T09:00:00Z",
           "value": "120",
-          "unit": "MW"
+          "unit": "MW",
+          "subject_id": "synthetic-poc-001",
+          "boundary_id": "grid-poc-synthetic-poc-001",
+          "issuer_id": "did:synthetic:grid-operator",
+          "issuer_role": "system_operator"
         },
         {
           "evidence_id": "ev_yield_meter",
@@ -53,7 +57,11 @@
           },
           "known_at": "2026-07-10T12:00:00Z",
           "value": "221000",
-          "unit": "MWh"
+          "unit": "MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-metering-boundary-v1",
+          "issuer_id": "did:synthetic:independent-verifier",
+          "issuer_role": "independent_verifier"
         },
         {
           "evidence_id": "ev_model",
@@ -69,7 +77,11 @@
           "known_at": "2026-07-31T17:00:00Z",
           "model_id": "pv-bess-model-v1",
           "value": "0.84",
-          "unit": "capacity_factor"
+          "unit": "capacity_factor",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-ac-boundary-v1",
+          "issuer_id": "did:synthetic:model-registry",
+          "issuer_role": "model_registry"
         },
         {
           "evidence_id": "ev_tariff",
@@ -84,7 +96,11 @@
           },
           "known_at": "2026-07-15T12:00:00Z",
           "value": "1450",
-          "unit": "ZAR/MWh"
+          "unit": "ZAR/MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-offtake-boundary-v1",
+          "issuer_id": "did:synthetic:offtaker",
+          "issuer_role": "offtaker"
         },
         {
           "evidence_id": "ev_capex",
@@ -99,7 +115,11 @@
           },
           "known_at": "2026-06-20T10:00:00Z",
           "value": "2500000000",
-          "unit": "ZAR"
+          "unit": "ZAR",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-epc-cost-boundary-v1",
+          "issuer_id": "did:synthetic:epc-contractor",
+          "issuer_role": "epc_contractor"
         },
         {
           "evidence_id": "ev_fx",
@@ -114,7 +134,11 @@
           },
           "known_at": "2026-08-01T12:00:00Z",
           "value": "18.2",
-          "unit": "ZAR/USD"
+          "unit": "ZAR/USD",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "fx-observation-boundary-v1",
+          "issuer_id": "did:synthetic:central-bank",
+          "issuer_role": "central_bank"
         }
       ],
       "claims": [
@@ -408,7 +432,11 @@
           },
           "known_at": "2026-07-10T12:00:00Z",
           "value": "221000",
-          "unit": "MWh"
+          "unit": "MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-metering-boundary-v1",
+          "issuer_id": "did:synthetic:independent-verifier",
+          "issuer_role": "independent_verifier"
         },
         {
           "evidence_id": "ev_model",
@@ -424,7 +452,11 @@
           "known_at": "2026-07-31T17:00:00Z",
           "model_id": "pv-bess-model-v1",
           "value": "0.84",
-          "unit": "capacity_factor"
+          "unit": "capacity_factor",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-ac-boundary-v1",
+          "issuer_id": "did:synthetic:model-registry",
+          "issuer_role": "model_registry"
         },
         {
           "evidence_id": "ev_tariff",
@@ -439,7 +471,11 @@
           },
           "known_at": "2026-07-15T12:00:00Z",
           "value": "1450",
-          "unit": "ZAR/MWh"
+          "unit": "ZAR/MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-offtake-boundary-v1",
+          "issuer_id": "did:synthetic:offtaker",
+          "issuer_role": "offtaker"
         },
         {
           "evidence_id": "ev_capex",
@@ -454,7 +490,11 @@
           },
           "known_at": "2026-06-20T10:00:00Z",
           "value": "2500000000",
-          "unit": "ZAR"
+          "unit": "ZAR",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-epc-cost-boundary-v1",
+          "issuer_id": "did:synthetic:epc-contractor",
+          "issuer_role": "epc_contractor"
         },
         {
           "evidence_id": "ev_fx",
@@ -469,7 +509,11 @@
           },
           "known_at": "2026-08-01T12:00:00Z",
           "value": "18.2",
-          "unit": "ZAR/USD"
+          "unit": "ZAR/USD",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "fx-observation-boundary-v1",
+          "issuer_id": "did:synthetic:central-bank",
+          "issuer_role": "central_bank"
         },
         {
           "evidence_id": "ev_grid_dev",
@@ -484,7 +528,11 @@
           },
           "known_at": "2026-07-20T10:00:00Z",
           "value": "120",
-          "unit": "MW"
+          "unit": "MW",
+          "subject_id": "synthetic-poc-001",
+          "boundary_id": "grid-poc-synthetic-poc-001",
+          "issuer_id": "did:synthetic:developer",
+          "issuer_role": "developer"
         }
       ],
       "claims": [
@@ -779,7 +827,11 @@
           },
           "known_at": "2026-06-03T09:00:00Z",
           "value": "120",
-          "unit": "MW"
+          "unit": "MW",
+          "subject_id": "synthetic-poc-001",
+          "boundary_id": "grid-poc-synthetic-poc-001",
+          "issuer_id": "did:synthetic:grid-operator",
+          "issuer_role": "system_operator"
         },
         {
           "evidence_id": "ev_yield_meter",
@@ -794,7 +846,11 @@
           },
           "known_at": "2026-07-10T12:00:00Z",
           "value": "221000",
-          "unit": "MWh"
+          "unit": "MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-metering-boundary-v1",
+          "issuer_id": "did:synthetic:independent-verifier",
+          "issuer_role": "independent_verifier"
         },
         {
           "evidence_id": "ev_model",
@@ -810,7 +866,11 @@
           "known_at": "2026-07-31T17:00:00Z",
           "model_id": "pv-bess-model-v1",
           "value": "0.84",
-          "unit": "capacity_factor"
+          "unit": "capacity_factor",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-ac-boundary-v1",
+          "issuer_id": "did:synthetic:model-registry",
+          "issuer_role": "model_registry"
         },
         {
           "evidence_id": "ev_tariff",
@@ -825,7 +885,11 @@
           },
           "known_at": "2026-07-15T12:00:00Z",
           "value": "1450",
-          "unit": "ZAR/MWh"
+          "unit": "ZAR/MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-offtake-boundary-v1",
+          "issuer_id": "did:synthetic:offtaker",
+          "issuer_role": "offtaker"
         },
         {
           "evidence_id": "ev_capex",
@@ -840,7 +904,11 @@
           },
           "known_at": "2026-06-20T10:00:00Z",
           "value": "2500000000",
-          "unit": "ZAR"
+          "unit": "ZAR",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-epc-cost-boundary-v1",
+          "issuer_id": "did:synthetic:epc-contractor",
+          "issuer_role": "epc_contractor"
         },
         {
           "evidence_id": "ev_fx",
@@ -855,7 +923,11 @@
           },
           "known_at": "2026-08-01T12:00:00Z",
           "value": "18.2",
-          "unit": "ZAR/USD"
+          "unit": "ZAR/USD",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "fx-observation-boundary-v1",
+          "issuer_id": "did:synthetic:central-bank",
+          "issuer_role": "central_bank"
         }
       ],
       "claims": [
@@ -1150,7 +1222,11 @@
           },
           "known_at": "2026-06-03T09:00:00Z",
           "value": "120",
-          "unit": "MW"
+          "unit": "MW",
+          "subject_id": "synthetic-poc-001",
+          "boundary_id": "grid-poc-synthetic-poc-001",
+          "issuer_id": "did:synthetic:grid-operator",
+          "issuer_role": "system_operator"
         },
         {
           "evidence_id": "ev_yield_meter",
@@ -1165,7 +1241,11 @@
           },
           "known_at": "2026-07-10T12:00:00Z",
           "value": "221000",
-          "unit": "MWh"
+          "unit": "MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-metering-boundary-v1",
+          "issuer_id": "did:synthetic:independent-verifier",
+          "issuer_role": "independent_verifier"
         },
         {
           "evidence_id": "ev_model",
@@ -1181,7 +1261,11 @@
           "known_at": "2026-07-31T17:00:00Z",
           "model_id": "pv-bess-model-v1",
           "value": "0.84",
-          "unit": "capacity_factor"
+          "unit": "capacity_factor",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-ac-boundary-v1",
+          "issuer_id": "did:synthetic:model-registry",
+          "issuer_role": "model_registry"
         },
         {
           "evidence_id": "ev_tariff",
@@ -1196,7 +1280,11 @@
           },
           "known_at": "2026-07-15T12:00:00Z",
           "value": "1450",
-          "unit": "ZAR/MWh"
+          "unit": "ZAR/MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-offtake-boundary-v1",
+          "issuer_id": "did:synthetic:offtaker",
+          "issuer_role": "offtaker"
         },
         {
           "evidence_id": "ev_capex",
@@ -1211,7 +1299,11 @@
           },
           "known_at": "2026-06-20T10:00:00Z",
           "value": "2500000000",
-          "unit": "ZAR"
+          "unit": "ZAR",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-epc-cost-boundary-v1",
+          "issuer_id": "did:synthetic:epc-contractor",
+          "issuer_role": "epc_contractor"
         },
         {
           "evidence_id": "ev_fx",
@@ -1226,7 +1318,11 @@
           },
           "known_at": "2026-08-01T12:00:00Z",
           "value": "18.2",
-          "unit": "ZAR/USD"
+          "unit": "ZAR/USD",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "fx-observation-boundary-v1",
+          "issuer_id": "did:synthetic:central-bank",
+          "issuer_role": "central_bank"
         }
       ],
       "claims": [
@@ -1539,7 +1635,11 @@
           },
           "known_at": "2026-06-03T09:00:00Z",
           "value": "120",
-          "unit": "MW"
+          "unit": "MW",
+          "subject_id": "synthetic-poc-001",
+          "boundary_id": "grid-poc-synthetic-poc-001",
+          "issuer_id": "did:synthetic:grid-operator",
+          "issuer_role": "system_operator"
         },
         {
           "evidence_id": "ev_yield_meter",
@@ -1554,7 +1654,11 @@
           },
           "known_at": "2026-07-10T12:00:00Z",
           "value": "221000",
-          "unit": "MWh"
+          "unit": "MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-metering-boundary-v1",
+          "issuer_id": "did:synthetic:independent-verifier",
+          "issuer_role": "independent_verifier"
         },
         {
           "evidence_id": "ev_model",
@@ -1570,7 +1674,11 @@
           "known_at": "2026-07-31T17:00:00Z",
           "model_id": "pv-bess-model-v1",
           "value": "0.84",
-          "unit": "capacity_factor"
+          "unit": "capacity_factor",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-ac-boundary-v1",
+          "issuer_id": "did:synthetic:model-registry",
+          "issuer_role": "model_registry"
         },
         {
           "evidence_id": "ev_tariff",
@@ -1585,7 +1693,11 @@
           },
           "known_at": "2026-08-15T12:00:00Z",
           "value": "1450",
-          "unit": "ZAR/MWh"
+          "unit": "ZAR/MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-offtake-boundary-v1",
+          "issuer_id": "did:synthetic:offtaker",
+          "issuer_role": "offtaker"
         },
         {
           "evidence_id": "ev_capex",
@@ -1600,7 +1712,11 @@
           },
           "known_at": "2026-06-20T10:00:00Z",
           "value": "2500000000",
-          "unit": "ZAR"
+          "unit": "ZAR",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-epc-cost-boundary-v1",
+          "issuer_id": "did:synthetic:epc-contractor",
+          "issuer_role": "epc_contractor"
         },
         {
           "evidence_id": "ev_fx",
@@ -1615,7 +1731,11 @@
           },
           "known_at": "2026-08-01T12:00:00Z",
           "value": "18.2",
-          "unit": "ZAR/USD"
+          "unit": "ZAR/USD",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "fx-observation-boundary-v1",
+          "issuer_id": "did:synthetic:central-bank",
+          "issuer_role": "central_bank"
         }
       ],
       "claims": [
@@ -1910,7 +2030,11 @@
           },
           "known_at": "2026-06-03T09:00:00Z",
           "value": "120",
-          "unit": "MW"
+          "unit": "MW",
+          "subject_id": "synthetic-poc-001",
+          "boundary_id": "grid-poc-synthetic-poc-001",
+          "issuer_id": "did:synthetic:grid-operator",
+          "issuer_role": "system_operator"
         },
         {
           "evidence_id": "ev_yield_meter",
@@ -1925,7 +2049,11 @@
           },
           "known_at": "2026-07-10T12:00:00Z",
           "value": "221000",
-          "unit": "MWh"
+          "unit": "MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-metering-boundary-v1",
+          "issuer_id": "did:synthetic:independent-verifier",
+          "issuer_role": "independent_verifier"
         },
         {
           "evidence_id": "ev_model",
@@ -1941,7 +2069,11 @@
           "known_at": "2026-07-31T17:00:00Z",
           "model_id": "pv-bess-model-v1",
           "value": "0.84",
-          "unit": "capacity_factor"
+          "unit": "capacity_factor",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-ac-boundary-v1",
+          "issuer_id": "did:synthetic:model-registry",
+          "issuer_role": "model_registry"
         },
         {
           "evidence_id": "ev_tariff",
@@ -1956,7 +2088,11 @@
           },
           "known_at": "2026-07-15T12:00:00Z",
           "value": "1450",
-          "unit": "ZAR/MWh"
+          "unit": "ZAR/MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-offtake-boundary-v1",
+          "issuer_id": "did:synthetic:offtaker",
+          "issuer_role": "offtaker"
         },
         {
           "evidence_id": "ev_capex",
@@ -1971,7 +2107,11 @@
           },
           "known_at": "2026-06-20T10:00:00Z",
           "value": "2500000000",
-          "unit": "ZAR"
+          "unit": "ZAR",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-epc-cost-boundary-v1",
+          "issuer_id": "did:synthetic:epc-contractor",
+          "issuer_role": "epc_contractor"
         },
         {
           "evidence_id": "ev_fx",
@@ -1986,7 +2126,11 @@
           },
           "known_at": "2026-08-01T12:00:00Z",
           "value": "18.2",
-          "unit": "ZAR/USD"
+          "unit": "ZAR/USD",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "fx-observation-boundary-v1",
+          "issuer_id": "did:synthetic:central-bank",
+          "issuer_role": "central_bank"
         }
       ],
       "claims": [
@@ -2280,7 +2424,11 @@
           },
           "known_at": "2026-06-03T09:00:00Z",
           "value": "120",
-          "unit": "MW"
+          "unit": "MW",
+          "subject_id": "synthetic-poc-001",
+          "boundary_id": "grid-poc-synthetic-poc-001",
+          "issuer_id": "did:synthetic:grid-operator",
+          "issuer_role": "system_operator"
         },
         {
           "evidence_id": "ev_yield_meter",
@@ -2295,7 +2443,11 @@
           },
           "known_at": "2026-07-10T12:00:00Z",
           "value": "221000",
-          "unit": "MWh"
+          "unit": "MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-metering-boundary-v1",
+          "issuer_id": "did:synthetic:independent-verifier",
+          "issuer_role": "independent_verifier"
         },
         {
           "evidence_id": "ev_model",
@@ -2311,7 +2463,11 @@
           "known_at": "2026-07-31T17:00:00Z",
           "model_id": "pv-bess-model-v1",
           "value": "0.84",
-          "unit": "capacity_factor"
+          "unit": "capacity_factor",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-ac-boundary-v1",
+          "issuer_id": "did:synthetic:model-registry",
+          "issuer_role": "model_registry"
         },
         {
           "evidence_id": "ev_tariff",
@@ -2326,7 +2482,11 @@
           },
           "known_at": "2026-07-15T12:00:00Z",
           "value": "1450",
-          "unit": "ZAR/MWh"
+          "unit": "ZAR/MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-offtake-boundary-v1",
+          "issuer_id": "did:synthetic:offtaker",
+          "issuer_role": "offtaker"
         },
         {
           "evidence_id": "ev_capex",
@@ -2341,7 +2501,11 @@
           },
           "known_at": "2026-06-20T10:00:00Z",
           "value": "2500000000",
-          "unit": "ZAR"
+          "unit": "ZAR",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-epc-cost-boundary-v1",
+          "issuer_id": "did:synthetic:epc-contractor",
+          "issuer_role": "epc_contractor"
         },
         {
           "evidence_id": "ev_fx",
@@ -2356,7 +2520,11 @@
           },
           "known_at": "2026-08-01T12:00:00Z",
           "value": "18.2",
-          "unit": "ZAR/USD"
+          "unit": "ZAR/USD",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "fx-observation-boundary-v1",
+          "issuer_id": "did:synthetic:central-bank",
+          "issuer_role": "central_bank"
         },
         {
           "evidence_id": "ev_grid_conflict",
@@ -2371,7 +2539,11 @@
           },
           "known_at": "2026-07-25T10:00:00Z",
           "value": "0",
-          "unit": "MW"
+          "unit": "MW",
+          "subject_id": "synthetic-poc-001",
+          "boundary_id": "grid-poc-synthetic-poc-001",
+          "issuer_id": "did:synthetic:grid-operator",
+          "issuer_role": "system_operator"
         }
       ],
       "claims": [
