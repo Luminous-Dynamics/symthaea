@@ -1087,7 +1087,17 @@ mod tests {
         assert_eq!(fused.sample_count, 1);
         assert_eq!(fused.sample_ids, paired_geometry.sample_ids);
         assert_eq!(fused.sample_ids, paired_em.sample_ids);
-        assert_eq!(paired_geometry.sample_ids_sha256, paired_em.sample_ids_sha256);
+        // Membership digests are domain-separated by cohort identity, so
+        // equal member sets intentionally have distinct cohort-bound hashes.
+        assert_eq!(
+            paired_geometry.sample_ids_sha256,
+            cohort_membership_sha256("paired_geometry_only", &paired_geometry.sample_ids)
+        );
+        assert_eq!(
+            paired_em.sample_ids_sha256,
+            cohort_membership_sha256("paired_em_legal_views", &paired_em.sample_ids)
+        );
+        assert_ne!(paired_geometry.sample_ids_sha256, paired_em.sample_ids_sha256);
         assert_eq!(cohorts["em_legal_any_view"].sample_ids, fused.sample_ids);
         assert!(cohorts["em_best_only_excluded"].sample_ids.contains(&rows[1].row.combined_sample_hash));
         assert!(!cohorts["em_legal_any_view"].sample_ids.contains(&rows[1].row.combined_sample_hash));
