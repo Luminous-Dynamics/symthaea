@@ -3,7 +3,7 @@
 //! The JSON Schema provides structural validation. This module adds cross-field invariants
 //! that are security-relevant and awkward to express in JSON Schema alone.
 
-use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use jsonschema::draft202012;
 use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde_json::{Map, Number, Value};
@@ -35,7 +35,9 @@ impl fmt::Display for ReceiptError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidSchema(detail) => write!(formatter, "invalid receipt schema: {detail}"),
-            Self::SchemaViolation(detail) => write!(formatter, "receipt schema violation: {detail}"),
+            Self::SchemaViolation(detail) => {
+                write!(formatter, "receipt schema violation: {detail}")
+            }
             Self::SemanticViolation(detail) => {
                 write!(formatter, "receipt semantic violation: {detail}")
             }
@@ -74,10 +76,7 @@ pub fn parse_unique_json(input: &[u8]) -> Result<Value, ReceiptError> {
 }
 
 /// Parse, reject duplicate names, and validate a raw receipt document in one operation.
-pub fn parse_and_validate_receipt(
-    schema: &Value,
-    input: &[u8],
-) -> Result<Value, ReceiptError> {
+pub fn parse_and_validate_receipt(schema: &Value, input: &[u8]) -> Result<Value, ReceiptError> {
     let receipt = parse_unique_json(input)?;
     validate_receipt(schema, &receipt)?;
     Ok(receipt)
@@ -195,10 +194,7 @@ pub fn validate_receipt(schema: &Value, receipt: &Value) -> Result<(), ReceiptEr
 /// permitted by the current receipt schema are small bounded integers: ZIP flags, compression
 /// method codes, and the bounded read-buffer length. Floating-point values and larger integers
 /// are rejected before canonicalization.
-pub fn canonicalize_receipt(
-    schema: &Value,
-    receipt: &Value,
-) -> Result<Vec<u8>, ReceiptError> {
+pub fn canonicalize_receipt(schema: &Value, receipt: &Value) -> Result<Vec<u8>, ReceiptError> {
     validate_receipt(schema, receipt)?;
     canonicalize_jcs_value(receipt)
 }
@@ -261,7 +257,10 @@ fn validate_semantics(receipt: &Value) -> Result<(), ReceiptError> {
             ReceiptError::SemanticViolation("claim_scope.not_established must be an array".into())
         })?;
     for required in PROHIBITED_INFERENCES {
-        if !not_established.iter().any(|value| value.as_str() == Some(required)) {
+        if !not_established
+            .iter()
+            .any(|value| value.as_str() == Some(required))
+        {
             return Err(ReceiptError::SemanticViolation(format!(
                 "claim ceiling must explicitly retain {required}"
             )));
@@ -280,7 +279,10 @@ fn validate_semantics(receipt: &Value) -> Result<(), ReceiptError> {
             }
         }
         "separate_envelope_reference" => {
-            if string_at(attestation, &["envelope_reference"])?.trim().is_empty() {
+            if string_at(attestation, &["envelope_reference"])?
+                .trim()
+                .is_empty()
+            {
                 return Err(ReceiptError::SemanticViolation(
                     "separate attestation requires a non-empty envelope reference".into(),
                 ));
@@ -326,9 +328,7 @@ fn validate_semantics(receipt: &Value) -> Result<(), ReceiptError> {
         return Ok(());
     }
 
-    if !observations
-        .get("failure_kind")
-        .is_some_and(Value::is_null)
+    if !observations.get("failure_kind").is_some_and(Value::is_null)
         || !observations
             .get("failure_detail")
             .is_some_and(Value::is_null)
@@ -405,9 +405,7 @@ fn validate_semantics(receipt: &Value) -> Result<(), ReceiptError> {
         }
     }
 
-    if string_at(occurrence, &["entry_kind"])? != "file"
-        || bool_at(occurrence, &["encrypted"])?
-    {
+    if string_at(occurrence, &["entry_kind"])? != "file" || bool_at(occurrence, &["encrypted"])? {
         return Err(ReceiptError::SemanticViolation(
             "verified outcome only supports unencrypted regular-file occurrences".into(),
         ));
@@ -474,8 +472,7 @@ fn validate_semantics(receipt: &Value) -> Result<(), ReceiptError> {
     let observed_size = decimal_at(observations, &["observed_uncompressed_bytes"])?;
     let member_limit = decimal_at(limits, &["max_member_output_bytes"])?;
     let entry_limit = decimal_at(limits, &["max_entry_declared_uncompressed_bytes"])?;
-    let aggregate_declared_limit =
-        decimal_at(limits, &["max_total_declared_uncompressed_bytes"])?;
+    let aggregate_declared_limit = decimal_at(limits, &["max_total_declared_uncompressed_bytes"])?;
     if observed_size != declared_size {
         return Err(ReceiptError::SemanticViolation(
             "observed decompressed byte count must equal declared uncompressed size".into(),
@@ -499,7 +496,7 @@ fn validate_semantics(receipt: &Value) -> Result<(), ReceiptError> {
             "independent observed CRC-32 does not match the central-directory declaration".into(),
         ));
     }
-    if !is_sha256(string_at(observations, &["payload_sha256"])? ) {
+    if !is_sha256(string_at(observations, &["payload_sha256"])?) {
         return Err(ReceiptError::SemanticViolation(
             "verified outcome requires a payload SHA-256".into(),
         ));
@@ -550,7 +547,10 @@ fn validate_jcs_number_subset(value: &Value) -> Result<(), ReceiptError> {
     Ok(())
 }
 
-fn object_at<'a>(value: &'a Value, path: &[&str]) -> Result<&'a serde_json::Map<String, Value>, ReceiptError> {
+fn object_at<'a>(
+    value: &'a Value,
+    path: &[&str],
+) -> Result<&'a serde_json::Map<String, Value>, ReceiptError> {
     let child = value_at(value, path)?;
     child.as_object().ok_or_else(|| {
         ReceiptError::SemanticViolation(format!("{} must be an object", path.join(".")))
@@ -558,15 +558,15 @@ fn object_at<'a>(value: &'a Value, path: &[&str]) -> Result<&'a serde_json::Map<
 }
 
 fn string_at<'a>(value: &'a Value, path: &[&str]) -> Result<&'a str, ReceiptError> {
-    value_at(value, path)?
-        .as_str()
-        .ok_or_else(|| ReceiptError::SemanticViolation(format!("{} must be a string", path.join("."))))
+    value_at(value, path)?.as_str().ok_or_else(|| {
+        ReceiptError::SemanticViolation(format!("{} must be a string", path.join(".")))
+    })
 }
 
 fn bool_at(value: &Value, path: &[&str]) -> Result<bool, ReceiptError> {
-    value_at(value, path)?
-        .as_bool()
-        .ok_or_else(|| ReceiptError::SemanticViolation(format!("{} must be a boolean", path.join("."))))
+    value_at(value, path)?.as_bool().ok_or_else(|| {
+        ReceiptError::SemanticViolation(format!("{} must be a boolean", path.join(".")))
+    })
 }
 
 fn decimal_at(value: &Value, path: &[&str]) -> Result<u64, ReceiptError> {
@@ -599,7 +599,10 @@ fn value_at<'a>(value: &'a Value, path: &[&str]) -> Result<&'a Value, ReceiptErr
 }
 
 fn is_sha256(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 #[cfg(test)]
