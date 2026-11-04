@@ -136,5 +136,9 @@ fn missing_file_returns_io_exit_code_without_echoing_local_path() {
     assert_eq!(output.status.code(), Some(3));
     let report: Value = serde_json::from_slice(&output.stderr).unwrap();
     assert_eq!(report["error"]["code"], "io_error");
-    assert!(!String::from_utf8(output.stderr).unwrap().contains(path.to_string_lossy().as_ref()));
+    assert!(
+        !String::from_utf8(output.stderr)
+            .unwrap()
+            .contains(path.to_string_lossy().as_ref())
+    );
 }
