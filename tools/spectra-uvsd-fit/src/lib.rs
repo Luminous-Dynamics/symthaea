@@ -646,8 +646,8 @@ fn expected_fisher_information(
         let lower_ratio = density_probability_ratio(signal_lower, signal_logp);
         let upper_ratio = density_probability_ratio(signal_upper, signal_logp);
         let mut signal_score = vec![0.0; 2 + thresholds.len()];
-        // Score of log probability (not the negative log likelihood).
-        signal_score[0] = (upper_ratio - lower_ratio) * inverse_sigma;
+        // d log P(category | signal) / d mu = (phi(z_lower)-phi(z_upper))/(sigma*P).
+        signal_score[0] = (lower_ratio - upper_ratio) * inverse_sigma;
         signal_score[1] =
             finite_z_ratio_product(signal_lower, lower_ratio)
             - finite_z_ratio_product(signal_upper, upper_ratio);
