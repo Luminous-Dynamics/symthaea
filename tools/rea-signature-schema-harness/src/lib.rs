@@ -25,6 +25,7 @@ pub fn validate_evaluation(evaluation: &Value) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
     use super::*;
 
     fn sample_valid_but_unexpected_signer() -> Value {
