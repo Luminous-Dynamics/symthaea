@@ -1,0 +1,9 @@
+{
+  "format": "symthaea.dynamic-projected-bce-trace-results",
+  "version": 1,
+  "claim_ceiling": "two_branch_context_trace_reference_checker_plus_exhaustive_oracle_not_formal_proof_or_D4_trace_replay",
+  "certificate_check": "pending_exact_uploaded_run",
+  "negative_controls": 10,
+  "negative_controls_rejected": 10,
+  "note": "Placeholder until exact uploaded checker bytes are executed."
+}
