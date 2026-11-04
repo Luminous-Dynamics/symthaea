@@ -28,8 +28,10 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - name: Install nightly Rust
-        uses: dtolnay/rust-toolchain@nightly-2026-11-03
+      - name: Install pinned nightly Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: nightly-2026-11-03
       - name: Install pinned cargo-fuzz
         run: cargo install cargo-fuzz --version 0.13.2 --locked
       - name: Resolve and audit fuzz dependency graph
