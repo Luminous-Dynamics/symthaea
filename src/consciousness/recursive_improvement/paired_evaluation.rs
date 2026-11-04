@@ -60,7 +60,7 @@ pub enum PairedEvaluationError {
     DuplicateCase(String),
     MetricSchemaMismatch,
     ContextMismatch,
-    CandidateIdentityMismatch,
+    CaseSetMismatch,
     ParentLineageMismatch,
     SameCandidate,
     InvalidTieEpsilon,
@@ -79,7 +79,7 @@ impl fmt::Display for PairedEvaluationError {
             Self::ContextMismatch => {
                 write!(f, "candidate receipts do not share an identical evaluation context")
             }
-            Self::CandidateIdentityMismatch => {
+            Self::CaseSetMismatch => {
                 write!(f, "candidate identity is inconsistent with its receipt")
             }
             Self::ParentLineageMismatch => {
@@ -279,7 +279,7 @@ impl PairedComparison {
         if parent.cases.len() != candidate.cases.len()
             || parent.cases.keys().ne(candidate.cases.keys())
         {
-            return Err(PairedEvaluationError::CandidateIdentityMismatch);
+            return Err(PairedEvaluationError::CaseSetMismatch);
         }
 
         let parent_metrics: Vec<&str> =
@@ -557,6 +557,27 @@ mod tests {
     }
 
     #[test]
+    fn rejects_metric_schema_drift_within_one_receipt() {
+        let ctx = context(EvaluationPartition::Development, "dev");
+        let result = CandidateEvaluationReceipt::new(
+            ctx,
+            "candidate",
+            None,
+            digest('1'),
+            digest('a'),
+            vec![
+                score("case-a", 0.5, 0.5),
+                CaseScore::new(
+                    "case-b",
+                    CapabilityVector::new(vec![("coding".into(), 0.6)]).unwrap(),
+                )
+                .unwrap(),
+            ],
+        );
+        assert_eq!(result.unwrap_err(), PairedEvaluationError::MetricSchemaMismatch);
+    }
+
+    #[test]
     fn rejects_missing_or_extra_case_ids() {
         let ctx = context(EvaluationPartition::Validation, "split");
         let parent = receipt(
@@ -578,7 +599,7 @@ mod tests {
 
         assert_eq!(
             PairedComparison::compare(&parent, &child, 0.0),
-            Err(PairedEvaluationError::CandidateIdentityMismatch)
+            Err(PairedEvaluationError::CaseSetMismatch)
         );
     }
 
