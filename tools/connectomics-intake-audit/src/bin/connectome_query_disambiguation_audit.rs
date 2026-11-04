@@ -123,13 +123,14 @@ struct Report {
     minimum_plans_truncated: bool,
     minimum_plan_within_budget: Option<bool>,
     plans: Vec<DisambiguationPlan>,
+    greedy_comparator: GreedyPlan,
     status: &'static str,
     search_complete: bool,
     probability_claim: &'static str,
     scope_note: &'static str,
 }
 
-#[derive(Debug, Clone, Serialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Eq, PartialEq, Ord, PartialOrd)]
 struct WorldPair {
     world_a: String,
     world_b: String,
@@ -147,6 +148,16 @@ struct DisambiguationPlan {
     action_ids: Vec<String>,
     effort_units: u64,
     separated_decision_conflict_pair_count: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct GreedyPlan {
+    action_ids: Vec<String>,
+    effort_units: u64,
+    separated_decision_conflict_pair_count: usize,
+    remaining_pairs: Vec<WorldPair>,
+    complete: bool,
+    regret_to_exact_minimum_effort_units: Option<u64>,
 }
 
 type OutcomesByWorld = BTreeMap<String, String>;
@@ -379,6 +390,81 @@ fn action_pair_coverage(
         .collect()
 }
 
+fn greedy_disambiguation_plan(
+    actions: &[ObservationAction],
+    outcomes_by_action: &[OutcomesByWorld],
+    pairs: &[WorldPair],
+    exact_minimum_cost: Option<u64>,
+) -> GreedyPlan {
+    let mut uncovered = pairs.iter().cloned().collect::<BTreeSet<_>>();
+    let mut selected_indices = BTreeSet::new();
+    let mut selected_ids = Vec::new();
+    let mut effort_units = 0_u64;
+
+    loop {
+        if uncovered.is_empty() {
+            break;
+        }
+        let mut best: Option<(usize, usize)> = None;
+        for (index, action) in actions.iter().enumerate() {
+            if selected_indices.contains(&index) {
+                continue;
+            }
+            let marginal = uncovered
+                .iter()
+                .filter(|pair| action_separates_pair(&outcomes_by_action[index], pair))
+                .count();
+            if marginal == 0 {
+                continue;
+            }
+            let replace = match best {
+                None => true,
+                Some((best_index, best_marginal)) => {
+                    let candidate_cross =
+                        (marginal as u128) * (actions[best_index].effort_units as u128);
+                    let best_cross =
+                        (best_marginal as u128) * (action.effort_units as u128);
+                    candidate_cross > best_cross
+                        || (candidate_cross == best_cross
+                            && (marginal > best_marginal
+                                || (marginal == best_marginal
+                                    && action.action_id < actions[best_index].action_id)))
+                }
+            };
+            if replace {
+                best = Some((index, marginal));
+            }
+        }
+        let Some((best_index, _)) = best else {
+            break;
+        };
+        let action = &actions[best_index];
+        effort_units = effort_units.saturating_add(action.effort_units);
+        selected_indices.insert(best_index);
+        selected_ids.push(action.action_id.clone());
+        uncovered.retain(|pair| {
+            !action_separates_pair(&outcomes_by_action[best_index], pair)
+        });
+    }
+
+    selected_ids.sort();
+    let complete = uncovered.is_empty();
+    let separated = pairs.len() - uncovered.len();
+    let regret = if complete {
+        exact_minimum_cost.map(|minimum| effort_units.saturating_sub(minimum))
+    } else {
+        None
+    };
+    GreedyPlan {
+        action_ids: selected_ids,
+        effort_units,
+        separated_decision_conflict_pair_count: separated,
+        remaining_pairs: uncovered.into_iter().collect(),
+        complete,
+        regret_to_exact_minimum_effort_units: regret,
+    }
+}
+
 fn selected_action_ids(mask: u64, actions: &[ObservationAction]) -> Vec<String> {
     let mut ids = actions
         .iter()
@@ -497,6 +583,8 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         "MINIMUM_COST_DISAMBIGUATION_EXCEEDS_BUDGET"
     };
     let minimum_plan_within_budget = min_cost.map(|cost| cost <= input.max_total_effort_units);
+    let greedy_comparator =
+        greedy_disambiguation_plan(&input.actions, &outcomes_by_action, &pairs, min_cost);
     let plans_truncated = minimum_count > MAX_RETURNED_MINIMAL_PLANS as u64;
     if plans.len() > MAX_RETURNED_MINIMAL_PLANS {
         plans.truncate(MAX_RETURNED_MINIMAL_PLANS);
@@ -528,6 +616,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         minimum_plans_truncated: plans_truncated,
         minimum_plan_within_budget,
         plans: std::mem::take(&mut plans),
+        greedy_comparator,
         status,
         search_complete: true,
         probability_claim: "NONE_DETERMINISTIC_WORLD_DISCRIMINATION_ONLY",
@@ -613,6 +702,26 @@ mod tests {
                 .all(|plan| { plan.action_ids.len() == 2 && plan.effort_units == 4 })
         );
         assert!(!report.probability_claim.contains("POSTERIOR"));
+    }
+
+    #[test]
+    fn greedy_comparator_reports_one_unit_of_regret_against_exact_optimum() {
+        let input = fixture();
+        let report = evaluate(&input, &fixture_bytes()).unwrap();
+        assert_eq!(report.minimum_disambiguation_effort_units, Some(4));
+        assert!(report.greedy_comparator.complete);
+        assert_eq!(report.greedy_comparator.effort_units, 5);
+        assert_eq!(
+            report.greedy_comparator.regret_to_exact_minimum_effort_units,
+            Some(1)
+        );
+        assert_eq!(
+            report.greedy_comparator.action_ids,
+            vec![
+                "inspect-morphology".to_string(),
+                "partial-broad-scan".to_string()
+            ]
+        );
     }
 
     #[test]
