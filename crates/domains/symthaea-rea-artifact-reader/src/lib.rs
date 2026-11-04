@@ -2182,6 +2182,34 @@ mod tests {
     }
 
     #[test]
+    fn deterministic_archive_mutations_never_panic_inventory_or_content_read() {
+        let baseline = single_entry(b"mutation-target.bin", b"known payload for deterministic mutation");
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+
+        for sample in 0..256u64 {
+            let mut mutated = baseline.clone();
+            for _ in 0..3 {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                let offset = (state as usize) % mutated.len();
+                let bit = ((state >> 32) & 7) as u8;
+                mutated[offset] ^= 1u8 << bit;
+            }
+
+            let path = write_temp(&mutated);
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                if let Ok(reader) = ZipArtifactReader::open(&path, ReaderLimits::default()) {
+                    let _ = reader
+                        .verify_entry_content(0, ContentVerificationLimits::default());
+                }
+            }));
+            fs::remove_file(path).unwrap();
+            assert!(outcome.is_ok(), "archive mutation sample {sample} panicked");
+        }
+    }
+
+    #[test]
     fn concurrent_content_verification_uses_independent_file_cursors() {
         let payload = vec![0x5au8; 2 * 1024 * 1024];
         let path = write_temp(&single_entry(b"concurrent.bin", &payload));
