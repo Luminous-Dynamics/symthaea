@@ -925,3 +925,13 @@ References: [zip 9.3.0 crate docs](https://docs.rs/zip/9.3.0/zip/), [ZipArchive 
 
 No cross-parser test is claimed to have passed until the exact-head workflow runs. No fuzz qualification result is claimed.
 
+### Resolved dependency-lineage correction
+
+The committed harness Cargo.lock from the exact workflow resolution shows both `zipcore 0.10.2` and test-only `zip 9.3.0` depending on `crc32fast 1.5.4`. Therefore:
+- The libraries are separate container parser implementations.
+- Their CRC outputs are not independent checksum implementations.
+- The custom Symthaea CRC routine is a separate bitwise implementation and now has the standard CRC-32/ISO-HDLC known-answer fixture `"123456789" -> 0xcbf43926`.
+- The current test-only zip-rs arm uses no Deflate feature; it is a structural and Stored-payload oracle, not a second Deflate codec oracle.
+
+The exact lockfile's SHA-256 is `7a53900c9ceb9882f3e5428d5a6712d68b09a32d3e6c8df2943d6e792c68e323`; its Git blob SHA in the branch is `5e493882c5df0d7ba1d8c991f031d3025a54844d`. This pins the dependency graph inspected here. The next independent-codec lane should use a genuinely different decoder implementation and report that lineage explicitly.
+
