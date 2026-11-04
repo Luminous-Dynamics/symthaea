@@ -11,6 +11,7 @@
 
 pub mod adaptive_transmission;
 pub mod cultural_evolution;
+pub mod environmental_adaptation;
 pub mod few_shot_transfer;
 pub mod intentional_teaching;
 pub mod czaplicka_2025;
