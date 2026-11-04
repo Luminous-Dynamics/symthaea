@@ -67,7 +67,8 @@
           "The official site reports 48.3% for Claude Opus 5.5 on the 56-task hidden test set; the paper abstract separately reports a 50.6% strongest-configuration mean. These are distinct reported evaluation summaries and must not be compared as if they were the same split or run aggregation.",
           "The official site reports that the leading system satisfied 91% of individual constraints on average but only 41% of designs passed every hard check.",
           "The paper abstract reports an average of 27 million tokens and 63 minutes per task for its strongest configuration.",
-          "Do not use hidden-test scores as a baseline for a development-set result. Pin and compare against the official public development leaderboard on the same task revision."
+          "Do not use hidden-test scores as a baseline for a development-set result. Pin and compare against the official public development leaderboard on the same task revision.",
+          "The official competition page's 2026-11-04 snapshot also shows committed-artifact development scores (for example, Claude Opus 5.5 / Claude Code 55.1% and GPT-6 Astra / Codex 53.0%). These are competition-entry artifact scores, not the three-run public development leaderboard mean described by the dataset card; do not compare them as the same evaluation mode."
         ]
       },
       "ceb_integration": {
