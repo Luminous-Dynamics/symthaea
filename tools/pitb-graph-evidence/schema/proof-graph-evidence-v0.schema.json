@@ -255,7 +255,8 @@
             "informal_extractor",
             "llm_alignment",
             "lean_build_graph",
-            "lean_doc_parser"
+            "lean_doc_parser",
+            "daps_graph_export"
           ]
         },
         "status": {
