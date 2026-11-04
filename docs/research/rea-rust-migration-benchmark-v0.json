@@ -1597,10 +1597,10 @@
     },
     {
       "id": "artifact_member_receipt_reproducibility",
-      "status": "schema_drafted",
+      "status": "draft_rust_validator_and_jcs_harness",
       "schema": "docs/research/rea-zip-content-verification-receipt-v0.schema.json",
       "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10477",
-      "implementation_pr": null,
+      "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10477",
       "objective": "Bind a member-integrity statement to the exact archive source/occurrence, verifier and codec lineage, observed bytes, limits and explicit claim ceiling in a versioned receipt that an independent replay tool can check.",
       "cases": [
         "verified_member_receipt_replays_against_frozen_archive_bytes",
@@ -1615,7 +1615,15 @@
         "receipt_does_not_infer_apk_ipa_signature_or_package_installability",
         "receipt_does_not_infer_whole_archive_completeness_from_one_member",
         "receipt_does_not_infer_masvs_control_pass_from_raw_observation",
-        "receipt_signature_authenticates_statement_not_underlying_semantic_truth"
+        "receipt_signature_authenticates_statement_not_underlying_semantic_truth",
+        "raw_receipt_parser_rejects_duplicate_root_and_nested_property_names",
+        "receipt_u64_max_decimal_string_survives_jcs_without_rounding",
+        "receipt_json_numeric_values_restricted_to_small_safe_integers",
+        "rfc8785_section_3_2_2_number_and_string_canonicalization_vector",
+        "rfc8785_utf16_property_sorting_vector",
+        "verified_receipt_requires_whole_archive_sha256_for_independent_replay",
+        "nonverified_receipt_cannot_publish_successful_payload_digest",
+        "receipt_attestation_reference_does_not_upgrade_observation_claim"
       ],
       "metrics": [
         "schema_valid_receipt_rate_by_outcome",
@@ -1626,7 +1634,13 @@
         "false_authenticity_inference_rate",
         "claim_ceiling_violation_rate",
         "receipt_serialization_and_validation_overhead",
-        "receipt_size_bytes"
+        "receipt_size_bytes",
+        "duplicate_json_property_rejection_rate",
+        "jcs_rfc8785_number_vector_conformance",
+        "jcs_utf16_property_sort_conformance",
+        "u64_exact_decimal_roundtrip_rate",
+        "verified_receipt_without_archive_replay_digest_rejection_rate",
+        "unsafe_numeric_json_value_rejection_rate"
       ],
       "target": "100_percent schema-valid receipts for all explicitly reported outcomes; zero verified receipts with missing source/occurrence/verifier/limits/EOF/size/decoder-CRC/independent-CRC evidence; zero false authenticity, signature, archive-completeness or control-pass inferences; 100_percent replay agreement on frozen supported-subset fixtures.",
       "protocol": [
@@ -1639,15 +1653,25 @@
         "keep unsupported/rejected/source-changed/limit-exceeded/abstained cases in denominators",
         "treat producer attestation as a separate in-toto/DSSE reference and separate trust policy",
         "do not add signer identity or authentication claims to REA Evidence ID or payload digest",
-        "pin canonical serialization only after deterministic RFC 8785 behavior and independent conformance vectors are qualified"
+        "pin canonical serialization only after deterministic RFC 8785 behavior and independent conformance vectors are qualified",
+        "reject duplicate JSON property names while parsing raw bytes before Value materialization; reject both root and nested duplicates",
+        "encode u64-sized offsets, lengths, indices and byte/count budgets as canonical decimal strings; JSON numbers in this schema are only small bounded integers",
+        "validate the schema itself against Draft 2020-12 and validate instances with a pinned validator with remote reference resolution disabled",
+        "run RFC 8785 section 3.2.2 number/string and UTF-16 property-order known-answer vectors against the pinned canonicalizer",
+        "verified receipts must carry a whole-archive SHA-256 replay commitment separately from filesystem identity; replay the source independently",
+        "compute receipt digest only over canonical JCS bytes after duplicate-key, I-JSON, schema and semantic checks"
       ],
       "claim_boundaries": {
         "receipt_integrity": "A receipt is an auditable record of the verifier's claim and inputs. Its own digest or signature does not increase the strength of the underlying observation.",
         "authenticity": "Not established by SHA-256, CRC, parser agreement or receipt signature alone; requires separate producer/build attestation and trust-root evaluation.",
         "completeness": "A verified member does not establish that all archive content, APK Signing Block records or package semantics were inspected.",
         "semantics": "A byte digest does not establish installability, runtime behavior, maliciousness/benignness or MASVS control pass.",
-        "identity": "A source file identity tuple is distinct from a whole-archive digest and distinct from an immutable content snapshot."
-      }
+        "identity": "A source file identity tuple is distinct from a whole-archive digest and distinct from an immutable content snapshot.",
+        "jcs": "Receipt u64 values are represented as canonical unsigned decimal strings, not JSON numbers, so values through u64::MAX remain exact under ECMAScript/IEEE-754 JCS implementations. JSON number fields are limited to small bounded integers.",
+        "duplicate_keys": "Raw receipt parsing rejects duplicate root and nested object property names before converting into serde_json::Value; otherwise a parser may collapse duplicates and hide non-I-JSON input.",
+        "replay": "Verified outcome requires a whole-archive SHA-256 commitment, separate from the held-file identity tuple, so an independent process can bind replay to original bytes."
+      },
+      "schema_digest_placeholder": "bind JSON Schema content SHA and Cargo.lock digest in every receipt validator run"
     }
   ],
   "promotion_policy": {

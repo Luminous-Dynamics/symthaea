@@ -1033,3 +1033,29 @@ The first fuzz runner successfully installed the dated nightly action, installed
 
 The workflow now explicitly uses `cargo +nightly-2026-11-03 fuzz run` and records `rustc +nightly-2026-11-03 --version --verbose` / `cargo +nightly-2026-11-03 --version` in the receipt. The repo-default stable toolchain remains unchanged for ordinary builds. This is a workflow correction; no fuzz execution was performed by the failed run.
 
+## 24. 2026-11-04 — executable receipt validation, duplicate-key rejection and JCS numeric fidelity
+
+The receipt contract now has an isolated Rust harness on [#10477](https://github.com/Luminous-Dynamics/symthaea/pull/10477). It validates the JSON Schema as Draft 2020-12, validates receipt instances, applies additional cross-field semantic checks, canonicalizes with a pinned RFC 8785 implementation, and hashes the resulting canonical bytes.
+
+### Why the schema uses decimal strings for u64 fields
+
+RFC 8785 is based on I-JSON and ECMAScript/IEEE-754 JSON number serialization. The RFC requires JSON number values to be exactly expressible as IEEE-754 double-precision values and recommends strings for integers requiring higher precision. A raw ZIP offset or byte length may occupy all 64 bits; serializing `u64::MAX` as a JSON number can lose exactness in JavaScript-compatible systems.
+
+Therefore archive length, occurrence index, duplicate-name count, member offsets, declared/observed byte counts, and byte/count limits are now canonical unsigned decimal strings matching `^(0|[1-9][0-9]*)$`. The only JSON number fields are bounded small integers: ZIP flags, method codes and read-buffer length. The harness rejects floats, negatives and values beyond that small-integer subset before canonicalization. A known-answer test carries `18446744073709551615` through JCS as an exact string.
+
+### Duplicate object keys are rejected before Value parsing
+
+I-JSON requires unique property names. A conventional JSON object deserializer may keep only one value when the same key appears twice, destroying evidence of ambiguity. The new raw JSON parser uses a Serde visitor with a per-object key set and rejects duplicate keys at every nesting level before materializing `serde_json::Value`.
+
+### Executable qualification gates
+
+The isolated harness pins:
+- `jsonschema 0.60.2`, Draft 2020-12 validation with remote reference resolution disabled;
+- `serde_json_canonicalizer 0.4.1` for RFC 8785 JCS;
+- `serde_json 1.0.151` and `serde 1.0.229`;
+- `sha2 0.10.9` for the canonical receipt digest.
+
+The semantic validator requires a verified receipt to contain a replayable whole-archive SHA-256 separately from source file identity; to prove held descriptor, selected path and after-attempt source checks; to require decoder EOF/CRC/size plus custom CRC and metadata parity; to bind the exact observed size to the declaration and configured output limits; and to retain every explicit non-claim in the claim ceiling. Non-verified outcomes cannot publish a successful payload hash.
+
+The harness includes RFC 8785 Section 3.2.2 number/string and UTF-16 property-order vectors, raw duplicate-key rejection, exact u64 string behavior, CRC/size mismatch controls, source-identity weakness and claim-ceiling overclaim controls. This is an executable validator/canonicalizer harness, not yet a production receipt writer, receipt replay tool, or producer attestation implementation.
+

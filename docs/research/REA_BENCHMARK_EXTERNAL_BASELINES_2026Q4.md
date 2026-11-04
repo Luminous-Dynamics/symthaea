@@ -173,6 +173,7 @@ A superiority claim requires matched inputs, budgets, safety settings, attempts 
 - #10451 — content-addressed ZIP corpus and bounded coverage-guided fuzz qualification.
 - #10452 — platform-qualified held-file identity; non-Unix content verification remains fail-closed until this is resolved.
 - #10455 — archive-session performance research without weakening per-member decompression limits.
+- #10477 — versioned member-verification receipts with schema/semantic validation, exact u64 decimal representation, duplicate-key rejection, RFC 8785 conformance vectors and independent replay bindings.
 
 
 ## Verification refresh — 2026-11-04
