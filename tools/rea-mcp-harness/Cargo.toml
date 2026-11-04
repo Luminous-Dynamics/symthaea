@@ -11,6 +11,10 @@ license = "AGPL-3.0-or-later"
 [lib]
 path = "../../crates/domains/symthaea-rea-mcp/src/lib.rs"
 
+[[bin]]
+name = "rea-evidence-mcp"
+path = "src/main.rs"
+
 [[test]]
 name = "protocol"
 path = "tests/protocol.rs"
