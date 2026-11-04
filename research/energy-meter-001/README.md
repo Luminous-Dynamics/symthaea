@@ -22,11 +22,17 @@ cargo run --locked --all-features --manifest-path research/energy-meter-001/Carg
 ```
 
 The final argument is the sample interval in milliseconds (default 500).
-Running without `--all-features` omits NVML. This probe does not attribute
-whole-GPU energy to individual processes, does not equate a package zone with
-whole-workstation energy, and does not infer uncovered sensor domains. Its JSON
-is a capability and short-interval diagnostic, not by itself a matched-quality
-benchmark receipt.
+Running without `--all-features` omits NVML. The JSON reports whether each
+configured discovery path completed without filesystem errors and how many
+sensors were enumerated. `discovery_complete=true` does not prove that the
+hardware exposes every physical power domain; it only means the requested
+paths were traversed without observed read/entry errors. A partial inventory
+must remain visible and cannot justify a whole-system claim.
+
+This probe does not attribute whole-GPU energy to individual processes, does
+not equate a package zone with whole-workstation energy, and does not infer
+uncovered sensor domains. Its JSON is a capability and short-interval
+diagnostic, not by itself a matched-quality benchmark receipt.
 
 ## Evidence classes
 
