@@ -21,10 +21,7 @@ pub enum IntervalSemantics {
     HardBound,
     MeasurementInterval,
     ModelUncertaintyInterval,
-    StatisticalInterval {
-        method: String,
-        confidence_ppm: u32,
-    },
+    StatisticalInterval { method: String, confidence_ppm: u32 },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -162,7 +159,9 @@ pub enum IncompleteReason {
     ActionSetDeclaredIncomplete,
     MissingExpectedReference(String),
     UnexpectedReference(String),
-    ApplicabilityUnknown { reference_id: String },
+    ApplicabilityUnknown {
+        reference_id: String,
+    },
     MissingActionResult {
         reference_id: String,
         action_id: String,
@@ -231,11 +230,20 @@ pub enum EvaluationError {
     DuplicateActionId,
     InvalidEquivalenceMargin,
     DuplicateReferenceId(String),
-    InvalidDigest { field: &'static str },
-    ContextMismatch { reference_id: String, action_id: String },
-    NonFiniteDifference { reference_id: String },
+    InvalidDigest {
+        field: &'static str,
+    },
+    ContextMismatch {
+        reference_id: String,
+        action_id: String,
+    },
+    NonFiniteDifference {
+        reference_id: String,
+    },
     DuplicateReceiptId(String),
-    DuplicateActionPayload { reference_id: String },
+    DuplicateActionPayload {
+        reference_id: String,
+    },
     NonFiniteMetricValue {
         reference_id: String,
         action_id: String,
@@ -287,8 +295,10 @@ pub fn evaluate_pair(
             return Err(EvaluationError::DuplicateReferenceId(reference_id.clone()));
         }
     }
-    let provided: BTreeSet<String> =
-        ordered_rows.iter().map(|row| row.reference_id.clone()).collect();
+    let provided: BTreeSet<String> = ordered_rows
+        .iter()
+        .map(|row| row.reference_id.clone())
+        .collect();
     if let Some(missing) = expected.difference(&provided).next() {
         return Ok(empty_envelope(
             DecisionClass::Incomplete,
@@ -306,7 +316,9 @@ pub fn evaluate_pair(
         validate_nonempty(&row.reference_id, "reference_id")?;
         validate_nonempty(&row.dependency_family_id, "dependency_family_id")?;
         if !seen_references.insert(row.reference_id.as_str()) {
-            return Err(EvaluationError::DuplicateReferenceId(row.reference_id.clone()));
+            return Err(EvaluationError::DuplicateReferenceId(
+                row.reference_id.clone(),
+            ));
         }
         for result in [row.action_a.as_ref(), row.action_b.as_ref()]
             .into_iter()
@@ -317,7 +329,9 @@ pub fn evaluate_pair(
             validate_digest(&result.action_payload_digest, "action_payload_digest")?;
             validate_digest(&result.output_digest, "output_digest")?;
             if !seen_receipts.insert(result.receipt_id.as_str()) {
-                return Err(EvaluationError::DuplicateReceiptId(result.receipt_id.clone()));
+                return Err(EvaluationError::DuplicateReceiptId(
+                    result.receipt_id.clone(),
+                ));
             }
         }
     }
@@ -363,7 +377,8 @@ pub fn evaluate_pair(
         let Qualification::Qualified {
             record_id,
             source_artifact_digest,
-        } = &row.qualification else {
+        } = &row.qualification
+        else {
             return Ok(DecisionEnvelope {
                 classification: DecisionClass::OutOfScope,
                 incomplete_reason: None,
@@ -453,38 +468,32 @@ pub fn evaluate_pair(
             }
         }
 
-        let evidence_a = match observed_evidence(
-            &row.reference_id,
-            &context.action_a_id,
-            &action_a.outcome,
-        ) {
-            Ok(evidence) => evidence,
-            Err(reason) => {
-                return Ok(incomplete_envelope(
-                    reason,
-                    applicable_count,
-                    inapplicable_count,
-                    families.len(),
-                    comparisons,
-                ));
-            }
-        };
-        let evidence_b = match observed_evidence(
-            &row.reference_id,
-            &context.action_b_id,
-            &action_b.outcome,
-        ) {
-            Ok(evidence) => evidence,
-            Err(reason) => {
-                return Ok(incomplete_envelope(
-                    reason,
-                    applicable_count,
-                    inapplicable_count,
-                    families.len(),
-                    comparisons,
-                ));
-            }
-        };
+        let evidence_a =
+            match observed_evidence(&row.reference_id, &context.action_a_id, &action_a.outcome) {
+                Ok(evidence) => evidence,
+                Err(reason) => {
+                    return Ok(incomplete_envelope(
+                        reason,
+                        applicable_count,
+                        inapplicable_count,
+                        families.len(),
+                        comparisons,
+                    ));
+                }
+            };
+        let evidence_b =
+            match observed_evidence(&row.reference_id, &context.action_b_id, &action_b.outcome) {
+                Ok(evidence) => evidence,
+                Err(reason) => {
+                    return Ok(incomplete_envelope(
+                        reason,
+                        applicable_count,
+                        inapplicable_count,
+                        families.len(),
+                        comparisons,
+                    ));
+                }
+            };
 
         validate_metric_evidence(&row.reference_id, &context.action_a_id, evidence_a)?;
         validate_metric_evidence(&row.reference_id, &context.action_b_id, evidence_b)?;
@@ -543,7 +552,11 @@ pub fn evaluate_pair(
                         point_preference: None,
                     });
                 }
-                mark_evidence_kind(&mut evidence_kind, EvidenceKind::Interval, &mut mixed_evidence);
+                mark_evidence_kind(
+                    &mut evidence_kind,
+                    EvidenceKind::Interval,
+                    &mut mixed_evidence,
+                );
             }
             (
                 MetricEvidence::PointEstimateOnly { value: a_value },
@@ -658,11 +671,7 @@ enum EvidenceKind {
     Mixed,
 }
 
-fn mark_evidence_kind(
-    current: &mut Option<EvidenceKind>,
-    next: EvidenceKind,
-    mixed: &mut bool,
-) {
+fn mark_evidence_kind(current: &mut Option<EvidenceKind>, next: EvidenceKind, mixed: &mut bool) {
     match *current {
         None => *current = Some(next),
         Some(existing) if existing == next => {}
@@ -679,8 +688,14 @@ fn validate_context(context: &ComparisonContext) -> Result<(), EvaluationError> 
     validate_nonempty(&context.action_a_id, "action_a_id")?;
     validate_nonempty(&context.action_b_id, "action_b_id")?;
     validate_nonempty(&context.metric.frame, "metric_frame")?;
-    validate_digest(&context.execution_context_digest, "execution_context_digest")?;
-    validate_digest(&context.metric_definition_digest, "metric_definition_digest")?;
+    validate_digest(
+        &context.execution_context_digest,
+        "execution_context_digest",
+    )?;
+    validate_digest(
+        &context.metric_definition_digest,
+        "metric_definition_digest",
+    )?;
     validate_digest(&context.metric_evaluator_digest, "metric_evaluator_digest")?;
     validate_digest(&context.action_a_payload_digest, "action_a_payload_digest")?;
     validate_digest(&context.action_b_payload_digest, "action_b_payload_digest")?;
@@ -697,9 +712,7 @@ fn validate_context(context: &ComparisonContext) -> Result<(), EvaluationError> 
     if context.expected_reference_ids.is_empty() {
         return Err(EvaluationError::EmptyField("expected_reference_ids"));
     }
-    if !context.metric.equivalence_margin.is_finite()
-        || context.metric.equivalence_margin < 0.0
-    {
+    if !context.metric.equivalence_margin.is_finite() || context.metric.equivalence_margin < 0.0 {
         return Err(EvaluationError::InvalidEquivalenceMargin);
     }
     Ok(())
@@ -783,7 +796,11 @@ fn validate_metric_evidence(
     evidence: &MetricEvidence,
 ) -> Result<(), EvaluationError> {
     match evidence {
-        MetricEvidence::BoundedInterval { lower, upper, semantics } => {
+        MetricEvidence::BoundedInterval {
+            lower,
+            upper,
+            semantics,
+        } => {
             if !lower.is_finite() || !upper.is_finite() {
                 return Err(EvaluationError::NonFiniteMetricValue {
                     reference_id: reference_id.to_owned(),
@@ -796,7 +813,11 @@ fn validate_metric_evidence(
                     action_id: action_id.to_owned(),
                 });
             }
-            if let IntervalSemantics::StatisticalInterval { method, confidence_ppm } = semantics {
+            if let IntervalSemantics::StatisticalInterval {
+                method,
+                confidence_ppm,
+            } = semantics
+            {
                 validate_nonempty(method, "interval_method")?;
                 if *confidence_ppm == 0 || *confidence_ppm >= 1_000_000 {
                     return Err(EvaluationError::InvalidStatisticalInterval {
@@ -817,21 +838,14 @@ fn validate_metric_evidence(
     Ok(())
 }
 
-fn favorable_interval(
-    lower: f64,
-    upper: f64,
-    direction: Direction,
-) -> (f64, f64) {
+fn favorable_interval(lower: f64, upper: f64, direction: Direction) -> (f64, f64) {
     match direction {
         Direction::HigherIsBetter => (lower, upper),
         Direction::LowerIsBetter => (-upper, -lower),
     }
 }
 
-fn classify_intervals(
-    comparisons: &[ReferenceComparison],
-    margin: f64,
-) -> DecisionClass {
+fn classify_intervals(comparisons: &[ReferenceComparison], margin: f64) -> DecisionClass {
     let mut all_a = true;
     let mut all_b = true;
     let mut all_equivalent = true;
@@ -942,7 +956,12 @@ mod tests {
         MetricOutcome::Observed(MetricEvidence::PointEstimateOnly { value })
     }
 
-    fn action(reference_id: &str, action_id: &str, receipt_id: &str, outcome: MetricOutcome) -> ActionResult {
+    fn action(
+        reference_id: &str,
+        action_id: &str,
+        receipt_id: &str,
+        outcome: MetricOutcome,
+    ) -> ActionResult {
         let action_payload_digest = if action_id == "continue" { "b" } else { "c" };
         ActionResult {
             receipt_id: receipt_id.into(),
@@ -984,12 +1003,7 @@ mod tests {
         evaluate_pair(&bound_context, rows)
     }
 
-    fn row(
-        reference_id: &str,
-        family: &str,
-        a: MetricOutcome,
-        b: MetricOutcome,
-    ) -> ReferenceRow {
+    fn row(reference_id: &str, family: &str, a: MetricOutcome, b: MetricOutcome) -> ReferenceRow {
         ReferenceRow {
             reference_id: reference_id.into(),
             dependency_family_id: family.into(),
@@ -998,16 +1012,36 @@ mod tests {
                 source_artifact_digest: "a".repeat(64),
             },
             applicability: Applicability::Applicable,
-            action_a: Some(action(reference_id, "continue", &format!("{reference_id}-a"), a)),
-            action_b: Some(action(reference_id, "yield", &format!("{reference_id}-b"), b)),
+            action_a: Some(action(
+                reference_id,
+                "continue",
+                &format!("{reference_id}-a"),
+                a,
+            )),
+            action_b: Some(action(
+                reference_id,
+                "yield",
+                &format!("{reference_id}-b"),
+                b,
+            )),
         }
     }
 
     #[test]
     fn unanimous_interval_preference_is_portfolio_dominance() {
         let rows = vec![
-            row("r0", "analytic", interval(0.20, 0.25), interval(-0.10, -0.05)),
-            row("r1", "independent-code", interval(0.15, 0.22), interval(-0.08, -0.02)),
+            row(
+                "r0",
+                "analytic",
+                interval(0.20, 0.25),
+                interval(-0.10, -0.05),
+            ),
+            row(
+                "r1",
+                "independent-code",
+                interval(0.15, 0.22),
+                interval(-0.08, -0.02),
+            ),
         ];
         let envelope = evaluate(&context(Direction::HigherIsBetter, 0.02), &rows).unwrap();
         assert_eq!(envelope.classification, DecisionClass::PortfolioDominatesA);
@@ -1018,8 +1052,18 @@ mod tests {
     #[test]
     fn opposite_reference_preferences_are_not_averaged() {
         let rows = vec![
-            row("r0", "family-a", interval(0.20, 0.30), interval(-0.10, -0.05)),
-            row("r1", "family-b", interval(-0.35, -0.25), interval(0.20, 0.30)),
+            row(
+                "r0",
+                "family-a",
+                interval(0.20, 0.30),
+                interval(-0.10, -0.05),
+            ),
+            row(
+                "r1",
+                "family-b",
+                interval(-0.35, -0.25),
+                interval(0.20, 0.30),
+            ),
         ];
         let envelope = evaluate_pair(&context(Direction::HigherIsBetter, 0.02), &rows).unwrap();
         assert_eq!(envelope.classification, DecisionClass::ReferenceSensitive);
@@ -1043,7 +1087,12 @@ mod tests {
     fn equivalence_requires_each_reference_interval_inside_margin() {
         let rows = vec![
             row("r0", "family-a", interval(1.00, 1.01), interval(1.00, 1.01)),
-            row("r1", "family-b", interval(2.00, 2.01), interval(2.005, 2.01)),
+            row(
+                "r1",
+                "family-b",
+                interval(2.00, 2.01),
+                interval(2.005, 2.01),
+            ),
         ];
         let envelope = evaluate_pair(&context(Direction::HigherIsBetter, 0.02), &rows).unwrap();
         assert_eq!(envelope.classification, DecisionClass::PortfolioEquivalent);
@@ -1067,8 +1116,18 @@ mod tests {
         ];
         let envelope = evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &rows).unwrap();
         assert_eq!(envelope.classification, DecisionClass::PointwiseOnly);
-        assert!(envelope.comparisons.iter().all(|item| item.difference.is_none()));
-        assert!(envelope.comparisons.iter().all(|item| item.point_preference == Some(Preference::ActionA)));
+        assert!(
+            envelope
+                .comparisons
+                .iter()
+                .all(|item| item.difference.is_none())
+        );
+        assert!(
+            envelope
+                .comparisons
+                .iter()
+                .all(|item| item.point_preference == Some(Preference::ActionA))
+        );
     }
 
     #[test]
@@ -1088,8 +1147,12 @@ mod tests {
     #[test]
     fn different_interval_semantics_cannot_be_pooled() {
         let mut second = row("r1", "family-b", interval(2.0, 2.2), interval(1.0, 1.2));
-        for result in [&mut second.action_a, &mut second.action_b].into_iter().flatten() {
-            if let MetricOutcome::Observed(MetricEvidence::BoundedInterval { semantics, .. }) = &mut result.outcome {
+        for result in [&mut second.action_a, &mut second.action_b]
+            .into_iter()
+            .flatten()
+        {
+            if let MetricOutcome::Observed(MetricEvidence::BoundedInterval { semantics, .. }) =
+                &mut result.outcome {
                 *semantics = IntervalSemantics::MeasurementInterval;
             }
         }
@@ -1107,7 +1170,12 @@ mod tests {
 
     #[test]
     fn inapplicable_reference_is_excluded_only_for_this_measurand() {
-        let mut actor_only = row("actor-only", "actor-policy", interval(5.0, 6.0), interval(1.0, 2.0));
+        let mut actor_only = row(
+            "actor-only",
+            "actor-policy",
+            interval(5.0, 6.0),
+            interval(1.0, 2.0),
+        );
         actor_only.applicability = Applicability::Inapplicable;
         actor_only.action_a = None;
         actor_only.action_b = None;
@@ -1161,7 +1229,10 @@ mod tests {
         bad.action_a.as_mut().unwrap().feasibility = Feasibility::Infeasible;
         let envelope = evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &[bad]).unwrap();
         assert_eq!(envelope.classification, DecisionClass::Incomplete);
-        assert!(matches!(envelope.incomplete_reason, Some(IncompleteReason::InfeasibleAction { .. })));
+        assert!(matches!(
+            envelope.incomplete_reason,
+            Some(IncompleteReason::InfeasibleAction { .. })
+        ));
     }
 
     #[test]
@@ -1171,14 +1242,20 @@ mod tests {
             row("r0", "family-b", interval(2.0, 2.2), interval(1.0, 1.2)),
         ];
         assert_eq!(
-            evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &duplicate_reference),
+            evaluate_pair(
+                &context(Direction::HigherIsBetter, 0.1),
+                &duplicate_reference
+            ),
             Err(EvaluationError::DuplicateReferenceId("r0".into()))
         );
 
         let mut duplicate_receipt = row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2));
         duplicate_receipt.action_b.as_mut().unwrap().receipt_id = "r0-a".into();
         assert_eq!(
-            evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &[duplicate_receipt]),
+            evaluate_pair(
+                &context(Direction::HigherIsBetter, 0.1),
+                &[duplicate_receipt]
+            ),
             Err(EvaluationError::DuplicateReceiptId("r0-a".into()))
         );
     }
@@ -1187,7 +1264,12 @@ mod tests {
     fn incomplete_candidate_set_suppresses_comparison() {
         let mut ctx = context(Direction::HigherIsBetter, 0.1);
         ctx.action_set_complete = false;
-        let rows = vec![row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2))];
+        let rows = vec![row(
+            "r0",
+            "family-a",
+            interval(2.0, 2.2),
+            interval(1.0, 1.2),
+        )];
         let envelope = evaluate(&ctx, &rows).unwrap();
         assert_eq!(envelope.classification, DecisionClass::Incomplete);
         assert_eq!(
@@ -1212,8 +1294,13 @@ mod tests {
     fn input_reference_order_does_not_change_canonical_result() {
         let first = row("r1", "family-b", interval(2.0, 2.2), interval(1.0, 1.2));
         let second = row("r0", "family-a", interval(2.1, 2.3), interval(1.0, 1.2));
-        let left = evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &[first.clone(), second.clone()]).unwrap();
-        let right = evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &[second, first]).unwrap();
+        let left = evaluate_pair(
+            &context(Direction::HigherIsBetter, 0.1),
+            &[first.clone(), second.clone()],
+        )
+        .unwrap();
+        let right =
+            evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &[second, first]).unwrap();
         assert_eq!(left, right);
         assert_eq!(left.comparisons[0].reference_id, "r0");
     }
@@ -1222,7 +1309,12 @@ mod tests {
     fn missing_expected_reference_suppresses_portfolio_dominance() {
         let mut ctx = context(Direction::HigherIsBetter, 0.1);
         ctx.expected_reference_ids = vec!["r0".into(), "r1".into()];
-        let rows = vec![row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2))];
+        let rows = vec![row(
+            "r0",
+            "family-a",
+            interval(2.0, 2.2),
+            interval(1.0, 1.2),
+        )];
         let envelope = evaluate_pair(&ctx, &rows).unwrap();
         assert_eq!(envelope.classification, DecisionClass::Incomplete);
         assert_eq!(
@@ -1299,7 +1391,8 @@ mod tests {
     fn no_applicable_qualified_reference_is_out_of_scope() {
         let mut unqualified = row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2));
         unqualified.qualification = Qualification::NotQualified;
-        let envelope = evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &[unqualified]).unwrap();
+        let envelope =
+            evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &[unqualified]).unwrap();
         assert_eq!(envelope.classification, DecisionClass::OutOfScope);
     }
 
