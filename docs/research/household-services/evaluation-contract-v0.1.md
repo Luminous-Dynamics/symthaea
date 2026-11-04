@@ -26,8 +26,8 @@ Known-answer negative control from WCONT-008:
     R = 480 - 120 - 520 - 40 = -200 L
     The fixture provides meter_uncertainty_l = 5 L but does not say whether
     that bound is per meter or already aggregated. The integration negative
-    control takes the conservative interpretation that each of the four terms
-    can contribute up to 5 L, so U_R = 4 × 5 L = 20 L:
+    control conservatively assigns 5 L to each of the four typed meter terms;
+    the evaluator derives U_R = 4 × 5 L = 20 L:
 
     interval = [-220 L, -180 L]
 
