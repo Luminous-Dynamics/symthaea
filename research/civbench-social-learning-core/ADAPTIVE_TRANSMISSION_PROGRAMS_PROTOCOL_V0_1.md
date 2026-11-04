@@ -72,7 +72,7 @@ The DAGs are synthetic fixtures, not extracted from the authors' 720-element tas
 
 ## 4. Policies and controls
 
-The current Rust benchmark includes six policies:
+The current Rust benchmark includes seven policies:
 1. NoSocial — individual innovation only.
 2. FixedRing — deterministic neighbour schedule; send the first available rule.
 3. FixedRingContentShuffled — preserve that ring's sender/receiver schedule but select a random available rule.
