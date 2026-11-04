@@ -59,3 +59,10 @@ Expected disposition: `FRAME_GAP_DETECTED`, with two required assertions, one de
 The crate uses exact dependency pins and its own lockfile. The workflow runs formatting, locked tests and strict Clippy on the crate independently of root-workspace compilation.
 
 V0.1 remains intentionally narrow: it validates supplied export structure and declared coverage labels; it cannot independently authenticate custodians or prove that real-world executions were all logged.
+
+
+## Timestamp and source-custody checks
+
+V0.1 accepts canonical UTC timestamps in `YYYY-MM-DDTHH:MM:SSZ` form. The selected `event_time_basis` must fall in the half-open interval `[start_at, end_at)`. Ingestion time may be later than event time but may not precede it. The verifier blocks a report when a required source role reuses a custodian reference or declares shared controls; this is a conservative source-separation check, not proof that distinct custodians have no hidden common control.
+
+The JSON Schema declares RFC 3339 date-time fields; the Rust profile intentionally narrows them to canonical UTC seconds so lexicographic interval checks are well-defined without a date/time dependency.
