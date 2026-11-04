@@ -225,10 +225,16 @@ Preserve reversible snapshots, deterministic builds where possible, resource cap
 
 ### Phase 1 — Receipt and paired-evaluation kernel
 
-- Add versioned per-case receipts and exact matched parent/candidate comparison.
-- Bind independent evaluator, case-set, seed, budget, metric-schema, and source identities.
-- Add deterministic paired statistics and confidence intervals.
-- Reject missing cases, duplicate cases, stale lineage, unsupported metric transformations, and evaluator mismatch.
+- [x] Add validated per-case receipts and exact matched parent/candidate comparison (`paired_evaluation.rs`).
+- [x] Bind each receipt to the exact evaluation context, candidate/parent identity, source-tree digest, receipt digest, case IDs, and normalized metric dimensions.
+- [x] Derive archive capability summaries from sorted per-case evidence rather than caller-supplied aggregate scores.
+- [x] Report per-metric paired wins/losses/ties, mean paired delta, and exact one-sided sign-test p-values.
+- [x] Reject empty/duplicate/mismatched cases, metric-schema drift, context mismatch, incorrect parent lineage, and invalid tie tolerances.
+- [ ] Add authenticated evaluator receipts and retained raw outcomes; digests alone do not authenticate a measurement.
+- [ ] Add confidence intervals, multiplicity correction, practical-effect thresholds, and non-inferiority gates.
+- [ ] Add an independently operated sealed-holdout evaluator/access boundary. The partition enum is descriptive metadata, not access control.
+
+**Statistical limitation:** the exact sign test measures directional consistency among non-tied paired cases. It does not measure effect magnitude (the mean delta is reported separately), establish practical significance, correct for repeated adaptive selection, prove equivalence when non-significant, or authorize promotion.
 
 ### Phase 2 — Controlled coding-agent evolution
 
