@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "analysis_id": "synthetic-query-decision-disambiguation-v1",
+  "dataset_revision_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "query_id": "circuit-connectivity-is-functionally-present",
+  "query_spec_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "scenario_set_scope": "exhaustive_declared_scenario_space",
+  "scenario_set_sha256": "c3223403c802a22ea89b335df4593f15d9017d19ba5184d7f2aaba6402efa5b5",
+  "effort_unit": "expert_review_minutes",
+  "max_total_effort_units": 4,
+  "scenarios": [
+    { "scenario_id": "world-alpha", "graph_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "decision_met": true },
+    { "scenario_id": "world-beta", "graph_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "decision_met": false },
+    { "scenario_id": "world-gamma", "graph_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "decision_met": false },
+    { "scenario_id": "world-delta", "graph_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "decision_met": true }
+  ],
+  "actions": [
+    {
+      "action_id": "inspect-synapse",
+      "action_kind": "synapse_adjudication",
+      "effort_units": 5,
+      "source_evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "observation_model_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "dependence_groups": ["raw-em-volume-001", "adjudication-family-A"],
+      "outcomes": [
+        { "scenario_id": "world-alpha", "outcome_id": "pre-post-pattern-A" },
+        { "scenario_id": "world-beta", "outcome_id": "pre-post-pattern-B" },
+        { "scenario_id": "world-gamma", "outcome_id": "pre-post-pattern-B" },
+        { "scenario_id": "world-delta", "outcome_id": "pre-post-pattern-A" }
+      ]
+    },
+    {
+      "action_id": "inspect-morphology",
+      "action_kind": "morphology_review",
+      "effort_units": 2,
+      "source_evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "observation_model_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "dependence_groups": ["raw-em-volume-001"],
+      "outcomes": [
+        { "scenario_id": "world-alpha", "outcome_id": "thin-axon" },
+        { "scenario_id": "world-beta", "outcome_id": "thick-axon" },
+        { "scenario_id": "world-gamma", "outcome_id": "thin-axon" },
+        { "scenario_id": "world-delta", "outcome_id": "thick-axon" }
+      ]
+    },
+    {
+      "action_id": "trace-morphology-review",
+      "action_kind": "morphology_review",
+      "effort_units": 2,
+      "source_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "observation_model_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "dependence_groups": ["raw-em-volume-001", "morphology-review-family"],
+      "outcomes": [
+        { "scenario_id": "world-alpha", "outcome_id": "trace-class-1" },
+        { "scenario_id": "world-beta", "outcome_id": "trace-class-2" },
+        { "scenario_id": "world-gamma", "outcome_id": "trace-class-1" },
+        { "scenario_id": "world-delta", "outcome_id": "trace-class-2" }
+      ]
+    },
+    {
+      "action_id": "reviewer-panel",
+      "action_kind": "other",
+      "effort_units": 2,
+      "source_evidence_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "observation_model_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "dependence_groups": ["adjudication-panel-B"],
+      "outcomes": [
+        { "scenario_id": "world-alpha", "outcome_id": "panel-result-1" },
+        { "scenario_id": "world-beta", "outcome_id": "panel-result-1" },
+        { "scenario_id": "world-gamma", "outcome_id": "panel-result-2" },
+        { "scenario_id": "world-delta", "outcome_id": "panel-result-2" }
+      ]
+    },
+    {
+      "action_id": "image-sharpness-decoy",
+      "action_kind": "image_inspection",
+      "effort_units": 1,
+      "source_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "observation_model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "dependence_groups": ["raw-em-volume-001"],
+      "outcomes": [
+        { "scenario_id": "world-alpha", "outcome_id": "same" },
+        { "scenario_id": "world-beta", "outcome_id": "same" },
+        { "scenario_id": "world-gamma", "outcome_id": "same" },
+        { "scenario_id": "world-delta", "outcome_id": "same" }
+      ]
+    }
+  ]
+}
