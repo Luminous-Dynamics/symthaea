@@ -256,8 +256,13 @@ jobs:
               raise SystemExit("synthetic proof-run report digest differs from JSONL bytes")
           if len(runs) != 2 or report["run_count"] != 2 or report["verified_success_run_count"] != 1 or report["unique_successful_task_count"] != 1:
               raise SystemExit("synthetic proof-run denominators changed")
-          if report["strategy_summaries"][0]["attempts"] != 2:
+          summary = report["strategy_summaries"][0]
+          if summary["attempts"] != 2 or summary["verified_success_attempts"] != 1:
               raise SystemExit("synthetic per-strategy attempt denominator changed")
+          if summary["unique_tasks_solved"] != 1 or summary["unique_task_success_rate"] != 0.5:
+              raise SystemExit("synthetic per-strategy unique task coverage changed")
+          if abs(summary["cost_per_unique_verified_task_usd"] - 0.01) > 1e-12:
+              raise SystemExit("synthetic cost per unique verified task changed")
           print("PITB_SORRYDB_REPORT_AND_PROOF_RUN_SCHEMA_PASS")
           PY
 
