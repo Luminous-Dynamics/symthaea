@@ -501,7 +501,8 @@
           "observations": {
             "properties": {
               "observed_uncompressed_bytes": {
-                "type": "integer"
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$"
               },
               "observed_crc32": {
                 "type": "string"
