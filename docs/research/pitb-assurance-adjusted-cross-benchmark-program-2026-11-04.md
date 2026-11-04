@@ -24,6 +24,11 @@ These benchmarks are complementary, not interchangeable.
 
 The live SorryDB page defines Pass@1 as one attempt per task and combined performance as the fraction solved by at least one listed approach. These are different statistics. PITB must report both **attempt success** and **unique task coverage**, never substitute one for the other.
 
+
+**Pinned snapshot count discrepancy:** the exact SorryDB-2601 full-dataset blob at repository commit 74b3b63f8ba890d675f362924b21ac55db410383 contains **5,663** task records, although the README at that commit documents 2,601. The pinned evaluation split remains 1,000 records and its membership is checked against the full 5,663-row file. Treat 2,601 as a stale documentation figure, not the evaluation denominator or current blob cardinality. The existing Rust auditor preserves this mismatch as an explicit warning and verifies the raw Git blob IDs rather than editing upstream data.
+
+**Leaderboard reference:** at the 4 November 2026 audit, the live SorryDB leaderboard reports **57.2% Pass@1** for its top listed individual approach and **63.2% combined unique coverage** across listed approaches on the 1,000-task evaluation slice. These represent different score types: the former is the strongest individual system, while the latter is an oracle-like union across systems. The proposed 60% assurance-adjusted PITB pilot gate is therefore above the published individual Pass@1 point but below the public combined union; it must be reported with matched budget/source-visibility controls and repository/file-clustered uncertainty. Neither headline should be described as a directly matched baseline until rerun under the pinned protocol.
+
 ### Current retrieval systems must be included
 
 The matched retrieval portfolio should include:
