@@ -422,8 +422,7 @@ fn greedy_disambiguation_plan(
                 Some((best_index, best_marginal)) => {
                     let candidate_cross =
                         (marginal as u128) * (actions[best_index].effort_units as u128);
-                    let best_cross =
-                        (best_marginal as u128) * (action.effort_units as u128);
+                    let best_cross = (best_marginal as u128) * (action.effort_units as u128);
                     candidate_cross > best_cross
                         || (candidate_cross == best_cross
                             && (marginal > best_marginal
@@ -442,9 +441,7 @@ fn greedy_disambiguation_plan(
         effort_units = effort_units.saturating_add(action.effort_units);
         selected_indices.insert(best_index);
         selected_ids.push(action.action_id.clone());
-        uncovered.retain(|pair| {
-            !action_separates_pair(&outcomes_by_action[best_index], pair)
-        });
+        uncovered.retain(|pair| !action_separates_pair(&outcomes_by_action[best_index], pair));
     }
 
     selected_ids.sort();
@@ -712,7 +709,9 @@ mod tests {
         assert!(report.greedy_comparator.complete);
         assert_eq!(report.greedy_comparator.effort_units, 5);
         assert_eq!(
-            report.greedy_comparator.regret_to_exact_minimum_effort_units,
+            report
+                .greedy_comparator
+                .regret_to_exact_minimum_effort_units,
             Some(1)
         );
         assert_eq!(
@@ -806,11 +805,18 @@ mod tests {
         let report = evaluate(&input, &bytes).unwrap();
         assert!(!report.greedy_comparator.complete);
         assert_eq!(
-            report.greedy_comparator.separated_decision_conflict_pair_count,
+            report
+                .greedy_comparator
+                .separated_decision_conflict_pair_count,
             2
         );
         assert_eq!(report.greedy_comparator.remaining_pairs.len(), 2);
-        assert_eq!(report.greedy_comparator.regret_to_exact_minimum_effort_units, None);
+        assert_eq!(
+            report
+                .greedy_comparator
+                .regret_to_exact_minimum_effort_units,
+            None
+        );
     }
 
     #[test]
