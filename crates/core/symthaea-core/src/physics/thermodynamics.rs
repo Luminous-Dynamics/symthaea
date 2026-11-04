@@ -602,6 +602,7 @@ mod tests {
 
         assert!((one_bit_300k - K_BOLTZMANN * 300.0 * std::f64::consts::LN_2).abs() < 1e-35);
         assert!((two_bits_300k - 2.0 * one_bit_300k).abs() < 1e-35);
+        assert!((one_bit_310k - 2.966_678_181_248_014_7e-21).abs() < 1e-35);
         assert!((one_bit_310k / one_bit_300k - 310.0 / 300.0).abs() < 1e-14);
     }
 
@@ -614,6 +615,7 @@ mod tests {
         assert!(encoder.landauer_erasure_heat_floor(1.0, 0.0).is_none());
         assert!(encoder.landauer_erasure_heat_floor(1.0, -300.0).is_none());
         assert!(encoder.landauer_erasure_heat_floor(1.0, f64::INFINITY).is_none());
+        assert!(encoder.landauer_erasure_heat_floor(f64::MAX, f64::MAX).is_none());
     }
 
     #[test]
