@@ -338,6 +338,11 @@ pub fn fit_with_optimizer(
     runs.sort_by(|a, b| a.objective.total_cmp(&b.objective));
     let best = runs.remove(0);
     let curvature = diagonal_curvature_with_correction(table, &best.parameters, options.count_correction);
+    let fisher = expected_fisher_information(
+        table,
+        &best.parameters,
+        options.count_correction == CountCorrection::None && best.converged && !best.at_boundary,
+    );
     let estimate = decode_parameters(&best.parameters, table.categories.len())
         .and_then(|(mu, sigma, thresholds, _)| UvsdEstimate::new(mu, sigma, thresholds));
 
@@ -564,6 +569,7 @@ fn finite_z_ratio_product(z: f64, ratio: f64) -> f64 {
 fn expected_fisher_information(
     table: &CategoryTable,
     parameters: &[f64],
+    allow_wald: bool,
 ) -> Option<FisherInformationDiagnostics> {
     let (mu, sigma, thresholds, _) = decode_parameters(parameters, table.categories.len())?;
     let _estimate = UvsdEstimate::new(mu, sigma, thresholds.clone())?;
@@ -635,7 +641,7 @@ fn expected_fisher_information(
     let weakly_identified = effective_rank < dimension
         || condition_number.map(|value| value > 1.0e10).unwrap_or(true);
 
-    let covariance = if weakly_identified {
+    let covariance = if weakly_identified || !allow_wald {
         None
     } else {
         inverse_from_eigen(&eigenvalues, &eigenvectors)
