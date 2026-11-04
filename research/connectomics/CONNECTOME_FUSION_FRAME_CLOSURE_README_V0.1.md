@@ -21,7 +21,7 @@ Digest domains are:
 - Frame: `SHA256("connectome-fusion-frame-v0.1\\0" || canonical_json(assertions))`
 - Extraction identity: `SHA256("connectome-fusion-extraction-v0.1\\0" || UTF8(source_id))`
 
-The canonical use material binds the scope digest, query ID, claim ID, operation ID, fusion-policy digest, verifier digest, sorted source-release IDs and sorted evidence IDs. Source-local event IDs and sequence numbers are deliberately excluded from the cross-source use key.
+The canonical use material binds the scope digest, query ID, claim ID, certificate ID, operation ID, fusion-policy digest, verifier digest, dependence-bundle digest, sorted source-release IDs and sorted evidence IDs. Source-local event IDs and sequence numbers are deliberately excluded from the cross-source use key. This prevents two different certificates or dependence-bundle revisions from aliasing to one semantic-use identity.
 
 ## Expected known answer
 
@@ -42,3 +42,20 @@ The frame must not proceed to #10414 sampling. Filling the missing assertion aft
 ## Limits
 
 The fixture demonstrates only deterministic digest conventions, cross-source event identity and frame-undercoverage detection. The declared source-coverage fields are synthetic assertions; the fixture does not authenticate custodians, prove source independence, test an event journal's completeness or establish biological independence.
+
+
+## Standalone Rust verifier
+
+The standalone crate lives at `tools/connectome-fusion-frame-closure-audit` and is deliberately excluded from the root workspace.
+
+Run the synthetic omitted-use known answer from the repository root:
+
+```sh
+cargo run --locked --manifest-path tools/connectome-fusion-frame-closure-audit/Cargo.toml -- research/connectomics/fixtures/connectome-fusion-frame-closure-omitted-use-v0.1.json
+```
+
+Expected disposition: `FRAME_GAP_DETECTED`, with two required assertions, one declared assertion and one missing assertion. A validly evaluated blocked disposition exits successfully; malformed input or unsupported/digest-invalid input emits `NOT_ESTIMABLE`.
+
+The crate uses exact dependency pins and its own lockfile. The workflow runs formatting, locked tests and strict Clippy on the crate independently of root-workspace compilation.
+
+V0.1 remains intentionally narrow: it validates supplied export structure and declared coverage labels; it cannot independently authenticate custodians or prove that real-world executions were all logged.
