@@ -1,0 +1,321 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/external-benchmark-registry-v0.1.schema.json",
+  "title": "External Benchmark Registry v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "updated_at",
+    "entries"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/entry"
+      },
+      "minItems": 1
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "status",
+        "publisher",
+        "official_url",
+        "repository_url",
+        "dataset_url",
+        "paper_url",
+        "paper_revision",
+        "task_count",
+        "splits",
+        "disciplines",
+        "licensing",
+        "execution",
+        "baseline_context",
+        "ceb_integration"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 3
+        },
+        "status": {
+          "enum": [
+            "metadata_only",
+            "access_gated",
+            "adapter_in_progress",
+            "runnable",
+            "qualified",
+            "retired"
+          ]
+        },
+        "publisher": {
+          "type": "string",
+          "minLength": 2
+        },
+        "official_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "repository_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "dataset_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "paper_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "paper_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "splits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "development",
+            "hidden_test"
+          ],
+          "properties": {
+            "development": {
+              "$ref": "#/$defs/split"
+            },
+            "hidden_test": {
+              "$ref": "#/$defs/split"
+            }
+          }
+        },
+        "disciplines": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "structural",
+            "civil",
+            "electrical",
+            "mechanical"
+          ],
+          "properties": {
+            "structural": {
+              "$ref": "#/$defs/discipline"
+            },
+            "civil": {
+              "$ref": "#/$defs/discipline"
+            },
+            "electrical": {
+              "$ref": "#/$defs/discipline"
+            },
+            "mechanical": {
+              "$ref": "#/$defs/discipline"
+            }
+          }
+        },
+        "licensing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runner_code",
+            "development_dataset",
+            "access_gated"
+          ],
+          "properties": {
+            "runner_code": {
+              "type": "string"
+            },
+            "development_dataset": {
+              "type": "string"
+            },
+            "access_gated": {
+              "type": "boolean"
+            }
+          }
+        },
+        "execution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "official_runner",
+            "harbor_version",
+            "per_task_time_limit_seconds",
+            "official_repeat_count",
+            "runner_revision",
+            "dataset_revision",
+            "execution_authorized"
+          ],
+          "properties": {
+            "official_runner": {
+              "type": "string"
+            },
+            "harbor_version": {
+              "type": "string"
+            },
+            "per_task_time_limit_seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "official_repeat_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "runner_revision": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "dataset_revision": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "execution_authorized": {
+              "const": false
+            }
+          }
+        },
+        "baseline_context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "hidden_test_leaderboard_score",
+            "paper_abstract_mean_score",
+            "all_hard_checks_clearance",
+            "notes"
+          ],
+          "properties": {
+            "hidden_test_leaderboard_score": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "paper_abstract_mean_score": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "all_hard_checks_clearance": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "notes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "ceb_integration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "task_contract_owner",
+            "receipt_owner",
+            "custody_owner",
+            "isolation_blocker",
+            "notes"
+          ],
+          "properties": {
+            "task_contract_owner": {
+              "type": "string"
+            },
+            "receipt_owner": {
+              "type": "string"
+            },
+            "custody_owner": {
+              "type": "string"
+            },
+            "isolation_blocker": {
+              "type": "string"
+            },
+            "notes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "count",
+        "access",
+        "score_scope"
+      ],
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "access": {
+          "enum": [
+            "public",
+            "access_gated",
+            "official_competition_only",
+            "unavailable"
+          ]
+        },
+        "score_scope": {
+          "type": "string"
+        }
+      }
+    },
+    "discipline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_tasks",
+        "development_tasks"
+      ],
+      "properties": {
+        "total_tasks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "development_tasks": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
