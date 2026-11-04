@@ -578,7 +578,6 @@ fn expected_fisher_information(
     let inverse_sigma = 1.0 / sigma;
 
     for index in 0..table.categories.len() {
-        let row = &table.categories[index];
         let lower = if index == 0 { f64::NEG_INFINITY } else { thresholds[index - 1] };
         let upper = if index == thresholds.len() { f64::INFINITY } else { thresholds[index] };
 
@@ -715,6 +714,12 @@ fn add_information_outer(
     score: &[f64],
 ) -> Option<()> {
     if !weight.is_finite() || weight < 0.0 || score.len() != information.len() {
+        return None;
+    }
+    if weight == 0.0 {
+        return Some(());
+    }
+    if score.iter().any(|value| !value.is_finite()) {
         return None;
     }
     for row in 0..score.len() {
@@ -908,6 +913,7 @@ fn sanitized_options(options: FitOptions) -> FitOptions {
             FitOptions::default().gradient_tolerance
         },
         starts: options.starts.clamp(1, 16),
+        count_correction: options.count_correction,
     }
 }
 
