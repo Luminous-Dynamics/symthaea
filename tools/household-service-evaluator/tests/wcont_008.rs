@@ -33,7 +33,7 @@ fn existing_wcont_008_fixture_is_recomputed_with_conservative_meter_bounds() {
     let per_term_bound_l = input["meter_uncertainty_l"].as_f64().unwrap();
     let aggregate_bound_l = 4.0 * per_term_bound_l;
 
-    let result = evaluate_water_balance(&WaterBalanceInput {
+    let input = WaterBalanceInput {
         inlet: meter(
             input["municipal_inlet_volume_l"].as_f64().unwrap(),
             "inlet-stream",
@@ -58,8 +58,13 @@ fn existing_wcont_008_fixture_is_recomputed_with_conservative_meter_bounds() {
         topology_audit: Some(TopologyAuditReference {
             report_sha256: "b".repeat(64),
         }),
-    })
-    .expect("synthetic known-answer input must be evaluable");
+    };
+    let encoded_input = serde_json::to_vec(&input)
+        .expect("typed evidence input must serialize deterministically");
+    let decoded_input: WaterBalanceInput = serde_json::from_slice(&encoded_input)
+        .expect("typed evidence input must deserialize without changing its contract");
+    let result = evaluate_water_balance(&decoded_input)
+        .expect("synthetic known-answer input must be evaluable");
 
     assert_eq!(result.residual_l, -200.0);
     assert_eq!(result.residual_lower_l, -220.0);
@@ -68,4 +73,10 @@ fn existing_wcont_008_fixture_is_recomputed_with_conservative_meter_bounds() {
         result.disposition,
         WaterBalanceDisposition::ContradictionBeyondDeclaredBound
     );
+    let receipt = serde_json::to_value(&result)
+        .expect("evaluation result must serialize as a machine-readable receipt");
+    assert_eq!(receipt["disposition"], "contradiction_beyond_declared_bound");
+    assert_eq!(receipt["residual_l"], -200.0);
+    assert_eq!(receipt["residual_lower_l"], -220.0);
+    assert_eq!(receipt["residual_upper_l"], -180.0);
 }
