@@ -239,7 +239,7 @@ Preserve reversible snapshots, deterministic builds where possible, resource cap
 
 **Evidence integration:** the adapter must consume validated task-level rows from the shared benchmark-run receipt contract (#10314) and the applicable DSSE/regrade verification pipeline (#10167/#10370). It is not an evidence format or authenticator of its own.
 
-**Statistical limitation:** the exact sign test measures directional consistency among non-tied paired cases. It does not measure effect magnitude (the mean delta is reported separately), establish practical significance, correct for repeated adaptive selection, prove equivalence when non-significant, or authorize promotion.
+**Statistical limitation:** the exact sign test measures directional consistency among non-tied paired cases under an independent-pair-sign assumption. It does not measure effect magnitude (the mean delta is reported separately), establish practical significance, correct for repeated adaptive selection or multiple metrics, prove equivalence when non-significant, or authorize promotion. Cases clustered by repository, task family, project, or run require independent-group or cluster-aware confirmation; counting correlated cases as independent can overstate evidence.
 
 ### Phase 2 — Controlled coding-agent evolution
 
