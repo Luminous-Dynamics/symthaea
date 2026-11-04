@@ -42,14 +42,16 @@ pub struct GeneratedTest {
 /// Category of generated test — informs which testing patterns to use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TestCategory {
-    /// Derived from user-provided examples
+    /// Explicit expected input/output example supplied by the request author.
     Example,
-    /// Invocation-only smoke probes at common input boundaries; not behavioral oracles.
-    Boundary,
-    /// Reserved for checks backed by an independent behavioral contract.
+    /// A call was formed for a selected boundary input; no output oracle is implied.
+    InvocationSmoke,
+    /// Reserved for properties justified by an independent behavioral contract.
     Property,
     /// Reserved until an error contract and valid inputs are supplied.
     ErrorCase,
+    /// Reserved for checks whose expected behavior is backed by an explicit task specification.
+    SpecificationBacked,
 }
 
 /// A complete test suite generated for a function.
@@ -388,7 +390,7 @@ mod tests {
         let boundary_tests: Vec<_> = suite
             .tests
             .iter()
-            .filter(|t| t.category == TestCategory::Boundary)
+            .filter(|t| t.category == TestCategory::InvocationSmoke)
             .collect();
 
         assert!(
