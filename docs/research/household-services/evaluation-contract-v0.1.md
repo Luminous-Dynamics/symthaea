@@ -81,3 +81,20 @@ Passing this Rust test suite establishes only the deterministic behavior of the 
 - appliance cleaning performance or energy/water superiority;
 - safe repair, spare-parts availability, regulatory compliance or lifetime reliability;
 - production variation or real-household validity.
+
+
+## 7. Batch evaluation contract
+
+The offline batch evaluator accepts only:
+- water corpus ID HOME-UTILITY-COORD-001-WATER-CONTINUITY-SYNTHETIC-001;
+- repair corpus ID HOME-REPAIR-QUAL-001-SYNTHETIC-REPAIR-TASKS-001;
+- schema version 0.1 and status synthetic_test_fixture_only;
+- the exact ten known water scenario IDs and exact ten known repair task IDs.
+
+Missing, duplicate, unknown, additional, or malformed cases fail the batch. A fixture's expected_disposition is copied into the receipt only as source metadata; evaluator output is selected independently from the scenario inputs. Deterministic metrics are derived from explicit synthetic assumptions and labelled accordingly.
+
+The batch report is generated without a timestamp and orders receipts by frozen corpus order. It includes corpus IDs, counts, per-case dispositions, derived metrics, evidence notes, unresolved claims and the claim ceiling. Re-running the same evaluator version against identical fixture bytes must produce byte-identical JSON.
+
+The report is a software-conformance artifact, not an installation result. Cases without measured pressure, calibrated outlet flow, usable delivery-boundary reserve, qualified end-use water, executed repair actions, post-repair checks or physical follow-up stay unresolved, blocked or held. The batch evaluator does not infer missing evidence from the expected fixture disposition.
+
+CI uploads the generated JSON for traceability. An uploaded artifact proves only that the declared deterministic software path produced a report from the declared synthetic fixture inputs.
