@@ -2,7 +2,7 @@
   "schema_version": "mel-output-clock-anchor-set-v1",
   "fixture_id": "MEL-CLOCK-DISCONTINUITY-001",
   "description": "A callback frame-counter gap indicates a dropped or reset stream segment. A new fit must not bridge the gap.",
-  "expected_disposition": "fit",
+  "expected_disposition": "reject_discontinuity",
   "anchors": [
     {
       "schema_version": "mel-output-clock-anchor-v1",
