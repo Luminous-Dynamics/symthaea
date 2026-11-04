@@ -1,6 +1,6 @@
 # MEL-EVIDENCE-001 — Grounded evidence to selective participation v1
 
-**Status:** independent evidence-bundle receipt contract, action authorization validator, four strict schemas, four conformance fixtures, CLI example and 20 authored Rust tests are committed. Rust compilation, test execution, integration with the #10265 temporal-grounding producer, runner prefix isolation and real-audio evaluation remain outstanding.
+**Status:** independent evidence-bundle receipt contract, action authorization validator, four strict schemas, four conformance fixtures, CLI example and 21 authored Rust tests are committed. Rust compilation, test execution, integration with the #10265 temporal-grounding producer, runner prefix isolation and real-audio evaluation remain outstanding.
 
 ## Objective
 
@@ -36,7 +36,7 @@ V1 uses the Rust `serde_json` serialization of the typed structs for the commitm
 - **RESPOND:** cite a grounded invitation claim.
 - **CONTINUE:** cite a grounded active-phrase claim.
 - **YIELD:** cite a grounded handoff/stop claim.
-- **WAIT:** when policy requires grounding, cite a grounded retained-floor, intentional-space or collaborator-veto claim.
+- **WAIT:** when policy requires grounding (the default), cite a grounded retained-floor, intentional-space or collaborator-veto claim. The optional permissive policy profile is explicit and tested.
 - **ASK:** cite ambiguous grounding; ASK is not treated as a failed attempt to find a grounded event.
 - **ABSTAIN:** cite explicit non-grounded evidence (ambiguous, unavailable, contradicted or not estimable) and withhold the contribution.
 
