@@ -4,9 +4,15 @@ use symthaea_household_service_evaluator::{
     evaluate_water_balance,
 };
 
-fn meter(value_l: f64, stream: &str, boundary: &str) -> MeterMeasurement {
+fn meter(
+    value_l: f64,
+    error_bound_l: f64,
+    stream: &str,
+    boundary: &str,
+) -> MeterMeasurement {
     MeterMeasurement {
         value_l,
+        absolute_error_bound_l: error_bound_l,
         stream_id: stream.to_owned(),
         measurement_boundary_id: boundary.to_owned(),
         window_start_unix_ms: 1,
@@ -31,30 +37,31 @@ fn existing_wcont_008_fixture_is_recomputed_with_conservative_meter_bounds() {
     // treat it as an absolute bound for each of the four terms and sum them.
     // The fixture remains synthetic; this interpretation is not calibration data.
     let per_term_bound_l = input["meter_uncertainty_l"].as_f64().unwrap();
-    let aggregate_bound_l = 4.0 * per_term_bound_l;
-
     let input = WaterBalanceInput {
         inlet: meter(
             input["municipal_inlet_volume_l"].as_f64().unwrap(),
+            per_term_bound_l,
             "inlet-stream",
             "inlet-boundary",
         ),
         tank_storage_delta: meter(
             input["tank_storage_delta_l"].as_f64().unwrap(),
+            per_term_bound_l,
             "tank-stream",
             "tank-boundary",
         ),
         delivered_outlet: meter(
             input["outlet_meter_volume_l"].as_f64().unwrap(),
+            per_term_bound_l,
             "outlet-stream",
             "outlet-boundary",
         ),
         purge_and_overflow: meter(
             input["purge_and_overflow_meter_volume_l"].as_f64().unwrap(),
+            per_term_bound_l,
             "purge-stream",
             "purge-boundary",
         ),
-        residual_absolute_error_bound_l: aggregate_bound_l,
         topology_audit: Some(TopologyAuditReference {
             report_sha256: "b".repeat(64),
         }),
@@ -69,6 +76,7 @@ fn existing_wcont_008_fixture_is_recomputed_with_conservative_meter_bounds() {
     assert_eq!(result.residual_l, -200.0);
     assert_eq!(result.residual_lower_l, -220.0);
     assert_eq!(result.residual_upper_l, -180.0);
+    assert_eq!(result.aggregate_absolute_error_bound_l, 20.0);
     assert_eq!(
         result.disposition,
         WaterBalanceDisposition::ContradictionBeyondDeclaredBound
@@ -82,4 +90,5 @@ fn existing_wcont_008_fixture_is_recomputed_with_conservative_meter_bounds() {
     assert_eq!(receipt["residual_l"], -200.0);
     assert_eq!(receipt["residual_lower_l"], -220.0);
     assert_eq!(receipt["residual_upper_l"], -180.0);
+    assert_eq!(receipt["aggregate_absolute_error_bound_l"], 20.0);
 }
