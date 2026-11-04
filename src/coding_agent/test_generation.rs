@@ -14,12 +14,12 @@
 //!     ↓
 //! TestSuite {
 //!     tests: [
-//!         Test { name: "test_fibonacci_example_0", assert: "fibonacci(0)", expected: "0" },
-//!         Test { name: "test_fibonacci_example_1", assert: "fibonacci(10)", expected: "55" },
-//!         Test { name: "test_fibonacci_boundary_zero", assert: "fibonacci(0)", expected: "0" },
-//!         Test { name: "test_fibonacci_boundary_one", assert: "fibonacci(1)", expected: "1" },
-//!         Test { name: "test_fibonacci_large", assert: "fibonacci(20)", expected: "6765" },
-//!     ]
+//!         Example { body: "assert_eq!(fibonacci(0), 0);" },
+//!         Example { body: "assert_eq!(fibonacci(10), 55);" },
+//!         InvocationSmoke { body: "let _ = fibonacci(0);" },
+//!         InvocationSmoke { body: "let _ = fibonacci(1);" },
+//!     ],
+//!     unsupported: ["No behavioral property is inferred from the return type alone."],
 //! }
 //! ```
 //!
@@ -33,7 +33,7 @@ use syn::{Expr, FnArg, Pat, Type};
 pub struct GeneratedTest {
     /// Test function name (e.g., "test_fibonacci_example_0")
     pub name: String,
-    /// The assertion expression (e.g., "assert_eq!(fibonacci(0), 0)")
+    /// The Rust statement/assertion placed in the generated test body
     pub assertion: String,
     /// Category of this test
     pub category: TestCategory,
