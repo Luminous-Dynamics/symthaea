@@ -20,7 +20,8 @@
 //! composition remains non-qualified.
 
 use crate::output_clock::{
-    OutputClockAccuracyStatusV1, OutputClockFitBundleV1, OutputClockFitErrorV1,
+    OutputClockAccuracyStatusV1, OutputClockAnchorSourceV1, OutputClockAnchorV1,
+    OutputClockFitBundleV1, OutputClockFitErrorV1, OutputClockStreamDescriptorV1,
     OutputFrameEstimateV1, OUTPUT_CLOCK_FIT_BUNDLE_SCHEMA_V1, OUTPUT_CLOCK_FIT_SCHEMA_V1,
 };
 use serde::{Deserialize, Serialize};
@@ -306,10 +307,9 @@ impl std::fmt::Display for RunnerCpalClockFitErrorV1 {
 impl std::error::Error for RunnerCpalClockFitErrorV1 {}
 
 impl RunnerCpalClockFitV1 {
-    /// Invert the fitted mapping and estimate the CPAL predicted-playback
-    /// stream-clock instant corresponding to a runner monotonic timestamp.
-    /// A caller may query MEL-CLOCK-001's playback-time -> output-frame fit
-    /// directly with this value; no callback-to-playback fit is required.
+    /// Invert the simultaneous runner/CPAL callback-clock observation.
+    /// A separate callback-to-predicted-playback mapping is required before
+    /// querying MEL-CLOCK-001's output-frame fit.
     pub fn callback_time_at_runner_time(
         &self,
         runner_time_ns: u64,
@@ -330,7 +330,7 @@ impl RunnerCpalClockFitV1 {
         }
 
         Ok(CpalClockEstimateV1 {
-            cpal_playback_stream_time_ns: cpal_time,
+            cpal_callback_stream_time_ns: cpal_time,
             fit_residual_bound_ns: self.maximum_abs_residual_ns,
             accuracy_status: self.accuracy_status,
             reported_uncertainty_ns: self.reported_uncertainty_ns,
