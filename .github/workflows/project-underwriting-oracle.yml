@@ -31,11 +31,11 @@ jobs:
           toolchain: "1.96.0"
 
       - name: Run oracle tests
-        run: cargo test --locked --manifest-path tools/project-underwriting-oracle/Cargo.toml
+        run: cargo test --manifest-path tools/project-underwriting-oracle/Cargo.toml
 
       - name: Produce deterministic reference receipt
         run: >-
-          cargo run --locked --manifest-path tools/project-underwriting-oracle/Cargo.toml --
+          cargo run --manifest-path tools/project-underwriting-oracle/Cargo.toml --
           docs/research/project-underwriting/v1/public-cases.json
           docs/research/project-underwriting/v1/reference-expected.json
           > project-underwriting-reference-receipt.json
