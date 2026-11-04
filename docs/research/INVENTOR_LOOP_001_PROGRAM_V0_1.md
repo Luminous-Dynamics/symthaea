@@ -94,43 +94,27 @@ Mycelix can preserve design lineage, authorship, licensed inputs, contributor ro
 
 ## 4. First vertical slice: tabletop bridge / truss
 
-Start with a small, supervised, non-human-load-bearing educational project. The initial learner-facing, design-only brief is [INVENTOR-LOOP-001 Bridge / Truss Design Challenge v0.1](INVENTOR_LOOP_001_BRIDGE_TRUSS_LEARNER_PACKET_V0_1.md), with a public [instructor analytical key](INVENTOR_LOOP_001_BRIDGE_TRUSS_INSTRUCTOR_KEY_V0_1.md) for its fixed paper exercise. Its intended digital mechanics target is Symtropy's open PHYS-TRUSS PR series (#2361/#2363 and the follow-ons in the owner table); #2363 is still open/unmerged, and the follow-on PRs are open/draft. Until the Symtropy owner confirms an exact reviewed head, supported request interface and qualification state, keep the activity to paper/hand calculations and do not claim solver integration. Once approved, consume that work rather than implementing a second truss kernel, analytic oracle or receipt format. The novel contribution is the full human-to-verified iteration and teaching loop. The PR-described truss tests are mathematical/software verification of a limited static model—not experimental physical validation. A guarded physical classroom fixture remains a distinct, future metrology study under the existing trial/evidence owners.
+Start with the [paper-first Bridge / Truss Design Challenge v0.1](INVENTOR_LOOP_001_BRIDGE_TRUSS_LEARNER_PACKET_V0_1.md) and its public [instructor analytical key](INVENTOR_LOOP_001_BRIDGE_TRUSS_INSTRUCTOR_KEY_V0_1.md). The initial deliverable is a learner's explained hand calculation, comparison of at least two concepts, prediction, and reflection—not a fabricated bridge or an executed solver run.
 
-**Problem packet**
+The paper exercise is numerically specified:
+- A=(0,0) m, B=(4,0) m, C=(2,3) m.
+- Two ideal pin-jointed axial members with E=200 GPa and A=10 mm².
+- Both base nodes restrained in x and y; apex load (0,−100) N; self-weight excluded.
+- The instructor key independently derives the symmetric stiffness, displacement, member compression, stresses/strains, support reactions, equilibrium and energy/work consistency.
 
-- A declared span and envelope.
-- A small set of available, characterized material and joint options.
-- A mass or material budget.
-- A low-load test envelope chosen after fixture and risk review.
-- Required displacement/strength or load-retention criteria, with units and decision margins.
-- A permitted design/manufacturing method and an explicit list of prohibited assumptions.
+**Digital phase — blocked pending owner review.** Its intended target is Symtropy's open PHYS-TRUSS PR series (#2361/#2363 and follow-ons). Core PR #2363 is still open/unmerged, and the follow-on PRs are open/draft. Until the Symtropy owner confirms an exact reviewed head, supported request interface and qualification state, do not call that branch or claim digital solver integration. Once approved, consume the existing solver/oracles/receipts rather than implementing a second truss kernel, analytic oracle or receipt format. These PR-described tests are mathematical/software verification of a limited static model, not experimental physical validation.
 
-**Mathematical path**
+**Physical phase — separate future study, not authorized by this programme.** Any prototype would need competent adult design/review, a guarded non-human-load-bearing fixture, characterized materials and joints, calibrated force/displacement measurement, predeclared stopping criteria, raw data retention, and the existing Symtropy physical-trial/metrology review. The paper task is not a test-load specification for a real structure.
 
-- geometry, vectors and trigonometry;
-- force balance and free-body diagrams;
-- moments and equilibrium;
-- stiffness and deformation;
-- material properties and dimensional consistency;
-- uncertainty, sensitivity and constrained optimisation.
+The eventual learning loop can extend from:
+- predicting tension/compression and displacement before seeing the answer;
+- explaining load paths and model assumptions;
+- comparing different topologies under matched requirements;
+- requesting the most decision-relevant next observation;
+- revising a design after evidence;
+- transferring the reasoning to a structurally different task without step-by-step assistance.
 
-**Engineering path**
-
-- generate multiple truss topologies;
-- derive first-order analytical bounds;
-- build an editable design and complete member/joint inventory;
-- run a pinned structural solver as a separate analysis result;
-- identify the most informative and safest next measurement;
-- build a guarded low-energy test article after review;
-- compare measured deflection/failure observations against predeclared predictions;
-- preserve all runs, failures and revisions.
-
-**Learning path**
-
-The learner predicts the critical member and expected deformation before simulation and test, explains the force path afterwards, and completes a structurally different transfer task later without step-by-step assistance.
-
-The task is not a real bridge design and cannot be used for people, buildings, public infrastructure or other safety-critical applications. A pilot must determine materials, load range, measurement reference, calibration, sample size and stopping rules before confirmatory trials.
-
+The task is not a real bridge design and cannot be used for people, buildings, public infrastructure or other safety-critical applications. A separate physical pilot must determine materials, load range, measurement reference, calibration, sample size and stopping rules before any confirmatory trial.
 ## 5. Benchmark programme
 
 Use existing external benchmarks as *separate diagnostic instruments*, not one blended leaderboard:
