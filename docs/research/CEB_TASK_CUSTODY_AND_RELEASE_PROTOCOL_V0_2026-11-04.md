@@ -184,9 +184,9 @@ Rust-SWE-bench and the RustForger study provide Rust-specific repository-level e
 
 Sources:
 - [Rust-SWE-bench / RustForger repository](https://github.com/GhabiX/Rust-SWE-Bench)
-- [Rust-SWE-bench paper](https://arxiv.org/abs/2602.????)
+- [Rust-SWE-bench paper, arXiv:2602.22764](https://arxiv.org/abs/2602.22764)
 
-The paper URL above is intentionally not guessed. Resolve the exact citation and benchmark revision from the repository/paper metadata before publication.
+The reported 28.6% is a historical result from the paper's Claude Sonnet 3.7 configuration, not a current frontier score.
 
 ### 6.5 SWE-Bench Pro V2
 
