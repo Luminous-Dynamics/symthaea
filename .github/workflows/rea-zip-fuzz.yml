@@ -29,7 +29,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install nightly Rust
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@nightly-2026-11-03
       - name: Install pinned cargo-fuzz
         run: cargo install cargo-fuzz --version 0.13.2 --locked
       - name: Resolve and audit fuzz dependency graph
