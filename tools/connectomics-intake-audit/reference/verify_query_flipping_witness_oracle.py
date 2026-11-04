@@ -209,19 +209,47 @@ def expected_enumeration(source: dict[str, Any]) -> dict[str, Any]:
     if len(indices) != len(edits):
         fail("duplicate edit IDs")
     by_id = {edit["edit_id"]: edit for edit in edits}
-    for edit in edits:
-        for required in edit["requires"]:
-            if required not in by_id:
-                fail(f"unknown requirement {required!r}")
-        for conflict in edit["conflicts_with"]:
-            if conflict not in by_id:
-                fail(f"unknown conflict {conflict!r}")
-            if edit["edit_id"] not in by_id[conflict]["conflicts_with"]:
-                fail("conflict declarations are not symmetric")
-
     baseline = graph_from_edges(source["baseline_graph"])
     if graph_digest(baseline) != source["baseline_graph_sha256"]:
         fail("baseline graph digest mismatch")
+
+    edge_owners: dict[tuple[int, int], list[str]] = {}
+    for edit in edits:
+        edit_id = edit["edit_id"]
+        if edit["kind"] not in ("graph_edit", "evidence_gate"):
+            fail(f"unsupported edit kind for {edit_id!r}")
+        if edit["kind"] == "graph_edit" and not edit["changes"]:
+            fail(f"graph edit {edit_id!r} has no edge changes")
+        if edit["kind"] == "evidence_gate" and edit["changes"]:
+            fail(f"evidence gate {edit_id!r} must not mutate graph")
+        for required in edit["requires"]:
+            if required not in by_id or required == edit_id:
+                fail(f"unknown or self requirement {required!r}")
+        for conflict in edit["conflicts_with"]:
+            if conflict not in by_id or conflict == edit_id:
+                fail(f"unknown or self conflict {conflict!r}")
+            if edit_id not in by_id[conflict]["conflicts_with"]:
+                fail("conflict declarations are not symmetric")
+        touched: set[tuple[int, int]] = set()
+        for change in edit["changes"]:
+            key = (change["source"], change["target"])
+            if key[0] == key[1] or key in touched:
+                fail(f"invalid or duplicate edge mutation in {edit_id!r}")
+            touched.add(key)
+            expected_weight = float(change["expected_weight"])
+            replacement_weight = float(change["replacement_weight"])
+            if not math.isfinite(expected_weight) or expected_weight < 0.0:
+                fail(f"invalid expected weight in {edit_id!r}")
+            if not math.isfinite(replacement_weight) or replacement_weight < 0.0:
+                fail(f"invalid replacement weight in {edit_id!r}")
+            current_weight = baseline.get(key, 0.0)
+            if struct.pack(">d", expected_weight) != struct.pack(">d", current_weight):
+                fail(f"stale edge precondition in {edit_id!r}")
+            edge_owners.setdefault(key, []).append(edit_id)
+    for owners in edge_owners.values():
+        for left, right in itertools.combinations(owners, 2):
+            if right not in by_id[left]["conflicts_with"] or left not in by_id[right]["conflicts_with"]:
+                fail("same-edge edits must explicitly conflict")
     query = source["query"]
     base_value = query_value(baseline, query["metric"])
     base_decision = decision_met(base_value, query["decision"])
