@@ -72,6 +72,20 @@
       ]
     },
     {
+      "action_id": "partial-broad-scan",
+      "action_kind": "orthogonal_measurement",
+      "effort_units": 3,
+      "source_evidence_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "observation_model_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "dependence_groups": ["independent-registration-check"],
+      "outcomes": [
+        { "scenario_id": "world-alpha", "outcome_id": "ambiguous-pair" },
+        { "scenario_id": "world-beta", "outcome_id": "ambiguous-pair" },
+        { "scenario_id": "world-gamma", "outcome_id": "unique-class-1" },
+        { "scenario_id": "world-delta", "outcome_id": "unique-class-2" }
+      ]
+    },
+    {
       "action_id": "image-sharpness-decoy",
       "action_kind": "image_inspection",
       "effort_units": 1,
