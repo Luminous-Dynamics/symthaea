@@ -47,14 +47,35 @@
             "minItems": 2,
             "maxItems": 2,
             "items": {
-              "enum": [
-                "WAIT",
-                "RESPOND",
-                "CONTINUE",
-                "YIELD",
-                "ABSTAIN",
-                "ASK"
-              ]
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "decision",
+                "decision_confidence",
+                "act_probability"
+              ],
+              "properties": {
+                "decision": {
+                  "enum": [
+                    "WAIT",
+                    "RESPOND",
+                    "CONTINUE",
+                    "YIELD",
+                    "ABSTAIN",
+                    "ASK"
+                  ]
+                },
+                "decision_confidence": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "act_probability": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
             }
           }
         },
