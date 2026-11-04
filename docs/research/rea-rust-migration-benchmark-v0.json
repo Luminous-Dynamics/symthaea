@@ -432,7 +432,9 @@
         "for every streamed member compute independent Symthaea bitwise CRC-32 on each bounded chunk and require equality with declared CRC as well as secondary decoder EOF/CRC/size success",
         "report observed CRC-32 in the per-member receipt; test update chunking invariance against the standard CRC-32/ISO-HDLC 123456789 known-answer vector",
         "do not count zipcore and zip's shared crc32fast dependency as independent ZIP CRC libraries; the custom incremental CRC is the separate algorithmic path",
-        "pin the fuzz compiler nightly date, cargo-fuzz version, libfuzzer-sys, seed corpus and resolved Cargo.lock digest in every run receipt"
+        "pin the fuzz compiler nightly date, cargo-fuzz version, libfuzzer-sys, seed corpus and resolved Cargo.lock digest in every run receipt",
+        "verify the decoded seed SHA-256 with sha256sum --check before executing the fuzzer",
+        "archive a run-context receipt with source commit, exact compiler, cargo-fuzz, runner OS/kernel, lockfile digest and both source/decoded seed digests"
       ],
       "fuzz_qualification": {
         "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10451",
@@ -454,7 +456,22 @@
         "current_status": "draft_target_authored; workflow queued; no fuzz executions claimed",
         "claim_ceiling": "A bounded 180-second smoke run is only evidence for the exact head, toolchain, seed corpus, runtime and environment. It is not security certification or proof of bug absence.",
         "toolchain": "nightly-2026-11-03",
-        "status": "draft_target_authored; workflow queued; no fuzz executions claimed"
+        "status": "draft_target_authored; workflow queued; no fuzz executions claimed",
+        "seed_verification": "workflow-enforced sha256sum --check against the tracked decoded ZIP seed",
+        "run_receipt_fields": [
+          "source_commit",
+          "rust_toolchain_verbose",
+          "cargo_version",
+          "cargo_fuzz_version",
+          "runner_os_kernel",
+          "fuzz_cargo_lock_sha256",
+          "base64_seed_sha256",
+          "decoded_seed_sha256",
+          "fuzz_runtime_seconds",
+          "rss_limit_mib",
+          "max_input_bytes",
+          "fuzz_artifact_digest"
+        ]
       }
     },
     {
