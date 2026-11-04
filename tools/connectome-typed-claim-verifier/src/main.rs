@@ -24,6 +24,8 @@ struct ClaimInfo {
     target_id: String,
     source_world: String,
     target_world: String,
+    source_kind: String,
+    target_kind: String,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -314,6 +316,8 @@ fn parse_claims(bundle: &Value) -> Result<ClaimIndex, String> {
             target_id,
             source_world,
             target_world,
+            source_kind,
+            target_kind,
         };
         if claims.insert(claim_id.clone(), info).is_some() {
             return Err(format!("duplicate claim_id {claim_id}"));
@@ -447,7 +451,8 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
             let mut seen_claims = BTreeSet::new();
             let mut relation_set = BTreeSet::new();
             let mut all_claims_supported = true;
-            let mut previous_target: Option<(String, String)> = None;
+            let mut previous_target: Option<(String, String, String)> = None;
+            let mut path_is_contiguous = true;
             for claim_id_value in claim_ids {
                 let claim_id = claim_id_value
                     .as_str()
@@ -465,14 +470,18 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                 if claim.claim_status != "CLAIMED_SUPPORTED" {
                     all_claims_supported = false;
                 }
-                if let Some((previous_id, previous_world)) = previous_target.as_ref()
-                    && (previous_id != &claim.source_id || previous_world != &claim.source_world)
+                if let Some((previous_id, previous_world, previous_kind)) = previous_target.as_ref()
+                    && (previous_id != &claim.source_id
+                        || previous_world != &claim.source_world
+                        || previous_kind != &claim.source_kind)
                 {
-                    return Err(format!(
-                        "{result_context}: path claims are not endpoint-contiguous at {claim_id}"
-                    ));
+                    path_is_contiguous = false;
                 }
-                previous_target = Some((claim.target_id.clone(), claim.target_world.clone()));
+                previous_target = Some((
+                    claim.target_id.clone(),
+                    claim.target_world.clone(),
+                    claim.target_kind.clone(),
+                ));
             }
             let asserted = string_field(result, "asserted_claim_type", &result_context)?;
             if !matches!(
@@ -564,12 +573,6 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                     _ => {}
                 }
             }
-            if disposition == "ACCEPTED_WITHIN_TYPED_SCOPE"
-                && claimed_result_status == "CLAIMED_REJECTED"
-            {
-                disposition = "REJECTED_EVIDENCE_CLAIM";
-                reasons.push("the producer marks the path result rejected".to_owned());
-            }
             if disposition == "ACCEPTED_WITHIN_TYPED_SCOPE" {
                 if used_claim_ids.iter().any(|claim_id| {
                     index
@@ -604,6 +607,13 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                 && disposition == "ACCEPTED_WITHIN_TYPED_SCOPE"
             {
                 disposition = "NOT_ESTIMABLE";
+            }
+            if !path_is_contiguous {
+                disposition = "REJECTED_PATH_CONTINUITY";
+                reasons.push(
+                    "adjacent path claims do not share the same target/source object, kind and world"
+                        .to_owned(),
+                );
             }
             outputs.push(json!({
                 "query_id": query_id,
@@ -925,30 +935,46 @@ mod tests {
     }
 
     #[test]
-    fn accepts_mixed_path_as_causal_only_with_supported_causal_claim() {
+    fn rejects_disconnected_multi_claim_path() {
+        let mut bundle = parse_fixture();
+        bundle["queries"][0]["allowed_relation_type_paths"][0]["relation_types"] =
+            json!(["ANATOMICAL_SYNAPSE_EDGE", "STATISTICAL_DEPENDENCE_EDGE"]);
+        bundle["queries"][0]["path_results"][0]["ordered_claim_ids"] =
+            json!(["anat-syn-17", "stat-edge-activity"]);
+        bundle["queries"][0]["path_results"][0]["asserted_claim_type"] =
+            Value::String("MIXED_EVIDENCE_PATH".to_owned());
+        bundle["queries"][0]["requested_claim_type"] =
+            Value::String("MIXED_EVIDENCE_PATH".to_owned());
+        bundle["queries"][0]["query_mode"] =
+            Value::String("DECLARED_MIXED_LAYERS".to_owned());
+        let report = verify(&bundle).expect("disconnected path is preserved for audit");
+        assert_eq!(
+            report["query_path_results"][0]["recomputed_disposition"],
+            "REJECTED_PATH_CONTINUITY"
+        );
+    }
+
+    #[test]
+    fn accepts_standalone_supported_causal_claim_path() {
         let mut bundle = parse_fixture();
         bundle["claims"][4]["claim_status"] = Value::String("CLAIMED_SUPPORTED".to_owned());
         bundle["claims"][4]["evidence"][0]["positivity_status"] =
             Value::String("CLAIMED_ADEQUATE".to_owned());
         bundle["claims"][4]["evidence"][0]["selection_status"] =
             Value::String("CLAIMED_HANDLED".to_owned());
-        bundle["queries"][2]["allowed_relation_type_paths"][0]["relation_types"] = json!([
-            "ANATOMICAL_SYNAPSE_EDGE",
-            "STATISTICAL_DEPENDENCE_EDGE",
-            "CAUSAL_EFFECT_CLAIM"
-        ]);
-        bundle["queries"][2]["path_results"][0]["ordered_claim_ids"] = json!([
-            "anat-syn-17",
-            "stat-edge-activity",
-            "causal-edge-unresolved"
-        ]);
-        let report = verify(&bundle).expect("explicit causal evidence in mixed path");
+        bundle["queries"][2]["query_mode"] = Value::String("SINGLE_RELATION_LAYER".to_owned());
+        bundle["queries"][2]["allowed_relation_type_paths"][0]["relation_types"] =
+            json!(["CAUSAL_EFFECT_CLAIM"]);
+        bundle["queries"][2]["path_results"][0]["ordered_claim_ids"] =
+            json!(["causal-edge-unresolved"]);
+        bundle["queries"][2]["path_results"][0]["asserted_claim_type"] =
+            Value::String("CAUSAL_EFFECT".to_owned());
+        let report = verify(&bundle).expect("standalone causal-effect claim");
         assert_eq!(
             report["query_path_results"][2]["recomputed_disposition"],
             "ACCEPTED_WITHIN_TYPED_SCOPE"
         );
     }
-
     #[test]
     fn rejects_mixed_path_requested_in_single_layer_mode() {
         let mut bundle = parse_fixture();
