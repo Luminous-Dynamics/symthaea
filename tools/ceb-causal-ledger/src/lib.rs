@@ -162,7 +162,7 @@ impl ActionKind {
 }
 
 /// Authorization state recorded for a proposed action.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Authorization {
     /// No external effect or privileged execution is requested.
     NotRequired,
@@ -862,7 +862,7 @@ impl Ledger {
                 || matches!(&action.authorization, Authorization::Denied { .. })
                     && outcome.status == OutcomeStatus::Observed
             {
-                return Err(if action.authorization == Authorization::Denied {
+                return Err(if matches!(&action.authorization, Authorization::Denied { .. }) {
                     ValidationError::DeniedActionExecuted
                 } else {
                     ValidationError::ForecastActionOutcomeOrder
