@@ -1,0 +1,162 @@
+# Water-use qualification: source-to-use evidence contract v0.1
+
+**Status:** design specification; no-runner tranche  
+**Owner:** WATER-QUALITY-EVIDENCE-001 (#10500)  
+**Parents:** WATERLOOP-APPL-001 (#10323), HOME-SERVICE-CONTINUITY-001 (#10445)  
+**Compose:** HOME-SVC-METROLOGY-001 (#10341), HOME-SVC-RECEIPT-001 (#10403), lifecycle exposure/censoring (#4920), WaterLoop comparator work (#10483)  
+**Evidence class:** design-only; no water sample or household system has been qualified.
+
+## 1. Problem and paradigm
+
+A water-quality decision is not a property of the noun "water". It is a relation:
+
+`source + system + batch/stream + treatment state + sample evidence + intended use + physical outlet + time`
+
+The question is not "Is the tank safe?" It is:
+
+> Does the current, source-bound evidence support this declared use at this exact delivery boundary at this time, under the applicable standard and system-specific monitoring programme?
+
+This moves the product from **sensor-led water status** to **source-to-use, evidence-qualified delivery**. It also prevents one passing sample from being projected onto a different source, treatment path, batch, tank, outlet, use class or future period.
+
+This is a domain adapter and semantic contract. It is not another laboratory information system, generic provenance store, standards database, treatment engine, water controller or safety authority.
+
+## 2. Compose existing infrastructure; do not fork it
+
+- #10403 owns exact-byte / typed evidence receipts. Reuse its source and evaluator lineage seam when the dependency is available; do not invent another digest envelope.
+- #10341 owns metrology identity, calibration and evidence strata. Reuse its instrument/method and uncertainty semantics.
+- #4920 and #3697 own generic exposure, lifecycle, reliability and censoring semantics.
+- #10445 owns service envelopes, user consent, boundary-level delivery and unknown-state handling.
+- #10483 owns WaterLoop's distinct backup, reuse and leak-detection comparator functions.
+
+This contract adds water-specific identity, quality-use compatibility and source-to-use invalidation only. It must not create a competing sensor catalogue, lab database or quality-limit repository.
+
+## 3. Qualification record
+
+The normative draft shape is in [`water-use-qualification-v1.schema.json`](water-use-qualification-v1.schema.json). A record binds:
+
+| Dimension | Required identity / content | What it prevents |
+|---|---|---|
+| Source | source class, source ID, supply/system identity, source lineage | treating municipal, borehole, tanker, rainwater and greywater as interchangeable |
+| Batch / stream | batch or stream ID, collection window, storage vessel, blend lineage | carrying one batch result to another batch or mixture |
+| Treatment | train ID/revision, process state, media/service state, alarms, bypass/fault state | assuming treatment label equals actual process performance |
+| Use | explicit drinking or non-potable use class | promoting a reuse classification into potable status |
+| Boundary | exact sample point and claimed delivery boundary | claiming a result at a different outlet |
+| Sample | sample ID, collection time, method, laboratory/provider, custody, parameters and analytical qualifiers | untraceable or method-incompatible claims |
+| Governing profile | standard edition, system-specific risk assessment and monitoring programme revisions | applying stale or wrong-system criteria |
+| Decision | state, reason, evidence IDs, decision time and monitoring status | replacing uncertainty with a pass |
+| Events | source switches, mixing, treatment faults, storage events, non-compliance and corrective actions | reusing evidence after a material change |
+
+A valid observation remains attached to its sample point and time. A decision can be reused only where the declared profile establishes that the evidence applies to the same source/system, stream, treatment state, use class, boundary and monitoring period.
+
+## 4. Qualification states and service-credit mapping
+
+| Water qualification state | Meaning | Household service treatment |
+|---|---|---|
+| `QualifiedForDeclaredUse` | Current evidence and applicable profile support this exact use and boundary | May be credited only for the declared use and interval |
+| `KnownNonCompliance` | Evidence identifies a failed applicable requirement | No qualified service credit for the affected use |
+| `UnknownEvidenceInsufficient` | Missing, incomplete, contradictory or insufficient evidence | No confirmed potable credit; physical flow is still reported |
+| `ExpiredOrMonitoringOverdue` | The governing monitoring programme requires evidence that is overdue | No qualified credit until the programme's requalification rule is satisfied |
+| `SourceOrSamplePointMismatch` | Evidence does not bind to the declared source, system, batch or boundary | No qualified credit |
+| `TreatmentStateUnqualified` | Relevant fault, bypass, maintenance or operating condition is not qualified | No qualified credit for affected downstream use |
+| `CorrectiveActionPending` | A non-compliant event is under response; restoration evidence is incomplete | Remain restricted / unknown until the prescribed closure criteria pass |
+
+The general service evaluator's `Qualified / KnownFailure / Unknown` classification is a terminal projection, not a replacement for the water-specific reason. Map known non-compliance to known failure; map missing, stale, mismatched or unresolved evidence to unknown; preserve the water-specific reason and the raw delivery observation.
+
+**Critical rule:** an unknown result is not proof of contamination, but it is also not proof of drinking-water quality. Do not conflate the epistemic state with the physical state.
+
+## 5. Edition-aware, risk-based quality profile
+
+The 2025 South African compulsory service standards refer to SANS 241 "as may be updated". The current-edition crosswalk is recorded in the parent household-continuity profile. Rand Water's 2026 migration briefing describes SANS 241:2025 as integrating risk assessment, monitoring, verification, non-compliance response and corrective action; it distinguishes mandatory process-risk parameters from system-specific risk-defined parameters and describes separate monitoring contexts for water supply systems, borehole systems, mobile tankers and static tanks.
+
+Implementation rules:
+
+1. Store the exact standard identifier/edition and the exact applicable risk-assessment and monitoring-programme revisions.
+2. Keep mandatory process-risk parameters separate from system-specific risk-defined parameters.
+3. Do not hardcode numeric SANS limits in this project schema or copy them from explanatory presentations. Use the current controlled SANS publication and qualified programme.
+4. Do not invent one universal sample TTL. Determine due/overdue state from the relevant standard, source/system risk assessment, sampling programme and event invalidators.
+5. A process sensor may supply operational telemetry but does not automatically replace a required laboratory or qualified verification method.
+6. A non-compliant result starts a recorded incident / corrective-action path. Do not restore Qualified solely because a timer elapsed or an alarm disappeared.
+7. Confirm applicability of each standard regime for the actual installation with qualified South African water-quality professionals / authorities. The migration briefing is explanatory evidence, not the standard itself.
+
+For greywater and other reuse streams, keep the declared non-potable use and its applicable requirements distinct from drinking-water qualification. ISO/CD 25446:2026 is a committee draft under development, not a final standard or product certification.
+
+## 6. Source-to-use graph and invalidation
+
+Represent the evidence chain as a directed, inspectable chain:
+
+`source -> collection -> storage / blend -> treatment -> sample point -> delivery boundary -> declared use`
+
+A node or edge may be absent or unknown; never silently substitute an adjacent node. Every transition is an event with identity, timestamp and affected downstream claims.
+
+| Event | Required consequence |
+|---|---|
+| Source switch | New source lineage; old result does not transfer by default |
+| Batch blend / mixed source | Create a new derived batch with all parents; no "best source wins" |
+| Treatment bypass / fault | Mark affected downstream use unqualified until the defined requalification rule passes |
+| Media replacement / maintenance | Record configuration transition and any required requalification; do not assume automatic pass or automatic failure |
+| Material storage/stagnation event | Apply the source/system risk programme's rule; absent a rule, state remains unresolved rather than inventing a TTL |
+| Sample point / outlet change | Reject transfer unless a validated boundary relationship and programme support it |
+| Monitoring becomes overdue | Expire the claim under the current monitoring programme |
+| Non-compliant result | Open incident; retain the affected source/batch/boundary scope; require documented correction and verification |
+| Contradictory observations | Preserve both observations and their lineage; adjudication must be explicit and independent |
+| Corrective action completed | Requalify only against declared closure criteria and fresh required evidence |
+
+A downstream result does not prove upstream supply compliance. An upstream result does not prove downstream storage or fixture quality. Sample points must be selected for the actual system and the claim being made.
+
+## 7. Adversarial challenge corpus
+
+The proposed deterministic WQ-001…WQ-014 matrix is design-only and should be maintained as a frozen manifest with expected dispositions held outside any candidate policy workspace.
+
+| ID | Challenge | Required disposition |
+|---|---|---|
+| WQ-001 | Source switched after last valid sample | Mismatch / Unknown |
+| WQ-002 | Monitoring programme overdue | Expired / Unknown |
+| WQ-003 | Raw-source sample claimed for treated outlet | Sample-point mismatch |
+| WQ-004 | Qualified batch blended with unqualified source | New derived batch; Unknown until qualified |
+| WQ-005 | Storage residence event crosses a risk-defined limit | Apply profile; otherwise Unknown |
+| WQ-006 | Treatment bypass or relevant process fault | TreatmentStateUnqualified |
+| WQ-007 | Wrong supply-system / borehole risk profile revision | Mismatch / Unknown |
+| WQ-008 | Required method, result qualifier, reporting limit or unit missing | Unknown |
+| WQ-009 | Contradictory laboratory results with no resolved adjudication | Unknown |
+| WQ-010 | Tanker/static-tank sample cannot bind to delivered batch | Mismatch / Unknown |
+| WQ-011 | Non-compliant result with incomplete corrective action | CorrectiveActionPending |
+| WQ-012 | Current evidence matches source, system, sample point, use and programme | Qualified only within declared scope |
+| WQ-013 | Non-potable greywater result relabelled as drinking water | Hard rejection |
+| WQ-014 | One household outlet's result reused for another outlet without supported transfer | Sample-point mismatch |
+
+Add negative controls for digest changes, replay from old profile revisions, time-zone/clock ambiguity, censored samples, unit conversions, parameter aliases and duplicate sample IDs without counting them as independent physical evidence.
+
+The positive cases are essential. A validator that rejects everything is not a qualified solution.
+
+## 8. Outcomes and proposed gates
+
+Keep these outputs separate:
+- false acceptance of known-noncompliant, stale, mismatched and out-of-scope evidence;
+- false rejection / unnecessary service restriction;
+- qualified litres by use class, source and delivery boundary;
+- physical litres delivered but not quality-qualified;
+- duration by qualification state;
+- time from a source/process event to detection and state update;
+- time from corrective action to verified restoration;
+- sample-point and source coverage versus the declared programme;
+- evidence completeness, missingness, contradiction and adjudication burden;
+- sampling / analysis cost and turnaround;
+- household service deficit attributable to quality restriction.
+
+Proposed software acceptance: every negative control must be rejected or remain explicitly unresolved; no negative control may receive a potable pass. Positive controls must be accepted only when every required field and transition condition is satisfied.
+
+For a future physical false-acceptance statement, preregister independent trials. Under an IID Bernoulli approximation, zero false accepts in 299 independent trials gives a one-sided 95% upper bound near 1%. Repeated samples sharing a source, batch, site, instrument, operator or collection event are clustered and cannot be counted as independent without a justified dependence model. This is a planning relationship, not a result.
+
+## 9. Execution order
+
+1. Review the schema and state semantics with the water-quality/metrology owners.
+2. Freeze WQ-001…014 and an independent expected-disposition oracle.
+3. Add a standalone Rust offline validator that composes with the existing household evidence/receipt path; do not add production Python or a duplicate receipt envelope.
+4. Add mutation/negative tests for every invalidator and positive known-answer tests.
+5. Replay receipts independently from raw source bytes and preserve exact profile / evaluator identities.
+6. Only after qualified partner review, design a contained bench with independent sample collection, correct sample points, laboratory methods and safety boundaries.
+7. Progress E1 repeatability, E2 independent lab reproducibility, E3 source/system/production variation, then E4 household validity. Do not leap between strata.
+
+## 10. Claim ceiling
+
+This package can qualify schema and software interpretation only. It cannot declare a sample safe, prove treatment efficacy, establish compliance with SANS 241, validate a municipal or private supply, authorize plumbing, or establish WaterLoop superiority. Those require the exact current standard, qualified interpretation, appropriate physical sampling and the relevant independent evidence.
