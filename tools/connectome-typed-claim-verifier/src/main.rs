@@ -429,7 +429,11 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                     .ok_or_else(|| format!("{result_context}.ordered_claim_ids missing"))?,
                 &format!("{result_context}.ordered_claim_ids"),
             )?;
+            if claim_ids.is_empty() {
+                return Err(format!("{result_context}: ordered_claim_ids must not be empty"));
+            }
             let mut used = Vec::new();
+            let mut used_claim_ids = Vec::new();
             let mut seen_claims = BTreeSet::new();
             let mut relation_set = BTreeSet::new();
             let mut all_claims_supported = true;
@@ -446,6 +450,7 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                     .get(claim_id)
                     .ok_or_else(|| format!("{result_context}: unknown claim ID {claim_id}"))?;
                 used.push(claim.relation_type.clone());
+                used_claim_ids.push(claim_id.to_owned());
                 relation_set.insert(claim.relation_type.clone());
                 if claim.claim_status != "CLAIMED_SUPPORTED" {
                     all_claims_supported = false;
@@ -541,7 +546,7 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                 reasons.push("the producer marks the path result rejected".to_owned());
             }
             if disposition == "ACCEPTED_WITHIN_TYPED_SCOPE" {
-                if used.iter().any(|claim_id| {
+                if used_claim_ids.iter().any(|claim_id| {
                     index
                         .claims
                         .get(claim_id)
@@ -549,7 +554,7 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                 }) {
                     disposition = "REJECTED_EVIDENCE_CLAIM";
                     reasons.push("path contains a producer-rejected claim".to_owned());
-                } else if used.iter().any(|claim_id| {
+                } else if used_claim_ids.iter().any(|claim_id| {
                     index
                         .claims
                         .get(claim_id)
@@ -557,7 +562,7 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                 }) {
                     disposition = "NOT_ESTIMABLE";
                     reasons.push("path contains a NOT_ESTIMABLE claim".to_owned());
-                } else if used.iter().any(|claim_id| {
+                } else if used_claim_ids.iter().any(|claim_id| {
                     index
                         .claims
                         .get(claim_id)
@@ -952,6 +957,46 @@ mod tests {
             report["query_path_results"][1]["recomputed_disposition"],
             "CONDITIONAL_ONLY"
         );
+    }
+
+    #[test]
+    fn recomputes_rejected_claim_as_rejected_evidence_not_conditional() {
+        let mut bundle = parse_fixture();
+        bundle["claims"][0]["claim_status"] = Value::String("CLAIMED_REJECTED".to_owned());
+        let report = verify(&bundle).expect("well-shaped bundle");
+        assert_eq!(
+            report["query_path_results"][0]["recomputed_disposition"],
+            "REJECTED_EVIDENCE_CLAIM"
+        );
+    }
+
+    #[test]
+    fn recomputes_ambiguous_claim_as_ambiguous_not_promotable() {
+        let mut bundle = parse_fixture();
+        bundle["claims"][0]["claim_status"] = Value::String("CLAIMED_AMBIGUOUS".to_owned());
+        let report = verify(&bundle).expect("well-shaped bundle");
+        assert_eq!(
+            report["query_path_results"][0]["recomputed_disposition"],
+            "AMBIGUOUS_NOT_PROMOTABLE"
+        );
+    }
+
+    #[test]
+    fn recomputes_not_estimable_claim_without_promoting_the_path() {
+        let mut bundle = parse_fixture();
+        bundle["claims"][0]["claim_status"] = Value::String("CLAIMED_NOT_ESTIMABLE".to_owned());
+        let report = verify(&bundle).expect("well-shaped bundle");
+        assert_eq!(
+            report["query_path_results"][0]["recomputed_disposition"],
+            "NOT_ESTIMABLE"
+        );
+    }
+
+    #[test]
+    fn rejects_empty_claim_id_path() {
+        let mut bundle = parse_fixture();
+        bundle["queries"][0]["path_results"][0]["ordered_claim_ids"] = json!([]);
+        assert!(verify(&bundle).is_err());
     }
 
     #[test]
