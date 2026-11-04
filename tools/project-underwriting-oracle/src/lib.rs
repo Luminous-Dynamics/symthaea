@@ -207,6 +207,20 @@ fn evidence_references_resolve(case: &Value) -> bool {
         return false;
     }
 
+    if array(case, "claims").iter().any(|claim| {
+        let claim_id = string(claim, "claim_id").unwrap_or_default();
+        array(claim, "evidence_refs").iter().any(|reference| {
+            let Some(evidence_id) = reference.as_str() else {
+                return true;
+            };
+            find_evidence(case, evidence_id).is_none_or(|evidence| {
+                string(evidence, "claim_id") != Some(claim_id)
+            })
+        })
+    }) {
+        return false;
+    }
+
     let mut references = Vec::new();
     for claim in array(case, "claims") {
         extend_references(&mut references, claim, "evidence_refs");
@@ -784,6 +798,25 @@ mod tests {
         assert!(result.blockers.iter().any(|value| value == "YIELD_UNCERTAINTY_CONTRACT_INVALID"));
     }
 
+    #[test]
+    fn claim_cannot_borrow_evidence_from_another_claim() {
+        let mut corpus = public_corpus();
+        let case = corpus["cases"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|item| item["case_id"] == "solar-storage-base-001")
+            .unwrap();
+        let tariff = case["claims"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|item| item["claim_id"] == "revenue_tariff")
+            .unwrap();
+        tariff["evidence_refs"] = json!(["ev_capex"]);
+        let result = evaluate_case(case);
+        assert!(result.blockers.iter().any(|value| value == "EVIDENCE_REFERENCE_INTEGRITY_FAILURE"));
+    }
     #[test]
     fn dangling_evidence_reference_fails_closed() {
         let mut corpus = public_corpus();
