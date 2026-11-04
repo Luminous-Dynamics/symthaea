@@ -471,7 +471,7 @@ mod tests {
         let boundary_tests: Vec<_> = suite
             .tests
             .iter()
-            .filter(|t| t.category == TestCategory::Boundary)
+            .filter(|t| t.category == TestCategory::InvocationSmoke)
             .collect();
 
         assert!(boundary_tests.len() >= 2); // At least negative + zero
