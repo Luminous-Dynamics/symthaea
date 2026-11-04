@@ -1,6 +1,8 @@
 name: Typed Connectome Claim Verifier
 
 on:
+  push:
+    branches: [research/connectome-typed-claim-verifier-v0-1-20261104]
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches: [research/connectome-typed-claim-queries-v0-1-20261104]
