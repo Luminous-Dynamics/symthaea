@@ -1657,7 +1657,11 @@ mod tests {
         let mut agents = vec![AgentKnowledge::new(&task)];
         let already_held = task.recipes()[0].recipe_id;
         agents[0].known_recipes.insert(already_held);
-        let signals = build_coarse_need_signals(&task, &agents);
+        let signals = build_coarse_need_signals(
+            &task,
+            &agents,
+            DEFAULT_COARSE_NEED_SIGNAL_BUDGET_PER_RECIPIENT,
+        );
         assert_eq!(signals.len(), 1);
         assert!(!signals[0].contains_key(&already_held));
         assert!(signals[0].len() <= DEFAULT_COARSE_NEED_SIGNAL_BUDGET_PER_RECIPIENT);
