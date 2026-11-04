@@ -967,3 +967,11 @@ This closes a significant gap in the previous oracle design: it was possible to 
 
 The updated feature graph requires a regenerated Cargo.lock. The reader workflow temporarily resolves and archives the updated lock so the exact graph can be committed before promotion. No Deflate cross-implementation test pass is claimed until that exact-head workflow completes.
 
+### Independent CRC over streamed bytes
+
+The member verifier now maintains a separate bitwise CRC-32 state and updates it incrementally for each decompressed read buffer. After the decoder reaches EOF and its own CRC/size checks pass, Symthaea finalizes its independent CRC and compares it with the central-directory declaration. A mismatch rejects the result. The returned `VerifiedEntryContent` contains `observed_crc32`; `verified_crc32` is true only after both the decoder and independent algorithm accept.
+
+The known-answer test checks CRC-32/ISO-HDLC `123456789 -> 0xcbf43926`, empty input -> zero, and three incremental chunk boundaries over the same input. This is genuinely separate from the shared `crc32fast 1.5.4` dependency used by zipcore and zip-rs. It also avoids accumulating the full member in memory: CRC and SHA-256 are updated side-by-side over the same fixed-size buffer.
+
+This does not authenticate the declared CRC or prove the archive producer is honest; it independently checks that the decompressed stream matches the archive's own declaration. A malicious producer can still consistently declare and encode malicious bytes. The content SHA-256, CRC consistency and producer attestation remain distinct facts.
+
