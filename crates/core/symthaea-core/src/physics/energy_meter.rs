@@ -282,7 +282,7 @@ pub mod linux_powercap {
     use super::*;
     use std::fs;
     use std::io::ErrorKind;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::Instant;
 
@@ -417,7 +417,7 @@ pub mod linux_powercap {
         }
     }
 
-    fn read_counter_file(path: &PathBuf) -> Result<u64, EnergyMeterError> {
+    fn read_counter_file(path: &Path) -> Result<u64, EnergyMeterError> {
         let contents = fs::read_to_string(path).map_err(|error| match error.kind() {
             ErrorKind::PermissionDenied => EnergyMeterError::PermissionDenied {
                 reason: format!("cannot read {}: {error}", path.display()),
@@ -507,7 +507,7 @@ pub mod linux_powercap {
             )
             .unwrap();
             let first = meter.read_counter().unwrap();
-            fs::write(&zone.range_path, "2_000_000").unwrap();
+            fs::write(&zone.range_path, "2000000").unwrap();
             let second = meter.read_counter().unwrap();
 
             assert_ne!(first.counter_epoch, second.counter_epoch);
