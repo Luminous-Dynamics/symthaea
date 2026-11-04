@@ -370,7 +370,7 @@ impl TestGenerator {
         path.path
             .segments
             .last()
-            .is_some_and(|segment| segment.ident.to_string() == fn_name)
+            .is_some_and(|segment| segment.ident.unraw().to_string() == fn_name.trim_start_matches("r#"))
     }
 
     /// Render tests into a Rust `#[cfg(test)] mod tests` block.
