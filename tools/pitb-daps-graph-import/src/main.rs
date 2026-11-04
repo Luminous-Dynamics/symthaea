@@ -567,6 +567,44 @@ mod tests {
     }
 
     #[test]
+    fn only_registered_daps_export_labels_are_imported() {
+        for label in [
+            "USES_CLASS",
+            "USES_CLASS_DERIVED",
+            "USES_STRUCTURE",
+            "USES_DEFINITION",
+            "USES_INSTANCE",
+            "DEPENDS_ON",
+        ] {
+            let raw = json!({
+                "type": label,
+                "source_name": "A",
+                "target_name": "B"
+            });
+            assert_eq!(
+                edge_relation(&raw, "formal_declaration", "formal_declaration").unwrap(),
+                "daps_dependency_candidate"
+            );
+        }
+        let imports = json!({"type":"IMPORTS","source_name":"file_A","target_name":"file_B"});
+        assert_eq!(
+            edge_relation(&imports, "module", "module").unwrap(),
+            "daps_import_candidate"
+        );
+        let contains = json!({"type":"CONTAINS","source_name":"file_A","target_name":"A"});
+        assert_eq!(
+            edge_relation(&contains, "module", "formal_declaration").unwrap(),
+            "daps_membership_candidate"
+        );
+        let invented = json!({"type":"USES_UNTRUSTED","source_name":"A","target_name":"B"});
+        assert!(edge_relation(&invented, "formal_declaration", "formal_declaration").is_err());
+        let wrong_orientation = json!({"type":"CONTAINS","source_name":"A","target_name":"B"});
+        assert!(edge_relation(&wrong_orientation, "formal_declaration", "formal_declaration").is_err());
+        let wrong_import = json!({"type":"IMPORTS","source_name":"A","target_name":"B"});
+        assert!(edge_relation(&wrong_import, "formal_declaration", "formal_declaration").is_err());
+    }
+
+    #[test]
     fn malformed_upstream_commit_identity_is_rejected() {
         let raw = graph_fixture();
         let bytes = json_bytes(&raw).unwrap();
