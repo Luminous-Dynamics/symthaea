@@ -232,14 +232,14 @@ def main() -> int:
         for failure in failures:
             print(f"DOC_COMMAND_AUDIT_FAIL: {failure}", file=sys.stderr)
         print(
-            f"DOC_COMMAND_AUDIT_SUMMARY: markdown={len(files)} manifests={checked} "
-            f"documented_unavailable={unavailable} dynamic={dynamic} errors={len(failures)}",
+            f"DOC_COMMAND_AUDIT_SUMMARY: markdown_files={len(files)} manifest_references_checked={checked} "
+            f"documented_unavailable_references={unavailable} dynamic_references={dynamic} errors={len(failures)}",
             file=sys.stderr,
         )
         return 1
     print(
-        f"DOC_COMMAND_AUDIT_PASS: markdown={len(files)} manifests={checked} "
-        f"documented_unavailable={unavailable} dynamic={dynamic} errors=0"
+        f"DOC_COMMAND_AUDIT_PASS: markdown_files={len(files)} manifest_references_checked={checked} "
+        f"documented_unavailable_references={unavailable} dynamic_references={dynamic} errors=0"
     )
     return 0
 
