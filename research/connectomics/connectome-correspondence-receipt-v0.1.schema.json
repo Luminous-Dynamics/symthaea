@@ -1,0 +1,731 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/connectomics/connectome-correspondence-receipt-v0.1.schema.json",
+  "title": "Evidence-qualified connectome correspondence receipt v0.1",
+  "description": "Typed, evidence-backed partial correspondence across versioned reconstructions. Identity, segment lineage, neuron correspondence, synapse correspondence and query equivalence are deliberately separate relations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "source_world",
+    "target_world",
+    "artifact_manifests",
+    "registration",
+    "mappings",
+    "query_comparisons",
+    "summary",
+    "disposition",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "receipt_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_world": {
+      "$ref": "#/$defs/world"
+    },
+    "target_world": {
+      "$ref": "#/$defs/world"
+    },
+    "artifact_manifests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "target"
+      ],
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/artifactManifest"
+        },
+        "target": {
+          "$ref": "#/$defs/artifactManifest"
+        }
+      }
+    },
+    "registration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "transform_source_to_target_4x4",
+        "max_residual_nm",
+        "uncertainty_bound_nm",
+        "coordinate_frame_policy_sha256"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "VERIFIED",
+            "UNCERTAIN",
+            "NOT_REGISTERED",
+            "REJECTED"
+          ]
+        },
+        "transform_source_to_target_4x4": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 4,
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "max_residual_nm": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uncertainty_bound_nm": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "coordinate_frame_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "VERIFIED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "max_residual_nm": {
+                "type": "number",
+                "minimum": 0
+              },
+              "uncertainty_bound_nm": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "mappings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/mapping"
+      },
+      "minItems": 1
+    },
+    "query_comparisons": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/queryComparison"
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mapping_count",
+        "claimed_verified_count",
+        "ambiguous_count",
+        "not_estimable_count",
+        "rejected_count",
+        "unmapped_source_object_count",
+        "one_to_many_count",
+        "many_to_one_count",
+        "many_to_many_count",
+        "query_same_count",
+        "query_different_count",
+        "query_not_estimable_count"
+      ],
+      "properties": {
+        "mapping_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ambiguous_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "not_estimable_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rejected_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unmapped_source_object_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "one_to_many_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "many_to_one_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "many_to_many_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "query_same_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "query_different_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "query_not_estimable_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "claimed_verified_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "disposition": {
+      "enum": [
+        "CORRESPONDENCE_VERIFIED",
+        "PARTIAL",
+        "AMBIGUOUS",
+        "NOT_ESTIMABLE",
+        "REJECTED"
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_manifest_sha256",
+        "target_manifest_sha256",
+        "lineage_receipt_sha256",
+        "mapping_policy_sha256",
+        "correspondence_engine_sha256",
+        "verifier_protocol_sha256",
+        "verifier_sha256",
+        "report_schema_sha256",
+        "world_manifest_schema_sha256"
+      ],
+      "properties": {
+        "source_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "target_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "lineage_receipt_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mapping_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "correspondence_engine_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "verifier_protocol_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "verifier_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "report_schema_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "world_manifest_schema_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "source_dataset_id",
+        "source_volume_id",
+        "release_id"
+      ],
+      "properties": {
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_volume_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "release_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "artifactManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifest_sha256",
+        "segmentation_sha256",
+        "mesh_sha256",
+        "skeleton_sha256",
+        "synapse_annotations_sha256",
+        "coordinate_frame_id",
+        "voxel_size_nm"
+      ],
+      "properties": {
+        "manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "segmentation_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mesh_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "skeleton_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "synapse_annotations_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "coordinate_frame_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "voxel_size_nm": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "kind",
+        "artifact_sha256",
+        "locator",
+        "authority"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "SOURCE_ANCHOR",
+            "EDIT_TRANSACTION",
+            "LINEAGE_RECEIPT",
+            "PHYSICAL_REGISTRATION",
+            "MORPHOLOGY",
+            "SYNAPSE_PARTNER",
+            "EXPERT_ADJUDICATION",
+            "OTHER"
+          ]
+        },
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authority": {
+          "enum": [
+            "SOURCE_DERIVED",
+            "INDEPENDENTLY_VERIFIED",
+            "EXPERT_ADJUDICATED",
+            "MODEL_DERIVED",
+            "UNKNOWN"
+          ]
+        }
+      }
+    },
+    "mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mapping_id",
+        "relation_type",
+        "source_object_ids",
+        "target_object_ids",
+        "cardinality",
+        "support_status",
+        "evidence",
+        "rationale_code",
+        "alternative_set_id"
+      ],
+      "properties": {
+        "mapping_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relation_type": {
+          "enum": [
+            "ARTIFACT_IDENTITY",
+            "SEGMENT_LINEAGE",
+            "NEURON_CORRESPONDENCE",
+            "SYNAPSE_CORRESPONDENCE"
+          ]
+        },
+        "source_object_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "target_object_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "cardinality": {
+          "enum": [
+            "ONE_TO_ONE",
+            "ONE_TO_MANY",
+            "MANY_TO_ONE",
+            "MANY_TO_MANY",
+            "UNMAPPED"
+          ]
+        },
+        "support_status": {
+          "enum": [
+            "CLAIMED_VERIFIED",
+            "AMBIGUOUS",
+            "NOT_ESTIMABLE",
+            "REJECTED"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          },
+          "minItems": 1
+        },
+        "rationale_code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "alternative_set_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "cardinality": {
+                "const": "ONE_TO_ONE"
+              }
+            },
+            "required": [
+              "cardinality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_object_ids": {
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "target_object_ids": {
+                "minItems": 1,
+                "maxItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "cardinality": {
+                "const": "ONE_TO_MANY"
+              }
+            },
+            "required": [
+              "cardinality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_object_ids": {
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "target_object_ids": {
+                "minItems": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "cardinality": {
+                "const": "MANY_TO_ONE"
+              }
+            },
+            "required": [
+              "cardinality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_object_ids": {
+                "minItems": 2
+              },
+              "target_object_ids": {
+                "minItems": 1,
+                "maxItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "cardinality": {
+                "const": "MANY_TO_MANY"
+              }
+            },
+            "required": [
+              "cardinality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_object_ids": {
+                "minItems": 2
+              },
+              "target_object_ids": {
+                "minItems": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "cardinality": {
+                "const": "UNMAPPED"
+              }
+            },
+            "required": [
+              "cardinality"
+            ]
+          },
+          "then": {
+            "properties": {
+              "target_object_ids": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "queryComparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "query_definition_sha256",
+        "analysis_code_sha256",
+        "source_output_sha256",
+        "target_output_sha256",
+        "equivalence"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_definition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "analysis_code_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_output_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target_output_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "equivalence": {
+          "enum": [
+            "SAME",
+            "DIFFERENT",
+            "NOT_ESTIMABLE"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "equivalence": {
+                "const": "SAME"
+              }
+            },
+            "required": [
+              "equivalence"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_output_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "target_output_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "equivalence": {
+                "const": "DIFFERENT"
+              }
+            },
+            "required": [
+              "equivalence"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_output_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "target_output_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$comment": "undefined In specification-only receipts, correspondence_engine_sha256 and verifier_sha256 may be null. A null implementation digest cannot support a CORRESPONDENCE_VERIFIED disposition."
+}

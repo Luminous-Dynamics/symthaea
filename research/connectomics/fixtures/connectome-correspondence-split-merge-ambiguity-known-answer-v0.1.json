@@ -1,0 +1,314 @@
+{
+  "schema_version": "0.1.0",
+  "receipt_id": "synthetic-correspondence-split-merge-ambiguity-v0.1",
+  "source_world": {
+    "world_id": "world-source-v1",
+    "source_dataset_id": "dataset-synthetic-001",
+    "source_volume_id": "volume-synthetic-001",
+    "release_id": "release-v1"
+  },
+  "target_world": {
+    "world_id": "world-target-v2",
+    "source_dataset_id": "dataset-synthetic-001",
+    "source_volume_id": "volume-synthetic-001",
+    "release_id": "release-v2"
+  },
+  "artifact_manifests": {
+    "source": {
+      "manifest_sha256": "37ced3556c7fecfbce6874cf5a6c95fd1eed4933d10694e4ab5ffaf7e01b7515",
+      "segmentation_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "mesh_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "skeleton_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "synapse_annotations_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "coordinate_frame_id": "physical-frame-v1",
+      "voxel_size_nm": [
+        4,
+        4,
+        40
+      ]
+    },
+    "target": {
+      "manifest_sha256": "b158dc4cacf2a39d3766d99cc554a8f166b9ab333ffb50f498b1a178c3fe51ed",
+      "segmentation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "mesh_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "skeleton_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "synapse_annotations_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "coordinate_frame_id": "physical-frame-v2",
+      "voxel_size_nm": [
+        4,
+        4,
+        40
+      ]
+    }
+  },
+  "registration": {
+    "status": "UNCERTAIN",
+    "transform_source_to_target_4x4": [
+      [
+        1,
+        0,
+        0,
+        20
+      ],
+      [
+        0,
+        1,
+        0,
+        -10
+      ],
+      [
+        0,
+        0,
+        1,
+        5
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "max_residual_nm": 12,
+    "uncertainty_bound_nm": 25,
+    "coordinate_frame_policy_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+  },
+  "mappings": [
+    {
+      "mapping_id": "map-seg-split",
+      "relation_type": "SEGMENT_LINEAGE",
+      "source_object_ids": [
+        "seg-A"
+      ],
+      "target_object_ids": [
+        "seg-A-left",
+        "seg-A-right"
+      ],
+      "cardinality": "ONE_TO_MANY",
+      "support_status": "CLAIMED_VERIFIED",
+      "alternative_set_id": null,
+      "evidence": [
+        {
+          "evidence_id": "evidence-txn-001",
+          "kind": "EDIT_TRANSACTION",
+          "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "locator": "transactions/txn-001",
+          "authority": "SOURCE_DERIVED"
+        }
+      ],
+      "rationale_code": "SYNTHETIC_SPLIT_TRANSACTION"
+    },
+    {
+      "mapping_id": "map-seg-merge",
+      "relation_type": "SEGMENT_LINEAGE",
+      "source_object_ids": [
+        "seg-B",
+        "seg-C"
+      ],
+      "target_object_ids": [
+        "seg-BC"
+      ],
+      "cardinality": "MANY_TO_ONE",
+      "support_status": "CLAIMED_VERIFIED",
+      "alternative_set_id": null,
+      "evidence": [
+        {
+          "evidence_id": "evidence-txn-002",
+          "kind": "EDIT_TRANSACTION",
+          "artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "locator": "transactions/txn-002",
+          "authority": "SOURCE_DERIVED"
+        }
+      ],
+      "rationale_code": "SYNTHETIC_MERGE_TRANSACTION"
+    },
+    {
+      "mapping_id": "map-neuron-1",
+      "relation_type": "NEURON_CORRESPONDENCE",
+      "source_object_ids": [
+        "neuron-1"
+      ],
+      "target_object_ids": [
+        "neuron-1-v2"
+      ],
+      "cardinality": "ONE_TO_ONE",
+      "support_status": "CLAIMED_VERIFIED",
+      "alternative_set_id": null,
+      "evidence": [
+        {
+          "evidence_id": "evidence-neuron-anchor",
+          "kind": "EXPERT_ADJUDICATION",
+          "artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "locator": "adjudications/neuron-1",
+          "authority": "EXPERT_ADJUDICATED"
+        }
+      ],
+      "rationale_code": "STABLE_ANCHOR_AND_ADJUDICATION"
+    },
+    {
+      "mapping_id": "map-neuron-2-alt-a",
+      "relation_type": "NEURON_CORRESPONDENCE",
+      "source_object_ids": [
+        "neuron-2"
+      ],
+      "target_object_ids": [
+        "neuron-2-candidate-a"
+      ],
+      "cardinality": "ONE_TO_ONE",
+      "support_status": "AMBIGUOUS",
+      "alternative_set_id": "neuron-2-alternatives-v1",
+      "evidence": [
+        {
+          "evidence_id": "evidence-neuron-2-a",
+          "kind": "MORPHOLOGY",
+          "artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "locator": "morphology/candidate-a",
+          "authority": "MODEL_DERIVED"
+        }
+      ],
+      "rationale_code": "AMBIGUOUS_MORPHOLOGY_CANDIDATE"
+    },
+    {
+      "mapping_id": "map-neuron-2-alt-b",
+      "relation_type": "NEURON_CORRESPONDENCE",
+      "source_object_ids": [
+        "neuron-2"
+      ],
+      "target_object_ids": [
+        "neuron-2-candidate-b"
+      ],
+      "cardinality": "ONE_TO_ONE",
+      "support_status": "AMBIGUOUS",
+      "alternative_set_id": "neuron-2-alternatives-v1",
+      "evidence": [
+        {
+          "evidence_id": "evidence-neuron-2-b",
+          "kind": "MORPHOLOGY",
+          "artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "locator": "morphology/candidate-b",
+          "authority": "MODEL_DERIVED"
+        }
+      ],
+      "rationale_code": "AMBIGUOUS_MORPHOLOGY_CANDIDATE"
+    },
+    {
+      "mapping_id": "map-synapse-1",
+      "relation_type": "SYNAPSE_CORRESPONDENCE",
+      "source_object_ids": [
+        "syn-1"
+      ],
+      "target_object_ids": [
+        "syn-1-v2"
+      ],
+      "cardinality": "ONE_TO_ONE",
+      "support_status": "NOT_ESTIMABLE",
+      "alternative_set_id": null,
+      "evidence": [
+        {
+          "evidence_id": "evidence-synapse-partners",
+          "kind": "SYNAPSE_PARTNER",
+          "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "locator": "synapses/syn-1",
+          "authority": "UNKNOWN"
+        }
+      ],
+      "rationale_code": "PARTNER_EVIDENCE_MISSING"
+    },
+    {
+      "mapping_id": "map-synapse-2-unmapped",
+      "relation_type": "SYNAPSE_CORRESPONDENCE",
+      "source_object_ids": [
+        "syn-2"
+      ],
+      "target_object_ids": [],
+      "cardinality": "UNMAPPED",
+      "support_status": "NOT_ESTIMABLE",
+      "alternative_set_id": null,
+      "evidence": [
+        {
+          "evidence_id": "evidence-synapse-unmapped",
+          "kind": "OTHER",
+          "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "locator": "synapses/syn-2",
+          "authority": "UNKNOWN"
+        }
+      ],
+      "rationale_code": "NO_TARGET_CANDIDATE"
+    },
+    {
+      "mapping_id": "map-segmentation-artifact",
+      "relation_type": "ARTIFACT_IDENTITY",
+      "source_object_ids": [
+        "skeleton-artifact-shared"
+      ],
+      "target_object_ids": [
+        "skeleton-artifact-shared"
+      ],
+      "cardinality": "ONE_TO_ONE",
+      "support_status": "CLAIMED_VERIFIED",
+      "alternative_set_id": null,
+      "evidence": [
+        {
+          "evidence_id": "evidence-artifact-release",
+          "kind": "SOURCE_ANCHOR",
+          "artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "locator": "artifacts/shared-skeleton",
+          "authority": "SOURCE_DERIVED"
+        }
+      ],
+      "rationale_code": "EXACT_SAME_SKELETON_BYTES"
+    }
+  ],
+  "query_comparisons": [
+    {
+      "query_id": "pathway-query-1",
+      "query_definition_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "analysis_code_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "source_output_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "target_output_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "equivalence": "SAME"
+    },
+    {
+      "query_id": "pathway-query-2",
+      "query_definition_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "analysis_code_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "source_output_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "target_output_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "equivalence": "DIFFERENT"
+    },
+    {
+      "query_id": "synapse-partner-query",
+      "query_definition_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "analysis_code_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "source_output_sha256": null,
+      "target_output_sha256": null,
+      "equivalence": "NOT_ESTIMABLE"
+    }
+  ],
+  "summary": {
+    "mapping_count": 8,
+    "ambiguous_count": 2,
+    "not_estimable_count": 2,
+    "rejected_count": 0,
+    "unmapped_source_object_count": 1,
+    "one_to_many_count": 1,
+    "many_to_one_count": 1,
+    "many_to_many_count": 0,
+    "query_same_count": 1,
+    "query_different_count": 1,
+    "query_not_estimable_count": 1,
+    "claimed_verified_count": 4
+  },
+  "disposition": "NOT_ESTIMABLE",
+  "provenance": {
+    "source_manifest_sha256": "37ced3556c7fecfbce6874cf5a6c95fd1eed4933d10694e4ab5ffaf7e01b7515",
+    "target_manifest_sha256": "b158dc4cacf2a39d3766d99cc554a8f166b9ab333ffb50f498b1a178c3fe51ed",
+    "lineage_receipt_sha256": null,
+    "mapping_policy_sha256": "2d9c68e6c835e266225a680601d79e15c1aed79ff53204b67386187b001f45eb",
+    "correspondence_engine_sha256": null,
+    "verifier_protocol_sha256": "935643661ebacd206cee3dc153806deba6dd245dbf20c5d4b402207c16b53c92",
+    "verifier_sha256": null,
+    "report_schema_sha256": "10c3eb5ab6deb5d4044897501a97336e8ae3ec2a6a3520e9d19e5f313dccad9c",
+    "world_manifest_schema_sha256": "b8bbc20a6e581232b7439a1fbbbecf65bbcb6b6b702732c98720a2dce8575f06"
+  }
+}

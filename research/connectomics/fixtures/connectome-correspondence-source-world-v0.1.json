@@ -1,0 +1,71 @@
+{
+  "schema_version": "0.1.0",
+  "world": {
+    "world_id": "world-source-v1",
+    "source_dataset_id": "dataset-synthetic-001",
+    "source_volume_id": "volume-synthetic-001",
+    "release_id": "release-v1",
+    "objects": [
+      {
+        "object_id": "seg-A",
+        "object_type": "SEGMENT",
+        "lineage_id": "lineage-A",
+        "stable_anchor_id": null
+      },
+      {
+        "object_id": "seg-B",
+        "object_type": "SEGMENT",
+        "lineage_id": "lineage-B",
+        "stable_anchor_id": null
+      },
+      {
+        "object_id": "seg-C",
+        "object_type": "SEGMENT",
+        "lineage_id": "lineage-C",
+        "stable_anchor_id": null
+      },
+      {
+        "object_id": "neuron-1",
+        "object_type": "NEURON",
+        "lineage_id": "neuron-lineage-1",
+        "stable_anchor_id": "anchor-neuron-1"
+      },
+      {
+        "object_id": "neuron-2",
+        "object_type": "NEURON",
+        "lineage_id": null,
+        "stable_anchor_id": null
+      },
+      {
+        "object_id": "syn-1",
+        "object_type": "SYNAPSE",
+        "lineage_id": "synapse-lineage-1",
+        "stable_anchor_id": null
+      },
+      {
+        "object_id": "syn-2",
+        "object_type": "SYNAPSE",
+        "lineage_id": null,
+        "stable_anchor_id": null
+      },
+      {
+        "object_id": "skeleton-artifact-shared",
+        "object_type": "ARTIFACT",
+        "lineage_id": "shared-skeleton-artifact",
+        "stable_anchor_id": null
+      }
+    ]
+  },
+  "manifest": {
+    "segmentation_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "mesh_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "skeleton_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "synapse_annotations_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "coordinate_frame_id": "physical-frame-v1",
+    "voxel_size_nm": [
+      4,
+      4,
+      40
+    ]
+  }
+}

@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/connectomics/connectome-world-artifact-manifest-v0.1.schema.json",
+  "title": "Connectome world artifact manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "world",
+    "manifest"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "source_dataset_id",
+        "source_volume_id",
+        "release_id",
+        "objects"
+      ],
+      "properties": {
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_volume_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "release_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "objects": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "object_id",
+              "object_type",
+              "lineage_id",
+              "stable_anchor_id"
+            ],
+            "properties": {
+              "object_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "object_type": {
+                "enum": [
+                  "SEGMENT",
+                  "NEURON",
+                  "SYNAPSE",
+                  "ARTIFACT"
+                ]
+              },
+              "lineage_id": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "stable_anchor_id": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "segmentation_sha256",
+        "mesh_sha256",
+        "skeleton_sha256",
+        "synapse_annotations_sha256",
+        "coordinate_frame_id",
+        "voxel_size_nm"
+      ],
+      "properties": {
+        "segmentation_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "mesh_sha256": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "skeleton_sha256": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "synapse_annotations_sha256": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "coordinate_frame_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "voxel_size_nm": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      }
+    }
+  },
+  "$comment": "The receipt's artifact_manifests.<side>.manifest_sha256 binds the exact bytes of this sidecar. Its world and manifest objects must match the corresponding embedded receipt declarations. Object IDs must be unique within a world. Mappings may only reference IDs present in the declared source/target world inventories. Stable anchors are evidence inputs, not automatically trusted identity assertions."
+}

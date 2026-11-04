@@ -1,0 +1,17 @@
+[package]
+name = "connectome-world-correspondence-verifier"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Fail-closed semantic verifier for evidence-qualified connectome world correspondence receipts"
+
+[[bin]]
+name = "connectome-world-correspondence-verifier"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"
+
+[workspace]
