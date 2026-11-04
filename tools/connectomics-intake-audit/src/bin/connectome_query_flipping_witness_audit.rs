@@ -809,8 +809,12 @@ mod tests {
             report.status,
             "NO_WITNESS_WITHIN_DECLARED_EDIT_UNIVERSE_AND_BUDGET"
         );
-        assert_eq!(report.search_complete, true);
-        assert!(report.scope_note.contains("does not establish that no biological counterexample exists"));
+        assert!(report.search_complete);
+        assert!(
+            report
+                .scope_note
+                .contains("does not establish that no biological counterexample exists")
+        );
     }
 
     #[test]
