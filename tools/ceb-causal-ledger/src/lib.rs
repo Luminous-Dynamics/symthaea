@@ -845,6 +845,12 @@ impl Ledger {
                     if evidence.source_action_id.as_deref() != Some(action.id.as_str())
                         || evidence.sequence <= action.sequence
                         || evidence.sequence >= outcome.sequence
+                        || matches!(
+                            evidence.authority,
+                            EvidenceAuthority::DreamDerived
+                                | EvidenceAuthority::Inferred
+                                | EvidenceAuthority::Unresolved
+                        )
                     {
                         return Err(ValidationError::OutcomeEvidenceMismatch);
                     }
@@ -901,6 +907,7 @@ impl Ledger {
             }
             if decision.kind == DecisionKind::ProceedToRepair
                 && (decision.hypothesis_record_ids.is_empty()
+                    || decision.required_evidence_ids.is_empty()
                     || !decision.missing_requirements.is_empty())
             {
                 return Err(ValidationError::InvalidDecisionRecord);
@@ -958,7 +965,7 @@ impl Ledger {
                 let outcome = outcomes_by_id
                     .get(outcome_id.as_str())
                     .ok_or(ValidationError::RepairReferenceMismatch)?;
-                if outcome.sequence >= repair.sequence {
+                if outcome.sequence >= decision.sequence || outcome.sequence >= repair.sequence {
                     return Err(ValidationError::RepairReferenceMismatch);
                 }
             }
@@ -1314,6 +1321,40 @@ mod tests {
         assert_eq!(
             ledger.validate(),
             Err(ValidationError::InvalidDecisionRecord)
+        );
+    }
+
+    #[test]
+    fn proceed_decision_requires_prior_evidence() {
+        let mut ledger = base_ledger();
+        ledger.decisions[0].required_evidence_ids.clear();
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::InvalidDecisionRecord)
+        );
+    }
+
+    #[test]
+    fn repair_cannot_use_an_outcome_observed_after_the_decision() {
+        let mut ledger = base_ledger();
+        ledger.outcomes[0].sequence = 8;
+        ledger.repairs[0].sequence = 9;
+        ledger.grades[0].sequence = 10;
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::RepairReferenceMismatch)
+        );
+    }
+
+    #[test]
+    fn dream_derived_item_cannot_be_an_observed_action_outcome() {
+        let mut ledger = base_ledger();
+        ledger.evidence[0].authority = EvidenceAuthority::DreamDerived;
+        ledger.hypotheses[0].status = HypothesisStatus::Unresolved;
+        ledger.hypotheses[0].supporting_evidence_ids.clear();
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::OutcomeEvidenceMismatch)
         );
     }
 
