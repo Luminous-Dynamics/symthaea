@@ -28,7 +28,9 @@ impl RateUnit {
     const fn seconds_per_unit(self) -> f64 {
         match self {
             Self::LitresPerMinute => 60.0,
-            Self::LitresPerHour | Self::ElectricalKilowatts | Self::UsefulThermalKilowatts => 3_600.0,
+            Self::LitresPerHour | Self::ElectricalKilowatts | Self::UsefulThermalKilowatts => {
+                3_600.0
+            }
         }
     }
 
@@ -448,8 +450,7 @@ mod tests {
             duration_seconds: 3600,
         };
 
-        let error =
-            evaluate_service_deficit(input).expect_err("energy carriers must not be mixed");
+        let error = evaluate_service_deficit(input).expect_err("energy carriers must not be mixed");
         assert_eq!(error.path, "service_deficit.rate_unit");
     }
 
