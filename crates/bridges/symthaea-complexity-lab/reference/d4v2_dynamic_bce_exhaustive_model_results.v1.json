@@ -1,0 +1,6 @@
+{
+  "format": "symthaea.d4v2.dynamic-bce-exhaustive-model-results",
+  "version": 1,
+  "claim_ceiling": "local_independent_source_derived_state_model_plus_exhaustive_exact_projected_oracle_not_D4_binary_differential_or_formal_proof",
+  "uploaded_corpus_execution": "not_run"
+}
