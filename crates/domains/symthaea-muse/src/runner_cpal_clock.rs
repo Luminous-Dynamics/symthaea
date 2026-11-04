@@ -753,6 +753,83 @@ mod tests {
         assert_eq!(bundle.fit.minimum_required_pair_count, 4);
     }
 
+    #[derive(Deserialize)]
+    struct RunnerCpalClockFixtureV1 {
+        schema_version: String,
+        fixture_id: String,
+        expected_disposition: String,
+        descriptor: RunnerCpalClockDescriptorV1,
+        policy: RunnerCpalClockFitPolicyV1,
+        pairs: Vec<RunnerCpalClockPairV1>,
+    }
+
+    #[test]
+    fn checked_in_runner_cpal_clock_fixtures_match_the_evaluator() {
+        let fixtures = [
+            include_str!("../../../../benchmarks/mel/clock/mel-runner-cpal-exact-001.json"),
+            include_str!("../../../../benchmarks/mel/clock/mel-runner-cpal-drift-pos-25ppm-001.json"),
+            include_str!("../../../../benchmarks/mel/clock/mel-runner-cpal-drift-neg-25ppm-001.json"),
+            include_str!("../../../../benchmarks/mel/clock/mel-runner-cpal-missing-pair-001.json"),
+            include_str!("../../../../benchmarks/mel/clock/mel-runner-cpal-wide-bracket-001.json"),
+            include_str!("../../../../benchmarks/mel/clock/mel-runner-cpal-descriptor-mismatch-001.json"),
+        ];
+
+        for fixture_json in fixtures {
+            let fixture: RunnerCpalClockFixtureV1 =
+                serde_json::from_str(fixture_json).expect("clock fixture must parse");
+            assert_eq!(
+                fixture.schema_version,
+                "mel-runner-cpal-clock-pair-set-v1",
+                "{}",
+                fixture.fixture_id
+            );
+            let result = fit_runner_cpal_clock_bundle_v1(
+                &fixture.descriptor,
+                &fixture.pairs,
+                fixture.policy,
+            );
+            match fixture.expected_disposition.as_str() {
+                "fit" => {
+                    let bundle = result.unwrap_or_else(|error| {
+                        panic!("{} unexpectedly rejected: {error}", fixture.fixture_id)
+                    });
+                    assert_eq!(
+                        bundle.schema_version,
+                        RUNNER_CPAL_CLOCK_BUNDLE_SCHEMA_V1,
+                        "{}",
+                        fixture.fixture_id
+                    );
+                    if fixture.fixture_id == "MEL-RUNNER-CPAL-DRIFT-POS-25PPM-001" {
+                        assert!((bundle.fit.estimated_drift_ppm - 25.0).abs() < 0.1);
+                    }
+                    if fixture.fixture_id == "MEL-RUNNER-CPAL-DRIFT-NEG-25PPM-001" {
+                        assert!((bundle.fit.estimated_drift_ppm + 25.0).abs() < 0.1);
+                    }
+                    if fixture.fixture_id == "MEL-RUNNER-CPAL-MISSING-PAIR-001" {
+                        assert_eq!(
+                            bundle.fit.missing_pair_records_before_or_between_observations,
+                            1
+                        );
+                    }
+                }
+                "reject_capture_bracket" => assert!(
+                    matches!(result, Err(RunnerCpalClockFitErrorV1::CaptureBracketOutsidePolicy { .. })),
+                    "{} must fail the capture-bracket gate",
+                    fixture.fixture_id
+                ),
+                "reject_descriptor_mismatch" => assert!(
+                    matches!(result, Err(RunnerCpalClockFitErrorV1::DescriptorMismatch { .. })),
+                    "{} must fail the descriptor-identity gate",
+                    fixture.fixture_id
+                ),
+                other => panic!(
+                    "{} has unsupported expected disposition {other}",
+                    fixture.fixture_id
+                ),
+            }
+        }
+    }
+
     #[test]
     fn bundle_rejects_invalid_descriptor_digest() {
         let mut d = descriptor();
