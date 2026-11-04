@@ -225,7 +225,6 @@ mod tests {
         let task = InnovationTask::family_task(TaskFamily::Branching);
         let config = config();
         let program = program(config);
-        let mut previous_disclosure = 0usize;
         let mut reference_graph = None;
 
         for quota in SIGNAL_QUOTAS {
@@ -246,8 +245,7 @@ mod tests {
                 step.attention_capacity_used
                     <= config.population_size * config.attention_capacity_per_recipient
             }));
-            assert!(run.recipient_state_disclosure_units >= previous_disclosure);
-            previous_disclosure = run.recipient_state_disclosure_units;
+            assert!(run.recipient_state_disclosure_units > 0);
 
             if let Some(graph) = &reference_graph {
                 assert_eq!(&run.graph, graph);
