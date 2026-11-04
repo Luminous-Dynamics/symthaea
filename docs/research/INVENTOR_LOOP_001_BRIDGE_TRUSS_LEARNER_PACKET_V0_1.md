@@ -1,6 +1,6 @@
 # INVENTOR-LOOP-001 — Bridge / Truss Design Challenge (Learner Packet)
 
-**Artifact status:** DESIGN_ONLY / learner-facing draft  
+**Artifact status:** DESIGN_ONLY / learner-facing draft; no merged Symtropy solver integration  
 **Programme:** [INVENTOR-LOOP-001](../INVENTOR_LOOP_001_PROGRAM_V0_1.md)  
 **Tracking:** [Symthaea #10442](https://github.com/Luminous-Dynamics/symthaea/issues/10442)  
 **Date:** 2026-11-04  
@@ -31,7 +31,7 @@ By the end of the project, you should be able to:
 - compare two designs using requirements and evidence rather than appearance alone;
 - explain one revision you made and what evidence motivated it.
 
-The activity can be adapted by the educator for different ages and prior knowledge. More advanced learners can work with equations and sensitivity analysis; younger learners can begin with force arrows, manipulable diagrams and qualitative predictions.
+The activity can be adapted by the educator for different ages and prior knowledge. More advanced learners can work with equations and sensitivity analysis; younger learners can begin with force arrows, manipulable diagrams and qualitative predictions. Until the owner-approved digital interface is available, all learners use the paper/hand-calculation path; no solver call is implied.
 
 ## 3. Design brief and requirements
 
@@ -217,6 +217,6 @@ The physical protocol must be designed by competent adults and must follow Symtr
 
 ## 11. Current status
 
-The packet is **DESIGN_ONLY**. The numeric task card, solver adapter, learner interface, evaluator custody, educator review, physical fixture, and any human learning study are not yet implemented or qualified.
+The packet is **DESIGN_ONLY**. The numeric task card, solver integration against an exact owner-approved Symtropy head, learner interface, evaluator custody, educator review, physical fixture, and any human learning study are not yet implemented or qualified.
 
 This draft is intended for review by the Symtropy truss owner, Praxis educators/researchers, and the CEB/PhysicsIR owners before implementation.
