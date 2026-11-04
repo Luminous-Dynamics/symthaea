@@ -38,7 +38,7 @@ pub enum MusicalParticipationDecisionV1 {
 
 impl MusicalParticipationDecisionV1 {
     /// Any explicit interaction intervention, including relinquishing the floor.
-    pub fn is_contribution(self) -> bool {
+    pub fn is_active_intervention(self) -> bool {
         matches!(self, Self::Respond | Self::Continue | Self::Yield)
     }
 
@@ -142,8 +142,9 @@ pub struct MusicalParticipationPredictionV1 {
     /// Calibrated probability that the selected decision belongs to the
     /// musician-annotated valid-decision set.
     pub decision_confidence: f64,
-    /// Calibrated probability that making a musical contribution is
-    /// appropriate for this variant, independent of the selected action.
+    /// Calibrated probability that an active musical intervention (RESPOND,
+    /// CONTINUE or YIELD) is appropriate for this variant, independent of
+    /// the selected action.
     pub act_probability: f64,
 }
 
@@ -208,8 +209,8 @@ fn valid_decision_for_requirement(
     decision: MusicalParticipationDecisionV1,
 ) -> bool {
     match requirement {
-        MusicalParticipationRequirementV1::Act => decision.is_contribution(),
-        MusicalParticipationRequirementV1::Withhold => !decision.is_contribution(),
+        MusicalParticipationRequirementV1::Act => decision.is_active_intervention(),
+        MusicalParticipationRequirementV1::Withhold => !decision.is_active_intervention(),
     }
 }
 
@@ -546,13 +547,13 @@ pub fn score_musical_participation_set_v1(
             let act_is_required = member.requirement == MusicalParticipationRequirementV1::Act;
             if act_is_required {
                 act_required_count += 1;
-                if !prediction.decision.is_contribution() {
+                if !prediction.decision.is_active_intervention() {
                     family_missed_invitations += 1;
                     missed_invitation_count += 1;
                 }
             } else {
                 withhold_required_count += 1;
-                if prediction.decision.is_contribution() {
+                if prediction.decision.is_active_intervention() {
                     family_withhold_violations += 1;
                     withhold_violation_count += 1;
                     if prediction.decision.is_entry() {
