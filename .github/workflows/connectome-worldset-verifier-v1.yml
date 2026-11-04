@@ -1,0 +1,43 @@
+name: Connectome Structural-World Verifier
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [research/connectome-query-impact-v0-1-20261102]
+    paths:
+      - "tools/connectome-worldset-verifier/**"
+      - ".github/workflows/connectome-worldset-verifier-v1.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/connectome-worldset-verifier/**"
+      - ".github/workflows/connectome-worldset-verifier-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: connectome-worldset-verifier-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier:
+    name: Finite-world closure and artifact integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Formatting
+        run: cargo fmt --manifest-path tools/connectome-worldset-verifier/Cargo.toml -- --check
+      - name: Validate Draft 2020-12 universe schema
+        run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python3 -c 'import json, jsonschema; p="research/connectomics/connectome-worldset-universe-v0.1.schema.json"; s=json.load(open(p)); jsonschema.Draft202012Validator.check_schema(s)'
+      - name: Tests
+        run: cargo test --manifest-path tools/connectome-worldset-verifier/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path tools/connectome-worldset-verifier/Cargo.toml --locked --all-targets -- -D warnings

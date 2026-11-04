@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-worldset-universe-v0.1.schema.json",
+  "title": "Finite structural-world universe v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol",
+    "universe_id",
+    "admissibility_policy",
+    "manifest_sha256",
+    "context",
+    "freeze",
+    "artifact_files",
+    "axes",
+    "paired_worlds"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "protocol": {
+      "const": "CONNECTOME-STRUCTURAL-WORLD-UNIVERSE-V1"
+    },
+    "universe_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "admissibility_policy": {
+      "const": "cartesian_product_all_combinations_v1"
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "operation_id",
+        "sample_hash",
+        "task_route",
+        "query_id",
+        "scenario_id",
+        "query_definition_sha256",
+        "metric_id",
+        "unit_id",
+        "decision_threshold",
+        "materiality_threshold",
+        "source_volume_id",
+        "base_graph_snapshot_sha256",
+        "hypothetical_result_graph_snapshot_sha256",
+        "candidate_patch_sha256",
+        "baseline_interval",
+        "after_edit_interval",
+        "paired_effect_interval"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        },
+        "task_route": {
+          "enum": [
+            "false_split_correction",
+            "false_merge_identification",
+            "split_mask_generation"
+          ]
+        },
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_definition_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_threshold": {
+          "type": "number"
+        },
+        "materiality_threshold": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "source_volume_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base_graph_snapshot_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "hypothetical_result_graph_snapshot_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "candidate_patch_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "baseline_interval": {
+          "$ref": "#/$defs/interval"
+        },
+        "after_edit_interval": {
+          "$ref": "#/$defs/interval"
+        },
+        "paired_effect_interval": {
+          "$ref": "#/$defs/interval"
+        }
+      }
+    },
+    "freeze": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "universe_frozen_before_query_scoring",
+        "query_scoring_opened_before_freeze",
+        "unresolved_frontier_count",
+        "prequery_freeze_receipt_sha256"
+      ],
+      "properties": {
+        "universe_frozen_before_query_scoring": {
+          "const": true
+        },
+        "query_scoring_opened_before_freeze": {
+          "const": false
+        },
+        "unresolved_frontier_count": {
+          "const": 0
+        },
+        "prequery_freeze_receipt_sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "artifact_files": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "artifact_id",
+          "relative_path",
+          "sha256"
+        ],
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "relative_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha"
+          }
+        }
+      }
+    },
+    "axes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "axis_id",
+          "alternatives"
+        ],
+        "properties": {
+          "axis_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "alternatives": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "alternative_id",
+                "evidence_sha256",
+                "evidence_artifact_id"
+              ],
+              "properties": {
+                "alternative_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "evidence_sha256": {
+                  "$ref": "#/$defs/sha"
+                },
+                "evidence_artifact_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "paired_worlds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "world_id",
+          "assignment",
+          "baseline_value",
+          "after_edit_value"
+        ],
+        "properties": {
+          "world_id": {
+            "type": "string",
+            "pattern": "^world-[0-9a-f]{64}$"
+          },
+          "assignment": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "baseline_value": {
+            "type": "number"
+          },
+          "after_edit_value": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower",
+        "upper"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number"
+        },
+        "upper": {
+          "type": "number"
+        }
+      }
+    }
+  }
+}
