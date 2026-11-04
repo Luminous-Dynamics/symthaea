@@ -466,13 +466,15 @@
         "separate unique-name index parity from duplicate raw-name occurrence preservation; zip 9.3.0 indexed view is name-keyed and only reports duplicate presence separately",
         "retain the exact raw central-directory count and the oracle unique-name count for duplicate fixtures; do not use majority vote",
         "expose a bounded virtual Read+Seek archive view beginning at the custom parser's admitted leading_bytes origin; disable heuristic decoder offset correction and compare central-directory offsets in ZIP-relative coordinates",
-        "preserve fail-closed rejection whenever the secondary decoder rejects the bounded ZIP-relative view; the virtual origin may only be sourced from the custom parser's fully admitted inventory"
+        "preserve fail-closed rejection whenever the secondary decoder rejects the bounded ZIP-relative view; the virtual origin may only be sourced from the custom parser's fully admitted inventory",
+        "the repository root rust-toolchain.toml pins stable 1.96.0; cargo-fuzz sanitizer build must invoke cargo +nightly-2026-11-03 fuzz run explicitly so rustc receives nightly -Z sanitizer/coverage flags",
+        "capture rustc +nightly-2026-11-03 --version --verbose separately from the stable repo-default toolchain; include both in receipts"
       ],
       "fuzz_qualification": {
         "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10451",
         "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10451",
         "target": "zip_inventory_and_content",
-        "runner": "cargo-fuzz 0.13.2; libfuzzer-sys 0.4.13; Rust nightly-2026-11-03; Linux x86-64",
+        "runner": "cargo-fuzz 0.13.2; libfuzzer-sys 0.4.13; explicit cargo +nightly-2026-11-03 fuzz override; Rust nightly-2026-11-03; Linux x86-64",
         "starter_seed_sha256": "dd8a2bd8c16d808363a1d1e7560a4cc86494393c1a202a478db00f00ae53d099",
         "limits": {
           "input_bytes": 1048576,
@@ -487,8 +489,8 @@
         },
         "current_status": "draft_target_authored; workflow queued; no fuzz executions claimed",
         "claim_ceiling": "A bounded 180-second smoke run is only evidence for the exact head, toolchain, seed corpus, runtime and environment. It is not security certification or proof of bug absence.",
-        "toolchain": "nightly-2026-11-03",
-        "status": "draft_target_authored; workflow queued; no fuzz executions claimed",
+        "toolchain": "nightly-2026-11-03 (explicit + override required because repository rust-toolchain.toml pins stable 1.96.0)",
+        "status": "nightly_override_committed; next exact-head workflow pending; previous run failed before fuzzing on stable toolchain",
         "seed_verification": "workflow-enforced sha256sum --check against the tracked decoded ZIP seed",
         "run_receipt_fields": [
           "source_commit",
