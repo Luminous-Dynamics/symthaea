@@ -49,6 +49,22 @@ pub enum RaceError {
     DuplicateFrame {
         frame_id: u64,
     },
+    OverlappingFrameRange {
+        existing_frame_id: u64,
+        incoming_frame_id: u64,
+    },
+    DuplicateProducerOperation {
+        producer_id: String,
+    },
+    UnknownProducerOperation {
+        producer_id: String,
+    },
+    ProducerAlreadyCompleted {
+        producer_id: String,
+    },
+    ProducerBindingMismatch {
+        producer_id: String,
+    },
     UnknownFrame {
         frame_id: u64,
     },
@@ -100,6 +116,10 @@ impl FrameRange {
     pub fn is_empty(self) -> bool {
         self.start >= self.end
     }
+
+    pub fn overlaps(self, other: Self) -> bool {
+        self.start < other.end && other.start < self.end
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -133,6 +153,16 @@ pub struct RenderedFrameRange {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProducerOperation {
+    pub producer_id: String,
+    pub authorization_id: String,
+    pub plan_sha256: String,
+    pub captured_epoch: u64,
+    pub started_order: u64,
+    pub completed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EventKind {
     Authorize {
         authorization_id: String,
@@ -144,12 +174,16 @@ pub enum EventKind {
         control_sequence: u64,
         expires_at_ns: u64,
     },
-    Render {
-        frame_id: u64,
-        range: FrameRange,
+    ProducerStarted {
+        producer_id: String,
         authorization_id: String,
         plan_sha256: String,
         captured_epoch: u64,
+    },
+    RenderCompleted {
+        producer_id: String,
+        frame_id: u64,
+        range: FrameRange,
     },
     Enqueue {
         frame_id: u64,
@@ -184,8 +218,13 @@ pub struct RaceSummary {
     pub current_epoch: u64,
     pub authorization_count: usize,
     pub revoked_authorization_count: usize,
+    pub producer_started_count: usize,
+    pub producer_completed_count: usize,
+    pub producer_in_flight_count: usize,
     pub rendered_frame_ranges: usize,
     pub rendered_frames: u64,
+    pub rendered_not_enqueued_ranges: usize,
+    pub rendered_not_enqueued_frames: u64,
     pub enqueued_frame_ranges: usize,
     pub enqueued_frames: u64,
     pub callback_admitted_ranges: usize,
@@ -202,6 +241,7 @@ pub struct RaceLedger {
     last_event_order: Option<u64>,
     last_control_sequence: u64,
     authorizations: BTreeMap<String, Authorization>,
+    producers: BTreeMap<String, ProducerOperation>,
     frames: BTreeMap<u64, RenderedFrameRange>,
     seen_events: BTreeMap<String, LedgerEvent>,
 }
@@ -224,6 +264,10 @@ impl RaceLedger {
 
     pub fn frame(&self, frame_id: u64) -> Option<&RenderedFrameRange> {
         self.frames.get(&frame_id)
+    }
+
+    pub fn producer(&self, producer_id: &str) -> Option<&ProducerOperation> {
+        self.producers.get(producer_id)
     }
 
     /// Apply one event in modeled linearization order.
@@ -310,12 +354,52 @@ impl RaceLedger {
                     },
                 );
             }
-            EventKind::Render {
-                frame_id,
-                range,
+            EventKind::ProducerStarted {
+                producer_id,
                 authorization_id,
                 plan_sha256,
                 captured_epoch,
+            } => {
+                require_identity(producer_id)?;
+                if self.producers.contains_key(producer_id) {
+                    return Err(RaceError::DuplicateProducerOperation {
+                        producer_id: producer_id.clone(),
+                    });
+                }
+                let auth = self.authorizations.get(authorization_id).ok_or_else(|| {
+                    RaceError::UnknownAuthorization {
+                        authorization_id: authorization_id.clone(),
+                    }
+                })?;
+                if auth.revoked {
+                    return Err(RaceError::RevokedAuthorization {
+                        authorization_id: authorization_id.clone(),
+                    });
+                }
+                if auth.plan_sha256 != *plan_sha256
+                    || auth.epoch != *captured_epoch
+                    || *captured_epoch != self.current_epoch
+                {
+                    return Err(RaceError::ProducerBindingMismatch {
+                        producer_id: producer_id.clone(),
+                    });
+                }
+                self.producers.insert(
+                    producer_id.clone(),
+                    ProducerOperation {
+                        producer_id: producer_id.clone(),
+                        authorization_id: authorization_id.clone(),
+                        plan_sha256: plan_sha256.clone(),
+                        captured_epoch: *captured_epoch,
+                        started_order: self.last_event_order.unwrap_or(0) + 1,
+                        completed: false,
+                    },
+                );
+            }
+            EventKind::RenderCompleted {
+                producer_id,
+                frame_id,
+                range,
             } => {
                 if !range.is_valid() {
                     return Err(RaceError::InvalidFrameRange);
@@ -325,26 +409,39 @@ impl RaceLedger {
                         frame_id: *frame_id,
                     });
                 }
-                let auth = self.authorizations.get(authorization_id).ok_or_else(|| {
-                    RaceError::UnknownAuthorization {
-                        authorization_id: authorization_id.clone(),
-                    }
-                })?;
-                if auth.plan_sha256 != *plan_sha256 || auth.epoch != *captured_epoch {
-                    return Err(RaceError::FrameBindingMismatch {
-                        frame_id: *frame_id,
+                let producer = self
+                    .producers
+                    .get_mut(producer_id)
+                    .ok_or_else(|| RaceError::UnknownProducerOperation {
+                        producer_id: producer_id.clone(),
+                    })?;
+                if producer.completed {
+                    return Err(RaceError::ProducerAlreadyCompleted {
+                        producer_id: producer_id.clone(),
                     });
                 }
-                // Deliberately allow an already-started producer to finish
-                // rendering after revocation, but retain its old epoch.
+                let authorization_id = producer.authorization_id.clone();
+                let plan_sha256 = producer.plan_sha256.clone();
+                let captured_epoch = producer.captured_epoch;
+                // Completion is allowed after veto only because this producer
+                // captured the active authorization/epoch before revocation.
+                producer.completed = true;
+                if let Some((existing_frame_id, _)) = self.frames.iter().find(|(_, existing)| {
+                    existing.range.overlaps(*range)
+                }) {
+                    return Err(RaceError::OverlappingFrameRange {
+                        existing_frame_id: *existing_frame_id,
+                        incoming_frame_id: *frame_id,
+                    });
+                }
                 self.frames.insert(
                     *frame_id,
                     RenderedFrameRange {
                         frame_id: *frame_id,
                         range: *range,
-                        authorization_id: authorization_id.clone(),
-                        plan_sha256: plan_sha256.clone(),
-                        captured_epoch: *captured_epoch,
+                        authorization_id,
+                        plan_sha256,
+                        captured_epoch,
                         enqueued: false,
                         disposition: None,
                     },
@@ -417,7 +514,9 @@ impl RaceLedger {
                 let frame = self
                     .frames
                     .get_mut(frame_id)
-                    .ok_or(RaceError::UnknownFrame { frame_id: *frame_id })?;
+                    .ok_or(RaceError::UnknownFrame {
+                        frame_id: *frame_id,
+                    })?;
                 if !frame.enqueued {
                     return Err(RaceError::FrameNotEnqueued {
                         frame_id: *frame_id,
@@ -474,6 +573,9 @@ impl RaceLedger {
             current_epoch: self.current_epoch,
             authorization_count: self.authorizations.len(),
             revoked_authorization_count: self.authorizations.values().filter(|a| a.revoked).count(),
+            producer_started_count: self.producers.len(),
+            producer_completed_count: self.producers.values().filter(|p| p.completed).count(),
+            producer_in_flight_count: self.producers.values().filter(|p| !p.completed).count(),
             rendered_frame_ranges: self.frames.len(),
             ..RaceSummary::default()
         };
@@ -484,6 +586,10 @@ impl RaceLedger {
             if frame.enqueued {
                 summary.enqueued_frame_ranges += 1;
                 summary.enqueued_frames = summary.enqueued_frames.saturating_add(count);
+            } else {
+                summary.rendered_not_enqueued_ranges += 1;
+                summary.rendered_not_enqueued_frames =
+                    summary.rendered_not_enqueued_frames.saturating_add(count);
             }
             match frame.disposition {
                 Some(FrameDisposition::CallbackAdmitted { .. }) => {
@@ -543,8 +649,12 @@ mod tests {
     }
 
     fn authorization_event(control_sequence: u64) -> LedgerEvent {
+        authorization_event_at(control_sequence, control_sequence)
+    }
+
+    fn authorization_event_at(order: u64, control_sequence: u64) -> LedgerEvent {
         event(
-            control_sequence,
+            order,
             &format!("authorize-{control_sequence}"),
             EventKind::Authorize {
                 authorization_id: format!("auth-{control_sequence}"),
@@ -559,19 +669,30 @@ mod tests {
         )
     }
 
-    fn render_event(order: u64, frame_id: u64, epoch: u64) -> LedgerEvent {
+    fn producer_start_event(order: u64, producer_id: &str, epoch: u64) -> LedgerEvent {
         event(
             order,
-            &format!("render-{frame_id}"),
-            EventKind::Render {
+            &format!("producer-start-{producer_id}"),
+            EventKind::ProducerStarted {
+                producer_id: producer_id.into(),
+                authorization_id: "auth-1".into(),
+                plan_sha256: PLAN_A.into(),
+                captured_epoch: epoch,
+            },
+        )
+    }
+
+    fn render_complete_event(order: u64, producer_id: &str, frame_id: u64) -> LedgerEvent {
+        event(
+            order,
+            &format!("render-complete-{frame_id}"),
+            EventKind::RenderCompleted {
+                producer_id: producer_id.into(),
                 frame_id,
                 range: FrameRange {
                     start: frame_id * 100,
                     end: frame_id * 100 + 100,
                 },
-                authorization_id: "auth-1".into(),
-                plan_sha256: PLAN_A.into(),
-                captured_epoch: epoch,
             },
         )
     }
@@ -621,10 +742,11 @@ mod tests {
     #[test]
     fn veto_before_callback_discards_late_enqueued_old_epoch_frames() {
         let mut ledger = authorized_ledger();
-        ledger.apply(render_event(2, 7, 0)).unwrap();
+        ledger.apply(producer_start_event(2, "producer-7", 0)).unwrap();
         ledger.apply(veto_event(3)).unwrap();
-        ledger.apply(enqueue_event(4, 7)).unwrap();
-        ledger.apply(callback_event(5, 7, 1)).unwrap();
+        ledger.apply(render_complete_event(4, "producer-7", 7)).unwrap();
+        ledger.apply(enqueue_event(5, 7)).unwrap();
+        ledger.apply(callback_event(6, 7, 1)).unwrap();
 
         let frame = ledger.frame(7).unwrap();
         assert_eq!(frame.captured_epoch, 0);
@@ -638,8 +760,13 @@ mod tests {
                 current_epoch: 1,
                 authorization_count: 1,
                 revoked_authorization_count: 1,
+                producer_started_count: 1,
+                producer_completed_count: 1,
+                producer_in_flight_count: 0,
                 rendered_frame_ranges: 1,
                 rendered_frames: 100,
+                rendered_not_enqueued_ranges: 0,
+                rendered_not_enqueued_frames: 0,
                 enqueued_frame_ranges: 1,
                 enqueued_frames: 100,
                 callback_admitted_ranges: 0,
@@ -655,10 +782,11 @@ mod tests {
     #[test]
     fn callback_admitted_before_veto_remains_admitted_and_is_not_retroactively_cancelled() {
         let mut ledger = authorized_ledger();
-        ledger.apply(render_event(2, 7, 0)).unwrap();
-        ledger.apply(enqueue_event(3, 7)).unwrap();
-        ledger.apply(callback_event(4, 7, 0)).unwrap();
-        ledger.apply(veto_event(5)).unwrap();
+        ledger.apply(producer_start_event(2, "producer-7", 0)).unwrap();
+        ledger.apply(render_complete_event(3, "producer-7", 7)).unwrap();
+        ledger.apply(enqueue_event(4, 7)).unwrap();
+        ledger.apply(callback_event(5, 7, 0)).unwrap();
+        ledger.apply(veto_event(6)).unwrap();
 
         assert_eq!(
             ledger.frame(7).unwrap().disposition,
@@ -672,10 +800,11 @@ mod tests {
     #[test]
     fn callback_that_observes_new_epoch_never_admits_old_frame() {
         let mut ledger = authorized_ledger();
-        ledger.apply(render_event(2, 7, 0)).unwrap();
+        ledger.apply(producer_start_event(2, "producer-7", 0)).unwrap();
         ledger.apply(veto_event(3)).unwrap();
-        ledger.apply(enqueue_event(4, 7)).unwrap();
-        ledger.apply(callback_event(5, 7, 1)).unwrap();
+        ledger.apply(render_complete_event(4, "producer-7", 7)).unwrap();
+        ledger.apply(enqueue_event(5, 7)).unwrap();
+        ledger.apply(callback_event(6, 7, 1)).unwrap();
 
         assert_eq!(
             ledger.frame(7).unwrap().disposition,
@@ -687,24 +816,27 @@ mod tests {
     #[test]
     fn producer_cannot_retag_old_render_with_new_epoch() {
         let mut ledger = authorized_ledger();
-        ledger.apply(render_event(2, 7, 0)).unwrap();
+        ledger.apply(producer_start_event(2, "producer-7", 0)).unwrap();
         ledger.apply(veto_event(3)).unwrap();
+        // Already-started work may complete, but its captured epoch is fixed.
+        ledger.apply(render_complete_event(4, "producer-7", 7)).unwrap();
 
         let result = ledger.apply(event(
-            4,
-            "bad-retag",
-            EventKind::Render {
-                frame_id: 8,
-                range: FrameRange {
-                    start: 800,
-                    end: 900,
-                },
+            5,
+            "producer-start-after-veto",
+            EventKind::ProducerStarted {
+                producer_id: "producer-8".into(),
                 authorization_id: "auth-1".into(),
                 plan_sha256: PLAN_A.into(),
                 captured_epoch: 1,
             },
         ));
-        assert_eq!(result, Err(RaceError::FrameBindingMismatch { frame_id: 8 }));
+        assert_eq!(
+            result,
+            Err(RaceError::RevokedAuthorization {
+                authorization_id: "auth-1".into(),
+            })
+        );
     }
 
     #[test]
@@ -735,12 +867,13 @@ mod tests {
     #[test]
     fn new_authorization_uses_new_epoch_and_old_frames_stay_stale() {
         let mut ledger = authorized_ledger();
-        ledger.apply(render_event(2, 7, 0)).unwrap();
+        ledger.apply(producer_start_event(2, "producer-7", 0)).unwrap();
         ledger.apply(veto_event(3)).unwrap();
-        ledger.apply(enqueue_event(4, 7)).unwrap();
-        ledger.apply(callback_event(5, 7, 1)).unwrap();
+        ledger.apply(render_complete_event(4, "producer-7", 7)).unwrap();
+        ledger.apply(enqueue_event(5, 7)).unwrap();
+        ledger.apply(callback_event(6, 7, 1)).unwrap();
 
-        ledger.apply(authorization_event(6)).unwrap();
+        ledger.apply(authorization_event_at(7, 6)).unwrap();
         let new_authorization = ledger.authorization("auth-6").unwrap();
         assert_eq!(new_authorization.epoch, 1);
         assert!(!new_authorization.revoked);
@@ -790,18 +923,28 @@ mod tests {
     #[test]
     fn missing_enqueue_or_duplicate_terminal_check_fails_closed() {
         let mut no_enqueue = authorized_ledger();
-        no_enqueue.apply(render_event(2, 7, 0)).unwrap();
+        no_enqueue
+            .apply(producer_start_event(2, "producer-7", 0))
+            .unwrap();
+        no_enqueue
+            .apply(render_complete_event(3, "producer-7", 7))
+            .unwrap();
         assert_eq!(
-            no_enqueue.apply(callback_event(3, 7, 0)),
+            no_enqueue.apply(callback_event(4, 7, 0)),
             Err(RaceError::FrameNotEnqueued { frame_id: 7 })
         );
 
         let mut duplicate_terminal = authorized_ledger();
-        duplicate_terminal.apply(render_event(2, 7, 0)).unwrap();
-        duplicate_terminal.apply(enqueue_event(3, 7)).unwrap();
-        duplicate_terminal.apply(callback_event(4, 7, 0)).unwrap();
+        duplicate_terminal
+            .apply(producer_start_event(2, "producer-7", 0))
+            .unwrap();
+        duplicate_terminal
+            .apply(render_complete_event(3, "producer-7", 7))
+            .unwrap();
+        duplicate_terminal.apply(enqueue_event(4, 7)).unwrap();
+        duplicate_terminal.apply(callback_event(5, 7, 0)).unwrap();
         assert_eq!(
-            duplicate_terminal.apply(callback_event(5, 7, 0)),
+            duplicate_terminal.apply(callback_event(6, 7, 0)),
             Err(RaceError::FrameAlreadyTerminal { frame_id: 7 })
         );
     }
