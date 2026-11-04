@@ -331,11 +331,9 @@ fn matches_pinned_upstream_rea_evidence_bundle_and_unknown_graph() {
         target_meta["raw_file_sha256"].as_str().unwrap()
     );
     let target_upstream: Value = serde_json::from_slice(&target_bytes).unwrap();
-    let projected = evidence_bundle_for_target(
-        &upstream,
-        target_meta["target_sha256"].as_str().unwrap(),
-    )
-    .unwrap();
+    let projected =
+        evidence_bundle_for_target(&upstream, target_meta["target_sha256"].as_str().unwrap())
+            .unwrap();
     assert_eq!(projected, target_upstream);
     let target_verified = verify_evidence_bundle_json(&target_bytes).unwrap();
     assert_eq!(target_verified.bundle, projected);
@@ -353,14 +351,12 @@ fn matches_pinned_upstream_rea_evidence_bundle_and_unknown_graph() {
     );
 
     let other_target_meta = &manifest["evidence_bundle_other_target"];
-    let other_target_bytes =
-        fixture_file(&directory, other_target_meta["file"].as_str().unwrap());
+    let other_target_bytes = fixture_file(&directory, other_target_meta["file"].as_str().unwrap());
     assert_eq!(
         sha256_hex(&other_target_bytes),
         other_target_meta["raw_file_sha256"].as_str().unwrap()
     );
-    let other_target_upstream: Value =
-        serde_json::from_slice(&other_target_bytes).unwrap();
+    let other_target_upstream: Value = serde_json::from_slice(&other_target_bytes).unwrap();
     let other_projected = evidence_bundle_for_target(
         &upstream,
         other_target_meta["target_sha256"].as_str().unwrap(),
