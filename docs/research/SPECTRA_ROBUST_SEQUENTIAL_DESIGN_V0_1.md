@@ -50,8 +50,19 @@ The following work motivates the research direction:
 5. Abdulsamad et al. (2026), [Maximin Robust Bayesian Experimental Design](https://arxiv.org/abs/2603.14094), frames robust design as a max-min problem and derives a robust information objective with finite-sample PAC-Bayes bounds for stochastic policies.
 6. Doumbouya, Vidard & Zahm (2026), [Certified Bayesian optimal experimental design: from Expected Information Gain to Signal-to-Noise Ratio](https://arxiv.org/abs/2609.32282), develops upper/lower EIG bounds from signal-to-noise and Fisher-information structure to reduce nested Monte Carlo cost in its stated settings.
 7. Lages (2024), [A hierarchical signal detection model with unequal variance for binary responses](https://doi.org/10.3758/s13423-024-02504-5), is a different population-level binary-response estimand and a useful comparator for heterogeneity, not a substitute for single-observer rating-scale UVSD.
+8. Wen et al. (ICML/PMLR 2026), [Robust Sequential Experimental Design for A/B Testing](https://proceedings.mlr.press/v306/wen26i.html), develops robust sequential design for contextual-bandit and dynamic settings, proves a worst-case MSE bound for treatment-effect estimation, and evaluates on synthetic and technology-company data. This is a strong architectural comparator, but its treatment-effect estimand is not a UVSD estimand; SPECTRA should compare design principles and only run numerical parity when an exactly shared target can be defined.
+9. Callahan & Catanach (AISTATS/PMLR 2026), [On the Misinformation in a Statistical Experiment](https://proceedings.mlr.press/v300/callahan26a.html), shows that under model and inferential misspecification classical experimental-utility comparisons can break down and highly informative designs can amplify bias into confident incorrect inference. This strengthens the requirement that model adequacy and misspecification stress gates sit outside, and can veto, an information objective.
+10. van Meer (JRSSB 2026), [Anytime validity is free: inducing sequential tests](https://doi.org/10.1093/jrsssb/qkag050), gives a way to induce an anytime-valid procedure from a fixed-horizon test while retaining its terminal behavior. This is not a license to assume every sequential method is power-neutral: the paper also discusses the power costs of common sequential tests. Benchmark whole-policy power and type-I error at every stopping horizon, as well as terminal power.
 
 These results define baselines and ideas to test. They do not establish SPECTRA performance or superiority.
+
+
+
+### Comparator interpretation (2026 literature)
+
+SPECTRA's contribution cannot be framed as the first robust sequential experiment designer. Wen et al. already provide a 2026 ICML treatment-effect framework for contextual-bandit and dynamic A/B testing, including a worst-case MSE bound and an industry dataset evaluation. Tang et al. provide an acquisition function explicitly designed around representativeness, informativeness and de-amplification. Callahan & Catanach warn that information-based utility comparisons themselves can fail under model/inference misspecification. These are serious comparators. Their estimands and evaluation domains differ from single-observer ordinal UVSD, so compare architectural properties now and reserve numerical superiority claims for a common estimand and locked data-generating process.
+
+Likewise, sequential validity is not a single interchangeable checkbox. Compare fixed-horizon tests, alpha-spending, e-process/confidence-sequence procedures, and induced anytime-valid versions of a fixed terminal test. Measure the full power-versus-stopping-time curve; do not infer either free power or unavoidable power loss from the label "anytime-valid".
 
 ## 4. Typed operational action space
 
