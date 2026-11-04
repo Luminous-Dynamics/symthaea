@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-evidence-closure-report-v0.schema.json",
+  "title": "PITB SorryDB evidence-closure report v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evaluation_split_git_blob_sha1",
+    "evaluation_split_raw_sha256",
+    "proof_runs_jsonl_sha256",
+    "attempt_count",
+    "verified_success_run_count",
+    "closed_verified_success_run_count",
+    "closed_unique_task_count",
+    "non_success_run_count",
+    "run_closures",
+    "admission_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-evidence-closure-report.v0"
+    },
+    "evaluation_split_git_blob_sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "evaluation_split_raw_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "proof_runs_jsonl_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "attempt_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "verified_success_run_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "closed_verified_success_run_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "closed_unique_task_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "non_success_run_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "run_closures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "run_id",
+          "task_id",
+          "outcome",
+          "closure_status",
+          "source_file_sha256",
+          "modified_source_sha256",
+          "proof_artifact_sha256",
+          "checker_receipt_sha256",
+          "semantic_gate_receipt_sha256",
+          "source_binding_receipt_sha256"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "task_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "outcome": {
+            "enum": [
+              "verified_success",
+              "non_solve",
+              "infrastructure_failure",
+              "invalid_target"
+            ]
+          },
+          "closure_status": {
+            "enum": [
+              "closed_verified_success",
+              "not_required_non_success"
+            ]
+          },
+          "source_file_sha256": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            ]
+          },
+          "modified_source_sha256": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            ]
+          },
+          "proof_artifact_sha256": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            ]
+          },
+          "checker_receipt_sha256": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            ]
+          },
+          "semantic_gate_receipt_sha256": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            ]
+          },
+          "source_binding_receipt_sha256": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "admission_boundary": {
+      "type": "string",
+      "minLength": 60
+    }
+  }
+}
