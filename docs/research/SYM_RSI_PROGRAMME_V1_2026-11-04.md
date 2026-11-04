@@ -225,14 +225,16 @@ Preserve reversible snapshots, deterministic builds where possible, resource cap
 
 ### Phase 1 — Receipt and paired-evaluation kernel
 
-- [x] Add validated per-case receipts and exact matched parent/candidate comparison (`paired_evaluation.rs`).
-- [x] Bind each receipt to the exact evaluation context, candidate/parent identity, source-tree digest, receipt digest, case IDs, and normalized metric dimensions.
+- [x] Add an in-memory paired-analysis adapter over the shared benchmark-run receipt contract (`paired_evaluation.rs`); do not introduce a competing persisted receipt schema.
+- [x] Require exact evaluation context, candidate/parent identity, source-tree digest, shared receipt digest, case IDs, and normalized metric dimensions in the in-memory view.
 - [x] Derive archive capability summaries from sorted per-case evidence rather than caller-supplied aggregate scores.
 - [x] Report per-metric paired wins/losses/ties, mean paired delta, and exact one-sided sign-test p-values.
 - [x] Reject empty/duplicate/mismatched cases, metric-schema drift, context mismatch, incorrect parent lineage, and invalid tie tolerances.
 - [ ] Add authenticated evaluator receipts and retained raw outcomes; digests alone do not authenticate a measurement.
 - [ ] Add confidence intervals, multiplicity correction, practical-effect thresholds, and non-inferiority gates.
 - [ ] Add an independently operated sealed-holdout evaluator/access boundary. The partition enum is descriptive metadata, not access control.
+
+**Evidence integration:** the adapter must consume validated task-level rows from the shared benchmark-run receipt contract (#10314) and the applicable DSSE/regrade verification pipeline (#10167/#10370). It is not an evidence format or authenticator of its own.
 
 **Statistical limitation:** the exact sign test measures directional consistency among non-tied paired cases. It does not measure effect magnitude (the mean delta is reported separately), establish practical significance, correct for repeated adaptive selection, prove equivalence when non-significant, or authorize promotion.
 
