@@ -2200,6 +2200,12 @@ mod tests {
     }
 
     #[test]
+    fn crc32_matches_standard_123456789_check_value() {
+        assert_eq!(crc32(b"123456789"), 0xcbf4_3926);
+        assert_eq!(crc32(b""), 0);
+    }
+
+    #[test]
     fn differential_zip_rs_93_metadata_and_stream_match_preserved_occurrences() {
         let fixtures = [
             TestEntry {
