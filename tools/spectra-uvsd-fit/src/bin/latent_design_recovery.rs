@@ -320,7 +320,7 @@ fn main() {
         "design_class,seed_root,rng,design,mu_true,sigma_true,d_a_true,outer_attempted,trials_per_class,fit_converged,fit_boundary,fit_weakly_identified,fit_not_identifiable,fit_not_converged,fit_not_evaluable,estimate_availability,mu_bias,mu_rmse,sigma_bias,sigma_rmse,d_a_bias,d_a_rmse,fisher_rank,fisher_dimension,fisher_condition_at_truth,fisher_d_a_se_at_truth,mu_interval_returned,mu_interval_availability,mu_coverage_conditional,mu_coverage_wilson_low,mu_coverage_wilson_high,mu_mean_width,sigma_interval_returned,sigma_interval_availability,sigma_coverage_conditional,sigma_coverage_wilson_low,sigma_coverage_wilson_high,sigma_mean_width,d_a_interval_returned,d_a_interval_availability,d_a_coverage_conditional,d_a_coverage_wilson_low,d_a_coverage_wilson_high,d_a_mean_width,joint_interval_returned,joint_interval_availability,joint_coverage_conditional"
     );
 
-    for (design_index, (design_name, thresholds)) in DESIGNS.iter().enumerate() {
+    for (design_name, thresholds) in DESIGNS.iter() {
         for (mu_index, &mu) in MU_GRID.iter().enumerate() {
             for (sigma_index, &sigma) in SIGMA_GRID.iter().enumerate() {
                 let true_da = mu / ((1.0 + sigma * sigma) / 2.0).sqrt();
