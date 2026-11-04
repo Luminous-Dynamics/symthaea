@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //! Compare centralized full-inventory routing with a minimized recipient
-//! readiness signal under matched tasks, seeds, message and attention budgets.
+//! readiness signal under matched tasks/seeds and identical configured message
+//! and attention ceilings. Realized message volumes can differ and are reported
+//! separately; this is not a fixed-realized-message-count comparison.
 //!
 //! This is a synthetic disclosure/performance benchmark, not a cryptographic
 //! privacy proof or a deployed federated protocol.
