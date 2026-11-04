@@ -177,12 +177,9 @@ pub enum EnergyDeltaError {
 /// measurement receipt.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnergyDelta {
-    /// Stable sensor descriptor shared by the two readings.
-    pub descriptor: EnergyMeterDescriptor,
-    /// Measured energy difference in microjoules.
-    pub energy_microjoules: u128,
-    /// Elapsed monotonic time in nanoseconds.
-    pub elapsed_ns: u128,
+    descriptor: EnergyMeterDescriptor,
+    energy_microjoules: u128,
+    elapsed_ns: u128,
 }
 
 impl EnergyDelta {
@@ -242,6 +239,21 @@ impl EnergyDelta {
         })
     }
 
+    /// Stable sensor descriptor shared by the two readings.
+    pub fn descriptor(&self) -> &EnergyMeterDescriptor {
+        &self.descriptor
+    }
+
+    /// Measured energy difference in microjoules.
+    pub fn energy_microjoules(&self) -> u128 {
+        self.energy_microjoules
+    }
+
+    /// Elapsed monotonic time in nanoseconds.
+    pub fn elapsed_ns(&self) -> u128 {
+        self.elapsed_ns
+    }
+
     /// Average power over the interval, in watts.
     ///
     /// One microjoule per nanosecond equals one kilowatt. This is a derived
@@ -292,9 +304,30 @@ mod tests {
         let end = reading(d, 1, 51_750, 2_000_000_000);
 
         let delta = EnergyDelta::between(&start, &end).unwrap();
-        assert_eq!(delta.energy_microjoules, 1_750);
-        assert_eq!(delta.elapsed_ns, 1_999_999_000);
+        assert_eq!(delta.energy_microjoules(), 1_750);
+        assert_eq!(delta.elapsed_ns(), 1_999_999_000);
         assert!((delta.energy_joules() - 0.00175).abs() < 1e-15);
+    }
+
+    #[test]
+    fn joule_counter_is_converted_to_microjoules() {
+        let d = descriptor(EnergyCounterUnit::Joules, None);
+        let start = reading(d.clone(), 1, 2, 1);
+        let end = reading(d, 1, 5, 2);
+
+        let delta = EnergyDelta::between(&start, &end).unwrap();
+        assert_eq!(delta.energy_microjoules(), 3_000_000);
+        assert!((delta.energy_joules() - 3.0).abs() < 1e-15);
+    }
+
+    #[test]
+    fn average_power_uses_energy_and_monotonic_interval() {
+        let d = descriptor(EnergyCounterUnit::Microjoules, None);
+        let start = reading(d.clone(), 1, 0, 1_000_000_000);
+        let end = reading(d, 1, 1_000_000, 2_000_000_000);
+
+        let delta = EnergyDelta::between(&start, &end).unwrap();
+        assert!((delta.average_power_watts() - 1.0).abs() < 1e-12);
     }
 
     #[test]
@@ -304,7 +337,7 @@ mod tests {
         let end = reading(d, 1, 103, 1_000_000_001);
 
         let delta = EnergyDelta::between(&start, &end).unwrap();
-        assert_eq!(delta.energy_microjoules, 3_000);
+        assert_eq!(delta.energy_microjoules(), 3_000);
         assert!((delta.energy_joules() - 0.003).abs() < 1e-15);
     }
 
@@ -315,7 +348,7 @@ mod tests {
         let end = reading(d, 4, 25, 20);
 
         let delta = EnergyDelta::between(&start, &end).unwrap();
-        assert_eq!(delta.energy_microjoules, 75);
+        assert_eq!(delta.energy_microjoules(), 75);
     }
 
     #[test]
