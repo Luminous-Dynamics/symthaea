@@ -83,3 +83,20 @@ The committed unit fixture is a source-derived reference vector; its semantic di
 ## Claim ceiling
 
 A matching Evidence ID proves that the supplied object is internally consistent with this implementation's semantic projection and canonicalization. It does not prove producer authorship, provenance authenticity, observation truth, hardware identity, runtime behavior, or security compliance. Use HARDSEC and independently trusted signed/anchored receipts for those claims.
+
+
+## Offline verification CLI
+
+The repository now includes a small CLI source at `tools/rea-evidence-verify-cli/src/main.rs`. It is compiled by the isolated, locked harness so it does not require resolving the unrelated root-workspace glob entries:
+
+```bash
+cargo run --manifest-path tools/rea-evidence-compat-harness/Cargo.toml \
+  --locked --bin rea-evidence-verify -- --text evidence.json
+
+cargo run --manifest-path tools/rea-evidence-compat-harness/Cargo.toml \
+  --locked --bin rea-evidence-verify -- --json evidence.json
+```
+
+The CLI reads at most 64 MiB + 1 byte, rejects duplicate keys and trailing data through the library importer, and emits separate raw-file and semantic identities. It intentionally omits subject paths, display names, raw results and normalized payloads. Stable nonzero exit codes distinguish I/O, invalid JSON, schema, identity, size and canonicalization failures. It performs no network access, process execution, provider discovery, device access or output file writes.
+
+The output reports semantic consistency only. It explicitly does not establish producer authentication, observation truth, hardware attestation, runtime integrity or security compliance.
