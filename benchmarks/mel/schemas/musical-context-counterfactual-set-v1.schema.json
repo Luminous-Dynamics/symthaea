@@ -59,7 +59,8 @@
                 "collaborator_intent",
                 "performer_role",
                 "surface_instrument",
-                "valid_action_set"
+                "valid_action_set",
+                "preceding_harmonic_context_signature"
               ],
               "properties": {
                 "variant_id": {
@@ -111,6 +112,10 @@
                       "YIELD"
                     ]
                   }
+                },
+                "preceding_harmonic_context_signature": {
+                  "type": "string",
+                  "minLength": 1
                 }
               }
             }
