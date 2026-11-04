@@ -74,7 +74,7 @@
       "pattern": "^[a-f0-9]{64}$"
     },
     "source_span_sha256": {
-      "const": "e4b0f7a7c99f3a6c12c3c9d80f5b2b4beecb3c3f"
+      "const": "484aab2f2cd0f77b3c30f91521ba9a76c8c501112a53e100154a098c274f03d3"
     },
     "source_span": {
       "const": "sorry"
@@ -83,7 +83,7 @@
       "const": true
     },
     "target_goal_reproduced": {
-      "type": "boolean"
+      "const": true
     },
     "lake_manifest_sha256": {
       "type": "string",
