@@ -1,6 +1,7 @@
 #![no_main]
 
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -33,10 +34,15 @@ fuzz_target!(|data: &[u8]| {
         "symthaea-rea-zip-fuzz-{}-{id}.zip",
         std::process::id()
     ));
-    if fs::write(&path, data).is_err() {
+    // create_new refuses a pre-existing file or symlink at this predictable temp path.
+    let Ok(mut temp_file) = OpenOptions::new().write(true).create_new(true).open(&path) else {
+        return;
+    };
+    let _cleanup = TempArchive(path.clone());
+    if temp_file.write_all(data).is_err() {
         return;
     }
-    let _cleanup = TempArchive(path.clone());
+    drop(temp_file);
 
     let limits = ReaderLimits {
         max_archive_bytes: MAX_INPUT_BYTES as u64,
