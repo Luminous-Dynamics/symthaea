@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeSet,
     env, fs,
     path::PathBuf,
     process::ExitCode,
@@ -641,6 +641,87 @@ fn run_self_tests() -> Result<(), String> {
     }
     println!("SELF_TEST_PASS evaluation labels must remain sequestered");
 
+    let graph_bytes = serde_json::to_vec(&graph).map_err(|e| e.to_string())?;
+    let base = synthetic_receipt(&graph, &graph_bytes);
+    let second = {
+        let mut receipt = base.clone();
+        receipt.retriever.kind = "bm25".into();
+        receipt.retriever.name = "BM25".into();
+        receipt.retriever.version = "v1".into();
+        receipt.retriever.checkpoint_sha256 = None;
+        receipt
+    };
+    let receipt_bytes = [
+        serde_json::to_vec(&base).map_err(|e| e.to_string())?,
+        b"\n".to_vec(),
+        serde_json::to_vec(&second).map_err(|e| e.to_string())?,
+        b"\n".to_vec(),
+    ].concat();
+    if validate_all(&graph_bytes, &receipt_bytes).is_err() {
+        return Err("matched retrieval systems could not score the same query identity".into());
+    }
+    println!("SELF_TEST_PASS matched retrievers can emit receipts for the same benchmark query");
+
+    let duplicate_bytes = [
+        serde_json::to_vec(&base).map_err(|e| e.to_string())?,
+        b"\n".to_vec(),
+        serde_json::to_vec(&base).map_err(|e| e.to_string())?,
+        b"\n".to_vec(),
+    ].concat();
+    if validate_all(&graph_bytes, &duplicate_bytes).is_ok() {
+        return Err("duplicate query receipt for the same retriever was accepted".into());
+    }
+    println!("SELF_TEST_PASS duplicate query receipt for one retriever is rejected");
+
+    Ok(())
+}
+
+fn write_synthetic_run(
+    graph_path: &PathBuf,
+    receipt_path: &PathBuf,
+    report_path: &PathBuf,
+) -> Result<(), String> {
+    let graph_bytes = fs::read(graph_path).map_err(|e| format!("read synthetic graph: {e}"))?;
+    let graph: Value = serde_json::from_slice(&graph_bytes)
+        .map_err(|e| format!("parse synthetic graph: {e}"))?;
+    let (snapshot_id, repository_commit, environment, node_ids) = load_graph(&graph_bytes)?;
+    let nodes = graph["nodes"].as_array().ok_or("synthetic graph nodes missing")?;
+    if nodes.len() < 2 {
+        return Err("synthetic retrieval graph must contain at least two nodes".into());
+    }
+    let candidate_node_ids: BTreeSet<String> = nodes.iter().take(2)
+        .map(|node| node["node_id"].as_str().ok_or("synthetic node_id missing").map(str::to_owned))
+        .collect::<Result<_, _>>()?;
+    let mut receipt = synthetic_receipt(&graph, &graph_bytes);
+    receipt.graph.snapshot_id = snapshot_id.clone();
+    receipt.graph.repository_commit = repository_commit.clone();
+    receipt.graph.environment_sha256 = environment.clone();
+    receipt.graph.graph_manifest_sha256 = sha256(&graph_bytes);
+    receipt.query.target_environment_sha256 = environment.clone();
+    receipt.candidate_pool.candidate_count = candidate_node_ids.len();
+    receipt.candidate_pool.requested_top_k = candidate_node_ids.len();
+    receipt.candidate_pool.candidate_node_ids = candidate_node_ids.iter().cloned().collect();
+    receipt.candidate_pool.node_id_set_sha256 = canonical_node_id_set_digest(&candidate_node_ids)?;
+    receipt.ranking.candidates = receipt.ranking.candidates.into_iter().take(candidate_node_ids.len()).collect();
+    for (rank, candidate) in receipt.ranking.candidates.iter_mut().enumerate() {
+        candidate.rank = rank + 1;
+        candidate.node_id = receipt.candidate_pool.candidate_node_ids[rank].clone();
+    }
+    validate_receipt(
+        &receipt,
+        1,
+        &snapshot_id,
+        &repository_commit,
+        &environment,
+        &sha256(&graph_bytes),
+        &node_ids,
+    )?;
+    let receipt_line = serde_json::to_vec(&receipt).map_err(|e| format!("serialize synthetic retrieval receipt: {e}"))?;
+    let receipt_jsonl = [receipt_line, b"\n".to_vec()].concat();
+    let report = validate_all(&graph_bytes, &receipt_jsonl)?;
+    fs::write(receipt_path, receipt_jsonl).map_err(|e| format!("write synthetic receipt JSONL: {e}"))?;
+    let report_bytes = serde_json::to_vec_pretty(&report).map_err(|e| format!("serialize synthetic retrieval report: {e}"))?;
+    fs::write(report_path, report_bytes).map_err(|e| format!("write synthetic retrieval report: {e}"))?;
     Ok(())
 }
 
@@ -651,9 +732,19 @@ fn execute() -> Result<(), String> {
         println!("PITB_RETRIEVAL_EVIDENCE_SELF_TEST_PASS");
         return Ok(());
     }
+    if args.len() == 5 && args[1] == "--self-test-report" {
+        run_self_tests()?;
+        write_synthetic_run(
+            &PathBuf::from(&args[2]),
+            &PathBuf::from(&args[3]),
+            &PathBuf::from(&args[4]),
+        )?;
+        println!("PITB_RETRIEVAL_EVIDENCE_SYNTHETIC_REPORT_OK");
+        return Ok(());
+    }
     if args.len() != 5 || args[1] != "--verify" {
         return Err(format!(
-            "usage: {} --verify <graph.json> <retrieval-runs.jsonl> <report.json> OR --self-test",
+            "usage: {} --verify <graph.json> <retrieval-runs.jsonl> <report.json> OR --self-test OR --self-test-report <graph.json> <receipt.jsonl> <report.json>",
             args.first().map(String::as_str).unwrap_or("pitb-retrieval-evidence")
         ));
     }
