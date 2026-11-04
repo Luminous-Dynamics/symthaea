@@ -454,10 +454,13 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
         "WCONT-001" => {
             let flow = required_number(input, "municipal_inlet_flow_l_min")?;
             let duration = required_number(input, "duration_h")?;
-            metrics.insert(
-                "synthetic_inlet_volume_l".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "synthetic_inlet_volume_l",
                 flow * duration * 60.0,
-            );
+                "L",
+                "constant synthetic inlet flow multiplied by duration in minutes",
+            )?;
             notes.push(
                 "Inlet volume is integrated from the fixture's constant synthetic flow assumption."
                     .to_owned(),
@@ -469,14 +472,20 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
             BatchDisposition::ProcessAccountingOnly
         }
         "WCONT-002" => {
-            metrics.insert(
-                "gross_tank_sensor_inventory_l".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "gross_tank_sensor_inventory_l",
                 required_number(input, "tank_level_sensor_l")?,
-            );
-            metrics.insert(
-                "municipal_inlet_flow_l_min".to_owned(),
+                "L",
+                "synthetic tank-level sensor reading; not usable deliverable reserve",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "municipal_inlet_flow_l_min",
                 required_number(input, "municipal_inlet_flow_l_min")?,
-            );
+                "L/min",
+                "synthetic fixture inlet flow",
+            )?;
             notes.push(
                 "Zero municipal inflow is preserved for the declared 48-hour interruption."
                     .to_owned(),
@@ -490,14 +499,20 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
         "WCONT-003" => {
             let flow = required_number(input, "municipal_inlet_flow_l_min")?;
             let duration = required_number(input, "duration_h")?;
-            metrics.insert(
-                "synthetic_inlet_volume_l_under_constant_flow".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "synthetic_inlet_volume_l_under_constant_flow",
                 flow * duration * 60.0,
-            );
-            metrics.insert(
-                "gross_tank_sensor_inventory_l".to_owned(),
+                "L",
+                "constant-flow synthetic inlet integration over the declared duration",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "gross_tank_sensor_inventory_l",
                 required_number(input, "tank_level_sensor_l")?,
-            );
+                "L",
+                "synthetic tank-level sensor reading; not usable deliverable reserve",
+            )?;
             notes.push(
                 "The 576 L inlet figure assumes the fixture's 0.8 L/min flow remains constant for all 12 hours."
                     .to_owned(),
@@ -511,12 +526,27 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
         "WCONT-004" => {
             let sensor = required_number(input, "tank_level_sensor_l")?;
             let reference = required_number(input, "independent_reference_tank_level_l")?;
-            metrics.insert("tank_sensor_l".to_owned(), sensor);
-            metrics.insert("independent_reference_l".to_owned(), reference);
-            metrics.insert(
-                "absolute_sensor_disagreement_l".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "tank_sensor_l",
+                sensor,
+                "L",
+                "synthetic tank sensor observation; not selected as truth",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "independent_reference_l",
+                reference,
+                "L",
+                "synthetic independent reference observation; not selected as truth",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "absolute_sensor_disagreement_l",
                 (sensor - reference).abs(),
-            );
+                "L",
+                "absolute difference between the two synthetic observations",
+            )?;
             notes.push(
                 "The sensor and independent reference remain separate observations; neither is silently selected as truth."
                     .to_owned(),
@@ -530,10 +560,13 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
         "WCONT-005" => {
             let flow = required_number(input, "measured_unexplained_flow_l_min")?;
             let duration = required_number(input, "duration_h")?;
-            metrics.insert(
-                "unexplained_flow_volume_l_under_constant_rate".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "unexplained_flow_volume_l_under_constant_rate",
                 flow * duration * 60.0,
-            );
+                "L",
+                "unexplained synthetic flow integrated under a constant-rate assumption; not proven leakage",
+            )?;
             notes.push(
                 "The unexplained 0.5 L/min signal integrates to 240 L over the synthetic 8-hour window if constant."
                     .to_owned(),
@@ -545,10 +578,13 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
             BatchDisposition::HumanReviewRequired
         }
         "WCONT-006" => {
-            metrics.insert(
-                "gross_tank_sensor_inventory_l".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "gross_tank_sensor_inventory_l",
                 required_number(input, "tank_level_sensor_l")?,
-            );
+                "L",
+                "synthetic tank-level sensor reading; pump/power delivery is unavailable",
+            )?;
             let grid = required_bool(input, "grid_available")?;
             let pump = required_bool(input, "pump_available")?;
             let backup = required_bool(input, "backup_power_available")?;
@@ -562,14 +598,20 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
             BatchDisposition::DeliveryUnavailable
         }
         "WCONT-007" => {
-            metrics.insert(
-                "stored_water_age_h".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "stored_water_age_h",
                 required_number(input, "stored_water_age_h")?,
-            );
-            metrics.insert(
-                "gross_tank_sensor_inventory_l".to_owned(),
+                "h",
+                "synthetic stored-water age",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "gross_tank_sensor_inventory_l",
                 required_number(input, "tank_level_sensor_l")?,
-            );
+                "L",
+                "synthetic tank-level sensor reading; does not establish end-use quality",
+            )?;
             notes.push(format!(
                 "Water-quality evidence state: {}.",
                 required_str(input, "water_quality_evidence", "WCONT-007.input")?
@@ -622,23 +664,41 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
                 ),
                 topology_audit: None::<TopologyAuditReference>,
             })?;
-            metrics.insert("mass_balance_residual_l".to_owned(), balance.residual_l);
-            metrics.insert(
-                "mass_balance_residual_lower_l".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "mass_balance_residual_l",
+                balance.residual_l,
+                "L",
+                "inlet minus tank storage delta minus delivered outlet minus purge/overflow",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "mass_balance_residual_lower_l",
                 balance.residual_lower_l,
-            );
-            metrics.insert(
-                "mass_balance_residual_upper_l".to_owned(),
+                "L",
+                "residual minus evaluator-derived worst-case aggregate absolute error bound",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "mass_balance_residual_upper_l",
                 balance.residual_upper_l,
-            );
-            metrics.insert(
-                "assumed_per_term_absolute_error_bound_l".to_owned(),
+                "L",
+                "residual plus evaluator-derived worst-case aggregate absolute error bound",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "assumed_per_term_absolute_error_bound_l",
                 per_term_bound,
-            );
-            metrics.insert(
-                "conservative_aggregate_absolute_error_bound_l".to_owned(),
+                "L",
+                "synthetic fixture field conservatively mapped to each of the four meter terms",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "conservative_aggregate_absolute_error_bound_l",
                 balance.aggregate_absolute_error_bound_l,
-            );
+                "L",
+                "sum of the four typed per-measurement absolute error bounds",
+            )?;
             notes.push(
                 "meter_uncertainty_l has ambiguous scope; the software-only negative control conservatively sums four per-term absolute bounds."
                     .to_owned(),
@@ -656,8 +716,19 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
         "WCONT-009" => {
             let command = required_bool(input, "commanded_refill")?;
             let flow = required_number(input, "municipal_inlet_flow_l_min")?;
-            metrics.insert("commanded_refill".to_owned(), bool_as_f64(command));
-            metrics.insert("measured_inlet_flow_l_min".to_owned(), flow);
+            insert_boolean(
+                &mut metrics,
+                "commanded_refill",
+                command,
+                "whether the synthetic controller command requested refill; not proof of inflow",
+            );
+            insert_quantity(
+                &mut metrics,
+                "measured_inlet_flow_l_min",
+                flow,
+                "L/min",
+                "synthetic measured inlet flow; zero despite the refill command",
+            )?;
             notes.push(
                 "Open-valve feedback and a refill command are not treated as proof of physical inflow."
                     .to_owned(),
@@ -669,10 +740,13 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
             BatchDisposition::CommandObservationMismatch
         }
         "WCONT-010" => {
-            metrics.insert(
-                "observation_duration_h".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "observation_duration_h",
                 required_number(input, "duration_h")?,
-            );
+                "h",
+                "synthetic scenario observation duration",
+            )?;
             notes.push(
                 "The fixture describes unstable flow and a surge-then-decay pressure profile without numerical time series."
                     .to_owned(),
@@ -712,18 +786,27 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
 
     let disposition = match id {
         "REPAIR-001" => {
-            metrics.insert(
-                "access_fasteners".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "access_fasteners",
                 required_number(baseline, "access_fasteners")?,
-            );
-            metrics.insert(
-                "disassembly_steps".to_owned(),
+                "count",
+                "synthetic count of access fasteners",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "disassembly_steps",
                 required_number(baseline, "disassembly_steps")?,
-            );
-            metrics.insert(
-                "synthetic_part_lead_time_days".to_owned(),
+                "count",
+                "synthetic count of disassembly steps; not measured repair time",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "synthetic_part_lead_time_days",
                 required_number(baseline, "part_lead_time_days")?,
-            );
+                "d",
+                "synthetic target-market lead-time assumption",
+            )?;
             notes.push(
                 "Fixture documents a user-serviceable access path and offline instructions; no physical replacement task was executed."
                     .to_owned(),
@@ -758,20 +841,25 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
             BatchDisposition::RepairHeld
         }
         "REPAIR-003" => {
-            metrics.insert(
-                "access_fasteners".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "access_fasteners",
                 required_number(baseline, "access_fasteners")?,
-            );
-            metrics.insert(
-                "disassembly_steps".to_owned(),
+                "count",
+                "synthetic count of access fasteners",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "disassembly_steps",
                 required_number(baseline, "disassembly_steps")?,
-            );
-            metrics.insert(
-                "adhesive_or_destructive_disassembly".to_owned(),
-                bool_as_f64(required_bool(
-                    baseline,
-                    "adhesive_or_destructive_disassembly",
-                )?),
+                "count",
+                "synthetic count of disassembly steps; not measured repair time",
+            )?;
+            insert_boolean(
+                &mut metrics,
+                "adhesive_or_destructive_disassembly",
+                required_bool(baseline, "adhesive_or_destructive_disassembly")?,
+                "whether the fixture declares adhesive or destructive disassembly",
             );
             notes.push(
                 "The synthetic task declares non-destructive access; it does not demonstrate an actual seal replacement."
@@ -784,13 +872,18 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
             BatchDisposition::RepairHeld
         }
         "REPAIR-004" => {
-            metrics.insert(
-                "synthetic_part_lead_time_days".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "synthetic_part_lead_time_days",
                 required_number(baseline, "part_lead_time_days")?,
-            );
-            metrics.insert(
-                "calibration_required".to_owned(),
-                bool_as_f64(required_bool(baseline, "calibration_required")?),
+                "d",
+                "synthetic part lead-time assumption",
+            )?;
+            insert_boolean(
+                &mut metrics,
+                "calibration_required",
+                required_bool(baseline, "calibration_required")?,
+                "whether the repair task requires calibration",
             );
             notes.push(
                 "Calibration is explicitly required by the synthetic task profile.".to_owned(),
@@ -804,13 +897,17 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
         "REPAIR-005" => {
             let signed_image = required_bool(baseline, "signed_image_available")?;
             let previous_image = required_bool(baseline, "previous_known_good_image_available")?;
-            metrics.insert(
-                "signed_image_available".to_owned(),
-                bool_as_f64(signed_image),
+            insert_boolean(
+                &mut metrics,
+                "signed_image_available",
+                signed_image,
+                "whether the fixture declares a signed recovery image available",
             );
-            metrics.insert(
-                "previous_known_good_image_available".to_owned(),
-                bool_as_f64(previous_image),
+            insert_boolean(
+                &mut metrics,
+                "previous_known_good_image_available",
+                previous_image,
+                "whether the fixture declares a previous known-good image available",
             );
             notes.push(
                 "Both offline recovery artifacts are declared available while internet access is absent."
@@ -840,13 +937,17 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
                 recurrence_observed: false,
             };
             let result = evaluate_repair_attempt(&attempt, 30)?;
-            metrics.insert(
-                "catalog_part_exists".to_owned(),
-                bool_as_f64(required_bool(baseline, "catalog_part_exists")?),
+            insert_boolean(
+                &mut metrics,
+                "catalog_part_exists",
+                required_bool(baseline, "catalog_part_exists")?,
+                "whether the fixture says a catalogue entry exists; not evidence of local supply",
             );
-            metrics.insert(
-                "local_stock".to_owned(),
-                bool_as_f64(required_bool(baseline, "local_stock")?),
+            insert_boolean(
+                &mut metrics,
+                "local_stock",
+                required_bool(baseline, "local_stock")?,
+                "whether the fixture declares target-market local stock",
             );
             notes.push(
                 "Catalog presence is kept separate from target-market stock; unknown quoted lead time is not coerced to zero."
@@ -885,17 +986,23 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
                 recurrence_observed: false,
             };
             let result = evaluate_repair_attempt(&attempt, 30)?;
-            metrics.insert(
-                "physical_fit".to_owned(),
-                bool_as_f64(required_bool(baseline, "physical_fit")?),
+            insert_boolean(
+                &mut metrics,
+                "physical_fit",
+                required_bool(baseline, "physical_fit")?,
+                "whether the fixture declares physical fit; not qualified compatibility",
             );
-            metrics.insert(
-                "electrical_interface_match".to_owned(),
-                bool_as_f64(required_bool(baseline, "electrical_interface_match")?),
+            insert_boolean(
+                &mut metrics,
+                "electrical_interface_match",
+                required_bool(baseline, "electrical_interface_match")?,
+                "whether the fixture declares a matching electrical interface; not qualified compatibility",
             );
-            metrics.insert(
-                "material_grade_known".to_owned(),
-                bool_as_f64(required_bool(baseline, "material_grade_known")?),
+            insert_boolean(
+                &mut metrics,
+                "material_grade_known",
+                required_bool(baseline, "material_grade_known")?,
+                "whether the replacement material grade is known",
             );
             notes.push(
                 "Physical fit and an electrical connector match are not treated as qualified compatibility."
@@ -932,10 +1039,18 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
                 recurrence_observed: required_bool(baseline, "recurrence_observed_after_30_days")?,
             };
             let result = evaluate_repair_attempt(&attempt, 30)?;
-            metrics.insert("follow_up_days_observed".to_owned(), 30.0);
-            metrics.insert(
-                "recurrence_observed".to_owned(),
-                bool_as_f64(attempt.recurrence_observed),
+            insert_quantity(
+                &mut metrics,
+                "follow_up_days_observed",
+                30.0,
+                "d",
+                "synthetic follow-up interval; not lifetime exposure",
+            )?;
+            insert_boolean(
+                &mut metrics,
+                "recurrence_observed",
+                attempt.recurrence_observed,
+                "whether recurrence is recorded during the specified 30-day synthetic follow-up",
             );
             notes.push(
                 "Initial function restoration and later fault recurrence are represented as distinct outcomes."
@@ -972,17 +1087,23 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
                 recurrence_observed: false,
             };
             let result = evaluate_repair_attempt(&attempt, 30)?;
-            metrics.insert(
-                "vendor_cloud_available".to_owned(),
-                bool_as_f64(required_bool(baseline, "vendor_cloud_available")?),
+            insert_boolean(
+                &mut metrics,
+                "vendor_cloud_available",
+                required_bool(baseline, "vendor_cloud_available")?,
+                "whether the vendor cloud service is available",
             );
-            metrics.insert(
-                "offline_diagnostics_available".to_owned(),
-                bool_as_f64(required_bool(baseline, "offline_diagnostics_available")?),
+            insert_boolean(
+                &mut metrics,
+                "offline_diagnostics_available",
+                required_bool(baseline, "offline_diagnostics_available")?,
+                "whether offline diagnostics are available",
             );
-            metrics.insert(
-                "manual_available".to_owned(),
-                bool_as_f64(required_bool(baseline, "manual_available")?),
+            insert_boolean(
+                &mut metrics,
+                "manual_available",
+                required_bool(baseline, "manual_available")?,
+                "whether a service manual is available",
             );
             notes.push(
                 "A manual is present, but the declared diagnostic workflow requires a vendor cloud account."
@@ -1022,13 +1143,17 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
                 recurrence_observed: false,
             };
             let result = evaluate_repair_attempt(&attempt, 30)?;
-            metrics.insert(
-                "critical_interface_changed".to_owned(),
-                bool_as_f64(required_bool(baseline, "critical_interface_changed")?),
+            insert_boolean(
+                &mut metrics,
+                "critical_interface_changed",
+                required_bool(baseline, "critical_interface_changed")?,
+                "whether the repair changed a critical safety or hygiene interface",
             );
-            metrics.insert(
-                "post_repair_test_available".to_owned(),
-                bool_as_f64(required_bool(baseline, "post_repair_test_available")?),
+            insert_boolean(
+                &mut metrics,
+                "post_repair_test_available",
+                required_bool(baseline, "post_repair_test_available")?,
+                "whether the product-specific post-repair test is available",
             );
             notes.push(
                 "A critical safety/hygiene interface change reopens the affected qualification."
@@ -1099,10 +1224,6 @@ fn required_bool(object: &Value, key: &'static str) -> Result<bool, EvaluationEr
             format!("required boolean {key} is missing"),
         )
     })
-}
-
-fn bool_as_f64(value: bool) -> f64 {
-    if value { 1.0 } else { 0.0 }
 }
 
 fn disposition_name(disposition: BatchDisposition) -> &'static str {
