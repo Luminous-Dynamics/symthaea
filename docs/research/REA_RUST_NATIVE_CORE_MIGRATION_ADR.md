@@ -1033,3 +1033,24 @@ The first fuzz runner successfully installed the dated nightly action, installed
 
 The workflow now explicitly uses `cargo +nightly-2026-11-03 fuzz run` and records `rustc +nightly-2026-11-03 --version --verbose` / `cargo +nightly-2026-11-03 --version` in the receipt. The repo-default stable toolchain remains unchanged for ordinary builds. This is a workflow correction; no fuzz execution was performed by the failed run.
 
+### Second bounded ZIP fuzz campaign — committed lock, same toolchain and seed
+
+A second dedicated run [#41904482693](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41904482693) completed successfully on source commit `361be1d1f2989a3b98f81ad326806c03e85aabac`. Unlike the initial campaign, this run explicitly validated and used the committed `fuzz/Cargo.lock` with `cargo tree --locked`. It also verified the decoded seed digest before fuzzing and archived the exact run-context receipt.
+
+| Measurement | Second run |
+|---|---:|
+| Runtime | 181 s |
+| Executed units | 3,371,635 |
+| Average throughput | 18,627 exec/s |
+| New interesting units | 687 |
+| Final corpus files | 204 |
+| Final corpus size | 22 KiB |
+| libFuzzer coverage counters | 1,065 |
+| Feature count | 1,475 |
+| Peak RSS | 283 MiB |
+| Runner | Ubuntu 24.04 / Linux x86_64 / kernel 7.0.0-1017-azure |
+
+The run used rustc `1.101.0-nightly (1c3a65069 2026-11-02)`, nightly `2026-11-03`, cargo-fuzz `0.13.2`, and libfuzzer-sys `0.4.13`. The committed fuzz Cargo.lock digest remained `7882005319dffae75822a6560984b25fec8b1e2c6369a9e88a432ac3d58b9f93`; decoded seed digest remained `dd8a2bd8c16d808363a1d1e7560a4cc86494393c1a202a478db00f00ae53d099`. Artifact `13358294215` SHA-256: `2566b473d92a223886c9461d581494b6a3479118077a14838115bba785e154d9`.
+
+No crash was reported in the run. This is a second 181-second smoke campaign, not sustained fuzz qualification, coverage saturation, multi-platform assurance, or a proof of absence of bugs. The two runs are recorded separately in the machine-readable manifest; their executions/corpora/counters are not summed into a quality score.
+
