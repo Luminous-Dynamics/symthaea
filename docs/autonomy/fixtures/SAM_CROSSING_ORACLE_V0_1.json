@@ -1,0 +1,101 @@
+{
+  "schema_version": "sam.counterfactual-crossing-oracle.v0.1",
+  "protocol_id": "SAM-CROSSING-ORACLE-001",
+  "fixture_id": "crossing-world-model-optimism-001",
+  "units": {
+    "distance": "m",
+    "time": "s",
+    "speed": "m/s",
+    "acceleration": "m/s^2",
+    "utility": "synthetic-utility-unit"
+  },
+  "scope": {
+    "reference_class": "R0-analytic",
+    "dynamics": "one-dimensional-ego-plus-orthogonal-constant-speed-pedestrian-occupancy",
+    "actor_behavior": "prescribed-constant-speed-crossing",
+    "physical_validation": false,
+    "human_behavior_model": false,
+    "safety_claim": false
+  },
+  "initial_conditions": {
+    "ego": {
+      "x_initial_m": 0.0,
+      "x_conflict_m": 20.0,
+      "speed_initial_mps": 10.0,
+      "length_m": 4.0
+    },
+    "pedestrian": {
+      "crossing_width_m": 4.0,
+      "reference_lateral_speed_mps": 1.4,
+      "crossing_start_s": 0.0
+    },
+    "yield_profile": {
+      "braking_magnitude_mps2": 3.0,
+      "restart_acceleration_mps2": 2.0,
+      "restart_condition": "after_pedestrian_clearance_and_ego_is_stopped"
+    }
+  },
+  "biased_predictor": {
+    "pedestrian_lateral_speed_predicted_mps": 2.6666666666666665,
+    "predicted_pedestrian_clearance_s": 1.5,
+    "predicted_action_utilities": {
+      "continue": 10.0,
+      "yield": 7.0
+    },
+    "interpretation": "The predictor falsely forecasts the pedestrian clear before ego conflict occupancy and is intentionally injected with a pessimistic yield utility."
+  },
+  "analytic_reference": {
+    "pedestrian_clearance_s": 2.857142857142857,
+    "continue": {
+      "arrival_at_conflict_s": 2.0,
+      "ego_occupancy_start_s": 1.8,
+      "ego_occupancy_end_s": 2.2,
+      "pedestrian_occupancy_start_s": 0.0,
+      "pedestrian_occupancy_end_s": 2.857142857142857,
+      "conflict_overlap": true
+    },
+    "yield": {
+      "ego_stop_time_s": 3.3333333333333335,
+      "ego_stop_distance_m": 16.666666666666668,
+      "remaining_distance_m": 3.333333333333332,
+      "restart_time_s": 3.3333333333333335,
+      "acceleration_duration_s": 1.8257418583505534,
+      "arrival_at_conflict_s": 5.159075191683887,
+      "arrival_speed_mps": 3.6514837167011067,
+      "ego_occupancy_start_s": 4.611352634178721,
+      "ego_occupancy_end_s": 5.706797749189053,
+      "pedestrian_occupancy_end_s": 2.857142857142857,
+      "conflict_overlap": false
+    },
+    "utility": {
+      "formula": "10 - lambda * max(0, arrival_at_conflict_s - 2) - 8 * conflict_overlap_indicator",
+      "lambda": 0.6330966750221405,
+      "realized_action_utilities": {
+        "continue": 2.0,
+        "yield": 8.0
+      }
+    }
+  },
+  "expected_decision_audit": {
+    "selected_action_id": "continue",
+    "predicted_best_action_id": "continue",
+    "realized_best_action_id": "yield",
+    "ranking_reversed": true,
+    "selected_action_regret": 6.0,
+    "predicted_selected_action_advantage_over_alternative": 3.0,
+    "realized_selected_action_advantage_over_alternative": -6.0,
+    "optimism_gap": 9.0,
+    "candidate_set_complete": true
+  },
+  "event_order": {
+    "selection_commit_sequence": 10,
+    "reference_outcome_reveal_sequence": 11,
+    "must_hold": "selection_commit_sequence < reference_outcome_reveal_sequence"
+  },
+  "digest_policy": {
+    "expected_schedule_digest": "compute with model_discrepancy_expected_schedule_digest",
+    "action_set_digest": "compute with model_discrepancy_action_set_digest",
+    "decision_context_digest": "compute with model_discrepancy_decision_context_digest",
+    "note": "These helpers bind canonical input identities; they do not authenticate a schedule author or prove pre-outcome freezing."
+  }
+}
