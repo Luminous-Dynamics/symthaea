@@ -1119,6 +1119,32 @@ mod tests {
     }
 
     #[test]
+    fn identification_under_assumptions_accepts_compiler_resolved_support() {
+        let mut ledger = base_ledger();
+        ledger.evidence[0].authority = EvidenceAuthority::RuntimeObserved;
+        ledger.outcomes[0].sequence = 6;
+        ledger.evidence.push(EvidenceRecord {
+            id: "e-compiler".into(),
+            binding: ledger.binding.clone(),
+            authority: EvidenceAuthority::CompilerResolved,
+            origin_id: "compiler-resolution".into(),
+            parent_ids: vec![],
+            source_action_id: None,
+            sequence: 5,
+        });
+        ledger.hypotheses[0].supporting_evidence_ids = vec!["e-compiler".into()];
+        ledger.hypotheses[0].status = HypothesisStatus::IdentifiedUnderAssumptions;
+        ledger.hypotheses[0].identification_assumptions =
+            vec!["The pinned compiler's resolution is complete for this declared feature world.".into()];
+        ledger.hypotheses[0].sequence = 7;
+        ledger.decisions[0].required_evidence_ids = vec!["e-compiler".into()];
+        ledger.decisions[0].sequence = 8;
+        ledger.repairs[0].sequence = 9;
+        ledger.grades[0].sequence = 10;
+        assert_eq!(ledger.validate(), Ok(()));
+    }
+
+    #[test]
     fn test_execution_requires_explicit_authorization() {
         let mut ledger = base_ledger();
         ledger.actions[0].kind = ActionKind::TestExecution;
