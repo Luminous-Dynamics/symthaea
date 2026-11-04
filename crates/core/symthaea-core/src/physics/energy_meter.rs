@@ -386,49 +386,31 @@ pub mod linux_powercap {
         }
 
         fn availability(&self) -> EnergyMeterAvailability {
-            match self.read_energy() {
-                Ok(_) => match self.max_range_path.as_ref() {
-                    Some(path) => match read_counter_file(path) {
-                        Ok(0) => EnergyMeterAvailability::Unsupported {
-                            reason: "powercap counter reports a zero rollover range".into(),
-                        },
-                        Ok(_) => EnergyMeterAvailability::Available,
-                        Err(EnergyMeterError::PermissionDenied { reason }) => {
-                            EnergyMeterAvailability::PermissionDenied { reason }
-                        }
-                        Err(EnergyMeterError::Unavailable { reason }) => {
-                            EnergyMeterAvailability::Unavailable { reason }
-                        }
-                        Err(EnergyMeterError::Unsupported { reason }) => {
-                            EnergyMeterAvailability::Unsupported { reason }
-                        }
-                        Err(EnergyMeterError::BackendFailure { reason }) => {
-                            EnergyMeterAvailability::Unavailable { reason }
-                        }
-                        Err(EnergyMeterError::ClockUnavailable) => {
-                            EnergyMeterAvailability::Unavailable {
-                                reason: "monotonic clock unavailable".into(),
-                            }
-                        }
-                    },
-                    None => EnergyMeterAvailability::Available,
-                },
-                Err(EnergyMeterError::PermissionDenied { reason }) => {
-                    EnergyMeterAvailability::PermissionDenied { reason }
-                }
-                Err(EnergyMeterError::Unavailable { reason }) => {
-                    EnergyMeterAvailability::Unavailable { reason }
-                }
-                Err(EnergyMeterError::Unsupported { reason }) => {
-                    EnergyMeterAvailability::Unsupported { reason }
-                }
-                Err(EnergyMeterError::BackendFailure { reason }) => {
-                    EnergyMeterAvailability::Unavailable { reason }
-                }
-                Err(EnergyMeterError::ClockUnavailable) => EnergyMeterAvailability::Unavailable {
-                    reason: "monotonic clock unavailable".into(),
-                },
+            let energy = match self.read_energy() {
+                Ok(value) => value,
+                Err(error) => return availability_from_error(error),
+            };
+
+            let Some(path) = self.max_range_path.as_ref() else {
+                return EnergyMeterAvailability::Available;
+            };
+            let range = match read_counter_file(path) {
+                Ok(value) => value,
+                Err(error) => return availability_from_error(error),
+            };
+
+            if range == 0 {
+                return EnergyMeterAvailability::Unsupported {
+                    reason: "powercap counter reports a zero rollover range".into(),
+                };
             }
+            if energy >= range {
+                return EnergyMeterAvailability::Unavailable {
+                    reason: "energy counter is outside its declared rollover range".into(),
+                };
+            }
+
+            EnergyMeterAvailability::Available
         }
 
         fn read_counter(&mut self) -> Result<EnergyCounterReading, EnergyMeterError> {
@@ -449,6 +431,24 @@ pub mod linux_powercap {
                 raw_counter,
                 monotonic_timestamp_ns: self.started_at.elapsed().as_nanos(),
             })
+        }
+    }
+
+    fn availability_from_error(error: EnergyMeterError) -> EnergyMeterAvailability {
+        match error {
+            EnergyMeterError::Unsupported { reason } => {
+                EnergyMeterAvailability::Unsupported { reason }
+            }
+            EnergyMeterError::PermissionDenied { reason } => {
+                EnergyMeterAvailability::PermissionDenied { reason }
+            }
+            EnergyMeterError::Unavailable { reason }
+            | EnergyMeterError::BackendFailure { reason } => {
+                EnergyMeterAvailability::Unavailable { reason }
+            }
+            EnergyMeterError::ClockUnavailable => EnergyMeterAvailability::Unavailable {
+                reason: "monotonic clock unavailable".into(),
+            },
         }
     }
 
@@ -555,6 +555,31 @@ pub mod linux_powercap {
                 EnergyDelta::between(&first, &second),
                 Err(EnergyDeltaError::CounterEpochChanged)
             );
+        }
+
+        #[test]
+        fn availability_rejects_zero_range_and_counter_outside_range() {
+            let zone = TestZone::new(10_000, 1_000_000);
+            let mut meter = LinuxPowercapMeter::open(
+                "intel-rapl:0",
+                "package-0",
+                EnergyScope::CpuPackage { package_id: 0 },
+                &zone.energy_path,
+                Some(zone.range_path.clone()),
+            )
+            .unwrap();
+
+            fs::write(&zone.range_path, "0").unwrap();
+            assert!(matches!(
+                meter.availability(),
+                EnergyMeterAvailability::Unsupported { .. }
+            ));
+
+            fs::write(&zone.range_path, "5000").unwrap();
+            assert!(matches!(
+                meter.availability(),
+                EnergyMeterAvailability::Unavailable { .. }
+            ));
         }
 
         #[test]
