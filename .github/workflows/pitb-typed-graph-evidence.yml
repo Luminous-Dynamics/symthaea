@@ -236,6 +236,12 @@ jobs:
           unfinished["attempt_finished"] = False
           if not list(outcome_validator.iter_errors(unfinished)):
               raise SystemExit("unfinished attempt was schema-accepted as a support non-solve")
+          semantic_rejection = copy.deepcopy(budget_non_solve)
+          semantic_rejection["terminal_reason"] = "semantic_rejection"
+          semantic_rejection["kernel_passed"] = True
+          semantic_rejection["semantic_gate_passed"] = False
+          if not list(outcome_validator.iter_errors(semantic_rejection)):
+              raise SystemExit("kernel-valid semantic rejection was schema-accepted as a non-solve")
           print("PITB_SUPPORT_OUTCOME_TERMINAL_SCHEMA_PASS")
           schema = report_schema
           report = json.loads(Path(sys.argv[1]).read_text())
