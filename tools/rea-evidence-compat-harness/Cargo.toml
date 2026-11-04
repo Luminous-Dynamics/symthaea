@@ -20,3 +20,7 @@ serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = { version = "=1.0.150", features = ["preserve_order"] }
 serde_json_canonicalizer = "=0.3.2"
 sha2 = { version = "=0.10.9", features = ["oid"] }
+
+[[bin]]
+name = "rea-evidence-verify"
+path = "../rea-evidence-verify-cli/src/main.rs"
