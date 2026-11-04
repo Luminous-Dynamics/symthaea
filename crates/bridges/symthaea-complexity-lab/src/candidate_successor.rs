@@ -338,16 +338,21 @@ impl CandidateSuccessorIndex {
                 clause_count: self.clause_count,
             });
         }
-        let memberships = self.reverse_incidence[clause].clone();
-        for record_id in memberships {
-            let position = *self.records[record_id]
+        let CandidateSuccessorIndex {
+            records,
+            reverse_incidence,
+            stats,
+            ..
+        } = self;
+        for &record_id in &reverse_incidence[clause] {
+            let position = *records[record_id]
                 .positions
                 .get(&clause)
                 .ok_or(CandidateIndexError::InvalidState {
                     record: record_id,
                     clause,
                 })?;
-            let set = &mut self.records[record_id];
+            let set = &mut records[record_id];
             if !set.active_positions.set(position, active) {
                 return Err(CandidateIndexError::PositionOutOfRange {
                     record: record_id,
@@ -355,8 +360,8 @@ impl CandidateSuccessorIndex {
                     candidate_count: set.candidates.len(),
                 });
             }
-            self.stats.membership_status_updates =
-                self.stats.membership_status_updates.saturating_add(1);
+            stats.membership_status_updates =
+                stats.membership_status_updates.saturating_add(1);
         }
         Ok(())
     }
