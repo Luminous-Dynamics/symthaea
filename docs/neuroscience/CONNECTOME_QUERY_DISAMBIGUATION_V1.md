@@ -104,7 +104,9 @@ The oracle is test-only. It is not imported into production Rust code or used to
 
 ## 8. Exact optimality oracle versus greedy set cover
 
-The report includes a deterministic greedy baseline that repeatedly selects the remaining action with the highest marginal number of newly separated decision-conflict pairs per effort unit. Ties prefer greater marginal coverage, then stable lexical action ID. This is a comparator only; the exact subset search remains authoritative.
+The report includes a deterministic weighted-greedy baseline that repeatedly selects the remaining action with the highest marginal number of newly separated decision-conflict pairs per effort unit. Ties prefer greater marginal coverage, then stable lexical action ID. This is a comparator only; the exact subset search remains authoritative.
+
+For a complete weighted set-cover instance, this standard greedy rule has the classical harmonic approximation guarantee (H_d), where (d) is the maximum number of universe elements covered by any one action (Chvátal's weighted greedy set cover; see [Young's survey](https://www.cs.ucr.edu/~neal/publication/Young16SetCover.pdf)). In V1 there are at most 24 worlds, and at most 12 positive × 12 negative = 144 opposing-decision pairs, so (d le 144) and the worst-case bound is (H_{144} approx 5.55). This is deliberately conservative; exact-vs-greedy regret is measured on each fixture and generated benchmark. No complete-cover approximation guarantee applies when the submitted action universe cannot distinguish every opposing-decision pair.
 
 The primary fixture deliberately demonstrates approximation regret:
 - a three-unit broad scan separates three of four conflict pairs;
