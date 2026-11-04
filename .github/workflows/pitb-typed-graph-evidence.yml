@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "tools/pitb-graph-evidence/**"
+      - "tools/pitb-retrieval-evidence/**"
       - ".github/workflows/pitb-typed-graph-evidence.yml"
   workflow_dispatch:
 
@@ -140,5 +141,105 @@ jobs:
         with:
           name: pitb-typed-graph-evidence-summary
           path: ${{ runner.temp }}/pitb-graph-evidence-summary.json
+          if-no-files-found: warn
+          retention-days: 30
+
+
+  retrieval-evidence-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Install JSON Schema validator
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pitb-retrieval-venv"
+          "$RUNNER_TEMP/pitb-retrieval-venv/bin/pip" install "jsonschema==4.25.1"
+
+      - name: Stage isolated retrieval evidence validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/pitb-retrieval-evidence"
+          mkdir -p "$staged/src"
+          cp tools/pitb-retrieval-evidence/Cargo.toml "$staged/Cargo.toml"
+          cp tools/pitb-retrieval-evidence/Cargo.lock "$staged/Cargo.lock"
+          cp tools/pitb-retrieval-evidence/src/main.rs "$staged/src/main.rs"
+          echo "PITB_RETRIEVAL_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+          echo "PITB_RETRIEVAL_DIR=$staged" >> "$GITHUB_ENV"
+
+      - name: Format and test retrieval evidence validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2021 "$PITB_RETRIEVAL_DIR/src/main.rs"
+          cargo fmt --check --manifest-path "$PITB_RETRIEVAL_MANIFEST"
+          cargo test --locked --manifest-path "$PITB_RETRIEVAL_MANIFEST"
+
+      - name: Generate a query-level receipt and evidence report
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path "$PITB_RETRIEVAL_MANIFEST" -- \
+            --self-test-report \
+            tools/pitb-graph-evidence/fixtures/graph-evidence.synthetic.json \
+            "$RUNNER_TEMP/retrieval-runs.synthetic.jsonl" \
+            "$RUNNER_TEMP/retrieval-report.synthetic.json"
+
+      - name: Validate receipt and report schemas
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-retrieval-venv/bin/python" - \
+            "$RUNNER_TEMP/retrieval-runs.synthetic.jsonl" \
+            "$RUNNER_TEMP/retrieval-report.synthetic.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("tools/pitb-retrieval-evidence/schema")
+          receipt_schema = json.loads((root / "retrieval-query-receipt-v0.schema.json").read_text())
+          report_schema = json.loads((root / "retrieval-evidence-report-v0.schema.json").read_text())
+          Draft202012Validator.check_schema(receipt_schema)
+          Draft202012Validator.check_schema(report_schema)
+          receipts = [
+              json.loads(line)
+              for line in Path(sys.argv[1]).read_text().splitlines()
+              if line.strip()
+          ]
+          for receipt in receipts:
+              errors = list(Draft202012Validator(receipt_schema).iter_errors(receipt))
+              if errors:
+                  raise SystemExit("receipt schema errors: " + "; ".join(e.message for e in errors))
+          report = json.loads(Path(sys.argv[2]).read_text())
+          errors = list(Draft202012Validator(report_schema).iter_errors(report))
+          if errors:
+              raise SystemExit("report schema errors: " + "; ".join(e.message for e in errors))
+          if len(receipts) != 1 or receipts[0]["candidate_pool"]["candidate_count"] >= report["graph_node_count"]:
+              raise SystemExit("synthetic run must exercise a filtered candidate-pool subset")
+          if receipts[0]["ranking"]["calibration"] != "uncalibrated" or report["scheduler_admission"] is not False:
+              raise SystemExit("retrieval candidate trust boundary changed")
+          print("PITB_RETRIEVAL_RECEIPT_AND_REPORT_SCHEMA_PASS")
+          PY
+
+      - name: Retain synthetic retrieval receipt and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-retrieval-evidence
+          path: |
+            ${{ runner.temp }}/retrieval-runs.synthetic.jsonl
+            ${{ runner.temp }}/retrieval-report.synthetic.json
+            ${{ runner.temp }}/pitb-retrieval-evidence/src/main.rs
           if-no-files-found: warn
           retention-days: 30
