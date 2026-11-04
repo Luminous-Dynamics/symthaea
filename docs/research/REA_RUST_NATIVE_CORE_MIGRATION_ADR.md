@@ -854,3 +854,18 @@ The MCP adapter required several exact-head fixes: enabling/declaring the `schem
 - The MCP result verifies only two content-supplied, read-only tools. It does not qualify the general REA tool catalog, external provider dispatch, producer authenticity, observation truth or mobile-device behavior.
 - The provider-dispatch gateway remains separately tracked in [#10398](https://github.com/Luminous-Dynamics/symthaea/issues/10398), with crash/reconciliation requirements composed from #4493, #7068, #7080 and #8769.
 - The newly opened [#10410](https://github.com/Luminous-Dynamics/symthaea/issues/10410) adds reverse-engineering-specific provider lineage/common-mode provenance as a consumer of #6283, not a second evidence ledger or trust score.
+
+
+### Provider-lineage benchmark family added
+
+The machine-readable benchmark manifest now includes a 25th family,
+`provider_lineage_and_common_mode_corroboration`, linked to
+[REA-RUST-021 / #10410](https://github.com/Luminous-Dynamics/symthaea/issues/10410).
+The manifest was fetched after the update and parsed successfully as JSON; it records
+`as_of: 2026-11-04` and 25 distinct benchmark families.
+
+This family evaluates seeded shared parser/engine/ruleset/model/acquisition roots,
+derived-output relays, unknown ancestry, disagreement preservation and confidence
+inflation. It composes with the general measurement-dependence work in #6283 and the
+REA causal-investigation benchmark in #9911. It does not alter REA Evidence IDs and
+does not produce a scalar provider-independence score.
