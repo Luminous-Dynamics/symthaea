@@ -74,7 +74,7 @@ fn regime_name(regime: EnvironmentRegime) -> &'static str {
     }
 }
 
-fn policies() -> [EncodingPolicy; 4] {
+fn policies() -> [EncodingPolicy; 5] {
     [
         EncodingPolicy::NoTransmission,
         EncodingPolicy::AlwaysProcedure,
@@ -97,7 +97,7 @@ fn policy_name(policy: EncodingPolicy) -> &'static str {
 fn main() {
     let config = Config::default();
     let mut all_rows: Vec<(EnvironmentRegime, EncodingPolicy, usize, GenerationBucket)> =
-        Vec::with_capacity(3 * 4 * config.generations);
+        Vec::with_capacity(3 * 5 * config.generations);
 
     for regime in regimes() {
         for policy in policies() {
