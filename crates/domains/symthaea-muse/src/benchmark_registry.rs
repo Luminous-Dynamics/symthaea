@@ -41,6 +41,7 @@ pub enum MusicBenchmarkFamilyV1 {
     SymbolicAudioAlignment,
     GlobalMusicUnderstanding,
     MusicGenerationPreference,
+    MusicEditing,
     SelectiveParticipation,
     CrossCulturalEvaluation,
     Other,
@@ -968,6 +969,18 @@ mod tests {
             MusicBenchmarkComparabilityV1::DescriptiveOnly
         );
         assert!(comparison.reasons.iter().any(|reason| reason.contains("precision")));
+    }
+
+    #[test]
+    fn music_editing_family_round_trips_to_schema_identifier() {
+        let mut profile = profile();
+        profile.benchmark_family = MusicBenchmarkFamilyV1::MusicEditing;
+
+        let value = serde_json::to_value(&profile).unwrap();
+        assert_eq!(value["benchmark_family"], "music_editing");
+
+        let parsed: MusicBenchmarkProfileV1 = serde_json::from_value(value).unwrap();
+        assert_eq!(parsed.benchmark_family, MusicBenchmarkFamilyV1::MusicEditing);
     }
 
     #[test]
