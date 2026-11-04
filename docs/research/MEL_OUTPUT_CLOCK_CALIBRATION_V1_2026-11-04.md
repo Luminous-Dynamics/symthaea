@@ -8,6 +8,8 @@ This slice defines the persisted anchor and deterministic fit contract. It maps 
 
 Each callback anchor binds:
 - exact output frame index and frame count represented by the callback buffer;
+- channel count and negotiated sample rate;
+- a stream-instance ID joined to a stream descriptor containing a privacy-preserving device-ID SHA-256 fingerprint and configuration digest;
 - CPAL callback timestamp;
 - CPAL predicted playback timestamp;
 - callback-to-predicted-playback interval;
@@ -41,7 +43,7 @@ The nominal sample rate is metadata and a drift reference, not a replacement for
 - any residual outside the frozen threshold;
 - queries beyond the valid interval plus explicit extrapolation horizon.
 
-The fitter does not silently remove outliers. A discontinuity or suspicious anchor requires a new segment or a separately justified regrade.
+The fitter does not silently remove outliers. A discontinuity or suspicious anchor requires a new segment or a separately justified regrade. Consecutive anchor indices require contiguous frame ranges; a gap in anchor indices may represent a dropped evidence record and is accepted only when the next recorded frame range does not overlap the preceding one. This preserves real frame progression when the callback's bounded anchor ring is full without pretending the missing anchor was observed.
 
 ## Accuracy boundary
 
@@ -50,6 +52,14 @@ CPAL supplies predicted playback timestamps, not a universal accuracy bound and 
 Raw per-anchor timestamp uncertainty metadata is retained, but v1 does not yet propagate those bounds through regression slope and intercept estimation. Therefore reported_uncertainty_frames remains absent and status is point_estimate_only even when anchors carry declared bounds. This deliberately avoids converting a fit residual or incomplete error-propagation model into an accuracy guarantee.
 
 Electrical/acoustic output latency still requires independent loopback observation. Mapping CPAL stream time to runner monotonic time requires a separate set of paired observations and a separately qualified cross-clock fit.
+
+## CPAL runtime capture
+
+The optional `muse-live` path now captures callback/playback timestamp pairs and cumulative output frame indices. It uses CPAL's stable `DeviceTrait::id` outside the callback, hashes it, and stores the descriptor (device fingerprint, sample rate, channel count, F32 format and configuration digest) separately from the per-callback anchors. The callback writes fixed-size `Copy` anchors to a 1,024-entry SPSC ring; it never takes the consumer mutex or formats/allocates strings. Callers retrieve up to a bounded number of records with `LiveMuseOutput::drain_output_clock_anchors` on a non-real-time thread. Dropped anchor callbacks are counted separately from audio underruns.
+
+A malformed callback frame shape invalidates further anchors for that stream instance rather than silently resuming with a guessed frame offset. A full anchor ring drops the evidence record but preserves the cumulative frame cursor and anchor index, allowing a later fit to recognize missing evidence records.
+
+This integration has not been compiled or exercised against a device in this environment. It does not provide a runner-monotonic clock mapping or physical loopback observation.
 
 ## Synthetic fixtures
 
