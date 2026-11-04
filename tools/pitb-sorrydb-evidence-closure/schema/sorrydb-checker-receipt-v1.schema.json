@@ -72,22 +72,22 @@
       "pattern": "^[a-f0-9]{64}$"
     },
     "target_is_prop": {
-      "type": "boolean"
+      "const": true
     },
     "build_passed": {
-      "type": "boolean"
+      "const": true
     },
     "kernel_passed": {
-      "type": "boolean"
+      "const": true
     },
     "target_sorry_ax_absent": {
-      "type": "boolean"
+      "const": true
     },
     "axiom_delta_zero": {
-      "type": "boolean"
+      "const": true
     },
     "new_sorry_delta_zero": {
-      "type": "boolean"
+      "const": true
     },
     "checker_binary_sha256": {
       "type": "string",
