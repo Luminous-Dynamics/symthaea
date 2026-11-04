@@ -1,0 +1,293 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-provenance-audit-v0.1.schema.json",
+  "title": "Connectome Provenance Completeness Audit Input V0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "audit_id",
+    "dependence_bundle_sha256",
+    "frame",
+    "sampling",
+    "risk_policy",
+    "outcomes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "audit_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dependence_bundle_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame_sha256",
+        "frozen_at",
+        "frame_builder_digest",
+        "assertion_count",
+        "assertions",
+        "strata"
+      ],
+      "properties": {
+        "frame_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "frozen_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "frame_builder_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "assertion_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "assertions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/assertion"
+          }
+        },
+        "strata": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/stratum"
+          }
+        }
+      }
+    },
+    "sampling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "design",
+        "algorithm",
+        "seed_source",
+        "seed_hex",
+        "selection_commitment"
+      ],
+      "properties": {
+        "design": {
+          "const": "STRATIFIED_SRSWOR_V1"
+        },
+        "algorithm": {
+          "const": "SHA256_RANK_V1"
+        },
+        "seed_source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed_hex": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "selection_commitment": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "risk_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "familywise_alpha",
+        "query_risk_budget",
+        "minimum_sample_per_critical_stratum",
+        "critical_strata"
+      ],
+      "properties": {
+        "familywise_alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.5
+        },
+        "query_risk_budget": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "minimum_sample_per_critical_stratum": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "critical_strata": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "outcomes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/outcome"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "assertion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assertion_id",
+        "stratum_id",
+        "left_evidence_id",
+        "right_evidence_id",
+        "claim_id",
+        "declared_scope"
+      ],
+      "properties": {
+        "assertion_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stratum_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "left_evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "right_evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "declared_scope": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "stratum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stratum_id",
+        "population_size",
+        "sample_size",
+        "risk_class",
+        "alpha_allocation"
+      ],
+      "properties": {
+        "stratum_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "population_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sample_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "risk_class": {
+          "enum": [
+            "CRITICAL",
+            "ROUTINE",
+            "EXPLORATORY"
+          ]
+        },
+        "alpha_allocation": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.5
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assertion_id",
+        "disposition",
+        "finding_codes",
+        "sources_examined"
+      ],
+      "properties": {
+        "assertion_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "disposition": {
+          "enum": [
+            "CONTRADICTED_DEPENDENCE",
+            "NO_SHARED_ANCESTOR_FOUND_WITHIN_AUDITED_SCOPE",
+            "UNRESOLVED_SOURCE_ACCESS",
+            "AMBIGUOUS_LINEAGE",
+            "PROTOCOL_VIOLATION"
+          ]
+        },
+        "finding_codes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "SHARED_RAW_IMAGE",
+              "SHARED_SEGMENTATION",
+              "SHARED_ANNOTATION",
+              "SHARED_TRAINING_DATA",
+              "SHARED_PREPROCESSING",
+              "SHARED_REGISTRATION",
+              "SHARED_ACQUISITION_SESSION",
+              "SHARED_REVIEW_EXPOSURE",
+              "SHARED_SELECTION_MECHANISM",
+              "OTHER"
+            ]
+          }
+        },
+        "sources_examined": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_ref",
+              "access_status"
+            ],
+            "properties": {
+              "source_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_digest": {
+                "$ref": "#/$defs/sha256"
+              },
+              "access_status": {
+                "enum": [
+                  "AVAILABLE",
+                  "INACCESSIBLE",
+                  "PARTIAL"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
