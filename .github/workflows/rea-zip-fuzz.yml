@@ -34,10 +34,10 @@ jobs:
           toolchain: nightly-2026-11-03
       - name: Install pinned cargo-fuzz
         run: cargo install cargo-fuzz --version 0.13.2 --locked
-      - name: Resolve and audit fuzz dependency graph
-        run: |
-          cargo generate-lockfile --manifest-path fuzz/Cargo.toml
-          cargo tree --manifest-path fuzz/Cargo.toml --locked -e normal,dev
+      - name: Validate committed fuzz dependency lock
+        run: test -f fuzz/Cargo.lock
+      - name: Audit committed fuzz dependency graph
+        run: cargo tree --manifest-path fuzz/Cargo.toml --locked -e normal,dev
       - name: Prepare content-addressable seed corpus
         run: |
           mkdir -p fuzz/corpus/zip_inventory_and_content fuzz/artifacts
@@ -64,7 +64,7 @@ jobs:
             -max_len=1048576 \
             -rss_limit_mb=512 \
             -print_final_stats=1
-      - name: Upload fuzz lock and artifacts
+      - name: Upload committed fuzz lock and artifacts
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
