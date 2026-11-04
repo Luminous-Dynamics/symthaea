@@ -136,9 +136,12 @@ fn main() {
 
             for outer_index in 0..outer {
                 let cell = (mu_index * SIGMA_GRID.len() + sigma_index) as u64;
+                // Parameter-cell and replicate indices occupy disjoint
+                // portions of the seed so changing outer count preserves
+                // existing seed identities for every cell.
                 let seed = 0x5350_4543_434f_5600u64
-                    .wrapping_add(cell.wrapping_mul(outer as u64))
-                    .wrapping_add(outer_index as u64);
+                    ^ cell.wrapping_shl(32)
+                    ^ outer_index as u64;
                 let table = simulate_table(mu, sigma, trials, seed);
                 let full_fit = fit(&table, fit_options);
 
