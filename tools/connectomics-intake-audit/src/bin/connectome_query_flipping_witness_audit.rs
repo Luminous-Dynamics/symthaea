@@ -783,6 +783,37 @@ mod tests {
     }
 
     #[test]
+    fn three_way_fixture_is_independently_replayable() {
+        let bytes = include_bytes!(
+            "../../../../docs/neuroscience/examples/CONNECTOME_QUERY_FLIPPING_WITNESS_THREE_WAY.example.json"
+        );
+        let input: Input = serde_json::from_slice(bytes).unwrap();
+        let report = evaluate(&input, bytes).unwrap();
+        assert_eq!(report.baseline_query_value, 2.0);
+        assert_eq!(report.minimal_witness_effort_units, Some(3));
+        assert_eq!(report.minimal_witness_count, 4);
+        assert_eq!(report.decision_flipping_subset_count_within_budget, 4);
+    }
+
+    #[test]
+    fn bounded_no_witness_fixture_does_not_claim_global_robustness() {
+        let bytes = include_bytes!(
+            "../../../../docs/neuroscience/examples/CONNECTOME_QUERY_FLIPPING_WITNESS_BOUNDED_NO_WITNESS.example.json"
+        );
+        let input: Input = serde_json::from_slice(bytes).unwrap();
+        let report = evaluate(&input, bytes).unwrap();
+        assert_eq!(report.edit_universe_scope, "bounded_candidate_subset");
+        assert!(report.baseline_decision_met);
+        assert_eq!(report.minimal_witness_effort_units, None);
+        assert_eq!(
+            report.status,
+            "NO_WITNESS_WITHIN_DECLARED_EDIT_UNIVERSE_AND_BUDGET"
+        );
+        assert_eq!(report.search_complete, true);
+        assert!(report.scope_note.contains("does not establish that no biological counterexample exists"));
+    }
+
+    #[test]
     fn exact_search_finds_minimum_two_edit_synergy_with_evidence_gate() {
         let input = fixture();
         let report = evaluate(&input, &fixture_bytes()).unwrap();
