@@ -267,7 +267,7 @@ fn validate_task(task: &Task, index: usize) -> Result<(), String> {
         return Err(format!("{label} has an end column before its start column"));
     }
     let expected_url = format!(
-        "{}/blob/{}/{ }#L{}",
+        "{}/blob/{}/{}#L{}",
         task.repository_url, task.repository_commit, task.source_path, task.start_line
     );
     if task.source_url != expected_url {
@@ -527,14 +527,12 @@ fn verify_cohort_file(manifest_path: &PathBuf) -> Result<IntegrityReport, String
     Ok(build_integrity_report(report, None))
 }
 
-fn verify_proof_file(
-    manifest_path: &PathBuf,
-    receipts_path: &PathBuf,
-) -> Result<IntegrityReport, String> {
-    let loaded = load_cohort(manifest_path)?;
-    let cohort_report = validate_cohort(&loaded.cohort, &loaded.manifest_sha256)?;
-    let receipts = load_receipts(receipts_path)?;
-    let task_map: BTreeMap<&str, &Task> = loaded.cohort.tasks.iter()
+fn validate_receipt_set(
+    receipts: &[ProofReceipt],
+    cohort: &CohortManifest,
+    cohort_sha256: &str,
+) -> Result<Vec<ProofResult>, String> {
+    let task_map: BTreeMap<&str, &Task> = cohort.tasks.iter()
         .map(|task| (task.task_id.as_str(), task))
         .collect();
     let mut seen = BTreeSet::new();
@@ -545,12 +543,23 @@ fn verify_proof_file(
         }
         results.push(validate_proof_receipt(
             receipt,
-            &loaded.cohort,
-            &loaded.manifest_sha256,
+            cohort,
+            cohort_sha256,
             &task_map,
             index,
         )?);
     }
+    Ok(results)
+}
+
+fn verify_proof_file(
+    manifest_path: &PathBuf,
+    receipts_path: &PathBuf,
+) -> Result<IntegrityReport, String> {
+    let loaded = load_cohort(manifest_path)?;
+    let cohort_report = validate_cohort(&loaded.cohort, &loaded.manifest_sha256)?;
+    let receipts = load_receipts(receipts_path)?;
+    let results = validate_receipt_set(&receipts, &loaded.cohort, &loaded.manifest_sha256)?;
     let kernel_count = results.len();
     let semantic_count = results.iter().filter(|x| x.semantic_review_claimed).count();
     let denom = loaded.cohort.tasks.len() as f64;
@@ -793,12 +802,8 @@ mod tests {
         let cohort = synthetic_cohort();
         let bytes = serde_json::to_vec(&cohort).unwrap();
         let cohort_sha = sha256(&bytes);
-        let map: BTreeMap<&str, &Task> = cohort.tasks.iter().map(|task| (task.task_id.as_str(), task)).collect();
         let first = synthetic_receipt(&cohort.tasks[0], &cohort_sha);
         let duplicate = first.clone();
-        let results = [first, duplicate];
-        let mut seen = BTreeSet::new();
-        assert!(results.iter().all(|receipt| seen.insert(receipt.task_id.clone())) == false);
-        assert!(validate_proof_receipt(&results[0], &cohort, &cohort_sha, &map, 0).is_ok());
+        assert!(validate_receipt_set(&[first, duplicate], &cohort, &cohort_sha).is_err());
     }
 }
