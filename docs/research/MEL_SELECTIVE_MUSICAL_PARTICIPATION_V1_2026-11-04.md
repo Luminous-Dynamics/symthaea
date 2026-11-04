@@ -1,6 +1,6 @@
 # MEL-ABSTAIN-001 — Selective musical participation v1
 
-**Status:** Rust evaluator, four paired symbolic families, three frozen baseline policies, strict set/report/baseline schemas, runnable example and nine authored unit tests are committed. Rust compilation, tests and audio/performer qualification are not yet executed.
+**Status:** Rust evaluator, four paired symbolic families, three frozen baseline policies, strict set/report/baseline schemas, runnable example and ten authored unit tests are committed. Rust compilation, tests and audio/performer qualification are not yet executed.
 
 ## Research question
 
@@ -48,6 +48,7 @@ The Rust scorer reports, independently:
 - false-entry rate on withhold-required members (RESPOND/CONTINUE only);
 - unauthorized YIELD count on withhold-required members;
 - total withhold-policy violation count/rate, including false entries and unauthorized YIELD;
+- unauthorized YIELD count and total withhold-policy violation rate;
 - missed-invitation rate on act-required members;
 - WAIT, ABSTAIN and ASK counts;
 - Brier score for the declared probability of an act being appropriate;
