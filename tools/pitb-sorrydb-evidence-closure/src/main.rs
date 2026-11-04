@@ -1104,6 +1104,54 @@ fn run_self_tests() -> Result<(), String> {
     println!("SELF_TEST_PASS source-before/source-after are exact single-span sorry replacement");
 
     let run_dir = root.join("synthetic-run");
+    let semantic_receipt_bytes = fs::read(run_dir.join("semantic-gate-receipt.json"))
+        .map_err(|e| format!("read synthetic semantic receipt: {e}"))?;
+    let semantic: SemanticGateReceipt = serde_json::from_slice(&semantic_receipt_bytes)
+        .map_err(|e| format!("parse synthetic semantic receipt: {e}"))?;
+    let attestation_bytes = fs::read(run_dir.join("reviewer-attestation.json"))
+        .map_err(|e| format!("read synthetic reviewer attestation: {e}"))?;
+
+    let wrong_registry_pin = "0".repeat(64);
+    if verify_reviewer_attestation(
+        &semantic, &attestation_bytes, &reviewer_registry_bytes,
+        &wrong_registry_pin, &root, "synthetic-run",
+    ).is_ok() {
+        return Err("wrong out-of-band reviewer key-registry digest was accepted".into());
+    }
+    println!("SELF_TEST_PASS out-of-band reviewer registry digest is mandatory");
+
+    let mut tampered_attestation: Value = serde_json::from_slice(&attestation_bytes)
+        .map_err(|e| format!("parse synthetic reviewer attestation: {e}"))?;
+    let signature = tampered_attestation["signature_ed25519_hex"].as_str()
+        .ok_or("synthetic reviewer signature missing")?;
+    let replacement = if signature.starts_with('0') { '1' } else { '0' };
+    let mut changed_signature = signature.to_owned();
+    changed_signature.replace_range(0..1, &replacement.to_string());
+    tampered_attestation["signature_ed25519_hex"] = Value::String(changed_signature);
+    let tampered_attestation_bytes = serde_json::to_vec(&tampered_attestation)
+        .map_err(|e| format!("serialize tampered reviewer attestation: {e}"))?;
+    if verify_reviewer_attestation(
+        &semantic, &tampered_attestation_bytes, &reviewer_registry_bytes,
+        &reviewer_registry_sha256, &root, "synthetic-run",
+    ).is_ok() {
+        return Err("tampered reviewer signature was accepted".into());
+    }
+    println!("SELF_TEST_PASS tampered reviewer signature is rejected");
+
+    let mut revoked_registry: Value = serde_json::from_slice(&reviewer_registry_bytes)
+        .map_err(|e| format!("parse synthetic reviewer registry: {e}"))?;
+    revoked_registry["keys"][0]["status"] = Value::String("revoked".into());
+    let revoked_registry_bytes = serde_json::to_vec(&revoked_registry)
+        .map_err(|e| format!("serialize revoked reviewer registry: {e}"))?;
+    let revoked_registry_sha256 = sha256(&revoked_registry_bytes);
+    if verify_reviewer_attestation(
+        &semantic, &attestation_bytes, &revoked_registry_bytes,
+        &revoked_registry_sha256, &root, "synthetic-run",
+    ).is_ok() {
+        return Err("revoked reviewer key was accepted".into());
+    }
+    println!("SELF_TEST_PASS revoked reviewer key is rejected");
+
     let source_after_path = run_dir.join("source-after.lean");
     let valid_after = fs::read(&source_after_path).map_err(|e| e.to_string())?;
     fs::write(&source_after_path, b"unrelated source edit\n").map_err(|e| e.to_string())?;
