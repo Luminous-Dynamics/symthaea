@@ -134,7 +134,7 @@ The task is not a real bridge design and cannot be used for people, buildings, p
 
 Use existing external benchmarks as *separate diagnostic instruments*, not one blended leaderboard:
 
-- **Physical-Engineering's Last Exam (PLE):** long-horizon, multi-file professional engineering deliverables and hard constraints. Published 2026 report: best reported agent result 48.3%; only 41% of designs cleared all hard checks. These are separate measures and a result on the public/hidden conditions is comparable only under the official evaluator.
+- **Physical-Engineering's Last Exam (PLE):** long-horizon, multi-file professional engineering deliverables and hard constraints. Mercor's live leaderboard reports 48.3% on its 56-task hidden set; the PLE paper abstract separately reports a 50.6% strongest configuration. These are distinct published evaluation summaries and must not be treated as interchangeable. Mercor reports that only 41% of designs cleared every hard check in its reported analysis. These scores are comparable only under the exact official evaluator conditions.
 - **EngiBench:** foundational retrieval, contextual reasoning and open-ended modelling; its authors report declining performance under increased complexity and perturbation.
 - **EngDesign:** simulation-graded multi-domain engineering design.
 - **CADGenBench:** valid STEP/BREP generation and editing, with validity, shape, interface and topology metrics.
@@ -229,7 +229,8 @@ Use explicit status labels: **PROPOSED**, **DESIGN_ONLY**, **SIMULATED**, **MEAS
 
 ## References and external comparators
 
-- PLE leaderboard: https://www.mercor.com/apex/partner-benchmarks/ple-bench-leaderboard/\n- PLE paper: https://arxiv.org/abs/2610.30537
+- PLE leaderboard: https://www.mercor.com/apex/partner-benchmarks/ple-bench-leaderboard/
+- PLE paper: https://arxiv.org/abs/2610.30537
 - EngiBench ACL Findings 2026: https://aclanthology.org/2026.findings-acl.1810/
 - EngDesign: https://github.com/AGI4Engineering/EngDesign
 - CADGenBench: https://github.com/huggingface/cadgenbench/
