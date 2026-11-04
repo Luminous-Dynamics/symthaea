@@ -31,7 +31,7 @@ The adapter boundary must be resolved through the existing **benchmark-neutral r
 | Official `checks`, `rubric`, `checks-judge` grader | Grader identity, grading protocol and raw grader output digest | Use official verifier unchanged; preserve the grader type and judge model/revision |
 | Deliverable files, trajectory, logs and resource data | Evidence-artifact inventory | Hash every artifact; do not invent a patch hash for a report, drawing or STEP file |
 | Official per-task reward and hard-check outcomes | Official score plus separately derived coverage/yield/feasibility metrics | Never replace official score with a local approximation; never average away hard-gate failure |
-| Repetition policy | Official hidden competition: three harness runs; public dev: committed-artifact scoring plus a live harness check on a sample; Luminous local dev comparison: three independent full-set runs (proposed) | Keep official and local repetition policies separate; do not confuse `--trials` parallelism or evaluator retries with independent repetitions |
+| Repetition policy | Published dev leaderboard: three-run average; competition-entry dev score: committed artifacts plus live sample check; hidden competition: three-run average | Keep official and local repetition policies separate; do not confuse `--trials` parallelism or evaluator retries with independent repetitions |
 
 The adapter may use a small **benchmark-profile mapping** to project PLE task metadata into generic accounting fields. That projection must not duplicate PLE task prompts, tests, graders or hidden labels, and it must not change official scoring semantics. A CEB task ID may identify the Luminous adapter/profile work, but the external PLE task ID remains a separate source identifier.
 
@@ -52,7 +52,7 @@ Authoritative public references:
 
 The benchmark contains 85 tasks: structural 10, civil 18, electrical 27 and mechanical 30. Its public development split contains 29 tasks: 4 structural, 9 civil, 9 electrical and 7 mechanical. The hidden test split contains 56 tasks and must remain in the official competition trust boundary.
 
-The dataset card identifies 12 `checks`, 14 `rubric` and 3 `checks-judge` dev tasks. Seventeen tasks require the official evaluation runner to build task-specific verifier images; standalone Harbor is not a full substitute. The official runner requires Harbor 0.20.0, uses `eval/run.py`, and enforces a six-hour per-task limit. The official competition runs the harness three times on the 56-task hidden test split. The public dev workflow grades committed artifacts and runs the harness live on a sample to check reproducibility; three full development repetitions are a proposed Luminous matched-comparison protocol, not an official PLE dev-set requirement.
+The dataset card identifies 12 `checks`, 14 `rubric` and 3 `checks-judge` dev tasks. Seventeen tasks require the official evaluation runner to build task-specific verifier images; standalone Harbor is not a full substitute. The official runner requires Harbor 0.20.0, uses `eval/run.py`, and enforces a six-hour per-task limit. The published public development leaderboard reports model results averaged over three runs. The competition submission dev score is different: it grades committed artifacts and runs the harness live on a sample to check reproducibility. The official hidden competition leaderboard also averages three harness runs. A Luminous matched dev comparison should use three independently identified full-set runs to align with the published dev baseline.
 
 ### Required gates before any run
 
@@ -77,7 +77,7 @@ uv run python eval/run.py <submission> --env-file <private-env-file>
 
 This is documentation of the official interface, **not authorization to execute it in the current environment**. It invokes Python, Harbor, Docker images, task-provided software, local services and an agent harness; it must not run until all isolation/custody gates are satisfied. Keep `HF_TOKEN`, model keys and judge keys in a secret store / private environment file outside the repository.
 
-Run all 29 dev tasks. For a Luminous matched comparison, preregister three independent full-set development runs with distinct run IDs as a local reproducibility protocol. This is not an official PLE dev-set requirement. Do not confuse Harbor's `--trials` parallelism or per-task retry count with independent benchmark repetitions. Re-grade only through the official tool. Record official per-task scores and raw artifacts as the evaluator returns them. Preserve tasks that are unattempted, ungraded, interrupted or unresolved.
+Run all 29 dev tasks. For a Luminous matched comparison, preregister three independent full-set development runs with distinct run IDs to align with the published PLE dev leaderboard's three-run average. Keep the competition-entry dev score from committed artifacts as a separate result. Do not confuse Harbor's `--trials` parallelism or per-task retry count with independent benchmark repetitions. Re-grade only through the official tool. Record official per-task scores and raw artifacts as the evaluator returns them. Preserve tasks that are unattempted, ungraded, interrupted or unresolved.
 
 ### Score interpretation
 
