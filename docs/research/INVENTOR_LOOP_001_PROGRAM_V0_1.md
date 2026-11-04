@@ -175,7 +175,7 @@ These are programme targets, not existing Luminous results:
 - PLE stretch target: ≥55% under the same official task/evaluation conditions, compared with the published 48.3% reference; do not claim improvement without a matched reproduction.
 - Reverse-engineering target: reuse #9911/#9969's prospective ≥20% relative top-3 localization lift, no increase in false causal diagnoses, and correct abstention on ambiguity.
 - Reject every unit/dimension/frame invalid control in the initial PhysicsIR corpus; require zero false-pass on known-bad and boundary controls.
-- Educational pilot target: ≥0.30 standard-deviation improvement in delayed transfer against an active project-based comparison, with independent problem solving non-inferior. Preregister duration, primary endpoint and sample-size rationale.
+- Educational pilot target: demonstrate a preregistered, domain-specific superiority or non-inferiority result on delayed unaided transfer against an active project-based comparison, while showing no meaningful displacement of protected human instruction or independent work. Set the minimum meaningful effect/margin and sample size from pilot variance and educator review; do not impose one universal effect-size target across contexts.
 - Choose physical reproducibility margins and sample size after a pilot estimates variance and cross-laboratory confounding. Do not set arbitrary universal tolerances.
 
 Never produce a single score that hides a critical safety, security, code, material or regulatory failure.
@@ -204,14 +204,40 @@ A result should be called better than SOTA only after the incumbent baseline is 
 
 Our differentiation should be **decision quality per independently accepted artifact**, with a human who learns, and an evidence record that an external reviewer can inspect.
 
-## 7. Learning research basis
+## 7. Learning research basis and benchmark strategy
 
-Two 2026 syntheses provide useful starting evidence:
+The current evidence does not support a universal claim that AI tutoring helps or harms. Four recent studies point to different mechanisms and contexts:
 
-- A preregistered meta-analysis of 22 GenAI-in-mathematics studies (46 samples, N=5,232) reported an average effect of g=0.534. Effects varied with how GenAI was integrated into instruction.
-- A 34-study meta-analysis of physically embodied educational robots (N=3,665) found r=0.31 overall; effects were stronger when robots played active collaborative/teaching roles, programmable kits were used and programmes lasted more than four weeks.
+- **StudentBench (September 2026; adult GRE):** 2,383 participants were assigned to AI tutoring, expert human tutoring or no tutoring. The authors report statistical equivalence between pooled AI and human tutoring on the studied GRE gains (p=.015), with substantial variation among tutor configurations and separate measurements for lesson plans, practice problems, pedagogy, cost and engagement. This is a useful adult-learning outcome comparator, not direct evidence for school-age learners or engineering education. [Paper](https://arxiv.org/abs/2609.28470) · [Reproduction code/data](https://github.com/Handshake-AI-Research/studentbench).
+- **Khanmigo two-year school trial (NBER 35620, August 2026):** a cluster-randomized trial across 18 Tennessee middle schools reports about 0.06–0.08 SD math-achievement improvement over a school year, similar to Khan Academy practice without AI. AI uptake was low: the median student used it on only about one third of practice days, and on a minority of mistake sessions. This shows that access does not equal meaningful use. [NBER paper](https://www.nber.org/papers/w35620).
+- **NUMI mastery-based math experiment (NBER 35621, August 2026):** a randomized experiment with more than 6,000 middle-school students found that AI support improved correctness on the next attempt after mistakes, but students progressed more slowly and attempted fewer questions. Delayed gains were mixed and concentrated in some practiced material; mastery progression alone did not guarantee transfer. This supports testing well-timed, mistake-responsive scaffolding rather than default answer provision. [NBER paper](https://www.nber.org/papers/w35621).
+- **Course-integrated tutor access university trial (IZA Discussion Paper 18989, October 2026):** 2,379 undergraduates across 30 instructors saw reduced final grades (−0.37 SD) and LMS participation (−0.90 SD) in the studied access condition, with potentially greater losses among first-generation students. This is a setting-specific warning about displacement of existing learning activity, not a universal conclusion about AI tutors. [IZA paper](https://iza.org/publications/dp/18989/the-effects-of-course-integrated-ai-tutoring-on-student-performance-and-engagement-a-randomized-university-trial).
 
-These results support testing a sustained, active, scaffolded learning design, but do not establish the efficacy of Praxis. A crucial counterpoint is the October 2026 randomized university trial (2,379 undergraduates, 30 instructors) in which course-integrated tutor access reduced final grades by 0.37 SD and LMS participation by 0.90 SD in the studied setting. That study is not universal evidence against AI tutoring; it shows why support displacement, independent effort, accessibility, subgroup effects and delayed transfer must be measured as first-class outcomes. Praxis #5461 owns the non-harm protocol. Source: [Liu et al., IZA Discussion Paper 18989](https://iza.org/publications/dp/18989/the-effects-of-course-integrated-ai-tutoring-on-student-performance-and-engagement-a-randomized-university-trial).
+LongTutor (ACL 2026) and MMTutorBench (ACL 2026) provide additional diagnostic benchmarks: LongTutor evaluates historical evidence acquisition, knowledge-state diagnosis and adaptive teaching action, and identifies a gap between acquiring learner history and using it to choose effective teaching actions. MMTutorBench tests step-level multimodal mathematical tutoring across 770 problems and six rubric dimensions. Neither substitutes for measuring actual human learning gains. [LongTutor](https://aclanthology.org/2026.acl-long.1371/) · [MMTutorBench](https://aclanthology.org/2026.acl-long.1068/).
+
+### Praxis strategy implied by the evidence
+
+Praxis should not optimize "AI answer correctness" alone. It should choose a support mode and time of intervention:
+
+1. Preserve learner-chosen goals and normal educator/peer/offline resources.
+2. Where pedagogically appropriate, invite an unaided attempt or prediction first; do not block accessibility accommodations or learner requests.
+3. Trigger help at meaningful decision points (e.g. after a misconception or error), using a small hint or question before a full explanation where appropriate.
+4. Ask the learner to reconstruct the reasoning, practise a structurally different case, and later retrieve it without assistance.
+5. Fade scaffolding as independent capability improves; allow the learner to decline AI or request a human.
+6. Measure whether this policy actually improves learning and does not displace more effective teaching or practice.
+
+Reuse Mycelix's existing planner/BKT/SRS and assessment contracts (#5286, #5403, #5455), support router (#5467), non-harm/displacement protocol (#5461), bounded Symthaea advisory boundary (#5472) and curriculum research (#5446). Do not create a second learner-state model, tutor, assessment authority or credential path.
+
+A controlled Praxis pilot should preregister:
+- independent, unaided transfer on unfamiliar tasks as the primary outcome;
+- delayed retention at a domain-appropriate interval;
+- attempts, error recovery, task progression and time-on-task;
+- AI availability, invocation, dose and assistance type separately;
+- educator/peer engagement and displaced course activity;
+- accessibility and subgroup effects where consent, study design and sample size permit;
+- attrition, missing follow-ups and adverse outcomes.
+
+Use active comparators and randomization where feasible and ethical. Choose a domain-specific minimum meaningful effect or non-inferiority margin with educators from pilot variance and power calculations; **do not impose a universal effect-size target such as +0.30 SD across unrelated ages, topics and interventions.** A study without enough power cannot claim equivalence. Keep adult GRE, middle-school maths and engineering-project cohorts separate. Synthetic benchmark success is not evidence of real learning efficacy.
 
 ## 8. Delivery sequence and gates
 
