@@ -83,3 +83,23 @@ Scenario weights and likelihood matrices are still caller-supplied. They are not
 Do not pass ad hoc cell-wise lower/upper probability bounds and renormalize them as though they were a valid joint uncertainty set. If adding interval bounds later, use a mathematically valid simplex-constrained uncertainty set or a reviewed robust-optimization formulation.
 
 The robust tests are additive to the point-planner tests. The dedicated planner workflow runs both through the same isolated locked harness.
+
+
+## Decision-aware extension
+
+This crate now supports a separate decision-aware planner in addition to point-EIG and scenario-robust EIG:
+
+- Point-EIG measures expected entropy reduction.
+- Robust EIG exposes expected, worst-case and lower-tail information gain across caller-supplied scenarios.
+- EVSI evaluates whether an observation is expected to change or improve a declared terminal decision.
+- **Minimax regret** performs an exact bounded search over deterministic outcome-to-decision policies and minimizes the maximum expected regret across the supplied finite scenarios.
+
+The minimax policy search is capped by `DecisionAwareConfig.max_policy_evaluations` (default 65,536). If the finite policy space exceeds that cap, the experiment is rejected with `PolicySearchBudgetExceeded`; there is no silent fallback to the scenario-mixture Bayes policy. Policy ties are broken lexicographically by decision IDs in declared outcome order.
+
+The planner still only scores proposed investigations. It does not execute probes or terminal decisions, and its caller-supplied likelihoods, scenario weights and utility matrices are neither authenticated nor calibrated by this crate.
+
+Run the focused harness:
+
+```bash
+cargo test --manifest-path tools/rea-investigator-harness/Cargo.toml --locked
+```

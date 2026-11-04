@@ -1363,3 +1363,5 @@ mod tests {
 
 /// Robust expected / worst-case / lower-tail EIG planning over likelihood scenarios.
 pub mod robust;
+/// Decision-aware EVSI and bounded minimax-regret planning.
+pub mod decision;
