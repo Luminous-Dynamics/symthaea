@@ -74,7 +74,8 @@
               "theoremgraph",
               "bm25",
               "pitb_union",
-              "other"
+              "other",
+              "leanfinder_v2"
             ]
           },
           "candidate_count": {
