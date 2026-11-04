@@ -130,6 +130,7 @@ struct ProofRun {
     proof_inserted: bool,
     exact_sorry_replaced: bool,
     sorry_absent_after_replacement: bool,
+    target_sorry_ax_absent: bool,
     build_passed: bool,
     kernel_passed: bool,
     semantic_gate_passed: bool,
@@ -762,6 +763,7 @@ fn validate_proof_run(
         run.proof_inserted,
         run.exact_sorry_replaced,
         run.sorry_absent_after_replacement,
+        run.target_sorry_ax_absent,
         run.target_is_prop,
         run.build_passed,
         run.kernel_passed,
@@ -1114,6 +1116,7 @@ fn synthetic_proof_run(task: &SorryRecord, verified: bool, run_id: &str) -> Proo
         proof_inserted: verified,
         exact_sorry_replaced: verified,
         sorry_absent_after_replacement: verified,
+        target_sorry_ax_absent: verified,
         build_passed: verified,
         kernel_passed: verified,
         semantic_gate_passed: verified,
@@ -1250,6 +1253,13 @@ fn run_self_tests() -> Result<(), String> {
         return Err("non-Prop target was accepted as a SorryDB proof task".into());
     }
     println!("SELF_TEST_PASS target must elaborate as Prop");
+
+    let mut bad_run = valid_run.clone();
+    bad_run.target_sorry_ax_absent = false;
+    if validate_proof_run(&bad_run, 7, &evaluation_by_id).is_ok() {
+        return Err("target retaining sorryAx was accepted".into());
+    }
+    println!("SELF_TEST_PASS target sorryAx must be absent");
 
     let mut bad_run = valid_run.clone();
     bad_run.declaration_signature_after_sha256 = sha256(b"weakened theorem signature");
