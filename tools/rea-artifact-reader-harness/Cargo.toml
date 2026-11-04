@@ -16,4 +16,4 @@ sha2 = "=0.10.9"
 zipcore = { version = "=0.10.2", default-features = false }
 
 [dev-dependencies]
-zip = { version = "=9.3.0", default-features = false }
+zip = { version = "=9.3.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
