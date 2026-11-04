@@ -51,6 +51,10 @@ pub fn replay_member_claim(
     path: impl AsRef<Path>,
     receipt: &Value,
 ) -> Result<ReplayReport, ReplayError> {
+    let schema: Value = serde_json::from_str(RECEIPT_SCHEMA)
+        .map_err(|error| ReplayError::Rejected(format!("embedded receipt schema is invalid: {error}")))?;
+    crate::validate_receipt(&schema, receipt)
+        .map_err(|error| ReplayError::Rejected(format!("receipt validation failed: {error}")))?;
     if string_at(receipt, &["outcome"])? != "verified" {
         return Err(ReplayError::Rejected(
             "only verified member receipts are replayable".into(),
