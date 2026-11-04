@@ -246,7 +246,9 @@ jobs:
         run: |
           set -euo pipefail
           "$RUNNER_TEMP/pitb-daps-venv/bin/python" - <<'PY'
+          import hashlib
           import json
+          import os
           from pathlib import Path
           from jsonschema import Draft202012Validator
 
