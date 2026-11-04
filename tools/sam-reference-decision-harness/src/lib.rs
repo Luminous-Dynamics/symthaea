@@ -87,6 +87,9 @@ pub struct ActionResult {
     pub action_id: String,
     pub metric_id: String,
     pub unit: String,
+    pub frame: String,
+    pub metric_definition_digest: String,
+    pub metric_evaluator_digest: String,
     pub execution_context_digest: String,
     pub action_payload_digest: String,
     pub output_digest: String,
@@ -108,6 +111,7 @@ pub struct ReferenceRow {
 pub struct MetricDefinition {
     pub metric_id: String,
     pub unit: String,
+    pub frame: String,
     pub direction: Direction,
     pub equivalence_margin: f64,
 }
@@ -123,6 +127,10 @@ pub struct ComparisonContext {
     pub action_b_id: String,
     /// Digest of the shared scenario/initial-state/environment/action-history context.
     pub execution_context_digest: String,
+    /// Digest of metric identity, units, frame, direction and decision margin.
+    pub metric_definition_digest: String,
+    /// Digest of the exact metric scoring implementation.
+    pub metric_evaluator_digest: String,
     /// Frozen command payloads for the two compared actions.
     pub action_a_payload_digest: String,
     pub action_b_payload_digest: String,
@@ -670,7 +678,10 @@ fn validate_context(context: &ComparisonContext) -> Result<(), EvaluationError> 
     validate_nonempty(&context.action_set_id, "action_set_id")?;
     validate_nonempty(&context.action_a_id, "action_a_id")?;
     validate_nonempty(&context.action_b_id, "action_b_id")?;
+    validate_nonempty(&context.metric.frame, "metric_frame")?;
     validate_digest(&context.execution_context_digest, "execution_context_digest")?;
+    validate_digest(&context.metric_definition_digest, "metric_definition_digest")?;
+    validate_digest(&context.metric_evaluator_digest, "metric_evaluator_digest")?;
     validate_digest(&context.action_a_payload_digest, "action_a_payload_digest")?;
     validate_digest(&context.action_b_payload_digest, "action_b_payload_digest")?;
     validate_nonempty(&context.metric.metric_id, "metric_id")?;
@@ -714,6 +725,9 @@ fn validate_action_identity(
         && action.action_id == expected_action_id
         && action.metric_id == context.metric.metric_id
         && action.unit == context.metric.unit
+        && action.frame == context.metric.frame
+        && action.metric_definition_digest == context.metric_definition_digest
+        && action.metric_evaluator_digest == context.metric_evaluator_digest
         && action.execution_context_digest == context.execution_context_digest
         && action.action_payload_digest == expected_payload_digest;
     if !matches {
@@ -898,11 +912,14 @@ mod tests {
             action_a_id: "continue".into(),
             action_b_id: "yield".into(),
             execution_context_digest: "d".repeat(64),
+            metric_definition_digest: "1".repeat(64),
+            metric_evaluator_digest: "2".repeat(64),
             action_a_payload_digest: "b".repeat(64),
             action_b_payload_digest: "c".repeat(64),
             metric: MetricDefinition {
                 metric_id: "clearance-margin".into(),
                 unit: "m".into(),
+                frame: "world-x".into(),
                 direction,
                 equivalence_margin: margin,
             },
@@ -935,6 +952,9 @@ mod tests {
             action_id: action_id.into(),
             metric_id: "clearance-margin".into(),
             unit: "m".into(),
+            frame: "world-x".into(),
+            metric_definition_digest: "1".repeat(64),
+            metric_evaluator_digest: "2".repeat(64),
             execution_context_digest: "d".repeat(64),
             action_payload_digest: action_payload_digest.repeat(64),
             output_digest: format!(
@@ -1215,6 +1235,16 @@ mod tests {
     fn mismatched_action_context_is_rejected() {
         let mut bad = row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2));
         bad.action_a.as_mut().unwrap().action_set_id = "other-actions".into();
+        assert!(matches!(
+            evaluate(&context(Direction::HigherIsBetter, 0.1), &[bad]),
+            Err(EvaluationError::ContextMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn action_metric_frame_and_evaluator_must_match_definition() {
+        let mut bad = row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2));
+        bad.action_a.as_mut().unwrap().frame = "sensor-local-x".into();
         assert!(matches!(
             evaluate(&context(Direction::HigherIsBetter, 0.1), &[bad]),
             Err(EvaluationError::ContextMismatch { .. })
