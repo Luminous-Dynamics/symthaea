@@ -15,8 +15,6 @@ use std::f64::consts::TAU;
 
 const MU_GRID: [f64; 4] = [0.5, 1.0, 1.5, 2.0];
 const SIGMA_GRID: [f64; 4] = [0.70, 1.0, 1.30, 1.60];
-const SIGNAL_TRIALS: u64 = 250;
-const NOISE_TRIALS: u64 = 250;
 const DEFAULT_OUTER: usize = 50;
 const DEFAULT_TRIALS_PER_CLASS: usize = 250;
 const Z_975: f64 = 1.959_963_984_540_054;
@@ -330,8 +328,8 @@ fn main() {
                     mu,
                     sigma,
                     thresholds,
-                    SIGNAL_TRIALS,
-                    NOISE_TRIALS,
+                    trials as u64,
+                    trials as u64,
                 );
 
                 let (fisher_rank, fisher_dimension, fisher_condition, fisher_da_se) =
@@ -349,8 +347,10 @@ fn main() {
                 for outer_index in 0..outer {
                     let parameter_cell =
                         (mu_index * SIGMA_GRID.len() + sigma_index) as u64;
+                    // Common random numbers: every candidate design sees the
+                    // same latent Gaussian draws for this parameter cell and
+                    // replicate, enabling paired design comparisons.
                     let seed = seed_root
-                        ^ (design_index as u64).wrapping_shl(48)
                         ^ parameter_cell.wrapping_shl(32)
                         ^ outer_index as u64;
                     match simulate_table(mu, sigma, thresholds, trials, seed) {
