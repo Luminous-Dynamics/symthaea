@@ -49,8 +49,8 @@ jobs:
           {
             echo "source_commit=$GITHUB_SHA"
             echo "rust_toolchain=nightly-2026-11-03"
-            rustc --version --verbose
-            cargo --version
+            rustc +nightly-2026-11-03 --version --verbose
+            cargo +nightly-2026-11-03 --version
             cargo fuzz --version
             uname -a
             sha256sum fuzz/Cargo.lock
@@ -58,7 +58,7 @@ jobs:
           } | tee fuzz/artifacts/run-context.txt
       - name: Run bounded coverage-guided fuzz smoke
         run: |
-          cargo fuzz run zip_inventory_and_content -- \
+          cargo +nightly-2026-11-03 fuzz run zip_inventory_and_content -- \
             -artifact_prefix=fuzz/artifacts/ \
             -max_total_time=180 \
             -max_len=1048576 \
