@@ -653,6 +653,7 @@ fn replay_goal_with_lake(
     repo_root: &Path,
     receipt_path: &Path,
     log_path: &Path,
+    instrumented_path: &Path,
 ) -> Result<GoalReplayReceipt, String> {
     let checkout = verify_source_checkout(record, repo_root)?;
     let source_spec = format!("HEAD:{}", record.location.path);
@@ -691,6 +692,8 @@ fn replay_goal_with_lake(
     }
     fs::write(&replay_absolute, instrumented.as_bytes())
         .map_err(|e| format!("write instrumented Lean source: {e}"))?;
+    fs::write(instrumented_path, instrumented.as_bytes())
+        .map_err(|e| format!("retain instrumented Lean source: {e}"))?;
 
     let replay_relative_string = replay_relative.to_string_lossy().into_owned();
     let replay_command = format!("lake env lean {replay_relative_string}");
@@ -1170,7 +1173,7 @@ fn audit(
 fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, PathBuf, Option<PathBuf>), String> {
     if args.len() < 7 || args[1] != "--verify" {
         return Err(format!(
-            "usage: {} --verify <full-snapshot.json> <evaluation-split.json> <report.json> [--runs proof-runs.jsonl] --pinned-source SorryDB/SorryDB@74b3b63f8ba890d675f362924b21ac55db410383 | --verify-checkout <sorry-record.json> <repo-root> <receipt.json> | --replay-goal <sorry-record.json> <repo-root> <receipt.json> <replay.log> | --self-test-checkout-report <receipt.json>",
+            "usage: {} --verify <full-snapshot.json> <evaluation-split.json> <report.json> [--runs proof-runs.jsonl] --pinned-source SorryDB/SorryDB@74b3b63f8ba890d675f362924b21ac55db410383 | --verify-checkout <sorry-record.json> <repo-root> <receipt.json> | --replay-goal <sorry-record.json> <repo-root> <receipt.json> <replay.log> <instrumented.lean> | --self-test-checkout-report <receipt.json>",
             args.first().map(String::as_str).unwrap_or("pitb-sorrydb-audit")
         ));
     }
@@ -1556,7 +1559,7 @@ fn execute() -> Result<(), String> {
         println!("PITB_SORRYDB_AUDIT_SYNTHETIC_REPORT_OK");
         return Ok(());
     }
-    if args.len() == 6 && args[1] == "--replay-goal" {
+    if args.len() == 7 && args[1] == "--replay-goal" {
         let record_bytes = fs::read(&args[2])
             .map_err(|e| format!("read SorryDB task record: {e}"))?;
         let record: SorryRecord = serde_json::from_slice(&record_bytes)
@@ -1566,6 +1569,7 @@ fn execute() -> Result<(), String> {
             Path::new(&args[3]),
             Path::new(&args[4]),
             Path::new(&args[5]),
+            Path::new(&args[6]),
         )?;
         println!("PITB_SORRYDB_GOAL_REPLAY_OK");
         println!(
