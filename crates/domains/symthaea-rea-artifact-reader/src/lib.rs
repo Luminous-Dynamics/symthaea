@@ -426,12 +426,23 @@ impl ZipArtifactReader {
             ));
         }
 
-        // A cloned descriptor refers to the same admitted file object. Offset correction remains
-        // enabled for prefixed carriers; raw offsets are reconciled with our absolute offsets.
-        let decoder_file = self
-            .file
-            .try_clone()
-            .map_err(|error| ReaderError::io("cannot clone admitted archive descriptor", error))?;
+        // Each call opens an independent file descriptor. File::try_clone can share the
+        // underlying file cursor on Unix, so two simultaneous verifications must not share seeks.
+        let decoder_file = OpenOptions::new()
+            .read(true)
+            .open(&self.path)
+            .map_err(|error| ReaderError::io("cannot open archive for independent content verification", error))?;
+        let opened_identity = decoder_file
+            .metadata()
+            .map_err(|error| ReaderError::io("cannot stat content-verification descriptor", error))?;
+        if !self.initial_identity.matches(&opened_identity) {
+            return Err(ReaderError::new(
+                ReaderErrorKind::SourceChanged,
+                "content-verification descriptor does not identify the admitted archive source",
+            ));
+        }
+        self.verify_source()?;
+
         let decoder_limit = limits
             .max_uncompressed_bytes
             .min(expected.declared_uncompressed_size);
@@ -442,51 +453,57 @@ impl ZipArtifactReader {
             offset_correction: true,
             password: None,
         };
-        let mut archive = DecoderArchive::new_with_options(decoder_file, options)
+
+        // Keep all decoder setup and streaming in one result scope so the descriptor and selected
+        // path are revalidated even when the secondary parser rejects the archive or metadata.
+        let stream_result = (|| {
+            let mut archive = DecoderArchive::new_with_options(decoder_file.try_clone().map_err(
+                |error| ReaderError::io("cannot clone independent content descriptor", error),
+            )?, options)
             .map_err(|error| map_zipcore_error("secondary ZIP parser rejected archive", error))?;
 
-        if archive.len() != self.inventory.entries.len()
-            || archive.central_directory_offset() != self.inventory.regions.central_directory_offset
-            || archive.is_zip64() != self.inventory.regions.zip64
-        {
-            return Err(ReaderError::new(
-                ReaderErrorKind::InvalidArchive,
-                "secondary ZIP parser archive-level metadata differs from the admitted inventory",
-            ));
-        }
+            if archive.len() != self.inventory.entries.len()
+                || archive.central_directory_offset()
+                    != self.inventory.regions.central_directory_offset
+                || archive.is_zip64() != self.inventory.regions.zip64
+            {
+                return Err(ReaderError::new(
+                    ReaderErrorKind::InvalidArchive,
+                    "secondary ZIP parser archive-level metadata differs from the admitted inventory",
+                ));
+            }
 
-        let decoder_entry = archive.entries().get(index).ok_or_else(|| {
-            ReaderError::new(
-                ReaderErrorKind::InvalidArchive,
-                "secondary ZIP parser omitted the selected member occurrence",
-            )
-        })?;
-        let corrected_header_offset = decoder_entry
-            .header_offset()
-            .checked_add(self.inventory.regions.leading_bytes);
-        let decoder_kind_matches = match expected.kind {
-            EntryKind::File => !decoder_entry.is_dir() && !decoder_entry.is_symlink(),
-            EntryKind::Directory => decoder_entry.is_dir() && !decoder_entry.is_symlink(),
-            EntryKind::Symlink => decoder_entry.is_symlink(),
-        };
-        if decoder_entry.name_raw() != expected.raw_name
-            || corrected_header_offset != Some(expected.local_header_offset)
-            || decoder_entry.flags() != expected.general_purpose_flags
-            || decoder_entry.method() != expected.compression_method
-            || decoder_entry.compressed_size() != expected.declared_compressed_size
-            || decoder_entry.uncompressed_size() != expected.declared_uncompressed_size
-            || decoder_entry.crc32() != expected.declared_crc32
-            || decoder_entry.has_data_descriptor() != expected.uses_data_descriptor
-            || decoder_entry.is_encrypted() != expected.encrypted
-            || !decoder_kind_matches
-        {
-            return Err(ReaderError::new(
-                ReaderErrorKind::InvalidArchive,
-                "secondary ZIP parser metadata differs from the selected custom inventory occurrence",
-            ));
-        }
+            let decoder_entry = archive.entries().get(index).ok_or_else(|| {
+                ReaderError::new(
+                    ReaderErrorKind::InvalidArchive,
+                    "secondary ZIP parser omitted the selected member occurrence",
+                )
+            })?;
+            let corrected_header_offset = decoder_entry
+                .header_offset()
+                .checked_add(self.inventory.regions.leading_bytes);
+            let decoder_kind_matches = match expected.kind {
+                EntryKind::File => !decoder_entry.is_dir() && !decoder_entry.is_symlink(),
+                EntryKind::Directory => decoder_entry.is_dir() && !decoder_entry.is_symlink(),
+                EntryKind::Symlink => decoder_entry.is_symlink(),
+            };
+            if decoder_entry.name_raw() != expected.raw_name
+                || corrected_header_offset != Some(expected.local_header_offset)
+                || decoder_entry.flags() != expected.general_purpose_flags
+                || decoder_entry.method() != expected.compression_method
+                || decoder_entry.compressed_size() != expected.declared_compressed_size
+                || decoder_entry.uncompressed_size() != expected.declared_uncompressed_size
+                || decoder_entry.crc32() != expected.declared_crc32
+                || decoder_entry.has_data_descriptor() != expected.uses_data_descriptor
+                || decoder_entry.is_encrypted() != expected.encrypted
+                || !decoder_kind_matches
+            {
+                return Err(ReaderError::new(
+                    ReaderErrorKind::InvalidArchive,
+                    "secondary ZIP parser metadata differs from the selected custom inventory occurrence",
+                ));
+            }
 
-        let stream_result = (|| {
             let mut member = archive
                 .by_index(index)
                 .map_err(|error| map_zipcore_error("cannot open selected ZIP member stream", error))?;
@@ -535,8 +552,15 @@ impl ZipArtifactReader {
             ))
         })();
 
-        // Source stability is checked even when decoding failed. A mutated source must not be
-        // misreported as an ordinary CRC/codec failure, and no would-be result escapes.
+        let final_decoder_identity = decoder_file
+            .metadata()
+            .map_err(|error| ReaderError::io("cannot revalidate content-verification descriptor", error))?;
+        if !self.initial_identity.matches(&final_decoder_identity) {
+            return Err(ReaderError::new(
+                ReaderErrorKind::SourceChanged,
+                "content-verification descriptor identity changed during the stream",
+            ));
+        }
         self.verify_source()?;
         let (sha256, observed_uncompressed_bytes) = stream_result?;
 
