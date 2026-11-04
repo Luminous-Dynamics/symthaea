@@ -367,7 +367,7 @@ fn main() {
                     summary.joint_interval_returned,
                 );
                 println!(
-                    "LATENT_CONDITIONAL_ONLY,{seed_root},SplitMix64-v1,{design_name},{mu},{sigma},{true_da},{outer},{trials},{},{},{},{},{},{},{},{},{},{},{},{},{},{fisher_rank},{fisher_dimension},{fisher_condition},{fisher_da_se},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}{},
+                    "LATENT_CONDITIONAL_ONLY,{seed_root},SplitMix64-v1,{design_name},{mu},{sigma},{true_da},{outer},{trials},{},{},{},{},{},{},{},{},{},{},{},{},{},{fisher_rank},{fisher_dimension},{fisher_condition},{fisher_da_se},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}{}",
                     summary.converged,
                     summary.boundary,
                     summary.weakly_identified,
