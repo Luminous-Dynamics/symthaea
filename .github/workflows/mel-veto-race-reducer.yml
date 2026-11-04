@@ -1,0 +1,30 @@
+name: Melothaea veto race reducer
+
+on:
+  pull_request:
+    paths:
+      - "tools/mel-veto-race-reducer/**"
+      - ".github/workflows/mel-veto-race-reducer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic-race-reducer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Format
+        run: cargo fmt --check --manifest-path tools/mel-veto-race-reducer/Cargo.toml
+      - name: Test deterministic event reducer
+        run: cargo test --locked --manifest-path tools/mel-veto-race-reducer/Cargo.toml
