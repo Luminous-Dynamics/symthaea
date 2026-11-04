@@ -27,7 +27,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ))
         .into());
     }
-    let profile_sha256 = profile.expected_profile_sha256()?;
+    let profile_sha256 = profile
+        .expected_profile_sha256()
+        .map_err(std::io::Error::other)?;
     let report = json!({
         "schema_version": "mel-music-benchmark-profile-check-v1",
         "benchmark_id": profile.benchmark_id,
