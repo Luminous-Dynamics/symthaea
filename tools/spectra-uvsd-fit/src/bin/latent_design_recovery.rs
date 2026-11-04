@@ -75,9 +75,12 @@ fn argument_u64(name: &str, default: u64) -> u64 {
     std::env::args()
         .skip(1)
         .find_map(|argument| {
-            argument
-                .strip_prefix(&prefix)
-                .and_then(|value| value.parse::<u64>().ok())
+            argument.strip_prefix(&prefix).and_then(|value| {
+                value
+                    .strip_prefix("0x")
+                    .map(|hex| u64::from_str_radix(hex, 16).ok())
+                    .unwrap_or_else(|| value.parse::<u64>().ok())
+            })
         })
         .unwrap_or(default)
 }
