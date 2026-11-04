@@ -179,6 +179,7 @@ pub mod steering;
 pub mod stewardship_governance;
 #[cfg(feature = "theory")]
 pub mod stewardship_release;
+pub mod runner_cpal_clock;
 pub mod stream;
 pub mod streaming;
 #[cfg(feature = "theory")]
