@@ -94,6 +94,7 @@ The API separates:
 - `verify_evidence_bundle_json(&[u8])`: verify bounded raw JSON with duplicate-key rejection and a separate raw-file SHA-256;
 - `canonical_evidence_bundle_bytes(&Value)`: obtain JCS bytes only after bundle verification;
 - `audit_evidence_link_closure(&Value)`: a stricter optional audit that reports links to records outside the bundle.
+- `evidence_bundle_for_target(&Value, sha256)`: the upstream-compatible target projection. It retains only complete unknown histories whose immutable scope digest equals the selected artifact and whose referenced Evidence is target-bound or an explicitly recorded residual-unknown mutation. It then preserves relationship closure, removing histories whose related histories are not selected and their dependents.
 
 The compatibility verifier checks all embedded Evidence IDs/profile commitments, rejects duplicate record IDs, rebuilds the deterministic artifact/provider/environment/scenario/capture manifests, validates residual-unknown revision digests and contiguous histories, checks previous-revision bindings, support/contradiction/mutation/resolution references, validates dependency relationships and rejects dependency cycles. A `verified` resolution requires qualifying supporting Evidence with the required authority/confidence and no unresolved contradiction.
 
