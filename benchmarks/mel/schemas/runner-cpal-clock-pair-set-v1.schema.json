@@ -26,7 +26,8 @@
         "reject_capture_bracket",
         "reject_descriptor_mismatch",
         "reject_drift",
-        "reject_residual"
+        "reject_residual",
+        "reject_non_monotonic_playback"
       ]
     },
     "descriptor": {
