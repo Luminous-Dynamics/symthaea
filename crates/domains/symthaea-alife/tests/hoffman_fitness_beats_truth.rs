@@ -9,8 +9,8 @@
 //! drive the truth-tracking strategy to extinction. `perceptual_grain`
 //! (`Genome`/`OrganismConfig`) wires exactly this cost into `symthaea-alife` for the first time
 //! (see `metabolism::{quantize_to_grain, perceptual_resolution_bits}`): a genuinely finer-grained
-//! resource reading costs more real Landauer-charged energy per tick than a coarser one, with no
-//! separate built-in benefit -- any advantage to fine-graining has to come entirely from
+//! resource reading incurs a larger dimensionless resolution-model cost per tick than a coarser
+//! one, with no separate built-in benefit -- any advantage to fine-graining has to come entirely from
 //! better-informed `select_action` choices actually paying off in more gathered energy, exactly
 //! the tradeoff the theorem describes.
 //!
