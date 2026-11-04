@@ -262,7 +262,10 @@ fn validate(input: &Input) -> Result<Vec<OutcomesByWorld>, String> {
             return Err("scenario IDs must be non-empty and unique".into());
         }
         if !valid_hex(&scenario.graph_sha256, 64) {
-            return Err(format!("scenario {} graph_sha256 must be lowercase SHA-256", scenario.scenario_id));
+            return Err(format!(
+                "scenario {} graph_sha256 must be lowercase SHA-256",
+                scenario.scenario_id
+            ));
         }
     }
     let actual_scenario_set_sha = canonical_scenario_set_sha256(&input.scenarios);
@@ -281,7 +284,10 @@ fn validate(input: &Input) -> Result<Vec<OutcomesByWorld>, String> {
             return Err("action IDs must be non-empty and unique".into());
         }
         if action.effort_units == 0 {
-            return Err(format!("action {} effort_units must be positive", action.action_id));
+            return Err(format!(
+                "action {} effort_units must be positive",
+                action.action_id
+            ));
         }
         total_effort = total_effort
             .checked_add(action.effort_units)
@@ -289,22 +295,37 @@ fn validate(input: &Input) -> Result<Vec<OutcomesByWorld>, String> {
         if !valid_hex(&action.source_evidence_sha256, 64)
             || !valid_hex(&action.observation_model_sha256, 64)
         {
-            return Err(format!("action {} source/model digests must be lowercase SHA-256", action.action_id));
+            return Err(format!(
+                "action {} source/model digests must be lowercase SHA-256",
+                action.action_id
+            ));
         }
         let mut groups = BTreeSet::new();
         for group in &action.dependence_groups {
             if !nonempty(group) || !groups.insert(group) {
-                return Err(format!("action {} has empty or duplicate dependence groups", action.action_id));
+                return Err(format!(
+                    "action {} has empty or duplicate dependence groups",
+                    action.action_id
+                ));
             }
         }
 
         let mut outcomes = BTreeMap::new();
         for outcome in &action.outcomes {
             if !scenario_ids.contains(&outcome.scenario_id) || !nonempty(&outcome.outcome_id) {
-                return Err(format!("action {} has an unknown world or empty outcome", action.action_id));
+                return Err(format!(
+                    "action {} has an unknown world or empty outcome",
+                    action.action_id
+                ));
             }
-            if outcomes.insert(outcome.scenario_id.clone(), outcome.outcome_id.clone()).is_some() {
-                return Err(format!("action {} has duplicate outcome for world {}", action.action_id, outcome.scenario_id));
+            if outcomes
+                .insert(outcome.scenario_id.clone(), outcome.outcome_id.clone())
+                .is_some()
+            {
+                return Err(format!(
+                    "action {} has duplicate outcome for world {}",
+                    action.action_id, outcome.scenario_id
+                ));
             }
         }
         if outcomes.len() != input.scenarios.len() {
@@ -335,10 +356,7 @@ fn decision_conflict_pairs(scenarios: &[Scenario]) -> Vec<WorldPair> {
     pairs
 }
 
-fn action_separates_pair(
-    outcomes: &OutcomesByWorld,
-    pair: &WorldPair,
-) -> bool {
+fn action_separates_pair(outcomes: &OutcomesByWorld, pair: &WorldPair) -> bool {
     outcomes.get(&pair.world_a) != outcomes.get(&pair.world_b)
 }
 
@@ -460,16 +478,15 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         .collect::<Vec<_>>();
     let individually_discriminable = pair_count - undiscriminable_pairs.len();
 
-    let (subset_count, minimum_count, mut plans, min_cost) = if pair_count == 0
-        || !undiscriminable_pairs.is_empty()
-    {
-        (0, 0, Vec::new(), None)
-    } else {
-        let (subsets, count, plans) =
-            exact_minimum_disambiguation(input, &pairs, &outcomes_by_action)?;
-        let cost = plans.first().map(|plan| plan.effort_units);
-        (subsets, count, plans, cost)
-    };
+    let (subset_count, minimum_count, mut plans, min_cost) =
+        if pair_count == 0 || !undiscriminable_pairs.is_empty() {
+            (0, 0, Vec::new(), None)
+        } else {
+            let (subsets, count, plans) =
+                exact_minimum_disambiguation(input, &pairs, &outcomes_by_action)?;
+            let cost = plans.first().map(|plan| plan.effort_units);
+            (subsets, count, plans, cost)
+        };
     let status = if pair_count == 0 {
         "NO_DECISION_DISAGREEMENT_WITHIN_DECLARED_SCENARIOS"
     } else if !undiscriminable_pairs.is_empty() {
@@ -589,28 +606,41 @@ mod tests {
         assert_eq!(report.status, "MINIMUM_COST_DISAMBIGUATION_PLAN");
         assert_eq!(report.minimum_plan_within_budget, Some(true));
         assert_eq!(report.subset_count_evaluated, 31);
-        assert!(report.plans.iter().all(|plan| {
-            plan.action_ids.len() == 2 && plan.effort_units == 4
-        }));
+        assert!(
+            report
+                .plans
+                .iter()
+                .all(|plan| { plan.action_ids.len() == 2 && plan.effort_units == 4 })
+        );
         assert!(!report.probability_claim.contains("POSTERIOR"));
     }
 
     #[test]
     fn one_observation_cannot_claim_to_separate_identical_outcomes() {
         let mut input = fixture();
-        let action = input.actions.iter_mut()
+        let action = input
+            .actions
+            .iter_mut()
             .find(|action| action.action_id == "inspect-synapse")
             .unwrap();
-        let alpha_outcome = action.outcomes.iter()
+        let alpha_outcome = action
+            .outcomes
+            .iter()
             .find(|outcome| outcome.scenario_id == "world-alpha")
-            .unwrap().outcome_id.clone();
-        let beta_outcome = action.outcomes.iter_mut()
+            .unwrap()
+            .outcome_id
+            .clone();
+        let beta_outcome = action
+            .outcomes
+            .iter_mut()
             .find(|outcome| outcome.scenario_id == "world-beta")
             .unwrap();
         beta_outcome.outcome_id = alpha_outcome;
         let bytes = serde_json::to_vec(&input).unwrap();
         let report = evaluate(&input, &bytes).unwrap();
-        let coverage = report.action_pair_coverage.iter()
+        let coverage = report
+            .action_pair_coverage
+            .iter()
             .find(|row| row.action_id == "inspect-synapse")
             .unwrap();
         assert_eq!(coverage.separated_decision_conflict_pair_count, 2);
@@ -621,10 +651,16 @@ mod tests {
     fn no_action_can_distinguish_a_pair_means_no_complete_plan() {
         let mut input = fixture();
         for action in &mut input.actions {
-            let alpha = action.outcomes.iter()
+            let alpha = action
+                .outcomes
+                .iter()
                 .find(|outcome| outcome.scenario_id == "world-alpha")
-                .unwrap().outcome_id.clone();
-            let beta = action.outcomes.iter_mut()
+                .unwrap()
+                .outcome_id
+                .clone();
+            let beta = action
+                .outcomes
+                .iter_mut()
                 .find(|outcome| outcome.scenario_id == "world-beta")
                 .unwrap();
             beta.outcome_id = alpha;
@@ -665,10 +701,7 @@ mod tests {
         assert_eq!(report.minimum_disambiguation_effort_units, Some(4));
         assert_eq!(report.minimum_plan_count, 2);
         assert_eq!(report.minimum_plan_within_budget, Some(false));
-        assert_eq!(
-            report.status,
-            "MINIMUM_COST_DISAMBIGUATION_EXCEEDS_BUDGET"
-        );
+        assert_eq!(report.status, "MINIMUM_COST_DISAMBIGUATION_EXCEEDS_BUDGET");
     }
 
     #[test]
@@ -678,7 +711,10 @@ mod tests {
         let action_hash = canonical_action_set_sha256(&input.actions);
         input.scenarios.reverse();
         input.actions.reverse();
-        assert_eq!(scenario_hash, canonical_scenario_set_sha256(&input.scenarios));
+        assert_eq!(
+            scenario_hash,
+            canonical_scenario_set_sha256(&input.scenarios)
+        );
         assert_eq!(action_hash, canonical_action_set_sha256(&input.actions));
     }
 
@@ -686,7 +722,11 @@ mod tests {
     fn outcome_coverage_must_be_exact_for_every_scenario() {
         let mut input = fixture();
         input.actions[0].outcomes.pop();
-        assert!(validate(&input).unwrap_err().contains("exactly one outcome"));
+        assert!(
+            validate(&input)
+                .unwrap_err()
+                .contains("exactly one outcome")
+        );
     }
 
     #[test]
