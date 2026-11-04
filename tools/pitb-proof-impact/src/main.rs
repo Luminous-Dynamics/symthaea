@@ -862,7 +862,7 @@ fn run_self_tests() -> Result<(), String> {
     let mut changed_edges = base_edges.clone();
     let replacement_edge = changed_edges.iter_mut().find(|edge| edge.edge_id == "e-root-doc").unwrap();
     replacement_edge.target_node_id = "helper".into();
-    replacement_edge.relation = "signature_reference".into();
+    replacement_edge.relation = "inheritance_reference".into();
     let edge_change = snap("edge-change", &"d".repeat(64), base_nodes.clone(), changed_edges, true);
     let report = analyze(&old_bytes, &serde_json::to_vec(&edge_change).map_err(|e| e.to_string())?)?;
     if !report.impacts.iter().any(|x| x.node_id == "root" && x.action == "reprove")
