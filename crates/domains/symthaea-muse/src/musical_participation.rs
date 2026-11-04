@@ -685,6 +685,8 @@ mod tests {
         valid_decision_support_count: usize,
         paired_correct_count: usize,
         false_entry_count: usize,
+        unauthorized_yield_count: usize,
+        withhold_violation_count: usize,
         missed_invitation_count: usize,
         intentional_wait_count: usize,
         epistemic_abstain_count: usize,
@@ -755,6 +757,18 @@ mod tests {
                 score.false_entry_count,
                 baseline.expected.false_entry_count,
                 "{} false entries",
+                baseline.baseline_id
+            );
+            assert_eq!(
+                score.unauthorized_yield_count,
+                baseline.expected.unauthorized_yield_count,
+                "{} unauthorized yields",
+                baseline.baseline_id
+            );
+            assert_eq!(
+                score.withhold_violation_count,
+                baseline.expected.withhold_violation_count,
+                "{} withhold violations",
                 baseline.baseline_id
             );
             assert_eq!(
@@ -878,6 +892,34 @@ mod tests {
                 family_index: 0,
             }
         ));
+    }
+
+    #[test]
+    fn unauthorized_yield_is_not_misreported_as_an_audible_false_entry() {
+        let set = fixture_set();
+        let mut predictions = vec![
+            vec![
+                prediction(MusicalParticipationDecisionV1::Respond, 0.9, 0.9),
+                prediction(MusicalParticipationDecisionV1::Yield, 0.9, 0.1),
+            ],
+            vec![
+                prediction(MusicalParticipationDecisionV1::Continue, 0.85, 0.9),
+                prediction(MusicalParticipationDecisionV1::Ask, 0.7, 0.1),
+            ],
+            vec![
+                prediction(MusicalParticipationDecisionV1::Respond, 0.9, 0.9),
+                prediction(MusicalParticipationDecisionV1::Abstain, 0.8, 0.1),
+            ],
+            vec![
+                prediction(MusicalParticipationDecisionV1::Yield, 0.9, 0.9),
+                prediction(MusicalParticipationDecisionV1::Wait, 0.9, 0.1),
+            ],
+        ];
+        let score = score_musical_participation_set_v1(&set, &predictions).unwrap();
+        assert_eq!(score.false_entry_count, 0);
+        assert_eq!(score.unauthorized_yield_count, 1);
+        assert_eq!(score.withhold_violation_count, 1);
+        assert_eq!(score.valid_decision_support_count, 7);
     }
 
     #[test]
