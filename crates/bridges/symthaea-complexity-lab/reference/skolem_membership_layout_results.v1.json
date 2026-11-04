@@ -3,20 +3,147 @@
   "conclusion": "All representations returned identical membership results. Memory and time measurements are specific to CPython 3.13.5; the selected layout must be remeasured in CakeML before adoption.",
   "format": "symthaea.skolem-membership-layout-microbench",
   "overall": [
-    {"lookup_queries":86016,"lookup_time_ms":10.013,"membership_hits":43384,"ns_per_query":116.4,"representation":"hash_set","representation_bytes":42052768,"representation_mib":40.105,"semantics_match":true},
-    {"lookup_queries":86016,"lookup_time_ms":31.09,"membership_hits":43384,"ns_per_query":361.5,"representation":"sorted_u32","representation_bytes":2875544,"representation_mib":2.742,"semantics_match":true},
-    {"lookup_queries":86016,"lookup_time_ms":32.705,"membership_hits":43384,"ns_per_query":380.2,"representation":"dense_bitset","representation_bytes":7398936,"representation_mib":7.056,"semantics_match":true},
-    {"lookup_queries":86016,"lookup_time_ms":23.89,"membership_hits":43384,"ns_per_query":277.7,"representation":"hybrid","representation_bytes":1874293,"representation_mib":1.787,"semantics_match":true}
+    {
+      "lookup_queries": 86016,
+      "lookup_time_ms": 9.41,
+      "membership_hits": 43384,
+      "ns_per_query": 109.4,
+      "representation": "hash_set",
+      "representation_bytes": 42052768,
+      "representation_mib": 40.105,
+      "semantics_match": true
+    },
+    {
+      "lookup_queries": 86016,
+      "lookup_time_ms": 27.465,
+      "membership_hits": 43384,
+      "ns_per_query": 319.3,
+      "representation": "sorted_u32",
+      "representation_bytes": 2875544,
+      "representation_mib": 2.742,
+      "semantics_match": true
+    },
+    {
+      "lookup_queries": 86016,
+      "lookup_time_ms": 22.804,
+      "membership_hits": 43384,
+      "ns_per_query": 265.1,
+      "representation": "dense_bitset",
+      "representation_bytes": 7398936,
+      "representation_mib": 7.056,
+      "semantics_match": true
+    },
+    {
+      "lookup_queries": 86016,
+      "lookup_time_ms": 23.864,
+      "membership_hits": 43384,
+      "ns_per_query": 277.4,
+      "representation": "hybrid",
+      "representation_bytes": 1874293,
+      "representation_mib": 1.787,
+      "semantics_match": true
+    }
   ],
-  "parameters": {"degrees":[1,4,16,64,256,1024,4096],"nodes_per_degree":128,"total_nodes":896,"queries_per_node":96,"seed":946217,"universe_literals":65536,"dense_bitset_bytes_per_node":8192,"hybrid_threshold_degree":2048},
+  "parameters": {
+    "degrees": [
+      1,
+      4,
+      16,
+      64,
+      256,
+      1024,
+      4096
+    ],
+    "nodes_per_degree": 128,
+    "total_nodes": 896,
+    "queries_per_node": 96,
+    "seed": 946217,
+    "universe_literals": 65536,
+    "dense_bitset_bytes_per_node": 8192,
+    "hybrid_threshold_degree": 2048
+  },
   "per_degree": [
-    {"degree":1,"nodes":128,"sorted_u32_bytes":11832,"hash_set_bytes":32312,"dense_bitset_bytes":1056952,"theoretical_dense_bytes_per_node":8192,"hybrid_choice":"sparse"},
-    {"degree":4,"nodes":128,"sorted_u32_bytes":13368,"hash_set_bytes":43064,"dense_bitset_bytes":1056952,"theoretical_dense_bytes_per_node":8192,"hybrid_choice":"sparse"},
-    {"degree":16,"nodes":128,"sorted_u32_bytes":19512,"hash_set_bytes":151608,"dense_bitset_bytes":1056952,"theoretical_dense_bytes_per_node":8192,"hybrid_choice":"sparse"},
-    {"degree":64,"nodes":128,"sorted_u32_bytes":44088,"hash_set_bytes":520164,"dense_bitset_bytes":1056952,"theoretical_dense_bytes_per_node":8192,"hybrid_choice":"sparse"},
-    {"degree":256,"nodes":128,"sorted_u32_bytes":142392,"hash_set_bytes":1994360,"dense_bitset_bytes":1056952,"theoretical_dense_bytes_per_node":8192,"hybrid_choice":"sparse"},
-    {"degree":1024,"nodes":128,"sorted_u32_bytes":535608,"hash_set_bytes":7885236,"dense_bitset_bytes":1056952,"theoretical_dense_bytes_per_node":8192,"hybrid_choice":"sparse"},
-    {"degree":4096,"nodes":128,"sorted_u32_bytes":2108472,"hash_set_bytes":31435160,"dense_bitset_bytes":1056952,"theoretical_dense_bytes_per_node":8192,"hybrid_choice":"dense"}
+    {
+      "degree": 1,
+      "nodes": 128,
+      "sorted_u32_bytes": 11832,
+      "hash_set_bytes": 32312,
+      "dense_bitset_bytes": 1056952,
+      "theoretical_dense_bytes_per_node": 8192,
+      "hybrid_choice": "sparse"
+    },
+    {
+      "degree": 4,
+      "nodes": 128,
+      "sorted_u32_bytes": 13368,
+      "hash_set_bytes": 43064,
+      "dense_bitset_bytes": 1056952,
+      "theoretical_dense_bytes_per_node": 8192,
+      "hybrid_choice": "sparse"
+    },
+    {
+      "degree": 16,
+      "nodes": 128,
+      "sorted_u32_bytes": 19512,
+      "hash_set_bytes": 151608,
+      "dense_bitset_bytes": 1056952,
+      "theoretical_dense_bytes_per_node": 8192,
+      "hybrid_choice": "sparse"
+    },
+    {
+      "degree": 64,
+      "nodes": 128,
+      "sorted_u32_bytes": 44088,
+      "hash_set_bytes": 520164,
+      "dense_bitset_bytes": 1056952,
+      "theoretical_dense_bytes_per_node": 8192,
+      "hybrid_choice": "sparse"
+    },
+    {
+      "degree": 256,
+      "nodes": 128,
+      "sorted_u32_bytes": 142392,
+      "hash_set_bytes": 1994360,
+      "dense_bitset_bytes": 1056952,
+      "theoretical_dense_bytes_per_node": 8192,
+      "hybrid_choice": "sparse"
+    },
+    {
+      "degree": 1024,
+      "nodes": 128,
+      "sorted_u32_bytes": 535608,
+      "hash_set_bytes": 7885236,
+      "dense_bitset_bytes": 1056952,
+      "theoretical_dense_bytes_per_node": 8192,
+      "hybrid_choice": "sparse"
+    },
+    {
+      "degree": 4096,
+      "nodes": 128,
+      "sorted_u32_bytes": 2108472,
+      "hash_set_bytes": 31435160,
+      "dense_bitset_bytes": 1056952,
+      "theoretical_dense_bytes_per_node": 8192,
+      "hybrid_choice": "dense"
+    }
   ],
-  "runtime": {"platform":"linux","python":"3.13.5"}
+  "runtime": {
+    "platform": "linux",
+    "python": "3.13.5"
+  },
+  "uploaded_script_execution": "passed",
+  "script_git_blob_sha1": "4bf3dad70ac8a06e7f68fb4c05d6464b43084d12",
+  "script_sha256": "sha256:a85fa5baae40159ba60cdcf1eae23d02a6080d003ee1545cb6ea87f3cc125a9a",
+  "execution_environment": {
+    "python": "3.13.5",
+    "platform": "linux",
+    "execution_date": "2026-11-04",
+    "method": "exact uploaded script reconstructed locally; Git blob SHA-1 verified before execution"
+  },
+  "execution_summary": {
+    "queries": 86016,
+    "identical_membership_hits": 43384,
+    "representations": 4,
+    "semantic_agreement": true
+  }
 }
