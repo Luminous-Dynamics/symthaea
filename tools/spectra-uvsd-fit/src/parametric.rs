@@ -236,6 +236,7 @@ pub struct ParametricBootstrapFailureCounts {
 pub struct ParametricBootstrapResult {
     pub status: ParametricBootstrapStatus,
     pub seed: u64,
+    pub rng_algorithm: &'static str,
     pub count_correction: CountCorrection,
     pub generating_estimate: Option<UvsdEstimate>,
     pub signal_trials: u64,
@@ -280,6 +281,7 @@ pub fn parametric_bootstrap_intervals(
         return ParametricBootstrapResult {
             status: ParametricBootstrapStatus::NotEvaluable,
             seed: options.seed,
+            rng_algorithm: "SplitMix64-v1",
             count_correction: options.fit_options.count_correction,
             generating_estimate,
             signal_trials: template.signal_total(),
@@ -292,7 +294,7 @@ pub fn parametric_bootstrap_intervals(
         };
     }
 
-    let generating_estimate = valid_estimate.expect("checked above").clone();
+    let generating_estimate = (*valid_estimate.expect("checked above")).clone();
     let mut rng = SplitMix64(options.seed);
     let mut mu = Vec::with_capacity(options.replicates);
     let mut sigma = Vec::with_capacity(options.replicates);
@@ -359,6 +361,7 @@ pub fn parametric_bootstrap_intervals(
             ParametricBootstrapStatus::InsufficientSuccessfulFits
         },
         seed: options.seed,
+        rng_algorithm: "SplitMix64-v1",
         count_correction: options.fit_options.count_correction,
         generating_estimate: Some(generating_estimate),
         signal_trials: template.signal_total(),
