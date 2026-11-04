@@ -203,7 +203,7 @@ impl Default for ParametricBootstrapOptions {
 /// Explicit status for parametric bootstrap interval qualification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParametricBootstrapStatus {
-    Qualified,
+    SufficientSuccessfulFits,
     InsufficientSuccessfulFits,
     NotEvaluable,
 }
@@ -238,7 +238,13 @@ pub struct ParametricBootstrapResult {
     pub seed: u64,
     pub rng_algorithm: &'static str,
     pub count_correction: CountCorrection,
+    pub fit_options: FitOptions,
+    pub optimizer: Optimizer,
+    pub requested_replicates: usize,
+    pub minimum_successful_replicates: usize,
+    pub minimum_successful_fraction: f64,
     pub generating_estimate: Option<UvsdEstimate>,
+    pub category_order: Vec<i16>,
     pub signal_trials: u64,
     pub noise_trials: u64,
     pub attempted: usize,
@@ -283,7 +289,13 @@ pub fn parametric_bootstrap_intervals(
             seed: options.seed,
             rng_algorithm: "SplitMix64-v1",
             count_correction: options.fit_options.count_correction,
+            fit_options: options.fit_options,
+            optimizer: options.optimizer,
+            requested_replicates: options.replicates,
+            minimum_successful_replicates: options.minimum_successful_replicates,
+            minimum_successful_fraction: options.minimum_successful_fraction,
             generating_estimate,
+            category_order: template.categories().iter().map(|row| row.order).collect(),
             signal_trials: template.signal_total(),
             noise_trials: template.noise_total(),
             attempted: 0,
@@ -356,14 +368,20 @@ pub fn parametric_bootstrap_intervals(
 
     ParametricBootstrapResult {
         status: if qualified {
-            ParametricBootstrapStatus::Qualified
+            ParametricBootstrapStatus::SufficientSuccessfulFits
         } else {
             ParametricBootstrapStatus::InsufficientSuccessfulFits
         },
         seed: options.seed,
         rng_algorithm: "SplitMix64-v1",
         count_correction: options.fit_options.count_correction,
+        fit_options: options.fit_options,
+        optimizer: options.optimizer,
+        requested_replicates: options.replicates,
+        minimum_successful_replicates: options.minimum_successful_replicates,
+        minimum_successful_fraction: options.minimum_successful_fraction,
         generating_estimate: Some(generating_estimate),
+        category_order: template.categories().iter().map(|row| row.order).collect(),
         signal_trials: template.signal_total(),
         noise_trials: template.noise_total(),
         attempted,
