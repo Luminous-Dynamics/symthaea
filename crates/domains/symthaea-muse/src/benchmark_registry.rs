@@ -93,6 +93,8 @@ pub struct MusicBenchmarkProfileV1 {
     pub scorer_id: String,
     pub scorer_version: String,
     pub scorer_sha256: String,
+    /// Exact metric identifiers emitted by the benchmark's native scorer.
+    pub native_metric_ids: Vec<String>,
     /// Stable comparison scope. Do not compare across scopes without a new protocol.
     pub comparison_scope_id: String,
     pub intended_use: MusicBenchmarkUseV1,
@@ -114,6 +116,7 @@ struct MusicBenchmarkProfileCommitmentV1<'a> {
     scorer_id: &'a str,
     scorer_version: &'a str,
     scorer_sha256: &'a str,
+    native_metric_ids: &'a [String],
     comparison_scope_id: &'a str,
     intended_use: MusicBenchmarkUseV1,
     rights: &'a MusicBenchmarkRightsV1,
@@ -135,6 +138,7 @@ impl MusicBenchmarkProfileV1 {
             scorer_id: &self.scorer_id,
             scorer_version: &self.scorer_version,
             scorer_sha256: &self.scorer_sha256,
+            native_metric_ids: &self.native_metric_ids,
             comparison_scope_id: &self.comparison_scope_id,
             intended_use: self.intended_use,
             rights: &self.rights,
@@ -327,6 +331,10 @@ pub enum MusicBenchmarkRegistryIssueV1 {
     InvalidMetricValue { metric_index: usize },
     RunCommitmentMismatch,
     ProfileCommitmentMismatch,
+    RunCommitmentMismatch,
+    EmptyAttemptSet,
+    MissingNativeMetricIds,
+    UnknownNativeMetric { metric_index: usize },
 }
 
 impl std::fmt::Display for MusicBenchmarkRegistryIssueV1 {
@@ -390,10 +398,23 @@ pub fn validate_music_benchmark_profile_v1(
             break;
         }
     }
-    if profile.rights.status == MusicBenchmarkRightsStatusV1::Cleared
-        && profile.rights.rights_evidence_sha256.is_none()
+    if matches!(
+        profile.rights.status,
+        MusicBenchmarkRightsStatusV1::Cleared | MusicBenchmarkRightsStatusV1::Restricted
+    ) && profile.rights.rights_evidence_sha256.is_none()
     {
         issues.push(MusicBenchmarkRegistryIssueV1::MissingRightsPermissionEvidence);
+    }
+    if profile.native_metric_ids.is_empty()
+        || profile.native_metric_ids.iter().any(|metric| metric.trim().is_empty())
+    {
+        issues.push(MusicBenchmarkRegistryIssueV1::MissingNativeMetricIds);
+    }
+    for (index, metric) in profile.native_metric_ids.iter().enumerate() {
+        if profile.native_metric_ids[..index].contains(metric) {
+            issues.push(MusicBenchmarkRegistryIssueV1::MissingNativeMetricIds);
+            break;
+        }
     }
     if profile.rights.status == MusicBenchmarkRightsStatusV1::Unresolved
         && matches!(
@@ -453,8 +474,15 @@ pub fn validate_music_benchmark_run_v1(
     if let Some(digest) = &run.model.model_artifact_sha256 {
         push_digest(&mut issues, "model_artifact_sha256", digest);
     }
-    if run.expected_run_manifest_sha256().is_err() {
-        issues.push(MusicBenchmarkRegistryIssueV1::RunCommitmentMismatch);
+    match run.expected_run_manifest_sha256() {
+        Ok(expected) if expected != run.run_manifest_sha256 => {
+            issues.push(MusicBenchmarkRegistryIssueV1::RunCommitmentMismatch);
+        }
+        Err(_) => issues.push(MusicBenchmarkRegistryIssueV1::RunCommitmentMismatch),
+        _ => {}
+    }
+    if run.attempted_items == 0 {
+        issues.push(MusicBenchmarkRegistryIssueV1::EmptyAttemptSet);
     }
     let expected_profile = profile.expected_profile_sha256().ok();
     if expected_profile.as_deref() != Some(run.profile_sha256.as_str()) {
@@ -494,7 +522,8 @@ pub fn validate_music_benchmark_run_v1(
         || usage.audio_seconds > budget.maximum_audio_seconds
         || usage.input_tokens > budget.maximum_input_tokens
         || usage.output_tokens > budget.maximum_output_tokens
-        || usage.retries > budget.maximum_requests
+        || usage.retries
+            > budget.maximum_requests.saturating_mul(u64::from(budget.maximum_retries_per_request))
         || usage.maximum_observed_concurrency > budget.maximum_concurrency
     {
         issues.push(MusicBenchmarkRegistryIssueV1::ResourceBudgetExceeded {
@@ -518,6 +547,11 @@ pub fn validate_music_benchmark_run_v1(
         push_required(&mut issues, "metric_id", &metric.metric_id);
         push_required(&mut issues, "metric_scope_id", &metric.scope_id);
         push_required(&mut issues, "metric_unit", &metric.unit);
+        if !profile.native_metric_ids.contains(&metric.metric_id) {
+            issues.push(MusicBenchmarkRegistryIssueV1::UnknownNativeMetric {
+                metric_index: index,
+            });
+        }
         if !metric.value.is_finite() {
             issues.push(MusicBenchmarkRegistryIssueV1::InvalidMetricValue {
                 metric_index: index,
@@ -529,7 +563,7 @@ pub fn validate_music_benchmark_run_v1(
             });
         }
         if let Some(numerator) = metric.numerator {
-            if !numerator.is_finite() || numerator < 0.0 || numerator > metric.denominator as f64 {
+            if !numerator.is_finite() || numerator < 0.0 {
                 issues.push(MusicBenchmarkRegistryIssueV1::InvalidMetric {
                     metric_index: index,
                     field: "numerator".to_owned(),
@@ -636,6 +670,7 @@ mod tests {
             scorer_id: "mustbench-native-scorer".to_owned(),
             scorer_version: "1.0.0".to_owned(),
             scorer_sha256: "d".repeat(64),
+            native_metric_ids: vec!["hit_at_3s".to_owned()],
             comparison_scope_id: "mustbench-tsg-official-test-v1".to_owned(),
             intended_use: MusicBenchmarkUseV1::EvaluationOnly,
             rights: MusicBenchmarkRightsV1 {
@@ -673,7 +708,7 @@ mod tests {
             input_preprocessing_sha256: "4".repeat(64),
             decoding_config_sha256: "5".repeat(64),
             runtime_environment_sha256: "6".repeat(64),
-            runner_commit_sha: "abcdef0123456789".to_owned(),
+            runner_commit_sha: "a".repeat(40),
             precision: "f32".to_owned(),
             seed: Some(7),
             budget,
