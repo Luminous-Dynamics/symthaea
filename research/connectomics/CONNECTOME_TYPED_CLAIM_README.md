@@ -7,4 +7,4 @@ This directory specifies a relation-type boundary across anatomical synapses, re
 - Known-answer fixture: `fixtures/connectome-typed-claim-bundle-known-answer-v0.1.json`
 - Research issue: [#10349](https://github.com/Luminous-Dynamics/symthaea/issues/10349)
 
-The JSON Schema validates shape and relation-specific evidence profiles. It does not implement semantic path grammar, evidence authentication, statistical-family completeness or causal identification. All `CLAIMED_*` statuses are producer assertions.
+The JSON Schema validates shape and relation-specific evidence profiles. The semantic verifier requires endpoint-contiguous ordered paths and standalone causal-effect claims; mixed anatomical/statistical evidence cannot promote causality. The schema itself does not authenticate evidence, validate statistical-family completeness or establish causal identification. All `CLAIMED_*` statuses are producer assertions.
