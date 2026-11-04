@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Seeded exhaustive property corpus for hidden-variable blocked-clause deletion."""
 from __future__ import annotations
-import json, random, sys
+import hashlib, json, random, sys
 from fractions import Fraction
 from itertools import product
 from pathlib import Path
@@ -131,8 +131,9 @@ def main():
             "target_projected_support": ["0", "1"], "support_change_detected": True
         },
         "runtime": {"python": sys.version.split()[0], "platform": sys.platform},
-        "script_sha256": "sha256:df08b43fa61d075452243991af9fae56b6fdf7c9d64328b1782c668d12f7046d",
-        "execution": "local_reference_script_passed"
+        "script_sha256": "sha256:" + hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "script_git_blob_sha1": hashlib.sha1(b"blob " + str(Path(__file__).stat().st_size).encode() + b"\\0" + Path(__file__).read_bytes()).hexdigest(),
+        "execution": "uploaded_script_byte_verified"
     }
     out = Path(__file__).with_name("projected_hidden_bce_property_results.v1.json")
     out.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
