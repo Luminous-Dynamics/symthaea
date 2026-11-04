@@ -221,6 +221,8 @@ pub struct ForecastRecord {
     pub action_id: String,
     /// Expected action semantics.
     pub action_kind: ActionKind,
+    /// Exact hypothesis revision records available when this forecast was sealed.
+    pub hypothesis_record_ids: Vec<String>,
     /// Digest of the competing hypothesis set used for this forecast.
     pub hypothesis_set_digest: Digest,
     /// Digest of the policy/profile that generated this forecast.
@@ -256,6 +258,8 @@ pub struct ActionRecord {
     pub forecast_id: String,
     /// Typed action semantics.
     pub kind: ActionKind,
+    /// Digest of the policy/scaffold that selected this action.
+    pub policy_digest: Digest,
     /// Digest of the exact parameters authorized/executed.
     pub parameters_digest: Digest,
     /// Authorization state.
@@ -806,6 +810,28 @@ impl Ledger {
             }
         }
 
+        for forecast in &self.forecasts {
+            if forecast.hypothesis_record_ids.is_empty() {
+                return Err(ValidationError::ForecastActionOutcomeOrder);
+            }
+            let mut logical_hypotheses = HashSet::new();
+            for hypothesis_record_id in &forecast.hypothesis_record_ids {
+                let hypothesis = hypotheses_by_id
+                    .get(hypothesis_record_id.as_str())
+                    .ok_or(ValidationError::MissingReference)?;
+                if hypothesis.sequence >= forecast.sequence
+                    || !logical_hypotheses.insert(hypothesis.hypothesis_id.as_str())
+                    || self.hypotheses.iter().any(|revision| {
+                        revision.hypothesis_id == hypothesis.hypothesis_id
+                            && revision.sequence > hypothesis.sequence
+                            && revision.sequence < forecast.sequence
+                    })
+                {
+                    return Err(ValidationError::ForecastActionOutcomeOrder);
+                }
+            }
+        }
+
         let mut forecast_action_ids = HashSet::new();
         for action in &self.actions {
             let forecast = forecasts_by_id
@@ -813,6 +839,7 @@ impl Ledger {
                 .ok_or(ValidationError::MissingReference)?;
             if forecast.action_id != action.id
                 || forecast.action_kind != action.kind
+                || forecast.policy_digest != action.policy_digest
                 || forecast.parameters_digest != action.parameters_digest
                 || forecast.sequence >= action.sequence
                 || !forecast_action_ids.insert(forecast.id.as_str())
@@ -1044,25 +1071,42 @@ mod tests {
                 source_action_id: Some("a1".into()),
                 sequence: 4,
             }],
-            hypotheses: vec![HypothesisRecord {
-                id: "h1-r1".into(),
-                hypothesis_id: "h1".into(),
-                previous_record_id: None,
-                binding: binding.clone(),
-                claim: "feature gate causes the observed regression".into(),
-                applicability_domain: "pinned Rust workspace / declared feature matrix".into(),
-                competing_hypothesis_ids: vec![],
-                identification_assumptions: vec![],
-                supporting_evidence_ids: vec!["e-intervention".into()],
-                contradicting_evidence_ids: vec![],
-                status: HypothesisStatus::InterventionSupported,
-                sequence: 6,
-            }],
+            hypotheses: vec![
+                HypothesisRecord {
+                    id: "h1-r2".into(),
+                    hypothesis_id: "h1".into(),
+                    previous_record_id: Some("h1-r1".into()),
+                    binding: binding.clone(),
+                    claim: "feature gate causes the observed regression".into(),
+                    applicability_domain: "pinned Rust workspace / declared feature matrix".into(),
+                    competing_hypothesis_ids: vec![],
+                    identification_assumptions: vec![],
+                    supporting_evidence_ids: vec!["e-intervention".into()],
+                    contradicting_evidence_ids: vec![],
+                    status: HypothesisStatus::InterventionSupported,
+                    sequence: 6,
+                },
+                HypothesisRecord {
+                    id: "h1-r1".into(),
+                    hypothesis_id: "h1".into(),
+                    previous_record_id: None,
+                    binding: binding.clone(),
+                    claim: "feature gate causes the observed regression".into(),
+                    applicability_domain: "pinned Rust workspace / declared feature matrix".into(),
+                    competing_hypothesis_ids: vec![],
+                    identification_assumptions: vec![],
+                    supporting_evidence_ids: vec![],
+                    contradicting_evidence_ids: vec![],
+                    status: HypothesisStatus::Candidate,
+                    sequence: 1,
+                },
+            ],
             forecasts: vec![ForecastRecord {
                 id: "f1".into(),
                 binding: binding.clone(),
                 action_id: "a1".into(),
                 action_kind: ActionKind::ConfigurationPerturbation,
+                hypothesis_record_ids: vec!["h1-r1".into()],
                 hypothesis_set_digest: Digest([3; 32]),
                 policy_digest: Digest([6; 32]),
                 parameters_digest: Digest([5; 32]),
@@ -1080,6 +1124,7 @@ mod tests {
                 binding: binding.clone(),
                 forecast_id: "f1".into(),
                 kind: ActionKind::ConfigurationPerturbation,
+                policy_digest: Digest([6; 32]),
                 parameters_digest: Digest([5; 32]),
                 authorization: Authorization::Granted { decision_id: "auth-1".into() },
                 sequence: 3,
@@ -1100,7 +1145,7 @@ mod tests {
                 binding: binding.clone(),
                 kind: DecisionKind::ProceedToRepair,
                 reason: "The controlled configuration perturbation discriminated the leading hypothesis.".into(),
-                hypothesis_record_ids: vec!["h1-r1".into()],
+                hypothesis_record_ids: vec!["h1-r2".into()],
                 required_evidence_ids: vec!["e-intervention".into()],
                 missing_requirements: vec![],
                 sequence: 7,
@@ -1110,7 +1155,7 @@ mod tests {
                 binding: binding.clone(),
                 patch_digest: Digest([4; 32]),
                 decision_id: "d1".into(),
-                hypothesis_record_ids: vec!["h1-r1".into()],
+                hypothesis_record_ids: vec!["h1-r2".into()],
                 outcome_ids: vec!["o1".into()],
                 sequence: 8,
             }],
@@ -1194,13 +1239,13 @@ mod tests {
     fn hypothesis_updates_are_linked_immutable_revisions() {
         let mut ledger = base_ledger();
         let mut revision = ledger.hypotheses[0].clone();
-        revision.id = "h1-r2".into();
-        revision.previous_record_id = Some("h1-r1".into());
+        revision.id = "h1-r3".into();
+        revision.previous_record_id = Some("h1-r2".into());
         revision.status = HypothesisStatus::Unresolved;
         revision.sequence = 7;
         ledger.hypotheses.push(revision);
-        ledger.decisions[0].hypothesis_record_ids = vec!["h1-r2".into()];
-        ledger.repairs[0].hypothesis_record_ids = vec!["h1-r2".into()];
+        ledger.decisions[0].hypothesis_record_ids = vec!["h1-r3".into()];
+        ledger.repairs[0].hypothesis_record_ids = vec!["h1-r3".into()];
         ledger.decisions[0].sequence = 8;
         ledger.repairs[0].sequence = 9;
         ledger.grades[0].sequence = 10;
@@ -1293,10 +1338,10 @@ mod tests {
         let mut ledger = base_ledger();
         let mut revision_two = ledger.hypotheses[0].clone();
         revision_two.id = "h1-r2".into();
-        revision_two.previous_record_id = Some("h1-r1".into());
+        revision_two.previous_record_id = Some("h1-r2".into());
         revision_two.sequence = 7;
         let mut revision_three = revision_two.clone();
-        revision_three.id = "h1-r3".into();
+        revision_three.id = "h1-r4".into();
         revision_three.sequence = 8;
         ledger.hypotheses.extend([revision_two, revision_three]);
         ledger.decisions[0].sequence = 9;
@@ -1383,6 +1428,26 @@ mod tests {
         assert_eq!(
             ledger.validate(),
             Err(ValidationError::OutcomeEvidenceMismatch)
+        );
+    }
+
+    #[test]
+    fn forecast_must_bind_a_prior_hypothesis_revision() {
+        let mut ledger = base_ledger();
+        ledger.forecasts[0].hypothesis_record_ids = vec!["h1-r2".into()];
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::ForecastActionOutcomeOrder)
+        );
+    }
+
+    #[test]
+    fn action_policy_must_match_the_forecast_policy() {
+        let mut ledger = base_ledger();
+        ledger.actions[0].policy_digest = Digest([11; 32]);
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::ForecastActionOutcomeOrder)
         );
     }
 
