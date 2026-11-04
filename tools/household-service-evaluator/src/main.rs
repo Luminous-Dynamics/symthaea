@@ -43,13 +43,12 @@ fn run() -> Result<(), String> {
     let repair_path = repair_path.ok_or_else(|| "missing --repair PATH".to_owned())?;
     let output_path = output_path.unwrap_or_else(|| "-".to_owned());
 
-    let report =
-        evaluate_batch_from_paths_with_source_commit(
-            &water_path,
-            &repair_path,
-            source_commit.as_deref(),
-        )
-        .map_err(|error| error.to_string())?;
+    let report = evaluate_batch_from_paths_with_source_commit(
+        &water_path,
+        &repair_path,
+        source_commit.as_deref(),
+    )
+    .map_err(|error| error.to_string())?;
     let envelope = BatchOutputEnvelope::from_report(report).map_err(|error| error.to_string())?;
     let rendered = serde_json::to_string_pretty(&envelope)
         .map_err(|error| format!("could not serialize batch output envelope: {error}"))?;
