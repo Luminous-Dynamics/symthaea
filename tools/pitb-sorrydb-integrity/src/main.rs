@@ -228,13 +228,14 @@ fn records(root: &Value, label: &str) -> Result<&Vec<Value>, String> {
 
 fn source_location_key(task: &TaskIdentity) -> String {
     format!(
-        "{}|{}|{}|{}|{}|{}|{}",
+        "{}|{}|{}|{}|{}|{}|{}|{}",
         task.remote,
         task.commit,
         task.lean_version,
         task.path,
         task.start_line,
         task.start_column,
+        task.end_line,
         task.end_column
     )
 }
