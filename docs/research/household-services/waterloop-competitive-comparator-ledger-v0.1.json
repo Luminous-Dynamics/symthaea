@@ -316,7 +316,7 @@
               {
                 "model": "GW300",
                 "rated_capacity_us_gallons_per_day": 79,
-                "converted_litres_per_day": 299.2
+                "converted_litres_per_day": 299
               },
               {
                 "model": "GW600",
@@ -341,17 +341,17 @@
               {
                 "model": "GW1800",
                 "rated_capacity_us_gallons_per_day": 476,
-                "converted_litres_per_day": 1801
+                "converted_litres_per_day": 1801.9
               },
               {
                 "model": "GW3600",
                 "rated_capacity_us_gallons_per_day": 951,
-                "converted_litres_per_day": 3600
+                "converted_litres_per_day": 3599.9
               },
               {
                 "model": "GW5400",
                 "rated_capacity_us_gallons_per_day": 1427,
-                "converted_litres_per_day": 5400
+                "converted_litres_per_day": 5401.8
               }
             ],
             "classification": "Class C",
