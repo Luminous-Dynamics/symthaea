@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/benchmark-integrity-report-v0.schema.json",
+  "title": "PITB benchmark integrity report v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "cohort_manifest_sha256",
+    "source_repository_commit",
+    "source_blob_sha1",
+    "source_file_sha256",
+    "task_count",
+    "distinct_repository_count",
+    "distinct_repository_commit_lean_toolchain_count",
+    "unique_task_id_count",
+    "unique_goal_hash_count",
+    "lean_toolchain_distribution",
+    "proof_summary",
+    "integrity_scope",
+    "proof_execution_scope",
+    "trust_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.benchmark-integrity-report.v0"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cohort_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_repository_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "source_blob_sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "source_file_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "distinct_repository_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "distinct_repository_commit_lean_toolchain_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "unique_task_id_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "unique_goal_hash_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "lean_toolchain_distribution": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "proof_summary": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "receipt_count",
+            "kernel_verified_count",
+            "semantic_review_claim_count",
+            "kernel_verified_rate_of_cohort",
+            "semantic_review_claim_rate_of_cohort",
+            "results",
+            "interpretation_boundary"
+          ],
+          "properties": {
+            "receipt_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "kernel_verified_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "semantic_review_claim_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "kernel_verified_rate_of_cohort": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "semantic_review_claim_rate_of_cohort": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "results": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "task_id",
+                  "qualification_tier",
+                  "semantic_review_claimed",
+                  "proof_sha256",
+                  "execution_receipt_sha256"
+                ],
+                "properties": {
+                  "task_id": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "qualification_tier": {
+                    "enum": [
+                      "kernel_verified_semantic_review_unqualified",
+                      "kernel_verified_with_semantic_review_claim"
+                    ]
+                  },
+                  "semantic_review_claimed": {
+                    "type": "boolean"
+                  },
+                  "proof_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "execution_receipt_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              }
+            },
+            "interpretation_boundary": {
+              "type": "string",
+              "minLength": 30
+            }
+          }
+        }
+      ]
+    },
+    "integrity_scope": {
+      "type": "string",
+      "minLength": 30
+    },
+    "proof_execution_scope": {
+      "type": "string",
+      "minLength": 30
+    },
+    "trust_boundary": {
+      "type": "string",
+      "minLength": 30
+    }
+  }
+}
