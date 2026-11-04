@@ -1,0 +1,1902 @@
+{
+  "nodes": [
+    {
+      "name": "algebraMap.coe_zero",
+      "line": 121,
+      "isProp": true,
+      "isHumanTheorem": true,
+      "doc": null,
+      "column": 0,
+      "signature": "∀ {R : Type u_1} {A : Type u_2} [inst : CommSemiring R] [inst_1 : Semiring A] [inst_2 : Algebra R A], Eq (Algebra.cast (0 : R)) (0 : A)",
+      "lean4_start": 121,
+      "lean4_end": 123,
+      "lean4_code": "@[norm_cast]\ntheorem coe_zero : (↑(0 : R) : A) = 0 :=\n  map_zero (algebraMap R A)\n",
+      "module": "Mathlib.Algebra.Algebra.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Algebra/Defs.lean",
+      "category": "theorem",
+      "subcategory": "theorem",
+      "statement": "@[norm_cast]\ntheorem coe_zero : (↑(0 : R) : A) = 0",
+      "proof": "map_zero (algebraMap R A)",
+      "in_blacklist": false
+    },
+    {
+      "name": "algebraMap.coe_one",
+      "line": 125,
+      "isProp": true,
+      "isHumanTheorem": true,
+      "doc": null,
+      "column": 0,
+      "signature": "∀ {R : Type u_1} {A : Type u_2} [inst : CommSemiring R] [inst_1 : Semiring A] [inst_2 : Algebra R A], Eq (Algebra.cast (1 : R)) (1 : A)",
+      "lean4_start": 125,
+      "lean4_end": 127,
+      "lean4_code": "@[norm_cast]\ntheorem coe_one : (↑(1 : R) : A) = 1 :=\n  map_one (algebraMap R A)\n",
+      "module": "Mathlib.Algebra.Algebra.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Algebra/Defs.lean",
+      "category": "theorem",
+      "subcategory": "theorem",
+      "statement": "@[norm_cast]\ntheorem coe_one : (↑(1 : R) : A) = 1",
+      "proof": "map_one (algebraMap R A)",
+      "in_blacklist": false
+    },
+    {
+      "name": "algebraMap.coe_natCast",
+      "line": 129,
+      "isProp": true,
+      "isHumanTheorem": true,
+      "doc": null,
+      "column": 0,
+      "signature": "∀ {R : Type u_1} {A : Type u_2} [inst : CommSemiring R] [inst_1 : Semiring A] [inst_2 : Algebra R A] (a : Nat), Eq (Algebra.cast a.cast) a.cast",
+      "lean4_start": 129,
+      "lean4_end": 131,
+      "lean4_code": "@[norm_cast]\ntheorem coe_natCast (a : ℕ) : (↑(a : R) : A) = a :=\n  map_natCast (algebraMap R A) a\n",
+      "module": "Mathlib.Algebra.Algebra.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Algebra/Defs.lean",
+      "category": "theorem",
+      "subcategory": "theorem",
+      "statement": "@[norm_cast]\ntheorem coe_natCast (a : ℕ) : (↑(a : R) : A) = a",
+      "proof": "map_natCast (algebraMap R A) a",
+      "in_blacklist": false
+    },
+    {
+      "name": "algebraMap.coe_add",
+      "line": 133,
+      "isProp": true,
+      "isHumanTheorem": true,
+      "doc": null,
+      "column": 0,
+      "signature": "∀ {R : Type u_1} {A : Type u_2} [inst : CommSemiring R] [inst_1 : Semiring A] [inst_2 : Algebra R A] (a b : R), Eq (Algebra.cast (instHAdd.hAdd a b)) (instHAdd.hAdd (Algebra.cast a) (Algebra.cast b))",
+      "lean4_start": 133,
+      "lean4_end": 135,
+      "lean4_code": "@[norm_cast]\ntheorem coe_add (a b : R) : (↑(a + b : R) : A) = ↑a + ↑b :=\n  map_add (algebraMap R A) a b\n",
+      "module": "Mathlib.Algebra.Algebra.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Algebra/Defs.lean",
+      "category": "theorem",
+      "subcategory": "theorem",
+      "statement": "@[norm_cast]\ntheorem coe_add (a b : R) : (↑(a + b : R) : A) = ↑a + ↑b",
+      "proof": "map_add (algebraMap R A) a b",
+      "in_blacklist": false
+    },
+    {
+      "name": "algebraMap.coe_mul",
+      "line": 137,
+      "isProp": true,
+      "isHumanTheorem": true,
+      "doc": null,
+      "column": 0,
+      "signature": "∀ {R : Type u_1} {A : Type u_2} [inst : CommSemiring R] [inst_1 : Semiring A] [inst_2 : Algebra R A] (a b : R), Eq (Algebra.cast (instHMul.hMul a b)) (instHMul.hMul (Algebra.cast a) (Algebra.cast b))",
+      "lean4_start": 137,
+      "lean4_end": 139,
+      "lean4_code": "@[norm_cast]\ntheorem coe_mul (a b : R) : (↑(a * b : R) : A) = ↑a * ↑b :=\n  map_mul (algebraMap R A) a b\n",
+      "module": "Mathlib.Algebra.Algebra.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Algebra/Defs.lean",
+      "category": "theorem",
+      "subcategory": "theorem",
+      "statement": "@[norm_cast]\ntheorem coe_mul (a b : R) : (↑(a * b : R) : A) = ↑a * ↑b",
+      "proof": "map_mul (algebraMap R A) a b",
+      "in_blacklist": false
+    },
+    {
+      "name": "Algebra",
+      "line": 89,
+      "isProp": false,
+      "isHumanTheorem": false,
+      "doc": "An associative unital `R`-algebra is a semiring `A` equipped with a map into its center `R → A`.\n\nSee the implementation notes in this file for discussion of the details of this definition.\n",
+      "column": 0,
+      "signature": "(R : Type u) → (A : Type v) → [CommSemiring R] → [Semiring A] → Type (max u v)",
+      "lean4_start": 89,
+      "lean4_end": 98,
+      "lean4_code": "/-- An associative unital `R`-algebra is a semiring `A` equipped with a map into its center `R → A`.\n\nSee the implementation notes in this file for discussion of the details of this definition.\n-/\nclass Algebra (R : Type u) (A : Type v) [CommSemiring R] [Semiring A] extends SMul R A where\n  /-- Embedding `R →+* A` given by `Algebra` structure.\n  Use `algebraMap` from the root namespace instead. -/\n  protected algebraMap : R →+* A\n  commutes' : ∀ r x, algebraMap r * x = x * algebraMap r\n  smul_def' : ∀ r x, r • x = algebraMap r * x\n",
+      "module": "Mathlib.Algebra.Algebra.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Algebra/Defs.lean",
+      "category": "structure",
+      "subcategory": "class",
+      "statement": "class Algebra (R : Type u) (A : Type v) [CommSemiring R] [Semiring A] extends SMul R A where\n\n  protected algebraMap : R →+* A\n  commutes' : ∀ r x, algebraMap r * x = x * algebraMap r\n  smul_def' : ∀ r x, r • x = algebraMap r * x",
+      "proof": null,
+      "in_blacklist": false
+    },
+    {
+      "name": "Algebra.cast",
+      "line": 106,
+      "isProp": false,
+      "isHumanTheorem": false,
+      "doc": "Coercion from a commutative semiring to an algebra over this semiring. ",
+      "column": 0,
+      "signature": "{R : Type u_1} → {A : Type u_2} → [inst : CommSemiring R] → [inst_1 : Semiring A] → [Algebra R A] → R → A",
+      "lean4_start": 106,
+      "lean4_end": 109,
+      "lean4_code": "/-- Coercion from a commutative semiring to an algebra over this semiring. -/\n@[coe, reducible]\ndef Algebra.cast {R A : Type*} [CommSemiring R] [Semiring A] [Algebra R A] : R → A :=\n  algebraMap R A\n",
+      "module": "Mathlib.Algebra.Algebra.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Algebra/Defs.lean",
+      "category": "def",
+      "subcategory": "definition",
+      "statement": "@[coe, reducible]\ndef Algebra.cast {R A : Type*} [CommSemiring R] [Semiring A] [Algebra R A] : R → A",
+      "proof": "algebraMap R A",
+      "in_blacklist": false
+    },
+    {
+      "name": "algebraMap",
+      "line": 102,
+      "isProp": false,
+      "isHumanTheorem": false,
+      "doc": "Embedding `R →+* A` given by `Algebra` structure. ",
+      "column": 0,
+      "signature": "(R : Type u) → (A : Type v) → [inst : CommSemiring R] → [inst_1 : Semiring A] → [Algebra R A] → RingHom R A",
+      "lean4_start": 102,
+      "lean4_end": 104,
+      "lean4_code": "/-- Embedding `R →+* A` given by `Algebra` structure. -/\ndef algebraMap (R : Type u) (A : Type v) [CommSemiring R] [Semiring A] [Algebra R A] : R →+* A :=\n  Algebra.algebraMap\n",
+      "module": "Mathlib.Algebra.Algebra.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Algebra/Defs.lean",
+      "category": "def",
+      "subcategory": "definition",
+      "statement": "def algebraMap (R : Type u) (A : Type v) [CommSemiring R] [Semiring A] [Algebra R A] : R →+* A",
+      "proof": "Algebra.algebraMap",
+      "in_blacklist": false
+    },
+    {
+      "name": "file_Mathlib.Algebra.Algebra.Defs",
+      "signature": null,
+      "line": 0,
+      "column": 0,
+      "isProp": false,
+      "isHumanTheorem": false,
+      "doc": null,
+      "lean4_start": 0,
+      "lean4_end": 414,
+      "lean4_code": "/-\nCopyright (c) 2018 Kenny Lau. All rights reserved.\nReleased under Apache 2.0 license as described in the file LICENSE.\nAuthors: Kenny Lau, Yury Kudryashov\n-/\nimport Mathlib.Algebra.Module.LinearMap.Defs\n\n/-!\n# Algebras over commutative semirings\n\nIn this file we define associative unital `Algebra`s over commutative (semi)rings.\n\n* algebra homomorphisms `AlgHom` are defined in `Mathlib/Algebra/Algebra/Hom.lean`;\n\n* algebra equivalences `AlgEquiv` are defined in `Mathlib/Algebra/Algebra/Equiv.lean`;\n\n* `Subalgebra`s are defined in `Mathlib/Algebra/Algebra/Subalgebra.lean`;\n\n* The category `AlgCat R` of `R`-algebras is defined in the file\n  `Mathlib/Algebra/Category/Algebra/Basic.lean`.\n\nSee the implementation notes for remarks about non-associative and non-unital algebras.\n\n## Main definitions:\n\n* `Algebra R A`: the algebra typeclass.\n* `algebraMap R A : R →+* A`: the canonical map from `R` to `A`, as a `RingHom`. This is the\n  preferred spelling of this map, it is also available as:\n  * `Algebra.linearMap R A : R →ₗ[R] A`, a `LinearMap`.\n  * `Algebra.ofId R A : R →ₐ[R] A`, an `AlgHom` (defined in a later file).\n\n## Implementation notes\n\nGiven a commutative (semi)ring `R`, there are two ways to define an `R`-algebra structure on a\n(possibly noncommutative) (semi)ring `A`:\n* By endowing `A` with a morphism of rings `R →+* A` denoted `algebraMap R A` which lands in the\n  center of `A`.\n* By requiring `A` be an `R`-module such that the action associates and commutes with multiplication\n  as `r • (a₁ * a₂) = (r • a₁) * a₂ = a₁ * (r • a₂)`.\n\nWe define `Algebra R A` in a way that subsumes both definitions, by extending `SMul R A` and\nrequiring that this scalar action `r • x` must agree with left multiplication by the image of the\nstructure morphism `algebraMap R A r * x`.\n\nAs a result, there are two ways to talk about an `R`-algebra `A` when `A` is a semiring:\n1. ```lean\n   variable [CommSemiring R] [Semiring A]\n   variable [Algebra R A]\n   ```\n2. ```lean\n   variable [CommSemiring R] [Semiring A]\n   variable [Module R A] [SMulCommClass R A A] [IsScalarTower R A A]\n   ```\n\nThe first approach implies the second via typeclass search; so any lemma stated with the second set\nof arguments will automatically apply to the first set. Typeclass search does not know that the\nsecond approach implies the first, but this can be shown with:\n```lean\nexample {R A : Type*} [CommSemiring R] [Semiring A]\n  [Module R A] [SMulCommClass R A A] [IsScalarTower R A A] : Algebra R A :=\nAlgebra.ofModule smul_mul_assoc mul_smul_comm\n```\n\nThe advantage of the first approach is that `algebraMap R A` is available, and `AlgHom R A B` and\n`Subalgebra R A` can be used. For concrete `R` and `A`, `algebraMap R A` is often definitionally\nconvenient.\n\nThe advantage of the second approach is that `CommSemiring R`, `Semiring A`, and `Module R A` can\nall be relaxed independently; for instance, this allows us to:\n* Replace `Semiring A` with `NonUnitalNonAssocSemiring A` in order to describe non-unital and/or\n  non-associative algebras.\n* Replace `CommSemiring R` and `Module R A` with `CommGroup R'` and `DistribMulAction R' A`,\n  which when `R' = Rˣ` lets us talk about the \"algebra-like\" action of `Rˣ` on an\n  `R`-algebra `A`.\n\nWhile `AlgHom R A B` cannot be used in the second approach, `NonUnitalAlgHom R A B` still can.\n\nYou should always use the first approach when working with associative unital algebras, and mimic\nthe second approach only when you need to weaken a condition on either `R` or `A`.\n\n-/\n\nassert_not_exists Field Finset Module.End\n\nuniverse u v w u₁ v₁\n\nsection Prio\n\n/-- An associative unital `R`-algebra is a semiring `A` equipped with a map into its center `R → A`.\n\nSee the implementation notes in this file for discussion of the details of this definition.\n-/\nclass Algebra (R : Type u) (A : Type v) [CommSemiring R] [Semiring A] extends SMul R A where\n  /-- Embedding `R →+* A` given by `Algebra` structure.\n  Use `algebraMap` from the root namespace instead. -/\n  protected algebraMap : R →+* A\n  commutes' : ∀ r x, algebraMap r * x = x * algebraMap r\n  smul_def' : ∀ r x, r • x = algebraMap r * x\n\nend Prio\n\n/-- Embedding `R →+* A` given by `Algebra` structure. -/\ndef algebraMap (R : Type u) (A : Type v) [CommSemiring R] [Semiring A] [Algebra R A] : R →+* A :=\n  Algebra.algebraMap\n\n/-- Coercion from a commutative semiring to an algebra over this semiring. -/\n@[coe, reducible]\ndef Algebra.cast {R A : Type*} [CommSemiring R] [Semiring A] [Algebra R A] : R → A :=\n  algebraMap R A\n\nnamespace algebraMap\n\nscoped instance coeHTCT (R A : Type*) [CommSemiring R] [Semiring A] [Algebra R A] :\n    CoeHTCT R A :=\n  ⟨Algebra.cast⟩\n\nsection CommSemiringSemiring\n\nvariable {R A : Type*} [CommSemiring R] [Semiring A] [Algebra R A]\n\n@[norm_cast]\ntheorem coe_zero : (↑(0 : R) : A) = 0 :=\n  map_zero (algebraMap R A)\n\n@[norm_cast]\ntheorem coe_one : (↑(1 : R) : A) = 1 :=\n  map_one (algebraMap R A)\n\n@[norm_cast]\ntheorem coe_natCast (a : ℕ) : (↑(a : R) : A) = a :=\n  map_natCast (algebraMap R A) a\n\n@[norm_cast]\ntheorem coe_add (a b : R) : (↑(a + b : R) : A) = ↑a + ↑b :=\n  map_add (algebraMap R A) a b\n\n@[norm_cast]\ntheorem coe_mul (a b : R) : (↑(a * b : R) : A) = ↑a * ↑b :=\n  map_mul (algebraMap R A) a b\n\n@[norm_cast]\ntheorem coe_pow (a : R) (n : ℕ) : (↑(a ^ n : R) : A) = (a : A) ^ n :=\n  map_pow (algebraMap R A) _ _\n\nend CommSemiringSemiring\n\nsection CommRingRing\n\nvariable {R A : Type*} [CommRing R] [Ring A] [Algebra R A]\n\n@[norm_cast]\ntheorem coe_neg (x : R) : (↑(-x : R) : A) = -↑x :=\n  map_neg (algebraMap R A) x\n\n@[norm_cast]\ntheorem coe_sub (a b : R) :\n    (↑(a - b : R) : A) = ↑a - ↑b :=\n  map_sub (algebraMap R A) a b\n\nend CommRingRing\n\nend algebraMap\n\n/-- Creating an algebra from a morphism to the center of a semiring.\nSee note [reducible non-instances].\n\n*Warning:* In general this should not be used if `S` already has a `SMul R S`\ninstance, since this creates another `SMul R S` instance from the supplied `RingHom` and\nthis will likely create a diamond. -/\nabbrev RingHom.toAlgebra' {R S} [CommSemiring R] [Semiring S] (i : R →+* S)\n    (h : ∀ c x, i c * x = x * i c) : Algebra R S where\n  smul c x := i c * x\n  commutes' := h\n  smul_def' _ _ := rfl\n  algebraMap := i\n\n-- just simple lemmas for a declaration that is itself primed, no need for docstrings\nset_option linter.docPrime false in\ntheorem RingHom.smul_toAlgebra' {R S} [CommSemiring R] [Semiring S] (i : R →+* S)\n    (h : ∀ c x, i c * x = x * i c) (r : R) (s : S) :\n    let _ := RingHom.toAlgebra' i h\n    r • s = i r * s := rfl\n\nset_option linter.docPrime false in\ntheorem RingHom.algebraMap_toAlgebra' {R S} [CommSemiring R] [Semiring S] (i : R →+* S)\n    (h : ∀ c x, i c * x = x * i c) :\n    @algebraMap R S _ _ (i.toAlgebra' h) = i :=\n  rfl\n\n/-- Creating an algebra from a morphism to a commutative semiring.\nSee note [reducible non-instances].\n\n*Warning:* In general this should not be used if `S` already has a `SMul R S`\ninstance, since this creates another `SMul R S` instance from the supplied `RingHom` and\nthis will likely create a diamond. -/\nabbrev RingHom.toAlgebra {R S} [CommSemiring R] [CommSemiring S] (i : R →+* S) : Algebra R S :=\n  i.toAlgebra' fun _ => mul_comm _\n\ntheorem RingHom.smul_toAlgebra {R S} [CommSemiring R] [CommSemiring S] (i : R →+* S)\n    (r : R) (s : S) :\n    let _ := RingHom.toAlgebra i\n    r • s = i r * s := rfl\n\ntheorem RingHom.algebraMap_toAlgebra {R S} [CommSemiring R] [CommSemiring S] (i : R →+* S) :\n    @algebraMap R S _ _ i.toAlgebra = i :=\n  rfl\n\nnamespace Algebra\n\nvariable {R : Type u} {S : Type v} {A : Type w} {B : Type*}\n\n/-- Let `R` be a commutative semiring, let `A` be a semiring with a `Module R` structure.\nIf `(r • 1) * x = x * (r • 1) = r • x` for all `r : R` and `x : A`, then `A` is an `Algebra`\nover `R`.\n\nSee note [reducible non-instances]. -/\nabbrev ofModule' [CommSemiring R] [Semiring A] [Module R A]\n    (h₁ : ∀ (r : R) (x : A), r • (1 : A) * x = r • x)\n    (h₂ : ∀ (r : R) (x : A), x * r • (1 : A) = r • x) : Algebra R A where\n  algebraMap :=\n  { toFun r := r • (1 : A)\n    map_one' := one_smul _ _\n    map_mul' r₁ r₂ := by simp only [h₁, mul_smul]\n    map_zero' := zero_smul _ _\n    map_add' r₁ r₂ := add_smul r₁ r₂ 1 }\n  commutes' r x := by simp [h₁, h₂]\n  smul_def' r x := by simp [h₁]\n\n/-- Let `R` be a commutative semiring, let `A` be a semiring with a `Module R` structure.\nIf `(r • x) * y = x * (r • y) = r • (x * y)` for all `r : R` and `x y : A`, then `A`\nis an `Algebra` over `R`.\n\nSee note [reducible non-instances]. -/\nabbrev ofModule [CommSemiring R] [Semiring A] [Module R A]\n    (h₁ : ∀ (r : R) (x y : A), r • x * y = r • (x * y))\n    (h₂ : ∀ (r : R) (x y : A), x * r • y = r • (x * y)) : Algebra R A :=\n  ofModule' (fun r x => by rw [h₁, one_mul]) fun r x => by rw [h₂, mul_one]\n\nsection Semiring\n\nvariable [CommSemiring R] [CommSemiring S]\nvariable [Semiring A] [Algebra R A] [Semiring B] [Algebra R B]\n\n-- We'll later use this to show `Algebra ℤ M` is a subsingleton.\n/-- To prove two algebra structures on a fixed `[CommSemiring R] [Semiring A]` agree,\nit suffices to check the `algebraMap`s agree.\n-/\n@[ext]\ntheorem algebra_ext {R : Type*} [CommSemiring R] {A : Type*} [Semiring A] (P Q : Algebra R A)\n    (h : ∀ r : R, (haveI := P; algebraMap R A r) = haveI := Q; algebraMap R A r) :\n    P = Q := by\n  replace h : P.algebraMap = Q.algebraMap := DFunLike.ext _ _ h\n  have h' : (haveI := P; (· • ·) : R → A → A) = (haveI := Q; (· • ·) : R → A → A) := by\n    funext r a\n    rw [P.smul_def', Q.smul_def', h]\n  rcases P with @⟨⟨P⟩⟩\n  rcases Q with @⟨⟨Q⟩⟩\n  congr\n\n-- see Note [lower instance priority]\ninstance (priority := 200) toModule {R A} {_ : CommSemiring R} {_ : Semiring A} [Algebra R A] :\n    Module R A where\n  one_smul _ := by simp [smul_def']\n  mul_smul := by simp [smul_def', mul_assoc]\n  smul_add := by simp [smul_def', mul_add]\n  smul_zero := by simp [smul_def']\n  add_smul := by simp [smul_def', add_mul]\n  zero_smul := by simp [smul_def']\n\ntheorem smul_def (r : R) (x : A) : r • x = algebraMap R A r * x :=\n  Algebra.smul_def' r x\n\ntheorem algebraMap_eq_smul_one (r : R) : algebraMap R A r = r • (1 : A) :=\n  calc\n    algebraMap R A r = algebraMap R A r * 1 := (mul_one _).symm\n    _ = r • (1 : A) := (Algebra.smul_def r 1).symm\n\ntheorem algebraMap_eq_smul_one' : ⇑(algebraMap R A) = fun r => r • (1 : A) :=\n  funext algebraMap_eq_smul_one\n\n/-- `mul_comm` for `Algebra`s when one element is from the base ring. -/\ntheorem commutes (r : R) (x : A) : algebraMap R A r * x = x * algebraMap R A r :=\n  Algebra.commutes' r x\n\nlemma commute_algebraMap_left (r : R) (x : A) : Commute (algebraMap R A r) x :=\n  Algebra.commutes r x\n\nlemma commute_algebraMap_right (r : R) (x : A) : Commute x (algebraMap R A r) :=\n  (Algebra.commutes r x).symm\n\n/-- `mul_left_comm` for `Algebra`s when one element is from the base ring. -/\ntheorem left_comm (x : A) (r : R) (y : A) :\n    x * (algebraMap R A r * y) = algebraMap R A r * (x * y) := by\n  rw [← mul_assoc, ← commutes, mul_assoc]\n\n/-- `mul_right_comm` for `Algebra`s when one element is from the base ring. -/\ntheorem right_comm (x : A) (r : R) (y : A) :\n    x * algebraMap R A r * y = x * y * algebraMap R A r := by\n  rw [mul_assoc, commutes, ← mul_assoc]\n\ninstance _root_.IsScalarTower.right : IsScalarTower R A A :=\n  ⟨fun x y z => by rw [smul_eq_mul, smul_eq_mul, smul_def, smul_def, mul_assoc]⟩\n\n@[simp]\ntheorem _root_.RingHom.smulOneHom_eq_algebraMap : RingHom.smulOneHom = algebraMap R A :=\n  RingHom.ext fun r => (algebraMap_eq_smul_one r).symm\n\n-- TODO: set up `IsScalarTower.smulCommClass` earlier so that we can actually prove this using\n-- `mul_smul_comm s x y`.\n\n/-- This is just a special case of the global `mul_smul_comm` lemma that requires less typeclass\nsearch (and was here first). -/\n@[simp]\nprotected theorem mul_smul_comm (s : R) (x y : A) : x * s • y = s • (x * y) := by\n  rw [smul_def, smul_def, left_comm]\n\n/-- This is just a special case of the global `smul_mul_assoc` lemma that requires less typeclass\nsearch (and was here first). -/\n@[simp]\nprotected theorem smul_mul_assoc (r : R) (x y : A) : r • x * y = r • (x * y) :=\n  smul_mul_assoc r x y\n\n@[simp]\ntheorem _root_.smul_algebraMap {α : Type*} [Monoid α] [MulDistribMulAction α A]\n    [SMulCommClass α R A] (a : α) (r : R) : a • algebraMap R A r = algebraMap R A r := by\n  rw [algebraMap_eq_smul_one, smul_comm a r (1 : A), smul_one]\n\nsection compHom\n\nvariable (A) (f : S →+* R)\n\n/--\nCompose an `Algebra` with a `RingHom`, with action `f s • m`.\n\nThis is the algebra version of `Module.compHom`.\n-/\nabbrev compHom : Algebra S A where\n  smul s a := f s • a\n  algebraMap := (algebraMap R A).comp f\n  commutes' _ _ := Algebra.commutes _ _\n  smul_def' _ _ := Algebra.smul_def _ _\n\ntheorem compHom_smul_def (s : S) (x : A) :\n    letI := compHom A f\n    s • x = f s • x := rfl\n\ntheorem compHom_algebraMap_eq :\n    letI := compHom A f\n    algebraMap S A = (algebraMap R A).comp f := rfl\n\ntheorem compHom_algebraMap_apply (s : S) :\n    letI := compHom A f\n    algebraMap S A s = (algebraMap R A) (f s) := rfl\n\nend compHom\n\n\nvariable (R A)\n\n/-- The canonical ring homomorphism `algebraMap R A : R →+* A` for any `R`-algebra `A`,\npackaged as an `R`-linear map.\n-/\nprotected def linearMap : R →ₗ[R] A :=\n  { algebraMap R A with map_smul' := fun x y => by simp [Algebra.smul_def] }\n\n@[simp]\ntheorem linearMap_apply (r : R) : Algebra.linearMap R A r = algebraMap R A r :=\n  rfl\n\ntheorem coe_linearMap : ⇑(Algebra.linearMap R A) = algebraMap R A :=\n  rfl\n\n/-- The identity map inducing an `Algebra` structure. -/\ninstance (priority := 1100) id : Algebra R R where\n  -- We override `toFun` and `toSMul` because `RingHom.id` is not reducible and cannot\n  -- be made so without a significant performance hit.\n  -- see library note [reducible non-instances].\n  toSMul := Mul.toSMul _\n  __ := ({RingHom.id R with toFun x := x}).toAlgebra\n\n@[simp] lemma linearMap_self : Algebra.linearMap R R = .id := rfl\n\nvariable {R A}\n\n@[simp] lemma algebraMap_self : algebraMap R R = .id _ := rfl\nlemma algebraMap_self_apply (x : R) : algebraMap R R x = x := rfl\n\nnamespace id\n\n@[deprecated algebraMap_self (since := \"2025-07-17\")]\ntheorem map_eq_id : algebraMap R R = RingHom.id _ :=\n  rfl\n\n@[deprecated algebraMap_self_apply (since := \"2025-07-17\")]\ntheorem map_eq_self (x : R) : algebraMap R R x = x :=\n  rfl\n\n@[simp]\ntheorem smul_eq_mul (x y : R) : x • y = x * y :=\n  rfl\n\nend id\n\nend Semiring\n\nend Algebra\n\n@[norm_cast]\ntheorem algebraMap.coe_smul (A B C : Type*) [SMul A B] [CommSemiring B] [Semiring C] [Algebra B C]\n    [SMul A C] [IsScalarTower A B C] (a : A) (b : B) : (a • b : B) = a • (b : C) := calc\n  ((a • b : B) : C) = (a • b) • 1 := Algebra.algebraMap_eq_smul_one _\n  _ = a • (b • 1) := smul_assoc ..\n  _ = a • (b : C) := congrArg _ (Algebra.algebraMap_eq_smul_one b).symm\n\n",
+      "module": "Mathlib.Algebra.Algebra.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Algebra/Defs.lean",
+      "category": "file",
+      "subcategory": "file",
+      "statement": "Mathlib.Algebra.Algebra.Defs",
+      "proof": null,
+      "in_blacklist": false
+    },
+    {
+      "name": "CommSemiring",
+      "line": 213,
+      "isProp": false,
+      "isHumanTheorem": false,
+      "doc": "A commutative semiring is a semiring with commutative multiplication. ",
+      "column": 0,
+      "signature": "Type u → Type u",
+      "lean4_start": 213,
+      "lean4_end": 214,
+      "lean4_code": "/-- A commutative semiring is a semiring with commutative multiplication. -/\nclass CommSemiring (R : Type u) extends Semiring R, CommMonoid R\n",
+      "module": "Mathlib.Algebra.Ring.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Ring/Defs.lean",
+      "category": "structure",
+      "subcategory": "class",
+      "statement": "class CommSemiring (R : Type u) extends Semiring R, CommMonoid R",
+      "proof": null,
+      "in_blacklist": false
+    },
+    {
+      "name": "CommSemiring.toSemiring",
+      "line": 214,
+      "isProp": false,
+      "isHumanTheorem": false,
+      "doc": null,
+      "column": 0,
+      "signature": "{R : Type u} → [self : CommSemiring R] → Semiring R",
+      "lean4_start": 214,
+      "lean4_end": 214,
+      "lean4_code": "class CommSemiring (R : Type u) extends Semiring R, CommMonoid R\n",
+      "module": "Mathlib.Algebra.Ring.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Ring/Defs.lean",
+      "category": "def",
+      "subcategory": "class_derived",
+      "statement": "class CommSemiring (R : Type u) extends Semiring R, CommMonoid R",
+      "proof": null,
+      "in_blacklist": false
+    },
+    {
+      "name": "RingHom",
+      "line": 286,
+      "isProp": false,
+      "isHumanTheorem": false,
+      "doc": "Bundled semiring homomorphisms; use this for bundled ring homomorphisms too.\n\nThis extends from both `MonoidHom` and `MonoidWithZeroHom` in order to put the fields in a\nsensible order, even though `MonoidWithZeroHom` already extends `MonoidHom`. ",
+      "column": 0,
+      "signature": "(α : Type u_5) → (β : Type u_6) → [NonAssocSemiring α] → [NonAssocSemiring β] → Type (max u_5 u_6)",
+      "lean4_start": 286,
+      "lean4_end": 291,
+      "lean4_code": "/-- Bundled semiring homomorphisms; use this for bundled ring homomorphisms too.\n\nThis extends from both `MonoidHom` and `MonoidWithZeroHom` in order to put the fields in a\nsensible order, even though `MonoidWithZeroHom` already extends `MonoidHom`. -/\nstructure RingHom (α : Type*) (β : Type*) [NonAssocSemiring α] [NonAssocSemiring β] extends\n  α →* β, α →+ β, α →ₙ+* β, α →*₀ β\n",
+      "module": "Mathlib.Algebra.Ring.Hom.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Ring/Hom/Defs.lean",
+      "category": "structure",
+      "subcategory": "structure",
+      "statement": "structure RingHom (α : Type*) (β : Type*) [NonAssocSemiring α] [NonAssocSemiring β] extends\n  α →* β, α →+ β, α →ₙ+* β, α →*₀ β",
+      "proof": null,
+      "in_blacklist": false
+    },
+    {
+      "name": "RingHom.instFunLike",
+      "line": 355,
+      "isProp": false,
+      "isHumanTheorem": false,
+      "doc": null,
+      "column": 0,
+      "signature": "{α : Type u_2} → {β : Type u_3} → {x : NonAssocSemiring α} → {x_1 : NonAssocSemiring β} → FunLike (RingHom α β) α β",
+      "lean4_start": 355,
+      "lean4_end": 362,
+      "lean4_code": "instance instFunLike : FunLike (α →+* β) α β where\n  coe f := f.toFun\n  coe_injective' f g h := by\n    cases f\n    cases g\n    congr\n    apply DFunLike.coe_injective'\n    exact h\n",
+      "module": "Mathlib.Algebra.Ring.Hom.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Ring/Hom/Defs.lean",
+      "category": "def",
+      "subcategory": "instance",
+      "statement": "instance instFunLike : FunLike (α →+* β) α β where",
+      "proof": "coe f := f.toFun\n  coe_injective' f g h := by\n    cases f\n    cases g\n    congr\n    apply DFunLike.coe_injective'\n    exact h",
+      "in_blacklist": false
+    },
+    {
+      "name": "RingHom.instRingHomClass",
+      "line": 364,
+      "isProp": true,
+      "isHumanTheorem": true,
+      "doc": null,
+      "column": 0,
+      "signature": "∀ {α : Type u_2} {β : Type u_3} {x : NonAssocSemiring α} {x_1 : NonAssocSemiring β}, RingHomClass (RingHom α β) α β",
+      "lean4_start": 364,
+      "lean4_end": 368,
+      "lean4_code": "instance instRingHomClass : RingHomClass (α →+* β) α β where\n  map_add := RingHom.map_add'\n  map_zero := RingHom.map_zero'\n  map_mul f := f.map_mul'\n  map_one f := f.map_one'\n",
+      "module": "Mathlib.Algebra.Ring.Hom.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Ring/Hom/Defs.lean",
+      "category": "theorem",
+      "subcategory": "instance",
+      "statement": "instance instRingHomClass : RingHomClass (α →+* β) α β where",
+      "proof": "map_add := RingHom.map_add'\n  map_zero := RingHom.map_zero'\n  map_mul f := f.map_mul'\n  map_one f := f.map_one'",
+      "in_blacklist": false
+    },
+    {
+      "name": "Semiring",
+      "line": 137,
+      "isProp": false,
+      "isHumanTheorem": false,
+      "doc": "A `Semiring` is a type with addition, multiplication, a `0` and a `1` where addition is\ncommutative and associative, multiplication is associative and left and right distributive over\naddition, and `0` and `1` are additive and multiplicative identities. ",
+      "column": 0,
+      "signature": "Type u → Type u",
+      "lean4_start": 137,
+      "lean4_end": 140,
+      "lean4_code": "/-- A `Semiring` is a type with addition, multiplication, a `0` and a `1` where addition is\ncommutative and associative, multiplication is associative and left and right distributive over\naddition, and `0` and `1` are additive and multiplicative identities. -/\nclass Semiring (α : Type u) extends NonUnitalSemiring α, NonAssocSemiring α, MonoidWithZero α\n",
+      "module": "Mathlib.Algebra.Ring.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Ring/Defs.lean",
+      "category": "structure",
+      "subcategory": "class",
+      "statement": "class Semiring (α : Type u) extends NonUnitalSemiring α, NonAssocSemiring α, MonoidWithZero α",
+      "proof": null,
+      "in_blacklist": false
+    },
+    {
+      "name": "Semiring.toNonAssocSemiring",
+      "line": 140,
+      "isProp": false,
+      "isHumanTheorem": false,
+      "doc": null,
+      "column": 0,
+      "signature": "{α : Type u} → [self : Semiring α] → NonAssocSemiring α",
+      "lean4_start": 137,
+      "lean4_end": 140,
+      "lean4_code": "/-- A `Semiring` is a type with addition, multiplication, a `0` and a `1` where addition is\ncommutative and associative, multiplication is associative and left and right distributive over\naddition, and `0` and `1` are additive and multiplicative identities. -/\nclass Semiring (α : Type u) extends NonUnitalSemiring α, NonAssocSemiring α, MonoidWithZero α\n",
+      "module": "Mathlib.Algebra.Ring.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Ring/Defs.lean",
+      "category": "def",
+      "subcategory": "class_derived",
+      "statement": "class Semiring (α : Type u) extends NonUnitalSemiring α, NonAssocSemiring α, MonoidWithZero α",
+      "proof": null,
+      "in_blacklist": false
+    },
+    {
+      "name": "AddCommMonoidWithOne.toAddMonoidWithOne",
+      "line": 87,
+      "isProp": false,
+      "isHumanTheorem": false,
+      "doc": null,
+      "column": 0,
+      "signature": "{R : Type u_2} → [self : AddCommMonoidWithOne R] → AddMonoidWithOne R",
+      "lean4_start": 87,
+      "lean4_end": 89,
+      "lean4_code": "class AddCommMonoidWithOne (R : Type*) extends AddMonoidWithOne R, AddCommMonoid R\n\nlibrary_note \"coercion into rings\"\n",
+      "module": "Mathlib.Data.Nat.Cast.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Data/Nat/Cast/Defs.lean",
+      "category": "def",
+      "subcategory": "class_derived",
+      "statement": "class AddCommMonoidWithOne (R : Type*) extends AddMonoidWithOne R, AddCommMonoid R\n\nlibrary_note \"coercion into rings\"",
+      "proof": null,
+      "in_blacklist": false
+    },
+    {
+      "name": "NonAssocSemiring.toAddCommMonoidWithOne",
+      "line": 124,
+      "isProp": false,
+      "isHumanTheorem": false,
+      "doc": null,
+      "column": 0,
+      "signature": "{α : Type u} → [self : NonAssocSemiring α] → AddCommMonoidWithOne α",
+      "lean4_start": 124,
+      "lean4_end": 125,
+      "lean4_code": "class NonAssocSemiring (α : Type u) extends NonUnitalNonAssocSemiring α, MulZeroOneClass α,\n    AddCommMonoidWithOne α\n",
+      "module": "Mathlib.Algebra.Ring.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Ring/Defs.lean",
+      "category": "def",
+      "subcategory": "class_derived",
+      "statement": "class NonAssocSemiring (α : Type u) extends NonUnitalNonAssocSemiring α, MulZeroOneClass α,\n    AddCommMonoidWithOne α",
+      "proof": null,
+      "in_blacklist": false
+    },
+    {
+      "name": "NonAssocSemiring.toNonUnitalNonAssocSemiring",
+      "line": 124,
+      "isProp": false,
+      "isHumanTheorem": false,
+      "doc": null,
+      "column": 0,
+      "signature": "{α : Type u} → [self : NonAssocSemiring α] → NonUnitalNonAssocSemiring α",
+      "lean4_start": 124,
+      "lean4_end": 125,
+      "lean4_code": "class NonAssocSemiring (α : Type u) extends NonUnitalNonAssocSemiring α, MulZeroOneClass α,\n    AddCommMonoidWithOne α\n",
+      "module": "Mathlib.Algebra.Ring.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Ring/Defs.lean",
+      "category": "def",
+      "subcategory": "class_derived",
+      "statement": "class NonAssocSemiring (α : Type u) extends NonUnitalNonAssocSemiring α, MulZeroOneClass α,\n    AddCommMonoidWithOne α",
+      "proof": null,
+      "in_blacklist": false
+    },
+    {
+      "name": "NonAssocSemiring.toMulZeroOneClass",
+      "line": 124,
+      "isProp": false,
+      "isHumanTheorem": false,
+      "doc": null,
+      "column": 0,
+      "signature": "{α : Type u} → [self : NonAssocSemiring α] → MulZeroOneClass α",
+      "lean4_start": 124,
+      "lean4_end": 125,
+      "lean4_code": "class NonAssocSemiring (α : Type u) extends NonUnitalNonAssocSemiring α, MulZeroOneClass α,\n    AddCommMonoidWithOne α\n",
+      "module": "Mathlib.Algebra.Ring.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Ring/Defs.lean",
+      "category": "def",
+      "subcategory": "class_derived",
+      "statement": "class NonAssocSemiring (α : Type u) extends NonUnitalNonAssocSemiring α, MulZeroOneClass α,\n    AddCommMonoidWithOne α",
+      "proof": null,
+      "in_blacklist": false
+    },
+    {
+      "name": "NonUnitalNonAssocSemiring.toDistrib",
+      "line": 118,
+      "isProp": false,
+      "isHumanTheorem": false,
+      "doc": null,
+      "column": 0,
+      "signature": "{α : Type u} → [self : NonUnitalNonAssocSemiring α] → Distrib α",
+      "lean4_start": 115,
+      "lean4_end": 118,
+      "lean4_code": "/-- A not-necessarily-unital, not-necessarily-associative semiring. See `CommutatorRing` and the\n  documentation thereof in case you need a `NonUnitalNonAssocSemiring` instance on a Lie ring\n  or a Lie algebra. -/\nclass NonUnitalNonAssocSemiring (α : Type u) extends AddCommMonoid α, Distrib α, MulZeroClass α\n",
+      "module": "Mathlib.Algebra.Ring.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Ring/Defs.lean",
+      "category": "def",
+      "subcategory": "class_derived",
+      "statement": "class NonUnitalNonAssocSemiring (α : Type u) extends AddCommMonoid α, Distrib α, MulZeroClass α",
+      "proof": null,
+      "in_blacklist": false
+    },
+    {
+      "name": "PolynomialModule.eval_map",
+      "line": 264,
+      "isProp": true,
+      "isHumanTheorem": true,
+      "doc": null,
+      "column": 0,
+      "signature": "∀ {R : Type u_1} {M : Type u_2} [inst : CommRing R] [inst_1 : AddCommGroup M] [inst_2 : Module R M] (R' : Type u_4) {M' : Type u_5} [inst_3 : CommRing R'] [inst_4 : AddCommGroup M'] [inst_5 : Module R' M'] [inst_6 : Module R M'] [inst_7 : Algebra R R'] [IsScalarTower R R' M'] (f : LinearMap (RingHom.id R) M M') (q : PolynomialModule R M) (r : R), Eq (LinearMap.instFunLike.coe (PolynomialModule.eval (RingHom.instFunLike.coe (algebraMap R R') r)) (LinearMap.instFunLike.coe (PolynomialModule.map R' f) q)) (LinearMap.instFunLike.coe f (LinearMap.instFunLike.coe (PolynomialModule.eval r) q))",
+      "lean4_start": 264,
+      "lean4_end": 270,
+      "lean4_code": "@[simp]\ntheorem eval_map (f : M →ₗ[R] M') (q : PolynomialModule R M) (r : R) :\n    eval (algebraMap R R' r) (map R' f q) = f (eval r q) := by\n  induction q using induction_linear with\n  | zero => simp_rw [map_zero]\n  | add f g e₁ e₂ => simp_rw [map_add, e₁, e₂]\n  | single i m => simp only [map_single, eval_single, f.map_smul]; module\n",
+      "module": "Mathlib.Algebra.Polynomial.Module.Basic",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Polynomial/Module/Basic.lean",
+      "category": "theorem",
+      "subcategory": "theorem",
+      "statement": "@[simp]\ntheorem eval_map (f : M →ₗ[R] M') (q : PolynomialModule R M) (r : R) :\n    eval (algebraMap R R' r) (map R' f q) = f (eval r q)",
+      "proof": "by\n  induction q using induction_linear with\n  | zero => simp_rw [map_zero]\n  | add f g e₁ e₂ => simp_rw [map_add, e₁, e₂]\n  | single i m => simp only [map_single, eval_single, f.map_smul]; module",
+      "in_blacklist": false
+    },
+    {
+      "name": "RingHomClass.toMonoidWithZeroHomClass",
+      "line": 320,
+      "isProp": true,
+      "isHumanTheorem": true,
+      "doc": null,
+      "column": 0,
+      "signature": "∀ {F : Type u_5} {α : outParam (Type u_6)} {β : outParam (Type u_7)} [inst : NonAssocSemiring α] [inst_1 : NonAssocSemiring β] [inst_2 : FunLike F α β] [self : RingHomClass F α β], MonoidWithZeroHomClass F α β",
+      "lean4_start": 314,
+      "lean4_end": 322,
+      "lean4_code": "/-- `RingHomClass F α β` states that `F` is a type of (semi)ring homomorphisms.\nYou should extend this class when you extend `RingHom`.\n\nThis extends from both `MonoidHomClass` and `MonoidWithZeroHomClass` in\norder to put the fields in a sensible order, even though\n`MonoidWithZeroHomClass` already extends `MonoidHomClass`. -/\nclass RingHomClass (F : Type*) (α β : outParam Type*)\n    [NonAssocSemiring α] [NonAssocSemiring β] [FunLike F α β] : Prop\n  extends MonoidHomClass F α β, AddMonoidHomClass F α β, MonoidWithZeroHomClass F α β\n",
+      "module": "Mathlib.Algebra.Ring.Hom.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Ring/Hom/Defs.lean",
+      "category": "theorem",
+      "subcategory": "class_derived",
+      "statement": "class RingHomClass (F : Type*) (α β : outParam Type*)\n    [NonAssocSemiring α] [NonAssocSemiring β] [FunLike F α β] : Prop\n  extends MonoidHomClass F α β, AddMonoidHomClass F α β, MonoidWithZeroHomClass F α β",
+      "proof": null,
+      "in_blacklist": false
+    },
+    {
+      "name": "SameRay.sameRay_nonneg_smul_right",
+      "line": 109,
+      "isProp": true,
+      "isHumanTheorem": true,
+      "doc": "A vector is in the same ray as a nonnegative multiple of itself. ",
+      "column": 0,
+      "signature": "∀ {R : Type u_1} [inst : CommSemiring R] [inst_1 : PartialOrder R] [inst_2 : IsStrictOrderedRing R] {M : Type u_2} [inst_3 : AddCommMonoid M] [inst_4 : Module R M] {S : Type u_5} [inst_5 : CommSemiring S] [inst_6 : PartialOrder S] [inst_7 : Algebra S R] [inst_8 : Module S M] [SMulPosMono S R] [IsScalarTower S R M] {a : S} (v : M), inst_6.le (0 : S) a → SameRay R v (instHSMul.hSMul a v)",
+      "lean4_start": 109,
+      "lean4_end": 115,
+      "lean4_code": "/-- A vector is in the same ray as a nonnegative multiple of itself. -/\nlemma sameRay_nonneg_smul_right (v : M) (h : 0 ≤ a) : SameRay R v (a • v) := by\n  obtain h | h := (algebraMap_nonneg R h).eq_or_lt'\n  · rw [← algebraMap_smul R a v, h, zero_smul]\n    exact zero_right _\n  · refine Or.inr <| Or.inr ⟨algebraMap S R a, 1, h, by nontriviality R; exact zero_lt_one, ?_⟩\n    module\n",
+      "module": "Mathlib.LinearAlgebra.Ray",
+      "source_path": "/mathlib4-4.22.0/Mathlib/LinearAlgebra/Ray.lean",
+      "category": "theorem",
+      "subcategory": "lemma",
+      "statement": "lemma sameRay_nonneg_smul_right (v : M) (h : 0 ≤ a) : SameRay R v (a • v)",
+      "proof": "by\n  obtain h | h := (algebraMap_nonneg R h).eq_or_lt'\n  · rw [← algebraMap_smul R a v, h, zero_smul]\n    exact zero_right _\n  · refine Or.inr <| Or.inr ⟨algebraMap S R a, 1, h, by nontriviality R; exact zero_lt_one, ?_⟩\n    module",
+      "in_blacklist": false
+    },
+    {
+      "name": "real_linearMap_map_smul_complex",
+      "line": 179,
+      "isProp": true,
+      "isHumanTheorem": true,
+      "doc": "A real linear map `ℓ : ℂ →ₗ[ℝ] E` respects complex scalar multiplication if it maps `I` to\n`I • ℓ 1`.\n",
+      "column": 0,
+      "signature": "∀ {E : Type u_1} [inst : NormedAddCommGroup E] [inst_1 : NormedSpace Complex E] {ℓ : LinearMap (RingHom.id Real) Complex E}, Eq (LinearMap.instFunLike.coe ℓ Complex.I) (instHSMul.hSMul Complex.I (LinearMap.instFunLike.coe ℓ (1 : Complex))) → ∀ (a b : Complex), Eq (LinearMap.instFunLike.coe ℓ (instHSMul.hSMul a b)) (instHSMul.hSMul a (LinearMap.instFunLike.coe ℓ b))",
+      "lean4_start": 179,
+      "lean4_end": 196,
+      "lean4_code": "/--\nA real linear map `ℓ : ℂ →ₗ[ℝ] E` respects complex scalar multiplication if it maps `I` to\n`I • ℓ 1`.\n-/\nlemma real_linearMap_map_smul_complex {ℓ : ℂ →ₗ[ℝ] E} (h : ℓ I = I • ℓ 1) (a b : ℂ) :\n    ℓ (a • b) = a • ℓ b := by\n  rw [← re_add_im a, ← re_add_im b, ← smul_eq_mul _ I, ← smul_eq_mul _ I]\n  have t₀ : ((a.im : ℂ) • I) • (b.re : ℂ) = (↑(a.im * b.re) : ℂ) • I := by\n    simp only [smul_eq_mul, ofReal_mul, ← mul_assoc, mul_comm _ I]\n  have t₁ : ((a.im : ℂ) • I) • (b.im : ℂ) • I = (↑(- a.im * b.im) : ℂ) • (1 : ℂ) := by\n    simp [mul_mul_mul_comm _ I]\n  simp only [add_smul, smul_add, ℓ.map_add, t₀, t₁]\n  repeat rw [Complex.coe_smul, ℓ.map_smul]\n  have t₂ {r : ℝ}  : ℓ (r : ℂ) = r • ℓ (1 : ℂ) := by simp [← ℓ.map_smul]\n  simp only [t₂, h]\n  match_scalars\n  simp [mul_mul_mul_comm _ I]\n  ring\n",
+      "module": "Mathlib.Analysis.Complex.Conformal",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Analysis/Complex/Conformal.lean",
+      "category": "theorem",
+      "subcategory": "lemma",
+      "statement": "lemma real_linearMap_map_smul_complex {ℓ : ℂ →ₗ[ℝ] E} (h : ℓ I = I • ℓ 1) (a b : ℂ) :\n    ℓ (a • b) = a • ℓ b",
+      "proof": "by\n  rw [← re_add_im a, ← re_add_im b, ← smul_eq_mul _ I, ← smul_eq_mul _ I]\n  have t₀ : ((a.im : ℂ) • I) • (b.re : ℂ) = (↑(a.im * b.re) : ℂ) • I := by\n    simp only [smul_eq_mul, ofReal_mul, ← mul_assoc, mul_comm _ I]\n  have t₁ : ((a.im : ℂ) • I) • (b.im : ℂ) • I = (↑(- a.im * b.im) : ℂ) • (1 : ℂ) := by\n    simp [mul_mul_mul_comm _ I]\n  simp only [add_smul, smul_add, ℓ.map_add, t₀, t₁]\n  repeat rw [Complex.coe_smul, ℓ.map_smul]\n  have t₂ {r : ℝ}  : ℓ (r : ℂ) = r • ℓ (1 : ℂ) := by simp [← ℓ.map_smul]\n  simp only [t₂, h]\n  match_scalars\n  simp [mul_mul_mul_comm _ I]\n  ring",
+      "in_blacklist": false
+    },
+    {
+      "name": "AddMonoid.toAddZeroClass",
+      "line": 562,
+      "isProp": false,
+      "isHumanTheorem": false,
+      "doc": null,
+      "column": 0,
+      "signature": "{M : Type u} → [self : AddMonoid M] → AddZeroClass M",
+      "lean4_start": 562,
+      "lean4_end": 569,
+      "lean4_code": "class AddMonoid (M : Type u) extends AddSemigroup M, AddZeroClass M where\n  /-- Multiplication by a natural number.\n  Set this to `nsmulRec` unless `Module` diamonds are possible. -/\n  protected nsmul : ℕ → M → M\n  /-- Multiplication by `(0 : ℕ)` gives `0`. -/\n  protected nsmul_zero : ∀ x, nsmul 0 x = 0 := by intros; rfl\n  /-- Multiplication by `(n + 1 : ℕ)` behaves as expected. -/\n  protected nsmul_succ : ∀ (n : ℕ) (x), nsmul (n + 1) x = nsmul n x + x := by intros; rfl\n",
+      "module": "Mathlib.Algebra.Group.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Group/Defs.lean",
+      "category": "def",
+      "subcategory": "class_derived",
+      "statement": "class AddMonoid (M : Type u) extends AddSemigroup M, AddZeroClass M where\n\n  protected nsmul : ℕ → M → M\n\n  protected nsmul_zero : ∀ x, nsmul 0 x = 0 := by intros; rfl\n\n  protected nsmul_succ : ∀ (n : ℕ) (x), nsmul (n + 1) x = nsmul n x + x := by intros; rfl",
+      "proof": null,
+      "in_blacklist": false
+    },
+    {
+      "name": "AddMonoidHomClass.toAddHomClass",
+      "line": 154,
+      "isProp": true,
+      "isHumanTheorem": false,
+      "doc": null,
+      "column": 0,
+      "signature": "∀ {F : Type u_10} {M : outParam (Type u_11)} {N : outParam (Type u_12)} {inst : AddZeroClass M} {inst_1 : AddZeroClass N} {inst_2 : FunLike F M N} [self : AddMonoidHomClass F M N], AddHomClass F M N",
+      "lean4_start": 149,
+      "lean4_end": 156,
+      "lean4_code": "/-- `AddMonoidHomClass F M N` states that `F` is a type of `AddZeroClass`-preserving\nhomomorphisms.\n\nYou should also extend this typeclass when you extend `AddMonoidHom`.\n-/\nclass AddMonoidHomClass (F : Type*) (M N : outParam Type*)\n    [AddZeroClass M] [AddZeroClass N] [FunLike F M N] : Prop\n    extends AddHomClass F M N, ZeroHomClass F M N\n",
+      "module": "Mathlib.Algebra.Group.Hom.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Algebra/Group/Hom/Defs.lean",
+      "category": "theorem",
+      "subcategory": "class_derived",
+      "statement": "class AddMonoidHomClass (F : Type*) (M N : outParam Type*)\n    [AddZeroClass M] [AddZeroClass N] [FunLike F M N] : Prop\n    extends AddHomClass F M N, ZeroHomClass F M N",
+      "proof": null,
+      "in_blacklist": false
+    },
+    {
+      "name": "AddMonoidWithOne.toAddMonoid",
+      "line": 79,
+      "isProp": false,
+      "isHumanTheorem": false,
+      "doc": null,
+      "column": 0,
+      "signature": "{R : Type u_2} → [self : AddMonoidWithOne R] → AddMonoid R",
+      "lean4_start": 77,
+      "lean4_end": 84,
+      "lean4_code": "/-- An `AddMonoidWithOne` is an `AddMonoid` with a `1`.\nIt also contains data for the unique homomorphism `ℕ → R`. -/\nclass AddMonoidWithOne (R : Type*) extends NatCast R, AddMonoid R, One R where\n  natCast := Nat.unaryCast\n  /-- The canonical map `ℕ → R` sends `0 : ℕ` to `0 : R`. -/\n  natCast_zero : natCast 0 = 0 := by intros; rfl\n  /-- The canonical map `ℕ → R` is a homomorphism. -/\n  natCast_succ : ∀ n, natCast (n + 1) = natCast n + 1 := by intros; rfl\n",
+      "module": "Mathlib.Data.Nat.Cast.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Data/Nat/Cast/Defs.lean",
+      "category": "def",
+      "subcategory": "class_derived",
+      "statement": "class AddMonoidWithOne (R : Type*) extends NatCast R, AddMonoid R, One R where\n  natCast := Nat.unaryCast\n\n  natCast_zero : natCast 0 = 0 := by intros; rfl\n\n  natCast_succ : ∀ n, natCast (n + 1) = natCast n + 1 := by intros; rfl",
+      "proof": null,
+      "in_blacklist": false
+    },
+    {
+      "name": "AddMonoidWithOne.toNatCast",
+      "line": 79,
+      "isProp": false,
+      "isHumanTheorem": false,
+      "doc": null,
+      "column": 0,
+      "signature": "{R : Type u_2} → [self : AddMonoidWithOne R] → NatCast R",
+      "lean4_start": 77,
+      "lean4_end": 84,
+      "lean4_code": "/-- An `AddMonoidWithOne` is an `AddMonoid` with a `1`.\nIt also contains data for the unique homomorphism `ℕ → R`. -/\nclass AddMonoidWithOne (R : Type*) extends NatCast R, AddMonoid R, One R where\n  natCast := Nat.unaryCast\n  /-- The canonical map `ℕ → R` sends `0 : ℕ` to `0 : R`. -/\n  natCast_zero : natCast 0 = 0 := by intros; rfl\n  /-- The canonical map `ℕ → R` is a homomorphism. -/\n  natCast_succ : ∀ n, natCast (n + 1) = natCast n + 1 := by intros; rfl\n",
+      "module": "Mathlib.Data.Nat.Cast.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Data/Nat/Cast/Defs.lean",
+      "category": "def",
+      "subcategory": "class_derived",
+      "statement": "class AddMonoidWithOne (R : Type*) extends NatCast R, AddMonoid R, One R where\n  natCast := Nat.unaryCast\n\n  natCast_zero : natCast 0 = 0 := by intros; rfl\n\n  natCast_succ : ∀ n, natCast (n + 1) = natCast n + 1 := by intros; rfl",
+      "proof": null,
+      "in_blacklist": false
+    },
+    {
+      "name": "AddMonoidWithOne.toOne",
+      "line": 79,
+      "isProp": false,
+      "isHumanTheorem": false,
+      "doc": null,
+      "column": 0,
+      "signature": "{R : Type u_2} → [self : AddMonoidWithOne R] → One R",
+      "lean4_start": 77,
+      "lean4_end": 84,
+      "lean4_code": "/-- An `AddMonoidWithOne` is an `AddMonoid` with a `1`.\nIt also contains data for the unique homomorphism `ℕ → R`. -/\nclass AddMonoidWithOne (R : Type*) extends NatCast R, AddMonoid R, One R where\n  natCast := Nat.unaryCast\n  /-- The canonical map `ℕ → R` sends `0 : ℕ` to `0 : R`. -/\n  natCast_zero : natCast 0 = 0 := by intros; rfl\n  /-- The canonical map `ℕ → R` is a homomorphism. -/\n  natCast_succ : ∀ n, natCast (n + 1) = natCast n + 1 := by intros; rfl\n",
+      "module": "Mathlib.Data.Nat.Cast.Defs",
+      "source_path": "/mathlib4-4.22.0/Mathlib/Data/Nat/Cast/Defs.lean",
+      "category": "def",
+      "subcategory": "class_derived",
+      "statement": "class AddMonoidWithOne (R : Type*) extends NatCast R, AddMonoid R, One R where\n  natCast := Nat.unaryCast\n\n  natCast_zero : natCast 0 = 0 := by intros; rfl\n\n  natCast_succ : ∀ n, natCast (n + 1) = natCast n + 1 := by intros; rfl",
+      "proof": null,
+      "in_blacklist": false
+    }
+  ],
+  "edges": [
+    {
+      "source_name": "Algebra",
+      "target_name": "CommSemiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "Algebra",
+      "target_name": "Semiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap",
+      "target_name": "CommSemiring.toSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap",
+      "target_name": "Algebra",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap",
+      "target_name": "RingHom",
+      "type": "USES_STRUCTURE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap",
+      "target_name": "CommSemiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap",
+      "target_name": "Semiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap",
+      "target_name": "Semiring.toNonAssocSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_zero",
+      "target_name": "Algebra.cast",
+      "type": "USES_DEFINITION",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_zero",
+      "target_name": "RingHom.instRingHomClass",
+      "type": "USES_INSTANCE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_zero",
+      "target_name": "CommSemiring.toSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_zero",
+      "target_name": "Algebra",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_zero",
+      "target_name": "RingHom",
+      "type": "USES_STRUCTURE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_zero",
+      "target_name": "algebraMap",
+      "type": "USES_DEFINITION",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_zero",
+      "target_name": "RingHomClass.toMonoidWithZeroHomClass",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_zero",
+      "target_name": "NonAssocSemiring.toMulZeroOneClass",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_zero",
+      "target_name": "CommSemiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_zero",
+      "target_name": "RingHom.instFunLike",
+      "type": "USES_INSTANCE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_zero",
+      "target_name": "NonAssocSemiring.toNonUnitalNonAssocSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_zero",
+      "target_name": "Semiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_zero",
+      "target_name": "Semiring.toNonAssocSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_one",
+      "target_name": "Algebra.cast",
+      "type": "USES_DEFINITION",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_one",
+      "target_name": "NonAssocSemiring.toAddCommMonoidWithOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_one",
+      "target_name": "RingHom.instRingHomClass",
+      "type": "USES_INSTANCE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_one",
+      "target_name": "CommSemiring.toSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_one",
+      "target_name": "Algebra",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_one",
+      "target_name": "RingHom",
+      "type": "USES_STRUCTURE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_one",
+      "target_name": "algebraMap",
+      "type": "USES_DEFINITION",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_one",
+      "target_name": "RingHomClass.toMonoidWithZeroHomClass",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_one",
+      "target_name": "NonAssocSemiring.toMulZeroOneClass",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_one",
+      "target_name": "AddCommMonoidWithOne.toAddMonoidWithOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_one",
+      "target_name": "CommSemiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_one",
+      "target_name": "AddMonoidWithOne.toOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_one",
+      "target_name": "RingHom.instFunLike",
+      "type": "USES_INSTANCE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_one",
+      "target_name": "Semiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_one",
+      "target_name": "Semiring.toNonAssocSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "Algebra.cast",
+      "target_name": "CommSemiring.toSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "Algebra.cast",
+      "target_name": "Algebra",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "Algebra.cast",
+      "target_name": "RingHom",
+      "type": "USES_STRUCTURE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "Algebra.cast",
+      "target_name": "algebraMap",
+      "type": "USES_DEFINITION",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "Algebra.cast",
+      "target_name": "CommSemiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "Algebra.cast",
+      "target_name": "RingHom.instFunLike",
+      "type": "USES_INSTANCE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "Algebra.cast",
+      "target_name": "Semiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "Algebra.cast",
+      "target_name": "Semiring.toNonAssocSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_add",
+      "target_name": "Algebra.cast",
+      "type": "USES_DEFINITION",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_add",
+      "target_name": "NonAssocSemiring.toAddCommMonoidWithOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_add",
+      "target_name": "RingHom.instRingHomClass",
+      "type": "USES_INSTANCE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_add",
+      "target_name": "CommSemiring.toSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_add",
+      "target_name": "AddMonoid.toAddZeroClass",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_add",
+      "target_name": "Algebra",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_add",
+      "target_name": "RingHom",
+      "type": "USES_STRUCTURE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_add",
+      "target_name": "algebraMap",
+      "type": "USES_DEFINITION",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_add",
+      "target_name": "AddCommMonoidWithOne.toAddMonoidWithOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_add",
+      "target_name": "CommSemiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_add",
+      "target_name": "RingHom.instFunLike",
+      "type": "USES_INSTANCE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_add",
+      "target_name": "AddMonoidHomClass.toAddHomClass",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_add",
+      "target_name": "NonAssocSemiring.toNonUnitalNonAssocSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_add",
+      "target_name": "Semiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_add",
+      "target_name": "NonUnitalNonAssocSemiring.toDistrib",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_add",
+      "target_name": "AddMonoidWithOne.toAddMonoid",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_add",
+      "target_name": "Semiring.toNonAssocSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_mul",
+      "target_name": "Algebra.cast",
+      "type": "USES_DEFINITION",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_mul",
+      "target_name": "RingHom.instRingHomClass",
+      "type": "USES_INSTANCE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_mul",
+      "target_name": "CommSemiring.toSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_mul",
+      "target_name": "Algebra",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_mul",
+      "target_name": "RingHom",
+      "type": "USES_STRUCTURE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_mul",
+      "target_name": "algebraMap",
+      "type": "USES_DEFINITION",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_mul",
+      "target_name": "CommSemiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_mul",
+      "target_name": "RingHom.instFunLike",
+      "type": "USES_INSTANCE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_mul",
+      "target_name": "NonAssocSemiring.toNonUnitalNonAssocSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_mul",
+      "target_name": "Semiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_mul",
+      "target_name": "NonUnitalNonAssocSemiring.toDistrib",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_mul",
+      "target_name": "Semiring.toNonAssocSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_natCast",
+      "target_name": "Algebra.cast",
+      "type": "USES_DEFINITION",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_natCast",
+      "target_name": "NonAssocSemiring.toAddCommMonoidWithOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_natCast",
+      "target_name": "RingHom.instRingHomClass",
+      "type": "USES_INSTANCE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_natCast",
+      "target_name": "CommSemiring.toSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_natCast",
+      "target_name": "Algebra",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_natCast",
+      "target_name": "RingHom",
+      "type": "USES_STRUCTURE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_natCast",
+      "target_name": "algebraMap",
+      "type": "USES_DEFINITION",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_natCast",
+      "target_name": "AddMonoidWithOne.toNatCast",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_natCast",
+      "target_name": "AddCommMonoidWithOne.toAddMonoidWithOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_natCast",
+      "target_name": "CommSemiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_natCast",
+      "target_name": "RingHom.instFunLike",
+      "type": "USES_INSTANCE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_natCast",
+      "target_name": "Semiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "algebraMap.coe_natCast",
+      "target_name": "Semiring.toNonAssocSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "PolynomialModule.eval_map",
+      "target_name": "Algebra.cast",
+      "type": "USES_DEFINITION",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "PolynomialModule.eval_map",
+      "target_name": "NonAssocSemiring.toAddCommMonoidWithOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "PolynomialModule.eval_map",
+      "target_name": "RingHom.instRingHomClass",
+      "type": "USES_INSTANCE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "PolynomialModule.eval_map",
+      "target_name": "algebraMap.coe_one",
+      "type": "DEPENDS_ON",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "PolynomialModule.eval_map",
+      "target_name": "CommSemiring.toSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "PolynomialModule.eval_map",
+      "target_name": "AddMonoid.toAddZeroClass",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "PolynomialModule.eval_map",
+      "target_name": "Algebra",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "PolynomialModule.eval_map",
+      "target_name": "RingHom",
+      "type": "USES_STRUCTURE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "PolynomialModule.eval_map",
+      "target_name": "algebraMap",
+      "type": "USES_DEFINITION",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "PolynomialModule.eval_map",
+      "target_name": "AddMonoidWithOne.toNatCast",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "PolynomialModule.eval_map",
+      "target_name": "AddCommMonoidWithOne.toAddMonoidWithOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "PolynomialModule.eval_map",
+      "target_name": "AddMonoidWithOne.toOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "PolynomialModule.eval_map",
+      "target_name": "RingHom.instFunLike",
+      "type": "USES_INSTANCE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "PolynomialModule.eval_map",
+      "target_name": "NonAssocSemiring.toNonUnitalNonAssocSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "PolynomialModule.eval_map",
+      "target_name": "algebraMap.coe_mul",
+      "type": "DEPENDS_ON",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "PolynomialModule.eval_map",
+      "target_name": "NonUnitalNonAssocSemiring.toDistrib",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "PolynomialModule.eval_map",
+      "target_name": "Semiring.toNonAssocSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "Semiring.toNonAssocSemiring",
+      "target_name": "Semiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "NonAssocSemiring.toMulZeroOneClass",
+      "target_name": "NonAssocSemiring.toNonUnitalNonAssocSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "CommSemiring.toSemiring",
+      "target_name": "CommSemiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "CommSemiring.toSemiring",
+      "target_name": "Semiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "NonAssocSemiring.toAddCommMonoidWithOne",
+      "target_name": "NonAssocSemiring.toNonUnitalNonAssocSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "RingHomClass.toMonoidWithZeroHomClass",
+      "target_name": "NonAssocSemiring.toAddCommMonoidWithOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "RingHomClass.toMonoidWithZeroHomClass",
+      "target_name": "AddMonoid.toAddZeroClass",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "RingHomClass.toMonoidWithZeroHomClass",
+      "target_name": "NonAssocSemiring.toMulZeroOneClass",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "RingHomClass.toMonoidWithZeroHomClass",
+      "target_name": "AddCommMonoidWithOne.toAddMonoidWithOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "RingHomClass.toMonoidWithZeroHomClass",
+      "target_name": "AddMonoidWithOne.toAddMonoid",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "RingHom.instFunLike",
+      "target_name": "RingHom",
+      "type": "USES_STRUCTURE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "RingHom.instFunLike",
+      "target_name": "NonAssocSemiring.toMulZeroOneClass",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "RingHom.instRingHomClass",
+      "target_name": "NonAssocSemiring.toAddCommMonoidWithOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "RingHom.instRingHomClass",
+      "target_name": "AddMonoid.toAddZeroClass",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "RingHom.instRingHomClass",
+      "target_name": "RingHom",
+      "type": "USES_STRUCTURE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "RingHom.instRingHomClass",
+      "target_name": "NonAssocSemiring.toMulZeroOneClass",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "RingHom.instRingHomClass",
+      "target_name": "AddCommMonoidWithOne.toAddMonoidWithOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "RingHom.instRingHomClass",
+      "target_name": "RingHom.instFunLike",
+      "type": "USES_INSTANCE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "RingHom.instRingHomClass",
+      "target_name": "AddMonoidWithOne.toAddMonoid",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "real_linearMap_map_smul_complex",
+      "target_name": "Algebra.cast",
+      "type": "USES_DEFINITION",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "real_linearMap_map_smul_complex",
+      "target_name": "NonAssocSemiring.toAddCommMonoidWithOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "real_linearMap_map_smul_complex",
+      "target_name": "RingHom.instRingHomClass",
+      "type": "USES_INSTANCE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "real_linearMap_map_smul_complex",
+      "target_name": "algebraMap.coe_one",
+      "type": "DEPENDS_ON",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "real_linearMap_map_smul_complex",
+      "target_name": "CommSemiring.toSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "real_linearMap_map_smul_complex",
+      "target_name": "AddMonoid.toAddZeroClass",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "real_linearMap_map_smul_complex",
+      "target_name": "RingHom",
+      "type": "USES_STRUCTURE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "real_linearMap_map_smul_complex",
+      "target_name": "algebraMap",
+      "type": "USES_DEFINITION",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "real_linearMap_map_smul_complex",
+      "target_name": "AddMonoidWithOne.toNatCast",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "real_linearMap_map_smul_complex",
+      "target_name": "NonAssocSemiring.toMulZeroOneClass",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "real_linearMap_map_smul_complex",
+      "target_name": "AddCommMonoidWithOne.toAddMonoidWithOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "real_linearMap_map_smul_complex",
+      "target_name": "AddMonoidWithOne.toOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "real_linearMap_map_smul_complex",
+      "target_name": "RingHom.instFunLike",
+      "type": "USES_INSTANCE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "real_linearMap_map_smul_complex",
+      "target_name": "NonAssocSemiring.toNonUnitalNonAssocSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "real_linearMap_map_smul_complex",
+      "target_name": "algebraMap.coe_mul",
+      "type": "DEPENDS_ON",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "real_linearMap_map_smul_complex",
+      "target_name": "NonUnitalNonAssocSemiring.toDistrib",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "real_linearMap_map_smul_complex",
+      "target_name": "Semiring.toNonAssocSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "SameRay.sameRay_nonneg_smul_right",
+      "target_name": "Algebra.cast",
+      "type": "USES_DEFINITION",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "SameRay.sameRay_nonneg_smul_right",
+      "target_name": "NonAssocSemiring.toAddCommMonoidWithOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "SameRay.sameRay_nonneg_smul_right",
+      "target_name": "RingHom.instRingHomClass",
+      "type": "USES_INSTANCE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "SameRay.sameRay_nonneg_smul_right",
+      "target_name": "algebraMap.coe_one",
+      "type": "DEPENDS_ON",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "SameRay.sameRay_nonneg_smul_right",
+      "target_name": "CommSemiring.toSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "SameRay.sameRay_nonneg_smul_right",
+      "target_name": "AddMonoid.toAddZeroClass",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "SameRay.sameRay_nonneg_smul_right",
+      "target_name": "Algebra",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "SameRay.sameRay_nonneg_smul_right",
+      "target_name": "RingHom",
+      "type": "USES_STRUCTURE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "SameRay.sameRay_nonneg_smul_right",
+      "target_name": "algebraMap",
+      "type": "USES_DEFINITION",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "SameRay.sameRay_nonneg_smul_right",
+      "target_name": "AddMonoidWithOne.toNatCast",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "SameRay.sameRay_nonneg_smul_right",
+      "target_name": "AddCommMonoidWithOne.toAddMonoidWithOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "SameRay.sameRay_nonneg_smul_right",
+      "target_name": "CommSemiring",
+      "type": "USES_CLASS",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "SameRay.sameRay_nonneg_smul_right",
+      "target_name": "AddMonoidWithOne.toOne",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "SameRay.sameRay_nonneg_smul_right",
+      "target_name": "RingHom.instFunLike",
+      "type": "USES_INSTANCE",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "SameRay.sameRay_nonneg_smul_right",
+      "target_name": "NonAssocSemiring.toNonUnitalNonAssocSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "SameRay.sameRay_nonneg_smul_right",
+      "target_name": "algebraMap.coe_mul",
+      "type": "DEPENDS_ON",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "SameRay.sameRay_nonneg_smul_right",
+      "target_name": "NonUnitalNonAssocSemiring.toDistrib",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "SameRay.sameRay_nonneg_smul_right",
+      "target_name": "Semiring.toNonAssocSemiring",
+      "type": "USES_CLASS_DERIVED",
+      "explicit": false,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "file_Mathlib.Algebra.Algebra.Defs",
+      "target_name": "Algebra",
+      "type": "CONTAINS",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "file_Mathlib.Algebra.Algebra.Defs",
+      "target_name": "algebraMap",
+      "type": "CONTAINS",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "file_Mathlib.Algebra.Algebra.Defs",
+      "target_name": "algebraMap.coe_zero",
+      "type": "CONTAINS",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "file_Mathlib.Algebra.Algebra.Defs",
+      "target_name": "algebraMap.coe_one",
+      "type": "CONTAINS",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "file_Mathlib.Algebra.Algebra.Defs",
+      "target_name": "Algebra.cast",
+      "type": "CONTAINS",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "file_Mathlib.Algebra.Algebra.Defs",
+      "target_name": "algebraMap.coe_add",
+      "type": "CONTAINS",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "file_Mathlib.Algebra.Algebra.Defs",
+      "target_name": "algebraMap.coe_mul",
+      "type": "CONTAINS",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    },
+    {
+      "source_name": "file_Mathlib.Algebra.Algebra.Defs",
+      "target_name": "algebraMap.coe_natCast",
+      "type": "CONTAINS",
+      "explicit": true,
+      "direct": true,
+      "in_blacklist": false
+    }
+  ],
+  "metadata": {
+    "source_graph": "build_mathlib_dataset/generated_graphs/mathlib4-4.22.0-full/lake_graph_with_code_mathlib4-4.22.0-full.json",
+    "sampling": "seed_module=Mathlib.Algebra.Algebra.Defs; seed_count=5; total_nodes=30; neighbors from incident edges of seeds with module-aware ranking",
+    "node_count": 30,
+    "edge_count": 165
+  }
+}

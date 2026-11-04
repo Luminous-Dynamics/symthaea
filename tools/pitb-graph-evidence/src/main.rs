@@ -21,6 +21,8 @@ struct Graph {
     nodes: Vec<Node>,
     edges: Vec<Edge>,
     artifacts: Vec<Artifact>,
+    #[serde(default)]
+    upstream_provenance: Value,
 }
 
 #[derive(Debug, Deserialize)]
@@ -44,6 +46,8 @@ struct Node {
     statement_artifact_id: String,
     source_locator: String,
     formal_name: Value,
+    #[serde(default)]
+    upstream_metadata: Value,
 }
 
 #[derive(Debug, Deserialize)]
@@ -167,6 +171,9 @@ fn expected_evidence_class(relation: &str) -> Option<&'static str> {
         "informal_candidate_dependency" => Some("informal_extractor"),
         "cross_formality_match" => Some("llm_alignment"),
         "module_environment_dependency" => Some("lean_build_graph"),
+        "daps_dependency_candidate"
+        | "daps_import_candidate"
+        | "daps_membership_candidate" => Some("daps_graph_export"),
         _ => None,
     }
 }
@@ -202,6 +209,9 @@ fn expected_role(edge: &Edge) -> &'static str {
         "instance_synthesis" => "instance_environment_dependency_hash_bound",
         "module_environment_dependency" => "build_environment_dependency_hash_bound",
         "documentation_reference" => "documentation_retrieval_hint",
+        "daps_dependency_candidate"
+        | "daps_import_candidate"
+        | "daps_membership_candidate" => "candidate_retrieval_hint",
         "blueprint_dependency" if edge.status == "human_reviewed" => {
             "curated_search_prior_review_signature_unverified"
         }
@@ -238,6 +248,18 @@ fn validate_edge_endpoints(edge: &Edge, source: &Node, target: &Node) -> Result<
         | "instance_synthesis"
         | "documentation_reference" => {
             require_node_kind(source, &["formal_declaration"], &edge.edge_id, "source")?;
+            require_node_kind(target, &["formal_declaration"], &edge.edge_id, "target")?;
+        }
+        "daps_dependency_candidate" => {
+            require_node_kind(source, &["formal_declaration"], &edge.edge_id, "source")?;
+            require_node_kind(target, &["formal_declaration"], &edge.edge_id, "target")?;
+        }
+        "daps_import_candidate" => {
+            require_node_kind(source, &["module"], &edge.edge_id, "source")?;
+            require_node_kind(target, &["module"], &edge.edge_id, "target")?;
+        }
+        "daps_membership_candidate" => {
+            require_node_kind(source, &["module"], &edge.edge_id, "source")?;
             require_node_kind(target, &["formal_declaration"], &edge.edge_id, "target")?;
         }
         "module_environment_dependency" => {
@@ -306,6 +328,11 @@ fn validate_confidence(edge: &Edge) -> Result<(), String> {
         Value::Null if edge.status == "human_reviewed" && edge.relation == "blueprint_dependency" => {
             Ok(())
         }
+        Value::Null if edge.status == "candidate"
+            && matches!(
+                edge.relation.as_str(),
+                "daps_dependency_candidate" | "daps_import_candidate" | "daps_membership_candidate"
+            ) => Ok(()),
         Value::Number(number) => {
             let value = number
                 .as_f64()
@@ -352,8 +379,14 @@ fn validate_value(value: &Value) -> Result<(Graph, Summary), String> {
     if graph.schema_version != VERSION {
         return Err("unsupported graph schema_version".into());
     }
-    if !matches!(graph.evidence_class.as_str(), "synthetic_contract_fixture" | "measured_snapshot") {
+    if !matches!(
+        graph.evidence_class.as_str(),
+        "synthetic_contract_fixture" | "measured_snapshot" | "external_candidate_snapshot"
+    ) {
         return Err("unknown evidence_class".into());
+    }
+    if !graph.upstream_provenance.is_null() && !graph.upstream_provenance.is_object() {
+        return Err("upstream_provenance must be an object or null".into());
     }
     let snapshot = &graph.snapshot;
     if !non_empty(&snapshot.snapshot_id)
@@ -416,6 +449,9 @@ fn validate_value(value: &Value) -> Result<(Graph, Summary), String> {
             }
             (_, Value::Null) => {}
             _ => return Err(format!("non-formal node {} must set formal_name to null", node.node_id)),
+        }
+        if !node.upstream_metadata.is_null() && !node.upstream_metadata.is_object() {
+            return Err(format!("node {} upstream_metadata must be an object or null", node.node_id));
         }
         let statement_artifact = artifacts
             .get(&node.statement_artifact_id)
