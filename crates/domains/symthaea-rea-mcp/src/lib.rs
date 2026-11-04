@@ -13,8 +13,8 @@ use rmcp::{
 };
 use serde::{Deserialize, Serialize};
 use symthaea_rea_compat::{
-    BundleErrorKind, EvidenceErrorKind, sha256_hex, verify_evidence_bundle_json,
-    verify_evidence_json,
+    EvidenceErrorKind, sha256_hex, verify_evidence_json,
+    bundle::{BundleErrorKind, verify_evidence_bundle_json},
 };
 
 /// Maximum inline JSON payload accepted by an MCP tool invocation.
