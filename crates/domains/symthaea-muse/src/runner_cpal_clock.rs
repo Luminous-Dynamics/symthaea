@@ -13,11 +13,12 @@
 //! It does not establish absolute clock accuracy. V1 therefore reports only a
 //! point estimate and must not be promoted to a physical output-latency claim.
 //!
-//! The resulting mapping can be composed with the CPAL playback-time -> output
-//! frame fit from MEL-CLOCK-001 only when session, runner origin, stream
-//! identity, descriptor digest, validity interval and uncertainty status all
-//! match. Since uncertainty propagation is not yet qualified, such a
-//! composition remains non-qualified.
+//! Runner -> callback is only the first mapping. The callback -> predicted
+//! playback scheduling relation is fitted separately from the exact CPAL output
+//! anchor vector, which is also used by MEL-CLOCK-001's playback -> output-frame
+//! fit. Three-stage composition requires exact stream/configuration identity and
+//! anchor-set digest equality. Since uncertainty propagation is not yet
+//! qualified, the composed result remains a point estimate only.
 
 use crate::output_clock::{
     OutputClockAccuracyStatusV1, OutputClockAnchorSourceV1, OutputClockAnchorV1,
@@ -164,8 +165,9 @@ pub struct RunnerCpalClockPairV1 {
 
 impl RunnerCpalClockPairV1 {
     /// Construct the fixed-size callback record after the caller has sampled
-    /// the runner clock before/after reading both CPAL timestamps. The
-    /// descriptor digest is computed off the real-time thread and copied in.
+    /// the runner clock before/after reading and normalizing both CPAL callback
+    /// and predicted-playback timestamps. The descriptor digest is computed
+    /// off the real-time thread and copied in.
     pub fn from_observation(
         stream_instance_id: u64,
         descriptor_identity_sha256: [u8; 32],
@@ -476,8 +478,9 @@ impl CpalCallbackPlaybackFitV1 {
 }
 
 /// Fit the callback -> predicted-playback scheduling relation from the exact
-/// CPAL anchor vector. The resulting anchor digest must equal the anchor-set
-/// digest inside MEL-CLOCK-001's output-frame fit bundle before composition.
+/// CPAL anchor vector. The result is a scheduling-delay relation, not a second
+/// shared-origin clock synchronization. The resulting anchor digest must equal
+/// the anchor-set digest inside MEL-CLOCK-001's output-frame fit bundle.
 pub fn fit_cpal_callback_playback_v1(
     descriptor: &OutputClockStreamDescriptorV1,
     anchors: &[OutputClockAnchorV1],
