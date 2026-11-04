@@ -22,7 +22,7 @@ use crate::streaming::StreamingSynth;
 use crate::{MuseConfig, MusicalState};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::traits::{Consumer, Observer, Producer, Split};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 /// Errors from the live audio system.
@@ -66,6 +66,9 @@ enum LiveCommand {
 pub struct LiveMuseOutput {
     /// Control sender (game thread → synthesis thread).
     state_tx: std::sync::mpsc::Sender<LiveCommand>,
+    /// Serializes control publication with epoch advancement. This lock is
+    /// never accessed by the real-time audio callback.
+    control_lock: Mutex<()>,
     /// Handle to the cpal stream (held to keep audio alive).
     _stream: cpal::Stream,
     /// Handle to the synthesis thread.
@@ -299,6 +302,7 @@ impl LiveMuseOutput {
 
         Ok(Self {
             state_tx,
+            control_lock: Mutex::new(()),
             _stream: stream,
             _synth_thread: Some(synth_thread),
             running,
@@ -314,6 +318,10 @@ impl LiveMuseOutput {
     ///
     /// Already-rendered application-queued frames are preserved.
     pub fn update_state(&self, state: &MusicalState) {
+        let _control = self
+            .control_lock
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let _ = self.state_tx.send(LiveCommand::UpdateState(state.clone()));
     }
 
@@ -321,6 +329,10 @@ impl LiveMuseOutput {
     /// frames. This does not recall frames already copied into an in-flight
     /// callback or submitted to the operating system / physical device.
     pub fn invalidate_pending_output(&self) -> Result<u64, LiveError> {
+        let _control = self
+            .control_lock
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let epoch = self
             .output_epoch
             .invalidate()
@@ -339,6 +351,10 @@ impl LiveMuseOutput {
         &self,
         state: &MusicalState,
     ) -> Result<u64, LiveError> {
+        let _control = self
+            .control_lock
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let epoch = self
             .output_epoch
             .invalidate()
