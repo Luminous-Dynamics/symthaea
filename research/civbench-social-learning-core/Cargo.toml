@@ -59,4 +59,8 @@ path = "src/bin/intentional_teaching_sweep.rs"
 name = "adaptive-transmission-sweep"
 path = "src/bin/adaptive_transmission_sweep.rs"
 
+[[bin]]
+name = "privacy-disclosure-sweep"
+path = "src/bin/privacy_disclosure_sweep.rs"
+
 [dependencies]
