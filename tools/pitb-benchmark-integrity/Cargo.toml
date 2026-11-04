@@ -1,0 +1,16 @@
+[package]
+name = "pitb-benchmark-integrity"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "AGPL-3.0-or-later"
+description = "Cohort provenance and proof-replacement integrity checks for PITB"
+
+[[bin]]
+name = "pitb-benchmark-integrity"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.149"
+sha2 = "=0.10.9"
