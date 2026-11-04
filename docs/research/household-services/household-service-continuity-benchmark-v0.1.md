@@ -431,3 +431,6 @@ Regulation 27 permits a Water Services Authority to identify provisions where im
 - WHO access-level table: https://www.ncbi.nlm.nih.gov/books/NBK579449/table/ch5.tab1/?report=objectonly
 
 This crosswalk is a research benchmark interpretation, not legal advice, a municipal compliance finding, a plumbing approval or a product certification. Confirm current legal interpretation and any municipal implementation detail with qualified South African water-services counsel / authorities before a deployment or compliance claim.
+
+
+**Machine-readable national profile:** [`south-africa-water-service-standard-profile-v0.1.json`](south-africa-water-service-standard-profile-v0.1.json). It preserves the formal-settlement, interim informal-settlement and >48-hour alternative drinking-water profiles as distinct records, with regulatory clauses, boundaries, requirements and interpretation guards. JSON was parsed and fetched back after creation; this is not a legal-compliance validator.
