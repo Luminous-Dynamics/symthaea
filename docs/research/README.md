@@ -19,6 +19,7 @@ Symthaea is not just software - it's a research platform exploring fundamental q
 | [Validation Studies](#validation-studies) | Empirical validation approaches |
 | [Publications](#publications) | Papers and manuscripts |
 | [Research Roadmap](#research-roadmap) | Future research directions |
+| [Evidence-Driven Invention](INVENTOR_LOOP_001_PROGRAM_V0_1.md) | Engineering intelligence, physical validation and human learning |
 
 ---
 
