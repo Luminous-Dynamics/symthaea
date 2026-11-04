@@ -116,6 +116,9 @@ struct ProofRun {
     end_line: u64,
     end_column: u64,
     goal_sha256: String,
+    declaration_signature_before_sha256: String,
+    declaration_signature_after_sha256: String,
+    target_is_prop: bool,
     source_file_sha256: String,
     replacement_patch_sha256: String,
     proof_artifact_sha256: String,
@@ -724,6 +727,8 @@ fn validate_proof_run(
     }
     for (field, value) in [
         ("goal_sha256", &run.goal_sha256),
+        ("declaration_signature_before_sha256", &run.declaration_signature_before_sha256),
+        ("declaration_signature_after_sha256", &run.declaration_signature_after_sha256),
         ("source_file_sha256", &run.source_file_sha256),
         ("replacement_patch_sha256", &run.replacement_patch_sha256),
         ("proof_artifact_sha256", &run.proof_artifact_sha256),
@@ -750,10 +755,14 @@ fn validate_proof_run(
     ) {
         return Err(format!("{label} has unsupported outcome"));
     }
+    if run.declaration_signature_before_sha256 != run.declaration_signature_after_sha256 {
+        return Err(format!("{label} changes the exact target declaration signature"));
+    }
     let all_gates = [
         run.proof_inserted,
         run.exact_sorry_replaced,
         run.sorry_absent_after_replacement,
+        run.target_is_prop,
         run.build_passed,
         run.kernel_passed,
         run.semantic_gate_passed,
@@ -1085,6 +1094,9 @@ fn synthetic_proof_run(task: &SorryRecord, verified: bool, run_id: &str) -> Proo
         end_line: task.location.end_line,
         end_column: task.location.end_column,
         goal_sha256: sha256(task.debug_info.goal.as_bytes()),
+        declaration_signature_before_sha256: digest("synthetic-declaration-signature"),
+        declaration_signature_after_sha256: digest("synthetic-declaration-signature"),
+        target_is_prop: verified,
         source_file_sha256: digest("synthetic-source-file"),
         replacement_patch_sha256: digest("synthetic-patch"),
         proof_artifact_sha256: digest("synthetic-proof"),
@@ -1231,6 +1243,20 @@ fn run_self_tests() -> Result<(), String> {
         return Err("proof adding a new sorry was accepted".into());
     }
     println!("SELF_TEST_PASS newly introduced sorry invalidates verified success");
+
+    let mut bad_run = valid_run.clone();
+    bad_run.target_is_prop = false;
+    if validate_proof_run(&bad_run, 5, &evaluation_by_id).is_ok() {
+        return Err("non-Prop target was accepted as a SorryDB proof task".into());
+    }
+    println!("SELF_TEST_PASS target must elaborate as Prop");
+
+    let mut bad_run = valid_run.clone();
+    bad_run.declaration_signature_after_sha256 = sha256(b"weakened theorem signature");
+    if validate_proof_run(&bad_run, 6, &evaluation_by_id).is_ok() {
+        return Err("proof replacement that changes the target declaration signature was accepted".into());
+    }
+    println!("SELF_TEST_PASS exact theorem declaration signature must be preserved");
 
     let runs = vec![
         valid_run,
