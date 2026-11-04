@@ -178,7 +178,30 @@ Require actual local-market quotes and service evidence for:
 
 Do not infer price or market availability from a global product page. Do not assume every household can purchase private backup or reuse equipment. WaterLoop should complement reliable public/municipal water service and must not normalize tanker delivery or transfer public accountability to individual households.
 
-## 7. Prospective qualification gates
+## 7. South African source-stream and jurisdiction guardrails
+
+Greywater is not one homogeneous feedstock, and local rules must be checked for the actual municipality and installation.
+
+Relevant public references:
+- South African National Norms and Standards for Domestic Water and Sanitation Services, Government Gazette 41100 / GNR 982 (8 September 2017), section 6.3.2: https://www.gov.za/sites/default/files/gcis_document/201709/41100gon982.pdf
+- Water Research Commission, *Guidelines for greywater use and management in South Africa* (TT 746/17): https://www.wrc.org.za/wp-content/uploads/mdocs/TT%20746-17.pdf
+- City of Cape Town alternative-water guidance: https://www.capetown.gov.za/family-and-home/residential-utility-services/residential-water-and-sanitation-services/alternative-water-sources/
+- City of Cape Town Water and Sanitation Services By-law 2023, section 49 (Cape Town only): https://openbylaws.org.za/akn/za-wc023/act/by-law/2023/water-and-sanitation-services/eng%402023-07-28
+
+The national norms and WRC guidance identify source quality, intended use, public-health nuisance and low-pressure application as considerations. The WRC material separates higher-contamination laundry/kitchen-related streams; kitchen and dishwasher wastewater must not be treated as equivalent to shower/bath water. The City of Cape Town consumer guidance identifies showering, bathing and handwashing as common greywater sources, treats laundry reuse conditionally, excludes kitchen sinks/dishwashers from its greywater guidance, and advises against storage beyond 24 hours due to odour/slime/health risks. Those Cape Town statements are useful hazard/design leads, **not Johannesburg bylaws**.
+
+Before any Gauteng/Johannesburg installation:
+- obtain a current local bylaw and building/plumbing review for the exact site and use;
+- establish whether non-mains source use requires municipal approval or specific separation/notification;
+- validate air gap/backflow prevention and non-potable identification at the actual boundary;
+- keep shower/bath, hand basin, laundry, kitchen/dishwasher and rainwater streams separately identified;
+- declare maximum storage/retention time by the approved treatment and use profile;
+- do not aerosolize untreated greywater or route an unqualified stream to toilets, laundry or any other end use;
+- record the residual/reject route and prevent discharge/nuisance outside the property.
+
+Neither a vendor certification listing nor a generic national reference automatically supplies site-specific plumbing permission or local authority approval. Obtain written review from the competent local authority and qualified installation professional.
+
+## 8. Prospective qualification gates
 
 These are proposed research gates, not standards or achieved results:
 - every published capacity datum binds the exact model/revision, source document, unit, denominator, end-use class and declaration type;
@@ -190,6 +213,6 @@ These are proposed research gates, not standards or achieved results:
 - all cost, energy, consumable and maintenance overhead is allocated once and charged to the same functional unit as the benefit;
 - any combined WaterLoop claim reports the marginal contribution of continuity, reuse and leak containment separately.
 
-## 8. Claim ceiling
+## 9. Claim ceiling
 
 This comparator file does not establish a Hydraloop defect or certification failure, WaterLoop performance/superiority, water savings, potable safety, treatment efficacy, installation legality, local market availability, affordability or household demand. It establishes a source-bound acquisition and matched-test plan only.
