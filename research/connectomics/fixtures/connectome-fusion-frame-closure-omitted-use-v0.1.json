@@ -30,14 +30,14 @@
       "sequence_end": 2,
       "record_count": 2,
       "unique_use_count": 2,
-      "ordered_events_sha256": "3a4e99f348536ae7ff9b777956494d7eb84c1450139a4b6f24c5a8884b02f568",
+      "ordered_events_sha256": "be54afb39b4637981914f2841ac7f543cc8a22e53b2a007e390fca1452f86c30",
       "coverage_disposition": "QUALIFIED_COMPLETE_WITHIN_DECLARED_SCOPE",
       "shared_controls": [],
       "events": [
         {
           "event_id": "exec-event-001",
           "sequence": 1,
-          "canonical_use_key": "82ecba20f50da8cbd3c34eb52018b880074a15b8f45a77f818f1f1f777d3c848",
+          "canonical_use_key": "47b23720d0109570a037ae12712a9770cfdd90a362ec10895b42cfd3b366652e",
           "operation_id": "fusion-op-001",
           "claim_id": "claim-001",
           "query_id": "query-circuit-01",
@@ -57,7 +57,7 @@
         {
           "event_id": "exec-event-002",
           "sequence": 2,
-          "canonical_use_key": "a14d430b06228f1784c7e89f23cb5b140ce603bc6332378f926c645b17e34a48",
+          "canonical_use_key": "b793d36b6d328a351e6ea5a2d5dc99c1db8f55330d39326b24ead653561943b9",
           "operation_id": "fusion-op-002",
           "claim_id": "claim-002",
           "query_id": "query-circuit-01",
@@ -86,7 +86,7 @@
       "sequence_end": 2,
       "record_count": 2,
       "unique_use_count": 2,
-      "ordered_events_sha256": "77978c2a2cd55e895f177ad57e29b58bbdebfbdf7e6d1f2fb09a3aaa6153d745",
+      "ordered_events_sha256": "5ce223b58a2f364a2b4942ea040ab1b74c619c042042752c80cf9945f70a7803",
       "coverage_disposition": "QUALIFIED_COMPLETE_WITHIN_DECLARED_SCOPE",
       "shared_controls": [],
       "events": [
@@ -134,7 +134,7 @@
     }
   ],
   "declared_frame": {
-    "frame_sha256": "c49fb0bec202bb4692cd0a9b776d314d74768599e5923925f607793980be57a0",
+    "frame_sha256": "b39db635cbb00eeafdd1b9e8f4df19f965f3f4972aa101e5a2fc10cbc43f13b8",
     "assertion_count": 1,
     "assertions": [
       {
@@ -149,6 +149,7 @@
       }
     ]
   },
+  "scope_sha256": "c7765429a91fb7a76915b24613c286300376f04c6340a045e262ed7b95a48eba",
   "reconciliation_policy": {
     "required_source_roles": [
       "FUSION_EXECUTION_LEDGER",
