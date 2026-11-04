@@ -124,7 +124,7 @@ pub enum MusicalContextScoreErrorV1 {
     FamilyPredictionCountMismatch { expected: usize, actual: usize },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MusicalContextCounterfactualScoreV1 {
     pub family_id: String,
     pub member_count: usize,
@@ -388,7 +388,7 @@ pub fn score_musical_context_counterfactual_v1(
 /// Dataset-level summary. Keep these dimensions separate: no composite
 /// score is emitted because contextual sensitivity, surface invariance and
 /// ambiguity handling measure different behaviours.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MusicalContextCounterfactualAggregateV1 {
     pub family_count: usize,
     pub member_count: usize,
