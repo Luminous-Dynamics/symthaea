@@ -320,12 +320,25 @@ pub mod linux_powercap {
         ) -> Result<Self, EnergyMeterError> {
             let energy_path = energy_path.into();
             let max_range = match max_range_path.as_ref() {
-                Some(path) => Some(read_counter_file(path)?),
+                Some(path) => {
+                    let range = read_counter_file(path)?;
+                    if range == 0 {
+                        return Err(EnergyMeterError::Unsupported {
+                            reason: "powercap counter reports a zero rollover range".into(),
+                        });
+                    }
+                    Some(range)
+                }
                 None => None,
             };
             // Probe the counter at construction; permission and path failures
             // are surfaced now rather than converted into a zero reading.
-            let _ = read_counter_file(&energy_path)?;
+            let initial_energy = read_counter_file(&energy_path)?;
+            if max_range.is_some_and(|range| initial_energy >= range) {
+                return Err(EnergyMeterError::BackendFailure {
+                    reason: "initial energy counter is outside its declared range".into(),
+                });
+            }
 
             Ok(Self {
                 descriptor: EnergyMeterDescriptor {
@@ -351,7 +364,13 @@ pub mod linux_powercap {
             let Some(path) = self.max_range_path.as_ref() else {
                 return Ok(());
             };
-            let current = Some(read_counter_file(path)?);
+            let range = read_counter_file(path)?;
+            if range == 0 {
+                return Err(EnergyMeterError::Unsupported {
+                    reason: "powercap counter reports a zero rollover range".into(),
+                });
+            }
+            let current = Some(range);
             if current != self.descriptor.wrap_modulus {
                 self.counter_epoch = self
                     .counter_epoch
@@ -416,6 +435,15 @@ pub mod linux_powercap {
         fn read_counter(&mut self) -> Result<EnergyCounterReading, EnergyMeterError> {
             self.refresh_wrap_modulus()?;
             let raw_counter = self.read_energy()?;
+            if self
+                .descriptor
+                .wrap_modulus
+                .is_some_and(|range| raw_counter >= range)
+            {
+                return Err(EnergyMeterError::BackendFailure {
+                    reason: "energy counter is outside its declared range".into(),
+                });
+            }
             Ok(EnergyCounterReading {
                 descriptor: self.descriptor.clone(),
                 counter_epoch: self.counter_epoch,
