@@ -1152,7 +1152,8 @@ mod tests {
             .flatten()
         {
             if let MetricOutcome::Observed(MetricEvidence::BoundedInterval { semantics, .. }) =
-                &mut result.outcome {
+                &mut result.outcome
+            {
                 *semantics = IntervalSemantics::MeasurementInterval;
             }
         }
