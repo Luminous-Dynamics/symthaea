@@ -42,3 +42,17 @@ Run python3 verify_nested_dynamic_bce_trace.py. It writes nested_dynamic_bce_tra
 ## Limitations and next gate
 
 Only two decision levels and three leaves are exercised. The trace does not model D4's actual watched-clause activation/deactivation stack, propagation reasons, restarts or parallel workers. Next, instrument an unchanged D4 BCEi build and compare its true branch-state event stream with this context contract; only then generalize the verifier.
+
+
+## Local reference execution provenance
+
+A local reference implementation was executed against the public v2 certificate after its Git blob SHA-1 matched the fetched repository file.
+
+- Certificate Git blob SHA-1: edeaa6bd2b27b48cd89c070a8755dee1fa9833f8
+- Certificate SHA-256: 2b57e824b30df5452f7d3824a268f98715544adc7c586c93e669cd347c49a5e4
+- Local reference checker SHA-256: 55beb7db67de6e91f4822b203e95ba7b00ee95cc4ab7d0ad1c7951f93880ce97
+- Local reference checker Git blob SHA-1: cb4443853ca5bded57c6917f4e2e505386ca9f45
+- Runtime: Python 3.13.5, Linux.
+- Result: 14 root/source leaf models, 15 processed leaf models; eight visible assignments; PMC 8; PWMC 1/1; 11/11 negative controls rejected.
+
+**Important:** the public uploaded checker currently has a different Git blob (61c7acc4dd54f10904e0a287b6c0ee97e182806f) and is marked not_run in the result manifest. The pass above belongs to the local reference variant, not that uploaded checker. Re-run the uploaded checker before promoting its status.
