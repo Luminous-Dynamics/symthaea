@@ -101,15 +101,19 @@ pub enum HypothesisStatus {
 /// A hypothesis with explicit support and contradiction references.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HypothesisRecord {
-    /// Stable hypothesis identifier.
+    /// Unique immutable hypothesis-revision record identifier.
     pub id: String,
+    /// Stable logical hypothesis identifier shared across revisions.
+    pub hypothesis_id: String,
+    /// Previous revision record, when this is an update.
+    pub previous_record_id: Option<String>,
     /// Exact task/source/configuration identity.
     pub binding: TaskBinding,
     /// Exact causal or fault claim.
     pub claim: String,
     /// Declared domain in which this claim is intended to apply.
     pub applicability_domain: String,
-    /// Explicit competing hypothesis identifiers, including null where relevant.
+    /// Competing logical hypothesis identifiers, including null where relevant.
     pub competing_hypothesis_ids: Vec<String>,
     /// Assumptions required for an identification claim.
     pub identification_assumptions: Vec<String>,
@@ -161,9 +165,9 @@ pub enum Authorization {
     /// No external effect or privileged execution is requested.
     NotRequired,
     /// The relevant authority explicitly permitted this action.
-    Granted,
+    Granted { decision_id: String },
     /// The relevant authority denied this action.
-    Denied,
+    Denied { decision_id: String },
 }
 
 /// Predicted observation quality; unknown is not a numeric zero.
@@ -335,8 +339,8 @@ pub struct RepairRecord {
     pub binding: TaskBinding,
     /// Candidate patch digest.
     pub patch_digest: Digest,
-    /// Hypotheses considered by the repair.
-    pub hypothesis_ids: Vec<String>,
+    /// Exact hypothesis revision records considered by the repair.
+    pub hypothesis_record_ids: Vec<String>,
     /// Outcomes used to justify the repair.
     pub outcome_ids: Vec<String>,
     /// Append order; must follow every referenced hypothesis/outcome.
@@ -426,6 +430,10 @@ pub enum ValidationError {
     DuplicateEvidenceOrigin,
     /// A causal status is claimed without intervention evidence.
     CausalStatusWithoutIntervention,
+    /// A hypothesis revision does not link to the preceding revision correctly.
+    HypothesisRevisionChain,
+    /// A pristine regrade has no preceding primary grade for the same patch.
+    RegradeWithoutPrimary,
     /// Intervention evidence has no matching controlled action/outcome.
     InterventionEvidenceWithoutAction,
     /// Forecast/action/outcome links disagree or are out of order.
@@ -557,6 +565,17 @@ impl Ledger {
             {
                 return Err(ValidationError::MissingAuthorization);
             }
+            match &record.authorization {
+                Authorization::Granted { decision_id }
+                | Authorization::Denied { decision_id }
+                    if decision_id.trim().is_empty() =>
+                {
+                    return Err(ValidationError::MissingAuthorization);
+                }
+                Authorization::NotRequired
+                | Authorization::Granted { .. }
+                | Authorization::Denied { .. } => {}
+            }
         }
         for record in &self.outcomes {
             if record.binding != self.binding {
@@ -650,9 +669,32 @@ impl Ledger {
                     return Err(ValidationError::EvidenceParentOutOfOrder);
                 }
             }
+            if hypothesis.hypothesis_id.trim().is_empty() {
+                return Err(ValidationError::HypothesisRevisionChain);
+            }
+            match hypothesis.previous_record_id.as_deref() {
+                Some(previous_id) => {
+                    let previous = hypotheses_by_id
+                        .get(previous_id)
+                        .ok_or(ValidationError::HypothesisRevisionChain)?;
+                    if previous.hypothesis_id != hypothesis.hypothesis_id
+                        || previous.sequence >= hypothesis.sequence
+                    {
+                        return Err(ValidationError::HypothesisRevisionChain);
+                    }
+                }
+                None => {
+                    if self.hypotheses.iter().any(|other| {
+                        other.hypothesis_id == hypothesis.hypothesis_id
+                            && other.sequence < hypothesis.sequence
+                    }) {
+                        return Err(ValidationError::HypothesisRevisionChain);
+                    }
+                }
+            }
             for competing_id in &hypothesis.competing_hypothesis_ids {
-                if competing_id == &hypothesis.id
-                    || !hypotheses_by_id.contains_key(competing_id.as_str())
+                if competing_id == &hypothesis.hypothesis_id
+                    || !self.hypotheses.iter().any(|other| other.hypothesis_id == *competing_id)
                 {
                     return Err(ValidationError::MissingReference);
                 }
@@ -700,7 +742,7 @@ impl Ledger {
                 || forecast.action_id != action.id
                 || forecast.sequence >= action.sequence
                 || action.sequence >= outcome.sequence
-                || action.authorization == Authorization::Denied
+                || matches!(&action.authorization, Authorization::Denied { .. })
                     && outcome.status == OutcomeStatus::Observed
             {
                 return Err(if action.authorization == Authorization::Denied {
@@ -756,7 +798,7 @@ impl Ledger {
                         && outcome.sequence > evidence.sequence
                 });
                 if !action.kind.is_intervention()
-                    || action.authorization != Authorization::Granted
+                    || !matches!(&action.authorization, Authorization::Granted { .. })
                     || !has_observed_outcome
                 {
                     return Err(ValidationError::InterventionEvidenceWithoutAction);
@@ -765,9 +807,9 @@ impl Ledger {
         }
 
         for repair in &self.repairs {
-            for hypothesis_id in &repair.hypothesis_ids {
+            for hypothesis_record_id in &repair.hypothesis_record_ids {
                 let hypothesis = hypotheses_by_id
-                    .get(hypothesis_id.as_str())
+                    .get(hypothesis_record_id.as_str())
                     .ok_or(ValidationError::RepairReferenceMismatch)?;
                 if hypothesis.sequence >= repair.sequence {
                     return Err(ValidationError::RepairReferenceMismatch);
@@ -789,6 +831,17 @@ impl Ledger {
                 .ok_or(ValidationError::MissingReference)?;
             if grade.sequence <= repair.sequence || grade.patch_digest != repair.patch_digest {
                 return Err(ValidationError::GradePatchMismatch);
+            }
+            if grade.kind == GradeKind::PristineRegrade
+                && !self.grades.iter().any(|primary| {
+                    primary.kind == GradeKind::Primary
+                        && primary.repair_id == grade.repair_id
+                        && primary.patch_digest == grade.patch_digest
+                        && primary.sequence < grade.sequence
+                        && primary.execution_id != grade.execution_id
+                })
+            {
+                return Err(ValidationError::RegradeWithoutPrimary);
             }
         }
 
@@ -823,7 +876,9 @@ mod tests {
                 sequence: 4,
             }],
             hypotheses: vec![HypothesisRecord {
-                id: "h1".into(),
+                id: "h1-r1".into(),
+                hypothesis_id: "h1".into(),
+                previous_record_id: None,
                 binding: binding.clone(),
                 claim: "feature gate causes the observed regression".into(),
                 applicability_domain: "pinned Rust workspace / declared feature matrix".into(),
@@ -854,7 +909,7 @@ mod tests {
                 binding: binding.clone(),
                 forecast_id: "f1".into(),
                 kind: ActionKind::ConfigurationPerturbation,
-                authorization: Authorization::Granted,
+                authorization: Authorization::Granted { decision_id: "auth-1".into() },
                 sequence: 3,
             }],
             outcomes: vec![OutcomeRecord {
@@ -872,7 +927,7 @@ mod tests {
                 id: "r1".into(),
                 binding: binding.clone(),
                 patch_digest: Digest([4; 32]),
-                hypothesis_ids: vec!["h1".into()],
+                hypothesis_record_ids: vec!["h1-r1".into()],
                 outcome_ids: vec!["o1".into()],
                 sequence: 7,
             }],
@@ -993,7 +1048,7 @@ mod tests {
     #[test]
     fn denied_intervention_cannot_have_an_observed_outcome() {
         let mut ledger = base_ledger();
-        ledger.actions[0].authorization = Authorization::Denied;
+        ledger.actions[0].authorization = Authorization::Denied { decision_id: "deny-1".into() };
         assert_eq!(
             ledger.validate(),
             Err(ValidationError::DeniedActionExecuted)
