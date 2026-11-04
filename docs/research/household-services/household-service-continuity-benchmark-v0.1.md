@@ -277,7 +277,22 @@ Test these hypotheses against deterministic and later physically measured scenar
 - **Local autonomy + compositional planning:** coordinator proposes allocations; appliance-local safety, manual override and safe fallback remain authoritative.
 - **Household/city interoperability without centralization:** share read-only service and outage evidence where authorized; do not create a municipal command interface or imply authority.
 
-## 10. Adversarial controls
+## 10. Energy-carrier and thermal-boundary accounting
+
+A household water/thermal benchmark must not collapse electrical input and useful thermal output merely because both can be expressed in kWh.
+
+Record separately:
+- wall electrical energy input (kWh-electric) by appliance, pump, heat pump, controls and standby;
+- useful thermal energy delivered at the declared service boundary (kWh-thermal);
+- thermal storage state change, charge/discharge loss, ambient loss and rejected heat;
+- upstream hot-water or externally supplied thermal input, if present;
+- pump/fan/control parasitic electricity and duty profile.
+
+Do not subtract kWh-electric from kWh-thermal or combine them as if they were the same carrier. A COP or coefficient-of-performance ratio is a derived metric, not an accounting identity and not a validation of either meter. It must bind exact input/output measurement boundaries, a common observation window, operating mode/thermal lift, instrument calibration/uncertainty, storage state change and relevant boundary heat losses.
+
+For an electrical service deficit, compare electrical kW demand against electrical kW delivery. For a useful-heat service deficit, compare useful thermal kW demand against useful thermal kW delivered. Cross-carrier comparisons are invalid even when the numeric unit label is kW. The service-deficit implementation tracked by [#10486](https://github.com/Luminous-Dynamics/symthaea/issues/10486) follows this type separation.
+
+## 11. Adversarial controls
 
 At minimum:
 - same tank litres, different elevation/pump curve/fixture pressure;
@@ -297,7 +312,7 @@ At minimum:
 
 No sensitive demographic labels are needed for this synthetic corpus. Report service shortfalls by declared service class and demand window; do not infer protected traits.
 
-## 11. Proposed acceptance gates
+## 12. Proposed acceptance gates
 
 These are research hypotheses, not standards or achieved results:
 - Every synthetic hard safety/quality violation is either detected or left explicitly unresolved; none is silently accepted.
@@ -307,7 +322,7 @@ These are research hypotheses, not standards or achieved results:
 - Report the distinct #10342 hypothesis of at least 25% longer verified critical-water service versus the unbuffered reference; do not confuse that easier comparison with beating conventional tank + pump.
 - Determine physical sample sizes only after pilot variance and clustering are measured. Scenario count is not household sample size.
 
-## 12. No-runner tranche and physical gate
+## 13. No-runner tranche and physical gate
 
 Before executing any candidate logic:
 1. freeze scenario, demand, disturbance and initial-state contracts;
@@ -319,7 +334,7 @@ Before executing any candidate logic:
 
 No candidate pump/valve/actuator logic is executed on live household plumbing or mains-connected equipment in this tranche. Physical work requires qualified design/install review, pressure/electrical protections, isolation and containment, manual fallback and independent observation.
 
-## 13. Evidence strata and claim ceiling
+## 14. Evidence strata and claim ceiling
 
 - E1: within-rig repeatability under a frozen configuration and disturbance profile.
 - E2: independent operator/lab reproducibility of the same profile.
