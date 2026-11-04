@@ -981,6 +981,52 @@ mod tests {
     }
 
     #[test]
+    fn hypothesis_updates_are_linked_immutable_revisions() {
+        let mut ledger = base_ledger();
+        let mut revision = ledger.hypotheses[0].clone();
+        revision.id = "h1-r2".into();
+        revision.previous_record_id = Some("h1-r1".into());
+        revision.status = HypothesisStatus::Unresolved;
+        revision.sequence = 7;
+        ledger.hypotheses.push(revision);
+        ledger.repairs[0].sequence = 8;
+        ledger.grades[0].sequence = 9;
+        assert_eq!(ledger.validate(), Ok(()));
+    }
+
+    #[test]
+    fn hypothesis_revision_cannot_skip_or_cross_identity() {
+        let mut ledger = base_ledger();
+        ledger.hypotheses[0].previous_record_id = Some("missing-revision".into());
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::HypothesisRevisionChain)
+        );
+    }
+
+    #[test]
+    fn pristine_regrade_requires_a_prior_primary_grade() {
+        let mut ledger = base_ledger();
+        ledger.grades[0].kind = GradeKind::PristineRegrade;
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::RegradeWithoutPrimary)
+        );
+    }
+
+    #[test]
+    fn pristine_regrade_must_follow_primary_for_same_patch() {
+        let mut ledger = base_ledger();
+        let mut regrade = ledger.grades[0].clone();
+        regrade.id = "g2".into();
+        regrade.kind = GradeKind::PristineRegrade;
+        regrade.execution_id = "run-regrade".into();
+        regrade.sequence = 9;
+        ledger.grades.push(regrade);
+        assert_eq!(ledger.validate(), Ok(()));
+    }
+
+    #[test]
     fn post_hoc_forecast_is_rejected() {
         let mut ledger = base_ledger();
         ledger.actions[0].sequence = 2;
