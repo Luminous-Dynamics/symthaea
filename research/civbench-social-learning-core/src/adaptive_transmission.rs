@@ -685,6 +685,24 @@ struct Rng {
     state: u64,
 }
 
+const STREAM_GRAPH: u64 = 0xA6D3_5B79_1C42_E80F;
+const STREAM_DISCOVERY: u64 = 0xC58A_7E13_42B9_D601;
+const STREAM_SCHEDULE: u64 = 0x91F0_2C6B_D835_A47E;
+const STREAM_ACQUISITION: u64 = 0xE43B_19D7_6A20_F58C;
+
+/// Derive an independent deterministic stream for a subsystem and step.
+/// This prevents policy-specific scheduler draws from shifting the graph,
+/// discovery or acquisition random streams in matched policy comparisons.
+/// It does not promise per-action pairing when policy-dependent candidate
+/// sets differ.
+fn stream_seed(master_seed: u64, domain: u64, step: usize) -> u64 {
+    let mixed = master_seed
+        ^ domain
+        ^ (step as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    let mut mixer = Rng::new(mixed);
+    mixer.next_u64()
+}
+
 impl Rng {
     fn new(seed: u64) -> Self {
         Self { state: seed }
@@ -1105,11 +1123,15 @@ fn apply_actions(
     let before_group = group_known_elements(agents);
     for action in actions {
         attention_used += 1;
+        // Consume the draw for every scheduled message before checking
+        // recipient redundancy. This keeps subsequent message slots aligned
+        // between matched-schedule/content-shuffle ablations.
+        let acquisition_draw = rng.bernoulli(acquisition_probability);
         if agents[action.receiver].known_recipes.contains(&action.recipe_id) {
             redundant += 1;
             continue;
         }
-        if !rng.bernoulli(acquisition_probability) {
+        if !acquisition_draw {
             continue;
         }
         // The sender must genuinely possess the transmitted recipe. This is
@@ -1159,11 +1181,11 @@ fn simulate_internal(
     program: Option<&TransmissionProgram>,
 ) -> Result<Run, ConfigError> {
     config.validate(task)?;
-    let mut rng = Rng::new(seed);
+    let mut graph_rng = Rng::new(stream_seed(seed, STREAM_GRAPH, 0));
     let graph = SocialGraph::generate(
         config.population_size,
         config.network_shortcut_probability,
-        &mut rng,
+        &mut graph_rng,
     );
     let mut agents: Vec<AgentKnowledge> = (0..config.population_size)
         .map(|_| AgentKnowledge::new(task))
@@ -1187,23 +1209,27 @@ fn simulate_internal(
     history.push(collective_metrics(0, task, &agents, 0, 0, 0, 0, 0, 0));
 
     for step in 1..=config.steps {
+        let mut discovery_rng = Rng::new(stream_seed(seed, STREAM_DISCOVERY, step));
+        let mut schedule_rng = Rng::new(stream_seed(seed, STREAM_SCHEDULE, step));
+        let mut acquisition_rng = Rng::new(stream_seed(seed, STREAM_ACQUISITION, step));
+
         let individual_discoveries = individual_learning(
             task,
             &mut agents,
             config.individual_attempts_per_agent_step,
             config.individual_discovery_probability,
-            &mut rng,
+            &mut discovery_rng,
         );
         let actions = match program {
             Some(program) => program_schedule(task, &graph, &agents, config, program),
-            None => build_schedule(config.policy, task, &graph, &agents, config, &mut rng),
+            None => build_schedule(config.policy, task, &graph, &agents, config, &mut schedule_rng),
         };
         let (redundant, acquisitions, new_results, attention_used) = apply_actions(
             task,
             &mut agents,
             &actions,
             config.acquisition_probability,
-            &mut rng,
+            &mut acquisition_rng,
         );
         history.push(collective_metrics(
             step,
@@ -1514,6 +1540,60 @@ mod tests {
                 version: 1,
             })
         );
+    }
+
+    #[test]
+    fn policy_runs_share_graph_and_first_step_innovation_randomness() {
+        let task = InnovationTask::family_task(TaskFamily::Branching);
+        for seed in 0..32 {
+            let base = deterministic_config(TransmissionPolicy::StateAwareFrontier);
+            let state_aware = simulate(&task, base, seed).unwrap();
+            let shuffled = simulate(
+                &task,
+                Config {
+                    policy: TransmissionPolicy::StateAwareRecipientShuffled,
+                    ..base
+                },
+                seed,
+            )
+            .unwrap();
+            let random_content = simulate(
+                &task,
+                Config {
+                    policy: TransmissionPolicy::RandomNetworkContent,
+                    ..base
+                },
+                seed,
+            )
+            .unwrap();
+
+            assert_eq!(state_aware.graph, shuffled.graph);
+            assert_eq!(state_aware.graph, random_content.graph);
+            assert_eq!(
+                state_aware.history[1].individual_recipe_discoveries,
+                shuffled.history[1].individual_recipe_discoveries
+            );
+            assert_eq!(
+                state_aware.history[1].individual_recipe_discoveries,
+                random_content.history[1].individual_recipe_discoveries
+            );
+        }
+    }
+
+    #[test]
+    fn stochastic_subsystems_use_domain_separated_streams() {
+        let seed = 2026;
+        let step = 3;
+        let streams = [
+            stream_seed(seed, STREAM_GRAPH, 0),
+            stream_seed(seed, STREAM_DISCOVERY, step),
+            stream_seed(seed, STREAM_SCHEDULE, step),
+            stream_seed(seed, STREAM_ACQUISITION, step),
+        ];
+        let mut sorted = streams;
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(sorted.len(), streams.len());
     }
 
     #[test]
