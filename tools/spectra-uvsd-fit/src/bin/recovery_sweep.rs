@@ -107,14 +107,14 @@ fn main() {
                     .diagnostics
                     .solution_parameter_spread
                     .as_ref()
-                    .map(|values| values.iter().map(f64::to_string).collect::<Vec<_>>().join(";"))
+                    .map(|values| values.iter().map(|value| value.to_string()).collect::<Vec<_>>().join(";"))
                     .map(|value| format!(r#""{value}""#))
                     .unwrap_or_default();
                 let curvature = result
                     .diagnostics
                     .diagonal_curvature
                     .as_ref()
-                    .map(|values| values.iter().map(f64::to_string).collect::<Vec<_>>().join(";"))
+                    .map(|values| values.iter().map(|value| value.to_string()).collect::<Vec<_>>().join(";"))
                     .map(|value| format!(r#""{value}""#))
                     .unwrap_or_default();
                 println!(
