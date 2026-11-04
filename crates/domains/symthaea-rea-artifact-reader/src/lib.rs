@@ -2194,6 +2194,63 @@ mod tests {
     }
 
     #[test]
+    fn differential_zip_rs_93_metadata_and_stream_match_preserved_occurrences() {
+        let fixtures = [
+            TestEntry {
+                name: b"duplicate.bin",
+                data: b"first archive occurrence",
+                flags: 0,
+                method: 0,
+                external_attributes: 0,
+            },
+            TestEntry {
+                name: b"duplicate.bin",
+                data: b"second archive occurrence",
+                flags: 0,
+                method: 0,
+                external_attributes: 0,
+            },
+            TestEntry {
+                name: b"nested/asset.dat",
+                data: b"third independent payload",
+                flags: 0,
+                method: 0,
+                external_attributes: 0,
+            },
+        ];
+        let bytes = build_zip(&fixtures, &[]);
+        let path = write_temp(&bytes);
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let mut oracle = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+
+        assert_eq!(oracle.len(), reader.inventory().entries.len());
+        oracle.validate_header_consistency().unwrap();
+        assert!(!oracle.has_overlapping_entries().unwrap());
+
+        for (index, expected) in reader.inventory().entries.iter().enumerate() {
+            {
+                let metadata = oracle.by_index_data(index).unwrap();
+                assert_eq!(metadata.name_raw(), expected.raw_name);
+                assert_eq!(metadata.header_start(), expected.local_header_offset);
+                assert_eq!(metadata.compressed_size(), expected.declared_compressed_size);
+                assert_eq!(metadata.size(), expected.declared_uncompressed_size);
+                assert_eq!(metadata.crc32(), expected.declared_crc32);
+            }
+
+            let mut file = oracle.by_index(index).unwrap();
+            let mut observed = Vec::new();
+            file.read_to_end(&mut observed).unwrap();
+            assert_eq!(file.name_raw(), expected.raw_name);
+            assert_eq!(file.header_start(), expected.local_header_offset);
+            assert_eq!(file.compressed_size(), expected.declared_compressed_size);
+            assert_eq!(file.size(), expected.declared_uncompressed_size);
+            assert_eq!(file.crc32(), expected.declared_crc32);
+            assert_eq!(observed, fixtures[index].data);
+        }
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn deterministic_archive_mutations_never_panic_inventory_or_content_read() {
         let baseline = single_entry(b"mutation-target.bin", b"known payload for deterministic mutation");
         let mut state = 0x9e37_79b9_7f4a_7c15u64;
