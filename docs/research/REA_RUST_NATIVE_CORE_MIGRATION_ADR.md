@@ -957,3 +957,13 @@ The new [#10452 — handle-bound source identity across Windows/non-Unix](https:
 
 This changes the supported-platform claim, not the REA Evidence identity contract. A file identity is not proof of immutable contents, producer authenticity or absence of a malicious writer. Content hash, file identity and producer attestation remain distinct claims.
 
+### Independent Deflate implementation oracle
+
+The test-only `zip 9.3.0` harness has been upgraded to enable `deflate-flate2-zlib-rs`. The production decoder path in `zipcore 0.10.2` uses `miniz_oxide`; the oracle now uses the distinct `zlib-rs` backend in `flate2` to decode the exact same Deflate bytes emitted by the production candidate.
+
+A new differential test writes a bounded Deflate member through zipcore, verifies it through Symthaea's content API, and independently reads the same archive through zip-rs/zlib-rs, comparing the complete decompressed byte sequence and length.
+
+This closes a significant gap in the previous oracle design: it was possible to compare container parsers while both used the same Deflate engine. The new fixture separates codec implementation lineage as well as parser lineage. It does **not** make the ZIP-level CRC checks independent: the committed lock graph previously showed both zipcore and zip use `crc32fast 1.5.4` for ZIP CRC, while the zlib-rs decoder is a separately implemented raw Deflate engine.
+
+The updated feature graph requires a regenerated Cargo.lock. The reader workflow temporarily resolves and archives the updated lock so the exact graph can be committed before promotion. No Deflate cross-implementation test pass is claimed until that exact-head workflow completes.
+
