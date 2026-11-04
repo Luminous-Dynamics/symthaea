@@ -1670,7 +1670,8 @@ mod tests {
     fn instrumentation_replaces_exact_unicode_aware_sorry_span() {
         let source = "theorem sample (α : Nat) : True := by sorry\n";
         let line = source.lines().next().unwrap();
-        let start = line.find("sorry").unwrap() as u64;
+        let byte_start = line.find("sorry").unwrap();
+        let start = line[..byte_start].chars().count() as u64;
         let instrumented = instrument_sorry_span(source, 1, start, 1, start + 5).unwrap();
         assert!(instrumented.contains("by trace_state\n  sorry"));
         assert_eq!(source.matches("sorry").count(), 1);
