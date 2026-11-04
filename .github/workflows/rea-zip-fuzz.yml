@@ -46,8 +46,13 @@ jobs:
           echo "dd8a2bd8c16d808363a1d1e7560a4cc86494393c1a202a478db00f00ae53d099  fuzz/corpus/zip_inventory_and_content/minimal-stored-entry.zip" | sha256sum --check -
       - name: Record exact fuzz run context
         run: |
+          checked_out_commit="$(git rev-parse HEAD)"
+          test "$checked_out_commit" = "$GITHUB_SHA"
+          pr_head_commit="${{ github.event.pull_request.head.sha || github.sha }}"
           {
-            echo "source_commit=$GITHUB_SHA"
+            echo "tested_tree_commit=$checked_out_commit"
+            echo "workflow_event_sha=$GITHUB_SHA"
+            echo "pull_request_head_sha=$pr_head_commit"
             echo "rust_toolchain=nightly-2026-11-03"
             rustc +nightly-2026-11-03 --version --verbose
             cargo +nightly-2026-11-03 --version
