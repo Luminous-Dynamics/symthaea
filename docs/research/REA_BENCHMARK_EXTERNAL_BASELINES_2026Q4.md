@@ -1,6 +1,6 @@
 # Reverse-Engineering Benchmark Baselines and Comparability Matrix
 
-**Snapshot date:** 2026-11-03  
+**Snapshot date:** 2026-11-04  
 **Purpose:** external reference points for Symthaea + REA evaluation  
 **Status:** source-dated public baselines; no Luminous benchmark result is implied
 
@@ -169,3 +169,85 @@ A superiority claim requires matched inputs, budgets, safety settings, attempts 
 - #10026 — Decompile-Bench and OWASP control-verification programme.
 - #10029 — benchmark run receipt and denominator/accounting validator.
 - #10298 — from-scratch firmware reconstruction.
+
+
+## Verification refresh — 2026-11-04
+
+This section records a fresh check of the official benchmark/catalogue pages. It supersedes earlier page snapshots only where explicitly stated; the existing task protocols and historical observations remain unchanged.
+
+### SRE-Bench: current official result and denominator interpretation
+
+The DAPLab page reports 262 eligible binary instances and 1,572 deterministic tasks, six tasks per instance, across five domains. Its public-facing table currently lists:
+
+| Model | Graded / 262 | Mean tasks / 6 | Fully solved / graded | Zero-credit / graded |
+|---|---:|---:|---:|---:|
+| GPT-6-Astra | 181 (69.1%) | 5.55 | 149 (82.3%) | 7 (3.9%) |
+| GPT-5.6-Sol | 254 (96.9%) | 3.69 | 80 (31.5%) | 41 (16.1%) |
+| Claude-Fable-5.1 | 223 (85.1%) | 2.58 | 60 (26.9%) | 96 (43.0%) |
+| Claude-Opus-5 | 256 (97.7%) | 1.91 | 32 (12.5%) | 118 (46.1%) |
+| GPT-5.5 | 262 (100%) | 1.02 | 10 (3.8%) | 148 (56.5%) |
+| DeepSeek-V4.1-Flash | 262 (100%) | 0.85 | 2 (0.8%) | 166 (63.4%) |
+| Grok-4.5 | 218 (83.2%) | 0.45 | 2 (0.9%) | 160 (73.4%) |
+| GLM-5.2 | 262 (100%) | 0.21 | 0 (0%) | 217 (82.8%) |
+
+The GPT-6-Astra public-facing full-solve proportion is conditional on 181 graded instances: 149/181 = 82.3%. Against all 262 eligible instances, those 149 full solves are 56.9%. Both values are useful, but they answer different questions. The ungraded 81 instances are not silently passes or failures.
+
+The same official page reports a distinct **unconstrained** setting in which GPT-6-Astra achieved pass@1 = 88.0% and pass@4 = 99.2%. Do not combine those numbers with the public-facing safety-enabled table or describe pass@4 as one-shot reliability. The 11.2 percentage-point gap makes repeated-attempt selection a separate capability from reliable first-attempt diagnosis.
+
+### AgentRE-Bench v3.1: latest official Windows PE scorecard
+
+The current v3.1 results page reports 500 attempts: five models × 20 stripped/unstripped artifacts × five attempts. The 20 artifacts represent 10 Windows programs with and without symbols. Each attempt has a 25-tool-call budget.
+
+| Model | Overall / 100 | Main / 100 | Bonus / 100 | Valid answers |
+|---|---:|---:|---:|---:|
+| Muse Wonder | 87.37 | 87.37 | 87.37 | 100/100 |
+| GPT-6 Astra | 87.04 | 86.40 | 92.82 | 100/100 |
+| Grok 4.7 | 79.62 | 81.02 | 67.04 | 96/100 |
+| Claude Opus 5.5 | 69.66 | 68.84 | 77.03 | 78/100 |
+
+The benchmark reports 95% intervals and preserves original answers/transcripts plus checksum-verified scoring. Its methodology states that valid-answer coverage and answer quality are separate, and that the winner label does not establish repeat-run superiority or practical equivalence. This remains a Windows PE cohort and must not be pooled or ranked numerically against SRE-Bench.
+
+### Decompile-Bench: item-level release measurement
+
+The Stanford AIMS measurement database now exposes 72,059 released function-level decompiler outputs for HumanEval, MBPP and GitHub2025. Its released edit-similarity metric is explicitly **textual similarity, not executable correctness**. The current response matrix lists:
+
+- IDA Pro: 71,496 observations, mean 0.206.
+- Ghidra: 69,635 observations, mean 0.202.
+
+The two counts sum to 141,131 observations across the subjects; they are not 141,131 unique benchmark items. Preserve repeated/item-level structure and reproduce the official metric before adding separate compile, held-out execution-equivalence, control-flow/data-flow and side-effect oracles.
+
+### OWASP mobile verification: MASTG v2 and MASWE v1
+
+MASTG v2.0.0 is the first stable release of the refactored, machine-readable mobile testing guide. Its tests carry stable IDs and structured metadata, and explicitly separate **Observation** (raw test output) from **Evaluation** (the pass/fail rule). MASWE v1.0.0 is the first stable weakness catalogue.
+
+The architecture consequence is unchanged but now grounded in stable released versions:
+
+`MASVS control → MASWE weakness → MASTG test → technique/tool → raw observation → versioned evaluation → REA Evidence → independent claim receipt`
+
+A test result is not automatically a MASVS control pass. Keep static, dynamic, hook, manual and business-logic evidence distinct; platform and target profiles must remain explicit. A missing test/oracle is an oracle gap, not a pass.
+
+### MobSF current tool baseline
+
+The MobSF GitHub releases page lists v4.6.4, released 2026-10-31, as the latest release at this refresh. Its notes add direct standalone DEX static analysis, a built-in authenticated live Web Traffic viewer using mitmproxy, and other static/dynamic fixes. Record the exact MobSF release, configuration, Android/iOS target profile and instrumentation environment for matched comparisons; do not assume a release tag means that every dynamic target configuration is supported.
+
+### Updated competitive interpretation
+
+The latest evidence does not support a claim that a new orchestration layer alone beats specialist tools. It supports a more precise opportunity:
+
+1. Match or exceed specialist baselines on **selected** parser/inventory/decompiler operations with exact parity and measured resource cost.
+2. Beat single-provider workflows on **claim reliability**, measured by held-out correctness, calibration, abstention and false confident claims.
+3. Beat static-only workflows on **end-to-end investigation quality**, measured by causal localization, experiment value, independent postcondition validation and time-to-correct-diagnosis.
+4. Improve **evidence continuity** across acquisition, transformations, analysis, runtime observations and adjudication.
+5. Show the benefit under identical inputs, versions, target/environment, access permissions, model/tool-call budgets, time/compute and complete denominators.
+
+No Luminous result is reported by this refresh. All values above are external, publisher-reported reference data.
+
+### Official sources checked 2026-11-04
+
+- SRE-Bench current leaderboard and methodology: https://daplab.cs.columbia.edu/benchmarks/sre-bench/
+- AgentRE-Bench v3.1 results (October 25, 2026): https://www.agentre-bench.ai/results/v3-1/
+- Stanford AIMS Decompile-Bench item-level database: https://aims.stanford.edu/measurement-db/decompile_bench
+- MASTG v2.0.0 release announcement: https://mas.owasp.org/news/2026/07/04/mastg-v200-release/
+- MASTG v2.0.0 signed release: https://github.com/OWASP/mastg/releases/tag/v2.0.0
+- MASWE stable catalogue: https://mas.owasp.org/MASWE/
+- MobSF official releases: https://github.com/MobSF/Mobile-Security-Framework-MobSF/releases
