@@ -227,6 +227,7 @@ jobs:
           "$RUNNER_TEMP/pitb-sorrydb-venv/bin/python" - \
             "$RUNNER_TEMP/sorrydb-audit.synthetic.json" \
             "$RUNNER_TEMP/sorrydb-audit.synthetic-runs.jsonl" <<'PY'
+          import hashlib
           import json
           import sys
           from pathlib import Path
@@ -250,6 +251,9 @@ jobs:
               errors = list(Draft202012Validator(run_schema).iter_errors(run))
               if errors:
                   raise SystemExit("synthetic proof-run schema errors: " + "; ".join(e.message for e in errors))
+          run_bytes = Path(sys.argv[2]).read_bytes()
+          if report["run_input_sha256"] != hashlib.sha256(run_bytes).hexdigest():
+              raise SystemExit("synthetic proof-run report digest differs from JSONL bytes")
           if len(runs) != 2 or report["run_count"] != 2 or report["verified_success_count"] != 1:
               raise SystemExit("synthetic proof-run denominators changed")
           if report["strategy_summaries"][0]["attempts"] != 2:
