@@ -6,20 +6,52 @@
       "description": "Negative control: intentional WAIT for every paired member.",
       "predictions_by_family": [
         [
-          "WAIT",
-          "WAIT"
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.95,
+            "act_probability": 0.05
+          },
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.95,
+            "act_probability": 0.05
+          }
         ],
         [
-          "WAIT",
-          "WAIT"
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.95,
+            "act_probability": 0.05
+          },
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.95,
+            "act_probability": 0.05
+          }
         ],
         [
-          "WAIT",
-          "WAIT"
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.95,
+            "act_probability": 0.05
+          },
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.95,
+            "act_probability": 0.05
+          }
         ],
         [
-          "WAIT",
-          "WAIT"
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.95,
+            "act_probability": 0.05
+          },
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.95,
+            "act_probability": 0.05
+          }
         ]
       ],
       "expected": {
@@ -38,20 +70,52 @@
       "description": "Negative control: RESPOND for every paired member.",
       "predictions_by_family": [
         [
-          "RESPOND",
-          "RESPOND"
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.95,
+            "act_probability": 0.95
+          },
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.95,
+            "act_probability": 0.95
+          }
         ],
         [
-          "RESPOND",
-          "RESPOND"
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.95,
+            "act_probability": 0.95
+          },
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.95,
+            "act_probability": 0.95
+          }
         ],
         [
-          "RESPOND",
-          "RESPOND"
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.95,
+            "act_probability": 0.95
+          },
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.95,
+            "act_probability": 0.95
+          }
         ],
         [
-          "RESPOND",
-          "RESPOND"
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.95,
+            "act_probability": 0.95
+          },
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.95,
+            "act_probability": 0.95
+          }
         ]
       ],
       "expected": {
@@ -70,20 +134,52 @@
       "description": "Hand-written fixture sanity policy; not a learned-model result.",
       "predictions_by_family": [
         [
-          "RESPOND",
-          "WAIT"
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.9,
+            "act_probability": 0.9
+          },
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.9,
+            "act_probability": 0.1
+          }
         ],
         [
-          "CONTINUE",
-          "ASK"
+          {
+            "decision": "CONTINUE",
+            "decision_confidence": 0.85,
+            "act_probability": 0.9
+          },
+          {
+            "decision": "ASK",
+            "decision_confidence": 0.7,
+            "act_probability": 0.1
+          }
         ],
         [
-          "RESPOND",
-          "ABSTAIN"
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.9,
+            "act_probability": 0.9
+          },
+          {
+            "decision": "ABSTAIN",
+            "decision_confidence": 0.8,
+            "act_probability": 0.1
+          }
         ],
         [
-          "YIELD",
-          "WAIT"
+          {
+            "decision": "YIELD",
+            "decision_confidence": 0.9,
+            "act_probability": 0.9
+          },
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.9,
+            "act_probability": 0.1
+          }
         ]
       ],
       "expected": {
