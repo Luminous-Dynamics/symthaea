@@ -904,6 +904,28 @@ mod tests {
     }
 
     #[test]
+    fn identified_claim_requires_declared_assumptions() {
+        let mut ledger = base_ledger();
+        ledger.hypotheses[0].status = HypothesisStatus::IdentifiedUnderAssumptions;
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::CausalStatusWithoutIntervention)
+        );
+    }
+
+    #[test]
+    fn test_execution_requires_explicit_authorization() {
+        let mut ledger = base_ledger();
+        ledger.actions[0].kind = ActionKind::TestExecution;
+        ledger.actions[0].authorization = Authorization::NotRequired;
+        ledger.forecasts[0].action_kind = ActionKind::TestExecution;
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::MissingAuthorization)
+        );
+    }
+
+    #[test]
     fn post_hoc_forecast_is_rejected() {
         let mut ledger = base_ledger();
         ledger.actions[0].sequence = 2;
