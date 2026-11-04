@@ -189,6 +189,19 @@ We should not attempt to replace mature CAD or solver companies with an immature
 - **Commercial CAE platforms** offer powerful solvers and cloud execution. The distinctive opportunity is connecting requirements, multiple solvers, uncertainty, experiments, measured outcomes, learning and public provenance without tying the entire workflow to one vendor. PhysicsNeMo is a capable open physics-ML stack for neural operators, GNNs, transformers and PINNs; treat its learned models as optional, versioned surrogate candidates, not replacements for qualified solvers or a validation authority.
 - SimScale's 2026 survey of 350 senior engineering leaders reports agent use in 19% of simulation/CAE workflows and 11% of CAD workflows; the survey is vendor-produced and self-reported, not a controlled performance benchmark. It suggests adoption is still early, but it does not prove any specific technical gap.
 
+### How Luminous can compete rather than imitate
+
+Do not attempt a broad "all engineering" leaderboard sprint. Use a wedge strategy:
+
+1. **Win a narrow workflow end to end.** Start with the paper-first bridge/truss learner journey, then a single authorized reverse-engineering task. Prove the complete requirements → model → design → analysis → experiment-selection → measured revision loop before adding more domains.
+2. **Exploit model and solver complementarity.** Benchmark strong frontier-model-only and model-plus-commercial-tool baselines first. Symthaea's potential value is context continuity, contradiction detection, typed scientific models, uncertainty-aware reasoning and selecting the next useful observation; Symtropy should call suitable specialist solvers rather than recreate their mature numerics.
+3. **Optimize all-gates success, not partial-credit theatre.** PLE's 91% average individual-constraint adherence but 41% all-hard-check clearance is a warning: near-correct is still not acceptable in physical engineering. Report hard-gate pass probability, failure severity and justified abstention before cost/weight optimization.
+4. **Make experiment choice a first-class capability.** Compare random, fixed-sequence, expert-selected and model-selected experiments under an identical budget. Score information gain only when it changes a decision or reduces uncertainty in a decision-relevant quantity.
+5. **Make the human a co-inventor, not a prompt operator.** Demonstrate both artifact quality and unaided transfer. Offer support-mode choice and progressive hints; preserve the ability to work offline, ask a teacher/peer, decline AI or keep a project private.
+6. **Publish failure as well as success.** Release permitted fixtures, exact versions, input/output digests, mutation controls, exclusions, cost and failure analyses. Independent reproduction is part of the product, not a marketing afterthought.
+
+A result should be called better than SOTA only after the incumbent baseline is replicated on the same held-out tasks, exact grader, tools and resource budget, with uncertainty intervals and independent review. Otherwise report it as a promising local result, not a leaderboard win.
+
 Our differentiation should be **decision quality per independently accepted artifact**, with a human who learns, and an evidence record that an external reviewer can inspect.
 
 ## 7. Learning research basis
