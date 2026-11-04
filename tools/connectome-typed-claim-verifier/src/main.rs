@@ -933,8 +933,12 @@ mod tests {
         let mut bundle = parse_fixture();
         bundle["queries"][2]["requested_claim_type"] =
             Value::String("MIXED_EVIDENCE_PATH".to_owned());
+        bundle["queries"][2]["allowed_relation_type_paths"][0]["relation_types"] =
+            json!(["ANATOMICAL_SYNAPSE_EDGE", "STATISTICAL_DEPENDENCE_EDGE"]);
         bundle["queries"][2]["path_results"][0]["asserted_claim_type"] =
             Value::String("MIXED_EVIDENCE_PATH".to_owned());
+        bundle["queries"][2]["path_results"][0]["ordered_claim_ids"] =
+            json!(["anat-syn-17", "stat-edge-activity"]);
         let report = verify(&bundle).expect("composed mixed evidence");
         assert_eq!(
             report["query_path_results"][2]["recomputed_disposition"],
