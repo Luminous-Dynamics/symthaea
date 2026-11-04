@@ -1,11 +1,12 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # Self-Test Generation — Agent Writes Its Own Tests
+//! # Example and Invocation-Smoke Test Generation
 //!
-//! Generates `#[test]` modules from function signatures and docstrings.
-//! This enables the coding agent to validate its own output without
-//! relying on externally provided test suites.
+//! Generates tests from caller-supplied input/output examples and a narrow set of
+//! type-directed invocation smoke probes. Smoke probes demonstrate only that a
+//! constructed call can be formed; they do not establish behavioral correctness.
+//! Unsupported inputs and missing behavioral oracles are reported explicitly.
 //!
 //! ```text
 //! Function signature: fn fibonacci(n: u64) -> u64
@@ -22,8 +23,6 @@
 //! }
 //! ```
 //!
-//! No LLM can do this natively — it requires understanding function semantics
-//! well enough to derive test cases, not just pattern-match from training data.
 
 use symthaea_core::synthesis_trait::SynthesisRequest;
 use quote::ToTokens;
@@ -110,6 +109,11 @@ impl TestGenerator {
                 }
                 Err(reason) => Self::push_unique_reason(&mut unsupported_reasons, reason),
             }
+        } else if request.examples.is_empty() {
+            Self::push_unique_reason(
+                &mut unsupported_reasons,
+                "No Rust signature or explicit input/output examples were provided; no tests were generated.".to_string(),
+            );
         }
 
         let source = Self::render_test_module(&request.name, &tests);
@@ -221,7 +225,7 @@ impl TestGenerator {
                 tests.push(GeneratedTest {
                     name: format!("test_{fn_name}_boundary_{}_{}", parameter.name, suffix),
                     assertion: format!("let _ = {fn_name}({arguments});"),
-                    category: TestCategory::Boundary,
+                    category: TestCategory::InvocationSmoke,
                 });
             }
         }
@@ -491,7 +495,7 @@ mod tests {
 
         assert_eq!(suite.tests.len(), 6);
         for test in &suite.tests {
-            assert_eq!(test.category, TestCategory::Boundary);
+            assert_eq!(test.category, TestCategory::InvocationSmoke);
             let args = test.assertion.split_once("clamp(").unwrap().1.trim_end_matches(");");
             assert_eq!(args.split(',').count(), 3, "{}", test.assertion);
         }
