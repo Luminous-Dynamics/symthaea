@@ -674,7 +674,8 @@ mod tests {
     #[test]
     fn public_cases_match_transparent_reference_dispositions() {
         let results = evaluate_corpus(&public_corpus());
-        let expected = reference()["expected"].as_array().unwrap();
+        let reference_data = reference();
+        let expected = reference_data["expected"].as_array().unwrap();
         assert_eq!(results.len(), expected.len());
         for result in results {
             let expected_case = expected
