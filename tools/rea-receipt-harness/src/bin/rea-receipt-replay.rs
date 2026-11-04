@@ -30,10 +30,16 @@ fn run() -> Result<(), (u8, String)> {
     let mut args = std::env::args_os();
     let program = args.next().unwrap_or_default();
     let archive = args.next().ok_or_else(|| {
-        (3, format!("usage: {} <archive.zip> <receipt.json>", program.to_string_lossy()))
+        (3, format!(
+            "usage: {} <archive.zip> <receipt.json>",
+            program.to_string_lossy()
+        ))
     })?;
     let receipt_path = args.next().ok_or_else(|| {
-        (3, format!("usage: {} <archive.zip> <receipt.json>", program.to_string_lossy()))
+        (3, format!(
+            "usage: {} <archive.zip> <receipt.json>",
+            program.to_string_lossy()
+        ))
     })?;
     if args.next().is_some() {
         return Err((3, "unexpected extra command-line arguments".into()));
@@ -88,13 +94,23 @@ fn run() -> Result<(), (u8, String)> {
             Ok(())
         }
         Err(ReplayError::Unsupported(detail)) => {
-            let output = json!({"outcome":"unsupported","reason":detail,"receipt_sha256":receipt_sha256});
-            eprintln!("{}", serde_json::to_string(&output).unwrap_or_else(|_| "{\"outcome\":\"unsupported\"}".into()));
+            let output =
+                json!({"outcome":"unsupported","reason":detail,"receipt_sha256":receipt_sha256});
+            eprintln!(
+                "{}",
+                serde_json::to_string(&output)
+                    .unwrap_or_else(|_| "{\"outcome\":\"unsupported\"}".into())
+            );
             Err((2, format!("unsupported: {detail}")))
         }
         Err(ReplayError::Rejected(detail)) => {
-            let output = json!({"outcome":"rejected","reason":detail,"receipt_sha256":receipt_sha256});
-            eprintln!("{}", serde_json::to_string(&output).unwrap_or_else(|_| "{\"outcome\":\"rejected\"}".into()));
+            let output =
+                json!({"outcome":"rejected","reason":detail,"receipt_sha256":receipt_sha256});
+            eprintln!(
+                "{}",
+                serde_json::to_string(&output)
+                    .unwrap_or_else(|_| "{\"outcome\":\"rejected\"}".into())
+            );
             Err((1, format!("rejected: {detail}")))
         }
         Err(ReplayError::Io(detail)) => Err((3, detail)),
