@@ -349,7 +349,7 @@ impl RunnerCpalClockFitV1 {
 #[serde(deny_unknown_fields)]
 pub struct CpalCallbackPlaybackFitPolicyV1 {
     pub minimum_anchor_count: usize,
-    pub maximum_abs_drift_ppm: f64,
+    pub maximum_abs_slope_deviation_ppm: f64,
     pub maximum_abs_residual_ns: f64,
     pub maximum_extrapolation_ns: u64,
 }
@@ -358,7 +358,7 @@ impl Default for CpalCallbackPlaybackFitPolicyV1 {
     fn default() -> Self {
         Self {
             minimum_anchor_count: 4,
-            maximum_abs_drift_ppm: 500.0,
+            maximum_abs_slope_deviation_ppm: 500.0,
             maximum_abs_residual_ns: 500_000.0,
             maximum_extrapolation_ns: 100_000_000,
         }
@@ -395,9 +395,9 @@ pub struct CpalCallbackPlaybackFitV1 {
     pub anchor_set_sha256: String,
     pub fit_policy_sha256: String,
     pub anchor_count: usize,
-    pub maximum_abs_drift_ppm: f64,
+    pub maximum_abs_slope_deviation_ppm: f64,
     pub maximum_allowed_abs_residual_ns: f64,
-    pub estimated_drift_ppm: f64,
+    pub estimated_slope_deviation_ppm: f64,
     pub median_abs_residual_ns: f64,
     pub p95_abs_residual_ns: f64,
     pub maximum_abs_residual_ns: f64,
@@ -427,7 +427,7 @@ pub enum CpalCallbackPlaybackFitErrorV1 {
     NonMonotonicPlaybackTime { index: usize },
     ZeroTimeVariance,
     NonFiniteFit,
-    DriftOutsidePolicy { drift_ppm: f64, maximum_abs_ppm: f64 },
+    SlopeDeviationOutsidePolicy { drift_ppm: f64, maximum_abs_ppm: f64 },
     ResidualOutsidePolicy { residual_ns: f64, maximum_abs_ns: f64 },
     QueryOutsideValidity { callback_time_ns: u64 },
     SerializationFailure { reason: String },
@@ -500,8 +500,8 @@ pub fn fit_cpal_callback_playback_v1(
             required,
         });
     }
-    if !policy.maximum_abs_drift_ppm.is_finite()
-        || policy.maximum_abs_drift_ppm < 0.0
+    if !policy.maximum_abs_slope_deviation_ppm.is_finite()
+        || policy.maximum_abs_slope_deviation_ppm < 0.0
         || !policy.maximum_abs_residual_ns.is_finite()
         || policy.maximum_abs_residual_ns < 0.0
     {
@@ -576,14 +576,14 @@ pub fn fit_cpal_callback_playback_v1(
         return Err(CpalCallbackPlaybackFitErrorV1::NonFiniteFit);
     }
 
-    let estimated_drift_ppm = (slope - 1.0) * 1_000_000.0;
-    if !estimated_drift_ppm.is_finite() {
+    let estimated_slope_deviation_ppm = (slope - 1.0) * 1_000_000.0;
+    if !estimated_slope_deviation_ppm.is_finite() {
         return Err(CpalCallbackPlaybackFitErrorV1::NonFiniteFit);
     }
-    if estimated_drift_ppm.abs() > policy.maximum_abs_drift_ppm {
-        return Err(CpalCallbackPlaybackFitErrorV1::DriftOutsidePolicy {
-            drift_ppm: estimated_drift_ppm,
-            maximum_abs_ppm: policy.maximum_abs_drift_ppm,
+    if estimated_slope_deviation_ppm.abs() > policy.maximum_abs_slope_deviation_ppm {
+        return Err(CpalCallbackPlaybackFitErrorV1::SlopeDeviationOutsidePolicy {
+            drift_ppm: estimated_slope_deviation_ppm,
+            maximum_abs_ppm: policy.maximum_abs_slope_deviation_ppm,
         });
     }
 
@@ -644,9 +644,9 @@ pub fn fit_cpal_callback_playback_v1(
         anchor_set_sha256,
         fit_policy_sha256,
         anchor_count: anchors.len(),
-        maximum_abs_drift_ppm: effective_policy.maximum_abs_drift_ppm,
+        maximum_abs_slope_deviation_ppm: effective_policy.maximum_abs_slope_deviation_ppm,
         maximum_allowed_abs_residual_ns: effective_policy.maximum_abs_residual_ns,
-        estimated_drift_ppm,
+        estimated_slope_deviation_ppm,
         median_abs_residual_ns,
         p95_abs_residual_ns,
         maximum_abs_residual_ns,
