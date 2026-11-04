@@ -489,12 +489,11 @@ impl RaceLedger {
                         frame_id: *frame_id,
                     });
                 }
-                let producer = self
-                    .producers
-                    .get_mut(producer_id)
-                    .ok_or_else(|| RaceError::UnknownProducerOperation {
+                let producer = self.producers.get_mut(producer_id).ok_or_else(|| {
+                    RaceError::UnknownProducerOperation {
                         producer_id: producer_id.clone(),
-                    })?;
+                    }
+                })?;
                 if producer.completed {
                     return Err(RaceError::ProducerAlreadyCompleted {
                         producer_id: producer_id.clone(),
@@ -513,9 +512,11 @@ impl RaceLedger {
                 }
                 // Completion is allowed after veto only because this producer
                 // captured the active authorization/epoch before revocation.
-                if let Some((existing_frame_id, _)) = self.frames.iter().find(|(_, existing)| {
-                    existing.range.overlaps(*range)
-                }) {
+                if let Some((existing_frame_id, _)) = self
+                    .frames
+                    .iter()
+                    .find(|(_, existing)| existing.range.overlaps(*range))
+                {
                     return Err(RaceError::OverlappingFrameRange {
                         existing_frame_id: *existing_frame_id,
                         incoming_frame_id: *frame_id,
@@ -543,12 +544,9 @@ impl RaceLedger {
                 enqueued_at_ns,
             } => {
                 let (authorization_id, completed_at_ns, already_enqueued) = {
-                    let frame = self
-                        .frames
-                        .get(frame_id)
-                        .ok_or(RaceError::UnknownFrame {
-                            frame_id: *frame_id,
-                        })?;
+                    let frame = self.frames.get(frame_id).ok_or(RaceError::UnknownFrame {
+                        frame_id: *frame_id,
+                    })?;
                     (
                         frame.authorization_id.clone(),
                         frame.completed_at_ns,
@@ -567,12 +565,11 @@ impl RaceLedger {
                         enqueued_at_ns: *enqueued_at_ns,
                     });
                 }
-                let auth = self
-                    .authorizations
-                    .get(&authorization_id)
-                    .ok_or_else(|| RaceError::UnknownAuthorization {
+                let auth = self.authorizations.get(&authorization_id).ok_or_else(|| {
+                    RaceError::UnknownAuthorization {
                         authorization_id: authorization_id.clone(),
-                    })?;
+                    }
+                })?;
                 // A producer that finishes after veto may still publish its
                 // captured old-epoch work so the callback can explicitly drain
                 // and account for it. Ordinary expiry rejects enqueue rather
@@ -935,9 +932,13 @@ mod tests {
     #[test]
     fn veto_before_callback_discards_late_enqueued_old_epoch_frames() {
         let mut ledger = authorized_ledger();
-        ledger.apply(producer_start_event(2, "producer-7", 0)).unwrap();
+        ledger
+            .apply(producer_start_event(2, "producer-7", 0))
+            .unwrap();
         ledger.apply(veto_event(3)).unwrap();
-        ledger.apply(render_complete_event(4, "producer-7", 7)).unwrap();
+        ledger
+            .apply(render_complete_event(4, "producer-7", 7))
+            .unwrap();
         ledger.apply(enqueue_event(5, 7)).unwrap();
         ledger.apply(callback_event(6, 7, 1)).unwrap();
 
@@ -975,8 +976,12 @@ mod tests {
     #[test]
     fn callback_admitted_before_veto_remains_admitted_and_is_not_retroactively_cancelled() {
         let mut ledger = authorized_ledger();
-        ledger.apply(producer_start_event(2, "producer-7", 0)).unwrap();
-        ledger.apply(render_complete_event(3, "producer-7", 7)).unwrap();
+        ledger
+            .apply(producer_start_event(2, "producer-7", 0))
+            .unwrap();
+        ledger
+            .apply(render_complete_event(3, "producer-7", 7))
+            .unwrap();
         ledger.apply(enqueue_event(4, 7)).unwrap();
         ledger.apply(callback_event(5, 7, 0)).unwrap();
         ledger.apply(veto_event(6)).unwrap();
@@ -993,9 +998,13 @@ mod tests {
     #[test]
     fn callback_that_observes_new_epoch_never_admits_old_frame() {
         let mut ledger = authorized_ledger();
-        ledger.apply(producer_start_event(2, "producer-7", 0)).unwrap();
+        ledger
+            .apply(producer_start_event(2, "producer-7", 0))
+            .unwrap();
         ledger.apply(veto_event(3)).unwrap();
-        ledger.apply(render_complete_event(4, "producer-7", 7)).unwrap();
+        ledger
+            .apply(render_complete_event(4, "producer-7", 7))
+            .unwrap();
         ledger.apply(enqueue_event(5, 7)).unwrap();
         ledger.apply(callback_event(6, 7, 1)).unwrap();
 
@@ -1012,7 +1021,9 @@ mod tests {
         ledger.apply(producer_start_event(2, "producer-7", 0)).unwrap();
         ledger.apply(veto_event(3)).unwrap();
         // Already-started work may complete, but its captured epoch is fixed.
-        ledger.apply(render_complete_event(4, "producer-7", 7)).unwrap();
+        ledger
+            .apply(render_complete_event(4, "producer-7", 7))
+            .unwrap();
 
         let result = ledger.apply(event(
             5,
@@ -1064,7 +1075,9 @@ mod tests {
         let mut ledger = authorized_ledger();
         ledger.apply(producer_start_event(2, "producer-7", 0)).unwrap();
         ledger.apply(veto_event(3)).unwrap();
-        ledger.apply(render_complete_event(4, "producer-7", 7)).unwrap();
+        ledger
+            .apply(render_complete_event(4, "producer-7", 7))
+            .unwrap();
         ledger.apply(enqueue_event(5, 7)).unwrap();
         ledger.apply(callback_event(6, 7, 1)).unwrap();
 
@@ -1259,9 +1272,7 @@ mod tests {
         assert!(!ledger.authorization("auth-1").unwrap().revoked);
 
         // The failed event did not consume its order or control sequence.
-        ledger
-            .apply(expiration_event(2, 10_000_000_000))
-            .unwrap();
+        ledger.apply(expiration_event(2, 10_000_000_000)).unwrap();
         assert_eq!(ledger.current_epoch(), 1);
         assert!(ledger.authorization("auth-1").unwrap().revoked);
     }
