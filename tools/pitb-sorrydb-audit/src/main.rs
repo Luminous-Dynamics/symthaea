@@ -785,6 +785,61 @@ fn synthetic_record(id: &str, goal: &str, path: &str, column: u64) -> SorryRecor
     }
 }
 
+
+fn synthetic_proof_run(task: &SorryRecord, verified: bool, run_id: &str) -> ProofRun {
+    let digest = |label: &str| sha256(label.as_bytes());
+    ProofRun {
+        schema_version: "pitb.sorrydb-proof-run.v0".into(),
+        run_id: run_id.into(),
+        task_id: task.id.clone(),
+        repo_commit: task.repo.commit.clone(),
+        lean_version: task.repo.lean_version.clone(),
+        source_path: task.location.path.clone(),
+        start_line: task.location.start_line,
+        start_column: task.location.start_column,
+        end_line: task.location.end_line,
+        end_column: task.location.end_column,
+        goal_sha256: sha256(task.debug_info.goal.as_bytes()),
+        source_file_sha256: digest("synthetic-source-file"),
+        replacement_patch_sha256: digest("synthetic-patch"),
+        proof_artifact_sha256: digest("synthetic-proof"),
+        checker_receipt_sha256: digest("synthetic-checker"),
+        semantic_gate_receipt_sha256: digest("synthetic-semantic-gate"),
+        source_binding_receipt_sha256: digest("synthetic-source-binding"),
+        strategy: Strategy {
+            name: "synthetic-strategy".into(),
+            version: "v0".into(),
+            implementation_sha256: digest("synthetic-implementation"),
+            model_id: Some("synthetic-model".into()),
+            model_version: Some("v0".into()),
+        },
+        outcome: if verified { "verified_success" } else { "non_solve" }.into(),
+        proof_inserted: verified,
+        exact_sorry_replaced: verified,
+        sorry_absent_after_replacement: verified,
+        build_passed: verified,
+        kernel_passed: verified,
+        semantic_gate_passed: verified,
+        source_binding_passed: verified,
+        vacuity_gate_passed: verified,
+        axiom_delta_zero: verified,
+        new_sorry_delta_zero: verified,
+        wall_time_ms: 1250,
+        input_tokens: 500,
+        output_tokens: 120,
+        cost_microusd: 5000,
+        failure_type: None,
+    }
+}
+
+fn synthetic_proof_runs() -> Vec<ProofRun> {
+    let task = synthetic_record("task-a", "x : Nat\n⊢ x = x", "Demo/A.lean", 0);
+    vec![
+        synthetic_proof_run(&task, true, "synthetic-attempt-1"),
+        synthetic_proof_run(&task, false, "synthetic-attempt-2"),
+    ]
+}
+
 fn run_self_tests() -> Result<(), String> {
     if git_blob_sha1(b"") != "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
         || git_blob_sha1(b"abc") != "f2ba8f84ab5c1bce84a7b441cb1959cfc7093b7f"
@@ -847,6 +902,53 @@ fn run_self_tests() -> Result<(), String> {
         return Err("source path traversal was accepted".into());
     }
     println!("SELF_TEST_PASS unsafe source path is rejected");
+
+    let evaluation_by_id: BTreeMap<&str, &SorryRecord> = evaluation
+        .sorries
+        .iter()
+        .map(|row| (row.id.as_str(), row))
+        .collect();
+    let valid_run = synthetic_proof_run(&evaluation.sorries[0], true, "self-test-success");
+    validate_proof_run(&valid_run, 1, &evaluation_by_id)?;
+    println!("SELF_TEST_PASS proof receipt binds exact source task, range, commit, toolchain and goal");
+
+    let mut bad_run = valid_run.clone();
+    bad_run.semantic_gate_passed = false;
+    if validate_proof_run(&bad_run, 2, &evaluation_by_id).is_ok() {
+        return Err("kernel-only success without semantic gate was accepted".into());
+    }
+    println!("SELF_TEST_PASS kernel acceptance alone is not assurance-adjusted success");
+
+    let mut bad_run = valid_run.clone();
+    bad_run.axiom_delta_zero = false;
+    if validate_proof_run(&bad_run, 3, &evaluation_by_id).is_ok() {
+        return Err("proof adding an axiom was accepted".into());
+    }
+    println!("SELF_TEST_PASS newly introduced axioms invalidate verified success");
+
+    let mut bad_run = valid_run.clone();
+    bad_run.new_sorry_delta_zero = false;
+    if validate_proof_run(&bad_run, 4, &evaluation_by_id).is_ok() {
+        return Err("proof adding a new sorry was accepted".into());
+    }
+    println!("SELF_TEST_PASS newly introduced sorry invalidates verified success");
+
+    let runs = vec![
+        valid_run,
+        synthetic_proof_run(&evaluation.sorries[0], false, "self-test-non-solve"),
+    ];
+    let (successes, summaries) = summarize_proof_runs(&runs, &evaluation)?;
+    if successes != 1 || summaries.len() != 1
+        || summaries[0].attempts != 2
+        || summaries[0].verified_successes != 1
+        || summaries[0].non_solves != 1
+    {
+        return Err("proof-run denominator and strategy summary controls failed".into());
+    }
+    if summarize_proof_runs(&[runs[0].clone(), runs[0].clone()], &evaluation).is_ok() {
+        return Err("duplicate proof-run IDs were accepted".into());
+    }
+    println!("SELF_TEST_PASS per-strategy attempt/success denominators and duplicate run rejection");
     Ok(())
 }
 
