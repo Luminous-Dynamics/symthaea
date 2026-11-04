@@ -1060,10 +1060,10 @@ mod tests {
         };
         let identity = runner_descriptor.identity_sha256().unwrap();
         let pairs = vec![
-            RunnerCpalClockPairV1::from_observation(7, identity, 0, 0, 5_000_000, 100_000_000, 100_000_100).unwrap(),
-            RunnerCpalClockPairV1::from_observation(7, identity, 1, 10_000_000, 15_000_000, 110_000_000, 110_000_100).unwrap(),
-            RunnerCpalClockPairV1::from_observation(7, identity, 2, 20_000_000, 25_000_000, 120_000_000, 120_000_100).unwrap(),
-            RunnerCpalClockPairV1::from_observation(7, identity, 3, 30_000_000, 35_000_000, 130_000_000, 130_000_100).unwrap(),
+            RunnerCpalClockPairV1::from_observation(7, identity, 0, 0, 5_000_000, 99_999_950, 100_000_050).unwrap(),
+            RunnerCpalClockPairV1::from_observation(7, identity, 1, 10_000_000, 15_000_000, 109_999_950, 110_000_050).unwrap(),
+            RunnerCpalClockPairV1::from_observation(7, identity, 2, 20_000_000, 25_000_000, 119_999_950, 120_000_050).unwrap(),
+            RunnerCpalClockPairV1::from_observation(7, identity, 3, 30_000_000, 35_000_000, 129_999_950, 130_000_050).unwrap(),
         ];
         let runner_fit = fit_runner_cpal_clock_v1(
             &runner_descriptor,
