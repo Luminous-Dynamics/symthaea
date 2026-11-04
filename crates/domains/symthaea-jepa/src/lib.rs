@@ -3,17 +3,20 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # symthaea-jepa
 //!
-//! **Joint Embedding Predictive Architecture** for thermodynamically efficient
-//! prediction in Symthaea's cognitive loop.
+//! **Joint Embedding Predictive Architecture** for latent-space prediction
+//! in Symthaea's cognitive loop. Latent compression may reduce arithmetic or
+//! memory traffic for some workloads; actual energy savings must be measured
+//! at matched prediction quality on the target hardware.
 //!
 //! ## Core Idea
 //!
 //! Instead of predicting raw observations (16,384D HDC vectors), JEPA predicts
 //! in a learned 128D latent space. This provides:
 //!
-//! 1. **Thermodynamic efficiency**: 128x fewer dimensions → exponentially fewer
-//!    bits erased per prediction → lower Landauer floor → more cycles before
-//!    energy budget exhaustion.
+//! 1. **Potential compute reduction**: the default latent representation is
+//!    128D rather than 16,384D. This dimension ratio does not imply an
+//!    exponential reduction in erased bits or measured joules; those require
+//!    workload and hardware measurements at matched prediction quality.
 //!
 //! 2. **Compositional generalization**: The latent space learns to capture
 //!    abstract state transitions rather than raw observation correlations.
@@ -53,7 +56,7 @@ pub mod predictor;
 pub mod state;
 pub mod target;
 
-pub use config::JepaConfig;
+pub use config::{JepaConfig, JepaOperationCountError, JepaOperationCounts};
 pub use encoder::ContextEncoder;
 pub use loss::{cosine_loss, cosine_loss_gradient, cosine_similarity, prediction_error};
 pub use predictor::LatentPredictor;
@@ -67,7 +70,8 @@ use symthaea_core::hdc::unified_hv::ContinuousHV;
 pub struct JepaTelemetry {
     /// Latent prediction error (cosine loss, 0.0 = perfect).
     pub latent_pe: f32,
-    /// Total energy spent by JEPA (joules).
+    /// Accumulated configured energy estimate (nominally joules); not
+    /// device-measured energy unless the caller supplied a measured override.
     pub total_energy: f64,
     /// Number of forward passes completed.
     pub steps: u64,
@@ -114,7 +118,8 @@ impl JepaEngine {
     /// 3. Target encoder encodes `next_hv` → z*_{t+1}
     /// 4. Cosine loss(ẑ_{t+1}, z*_{t+1}) → latent PE
     ///
-    /// Returns (latent_pe, energy_cost).
+    /// Returns (latent_pe, configured energy estimate). The energy value is
+    /// a scenario proxy by default, not measured hardware energy.
     /// `tau_factor` modulates nothing in forward (reserved for multi-horizon).
     pub fn forward(
         &mut self,
@@ -191,7 +196,8 @@ impl JepaEngine {
         self.state.last_pe
     }
 
-    /// Get total energy spent by JEPA (joules).
+    /// Get the accumulated configured energy estimate. The default is a
+    /// legacy operation-count scenario proxy, not measured device energy.
     pub fn energy_spent(&self) -> f64 {
         self.state.total_energy_spent
     }
