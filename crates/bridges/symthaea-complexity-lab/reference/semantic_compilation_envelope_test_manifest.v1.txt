@@ -1,0 +1,23 @@
+ETH-027 semantic compilation envelope validator suite v1
+
+Positive cases:
+1. A projected-WMC fixture with exact Q weights, explicit existential quantification,
+   a continuous transformation digest chain, and replay status not_run is accepted.
+2. Exact arithmetic zero is accepted while Boolean support cardinality remains one.
+
+Negative controls:
+1. Overlapping visible/hidden variable partition.
+2. Incomplete visible/hidden partition.
+3. PWMC changed to full-assignment quantifier semantics.
+4. Hidden variable inserted into the PWMC weight map.
+5. Broken adjacent-stage representation digest chain.
+6. proof_checked obligation without proof artifact/checker evidence.
+7. Unreduced exact rational weight.
+8. Full-assignment WMC with a hidden variable outside the visible universe.
+9. Independent replay bound to the wrong input representation.
+10. Satisfiability-only equivalence used as a projected-counting proof.
+
+Acceptance means structural schema validation and reference cross-field checks only.
+It is not a formal proof, SCPOG check, compiler correctness theorem, or solver result.
+11. Proof/test evidence bound to the wrong stage output digest.
+12. PWMC aggregation plan uses count instead of weighted_sum.

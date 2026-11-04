@@ -1,0 +1,89 @@
+{
+  "format": "symthaea.dynamic-projected-bce-trace-results",
+  "version": 1,
+  "claim_ceiling": "two_branch_context_trace_reference_checker_plus_exhaustive_oracle_not_formal_proof_or_D4_trace_replay",
+  "certificate_check": "passed",
+  "certificate_sha256": "sha256:7babff7d600ec0eeb0f0a9cbbc80a183cc783bad61748032a3c0603fa404f087",
+  "checker_sha256": "sha256:566e003cff01d56d004db721999e7612b2ecb35dae225b6e5edc0168d2b8b682",
+  "certificate_git_blob_sha1": "01ace053d904afdd71d680069bfee3bbdcdaa965",
+  "checker_git_blob_sha1": "5ce424b6c3f4c70e9c37f19d21cb303f53a3b17d",
+  "uploaded_checker_execution": "passed",
+  "execution_environment": {
+    "python": "3.13.5",
+    "execution_date": "2026-11-04",
+    "method": "exact GitHub blobs reconstructed locally; Git blob SHA-1 verified before execution"
+  },
+  "summary": {
+    "root_full_models": 6,
+    "processed_branch_full_models": 7,
+    "root_projected_support": [
+      "00",
+      "01",
+      "10",
+      "11"
+    ],
+    "processed_projected_support": [
+      "00",
+      "01",
+      "10",
+      "11"
+    ],
+    "root_pmc": 4,
+    "processed_pmc": 4,
+    "root_pwmc": "1/1",
+    "processed_pwmc": "1/1",
+    "branches": [
+      {
+        "branch_id": "branch-x0",
+        "context_digest": "sha256:4124c3f26a3ab6d2c7096609eda41849ef8b07db9d77ed1058cd645d333ff476",
+        "conditioned_formula_digest": "sha256:d21b43db6beaf60656122ead665fded77b4a5c2426abe75d481067bc13220629",
+        "final_formula_digest": "sha256:38818568711255479594bcd142be69908719bb13814141898876f2eb162c6b45",
+        "source_full_models": 2,
+        "target_full_models": 3,
+        "source_projected_support": [
+          "0",
+          "1"
+        ],
+        "target_projected_support": [
+          "0",
+          "1"
+        ],
+        "backtrack_restored_root": true
+      },
+      {
+        "branch_id": "branch-x1",
+        "context_digest": "sha256:a16cc949bac998adb02c1fe1cbe216404c0f0c4c5ae8f631087a1739bb39fd09",
+        "conditioned_formula_digest": "sha256:96b3f00bc06b14a9735dad298a6e85869337f5351a2843827019c27bc55eeea9",
+        "final_formula_digest": "sha256:96b3f00bc06b14a9735dad298a6e85869337f5351a2843827019c27bc55eeea9",
+        "source_full_models": 4,
+        "target_full_models": 4,
+        "source_projected_support": [
+          "0",
+          "1"
+        ],
+        "target_projected_support": [
+          "0",
+          "1"
+        ],
+        "backtrack_restored_root": true
+      }
+    ]
+  },
+  "negative_controls": 10,
+  "negative_controls_rejected": 10,
+  "negative_control_labels": [
+    "missing x=1 sibling branch",
+    "duplicate branch assignment",
+    "stale context digest",
+    "conditioned formula tampering",
+    "visible blocker",
+    "missing opposing clause check",
+    "cross-branch context reuse",
+    "backtrack restores child instead of parent",
+    "wrong branch ancestry",
+    "stale root digest"
+  ],
+  "runtime": {
+    "python": "3.13.5"
+  }
+}

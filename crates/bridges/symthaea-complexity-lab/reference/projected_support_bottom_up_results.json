@@ -1,0 +1,97 @@
+{
+  "suite": "ETH-027 nested projected-support / bottom-up exact evaluation prototype",
+  "execution_status": "executed_locally",
+  "environment": {
+    "python": "3.13.5",
+    "seed": "0xe7027",
+    "cases_per_contract": 1000,
+    "max_input_variables": 7
+  },
+  "sources": {
+    "source_path": "reference/projected_support_bottom_up.py",
+    "source_git_blob_sha": "4f35cc8e20f82a070fd4444687e2f3e317b2d69b"
+  },
+  "contracts": [
+    "#sat",
+    "wmc",
+    "pmc",
+    "pwmc",
+    "amc-complex"
+  ],
+  "cases": 5000,
+  "passed": 5000,
+  "failed": 0,
+  "passed_by_contract": {
+    "#sat": 1000,
+    "wmc": 1000,
+    "pmc": 1000,
+    "pwmc": 1000,
+    "amc-complex": 1000
+  },
+  "independent_oracle": "Direct exhaustive truth-table assignment-set evaluator, separate from bottom-up circuit traversal.",
+  "hidden_witness_invariance_cases": 500,
+  "exact_zero_by_contract": {
+    "#sat": 57,
+    "wmc": 173,
+    "pmc": 5,
+    "pwmc": 109,
+    "amc-complex": 54
+  },
+  "zero_with_nonempty_support_by_contract": {
+    "#sat": 0,
+    "wmc": 122,
+    "pmc": 0,
+    "pwmc": 105,
+    "amc-complex": 9
+  },
+  "structural_coverage": {
+    "non_smooth_or_nodes": 12693,
+    "shared_nodes_referenced_by_multiple_parents": 11727,
+    "circuit_nodes": 159097
+  },
+  "controls": {
+    "non_smooth_scope_completion": {
+      "exact_output": "19/28",
+      "oracle": "19/28",
+      "support": 3,
+      "has_non_smooth_sum": true
+    },
+    "non_smooth_completion_mutant_detected": {
+      "correct": "19/28",
+      "mutant_without_scope_completion": "17/14",
+      "detected": true
+    },
+    "free_variable_completion": {
+      "root_scope": [
+        "x"
+      ],
+      "exact_output": "864",
+      "oracle": "864",
+      "support": 4
+    },
+    "free_variable_completion_mutant_detected": {
+      "correct": "864",
+      "mutant_without_completion": "3",
+      "detected": true
+    },
+    "hidden_witness_multiplier_mutant_detected": {
+      "correct_pwmc": "2/3",
+      "wrong_hidden_witness_sum": "4/3",
+      "detected": true
+    },
+    "signed_q_cancellation": {
+      "exact_output": "0",
+      "support": 2
+    },
+    "complex_qi_cancellation": {
+      "exact_output": "0",
+      "support": 2
+    },
+    "overlapping_product_rejected": true,
+    "false_determinism_rejected": true,
+    "inexact_float_weights_rejected": true
+  },
+  "elapsed_seconds": 5.974389,
+  "all_passed": true,
+  "claim_ceiling": "Small finite research prototype only. Shannon compilation and extensional determinism validation are exhaustive; arithmetic evaluation is bottom-up with explicit non-smooth scope completion. Not a scalable proof checker, SCPOG implementation, CNF compiler, Rust implementation, or solver differential."
+}

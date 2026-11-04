@@ -1,0 +1,1180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:symthaea:semantic-compilation-envelope:1",
+  "title": "Symthaea Semantic Compilation Envelope v1",
+  "description": "Strict wire contract for query-relative semantic compilation. JSON Schema is necessary but not sufficient; cross-field invariants are enforced by the reference validator.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "canonicalization",
+    "problem",
+    "stages",
+    "result",
+    "independent_replay",
+    "provenance"
+  ],
+  "properties": {
+    "format": {
+      "const": "symthaea.semantic-compilation-envelope"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "canonicalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "profile_version"
+      ],
+      "properties": {
+        "profile_id": {
+          "const": "symthaea-json-struct-v1"
+        },
+        "profile_version": {
+          "const": 1
+        }
+      }
+    },
+    "problem": {
+      "$ref": "#/$defs/problem"
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/stage"
+      }
+    },
+    "result": {
+      "$ref": "#/$defs/result"
+    },
+    "independent_replay": {
+      "$ref": "#/$defs/replay"
+    },
+    "provenance": {
+      "$ref": "#/$defs/provenance"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^(sha256|blake3):[0-9a-f]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9_.:/+-]+$"
+    },
+    "integerString": {
+      "type": "string",
+      "pattern": "^(0|-?[1-9][0-9]*)$"
+    },
+    "naturalString": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "positiveIntegerString": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "rational": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "numerator",
+        "denominator"
+      ],
+      "properties": {
+        "numerator": {
+          "$ref": "#/$defs/integerString"
+        },
+        "denominator": {
+          "$ref": "#/$defs/positiveIntegerString"
+        }
+      }
+    },
+    "gaussianRational": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "real",
+        "imaginary"
+      ],
+      "properties": {
+        "real": {
+          "$ref": "#/$defs/rational"
+        },
+        "imaginary": {
+          "$ref": "#/$defs/rational"
+        }
+      }
+    },
+    "weightMap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "domain",
+        "entries"
+      ],
+      "properties": {
+        "domain": {
+          "enum": [
+            "Q",
+            "Q(i)"
+          ]
+        },
+        "entries": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "variable",
+              "false_weight",
+              "true_weight"
+            ],
+            "properties": {
+              "variable": {
+                "$ref": "#/$defs/identifier"
+              },
+              "false_weight": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/rational"
+                  },
+                  {
+                    "$ref": "#/$defs/gaussianRational"
+                  }
+                ]
+              },
+              "true_weight": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/rational"
+                  },
+                  {
+                    "$ref": "#/$defs/gaussianRational"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "problem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "variables",
+        "contract",
+        "quantifier_semantics",
+        "coefficient_domain",
+        "aggregation_plan"
+      ],
+      "properties": {
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "format_id",
+            "parser_profile_id",
+            "bytes_digest"
+          ],
+          "properties": {
+            "format_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[A-Za-z0-9_.:/+-]+$"
+            },
+            "parser_profile_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[A-Za-z0-9_.:/+-]+$"
+            },
+            "bytes_digest": {
+              "$ref": "#/$defs/digest"
+            }
+          }
+        },
+        "variables": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "universe",
+            "visible",
+            "hidden"
+          ],
+          "properties": {
+            "universe": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "^[A-Za-z0-9_.:/+-]+$"
+              }
+            },
+            "visible": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "^[A-Za-z0-9_.:/+-]+$"
+              }
+            },
+            "hidden": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "^[A-Za-z0-9_.:/+-]+$"
+              }
+            }
+          }
+        },
+        "contract": {
+          "enum": [
+            "#sat",
+            "wmc",
+            "pmc",
+            "pwmc",
+            "amc-complex"
+          ]
+        },
+        "quantifier_semantics": {
+          "enum": [
+            "all_assignments",
+            "exists_hidden_per_visible_assignment"
+          ]
+        },
+        "coefficient_domain": {
+          "enum": [
+            "N",
+            "Q",
+            "Q(i)"
+          ]
+        },
+        "weight_map": {
+          "$ref": "#/$defs/weightMap"
+        },
+        "aggregation_plan": {
+          "$ref": "#/$defs/aggregationPlan"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "contract": {
+                "const": "#sat"
+              }
+            },
+            "required": [
+              "contract"
+            ]
+          },
+          "then": {
+            "properties": {
+              "quantifier_semantics": {
+                "const": "all_assignments"
+              },
+              "coefficient_domain": {
+                "const": "N"
+              }
+            },
+            "not": {
+              "required": [
+                "weight_map"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "contract": {
+                "const": "pmc"
+              }
+            },
+            "required": [
+              "contract"
+            ]
+          },
+          "then": {
+            "properties": {
+              "quantifier_semantics": {
+                "const": "exists_hidden_per_visible_assignment"
+              },
+              "coefficient_domain": {
+                "const": "N"
+              }
+            },
+            "not": {
+              "required": [
+                "weight_map"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "contract": {
+                "const": "wmc"
+              }
+            },
+            "required": [
+              "contract"
+            ]
+          },
+          "then": {
+            "required": [
+              "weight_map"
+            ],
+            "properties": {
+              "quantifier_semantics": {
+                "const": "all_assignments"
+              },
+              "coefficient_domain": {
+                "const": "Q"
+              },
+              "weight_map": {
+                "properties": {
+                  "domain": {
+                    "const": "Q"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "contract": {
+                "const": "pwmc"
+              }
+            },
+            "required": [
+              "contract"
+            ]
+          },
+          "then": {
+            "required": [
+              "weight_map"
+            ],
+            "properties": {
+              "quantifier_semantics": {
+                "const": "exists_hidden_per_visible_assignment"
+              },
+              "coefficient_domain": {
+                "const": "Q"
+              },
+              "weight_map": {
+                "properties": {
+                  "domain": {
+                    "const": "Q"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "contract": {
+                "const": "amc-complex"
+              }
+            },
+            "required": [
+              "contract"
+            ]
+          },
+          "then": {
+            "required": [
+              "weight_map"
+            ],
+            "properties": {
+              "quantifier_semantics": {
+                "const": "all_assignments"
+              },
+              "coefficient_domain": {
+                "const": "Q(i)"
+              },
+              "weight_map": {
+                "properties": {
+                  "domain": {
+                    "const": "Q(i)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "contract": {
+                "const": "#sat"
+              }
+            },
+            "required": [
+              "contract"
+            ]
+          },
+          "then": {
+            "properties": {
+              "aggregation_plan": {
+                "properties": {
+                  "projection": {
+                    "const": "none"
+                  },
+                  "final": {
+                    "const": "count"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "contract": {
+                "const": "wmc"
+              }
+            },
+            "required": [
+              "contract"
+            ]
+          },
+          "then": {
+            "properties": {
+              "aggregation_plan": {
+                "properties": {
+                  "projection": {
+                    "const": "none"
+                  },
+                  "final": {
+                    "const": "weighted_sum"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "contract": {
+                "const": "pmc"
+              }
+            },
+            "required": [
+              "contract"
+            ]
+          },
+          "then": {
+            "properties": {
+              "aggregation_plan": {
+                "properties": {
+                  "projection": {
+                    "const": "exists"
+                  },
+                  "final": {
+                    "const": "count"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "contract": {
+                "const": "pwmc"
+              }
+            },
+            "required": [
+              "contract"
+            ]
+          },
+          "then": {
+            "properties": {
+              "aggregation_plan": {
+                "properties": {
+                  "projection": {
+                    "const": "exists"
+                  },
+                  "final": {
+                    "const": "weighted_sum"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "contract": {
+                "const": "amc-complex"
+              }
+            },
+            "required": [
+              "contract"
+            ]
+          },
+          "then": {
+            "properties": {
+              "aggregation_plan": {
+                "properties": {
+                  "projection": {
+                    "const": "none"
+                  },
+                  "final": {
+                    "const": "weighted_sum"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "representation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:/+-]+$"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:/+-]+$"
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "testEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suite_id",
+        "artifact_digest",
+        "case_count",
+        "claim_ceiling",
+        "input_representation_digest",
+        "output_representation_digest"
+      ],
+      "properties": {
+        "suite_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:/+-]+$"
+        },
+        "artifact_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "case_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "claim_ceiling": {
+          "enum": [
+            "finite_test_evidence",
+            "differential_test_evidence",
+            "mutation_test_evidence"
+          ]
+        },
+        "input_representation_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "output_representation_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "proofEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter_id",
+        "proof_digest",
+        "checker_id",
+        "checker_binary_digest",
+        "outcome",
+        "input_representation_digest",
+        "output_representation_digest"
+      ],
+      "properties": {
+        "adapter_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:/+-]+$"
+        },
+        "proof_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "checker_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:/+-]+$"
+        },
+        "checker_binary_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "outcome": {
+          "const": "accepted"
+        },
+        "input_representation_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "output_representation_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "obligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "obligation_id",
+        "kind",
+        "status"
+      ],
+      "properties": {
+        "obligation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:/+-]+$"
+        },
+        "kind": {
+          "enum": [
+            "satisfiability_equivalence",
+            "parser_soundness",
+            "full_model_equivalence",
+            "projected_support_equivalence",
+            "model_bijection",
+            "weighted_value_preservation",
+            "deterministic_disjunction",
+            "decomposable_conjunction",
+            "scope_completion",
+            "weight_map_scope",
+            "coefficient_domain_compatibility",
+            "canonical_serialization",
+            "exact_arithmetic_replay"
+          ]
+        },
+        "status": {
+          "enum": [
+            "proof_checked",
+            "tested_only",
+            "unsupported",
+            "failed"
+          ]
+        },
+        "proof": {
+          "$ref": "#/$defs/proofEvidence"
+        },
+        "tests": {
+          "$ref": "#/$defs/testEvidence"
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 2048
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "proof_checked"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "proof"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "tested_only"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "tests"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "proof"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": "proof_checked"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "tests"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": "tested_only"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage_id",
+        "operation",
+        "input",
+        "output",
+        "relation",
+        "obligations"
+      ],
+      "properties": {
+        "stage_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:/+-]+$"
+        },
+        "operation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:/+-]+$"
+        },
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "version",
+            "digest"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[A-Za-z0-9_.:/+-]+$"
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[A-Za-z0-9_.:/+-]+$"
+            },
+            "digest": {
+              "$ref": "#/$defs/digest"
+            }
+          }
+        },
+        "output": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "version",
+            "digest"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[A-Za-z0-9_.:/+-]+$"
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[A-Za-z0-9_.:/+-]+$"
+            },
+            "digest": {
+              "$ref": "#/$defs/digest"
+            }
+          }
+        },
+        "relation": {
+          "enum": [
+            "satisfiability_equivalence",
+            "full_model_equivalence",
+            "projected_support_equivalence",
+            "model_bijection",
+            "weighted_value_preservation",
+            "support_to_scalar_evaluation",
+            "representation_only"
+          ]
+        },
+        "obligations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/obligation"
+          }
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_digest",
+        "support",
+        "arithmetic"
+      ],
+      "properties": {
+        "artifact_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "support": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "computed_exact",
+                "not_computed"
+              ]
+            },
+            "cardinality": {
+              "$ref": "#/$defs/naturalString"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "computed_exact"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "required": [
+                  "cardinality"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "not_computed"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "not": {
+                  "required": [
+                    "cardinality"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "arithmetic": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "domain"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "computed_exact",
+                "not_computed"
+              ]
+            },
+            "domain": {
+              "enum": [
+                "N",
+                "Q",
+                "Q(i)"
+              ]
+            },
+            "value": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/naturalString"
+                },
+                {
+                  "$ref": "#/$defs/rational"
+                },
+                {
+                  "$ref": "#/$defs/gaussianRational"
+                }
+              ]
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "computed_exact"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "required": [
+                  "value"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "not_computed"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "not": {
+                  "required": [
+                    "value"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "input_representation_digest"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "matched",
+            "mismatched",
+            "not_run"
+          ]
+        },
+        "engine_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:/+-]+$"
+        },
+        "engine_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:/+-]+$"
+        },
+        "engine_binary_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "replayed_result_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "input_representation_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "matched",
+                  "mismatched"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "engine_id",
+              "engine_version",
+              "engine_binary_digest",
+              "replayed_result_digest"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "not_run"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "replayed_result_digest"
+                  ]
+                },
+                {
+                  "required": [
+                    "engine_binary_digest"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "producer_id",
+        "producer_version",
+        "environment_id"
+      ],
+      "properties": {
+        "producer_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:/+-]+$"
+        },
+        "producer_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:/+-]+$"
+        },
+        "producer_binary_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "environment_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:/+-]+$"
+        },
+        "wall_time_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "peak_rss_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "aggregationPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projection",
+        "final"
+      ],
+      "properties": {
+        "projection": {
+          "enum": [
+            "none",
+            "exists"
+          ]
+        },
+        "final": {
+          "enum": [
+            "count",
+            "weighted_sum"
+          ]
+        }
+      }
+    }
+  }
+}

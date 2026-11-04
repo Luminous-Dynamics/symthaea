@@ -1,0 +1,98 @@
+{
+  "format": "symthaea.skolem-clause-intersection-layout-microbench",
+  "version": 2,
+  "claim_ceiling": "synthetic_python_sc_pog_shaped_lookup_proxy_not_cakeml_or_sc_pog_benchmark",
+  "parameters": {
+    "quantified_variable_universe": 65536,
+    "literal_id_universe": 131072,
+    "nodes_per_degree": 96,
+    "degrees": [
+      1,
+      4,
+      16,
+      64,
+      256,
+      1024,
+      4096
+    ],
+    "total_nodes": 672,
+    "clauses_per_node": 128,
+    "clause_lengths": [
+      3,
+      8,
+      16
+    ],
+    "hit_ratio": 0.5,
+    "seed": 946217,
+    "dense_2bit_bytes_per_node": 16384,
+    "hybrid_threshold_degree": 4096
+  },
+  "overall": [
+    {
+      "representation": "hash_set",
+      "representation_bytes": 31569052,
+      "representation_mib": 30.107,
+      "queries_clauses": 86016,
+      "candidate_literal_count": 769440,
+      "actual_literal_probes_after_short_circuit": 599519,
+      "clause_hits": 43008,
+      "lookup_time_ms": 62.11,
+      "ns_per_clause": 722.1,
+      "semantics_match": true
+    },
+    {
+      "representation": "sorted_u32",
+      "representation_bytes": 2156216,
+      "representation_mib": 2.056,
+      "queries_clauses": 86016,
+      "candidate_literal_count": 769440,
+      "actual_literal_probes_after_short_circuit": 599519,
+      "clause_hits": 43008,
+      "lookup_time_ms": 176.527,
+      "ns_per_clause": 2052.3,
+      "semantics_match": true
+    },
+    {
+      "representation": "dense_2bit",
+      "representation_bytes": 11053784,
+      "representation_mib": 10.542,
+      "queries_clauses": 86016,
+      "candidate_literal_count": 769440,
+      "actual_literal_probes_after_short_circuit": 599519,
+      "clause_hits": 43008,
+      "lookup_time_ms": 173.27,
+      "ns_per_clause": 2014.4,
+      "semantics_match": true
+    },
+    {
+      "representation": "hybrid",
+      "representation_bytes": 2191733,
+      "representation_mib": 2.09,
+      "queries_clauses": 86016,
+      "candidate_literal_count": 769440,
+      "actual_literal_probes_after_short_circuit": 599519,
+      "clause_hits": 43008,
+      "lookup_time_ms": 180.332,
+      "ns_per_clause": 2096.5,
+      "semantics_match": true
+    }
+  ],
+  "conclusion": "All layouts agree on clause-intersection results and short-circuit probe counts. CPython-specific storage/time only; no CakeML extrapolation.",
+  "uploaded_script_execution": "passed",
+  "script_git_blob_sha1": "c18d1a9397d4d47e528a6941dded432cc7213df1",
+  "script_sha256": "sha256:711869eee2f6b99f5bf0f2268534b2d0bb92b01d2d911b75164a8c63ee72a315",
+  "execution_environment": {
+    "python": "3.13.5",
+    "platform": "linux",
+    "execution_date": "2026-11-04",
+    "method": "exact uploaded script reconstructed locally; Git blob SHA-1 verified before execution"
+  },
+  "execution_summary": {
+    "layouts": 4,
+    "queries_clauses": 86016,
+    "candidate_literal_count": 769440,
+    "actual_literal_probes": 599519,
+    "clause_hits": 43008,
+    "semantic_agreement": true
+  }
+}
