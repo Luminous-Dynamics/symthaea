@@ -2,7 +2,7 @@
 
 **Status:** first Rust evaluator, JSON Schema and synthetic fixture committed; no Rust compilation or biological result claimed.  
 **Tracking:** [#9344 — Query robustness across plausible connectome reconstructions](https://github.com/Luminous-Dynamics/symthaea/issues/9344).  
-**Tool:** `connectome-query-ensemble-audit`.
+**Tool:** `connectome_query_ensemble_audit`.
 
 ## Research question
 
@@ -16,12 +16,12 @@ V1 is intentionally a **finite unweighted scenario evaluator**. It does not esti
 
 ```sh
 cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
-  --bin connectome-query-ensemble-audit -- \
+  --bin connectome_query_ensemble_audit -- \
   --input docs/neuroscience/examples/CONNECTOME_QUERY_ENSEMBLE_AUDIT.example.json \
   --output query-ensemble-report.json
 
 cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml \
-  --bin connectome-query-ensemble-audit
+  --bin connectome_query_ensemble_audit
 ```
 
 Input schema: `CONNECTOME_QUERY_ENSEMBLE_AUDIT.schema.json`. The fixture is synthetic and deliberately contains one reconstruction-sensitive path query plus two decision-stable control queries.
