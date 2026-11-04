@@ -161,10 +161,12 @@
             "official_runner",
             "harbor_version",
             "per_task_time_limit_seconds",
-            "official_repeat_count",
             "runner_revision",
             "dataset_revision",
-            "execution_authorized"
+            "execution_authorized",
+            "official_hidden_test_repeat_count",
+            "local_development_repeat_count",
+            "repeat_policy"
           ],
           "properties": {
             "official_runner": {
@@ -174,10 +176,6 @@
               "type": "string"
             },
             "per_task_time_limit_seconds": {
-              "type": "integer",
-              "minimum": 1
-            },
-            "official_repeat_count": {
               "type": "integer",
               "minimum": 1
             },
@@ -195,6 +193,18 @@
             },
             "execution_authorized": {
               "type": "boolean"
+            },
+            "official_hidden_test_repeat_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "local_development_repeat_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "repeat_policy": {
+              "type": "string",
+              "minLength": 20
             }
           }
         },
