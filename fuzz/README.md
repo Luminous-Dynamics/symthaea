@@ -16,7 +16,7 @@ Resource bounds are part of the fuzz contract:
 - Entries verified per input: at most eight.
 - Read buffer: 4 KiB.
 
-Run on Linux x86-64 with a nightly Rust toolchain and cargo-fuzz 0.13.2. Install with: cargo install cargo-fuzz --version 0.13.2 --locked.
+Run on Linux x86-64 with Rust nightly dated 2026-11-03 and cargo-fuzz 0.13.2. Install with: cargo install cargo-fuzz --version 0.13.2 --locked.
 
 Prepare the initial corpus with:
 mkdir -p fuzz/corpus/zip_inventory_and_content fuzz/artifacts
