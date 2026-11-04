@@ -1634,6 +1634,26 @@ mod tests {
         )
     }
 
+    fn scoped_open_unknown(question: &str, scope_sha256: &str) -> Value {
+        let mut unknown = open_unknown(question, json!([]));
+        let normalized_question =
+            collapse_ecmascript_whitespace(trim_ecmascript_whitespace(question));
+        let identity = json!({
+            "domain": "archive",
+            "question": normalized_question,
+            "scope_digest": scope_sha256,
+        });
+        unknown["scope_digest"] = json!(scope_sha256);
+        unknown["unknown_id"] = json!(format!("unk_{}", hash_canonical(&identity).unwrap()));
+        let mut revision_payload = unknown.clone();
+        revision_payload
+            .as_object_mut()
+            .unwrap()
+            .remove("revision_digest");
+        unknown["revision_digest"] = json!(hash_canonical(&revision_payload).unwrap());
+        unknown
+    }
+
     fn verified_unknown(question: &str, required_authority: Value) -> Value {
         let evidence_id = record()["evidence_id"].as_str().unwrap().to_owned();
         unknown_revision(
@@ -1685,6 +1705,70 @@ mod tests {
         assert_ne!(
             from_json.raw_file_sha256.as_deref(),
             Some(from_json.canonical_sha256.as_str())
+        );
+    }
+
+    #[test]
+    fn projects_only_unknown_histories_scoped_to_the_selected_artifact() {
+        let evidence = record();
+        let target_sha = evidence["subject"]["digest"]["sha256"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let unknown = scoped_open_unknown(
+            "APK signing block region needs independent inspection",
+            &target_sha,
+        );
+        let input = bundle(vec![evidence], vec![unknown]);
+
+        let selected = evidence_bundle_for_target(&input, &target_sha).unwrap();
+        assert_eq!(selected["records"].as_array().unwrap().len(), 1);
+        assert_eq!(selected["unknowns"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            selected["unknowns"][0]["scope_digest"].as_str(),
+            Some(target_sha.as_str())
+        );
+        assert!(verify_evidence_bundle_value(&selected).is_ok());
+
+        let other_target = "b".repeat(64);
+        let empty = evidence_bundle_for_target(&input, &other_target).unwrap();
+        assert!(empty["records"].as_array().unwrap().is_empty());
+        assert!(empty["unknowns"].as_array().unwrap().is_empty());
+        assert!(verify_evidence_bundle_value(&empty).is_ok());
+    }
+
+    #[test]
+    fn target_projection_rejects_histories_with_cross_artifact_support_evidence() {
+        let target_evidence = record();
+        let target_sha = target_evidence["subject"]["digest"]["sha256"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+
+        let mut other_evidence = record();
+        other_evidence["subject"]["digest"]["sha256"] = json!("b".repeat(64));
+        other_evidence["evidence_id"] = json!(compute_evidence_id(&other_evidence).unwrap());
+        let other_id = other_evidence["evidence_id"].as_str().unwrap().to_owned();
+
+        let mut unknown = scoped_open_unknown(
+            "APK support evidence must remain scoped to the target artifact",
+            &target_sha,
+        );
+        unknown["supporting_evidence_ids"] = json!([other_id]);
+        let mut revision_payload = unknown.clone();
+        revision_payload
+            .as_object_mut()
+            .unwrap()
+            .remove("revision_digest");
+        unknown["revision_digest"] = json!(hash_canonical(&revision_payload).unwrap());
+
+        let input = bundle(vec![target_evidence, other_evidence], vec![unknown]);
+        let selected = evidence_bundle_for_target(&input, &target_sha).unwrap();
+        assert_eq!(selected["records"].as_array().unwrap().len(), 1);
+        assert_eq!(selected["unknowns"].as_array().unwrap().len(), 0);
+        assert_eq!(
+            selected["records"][0]["subject"]["digest"]["sha256"].as_str(),
+            Some(target_sha.as_str())
         );
     }
 
