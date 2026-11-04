@@ -523,10 +523,12 @@ fn synthetic_record(id: &str, goal: &str, path: &str, column: u64) -> SorryRecor
 }
 
 fn run_self_tests() -> Result<(), String> {
-    if git_blob_sha1(b"") != "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391" {
-        return Err("Git empty-blob SHA-1 control failed".into());
+    if git_blob_sha1(b"") != "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+        || git_blob_sha1(b"abc") != "f2ba8f84ab5c1bce84a7b441cb1959cfc7093b7f"
+    {
+        return Err("Git blob SHA-1 controls failed".into());
     }
-    println!("SELF_TEST_PASS Git object SHA-1 uses canonical blob header");
+    println!("SELF_TEST_PASS Git object SHA-1 matches canonical empty and non-empty blobs");
 
     let a = synthetic_record("task-a", "x : Nat\n⊢ x = x", "Demo/A.lean", 0);
     let b = synthetic_record("task-b", "x : Nat\n⊢ x + 0 = x", "Demo/A.lean", 20);
