@@ -499,8 +499,8 @@ fn required_number(
         .ok_or_else(|| ValidationError::new(format!("{path}.{key}"), "expected a number"))
 }
 
-fn required_string<'a>(
-    values: &'a BTreeMap<String, Value>,
+fn required_string(
+    values: &BTreeMap<String, Value>,
     key: &str,
     expected: &str,
     path: &str,
