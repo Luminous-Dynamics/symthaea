@@ -294,6 +294,10 @@ compile_error!(
 #[cfg(feature = "rea-compat")]
 pub mod rea_compat;
 
+// Native Rust REA EvidenceBundle and residual-unknown graph API.
+#[cfg(feature = "rea-compat")]
+pub mod rea_bundle_compat;
+
 // Unified error types for cross-subsystem error handling.
 pub mod errors;
 pub use errors::{SymthaeaError, SymthaeaResult};
