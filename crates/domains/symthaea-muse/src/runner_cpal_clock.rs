@@ -508,6 +508,12 @@ pub fn fit_runner_cpal_clock_v1(
     let valid_until_runner = reference_runner_time_ns
         + slope * (valid_until_cpal as f64
             - reference_cpal_callback_stream_time_ns as f64);
+    if !valid_from_runner.is_finite()
+        || !valid_until_runner.is_finite()
+        || valid_until_runner < valid_from_runner
+    {
+        return Err(RunnerCpalClockFitErrorV1::NonFiniteFit);
+    }
 
     Ok(RunnerCpalClockFitV1 {
         schema_version: RUNNER_CPAL_CLOCK_FIT_SCHEMA_V1.to_owned(),
