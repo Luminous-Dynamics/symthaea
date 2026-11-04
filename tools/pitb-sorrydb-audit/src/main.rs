@@ -679,12 +679,14 @@ fn replay_goal_with_lake(
         .ok_or("SorryDB source path has no valid UTF-8 file stem")?;
     let task_suffix = record.id.chars().take(8).collect::<String>();
     let replay_filename = format!("{stem}.PITBReplay{task_suffix}.lean");
+    let canonical_repo_root = repo_root.canonicalize()
+        .map_err(|e| format!("canonicalize Lean repository root: {e}"))?;
     let replay_relative = parent.join(replay_filename);
-    let replay_absolute = repo_root.join(&replay_relative);
+    let replay_absolute = canonical_repo_root.join(&replay_relative);
     if replay_absolute.exists() {
         return Err(format!("goal replay temporary source already exists: {}", replay_relative.display()));
     }
-    if !replay_absolute.starts_with(repo_root) {
+    if !replay_absolute.starts_with(&canonical_repo_root) {
         return Err("goal replay temporary source escaped repository root".into());
     }
     fs::write(&replay_absolute, instrumented.as_bytes())
@@ -694,7 +696,7 @@ fn replay_goal_with_lake(
     let replay_command = format!("lake env lean {replay_relative_string}");
     let output_result = Command::new("lake")
         .args(["env", "lean", replay_relative_string.as_str()])
-        .current_dir(repo_root)
+        .current_dir(&canonical_repo_root)
         .output()
         .map_err(|e| format!("start lake env lean ({replay_command}): {e}"));
     let _ = fs::remove_file(&replay_absolute);
@@ -708,6 +710,7 @@ fn replay_goal_with_lake(
     let expected_goal = normalized_goal(&record.debug_info.goal);
     let actual_log = normalized_goal(&log_text);
     let goal_reproduced = output.status.success() && actual_log.contains(&expected_goal);
+    let replay_command_sha256 = sha256(replay_command.as_bytes());
 
     let receipt = GoalReplayReceipt {
         schema_version: "pitb.sorrydb-goal-replay.v0".into(),
@@ -727,7 +730,7 @@ fn replay_goal_with_lake(
         lake_manifest_sha256: sha256(&manifest_bytes),
         repository_tree_sha256: repository_tree,
         replay_command,
-        replay_command_sha256: sha256(replay_command.as_bytes()),
+        replay_command_sha256,
         replay_log_sha256: sha256(&log_bytes),
         replay_exit_code: output.status.code().unwrap_or(-1),
         goal_reproduced,
