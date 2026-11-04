@@ -550,7 +550,6 @@ pub fn amortization_schedule(
     Ok(schedule)
 }
 
-
 /// A dated cash flow on a UTC Unix timestamp, in seconds.
 ///
 /// Amounts in one schedule must already share the same currency and unit.
@@ -639,10 +638,7 @@ pub fn xnpv(rate: f64, cash_flows: &[DatedCashFlow]) -> Result<f64> {
     checked_output(sum + correction, "XNPV summation overflowed")
 }
 
-fn xnpv_and_derivative(
-    rate: f64,
-    cash_flows: &[DatedCashFlow],
-) -> Result<(f64, f64)> {
+fn xnpv_and_derivative(rate: f64, cash_flows: &[DatedCashFlow]) -> Result<(f64, f64)> {
     let growth = 1.0 + rate;
     let log_growth = rate.ln_1p();
     let base_seconds = cash_flows[0].timestamp_seconds;
@@ -743,10 +739,7 @@ fn bisect_xirr_stationary_point(
 /// search_complete field means every scan-grid evaluation was computable; it
 /// is not a formal interval proof that every multiple or tangent root was
 /// found. The strict xirr helper accepts only a single-sign-change schedule.
-pub fn xirr_analysis(
-    cash_flows: &[DatedCashFlow],
-    options: IrrOptions,
-) -> Result<IrrAnalysis> {
+pub fn xirr_analysis(cash_flows: &[DatedCashFlow], options: IrrOptions) -> Result<IrrAnalysis> {
     options.validate()?;
     validate_dated_cash_flows(cash_flows, "XIRR requires at least one dated cash flow")?;
 
@@ -872,7 +865,6 @@ pub fn xirr(cash_flows: &[DatedCashFlow]) -> Result<f64> {
 mod tests {
     use super::*;
 
-
     fn dated_flow(day: i64, amount: f64) -> DatedCashFlow {
         DatedCashFlow::new(day * 86_400, amount).unwrap()
     }
@@ -896,9 +888,8 @@ mod tests {
             dated_flow(180, 600.0),
             dated_flow(547, 600.0),
         ];
-        let expected = -1_000.0
-            + 600.0 / 1.10_f64.powf(180.0 / 365.0)
-            + 600.0 / 1.10_f64.powf(547.0 / 365.0);
+        let expected =
+            -1_000.0 + 600.0 / 1.10_f64.powf(180.0 / 365.0) + 600.0 / 1.10_f64.powf(547.0 / 365.0);
         assert!((xnpv(0.10, &flows).unwrap() - expected).abs() < 1e-10);
     }
 
