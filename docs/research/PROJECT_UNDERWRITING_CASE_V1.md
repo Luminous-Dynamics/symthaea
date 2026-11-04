@@ -133,6 +133,26 @@ For measurement and verification, evaluate the selected plan against the Efficie
 Do not conflate:
 \`modelled output != metered output != independently reconciled savings != contractual performance acceptance\`.
 
+### Competitive modelling and underwriting baselines
+
+The benchmark must compare with the tools that practitioners already use, not only general-purpose financial QA:
+
+- **NREL System Advisor Model (SAM):** matched-boundary PV and storage performance/financial simulations. Treat it as an independent engineering/financial reference for supported configurations.
+- **HOMER Grid:** distributed-energy resource sizing, dispatch and life-cycle economics. Compare on the same load/resource/tariff/dispatch assumptions.
+- **HOMER Front / Front for Bankability:** its public product materials advertise bankability-oriented BESS models, P50/P90/P99, DSCR, cash waterfalls, degradation/augmentation and sensitivity analysis. Treat these as vendor capability claims to test, not independent proof of forecast accuracy.
+- **NREL REopt:** technology sizing and dispatch for life-cycle cost and resilience objectives. Compare the declared objective/profile and constraints rather than assuming identical optimization semantics.
+- **Conventional project-finance underwriting:** independently prepared DCF, CFADS, DSCR/LLCR, debt sculpting, cash waterfall, construction drawdown, reserve account, covenant and sensitivity models. A model that calculates XIRR but omits debt structure or contractual restrictions is not a project-finance replacement.
+- **Independent technical / lender due diligence:** use qualified engineering, grid, legal, market, environmental, insurance and tax review as the human comparator. A language-model reviewer is not a substitute for the responsible independent professional.
+
+References:
+- SAM: https://sam.nrel.gov/
+- HOMER Grid: https://www.homerenergy.com/products/grid/index.html
+- HOMER Front: https://www.homerfront.com/
+- REopt: https://reopt.nrel.gov/
+- CRISIL project finance due diligence: https://www.crisil.com/en/home/our-analysis/reports/2026/infra-asset-risk-and-project-finance.html
+
+The comparison protocol must freeze a common evidence frontier, plant/contract boundary, project life, financial assumptions, tax/FX basis, dispatch constraints and scenario set. Report both capability coverage and measured predictive/decision quality. More fields, a richer narrative or a larger scenario count do not prove superior modelling. Vendor-reported feature lists are not independent validations. Any comparative error claim requires matched inputs and independently observed outcomes or a declared known-truth synthetic oracle.
+
 ## 7. South African grid and market evidence
 
 A grid-capacity map or provincial estimate is a discovery aid, not a project right. A decision-time grid claim must bind the specific point of connection, requested and allocated MW, operator/authority, queue/allocation stage, connection agreement, validity, curtailment basis and the exact source revision.
