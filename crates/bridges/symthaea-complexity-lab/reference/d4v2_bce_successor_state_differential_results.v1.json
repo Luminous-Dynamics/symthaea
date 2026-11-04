@@ -1,0 +1,70 @@
+{
+  "format": "symthaea.d4v2.indexed-dynamic-bce-state-differential-results",
+  "version": 1,
+  "claim_ceiling": "in_memory_python_differential_of_independent_source_derived_scan_and_indexed_reference_models_plus_exact_small_formula_oracle_not_uploaded_runner_rust_execution_D4_binary_differential_or_formal_proof",
+  "local_in_memory_execution": {
+    "status": "passed",
+    "execution_date": "2026-11-04",
+    "python": "3.13.5",
+    "platform": "linux",
+    "corpus": {
+      "exhaustive_2var": {
+        "formulas": 256,
+        "selected_partitions": 3,
+        "cases": 768
+      },
+      "seeded_3var": {
+        "formulas": 250,
+        "seed": "0xE7030",
+        "selected_partitions": 7,
+        "cases": 1750
+      },
+      "bounded_seeded_4var": {
+        "formulas": 64,
+        "seed": "0xE7034",
+        "selected_partitions": 15,
+        "cases": 960
+      },
+      "total_cases": 3478
+    },
+    "traversed": {
+      "decision_nodes": 23858,
+      "leaf_branches": 13668,
+      "backtracks": 20380
+    },
+    "exact_state_differential": {
+      "root_snapshots_match": true,
+      "branch_transition_snapshots_match": true,
+      "branch_event_sequences_match": true,
+      "active_clause_state_matches_after_backtrack": true,
+      "assignment_state_matches_after_backtrack": true,
+      "watchlists_match_after_backtrack": true,
+      "protected_candidate_permutations_match_after_backtrack": true,
+      "sentinel_persistence_matches": true,
+      "all_index_invariants_passed": true
+    },
+    "exact_semantics": {
+      "root_projected_support_preserved": true,
+      "leaf_projected_support_preserved": true,
+      "exact_rational_pwmc_preserved": true,
+      "sibling_support_unions_match_root": true
+    },
+    "operations": {
+      "linear_candidate_inspections": 55285,
+      "indexed_successor_queries": 35715,
+      "indexed_bitmap_word_reads_for_queries": 34948,
+      "indexed_bitmap_word_reads_for_promotions": 68810,
+      "indexed_reverse_incidence_membership_updates": 1194499,
+      "indexed_promotions": 34405
+    },
+    "interpretation": "The indexed policy reduced repeated candidate inspections on these reference traces, but generated substantial reverse-incidence update work. No wall-clock speedup is implied. Query/promotion word reads exclude full bitmap invariant-validation reads performed by the test harness.",
+    "method": "Scan and indexed Python state models were driven through the same selected-variable branch trees. Complete snapshots were compared at root, after every preUpdate and after every postUpdate. Exact projected support and Fraction-based PWMC were evaluated at the root and branch leaves."
+  },
+  "uploaded_differential_runner": "not_added",
+  "uploaded_rust_tests": "authored_not_run",
+  "rust_compile": "not_run_no_rustc_or_cargo_in_environment",
+  "github_ci_for_exact_head": "no_PR_triggered_workflow_run_returned",
+  "d4_binary_differential": "not_run",
+  "hol4_formal_proof": "not_started",
+  "performance_benchmark": "not_run"
+}
