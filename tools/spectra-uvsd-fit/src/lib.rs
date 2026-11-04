@@ -1537,6 +1537,45 @@ mod tests {
     }
 
     #[test]
+    fn expected_fisher_information_reports_rank_condition_and_wald_uncertainty() {
+        let table = synthetic_table(1.4, 1.55, 250_000);
+        let result = fit(&table, FitOptions::default());
+        let information = result.diagnostics.expected_fisher_information.unwrap();
+        assert_eq!(information.parameter_dimension, 5);
+        assert_eq!(information.effective_rank, 5, "{information:?}");
+        assert!(information.condition_number.unwrap().is_finite());
+        assert!(information.condition_number.unwrap() >= 1.0);
+        assert!(!information.weakly_identified);
+        assert!(information.mu_standard_error.unwrap().is_finite());
+        assert!(information.sigma_standard_error.unwrap().is_finite());
+        assert!(information.sigma_wald_95.unwrap()[0] < information.sigma_wald_95.unwrap()[1]);
+        assert!(information.d_a_wald_95.unwrap()[0] < information.d_a_wald_95.unwrap()[1]);
+    }
+
+    #[test]
+    fn symmetric_eigen_decomposition_reconstructs_small_matrix() {
+        let matrix = vec![
+            vec![4.0, 1.0, 0.5],
+            vec![1.0, 3.0, 0.25],
+            vec![0.5, 0.25, 2.0],
+        ];
+        let (eigenvalues, eigenvectors) = symmetric_eigen_decomposition(matrix.clone()).unwrap();
+        assert!(eigenvalues.windows(2).all(|pair| pair[0] <= pair[1]));
+        for row in 0..3 {
+            for col in 0..3 {
+                let reconstructed: f64 = (0..3)
+                    .map(|index| {
+                        eigenvectors[row][index]
+                            * eigenvalues[index]
+                            * eigenvectors[col][index]
+                    })
+                    .sum();
+                assert!((reconstructed - matrix[row][col]).abs() < 1.0e-10);
+            }
+        }
+    }
+
+    #[test]
     fn derivative_free_optimizer_produces_inspectable_fit() {
         let table = synthetic_table(1.0, 1.35, 100_000);
         let options = FitOptions {
