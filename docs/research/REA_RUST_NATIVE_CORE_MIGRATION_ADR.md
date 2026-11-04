@@ -1096,3 +1096,23 @@ This is a validator/canonicalizer harness, not a production receipt producer, re
 
 Do not combine these outcomes into one composite security score. The reader tests establish deterministic fixture behavior at one exact head, the fuzz smoke explores a bounded mutated-input distribution, and the receipt harness verifies a different serialization/claim-validation contract. Their evidence is complementary but not interchangeable.
 
+## 26. 2026-11-04 — independent receipt replay and platform-native signature evidence
+
+### Independent replay
+
+Draft [PR #10507](https://github.com/Luminous-Dynamics/symthaea/pull/10507), owned by [issue #10507](https://github.com/Luminous-Dynamics/symthaea/issues/10507), adds a separate zip-rs 9.3.0 / flate2-zlib-rs replay path for unique-name Stored/Deflate receipts. It hashes, parses, streams and re-hashes clones of the same already-open archive object, preventing a path re-open from binding the receipt to one file object and the parser to another. It compares raw filename bytes, occurrence index, offsets, flags, method, sizes and CRC, then independently recomputes SHA-256 and incremental CRC-32 over bounded output.
+
+The replay subset is deliberately narrower than the production candidate: duplicate names, ZIP64, prefixed/self-extracting carriers and unsupported layouts return explicit Unsupported. This is preferable to silently treating a name-keyed oracle as an occurrence-preserving parser. The replayer preflights EOCD, central-directory byte size and entry count before constructing the independent archive index, and retains the zip-rs header-consistency/overlap checks.
+
+The CLI accepts an archive and receipt JSON, rejects duplicate JSON properties before object conversion, validates schema and semantic claim ceilings, computes the canonical receipt digest and prints a replay result. Exit codes distinguish replayed, rejected, unsupported and input/schema/I/O error. The implementation remains draft until exact-head build, test and Clippy evidence is captured.
+
+### Platform-native package-signature evidence
+
+[Issue #10508](https://github.com/Luminous-Dynamics/symthaea/issues/10508) starts the next security workstream: package signature validity is not a boolean and is not interchangeable with ZIP/member integrity.
+
+Android's official signing documentation distinguishes v1/JAR, v2, v3 and v4. V1 does not cover all ZIP metadata; v2/v3 signatures are embedded in the APK Signing Block immediately before the central directory and protect specified APK content; v3 adds SDK-range and proof-of-rotation data; v4 uses a companion .apk.idsig Merkle structure over APK bytes and requires v2 or v3. The verifier therefore needs scheme-specific coverage and outcomes, not one "signed" flag. References: [Android v2](https://source.android.com/docs/security/features/apksigning/v2), [Android v3](https://source.android.com/docs/security/features/apksigning/v3), [Android v4](https://source.android.com/docs/security/features/apksigning/v4).
+
+Apple's code-signing model separately validates static/dynamic code and code-signature data. The provisioning profile is CMS-wrapped and contains an allowlist of entitlements; entitlements claimed in the code signature must be authorized by that profile. Modern platforms also require DER-encoded entitlements and validate nested components. Apple cautions that provisioning-profile serialization is implementation-defined, so production code should rely on supported platform APIs rather than a reverse-engineered plist/CMS layout. References: [Code Signing Services](https://developer.apple.com/documentation/security/code-signing-services), [TN3125 provisioning profiles](https://developer.apple.com/documentation/technotes/tn3125-inside-code-signing-provisioning-profiles), [TN3126 signing hashes](https://developer.apple.com/documentation/technotes/tn3126-inside-code-signing-hashes), [Apple platform signing process](https://support.apple.com/guide/security/app-code-signing-process-in-ios-ipados-tvos-visionos-and-watchos-sec7c917bf14/web).
+
+The proposed result is a separate versioned PackageSignatureEvaluation linked to the member receipt by the whole-package digest. It separates cryptographic signature validity, certificate/key identity, chain/trust-anchor policy, platform-version policy, package/distribution authorization (App ID, Bundle ID, Team ID, provisioning profile and entitlements), and installability/runtime observations. A valid signature from an unexpected signer remains cryptographically valid but policy-denied. A trusted publisher can still distribute malicious software. No aggregate trust scalar is permitted.
+
