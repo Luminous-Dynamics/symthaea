@@ -135,6 +135,16 @@ pub struct UvsdEstimate {
     pub thresholds: Vec<f64>,
 }
 
+/// Gradient of the unsmoothed negative log likelihood in natural parameters.
+/// log_sigma is the derivative with respect to ln(sigma), not sigma itself.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UvsdGradient {
+    pub mu: f64,
+    pub log_sigma: f64,
+    pub thresholds: Vec<f64>,
+}
+
+
 impl UvsdEstimate {
     pub fn new(mu: f64, sigma: f64, thresholds: Vec<f64>) -> Option<Self> {
         if !mu.is_finite()
@@ -314,20 +324,12 @@ pub fn fit_ordered_counts(
 
 /// Unsmoothed negative multinomial log likelihood for a supplied parameter set.
 /// Returns None for invalid parameters or a non-finite positive-count cell.
+/// Unsmoothed negative multinomial log likelihood for a supplied parameter set.
+/// Returns None for invalid parameters or a non-finite positive-count cell.
 pub fn negative_log_likelihood(
     table: &CategoryTable,
     estimate: &UvsdEstimate,
 ) -> Option<f64> {
-    if !estimate.mu.is_finite()
-        || !estimate.sigma.is_finite()
-        || estimate.sigma <= 0.0
-        || estimate.thresholds.len() + 1 != table.categories.len()
-        || estimate.thresholds.windows(2).any(|pair| pair[0] >= pair[1])
-        || estimate.thresholds.iter().any(|value| !value.is_finite())
-    {
-        return None;
-    }
-
     let mut nll = 0.0;
     for (index, row) in table.categories.iter().enumerate() {
         let lower = if index == 0 { f64::NEG_INFINITY } else { estimate.thresholds[index - 1] };
@@ -336,7 +338,6 @@ pub fn negative_log_likelihood(
         } else {
             estimate.thresholds[index]
         };
-
         if row.noise > 0 {
             let log_probability = normal_log_interval(lower, upper);
             if !log_probability.is_finite() {
@@ -355,6 +356,108 @@ pub fn negative_log_likelihood(
         }
     }
     if nll.is_finite() { Some(nll) } else { None }
+}
+
+/// Analytic gradient of the unsmoothed negative multinomial log likelihood.
+///
+/// Returns derivatives with respect to mu, ln(sigma), and each ordered
+/// threshold. This is independently testable against finite differences and
+/// does not change the primary unsmoothed likelihood.
+pub fn negative_log_likelihood_gradient(
+    table: &CategoryTable,
+    estimate: &UvsdEstimate,
+) -> Option<UvsdGradient> {
+    if !estimate.mu.is_finite()
+        || !estimate.sigma.is_finite()
+        || estimate.sigma <= 0.0
+        || estimate.thresholds.len() + 1 != table.categories.len()
+        || estimate.thresholds.windows(2).any(|pair| pair[0] >= pair[1])
+        || estimate.thresholds.iter().any(|value| !value.is_finite())
+    {
+        return None;
+    }
+
+    let mut gradient = UvsdGradient {
+        mu: 0.0,
+        log_sigma: 0.0,
+        thresholds: vec![0.0; estimate.thresholds.len()],
+    };
+    let inverse_sigma = 1.0 / estimate.sigma;
+
+    for (index, row) in table.categories.iter().enumerate() {
+        let lower = if index == 0 { f64::NEG_INFINITY } else { estimate.thresholds[index - 1] };
+        let upper = if index == estimate.thresholds.len() {
+            f64::INFINITY
+        } else {
+            estimate.thresholds[index]
+        };
+
+        if row.noise > 0 {
+            let log_probability = normal_log_interval(lower, upper);
+            if !log_probability.is_finite() {
+                return None;
+            }
+            let lower_ratio = density_probability_ratio(lower, log_probability);
+            let upper_ratio = density_probability_ratio(upper, log_probability);
+            if !lower_ratio.is_finite() || !upper_ratio.is_finite() {
+                return None;
+            }
+            let count = row.noise as f64;
+            if index > 0 {
+                gradient.thresholds[index - 1] += count * lower_ratio;
+            }
+            if index < estimate.thresholds.len() {
+                gradient.thresholds[index] -= count * upper_ratio;
+            }
+        }
+
+        if row.signal > 0 {
+            let signal_lower = standardize_boundary(lower, estimate.mu, estimate.sigma);
+            let signal_upper = standardize_boundary(upper, estimate.mu, estimate.sigma);
+            let log_probability = normal_log_interval(signal_lower, signal_upper);
+            if !log_probability.is_finite() {
+                return None;
+            }
+            let lower_ratio = density_probability_ratio(signal_lower, log_probability);
+            let upper_ratio = density_probability_ratio(signal_upper, log_probability);
+            if !lower_ratio.is_finite() || !upper_ratio.is_finite() {
+                return None;
+            }
+
+            let count = row.signal as f64;
+            gradient.mu -= count * (lower_ratio - upper_ratio) * inverse_sigma;
+            gradient.log_sigma -= count
+                * (finite_z_ratio_product(signal_lower, lower_ratio)
+                    - finite_z_ratio_product(signal_upper, upper_ratio));
+            if index > 0 {
+                gradient.thresholds[index - 1] += count * lower_ratio * inverse_sigma;
+            }
+            if index < estimate.thresholds.len() {
+                gradient.thresholds[index] -= count * upper_ratio * inverse_sigma;
+            }
+        }
+    }
+
+    if gradient.mu.is_finite()
+        && gradient.log_sigma.is_finite()
+        && gradient.thresholds.iter().all(|value| value.is_finite())
+    {
+        Some(gradient)
+    } else {
+        None
+    }
+}
+
+fn density_probability_ratio(z: f64, log_probability: f64) -> f64 {
+    if !z.is_finite() {
+        return 0.0;
+    }
+    let log_density = -0.5 * z * z - 0.5 * (2.0 * std::f64::consts::PI).ln();
+    (log_density - log_probability).exp()
+}
+
+fn finite_z_ratio_product(z: f64, ratio: f64) -> f64 {
+    if z.is_finite() { z * ratio } else { 0.0 }
 }
 
 fn converged_parameter_spread(runs: &[RunResult]) -> Option<Vec<f64>> {
@@ -558,6 +661,34 @@ struct RunResult {
     at_boundary: bool,
 }
 
+fn parameter_gradient(table: &CategoryTable, parameters: &[f64]) -> Vec<f64> {
+    let Some((mu, sigma, thresholds, _)) = decode_parameters(parameters, table.categories.len()) else {
+        return vec![f64::NAN; parameters.len()];
+    };
+    let Some(estimate) = UvsdEstimate::new(mu, sigma, thresholds) else {
+        return vec![f64::NAN; parameters.len()];
+    };
+    let Some(natural) = negative_log_likelihood_gradient(table, &estimate) else {
+        let (lower, upper) = parameter_bounds(table.categories.len());
+        return numeric_gradient(table, parameters, &lower, &upper);
+    };
+
+    let mut gradient = vec![0.0; parameters.len()];
+    gradient[0] = natural.mu;
+    gradient[1] = natural.log_sigma;
+    gradient[2] = natural.thresholds.iter().sum();
+
+    for gap_index in 0..natural.thresholds.len().saturating_sub(1) {
+        let gap = parameters[3 + gap_index].exp();
+        let downstream_gradient: f64 = natural.thresholds
+            .iter()
+            .skip(gap_index + 1)
+            .sum();
+        gradient[3 + gap_index] = gap * downstream_gradient;
+    }
+    gradient
+}
+
 fn numeric_gradient(table: &CategoryTable, x: &[f64], lower: &[f64], upper: &[f64]) -> Vec<f64> {
     let mut gradient = vec![0.0; x.len()];
     for index in 0..x.len() {
@@ -591,7 +722,7 @@ fn run_bfgs(table: &CategoryTable, mut x: Vec<f64>, options: FitOptions) -> RunR
         row[index] = 1.0;
     }
     let mut value = objective(table, &x);
-    let mut gradient = numeric_gradient(table, &x, &lower, &upper);
+    let mut gradient = parameter_gradient(table, &x);
     let mut converged = false;
     let mut iterations = 0usize;
 
@@ -644,7 +775,7 @@ fn run_bfgs(table: &CategoryTable, mut x: Vec<f64>, options: FitOptions) -> RunR
             break;
         };
 
-        let next_gradient = numeric_gradient(table, &next_x, &lower, &upper);
+        let next_gradient = parameter_gradient(table, &next_x);
         let s: Vec<f64> = next_x.iter().zip(x.iter()).map(|(a, b)| a - b).collect();
         let y: Vec<f64> = next_gradient.iter().zip(gradient.iter()).map(|(a, b)| a - b).collect();
         let ys = dot(&y, &s);
@@ -676,7 +807,7 @@ fn run_bfgs(table: &CategoryTable, mut x: Vec<f64>, options: FitOptions) -> RunR
         }
     }
 
-    let gradient_norm = vector_norm(&numeric_gradient(table, &x, &lower, &upper));
+    let gradient_norm = vector_norm(&parameter_gradient(table, &x));
     let at_boundary = decode_parameters(&x, table.categories.len())
         .map(|value| value.3)
         .unwrap_or(true);
@@ -866,6 +997,43 @@ mod tests {
             ]),
             Err(TableError::NonIncreasingCategoryOrder)
         );
+    }
+
+    #[test]
+    fn analytic_likelihood_gradient_matches_central_differences() {
+        let table = synthetic_table(1.35, 1.45, 120_000);
+        let estimate = UvsdEstimate::new(1.2, 1.3, vec![-0.8, 0.1, 1.2]).unwrap();
+        let gradient = negative_log_likelihood_gradient(&table, &estimate).unwrap();
+        let epsilon = 1.0e-5;
+
+        let mu_plus = UvsdEstimate::new(estimate.mu + epsilon, estimate.sigma, estimate.thresholds.clone()).unwrap();
+        let mu_minus = UvsdEstimate::new(estimate.mu - epsilon, estimate.sigma, estimate.thresholds.clone()).unwrap();
+        let mu_fd = (negative_log_likelihood(&table, &mu_plus).unwrap()
+            - negative_log_likelihood(&table, &mu_minus).unwrap()) / (2.0 * epsilon);
+        assert!((gradient.mu - mu_fd).abs() < 1.0e-3 * (1.0 + mu_fd.abs()));
+
+        let sigma_plus = UvsdEstimate::new(estimate.mu, estimate.sigma * epsilon.exp(), estimate.thresholds.clone()).unwrap();
+        let sigma_minus = UvsdEstimate::new(estimate.mu, estimate.sigma * (-epsilon).exp(), estimate.thresholds.clone()).unwrap();
+        let sigma_fd = (negative_log_likelihood(&table, &sigma_plus).unwrap()
+            - negative_log_likelihood(&table, &sigma_minus).unwrap()) / (2.0 * epsilon);
+        assert!((gradient.log_sigma - sigma_fd).abs() < 1.0e-3 * (1.0 + sigma_fd.abs()));
+
+        for index in 0..estimate.thresholds.len() {
+            let mut plus = estimate.thresholds.clone();
+            let mut minus = estimate.thresholds.clone();
+            plus[index] += epsilon;
+            minus[index] -= epsilon;
+            let plus = UvsdEstimate::new(estimate.mu, estimate.sigma, plus).unwrap();
+            let minus = UvsdEstimate::new(estimate.mu, estimate.sigma, minus).unwrap();
+            let finite_difference = (negative_log_likelihood(&table, &plus).unwrap()
+                - negative_log_likelihood(&table, &minus).unwrap()) / (2.0 * epsilon);
+            assert!(
+                (gradient.thresholds[index] - finite_difference).abs()
+                    < 1.0e-3 * (1.0 + finite_difference.abs()),
+                "cut {index}: analytic={} finite_difference={finite_difference}",
+                gradient.thresholds[index]
+            );
+        }
     }
 
     #[test]
