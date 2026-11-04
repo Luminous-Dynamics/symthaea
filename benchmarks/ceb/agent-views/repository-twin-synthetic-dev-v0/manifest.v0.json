@@ -1,0 +1,96 @@
+{
+  "schema_version": 0,
+  "manifest_kind": "ceb-agent-view-inventory",
+  "task_id": "CEB-REPO-001",
+  "package_id": "repository-twin-synthetic-public-development-v0",
+  "status": "public_development_only_not_sealed",
+  "source_repository": "Luminous-Dynamics/symthaea",
+  "source_revision": "7a563cd61f4bda3347119ea39169a2e2d1c4f30b",
+  "source_fixture_root": "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/",
+  "entry_count": 15,
+  "entries": [
+    {
+      "path": "Cargo.toml",
+      "mode": "100644",
+      "git_blob_oid": "3eafc986b7c8a076a2451711aecdf16b5faf7e49"
+    },
+    {
+      "path": "crates/api/Cargo.toml",
+      "mode": "100644",
+      "git_blob_oid": "cece6e8f9c5fb853bba368b093090c65060628ef"
+    },
+    {
+      "path": "crates/api/src/audit.rs",
+      "mode": "100644",
+      "git_blob_oid": "eff9d08cbd091abf6b1547a12176e1a3268698d9"
+    },
+    {
+      "path": "crates/api/src/lib.rs",
+      "mode": "100644",
+      "git_blob_oid": "58dd1552ac3bdaed8a74ec968c70359424128d5c"
+    },
+    {
+      "path": "crates/api/src/profile_api.rs",
+      "mode": "100644",
+      "git_blob_oid": "c6c74d9b314ead8b6e04c59d705a614265d2a4fb"
+    },
+    {
+      "path": "crates/api/src/windows_native.rs",
+      "mode": "100644",
+      "git_blob_oid": "b5b179a699055431e88d882fef545e9714315828"
+    },
+    {
+      "path": "crates/api/tests/profile.rs",
+      "mode": "100644",
+      "git_blob_oid": "5f8c856648fa87ef59cd30ff76bae96e99def009"
+    },
+    {
+      "path": "crates/cli/Cargo.toml",
+      "mode": "100644",
+      "git_blob_oid": "2d73680ff3e1f9706b468145cbc48e3dee694f2b"
+    },
+    {
+      "path": "crates/cli/src/main.rs",
+      "mode": "100644",
+      "git_blob_oid": "e16b3424f8c799a7035919789f66608db7cf9e7e"
+    },
+    {
+      "path": "crates/domain/Cargo.toml",
+      "mode": "100644",
+      "git_blob_oid": "736cf94573997c7e29636c92f081a1dbec9f1576"
+    },
+    {
+      "path": "crates/domain/src/lib.rs",
+      "mode": "100644",
+      "git_blob_oid": "215434c1d1d9afc965185d38edbfa734e898b020"
+    },
+    {
+      "path": "crates/service/Cargo.toml",
+      "mode": "100644",
+      "git_blob_oid": "c65466b989028c6eadef6a7920caafb5fe10c302"
+    },
+    {
+      "path": "crates/service/src/lib.rs",
+      "mode": "100644",
+      "git_blob_oid": "6af1a14aeb9cef5ddc7575cf476bdb714d222185"
+    },
+    {
+      "path": "crates/store/Cargo.toml",
+      "mode": "100644",
+      "git_blob_oid": "79f897a49d936726ac4dd2061ee21148224f1313"
+    },
+    {
+      "path": "crates/store/src/lib.rs",
+      "mode": "100644",
+      "git_blob_oid": "059242d54434015b65f8a005ce64b94137279a5f"
+    }
+  ],
+  "excluded_artifacts": [
+    "gold-graph.v0.json",
+    "mutations.v0.json",
+    "worlds.v0.json",
+    "authoring README with gold-label and mutation descriptions"
+  ],
+  "digest_note": "git_blob_oid is Git's SHA-1 blob object ID for each packaged file. It is not a CEB-TREE-V1 SHA-256 digest, cryptographic signature, authenticity proof or isolation result.",
+  "custody_note": "Only this package subtree omits evaluator/design artifacts. The corresponding gold artifacts remain public elsewhere in this repository, so this is not a sealed or blind holdout."
+}
