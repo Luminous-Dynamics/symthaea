@@ -254,6 +254,7 @@ Use explicit status labels: **PROPOSED**, **DESIGN_ONLY**, **SIMULATED**, **MEAS
 ## References and external comparators
 
 - PLE leaderboard: https://www.mercor.com/apex/partner-benchmarks/ple-bench-leaderboard/
+- Google Cloud / Mercor PLE launch report (3 Nov 2026; model vs. harness spread and 41.3% co-authored all-hard-check clearance): https://cloud.google.com/blog/products/ai-machine-learning/introducing-physical-engineerings-last-exam-for-agents/
 - PLE paper: https://arxiv.org/abs/2610.30537
 - EngiBench ACL Findings 2026: https://aclanthology.org/2026.findings-acl.1810/
 - EngDesign: https://github.com/AGI4Engineering/EngDesign
