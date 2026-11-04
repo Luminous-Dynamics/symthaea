@@ -79,9 +79,7 @@ impl std::error::Error for ReaderError {}
 fn map_zipcore_error(context: &str, error: zipcore::Error) -> ReaderError {
     let kind = match error.kind() {
         ZipErrorKind::LimitExceeded => ReaderErrorKind::LimitExceeded,
-        ZipErrorKind::IntegrityFailure | ZipErrorKind::Malformed => {
-            ReaderErrorKind::InvalidArchive
-        }
+        ZipErrorKind::IntegrityFailure | ZipErrorKind::Malformed => ReaderErrorKind::InvalidArchive,
         ZipErrorKind::Unsupported | ZipErrorKind::Password => ReaderErrorKind::Unsupported,
         _ => ReaderErrorKind::Io,
     };
@@ -366,8 +364,7 @@ impl ZipArtifactReader {
     ) -> Result<VerifiedEntryContent, ReaderError> {
         self.verify_source()?;
 
-        if limits.read_buffer_bytes == 0
-            || limits.read_buffer_bytes > MAX_CONTENT_READ_BUFFER_BYTES
+        if limits.read_buffer_bytes == 0 || limits.read_buffer_bytes > MAX_CONTENT_READ_BUFFER_BYTES
         {
             return Err(ReaderError::new(
                 ReaderErrorKind::LimitExceeded,
@@ -445,10 +442,15 @@ impl ZipArtifactReader {
         let decoder_file = OpenOptions::new()
             .read(true)
             .open(&self.path)
-            .map_err(|error| ReaderError::io("cannot open archive for independent content verification", error))?;
-        let decoder_identity = decoder_file
-            .metadata()
-            .map_err(|error| ReaderError::io("cannot stat content-verification descriptor", error))?;
+            .map_err(|error| {
+                ReaderError::io(
+                    "cannot open archive for independent content verification",
+                    error,
+                )
+            })?;
+        let decoder_identity = decoder_file.metadata().map_err(|error| {
+            ReaderError::io("cannot stat content-verification descriptor", error)
+        })?;
         if !self.initial_identity.matches(&decoder_identity) {
             return Err(ReaderError::new(
                 ReaderErrorKind::SourceChanged,
@@ -471,8 +473,10 @@ impl ZipArtifactReader {
         // Keep all decoder setup and streaming in one result scope so the descriptors and
         // selected path are revalidated even when the secondary parser rejects metadata.
         let stream_result = (move || {
-            let mut archive = DecoderArchive::new_with_options(decoder_file, options)
-                .map_err(|error| map_zipcore_error("secondary ZIP parser rejected archive", error))?;
+            let mut archive =
+                DecoderArchive::new_with_options(decoder_file, options).map_err(|error| {
+                    map_zipcore_error("secondary ZIP parser rejected archive", error)
+                })?;
 
             if archive.len() != self.inventory.entries.len()
                 || archive.central_directory_offset()
@@ -516,9 +520,9 @@ impl ZipArtifactReader {
                 ));
             }
 
-            let mut member = archive
-                .by_index(index)
-                .map_err(|error| map_zipcore_error("cannot open selected ZIP member stream", error))?;
+            let mut member = archive.by_index(index).map_err(|error| {
+                map_zipcore_error("cannot open selected ZIP member stream", error)
+            })?;
             let mut buffer = vec![0u8; limits.read_buffer_bytes];
             let mut hasher = Sha256::new();
             let mut observed_uncompressed_bytes = 0u64;
@@ -528,7 +532,9 @@ impl ZipArtifactReader {
                     Ok(read) => read,
                     Err(io_error) => {
                         return Err(match member.take_terminal_error() {
-                            Some(error) => map_zipcore_error("ZIP member stream verification failed", error),
+                            Some(error) => {
+                                map_zipcore_error("ZIP member stream verification failed", error)
+                            }
                             None => ReaderError::io("cannot read ZIP member stream", io_error),
                         });
                     }
@@ -564,9 +570,9 @@ impl ZipArtifactReader {
             ))
         })();
 
-        let final_witness_identity = identity_witness
-            .metadata()
-            .map_err(|error| ReaderError::io("cannot revalidate archive identity witness", error))?;
+        let final_witness_identity = identity_witness.metadata().map_err(|error| {
+            ReaderError::io("cannot revalidate archive identity witness", error)
+        })?;
         if !self.initial_identity.matches(&final_witness_identity) {
             return Err(ReaderError::new(
                 ReaderErrorKind::SourceChanged,
@@ -2232,7 +2238,10 @@ mod tests {
                 let metadata = oracle.by_index_data(index).unwrap();
                 assert_eq!(metadata.name_raw(), expected.raw_name);
                 assert_eq!(metadata.header_start(), expected.local_header_offset);
-                assert_eq!(metadata.compressed_size(), expected.declared_compressed_size);
+                assert_eq!(
+                    metadata.compressed_size(),
+                    expected.declared_compressed_size
+                );
                 assert_eq!(metadata.size(), expected.declared_uncompressed_size);
                 assert_eq!(metadata.crc32(), expected.declared_crc32);
             }
@@ -2252,7 +2261,10 @@ mod tests {
 
     #[test]
     fn deterministic_archive_mutations_never_panic_inventory_or_content_read() {
-        let baseline = single_entry(b"mutation-target.bin", b"known payload for deterministic mutation");
+        let baseline = single_entry(
+            b"mutation-target.bin",
+            b"known payload for deterministic mutation",
+        );
         let mut state = 0x9e37_79b9_7f4a_7c15u64;
 
         for sample in 0..256u64 {
@@ -2269,8 +2281,7 @@ mod tests {
             let path = write_temp(&mutated);
             let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 if let Ok(reader) = ZipArtifactReader::open(&path, ReaderLimits::default()) {
-                    let _ = reader
-                        .verify_entry_content(0, ContentVerificationLimits::default());
+                    let _ = reader.verify_entry_content(0, ContentVerificationLimits::default());
                 }
             }));
             fs::remove_file(path).unwrap();
@@ -2282,9 +2293,8 @@ mod tests {
     fn concurrent_content_verification_uses_independent_file_cursors() {
         let payload = vec![0x5au8; 2 * 1024 * 1024];
         let path = write_temp(&single_entry(b"concurrent.bin", &payload));
-        let reader = std::sync::Arc::new(
-            ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap(),
-        );
+        let reader =
+            std::sync::Arc::new(ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap());
         let workers: Vec<_> = (0..8)
             .map(|_| {
                 let reader = std::sync::Arc::clone(&reader);
@@ -2301,7 +2311,11 @@ mod tests {
             .collect();
 
         assert_eq!(results.len(), 8);
-        assert!(results.windows(2).all(|pair| pair[0].sha256 == pair[1].sha256));
+        assert!(
+            results
+                .windows(2)
+                .all(|pair| pair[0].sha256 == pair[1].sha256)
+        );
         assert!(results.iter().all(|result| {
             result.observed_uncompressed_bytes == 2 * 1024 * 1024 && result.verified_crc32
         }));
@@ -2362,11 +2376,7 @@ mod tests {
         let payload = vec![0u8; 4096];
         let mut writer = zipcore::ZipWriter::new(std::io::Cursor::new(Vec::new())).unwrap();
         writer
-            .add_file(
-                "bomb.bin",
-                &payload,
-                &zipcore::FileOptions::deflate(6),
-            )
+            .add_file("bomb.bin", &payload, &zipcore::FileOptions::deflate(6))
             .unwrap();
         let mut bytes = writer.finish().unwrap().into_inner();
 
