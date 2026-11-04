@@ -237,13 +237,13 @@ pub struct RunnerCpalClockFitV1 {
     pub stream_instance_id: u64,
     pub cpal_stream_descriptor_sha256: String,
     /// Runner nanoseconds per CPAL predicted-playback-stream nanosecond.
-    pub runner_ns_per_cpal_playback_ns: f64,
+    pub runner_ns_per_cpal_callback_ns: f64,
     /// Runner time at the reference CPAL timestamp. Retained as f64 because
     /// the OLS centroid need not fall on an integer nanosecond.
     pub reference_runner_time_ns: f64,
-    pub reference_cpal_playback_stream_time_ns: u64,
-    pub valid_from_cpal_playback_stream_time_ns: u64,
-    pub valid_until_cpal_playback_stream_time_ns: u64,
+    pub reference_cpal_callback_stream_time_ns: u64,
+    pub valid_from_cpal_callback_stream_time_ns: u64,
+    pub valid_until_cpal_callback_stream_time_ns: u64,
     pub valid_from_runner_time_ns: f64,
     pub valid_until_runner_time_ns: f64,
     pub maximum_extrapolation_ns: u64,
@@ -269,7 +269,7 @@ pub struct RunnerCpalClockFitV1 {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CpalClockEstimateV1 {
-    pub cpal_playback_stream_time_ns: f64,
+    pub cpal_callback_stream_time_ns: f64,
     /// Fit residual only; not a timestamp-accuracy guarantee.
     pub fit_residual_bound_ns: f64,
     pub accuracy_status: RunnerCpalClockAccuracyStatusV1,
@@ -310,7 +310,7 @@ impl RunnerCpalClockFitV1 {
     /// stream-clock instant corresponding to a runner monotonic timestamp.
     /// A caller may query MEL-CLOCK-001's playback-time -> output-frame fit
     /// directly with this value; no callback-to-playback fit is required.
-    pub fn playback_time_at_runner_time(
+    pub fn callback_time_at_runner_time(
         &self,
         runner_time_ns: u64,
     ) -> Result<CpalClockEstimateV1, RunnerCpalClockFitErrorV1> {
@@ -322,9 +322,9 @@ impl RunnerCpalClockFitV1 {
             });
         }
 
-        let cpal_time = self.reference_cpal_playback_stream_time_ns as f64
+        let cpal_time = self.reference_cpal_callback_stream_time_ns as f64
             + (runner_time_ns as f64 - self.reference_runner_time_ns)
-                / self.runner_ns_per_cpal_playback_ns;
+                / self.runner_ns_per_cpal_callback_ns;
         if !cpal_time.is_finite() || cpal_time < 0.0 {
             return Err(RunnerCpalClockFitErrorV1::NonFiniteFit);
         }
@@ -345,7 +345,7 @@ impl RunnerCpalClockFitV1 {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RunnerOutputFrameEstimateV1 {
     pub runner_time_ns: u64,
-    pub estimated_cpal_playback_stream_time_ns: f64,
+    pub estimated_cpal_callback_stream_time_ns: f64,
     pub rounded_cpal_playback_stream_time_ns: u64,
     /// Signed quantization introduced when converting the sub-nanosecond
     /// floating point playback estimate to the integer API used by the
@@ -409,9 +409,9 @@ pub fn estimate_output_frame_at_runner_time_v1(
     }
 
     let playback_estimate = runner_fit
-        .playback_time_at_runner_time(runner_time_ns)
+        .callback_time_at_runner_time(runner_time_ns)
         .map_err(RunnerOutputFrameCompositionErrorV1::RunnerClock)?;
-    let rounded_playback_time = playback_estimate.cpal_playback_stream_time_ns.round();
+    let rounded_playback_time = playback_estimate.cpal_callback_stream_time_ns.round();
     if !rounded_playback_time.is_finite()
         || rounded_playback_time < 0.0
         || rounded_playback_time >= u64::MAX as f64
@@ -430,7 +430,7 @@ pub fn estimate_output_frame_at_runner_time_v1(
             .cpal_playback_stream_time_ns,
         rounded_cpal_playback_stream_time_ns: rounded_playback_time_ns,
         playback_time_quantization_error_ns: rounded_playback_time
-            - playback_estimate.cpal_playback_stream_time_ns,
+            - playback_estimate.cpal_callback_stream_time_ns,
         output_frame_estimate,
         accuracy_status: RunnerCpalClockAccuracyStatusV1::PointEstimateOnly,
     })
@@ -511,11 +511,11 @@ pub fn fit_runner_cpal_clock_v1(
         }
     }
 
-    let x0 = pairs[0].cpal_playback_stream_time_ns;
+    let x0 = pairs[0].cpal_callback_stream_time_ns;
     let y0 = pairs[0].midpoint_runner_time_ns();
     let xs = pairs
         .iter()
-        .map(|pair| (pair.cpal_playback_stream_time_ns - x0) as f64)
+        .map(|pair| (pair.cpal_callback_stream_time_ns - x0) as f64)
         .collect::<Vec<_>>();
     let ys = pairs
         .iter()
@@ -536,10 +536,10 @@ pub fn fit_runner_cpal_clock_v1(
 
     let slope = covariance / variance;
     let reference_cpal_delta_ns = mean_x;
-    let reference_cpal_playback_stream_time_ns =
+    let reference_cpal_callback_stream_time_ns =
         x0.saturating_add(reference_cpal_delta_ns.max(0.0).round() as u64);
     let rounded_reference_delta_ns =
-        reference_cpal_playback_stream_time_ns.saturating_sub(x0) as f64;
+        reference_cpal_callback_stream_time_ns.saturating_sub(x0) as f64;
     let reference_runner_time_ns =
         y0 as f64 + mean_y + slope * (rounded_reference_delta_ns - reference_cpal_delta_ns);
 
@@ -617,13 +617,13 @@ pub fn fit_runner_cpal_clock_v1(
     }
 
     let valid_from_cpal = x0;
-    let valid_until_cpal = pairs[pairs.len() - 1].cpal_playback_stream_time_ns;
+    let valid_until_cpal = pairs[pairs.len() - 1].cpal_callback_stream_time_ns;
     let valid_from_runner = reference_runner_time_ns
         + slope * (valid_from_cpal as f64
-            - reference_cpal_playback_stream_time_ns as f64);
+            - reference_cpal_callback_stream_time_ns as f64);
     let valid_until_runner = reference_runner_time_ns
         + slope * (valid_until_cpal as f64
-            - reference_cpal_playback_stream_time_ns as f64);
+            - reference_cpal_callback_stream_time_ns as f64);
     if !valid_from_runner.is_finite()
         || !valid_until_runner.is_finite()
         || valid_until_runner < valid_from_runner
@@ -638,11 +638,11 @@ pub fn fit_runner_cpal_clock_v1(
         runner_origin_id: descriptor.runner_origin_id.clone(),
         stream_instance_id: descriptor.stream_instance_id,
         cpal_stream_descriptor_sha256: descriptor.cpal_stream_descriptor_sha256.clone(),
-        runner_ns_per_cpal_playback_ns: slope,
+        runner_ns_per_cpal_callback_ns: slope,
         reference_runner_time_ns,
-        reference_cpal_playback_stream_time_ns,
-        valid_from_cpal_playback_stream_time_ns: valid_from_cpal,
-        valid_until_cpal_playback_stream_time_ns: valid_until_cpal,
+        reference_cpal_callback_stream_time_ns,
+        valid_from_cpal_callback_stream_time_ns: valid_from_cpal,
+        valid_until_cpal_callback_stream_time_ns: valid_until_cpal,
         valid_from_runner_time_ns: valid_from_runner,
         valid_until_runner_time_ns: valid_until_runner,
         maximum_extrapolation_ns: effective_policy.maximum_extrapolation_ns,
@@ -764,13 +764,13 @@ mod tests {
     }
 
     #[test]
-    fn exact_pair_fit_maps_runner_to_cpal_playback_stream_time() {
+    fn exact_pair_fit_maps_runner_to_cpal_callback_stream_time() {
         let d = descriptor();
         let fit = fit_runner_cpal_clock_v1(&d, &exact_pairs(), policy()).unwrap();
-        let estimate = fit.playback_time_at_runner_time(120_000_000).unwrap();
+        let estimate = fit.callback_time_at_runner_time(120_000_000).unwrap();
 
         assert!((fit.estimated_drift_ppm).abs() < 1e-6);
-        assert!((estimate.cpal_playback_stream_time_ns - 25_000_000.0).abs() < 1e-6);
+        assert!((estimate.cpal_callback_stream_time_ns - 20_000_000.0).abs() < 1e-6);
         assert_eq!(
             estimate.accuracy_status,
             RunnerCpalClockAccuracyStatusV1::PointEstimateOnly
@@ -898,7 +898,7 @@ mod tests {
     fn calibration_expiry_rejects_queries_beyond_horizon() {
         let fit = fit_runner_cpal_clock_v1(&descriptor(), &exact_pairs(), policy()).unwrap();
         assert!(matches!(
-            fit.playback_time_at_runner_time(200_000_000),
+            fit.callback_time_at_runner_time(200_000_000),
             Err(RunnerCpalClockFitErrorV1::QueryOutsideValidity { .. })
         ));
     }
