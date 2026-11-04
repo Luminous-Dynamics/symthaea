@@ -95,6 +95,79 @@ fn valid_hex(value: &str, length: usize) -> bool {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
+fn sha1_digest(input: &[u8]) -> [u8; 20] {
+    let mut data = input.to_vec();
+    let bit_length = (data.len() as u64).wrapping_mul(8);
+    data.push(0x80);
+    while data.len() % 64 != 56 {
+        data.push(0);
+    }
+    data.extend_from_slice(&bit_length.to_be_bytes());
+
+    let mut h0 = 0x67452301_u32;
+    let mut h1 = 0xefcdab89_u32;
+    let mut h2 = 0x98badcfe_u32;
+    let mut h3 = 0x10325476_u32;
+    let mut h4 = 0xc3d2e1f0_u32;
+
+    for block in data.chunks_exact(64) {
+        let mut words = [0_u32; 80];
+        for (index, chunk) in block.chunks_exact(4).enumerate().take(16) {
+            words[index] = u32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+        }
+        for index in 16..80 {
+            words[index] = (words[index - 3]
+                ^ words[index - 8]
+                ^ words[index - 14]
+                ^ words[index - 16])
+                .rotate_left(1);
+        }
+
+        let (mut a, mut b, mut c, mut d, mut e) = (h0, h1, h2, h3, h4);
+        for (index, word) in words.iter().enumerate() {
+            let (function, constant) = match index {
+                0..=19 => ((b & c) | ((!b) & d), 0x5a827999_u32),
+                20..=39 => (b ^ c ^ d, 0x6ed9eba1_u32),
+                40..=59 => ((b & c) | (b & d) | (c & d), 0x8f1bbcdc_u32),
+                _ => (b ^ c ^ d, 0xca62c1d6_u32),
+            };
+            let temp = a
+                .rotate_left(5)
+                .wrapping_add(function)
+                .wrapping_add(e)
+                .wrapping_add(constant)
+                .wrapping_add(*word);
+            e = d;
+            d = c;
+            c = b.rotate_left(30);
+            b = a;
+            a = temp;
+        }
+        h0 = h0.wrapping_add(a);
+        h1 = h1.wrapping_add(b);
+        h2 = h2.wrapping_add(c);
+        h3 = h3.wrapping_add(d);
+        h4 = h4.wrapping_add(e);
+    }
+
+    let mut output = [0_u8; 20];
+    for (chunk, word) in output.chunks_exact_mut(4).zip([h0, h1, h2, h3, h4]) {
+        chunk.copy_from_slice(&word.to_be_bytes());
+    }
+    output
+}
+
+fn git_blob_sha1(raw: &[u8]) -> String {
+    let header = format!("blob {}\\0", raw.len());
+    let mut object = Vec::with_capacity(header.len() + raw.len());
+    object.extend_from_slice(header.as_bytes());
+    object.extend_from_slice(raw);
+    sha1_digest(&object)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
 fn require_nonempty(value: &str, label: &str) -> Result<(), String> {
     if value.trim().is_empty() {
         Err(format!("{label} must be non-empty"))
@@ -239,6 +312,12 @@ fn build_task(raw: &Value, index: usize) -> Result<TaskIdentity, String> {
 
 fn validate_database(raw_bytes: &[u8], snapshot_path: &str, blob_sha1: &str) -> Result<Report, String> {
     require_sha1(blob_sha1, "upstream snapshot Git blob SHA-1")?;
+    let computed_blob = git_blob_sha1(raw_bytes);
+    if computed_blob != blob_sha1 {
+        return Err(format!(
+            "raw snapshot bytes do not match declared Git blob SHA-1: expected {blob_sha1}, computed {computed_blob}"
+        ));
+    }
     if snapshot_path.ends_with("SorryDB_2601.json") && blob_sha1 != FULL_SNAPSHOT_BLOB {
         return Err("pinned SorryDB_2601 blob SHA-1 mismatch".into());
     }
@@ -305,7 +384,7 @@ fn validate_database(raw_bytes: &[u8], snapshot_path: &str, blob_sha1: &str) -> 
     })
 }
 
-fn run_git(repo: &Path, args: &[&str]) -> Result<String, String> {
+fn run_git_bytes(repo: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
     let output = Command::new("git").args(args).current_dir(repo).output()
         .map_err(|e| format!("run git {:?}: {e}", args))?;
     if !output.status.success() {
@@ -315,7 +394,14 @@ fn run_git(repo: &Path, args: &[&str]) -> Result<String, String> {
             String::from_utf8_lossy(&output.stderr).trim()
         ));
     }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
+    Ok(output.stdout)
+}
+
+fn run_git(repo: &Path, args: &[&str]) -> Result<String, String> {
+    let bytes = run_git_bytes(repo, args)?;
+    String::from_utf8(bytes)
+        .map(|value| value.trim().to_owned())
+        .map_err(|e| format!("git {:?} returned non-UTF-8 output: {e}", args))
 }
 
 fn position_to_byte_index(content: &str, line: usize, column: usize) -> Result<usize, String> {
@@ -355,18 +441,18 @@ fn verify_checkout(task: &TaskIdentity, repo_root: &Path) -> Result<CheckoutVeri
     if normalize_remote(&remote) != normalize_remote(&task.repository_remote) {
         return Err(format!("checkout remote mismatch: expected {}, got {remote}", task.repository_remote));
     }
-    let toolchain_path = repo_root.join("lean-toolchain");
-    let toolchain = fs::read_to_string(&toolchain_path)
-        .map_err(|e| format!("read lean-toolchain: {e}"))?;
-    let normalized = normalize_lean_version(&toolchain)?;
+    let toolchain_bytes = run_git_bytes(repo_root, &["show", "HEAD:lean-toolchain"])?;
+    let toolchain = std::str::from_utf8(&toolchain_bytes)
+        .map_err(|e| format!("committed lean-toolchain is not UTF-8: {e}"))?;
+    let normalized = normalize_lean_version(toolchain)?;
     if normalized != task.lean_version {
         return Err(format!("Lean toolchain mismatch: expected {}, got {}", task.lean_version, normalized));
     }
 
-    let source_path = repo_root.join(PathBuf::from(&task.source_path));
-    let source_bytes = fs::read(&source_path).map_err(|e| format!("read source file {}: {e}", task.source_path))?;
+    let source_spec = format!("HEAD:{}", task.source_path);
+    let source_bytes = run_git_bytes(repo_root, &["show", &source_spec])?;
     let source = std::str::from_utf8(&source_bytes)
-        .map_err(|e| format!("source file is not UTF-8: {e}"))?;
+        .map_err(|e| format!("committed source file is not UTF-8: {e}"))?;
     let start = position_to_byte_index(source, task.start_line, task.start_column)?;
     let end = position_to_byte_index(source, task.end_line, task.end_column)?;
     if end <= start {
@@ -436,7 +522,11 @@ fn synthetic_database() -> Value {
 fn run_self_tests() -> Result<(), String> {
     let database = synthetic_database();
     let bytes = serde_json::to_vec(&database).map_err(|e| e.to_string())?;
-    let report = validate_database(&bytes, "synthetic.json", &"2".repeat(40))?;
+    let synthetic_blob = git_blob_sha1(&bytes);
+    if git_blob_sha1(b"abc") != "f2ba8f84ab5c1bce84a7b441cb1959cfc7093b7f" {
+        return Err("Git blob SHA-1 implementation self-test failed".into());
+    }
+    let report = validate_database(&bytes, "synthetic.json", &synthetic_blob)?;
     if report.task_count != 1 || report.unique_task_count != 1
         || report.task_records[0].source_goal_trust != "debug_hint_not_reproduced"
         || report.scoring_admission
@@ -455,7 +545,7 @@ fn run_self_tests() -> Result<(), String> {
     let mut malformed = database.clone();
     malformed["sorries"][0]["location"]["start_line"] = Value::from(0);
     let malformed_bytes = serde_json::to_vec(&malformed).unwrap();
-    if validate_database(&malformed_bytes, "synthetic.json", &"2".repeat(40)).is_ok() {
+    if validate_database(&malformed_bytes, "synthetic.json", &git_blob_sha1(&malformed_bytes)).is_ok() {
         return Err("zero-based line in SorryDB input was accepted".into());
     }
     println!("SELF_TEST_PASS line coordinates must be 1-based");
@@ -463,7 +553,7 @@ fn run_self_tests() -> Result<(), String> {
     let mut reversed = database.clone();
     reversed["sorries"][0]["location"]["end_column"] = Value::from(5);
     let reversed_bytes = serde_json::to_vec(&reversed).unwrap();
-    if validate_database(&reversed_bytes, "synthetic.json", &"2".repeat(40)).is_ok() {
+    if validate_database(&reversed_bytes, "synthetic.json", &git_blob_sha1(&reversed_bytes)).is_ok() {
         return Err("reversed source range was accepted".into());
     }
     println!("SELF_TEST_PASS empty/reversed source range is rejected");
@@ -471,7 +561,7 @@ fn run_self_tests() -> Result<(), String> {
     let mut duplicate = database.clone();
     duplicate["sorries"].push(duplicate["sorries"][0].clone());
     let duplicate_bytes = serde_json::to_vec(&duplicate).unwrap();
-    if validate_database(&duplicate_bytes, "synthetic.json", &"2".repeat(40)).is_ok() {
+    if validate_database(&duplicate_bytes, "synthetic.json", &git_blob_sha1(&duplicate_bytes)).is_ok() {
         return Err("duplicate canonical task identity was accepted".into());
     }
     println!("SELF_TEST_PASS duplicate task identity is rejected");
