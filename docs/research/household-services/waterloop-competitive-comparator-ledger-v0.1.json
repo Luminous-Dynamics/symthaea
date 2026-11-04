@@ -120,11 +120,42 @@
           },
           "capacity_semantics": "Manufacturer describes 360 L/day as potential/cleaning capacity, dependent on user behaviour. This is not accepted end-use delivery, measured net mains displacement or the NSF listing value.",
           "missing_or_unresolved": [
+            "current product page states 280 kWh/year while the January 2026 H300 v2.1 data sheet states 220 kWh/year; no reconciliation is published in the sources inspected",
             "exact hardware/firmware and local-market revision",
             "end-use split and time profile supporting the 360 L/day value",
             "actual qualified output at target fixture pressure/flow",
-            "energy boundary and operating modes included in 280 kWh/year",
+            "energy boundary and operating modes included in each annual-energy figure",
             "South African installation, certification, service, spares and price"
+          ]
+        },
+        {
+          "observation_id": "H300-DATASHEET-2026-01-POWER-CONNECTIVITY-VARIANT",
+          "evidence_class": "manufacturer_technical_sheet",
+          "source_title": "Product data sheet H300 (January 2026 metric)",
+          "source_url": "https://info.hydraloop.com/wp-content/uploads/2026/01/Product-data-sheet-H300-January-2026-metric.pdf",
+          "retrieved_date": "2026-11-04",
+          "claims": {
+            "product_revision_marked": "H300 V2.1 230V",
+            "average_energy_kwh_per_year": 220,
+            "power_during_treatment_w": 25,
+            "internet_connection_required": true,
+            "internet_connection_methods": [
+              "Ethernet cable",
+              "internal Wi-Fi network"
+            ],
+            "standard_inlet_greywater_sources": [
+              "shower",
+              "bath"
+            ],
+            "premium_optional_greywater_source": "washing machine via inlet diverter",
+            "toilet_and_washing_machine_outputs": "permanently pressurized",
+            "auxiliary_output_condition": "pressurized before transfer to T3 when T3 is full"
+          },
+          "capacity_semantics": "This January 2026 manufacturer technical sheet gives 220 kWh/year, while the current H300 product page inspected on 2026-11-04 gives 280 kWh/year. Both are retained; the source set does not explain the difference. It also distinguishes the Standard inlet from the Premium washing-machine option and states an internet connection requirement.",
+          "missing_or_unresolved": [
+            "written reconciliation with current product-page 280 kWh/year figure",
+            "whether all model variants and operating modes share the same energy profile",
+            "whether loss of internet disables only monitoring/support or any essential operation, local controls, diagnostics or recovery"
           ]
         }
       ],
@@ -149,12 +180,11 @@
             "average_energy_kwh_per_year": 220,
             "wifi_network_connection_required": true
           },
-          "capacity_semantics": "The guide describes cleaning capacity as dependent on user behaviour. The Wi-Fi statement specifies an internal network; it does not by itself establish an internet/cloud dependency.",
+          "capacity_semantics": "The guide describes cleaning capacity as dependent on user behaviour. Its Wi-Fi requirement is preserved as a connectivity dependency; the January 2026 datasheet more explicitly states that an internet connection is needed over Ethernet or internal Wi-Fi.",
           "missing_or_unresolved": [
-            "whether 220 kWh/year applies to the currently marketed H300 revision",
+            "whether the 220 kWh/year value applies to the currently marketed H300 configuration and why the current product page states 280 kWh/year",
             "which standby, treatment and pump modes are included",
-            "whether an internal LAN is needed for normal operation, setup only, diagnostics or remote services",
-            "whether remote internet access is required for basic service and recovery"
+            "whether local control, fault handling, basic operation and safe recovery remain available when the internet service is unavailable"
           ]
         }
       ],
@@ -207,13 +237,19 @@
           "claims": {
             "nominal_distribution_pump_pressure_bar": 2.1,
             "nominal_distribution_pump_pressure_kpa": 210,
-            "nominal_distribution_pump_flow_l_per_min": 12
+            "nominal_distribution_pump_flow_l_per_min": 12,
+            "backup_water_required": true,
+            "backup_water_minimum_flow_l_per_min": 12,
+            "backup_water_connection": "permanently pressurized, 1/2 inch BSP",
+            "greywater_backup_separation": "manufacturer datasheet specifies a safe air gap (T4)"
           },
           "semantics": "Manufacturer-declared nominal pump figures. They are not fixture-boundary flow/pressure under a matched plumbing network and demand trace.",
           "missing_or_unresolved": [
             "pump curve and pressure/flow curve over the operating envelope",
             "delivered pressure at simultaneous-use fixtures",
-            "head loss, pipe topology and lift-pump configuration effects"
+            "head loss, pipe topology and lift-pump configuration effects",
+            "independent inspection of air-gap/backflow installation in the target South African installation",
+            "performance at simultaneous outlets and actual fixture boundaries"
           ]
         }
       ],
