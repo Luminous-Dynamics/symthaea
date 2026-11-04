@@ -71,6 +71,12 @@ The public R example uses `nr_s1 = [10, 7, 16, 27, 29, 10]` and `nr_s2 = [43, 21
 
 An independent Python reference replay of the same six-start design obtained `mu=1.231422`, `sigma=1.252292`, `d_a=1.086687`, and `logL=-315.878077`. This is a Python algorithm check, not execution of the Rust test.
 
+## Pre-study design search
+
+The public `expected_fisher_information_for_design` API computes local expected information for proposed category boundaries before observations exist. The `design_search` binary explores all 1,287 five-cut designs from a fixed [-3, 3] grid for six ordinal categories, scoring the worst-case expected standard error of d_a across mu={0.5, 1.0, 1.5, 2.0} and sigma={0.70, 1.0, 1.30, 1.60}, with 250 signal and 250 noise trials per design cell. It reports equal-probability and fixed-spacing baselines plus the top 20 minimax candidates.
+
+This is a **model-based design sensitivity analysis**, not evidence that an optimized category scale improves real participant measurements. It assumes the specified Gaussian distributions and known design parameters; the next qualification step is Monte Carlo recovery under lapses, RT/confidence noise, criterion changes, class imbalance and missingness, with frozen design choices and disjoint held-out seeds. Use worst-case and average precision together; do not choose a design solely from one parameter point.
+
 ## Run
 
     cargo test --manifest-path tools/spectra-uvsd-fit/Cargo.toml
