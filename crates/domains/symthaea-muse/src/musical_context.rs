@@ -833,7 +833,7 @@ mod tests {
                 &[vec![MusicalActionV1::Wait]]
             ),
             Err(MusicalContextScoreErrorV1::FamilyPredictionCountMismatch {
-                expected: 3,
+                expected: 5,
                 actual: 1
             })
         ));
