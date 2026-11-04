@@ -68,7 +68,7 @@ fn simulate_table(mu: f64, sigma: f64, seed: u64) -> CategoryTable {
 
 fn main() {
     println!(
-        "seed,mu_true,sigma_true,status,mu_hat,sigma_hat,d_a_hat,nll,gradient_norm,iterations,objective_spread,parameter_spread,diagonal_curvature"
+        "seed,mu_true,sigma_true,status,mu_hat,sigma_hat,d_a_hat,nll,gradient_norm,iterations,starts_converged,starts_non_finite,objective_spread,parameter_spread,diagonal_curvature"
     );
 
     for (mu_index, &mu) in MU_GRID.iter().enumerate() {
@@ -118,9 +118,11 @@ fn main() {
                     .map(|value| format!(r#""{value}""#))
                     .unwrap_or_default();
                 println!(
-                    "{campaign_seed},{mu},{sigma},{:?},{mu_hat},{sigma_hat},{d_a_hat},{nll},{gradient},{},{objective_spread},{parameter_spread},{curvature}",
+                    "{campaign_seed},{mu},{sigma},{:?},{mu_hat},{sigma_hat},{d_a_hat},{nll},{gradient},{},{},{},{objective_spread},{parameter_spread},{curvature}",
                     result.status,
-                    result.diagnostics.iterations
+                    result.diagnostics.iterations,
+                    result.diagnostics.starts_converged,
+                    result.diagnostics.starts_non_finite
                 );
             }
         }
