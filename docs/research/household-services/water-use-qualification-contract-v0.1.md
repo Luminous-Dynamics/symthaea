@@ -160,3 +160,55 @@ For a future physical false-acceptance statement, preregister independent trials
 ## 10. Claim ceiling
 
 This package can qualify schema and software interpretation only. It cannot declare a sample safe, prove treatment efficacy, establish compliance with SANS 241, validate a municipal or private supply, authorize plumbing, or establish WaterLoop superiority. Those require the exact current standard, qualified interpretation, appropriate physical sampling and the relevant independent evidence.
+
+
+## 11. Industry baseline and competitive target ladder
+
+The current comparator ledger in [WaterLoop competitive evidence PR #10485](https://github.com/Luminous-Dynamics/symthaea/pull/10485) already identifies established vendor capability families:
+- **Backup delivery:** JoJo municipal-backup tank + pump + automatic filling / switching.
+- **Leak observability and isolation:** Moen Flo and Phyn Plus flow/pressure monitoring, leak detection and automatic shutoff.
+- **Greywater reuse:** Hydraloop H300/H350 (Class R / Laundry & Bathing listing) and INTEWA AQUALOOP (Class C / Laundry & Bathing listings for larger systems).
+
+These are different functions and reference classes, not one league table. Public product pages and certification listings are not independent challenge results. Do not claim that WaterLoop has invented tank backup, leak sensing/shutoff, or greywater treatment. Do not claim that no incumbent offers an integrated combination without a fresh, broader market search.
+
+### How the candidate can be better
+
+The plausible differentiated capability is not another isolated tank, sensor, or treatment vessel. It is a **verifiable source-to-use service contract** that joins:
+- what water source and batch actually entered the system;
+- which treatment and storage state applied;
+- which samples and risk programme support the claimed use;
+- what service was delivered at the actual user/fixture boundary;
+- what changed, became stale, failed, or required corrective action;
+- whether the system remained locally understandable and operable without cloud/account dependencies.
+
+That is a research hypothesis. It must be compared against the strongest matched incumbents and any integrated solutions discovered during landscape expansion.
+
+### Proposed benchmark target ladder
+
+| Tier | Proposed target | Evidence required |
+|---|---|---|
+| Deterministic semantic conformance | 100% of WQ negative controls rejected or explicitly Unknown / restricted; zero wrong-use or stale-evidence potable passes | Frozen known-answer WQ corpus, independent evaluator, mutation tests |
+| Positive-control utility | All valid positive controls accepted when the full exact-scope evidence is present; report false refusals and causes | Positive controls across each declared source/system/use class |
+| Lineage completeness | 100% of credited potable litres bind to source/system, stream or batch, treatment state, sample point, boundary, use class, current SANS edition and monitoring-programme revision | Receipt replay and event-history audit |
+| Invalidation latency | Every declared source/treatment/boundary/monitoring invalidator changes the downstream qualification state before further service is credited; report event-to-state latency separately | Deterministic event replay, then instrumented fault injection |
+| Independent false-acceptance bound | Stretch objective: zero false potable acceptances in at least 299 independent, externally adjudicated trials, giving an approximately 1% one-sided 95% upper bound under IID Bernoulli assumptions | Independent physical samples / batches / sites; explicit clustering correction |
+| Operational utility | Minimize unjustified restriction and report litres withheld solely because evidence is missing, stale or mis-scoped | Matched control, user/service impact and evidence turnaround |
+| Offline resilience | Local service, manual fallback, local evidence visibility and safe recovery remain characterized across NET-001…NET-008 | Exact SKU/firmware/network profile and safe, approved disconnect tests |
+| Deployment evidence | Progress E1 repeatability → E2 independent-lab reproducibility → E3 source/system/unit variation → E4 household use; no shortcut | Independent sampling, calibration, site and household protocols |
+
+The 299-trial calculation is a statistical planning bound, not a blanket guarantee and not a target that synthetic fixtures can satisfy. Repeated samples from one batch, tank, laboratory, site or operator are correlated and must not be counted as independent trials without a justified model.
+
+### Competitive evaluation rule
+
+For each incumbent function, match the same source, use class, delivery boundary, service demand, initial reserve, maintenance state and disturbance profile. Compare:
+- qualified service actually delivered (not storage nameplate volume);
+- quality qualification / false-acceptance and unresolved-evidence behaviour;
+- flow/pressure at the use point;
+- loss events, isolation latency and false interruption;
+- mains displacement only for the reuse arm;
+- local/offline operation, recovery and human maintenance;
+- total installed and lifecycle cost.
+
+The target is to exceed the best matched operational baseline on a declared decision-relevant outcome without violating any service, quality, safety, access or maintenance gate. An improvement on one function cannot compensate for failure in another. Do not produce a scalar "WaterLoop score."
+
+**External comparison references:** JoJo municipal backup https://www.jojo.co.za/water-storage-solutions/municipal-backup-water-storage-solutions/ ; Moen Flo https://flo.moen.com/pages/flo-smart-water-monitor ; Phyn https://www.phyn.com/ ; Hydraloop H300 https://www.hydraloop.com/products/h300 ; NSF/ANSI 350 listings https://info.nsf.org/Certified/Wastewater/Listings.asp?Company=C0427542&Standard=350 ; INTEWA AQUALOOP https://www.intewa.com/en/greywater-recycling/.
