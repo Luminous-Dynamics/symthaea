@@ -136,13 +136,15 @@ pub fn evaluate_service_deficit(
     }
 
     let unit = input.demand_rate.unit.quantity_unit();
-    let scale = input.duration_seconds as f64 / input.demand_rate.unit.seconds_per_unit();
+    let (scale_lower, scale_upper) =
+        duration_scale(input.duration_seconds, input.demand_rate.unit)?;
 
     let requested = scale_interval(
         "service_deficit.requested",
         input.demand_rate.lower,
         input.demand_rate.upper,
-        scale,
+        scale_lower,
+        scale_upper,
         unit,
     )?;
 
@@ -150,7 +152,8 @@ pub fn evaluate_service_deficit(
         "service_deficit.physical_delivered",
         input.physical_delivery_rate.lower,
         input.physical_delivery_rate.upper,
-        scale,
+        scale_lower,
+        scale_upper,
         unit,
     )?;
 
@@ -172,14 +175,21 @@ pub fn evaluate_service_deficit(
         },
     };
 
-    let deficit_rate_lower = (input.demand_rate.lower - qualified_rate.upper).max(0.0);
-    let deficit_rate_upper = (input.demand_rate.upper - qualified_rate.lower).max(0.0);
+    let deficit_rate_lower = subtract_rate_lower(
+        input.demand_rate.lower,
+        qualified_rate.upper,
+    );
+    let deficit_rate_upper = subtract_rate_upper(
+        input.demand_rate.upper,
+        qualified_rate.lower,
+    );
 
     let qualified_delivered = scale_interval(
         "service_deficit.qualified_delivered",
         qualified_rate.lower,
         qualified_rate.upper,
-        scale,
+        scale_lower,
+        scale_upper,
         unit,
     )?;
 
@@ -187,7 +197,8 @@ pub fn evaluate_service_deficit(
         "service_deficit.deficit",
         deficit_rate_lower,
         deficit_rate_upper,
-        scale,
+        scale_lower,
+        scale_upper,
         unit,
     )?;
 
@@ -226,15 +237,79 @@ fn validate_rate_interval(
     Ok(())
 }
 
+/// Return the adjacent representable nonnegative f64 below a finite value.
+/// Zero is kept exact because all accepted operands are nonnegative.
+fn next_down_nonnegative(value: f64) -> f64 {
+    if value == 0.0 {
+        0.0
+    } else {
+        f64::from_bits(value.to_bits() - 1)
+    }
+}
+
+/// Return the adjacent representable f64 above a finite nonnegative value.
+fn next_up_nonnegative(value: f64) -> f64 {
+    if value == 0.0 {
+        f64::from_bits(1)
+    } else {
+        f64::from_bits(value.to_bits() + 1)
+    }
+}
+
+/// Widen a positive subtraction outward by one representable step.
+fn subtract_rate_lower(left: f64, right: f64) -> f64 {
+    let difference = left - right;
+    if difference <= 0.0 {
+        0.0
+    } else {
+        next_down_nonnegative(difference).max(0.0)
+    }
+}
+
+/// Widen a positive subtraction outward by one representable step.
+fn subtract_rate_upper(left: f64, right: f64) -> f64 {
+    let difference = left - right;
+    if difference <= 0.0 {
+        0.0
+    } else {
+        next_up_nonnegative(difference)
+    }
+}
+
+/// Enclose the exact positive duration/unit ratio despite f64 integer conversion
+/// and division rounding. This returns a lower and upper scale interval.
+fn duration_scale(
+    duration_seconds: u64,
+    unit: RateUnit,
+) -> Result<(f64, f64), EvaluationError> {
+    let duration = duration_seconds as f64;
+    let duration_lower = next_down_nonnegative(duration);
+    let duration_upper = next_up_nonnegative(duration);
+    let divisor = unit.seconds_per_unit();
+
+    let scale_lower = next_down_nonnegative(duration_lower / divisor);
+    let scale_upper = next_up_nonnegative(duration_upper / divisor);
+
+    if !scale_lower.is_finite() || !scale_upper.is_finite() || scale_lower <= 0.0 {
+        return Err(EvaluationError::new(
+            "service_deficit.duration_seconds",
+            "duration scaling is not representable as a finite positive interval",
+        ));
+    }
+
+    Ok((scale_lower, scale_upper))
+}
+
 fn scale_interval(
     path: &'static str,
     lower: f64,
     upper: f64,
-    scale: f64,
+    scale_lower: f64,
+    scale_upper: f64,
     unit: QuantityUnit,
 ) -> Result<QuantityInterval, EvaluationError> {
-    let scaled_lower = lower * scale;
-    let scaled_upper = upper * scale;
+    let scaled_lower = lower * scale_lower;
+    let scaled_upper = upper * scale_upper;
 
     if !scaled_lower.is_finite() || !scaled_upper.is_finite() {
         return Err(EvaluationError::new(
@@ -243,9 +318,19 @@ fn scale_interval(
         ));
     }
 
+    let outward_lower = next_down_nonnegative(scaled_lower);
+    let outward_upper = next_up_nonnegative(scaled_upper);
+
+    if !outward_lower.is_finite() || !outward_upper.is_finite() {
+        return Err(EvaluationError::new(
+            path,
+            "outward-rounded quantity interval is not finite",
+        ));
+    }
+
     Ok(QuantityInterval {
-        lower: scaled_lower,
-        upper: scaled_upper,
+        lower: outward_lower,
+        upper: outward_upper,
         unit,
     })
 }
@@ -256,6 +341,21 @@ mod tests {
 
     fn rate(lower: f64, upper: f64, unit: RateUnit) -> RateInterval {
         RateInterval { lower, upper, unit }
+    }
+
+    fn assert_encloses(actual: QuantityInterval, expected_lower: f64, expected_upper: f64) {
+        assert!(
+            actual.lower <= expected_lower,
+            "lower bound {} must enclose expected lower {}",
+            actual.lower,
+            expected_lower
+        );
+        assert!(
+            actual.upper >= expected_upper,
+            "upper bound {} must enclose expected upper {}",
+            actual.upper,
+            expected_upper
+        );
     }
 
     fn water_input(qualification: ServiceQualification) -> ServiceDeficitInput {
@@ -272,30 +372,9 @@ mod tests {
         let result =
             evaluate_service_deficit(water_input(ServiceQualification::Unknown)).expect("valid");
 
-        assert_eq!(
-            result.physical_delivered,
-            QuantityInterval {
-                lower: 51.0,
-                upper: 57.0,
-                unit: QuantityUnit::Litres,
-            }
-        );
-        assert_eq!(
-            result.qualified_delivered,
-            QuantityInterval {
-                lower: 0.0,
-                upper: 57.0,
-                unit: QuantityUnit::Litres,
-            }
-        );
-        assert_eq!(
-            result.deficit,
-            QuantityInterval {
-                lower: 0.0,
-                upper: 66.0,
-                unit: QuantityUnit::Litres,
-            }
-        );
+        assert_encloses(result.physical_delivered, 51.0, 57.0);
+        assert_encloses(result.qualified_delivered, 0.0, 57.0);
+        assert_encloses(result.deficit, 0.0, 66.0);
         assert_eq!(result.qualification, ServiceQualification::Unknown);
     }
 
@@ -312,14 +391,7 @@ mod tests {
                 unit: QuantityUnit::Litres,
             }
         );
-        assert_eq!(
-            result.deficit,
-            QuantityInterval {
-                lower: 54.0,
-                upper: 66.0,
-                unit: QuantityUnit::Litres,
-            }
-        );
+        assert_encloses(result.deficit, 54.0, 66.0);
         assert_eq!(result.qualification, ServiceQualification::KnownFailure);
     }
 
@@ -328,22 +400,8 @@ mod tests {
         let result =
             evaluate_service_deficit(water_input(ServiceQualification::Qualified)).expect("valid");
 
-        assert_eq!(
-            result.qualified_delivered,
-            QuantityInterval {
-                lower: 51.0,
-                upper: 57.0,
-                unit: QuantityUnit::Litres,
-            }
-        );
-        assert_eq!(
-            result.deficit,
-            QuantityInterval {
-                lower: 0.0,
-                upper: 15.0,
-                unit: QuantityUnit::Litres,
-            }
-        );
+        assert_encloses(result.qualified_delivered, 51.0, 57.0);
+        assert_encloses(result.deficit, 0.0, 15.0);
     }
 
     #[test]
@@ -356,14 +414,7 @@ mod tests {
         })
         .expect("valid");
 
-        assert_eq!(
-            result.deficit,
-            QuantityInterval {
-                lower: 0.5,
-                upper: 0.5,
-                unit: QuantityUnit::KilowattHours,
-            }
-        );
+        assert_encloses(result.deficit, 0.5, 0.5);
     }
 
     #[test]
@@ -376,14 +427,7 @@ mod tests {
         })
         .expect("valid");
 
-        assert_eq!(
-            result.deficit,
-            QuantityInterval {
-                lower: 5.0,
-                upper: 6.0,
-                unit: QuantityUnit::Litres,
-            }
-        );
+        assert_encloses(result.deficit, 5.0, 6.0);
     }
 
     #[test]
