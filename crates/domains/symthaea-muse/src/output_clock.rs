@@ -53,7 +53,7 @@ pub struct OutputClockStreamDescriptorV1 {
 impl OutputClockStreamDescriptorV1 {
     fn expected_configuration_digest_sha256(&self) -> String {
         let canonical = format!(
-            "{OUTPUT_CLOCK_STREAM_DESCRIPTOR_SCHEMA_V1}\\n{}\\n{}\\n{}\\nf32",
+            "{OUTPUT_CLOCK_STREAM_DESCRIPTOR_SCHEMA_V1}\n{}\n{}\n{}\nf32",
             self.device_identity_sha256,
             self.sample_rate_hz,
             self.channel_count
