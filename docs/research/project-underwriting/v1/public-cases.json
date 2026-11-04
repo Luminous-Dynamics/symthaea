@@ -129,7 +129,7 @@
         {
           "evidence_id": "ev_fx",
           "claim_id": "fx_basis",
-          "evidence_class": "issuer_signed",
+          "evidence_class": "official_source_publication",
           "record_state": "current",
           "source_family_id": "central-bank-series-001",
           "source_ref": "urn:synthetic:fx:zar-usd:2026-07-31",
@@ -582,7 +582,7 @@
         {
           "evidence_id": "ev_fx",
           "claim_id": "fx_basis",
-          "evidence_class": "issuer_signed",
+          "evidence_class": "official_source_publication",
           "record_state": "current",
           "source_family_id": "central-bank-series-001",
           "source_ref": "urn:synthetic:fx:zar-usd:2026-07-31",
@@ -1076,7 +1076,7 @@
         {
           "evidence_id": "ev_fx",
           "claim_id": "fx_basis",
-          "evidence_class": "issuer_signed",
+          "evidence_class": "official_source_publication",
           "record_state": "current",
           "source_family_id": "central-bank-series-001",
           "source_ref": "urn:synthetic:fx:zar-usd:2026-07-31",
@@ -1550,7 +1550,7 @@
         {
           "evidence_id": "ev_fx",
           "claim_id": "fx_basis",
-          "evidence_class": "issuer_signed",
+          "evidence_class": "official_source_publication",
           "record_state": "current",
           "source_family_id": "central-bank-series-001",
           "source_ref": "urn:synthetic:fx:zar-usd:2026-07-31",
@@ -1910,7 +1910,7 @@
             "fx_basis"
           ],
           "required_evidence_classes": [
-            "issuer_signed"
+            "official_source_publication"
           ],
           "fail_closed": true
         }
@@ -2042,7 +2042,7 @@
         {
           "evidence_id": "ev_fx",
           "claim_id": "fx_basis",
-          "evidence_class": "issuer_signed",
+          "evidence_class": "official_source_publication",
           "record_state": "current",
           "source_family_id": "central-bank-series-001",
           "source_ref": "urn:synthetic:fx:zar-usd:2026-07-31",
@@ -2516,7 +2516,7 @@
         {
           "evidence_id": "ev_fx",
           "claim_id": "fx_basis",
-          "evidence_class": "issuer_signed",
+          "evidence_class": "official_source_publication",
           "record_state": "current",
           "source_family_id": "central-bank-series-001",
           "source_ref": "urn:synthetic:fx:zar-usd:2026-07-31",
@@ -2989,7 +2989,7 @@
         {
           "evidence_id": "ev_fx",
           "claim_id": "fx_basis",
-          "evidence_class": "issuer_signed",
+          "evidence_class": "official_source_publication",
           "record_state": "current",
           "source_family_id": "central-bank-series-001",
           "source_ref": "urn:synthetic:fx:zar-usd:2026-07-31",
