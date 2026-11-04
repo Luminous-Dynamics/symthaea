@@ -5,7 +5,7 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
-      - "crates/domains/symthaea-household-bench-fixtures/**"
+      - "tools/household-bench-fixtures/**"
       - "docs/research/household-services/fixtures/**"
       - ".github/workflows/household-bench-fixtures.yml"
   workflow_dispatch:
@@ -33,10 +33,10 @@ jobs:
           components: rustfmt, clippy
 
       - name: Verify focused formatting
-        run: cargo fmt --manifest-path Cargo.toml --package symthaea-household-bench-fixtures -- --check
+        run: cargo fmt --manifest-path tools/household-bench-fixtures/Cargo.toml -- --check
 
       - name: Test synthetic household fixture contract
-        run: cargo test --locked --manifest-path Cargo.toml -p symthaea-household-bench-fixtures
+        run: cargo test --locked --manifest-path tools/household-bench-fixtures/Cargo.toml
 
       - name: Run focused clippy
-        run: cargo clippy --locked --manifest-path Cargo.toml -p symthaea-household-bench-fixtures --all-targets -- -D warnings
+        run: cargo clippy --locked --manifest-path tools/household-bench-fixtures/Cargo.toml --all-targets -- -D warnings
