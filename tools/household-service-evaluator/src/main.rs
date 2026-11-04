@@ -29,9 +29,7 @@ fn run() -> Result<(), String> {
             "--water" if water_path.is_none() => water_path = Some(value),
             "--repair" if repair_path.is_none() => repair_path = Some(value),
             "--output" if output_path.is_none() => output_path = Some(value),
-            "--digest-output" if digest_output_path.is_none() => {
-                digest_output_path = Some(value)
-            }
+            "--digest-output" if digest_output_path.is_none() => digest_output_path = Some(value),
             "--water" | "--repair" | "--output" | "--digest-output" => {
                 return Err(format!("duplicate argument: {argument}"));
             }
