@@ -52,6 +52,7 @@ It estimates:
 The fit:
 - validates descriptor, stream instance, sample rate and channel count;
 - validates callback/playback delta consistency;
+- reports slope deviation from unity separately from runner/CPAL clock drift (both timestamps share one CPAL stream clock);
 - requires strictly increasing anchor index, callback time and playback time;
 - rejects invalid frame counts, mixed anchor sources, excessive drift and residuals;
 - retains the exact serialized anchor-vector SHA-256 and fit-policy SHA-256;
@@ -98,7 +99,7 @@ The exact synthetic composition checks runner time 120 ms → callback time 20 m
 ## Qualification gates
 
 - 100% acceptance of valid exact and in-policy synthetic cases.
-- 100% rejection of identity mismatch, malformed/wide brackets, non-monotonic callback/playback/runner clocks, out-of-policy drift and residuals, expired calibration and anchor-set substitution.
+- 100% rejection of identity mismatch, malformed/wide brackets, non-monotonic callback/playback/runner clocks, out-of-policy clock-rate/scheduling-slope deviation and residuals, expired calibration and anchor-set substitution.
 - Zero extrapolation beyond each declared validity horizon.
 - Exact replay from the same descriptor, pair/anchor bytes and fit policies.
 - No upgrade from point estimate to timing-accuracy claim without propagated uncertainty and independent device validation.
