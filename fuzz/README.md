@@ -23,7 +23,7 @@ mkdir -p fuzz/corpus/zip_inventory_and_content fuzz/artifacts
 base64 --decode fuzz/seeds/empty-stored.zip.b64 > fuzz/corpus/zip_inventory_and_content/empty-stored.zip
 
 Run:
-cargo +nightly fuzz run zip_inventory_and_content -- -max_total_time=180 -max_len=1048576 -rss_limit_mb=512 -print_final_stats=1
+cargo fuzz run zip_inventory_and_content -- -max_total_time=180 -max_len=1048576 -rss_limit_mb=512 -print_final_stats=1
 
 The starter ZIP payload SHA-256 is `dd8a2bd8c16d808363a1d1e7560a4cc86494393c1a202a478db00f00ae53d099`. The weekly/manual workflow prints both the source base64 digest and decoded ZIP digest before fuzzing.
 
