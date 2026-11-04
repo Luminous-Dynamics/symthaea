@@ -19,9 +19,10 @@ The governing principle is:
 | Metrology and evidence strata | [HOME-SVC-METROLOGY-001 #10341](https://github.com/Luminous-Dynamics/symthaea/issues/10341) | Repeatability, reproducibility, production variation and household validity |
 
 ## Current research specifications under review
-
-- [WaterLoop competitive evidence v0.1](waterloop-competitive-evidence-v0.1.md) — separates outage backup, greywater source substitution and leak containment; reconciles manufacturer capacity with certification listing scope, source-stream classes, local jurisdiction and offline connectivity.
 - [WaterLoop machine-readable competitor ledger v0.1](waterloop-competitive-comparator-ledger-v0.1.json) — source-level claims, exact model/class scope, converted listing units, unresolved discrepancies and functional-unit boundaries; includes JoJo, Moen, Hydraloop, AQUALOOP and Phyn.
+- [WaterLoop competitive evidence v0.1](waterloop-competitive-evidence-v0.1.md) — separates outage backup, greywater source substitution and leak containment; reconciles manufacturer capacity with certification listing scope, source-stream classes, local jurisdiction and offline connectivity.
+
+- [#10342 — household water/energy/thermal coordination](https://github.com/Luminous-Dynamics/symthaea/issues/10342): [household-resource-arbitration-contract-v0.1.md](household-resource-arbitration-contract-v0.1.md) defines non-compensatory safety/quality/consent gates, local appliance authority, uncertainty-bounded resource planning and 14 adversarial HRA scenarios. Design-only; no live control.
 
 - [PR #10386 — household services charter, physical validation protocols and competitive frontier](https://github.com/Luminous-Dynamics/symthaea/pull/10386). Those research files are on the PR branch and should not be assumed present on main until merged.
 - [PR #10432 — repair recurrence and post-repair durability contract](https://github.com/Luminous-Dynamics/symthaea/pull/10432). Defines repair episode identity, independent restoration, use exposure, competing events, recurrent burden and censoring.
