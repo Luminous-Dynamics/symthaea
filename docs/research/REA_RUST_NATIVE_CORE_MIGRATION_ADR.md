@@ -1009,3 +1009,21 @@ A verified receipt requires qualified source binding plus decoder EOF, decoder C
 
 Canonical serialization is not yet frozen. RFC 8785 conformance must be established with vectors before any deterministic receipt digest is assigned. No runtime receipt serializer or replay tool is claimed yet.
 
+## 23. 2026-11-04 — ZIP-relative virtual source view for prefixed ZIP64 carriers
+
+The first exact-head content-verification run showed that the custom inventory admitted a ZIP64 archive with an 11-byte prepended executable stub, but `zipcore 0.10.2` rejected it with `bad ZIP64 EOCD signature`. The ZIP64 EOCD locator's offset is relative to the beginning of the ZIP structure; handing the decoder the entire carrier file leaves the decoder looking at the wrong absolute position.
+
+The new implementation adds a generic bounded `ArchiveSlice<R: Read + Seek>` over the same independently opened source descriptor:
+- logical offset zero maps to the custom parser's admitted `leading_bytes`;
+- logical length is exactly `source_bytes - leading_bytes`;
+- reads are capped at the virtual view's end;
+- seeks before the virtual start or beyond its end are rejected;
+- no prefix bytes are copied, extracted or exposed to the decoder;
+- heuristic decoder `offset_correction` is disabled;
+- the secondary central-directory offset is compared against the custom absolute offset minus `leading_bytes`;
+- each secondary local-header offset is rebased by `leading_bytes` before comparison with the custom inventory.
+
+This makes the decoder parse the archive in its native ZIP-relative coordinate system instead of relying on its guess about prepended data. The content verifier still uses separate decoder and identity-witness descriptors and revalidates the held source and selected path after the attempt.
+
+The prior ZIP64 negative test has been replaced by a positive intended test for ZIP64-with-prefix verification, plus a direct `ArchiveSlice` boundary test. These tests are authored, not yet confirmed passing. The exact-head REA artifact-reader workflow must determine whether this fixes zipcore's ZIP64 locator behavior; if it does not, retain fail-closed behavior and investigate the decoder's locator interpretation rather than reverting to unbounded whole-carrier parsing.
+
