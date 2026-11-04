@@ -43,6 +43,14 @@ Mapping row:
 
 `mapping_status` is `exact`, `unresolved`, or `ambiguous`. Non-exact rows must have a null `declaration_id` and cannot contribute to route coverage. Mapping methods are `exact_formal_name`, `exact_source_identity`, or `human_reviewed`. Human-reviewed mappings require a reviewer-attestation digest. The analyzer checks digest syntax and graph binding; it does not open or authenticate the referenced evidence bytes. “Novel” is deliberately not claimed: novelty requires a matched baseline candidate-set comparison.
 
+## Paired comparisons and uncertainty
+
+When multiple retrievers emit receipts for the same benchmark query and support group, the report builds paired comparisons only where query ID, support-group ID, benchmark/split, target statement, graph snapshot and environment match exactly.
+
+For each system pair it reports reference-only/challenger-only/both/neither complete-route outcomes, the paired complete-route coverage delta, the mean minimal-route coverage delta, and an exact two-sided McNemar p-value. P-values are Holm-adjusted across the generated pairwise family.
+
+The mean minimal-route coverage difference also receives a deterministic percentile bootstrap interval that resamples `component_id` clusters (the proof-family connected components), not individual rows. When fewer than two clusters are present, the interval is null rather than an IID approximation. A small sample's p-value is still descriptive; the bootstrap is not a substitute for more independent clusters or a preregistered confirmatory study.
+
 ## Run
 
 ```sh
