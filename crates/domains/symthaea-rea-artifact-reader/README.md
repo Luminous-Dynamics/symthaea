@@ -25,6 +25,7 @@ The custom Rust parser is the policy authority for:
 - Decompressed bytes are read through a fixed-size buffer, hashed incrementally, and bounded by both caller budget and declared uncompressed size.
 - A result is returned only after EOF and decoder CRC/size verification. A partial read is not a successful verification.
 - The held descriptor and selected path are revalidated after the attempt; source change discards the result.
+- Each verification call opens its own descriptor instead of sharing the inventory descriptor's file cursor; concurrent calls do not race through a shared seek position.
 - `declared_compressed_bytes` is metadata, not a measured compressed-byte count.
 - Per-entry verification does not make archive traversal complete. Unlisted local-header scanning, APK Signing Block interpretation, package-signature checks and full REA ArtifactReader parity remain separate work.
 
