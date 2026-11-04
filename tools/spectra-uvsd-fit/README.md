@@ -23,7 +23,7 @@ If a category is absent from an adapter's emitted sparse count vector, insert it
 
 - Uses shared symthaea-statistics log-CDF, log-survival and log-interval primitives; lower-tail probabilities are evaluated by a Mills-ratio continued fraction.
 - Ordered thresholds are parameterized by a free first threshold and exponentiated positive gaps.
-- The primary likelihood has no continuity correction or arbitrary pseudo-count smoothing.
+- The primary likelihood has no continuity correction or arbitrary pseudo-count smoothing. An explicit `CountCorrection::MiyoshiReferencePerCategory` compatibility mode adds `1/K` to each cell in each stimulus class, matching the public R source and `rt-da` Python implementation; it is never enabled by default.
 - Multi-start BFGS uses an analytic gradient in natural parameters, transformed to the ordered-cut parameterization. An independent central finite-difference test is included; finite differences remain a fallback for non-finite analytic-gradient evaluations.
 - Nelder-Mead is provided as a derivative-free cross-check, not as an assumed truth oracle.
 - Reports objective, gradient norm, iteration count, start count, optimizer and explicit Converged / Boundary / NotIdentifiable / NotConverged / NotEvaluable disposition.
@@ -55,8 +55,15 @@ The fit crate intentionally does not depend on symthaea-core or HDC-specific opt
 Reference work:
 - Miyoshi, Rahnev & Lau (2026), iScience 29(3), 114998: https://doi.org/10.1016/j.isci.2026.114998
 - Their public implementation: https://github.com/kiyomiyoshi/rt_type1_roc
+- Independent Python implementation and published-example/subject-fit validation: https://github.com/trevcaru/rt-da
 - Lages (2024), Psychonomic Bulletin & Review 31, 2534-2557: https://doi.org/10.3758/s13423-024-02504-5
 - SDT Assistant V3.1: https://hautus.org/sdt-assistant/
+
+### Published-example compatibility regression
+
+The public R example uses `nr_s1 = [10, 7, 16, 27, 29, 10]` and `nr_s2 = [43, 21, 10, 12, 8, 3]`. Its cell order is strongest-Yes to strongest-No, whereas this crate uses ascending evidence order, so the vectors are reversed before fitting. The explicit reference correction adds `1/K` to each of the K cells in each stimulus class. The regression test targets the published `mu=1.231417`, `sigma=1.252275`, `d_a=1.086691`, and `logL=-315.8781`.
+
+An independent Python reference replay of the same six-start design obtained `mu=1.231422`, `sigma=1.252292`, `d_a=1.086687`, and `logL=-315.878077`. This is a Python algorithm check, not execution of the Rust test.
 
 ## Run
 
