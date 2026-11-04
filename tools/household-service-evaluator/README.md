@@ -53,7 +53,7 @@ Unit rules are explicit and no implicit conversion is performed:
 - L/hour integrates over hours to L;
 - kW integrates over hours to kWh.
 
-The operation uses conservative interval bounds and assumes neither statistical independence nor a covariance model. It rejects unit mismatch, non-finite/negative/reversed intervals, zero duration and non-finite integrated results.
+The operation uses conservative interval bounds and assumes neither statistical independence nor a covariance model. Floating-point duration conversion, division, subtraction and integration are widened outward by adjacent representable f64 values so rounding-to-nearest does not silently shrink the interval; if outward widening becomes non-finite, evaluation fails closed. It rejects unit mismatch, non-finite/negative/reversed intervals, zero duration and non-finite integrated results.
 
 This is arithmetic over caller-supplied bounds and declared qualification state. It does not validate a meter, assay, calibration, topology, pressure threshold, end-use suitability or physical delivery record. Unknown qualification remains unknown; no result is a product safety or service-availability verdict.
 
