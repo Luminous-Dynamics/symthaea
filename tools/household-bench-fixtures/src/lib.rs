@@ -209,10 +209,16 @@ pub fn validate_water_continuity_corpus(
         true,
         "$.assumptions",
     )?;
-    required_bool(
+    required_string(
         &corpus.assumptions,
         "non_potable_reuse",
-        false,
+        "physically_separate_and_not_enabled",
+        "$.assumptions",
+    )?;
+    required_bool(
+        &corpus.assumptions,
+        "pump_required_for_fixture_delivery",
+        true,
         "$.assumptions",
     )?;
     required_string(
@@ -725,12 +731,23 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
             )?;
         }
         "REPAIR-002" => {
-            required_bool(
-                baseline,
-                "calibration_required",
-                true,
-                &format!("{path}.synthetic_baseline"),
-            )?;
+            for (key, expected) in [
+                ("access_fasteners", 6.0),
+                ("disassembly_steps", 12.0),
+                ("part_lead_time_days", 7.0),
+            ] {
+                let observed = required_number(
+                    baseline,
+                    key,
+                    &format!("{path}.synthetic_baseline"),
+                )?;
+                if observed != expected {
+                    return Err(ValidationError::new(
+                        format!("{path}.synthetic_baseline.{key}"),
+                        format!("expected {expected}, found {observed}"),
+                    ));
+                }
+            }
             require_invariant(
                 &task.invariants,
                 "pressure_flow_leak_and_protection_checks_are_repeated",
