@@ -69,7 +69,7 @@ The Symthaea CivBench research crate now implements two simulated recipient-stat
 - `central_full_inventory`: full-state research upper bound;
 - `coarse_recipe_readiness`: recipient-side per-recipe readiness signal for unheld recipes, exposing a recipe ID and matched-prerequisite fraction rather than the complete element/recipe inventory.
 
-This maps to the schema's `centralized_full_state` and `coarse_need_signal` modes. The coarse signal is not anonymous and is not a formal privacy mechanism: repeated requests/readiness values may permit inference about private inventory. The executable mode also rejects collective-novelty program features because they require a global inventory view. The runtime does not yet enforce real consent, mandate validation, payload licensing, cryptographic identity or secure aggregation. See `PRIVACY_PRESERVING_TRANSMISSION_PROTOCOL_V0_1.md` for the performance/leakage benchmark.
+This maps to the schema's `centralized_full_state` and `coarse_need_signal` modes. The coarse signal is capped at two prioritized unheld-recipe needs per recipient per step. Publishing every unheld recipe would expose the complement of the known-recipe inventory. The cap prevents that direct reconstruction but does not eliminate inference from repeated signals; the signal is not anonymous or a formal privacy mechanism. The executable mode also rejects collective-novelty program features because they require a global inventory view. The runtime does not yet enforce real consent, mandate validation, payload licensing, cryptographic identity or secure aggregation. See `PRIVACY_PRESERVING_TRANSMISSION_PROTOCOL_V0_1.md` for the performance/leakage benchmark.
 
 ## 5. Payload classes and negative knowledge
 
