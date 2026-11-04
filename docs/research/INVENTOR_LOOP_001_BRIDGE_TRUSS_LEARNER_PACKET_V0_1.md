@@ -35,8 +35,20 @@ The activity can be adapted by the educator for different ages and prior knowled
 
 ## 3. Design brief and requirements
 
-The educator or benchmark author must provide a versioned task card containing the actual numerical values for the chosen digital case. The following are intentionally parameters, not hidden assumptions:
+The educator or benchmark author should provide a versioned task card with numerical values, units, source, model assumptions and unresolved fields. Do not invent missing values.
 
+| Requirement | General task-card value | Unit / status |
+|---|---|---|
+| Clear span | To be assigned for a custom task | length |
+| Available envelope | To be assigned | length × height |
+| Candidate material model | To be declared | material identity + elastic properties |
+| Member cross-section options | To be declared | area |
+| Joint idealization | Pin-jointed for the analytical exercise | model assumption |
+| Applied load case | To be declared for each task | force + direction + application point |
+| Support conditions | To be declared | constrained degrees of freedom |
+| Mass/material budget | Optional, to be declared | mass or consistent proxy |
+| Design objective | Compare feasible alternatives; do not hide hard-constraint failures in a weighted score | decision rule |
+| Analysis scope | 2D, static, small-displacement, linear-elastic, axial-only truss | explicit model limit |
 
 ### Paper exercise A — complete numerical input
 
@@ -48,11 +60,11 @@ Use this fully specified idealized case for the first paper/hand-calculation exe
 | Right support node B | `(4, 0) m` |
 | Apex node C | `(2, 3) m` |
 | Members | A–C and B–C |
-| Support conditions | Both translations restrained at A and B: (u_x=u_y=0) |
+| Support conditions | Both translations restrained at A and B: \(u_x=u_y=0\) |
 | Joint idealization | Ideal pins; axial member response only |
-| Young's modulus, each member | (E=200\,\mathrm{GPa}) |
-| Cross-sectional area, each member | (A=10\,\mathrm{mm}^2=1.0\times10^{-5}\,\mathrm{m}^2) |
-| Applied load at C | (F_C=(0,-100)\,\mathrm{N}) |
+| Young's modulus, each member | \(E=200\,\mathrm{GPa}\) |
+| Cross-sectional area, each member | \(A=10\,\mathrm{mm}^2=1.0\times10^{-5}\,\mathrm{m}^2\) |
+| Applied load at C | \(F_C=(0,-100)\,\mathrm{N}\) |
 | Self-weight | Excluded |
 | Coordinate convention | +x right, +y up |
 | Units | SI for all calculations |
@@ -72,22 +84,6 @@ Use this fully specified idealized case for the first paper/hand-calculation exe
 Do not fabricate values for an unspecified material or joint. The stated elastic modulus and area belong only to this mathematical fixture. Do not apply these calculations to an actual bridge, building, person-supporting structure or physical load test.
 
 The separate [instructor answer key](INVENTOR_LOOP_001_BRIDGE_TRUSS_INSTRUCTOR_KEY_V0_1.md) is public teaching material, **not a hidden benchmark oracle**.
-
-
-| Requirement | Task-card value | Unit / status |
-|---|---|---|
-| Clear span | To be assigned | length |
-| Available envelope | To be assigned | length × height |
-| Candidate material model | To be assigned | material identity + declared elastic properties |
-| Member cross-section options | To be assigned | area |
-| Joint idealization | Pin-jointed for the analytical exercise | model assumption |
-| Applied load case | To be assigned for the digital reference case | force + direction + application point |
-| Support conditions | To be assigned | constrained degrees of freedom |
-| Mass/material budget | Optional, to be assigned | mass or consistent proxy |
-| Design objective | Compare feasible alternatives; do not hide hard-constraint failures in a weighted score | decision rule |
-| Analysis scope | 2D, static, small-displacement, linear-elastic, axial-only truss | explicit model limit |
-
-Do not invent missing numerical values. Ask the educator or task owner for a clarification, or mark the requirement unresolved. A solver that accepts a request does not establish that the selected load, material or support assumptions are appropriate for a real structure.
 
 ## 4. Your design notebook
 
