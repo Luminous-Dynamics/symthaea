@@ -875,6 +875,17 @@ mod tests {
     }
 
     #[test]
+    fn non_monotonic_playback_clock_is_rejected_even_when_callback_time_increases() {
+        let mut pairs = exact_pairs();
+        pairs[2].cpal_playback_stream_time_ns =
+            pairs[1].cpal_playback_stream_time_ns;
+        assert!(matches!(
+            fit_runner_cpal_clock_v1(&descriptor(), &pairs, policy()),
+            Err(RunnerCpalClockFitErrorV1::NonMonotonicPlaybackTime { index: 2 })
+        ));
+    }
+
+    #[test]
     fn missing_pair_records_are_counted_not_filled_with_zero() {
         let mut pairs = exact_pairs();
         pairs[2] = pair(3, 35_000_000, 135_000_000);
