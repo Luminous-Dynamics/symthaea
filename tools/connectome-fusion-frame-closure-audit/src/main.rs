@@ -386,7 +386,7 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
                 source.events.last().map(|e| e.sequence) == Some(source.sequence_end)
                     && source.sequence_end.saturating_sub(source.sequence_start).saturating_add(1) == source.record_count
             };
-        let event_digest_valid = computed_events.as_deref() == Ok(source.ordered_events_sha256.as_str());
+        let event_digest_valid = computed_events.as_ref().is_ok_and(|digest| digest == &source.ordered_events_sha256);
         let extraction_digest_valid = computed_extraction == source.extraction_sha256;
         let scope_match = source.scope_sha256 == input.scope_sha256;
 
