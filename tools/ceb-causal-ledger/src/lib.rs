@@ -508,6 +508,10 @@ pub enum ValidationError {
     RepairWithoutProceedDecision,
     /// A decision has an empty reason or invalid evidence/hypothesis references.
     InvalidDecisionRecord,
+    /// A proceed decision cites evidence not linked to its considered hypotheses.
+    DecisionEvidenceNotLinkedToHypothesis,
+    /// A matched ablation group is incomplete or changes policy/budget across arms.
+    InvalidAblationGroup,
     /// An execution identity is reused across grade records.
     DuplicateExecutionIdentity,
 }
@@ -531,6 +535,26 @@ fn ensure_unique<'a>(
         }
     }
     Ok(())
+}
+
+fn outcome_authority_matches_action(action: ActionKind, authority: EvidenceAuthority) -> bool {
+    match action {
+        ActionKind::Observation => matches!(
+            authority,
+            EvidenceAuthority::SourceDeclared
+                | EvidenceAuthority::SyntaxDerived
+                | EvidenceAuthority::CompilerResolved
+                | EvidenceAuthority::RuntimeObserved
+        ),
+        ActionKind::ToolAllocation | ActionKind::TestExecution => {
+            authority == EvidenceAuthority::RuntimeObserved
+        }
+        ActionKind::HardIntervention
+        | ActionKind::MechanismReplacement
+        | ActionKind::ConfigurationPerturbation => {
+            authority == EvidenceAuthority::InterventionObserved
+        }
+    }
 }
 
 fn valid_metric(value: MetricValue, minimum: Option<f64>, maximum: Option<f64>) -> bool {
@@ -649,7 +673,38 @@ impl Ledger {
             if record.binding != self.binding {
                 return Err(ValidationError::TaskBindingMismatch);
             }
+            if record.matched_group_id.trim().is_empty() {
+                return Err(ValidationError::InvalidAblationGroup);
+            }
         }
+
+        // A matched comparison must include the intact mechanism and at least
+        // one comparator, with policy identity and resource budget held fixed.
+        let mut ablation_groups: HashMap<&str, Vec<&AblationRecord>> = HashMap::new();
+        for record in &self.ablations {
+            ablation_groups
+                .entry(record.matched_group_id.as_str())
+                .or_default()
+                .push(record);
+        }
+        for group in ablation_groups.values() {
+            let Some(first) = group.first() else {
+                return Err(ValidationError::InvalidAblationGroup);
+            };
+            let mut arms = HashSet::new();
+            if group.len() < 2
+                || group.iter().any(|record| {
+                    record.policy_digest != first.policy_digest
+                        || record.budget_digest != first.budget_digest
+                        || !arms.insert(record.arm)
+                })
+                || !arms.contains(&AblationArm::Intact)
+                || arms.len() < 2
+            {
+                return Err(ValidationError::InvalidAblationGroup);
+            }
+        }
+
         for record in &self.decisions {
             if record.binding != self.binding {
                 return Err(ValidationError::TaskBindingMismatch);
@@ -881,12 +936,7 @@ impl Ledger {
                     if evidence.source_action_id.as_deref() != Some(action.id.as_str())
                         || evidence.sequence <= action.sequence
                         || evidence.sequence >= outcome.sequence
-                        || matches!(
-                            evidence.authority,
-                            EvidenceAuthority::DreamDerived
-                                | EvidenceAuthority::Inferred
-                                | EvidenceAuthority::Unresolved
-                        )
+                        || !outcome_authority_matches_action(action.kind, evidence.authority)
                     {
                         return Err(ValidationError::OutcomeEvidenceMismatch);
                     }
@@ -945,7 +995,7 @@ impl Ledger {
                 && (decision.hypothesis_record_ids.is_empty()
                     || decision.required_evidence_ids.is_empty()
                     || !decision.missing_requirements.is_empty()
-                    || decision.required_evidence_ids.iter().all(|id| {
+                    || decision.required_evidence_ids.iter().any(|id| {
                         evidence_by_id.get(id.as_str()).is_none_or(|evidence| {
                             matches!(
                                 evidence.authority,
@@ -983,6 +1033,19 @@ impl Ledger {
                     .ok_or(ValidationError::InvalidDecisionRecord)?;
                 if evidence.sequence >= decision.sequence {
                     return Err(ValidationError::InvalidDecisionRecord);
+                }
+            }
+            if decision.kind == DecisionKind::ProceedToRepair {
+                for evidence_id in &decision.required_evidence_ids {
+                    let linked = decision.hypothesis_record_ids.iter().any(|hypothesis_id| {
+                        hypotheses_by_id.get(hypothesis_id.as_str()).is_some_and(|hypothesis| {
+                            hypothesis.supporting_evidence_ids.iter().any(|id| id == evidence_id)
+                                || hypothesis.contradicting_evidence_ids.iter().any(|id| id == evidence_id)
+                        })
+                    });
+                    if !linked {
+                        return Err(ValidationError::DecisionEvidenceNotLinkedToHypothesis);
+                    }
                 }
             }
         }
@@ -1621,4 +1684,127 @@ mod tests {
             Err(ValidationError::EvidenceParentOutOfOrder)
         );
     }
+
+    #[test]
+    fn proceed_decision_rejects_mixed_qualified_and_unqualified_evidence() {
+        let mut ledger = base_ledger();
+        ledger.evidence.push(EvidenceRecord {
+            id: "e-dream".into(),
+            binding: ledger.binding.clone(),
+            content_digest: Digest([12; 32]),
+            authority: EvidenceAuthority::DreamDerived,
+            origin_id: "origin-dream".into(),
+            parent_ids: vec![],
+            source_action_id: None,
+            sequence: 5,
+        });
+        ledger.outcomes[0].sequence = 6;
+        ledger.hypotheses[0].supporting_evidence_ids.push("e-dream".into());
+        ledger.hypotheses[0].sequence = 7;
+        ledger.decisions[0].required_evidence_ids.push("e-dream".into());
+        ledger.decisions[0].sequence = 8;
+        ledger.repairs[0].sequence = 9;
+        ledger.grades[0].sequence = 10;
+
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::InvalidDecisionRecord)
+        );
+    }
+
+    #[test]
+    fn test_execution_outcome_requires_runtime_observed_evidence() {
+        let mut ledger = base_ledger();
+        ledger.actions[0].kind = ActionKind::TestExecution;
+        ledger.forecasts[0].action_kind = ActionKind::TestExecution;
+        ledger.evidence[0].authority = EvidenceAuthority::SourceDeclared;
+        ledger.hypotheses[0].status = HypothesisStatus::Unresolved;
+        ledger.hypotheses[0].supporting_evidence_ids.clear();
+
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::OutcomeEvidenceMismatch)
+        );
+    }
+
+    #[test]
+    fn proceed_decision_evidence_must_link_to_a_considered_hypothesis() {
+        let mut ledger = base_ledger();
+        ledger.evidence.push(EvidenceRecord {
+            id: "e-unlinked".into(),
+            binding: ledger.binding.clone(),
+            content_digest: Digest([13; 32]),
+            authority: EvidenceAuthority::SourceDeclared,
+            origin_id: "origin-unlinked".into(),
+            parent_ids: vec![],
+            source_action_id: None,
+            sequence: 5,
+        });
+        ledger.outcomes[0].sequence = 6;
+        ledger.hypotheses[0].sequence = 7;
+        ledger.decisions[0].required_evidence_ids.push("e-unlinked".into());
+        ledger.decisions[0].sequence = 8;
+        ledger.repairs[0].sequence = 9;
+        ledger.grades[0].sequence = 10;
+
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::DecisionEvidenceNotLinkedToHypothesis)
+        );
+    }
+
+    fn ablation_record(id: &str, arm: AblationArm, sequence: u64) -> AblationRecord {
+        AblationRecord {
+            id: id.into(),
+            binding: binding(),
+            matched_group_id: "matched-1".into(),
+            arm,
+            policy_digest: Digest([20; 32]),
+            budget_digest: Digest([21; 32]),
+            sequence,
+        }
+    }
+
+    #[test]
+    fn matched_ablation_group_requires_intact_and_comparator_arms() {
+        let mut ledger = base_ledger();
+        ledger.ablations = vec![
+            ablation_record("ablation-intact", AblationArm::Intact, 10),
+            ablation_record("ablation-lesion", AblationArm::Lesion, 11),
+        ];
+        assert_eq!(ledger.validate(), Ok(()));
+    }
+
+    #[test]
+    fn matched_ablation_group_rejects_policy_or_budget_drift() {
+        let mut ledger = base_ledger();
+        let mut intact = ablation_record("ablation-intact", AblationArm::Intact, 10);
+        let mut lesion = ablation_record("ablation-lesion", AblationArm::Lesion, 11);
+        lesion.budget_digest = Digest([22; 32]);
+        ledger.ablations = vec![intact.clone(), lesion];
+        assert_eq!(ledger.validate(), Err(ValidationError::InvalidAblationGroup));
+
+        intact = ablation_record("ablation-intact", AblationArm::Intact, 10);
+        let mut lesion = ablation_record("ablation-lesion", AblationArm::Lesion, 11);
+        lesion.policy_digest = Digest([23; 32]);
+        ledger.ablations = vec![intact, lesion];
+        assert_eq!(ledger.validate(), Err(ValidationError::InvalidAblationGroup));
+    }
+
+    #[test]
+    fn matched_ablation_group_rejects_duplicate_or_missing_intact_arm() {
+        let mut ledger = base_ledger();
+        ledger.ablations = vec![
+            ablation_record("ablation-intact-a", AblationArm::Intact, 10),
+            ablation_record("ablation-intact-b", AblationArm::Intact, 11),
+        ];
+        assert_eq!(ledger.validate(), Err(ValidationError::InvalidAblationGroup));
+
+        ledger.ablations = vec![
+            ablation_record("ablation-lesion", AblationArm::Lesion, 10),
+            ablation_record("ablation-sham", AblationArm::Sham, 11),
+        ];
+        assert_eq!(ledger.validate(), Err(ValidationError::InvalidAblationGroup));
+    }
+
 }
