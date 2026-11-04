@@ -9,17 +9,16 @@
 //! Unsupported inputs and missing behavioral oracles are reported explicitly.
 //!
 //! ```text
-//! Function signature: fn fibonacci(n: u64) -> u64
-//! Examples: fibonacci(0)=0, fibonacci(10)=55
+//! Function signature: fn lookup(key: u32) -> Option<String>
+//! Example: lookup(7) = Some(String::from("alpha"))
 //!     ↓
 //! TestSuite {
 //!     tests: [
-//!         Example { body: "assert_eq!(fibonacci(0), 0);" },
-//!         Example { body: "assert_eq!(fibonacci(10), 55);" },
-//!         InvocationSmoke { body: "let _ = fibonacci(0);" },
-//!         InvocationSmoke { body: "let _ = fibonacci(1);" },
+//!         Example { body: "assert_eq!(lookup(7), Some(String::from(\"alpha\")));" },
+//!         InvocationSmoke { body: "let _ = lookup(0);" },
+//!         InvocationSmoke { body: "let _ = lookup(1);" },
 //!     ],
-//!     unsupported: ["No behavioral property is inferred from the return type alone."],
+//!     unsupported: ["No property/error oracle is inferred from the Option return type."],
 //! }
 //! ```
 //!
