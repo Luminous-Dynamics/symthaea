@@ -941,7 +941,7 @@ mod tests {
         }];
         assert!(matches!(
             xnpv(0.10, &flows),
-            Err(EconomicsError::InvalidParameter { .. })
+            Err(EconomicsError::NonFiniteInput { .. })
         ));
     }
 
