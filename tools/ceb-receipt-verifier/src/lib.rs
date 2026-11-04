@@ -1029,6 +1029,322 @@ fn hash_source_tree_inner(root: &Path) -> Result<String, Failure> {
     Ok(format!("{:x}", tree_hasher.finalize()))
 }
 
+
+const MAX_AGENT_VIEW_MANIFEST_BYTES: usize = 8 * 1024 * 1024;
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentViewManifest {
+    schema_version: u32,
+    manifest_kind: String,
+    task_id: String,
+    package_id: String,
+    status: String,
+    source_repository: String,
+    source_revision: String,
+    tree_digest_algorithm: String,
+    tree_sha256: String,
+    entry_count: usize,
+    entries: Vec<AgentViewManifestEntry>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgentViewManifestEntry {
+    path: String,
+    mode: String,
+    size_bytes: u64,
+    sha256: String,
+}
+
+/// Inputs for static verification of a released agent-view directory.
+///
+/// Both the manifest hash and tree digest are expected from an out-of-band
+/// task registry/control plane. Neither value is authenticated by the
+/// manifest itself.
+pub struct AgentViewInputs {
+    pub snapshot_dir: PathBuf,
+    pub manifest: Vec<u8>,
+    pub expected_manifest_sha256: String,
+    pub expected_tree_sha256: String,
+    pub expected_task_id: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct AgentViewReport {
+    pub report_version: u32,
+    pub verifier_version: &'static str,
+    pub status: String,
+    pub accepted: bool,
+    pub task_id: Option<String>,
+    pub manifest_sha256: Option<String>,
+    pub tree_sha256: Option<String>,
+    pub entry_count: usize,
+    pub reasons: Vec<String>,
+    pub claim_ceiling: &'static str,
+}
+
+fn safe_agent_view_relative_path(path: &str) -> bool {
+    if !safe_tree_relative_path(path) || !path.is_ascii() {
+        return false;
+    }
+    path.split('/').all(|component| {
+        if component.ends_with('.') || component.ends_with(' ') {
+            return false;
+        }
+        let stem = component.split('.').next().unwrap_or("").to_ascii_uppercase();
+        !matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+            && !(stem.len() == 4
+                && (stem.starts_with("COM") || stem.starts_with("LPT"))
+                && matches!(stem.as_bytes()[3], b'1'..=b'9'))
+    })
+}
+
+fn hash_agent_view_snapshot(
+    root: &Path,
+) -> Result<(String, Vec<AgentViewManifestEntry>), Failure> {
+    let entries = collect_snapshot_entries(root)?;
+    if entries.is_empty() {
+        return Err(Failure::unresolved("agent view must not be empty"));
+    }
+
+    let mut seen_casefolded_prefixes: BTreeMap<String, String> = BTreeMap::new();
+    let mut manifest_entries = Vec::with_capacity(entries.len());
+    let mut tree_hasher = Sha256::new();
+    tree_hasher.update(b"CEB-TREE-V1\\0");
+    tree_hasher.update((entries.len() as u64).to_be_bytes());
+
+    for entry in entries {
+        if !safe_agent_view_relative_path(&entry.relative_path) {
+            return Err(Failure::protocol(format!(
+                "agent view contains a non-portable or unsafe path: {}",
+                entry.relative_path
+            )));
+        }
+        let mut prefix = String::new();
+        for component in entry.relative_path.split('/') {
+            if !prefix.is_empty() {
+                prefix.push('/');
+            }
+            prefix.push_str(component);
+            let folded = prefix.to_ascii_lowercase();
+            if let Some(existing) = seen_casefolded_prefixes.get(&folded) {
+                if existing != &prefix {
+                    return Err(Failure::protocol(format!(
+                        "agent-view paths collide under case-insensitive extraction: {existing} vs {prefix}"
+                    )));
+                }
+            } else {
+                seen_casefolded_prefixes.insert(folded, prefix.clone());
+            }
+        }
+
+        let TreeEntryContent::File(path) = entry.content else {
+            return Err(Failure::protocol(format!(
+                "V0 agent views do not permit symlinks: {}",
+                entry.relative_path
+            )));
+        };
+        let metadata = fs::symlink_metadata(&path).map_err(|error| {
+            Failure::protocol(format!("cannot stat agent-view file {}: {error}", path.display()))
+        })?;
+        if !metadata.file_type().is_file()
+            || metadata.len() != entry.size
+            || is_executable(&metadata) != entry.executable
+        {
+            return Err(Failure::unresolved(format!(
+                "agent-view file metadata changed while hashing: {}",
+                entry.relative_path
+            )));
+        }
+
+        let mut file = File::open(&path).map_err(|error| {
+            Failure::protocol(format!("cannot open agent-view file {}: {error}", path.display()))
+        })?;
+        let mut content_hasher = Sha256::new();
+        let mut total = 0u64;
+        let mut buffer = [0u8; 64 * 1024];
+        loop {
+            let read = file.read(&mut buffer).map_err(|error| {
+                Failure::protocol(format!("cannot read agent-view file {}: {error}", path.display()))
+            })?;
+            if read == 0 {
+                break;
+            }
+            total = total.checked_add(read as u64)
+                .ok_or_else(|| Failure::protocol("agent-view file length overflow"))?;
+            if total > entry.size || total > MAX_TREE_BYTES {
+                return Err(Failure::unresolved(format!(
+                    "agent-view file changed or exceeded its declared size: {}",
+                    entry.relative_path
+                )));
+            }
+            content_hasher.update(&buffer[..read]);
+        }
+        if total != entry.size {
+            return Err(Failure::unresolved(format!(
+                "agent-view file size changed while hashing: {}",
+                entry.relative_path
+            )));
+        }
+        let content_sha256 = format!("{:x}", content_hasher.finalize());
+
+        let path_bytes = entry.relative_path.as_bytes();
+        tree_hasher.update((path_bytes.len() as u64).to_be_bytes());
+        tree_hasher.update(path_bytes);
+        tree_hasher.update(entry.size.to_be_bytes());
+        tree_hasher.update([b'F']);
+        tree_hasher.update([u8::from(entry.executable)]);
+        let content_digest = Sha256::digest(
+            hex_to_bytes(&content_sha256).as_slice()
+        );
+        // The CEB-TREE-V1 entry commits to the SHA-256 digest of the file bytes.
+        tree_hasher.update(content_digest);
+
+        manifest_entries.push(AgentViewManifestEntry {
+            path: entry.relative_path,
+            mode: if entry.executable { "100755" } else { "100644" }.to_string(),
+            size_bytes: entry.size,
+            sha256: content_sha256,
+        });
+    }
+
+    Ok((format!("{:x}", tree_hasher.finalize()), manifest_entries))
+}
+
+fn hex_to_bytes(value: &str) -> Vec<u8> {
+    let bytes = value.as_bytes();
+    let mut output = Vec::with_capacity(bytes.len() / 2);
+    for pair in bytes.chunks_exact(2) {
+        let high = (pair[0] as char).to_digit(16).unwrap_or(0);
+        let low = (pair[1] as char).to_digit(16).unwrap_or(0);
+        output.push(((high << 4) | low) as u8);
+    }
+    output
+}
+
+fn verify_agent_view_inner(inputs: &AgentViewInputs) -> Result<AgentViewReport, Failure> {
+    if inputs.manifest.len() > MAX_AGENT_VIEW_MANIFEST_BYTES {
+        return Err(Failure::protocol("agent-view manifest exceeds the 8 MiB limit"));
+    }
+    if !is_sha256(&inputs.expected_manifest_sha256)
+        || sha256_hex(&inputs.manifest) != inputs.expected_manifest_sha256
+    {
+        return Err(Failure::protocol(
+            "agent-view manifest does not match its out-of-band SHA-256 pin",
+        ));
+    }
+    if !is_sha256(&inputs.expected_tree_sha256) {
+        return Err(Failure::protocol(
+            "expected agent-view CEB-TREE-V1 SHA-256 must be lowercase 64-character hex",
+        ));
+    }
+
+    let value = parse_strict_json(&inputs.manifest, "agent-view manifest")?;
+    let manifest: AgentViewManifest = serde_json::from_value(value)
+        .map_err(|error| Failure::protocol(format!("invalid agent-view manifest: {error}")))?;
+
+    if manifest.schema_version != 0
+        || manifest.manifest_kind != "ceb-agent-view-v1"
+        || manifest.status != "public_development_only_not_sealed"
+        || manifest.tree_digest_algorithm != TREE_DIGEST_ALGORITHM
+        || manifest.task_id != inputs.expected_task_id
+        || manifest.task_id.trim().is_empty()
+        || manifest.package_id.trim().is_empty()
+        || manifest.source_repository.trim().is_empty()
+        || manifest.source_revision.trim().is_empty()
+    {
+        return Err(Failure::protocol(
+            "agent-view manifest identity, task binding, status or digest algorithm is invalid",
+        ));
+    }
+    if manifest.entries.is_empty()
+        || manifest.entries.len() != manifest.entry_count
+        || manifest.entries.len() > MAX_TREE_FILES
+    {
+        return Err(Failure::protocol(
+            "agent-view manifest entry_count is empty, oversized or inconsistent",
+        ));
+    }
+
+    let mut previous_path: Option<&str> = None;
+    for entry in &manifest.entries {
+        if !safe_agent_view_relative_path(&entry.path)
+            || !is_sha256(&entry.sha256)
+            || !matches!(entry.mode.as_str(), "100644" | "100755")
+            || previous_path.is_some_and(|previous| previous.as_bytes() >= entry.path.as_bytes())
+        {
+            return Err(Failure::protocol(
+                "agent-view manifest paths must be safe, ASCII, strictly sorted and unique; modes and hashes must be valid",
+            ));
+        }
+        previous_path = Some(&entry.path);
+    }
+
+    let (actual_tree_sha256, actual_entries) = hash_agent_view_snapshot(&inputs.snapshot_dir)?;
+    if actual_entries.len() != manifest.entries.len() {
+        return Err(Failure::protocol(
+            "agent-view inventory does not contain exactly the manifest-listed files",
+        ));
+    }
+    for (expected, actual) in manifest.entries.iter().zip(actual_entries.iter()) {
+        if expected.path != actual.path
+            || expected.mode != actual.mode
+            || expected.size_bytes != actual.size_bytes
+            || expected.sha256 != actual.sha256
+        {
+            return Err(Failure::protocol(format!(
+                "agent-view manifest entry does not match packaged file: {}",
+                expected.path
+            )));
+        }
+    }
+    if manifest.tree_sha256 != actual_tree_sha256
+        || inputs.expected_tree_sha256 != actual_tree_sha256
+    {
+        return Err(Failure::protocol(
+            "agent-view CEB-TREE-V1 digest does not match the manifest and out-of-band pin",
+        ));
+    }
+
+    Ok(AgentViewReport {
+        report_version: 1,
+        verifier_version: env!("CARGO_PKG_VERSION"),
+        status: "inventory_verified".to_string(),
+        accepted: true,
+        task_id: Some(manifest.task_id),
+        manifest_sha256: Some(sha256_hex(&inputs.manifest)),
+        tree_sha256: Some(actual_tree_sha256),
+        entry_count: actual_entries.len(),
+        reasons: Vec::new(),
+        claim_ceiling: "The pinned manifest exactly matches the enumerated public-development agent-view files, per-file hashes, modes and CEB-TREE-V1 digest. This does not establish hidden-oracle custody, sealed-holdout status, runner isolation, licensing rights or task correctness.",
+    })
+}
+
+/// Verify a source-only agent-view directory against a strict inventory manifest.
+///
+/// The expected manifest digest, expected task ID and expected CEB-TREE-V1
+/// digest must be supplied by an out-of-band task registry/control plane.
+/// V0 accepts only public-development manifests and regular files; it does not
+/// establish sealed-answer custody or runner isolation.
+pub fn verify_agent_view(inputs: AgentViewInputs) -> AgentViewReport {
+    match verify_agent_view_inner(&inputs) {
+        Ok(report) => report,
+        Err(failure) => AgentViewReport {
+            report_version: 1,
+            verifier_version: env!("CARGO_PKG_VERSION"),
+            status: failure.status.to_string(),
+            accepted: false,
+            task_id: None,
+            manifest_sha256: None,
+            tree_sha256: None,
+            entry_count: 0,
+            reasons: vec![failure.reason],
+            claim_ceiling: "No agent-view inventory acceptance claim; manifest, path, content or tree validation failed.",
+        },
+    }
+}
+
 fn validate_against_schema(
     schema_source: &str,
     instance: &Value,
