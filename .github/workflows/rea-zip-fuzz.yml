@@ -43,7 +43,7 @@ jobs:
           sha256sum fuzz/seeds/empty-stored.zip.b64 fuzz/corpus/zip_inventory_and_content/empty-stored.zip
       - name: Run bounded coverage-guided fuzz smoke
         run: |
-          cargo +nightly fuzz run zip_inventory_and_content -- \
+          cargo fuzz run zip_inventory_and_content -- \
             -artifact_prefix=fuzz/artifacts/ \
             -max_total_time=180 \
             -max_len=1048576 \
