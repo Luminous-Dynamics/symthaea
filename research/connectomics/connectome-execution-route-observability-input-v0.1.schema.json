@@ -1,0 +1,525 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-execution-route-observability-v0.1.schema.json",
+  "title": "Input V0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "audit_id": {
+      "$ref": "#/$defs/id"
+    },
+    "build": {
+      "$ref": "#/$defs/build"
+    },
+    "discovery": {
+      "$ref": "#/$defs/discovery"
+    },
+    "routes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/route"
+      }
+    },
+    "canaries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/canary"
+      }
+    },
+    "observers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/observer"
+      }
+    },
+    "mutation_results": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/mutation"
+      }
+    },
+    "contamination": {
+      "$ref": "#/$defs/contamination"
+    }
+  },
+  "required": [
+    "schema_version",
+    "audit_id",
+    "build",
+    "discovery",
+    "routes",
+    "canaries",
+    "observers",
+    "mutation_results",
+    "contamination"
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "Build identity",
+      "properties": {
+        "repository": {
+          "$ref": "#/$defs/id"
+        },
+        "source_commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "source_tree_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "toolchain": {
+          "$ref": "#/$defs/id"
+        },
+        "lock_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "target_triple": {
+          "$ref": "#/$defs/id"
+        },
+        "features": {
+          "$ref": "#/$defs/ids"
+        },
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "config_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "repository",
+        "source_commit",
+        "source_tree_sha256",
+        "toolchain",
+        "lock_sha256",
+        "target_triple",
+        "features",
+        "artifact_sha256",
+        "config_sha256"
+      ]
+    },
+    "discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "Discovery receipt",
+      "properties": {
+        "generator_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_scan_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "dispatch_registry_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "resolved_feature_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "deployment_routes_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "unresolved_dynamic_targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "discovery_disposition": {
+          "enum": [
+            "COMPLETE_WITHIN_DECLARED_SCOPE",
+            "INCOMPLETE",
+            "UNKNOWN"
+          ]
+        }
+      },
+      "required": [
+        "generator_sha256",
+        "source_scan_sha256",
+        "dispatch_registry_sha256",
+        "resolved_feature_set_sha256",
+        "deployment_routes_sha256",
+        "unresolved_dynamic_targets",
+        "discovery_disposition"
+      ]
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "Route",
+      "properties": {
+        "route_id": {
+          "$ref": "#/$defs/id"
+        },
+        "route_class": {
+          "enum": [
+            "FUSION",
+            "CLAIM_ISSUANCE",
+            "CERTIFICATE_ISSUANCE",
+            "REPLAY",
+            "IMPORT_BACKFILL",
+            "ADMIN_OVERRIDE",
+            "PLUGIN_DISPATCH",
+            "OTHER"
+          ]
+        },
+        "status": {
+          "enum": [
+            "ACTIVE",
+            "DISABLED_WITH_PROOF",
+            "OUT_OF_SCOPE_WITH_RATIONALE"
+          ]
+        },
+        "entrypoint": {
+          "$ref": "#/$defs/id"
+        },
+        "source_file": {
+          "$ref": "#/$defs/id"
+        },
+        "implementation_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "build_artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "query_types": {
+          "$ref": "#/$defs/ids"
+        },
+        "claim_types": {
+          "$ref": "#/$defs/ids"
+        },
+        "evidence_roles": {
+          "$ref": "#/$defs/ids"
+        },
+        "instrumentation_contract_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "event_schema_version": {
+          "$ref": "#/$defs/id"
+        },
+        "expected_observer_ids": {
+          "$ref": "#/$defs/ids"
+        },
+        "dispatch_evidence_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "exclusion_evidence_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "exclusion_rationale": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "route_id",
+        "route_class",
+        "status",
+        "entrypoint",
+        "source_file",
+        "implementation_sha256",
+        "build_artifact_sha256",
+        "query_types",
+        "claim_types",
+        "evidence_roles",
+        "instrumentation_contract_sha256",
+        "event_schema_version",
+        "expected_observer_ids",
+        "dispatch_evidence_sha256"
+      ]
+    },
+    "canary": {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "Canary execution",
+      "properties": {
+        "canary_id": {
+          "$ref": "#/$defs/id"
+        },
+        "route_id": {
+          "$ref": "#/$defs/id"
+        },
+        "build_artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "nonce_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "synthetic_namespace": {
+          "$ref": "#/$defs/id"
+        },
+        "synthetic_evidence_ids": {
+          "$ref": "#/$defs/ids"
+        },
+        "query_id": {
+          "$ref": "#/$defs/id"
+        },
+        "claim_id": {
+          "$ref": "#/$defs/id"
+        },
+        "fusion_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "verifier_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "route_trace_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "handler_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "annotation_write_capability": {
+          "type": "boolean"
+        },
+        "training_export_capability": {
+          "type": "boolean"
+        },
+        "evaluation_export_capability": {
+          "type": "boolean"
+        },
+        "expected_observers": {
+          "$ref": "#/$defs/ids"
+        },
+        "observed_receipts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/receipt"
+          }
+        },
+        "execution_disposition": {
+          "enum": [
+            "EXECUTED",
+            "NOT_EXECUTED",
+            "FAILED"
+          ]
+        }
+      },
+      "required": [
+        "canary_id",
+        "route_id",
+        "build_artifact_sha256",
+        "nonce_sha256",
+        "synthetic_namespace",
+        "synthetic_evidence_ids",
+        "query_id",
+        "claim_id",
+        "fusion_policy_sha256",
+        "verifier_sha256",
+        "route_trace_sha256",
+        "handler_digest",
+        "annotation_write_capability",
+        "training_export_capability",
+        "evaluation_export_capability",
+        "expected_observers",
+        "observed_receipts",
+        "execution_disposition"
+      ]
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "Observation receipt",
+      "properties": {
+        "observer_id": {
+          "$ref": "#/$defs/id"
+        },
+        "event_id": {
+          "$ref": "#/$defs/id"
+        },
+        "route_id": {
+          "$ref": "#/$defs/id"
+        },
+        "canary_id": {
+          "$ref": "#/$defs/id"
+        },
+        "build_artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "nonce_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evidence_ids": {
+          "$ref": "#/$defs/ids"
+        },
+        "fusion_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "verifier_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "event_schema_version": {
+          "$ref": "#/$defs/id"
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "observer_id",
+        "event_id",
+        "route_id",
+        "canary_id",
+        "build_artifact_sha256",
+        "nonce_sha256",
+        "evidence_ids",
+        "fusion_policy_sha256",
+        "verifier_sha256",
+        "event_schema_version",
+        "receipt_sha256"
+      ]
+    },
+    "observer": {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "Observer identity",
+      "properties": {
+        "observer_id": {
+          "$ref": "#/$defs/id"
+        },
+        "custodian_ref": {
+          "$ref": "#/$defs/id"
+        },
+        "source_role": {
+          "enum": [
+            "EXECUTION_LEDGER",
+            "CLAIM_CERTIFICATE_LEDGER",
+            "INDEPENDENT_EXPORT"
+          ]
+        },
+        "implementation_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "storage_lineage_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "retention_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "shared_controls": {
+          "$ref": "#/$defs/ids"
+        }
+      },
+      "required": [
+        "observer_id",
+        "custodian_ref",
+        "source_role",
+        "implementation_sha256",
+        "storage_lineage_sha256",
+        "retention_profile_sha256",
+        "shared_controls"
+      ]
+    },
+    "mutation": {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "Fault-injection result",
+      "properties": {
+        "mutation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "route_id": {
+          "$ref": "#/$defs/id"
+        },
+        "fault_class": {
+          "enum": [
+            "SUPPRESS_EMIT",
+            "BYPASS_WRAPPER",
+            "DROP_SINK",
+            "UNREGISTERED_PLUGIN",
+            "STALE_BUILD",
+            "WRONG_POLICY",
+            "WRONG_EVIDENCE",
+            "DISABLED_ROUTE_REACHABLE",
+            "OTHER"
+          ]
+        },
+        "fault_injected": {
+          "type": "boolean"
+        },
+        "expected_detection": {
+          "type": "boolean"
+        },
+        "observed_detection": {
+          "type": "boolean"
+        },
+        "disposition": {
+          "enum": [
+            "DETECTED",
+            "NOT_DETECTED",
+            "NOT_RUN"
+          ]
+        }
+      },
+      "required": [
+        "mutation_id",
+        "route_id",
+        "fault_class",
+        "fault_injected",
+        "expected_detection",
+        "observed_detection",
+        "disposition"
+      ]
+    },
+    "contamination": {
+      "type": "object",
+      "additionalProperties": false,
+      "title": "Contamination isolation",
+      "properties": {
+        "synthetic_namespace_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "biological_annotation_write_attempts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "training_export_matches": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evaluation_export_matches": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "isolation_check_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "disposition": {
+          "enum": [
+            "CLEAN",
+            "CONTAMINATION_DETECTED",
+            "UNKNOWN"
+          ]
+        }
+      },
+      "required": [
+        "synthetic_namespace_sha256",
+        "biological_annotation_write_attempts",
+        "training_export_matches",
+        "evaluation_export_matches",
+        "isolation_check_sha256",
+        "disposition"
+      ]
+    }
+  }
+}
