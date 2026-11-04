@@ -1337,7 +1337,7 @@ mod tests {
     fn hypothesis_revision_forks_are_rejected() {
         let mut ledger = base_ledger();
         let mut revision_two = ledger.hypotheses[0].clone();
-        revision_two.id = "h1-r2".into();
+        revision_two.id = "h1-r3".into();
         revision_two.previous_record_id = Some("h1-r2".into());
         revision_two.sequence = 7;
         let mut revision_three = revision_two.clone();
