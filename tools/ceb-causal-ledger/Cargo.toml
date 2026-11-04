@@ -1,0 +1,14 @@
+[package]
+name = "ceb-causal-ledger"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Pure, deterministic validation model for CEB causal-investigation records"
+
+# This is intentionally a standalone tools crate. It is not a production
+# dependency of symthaea-core and is not added to the main workspace until its
+# contract and implementation have been independently reviewed.
+
+[lib]
+path = "src/lib.rs"
