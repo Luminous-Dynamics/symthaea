@@ -173,6 +173,10 @@ pub struct FitDiagnostics {
     pub iterations: usize,
     pub starts_attempted: usize,
     pub solution_objective_spread: Option<f64>,
+    /// Per-parameter max-minus-min across converged starts, when at least two converge.
+    pub solution_parameter_spread: Option<Vec<f64>>,
+    /// Coordinate-wise observed curvature at the selected solution, not a full Hessian.
+    pub diagonal_curvature: Option<Vec<f64>>,
     pub at_parameter_boundary: bool,
     pub note: Option<String>,
 }
@@ -198,6 +202,8 @@ impl FitResult {
                 iterations: 0,
                 starts_attempted: 0,
                 solution_objective_spread: None,
+                solution_parameter_spread: None,
+                diagonal_curvature: None,
                 at_parameter_boundary: false,
                 note: Some(note.into()),
             },
@@ -252,7 +258,9 @@ pub fn fit_with_optimizer(
     runs.sort_by(|a, b| {
         b.converged.cmp(&a.converged).then_with(|| a.objective.total_cmp(&b.objective))
     });
+    let parameter_spread = converged_parameter_spread(&runs);
     let best = runs.remove(0);
+    let curvature = diagonal_curvature(table, &best.parameters);
     let estimate = decode_parameters(&best.parameters, table.categories.len())
         .and_then(|(mu, sigma, thresholds, _)| UvsdEstimate::new(mu, sigma, thresholds));
 
@@ -279,6 +287,8 @@ pub fn fit_with_optimizer(
             iterations: best.iterations,
             starts_attempted: options.starts,
             solution_objective_spread: spread,
+            solution_parameter_spread: parameter_spread,
+            diagonal_curvature: curvature,
             at_parameter_boundary: best.at_boundary,
             note: if status == FitStatus::Converged {
                 None
@@ -344,6 +354,60 @@ pub fn negative_log_likelihood(
         }
     }
     if nll.is_finite() { Some(nll) } else { None }
+}
+
+fn converged_parameter_spread(runs: &[RunResult]) -> Option<Vec<f64>> {
+    let mut converged = runs.iter().filter(|run| run.converged);
+    let first = converged.next()?;
+    let mut minimum = first.parameters.clone();
+    let mut maximum = first.parameters.clone();
+    let mut count = 1usize;
+    for run in converged {
+        count += 1;
+        for index in 0..minimum.len() {
+            minimum[index] = minimum[index].min(run.parameters[index]);
+            maximum[index] = maximum[index].max(run.parameters[index]);
+        }
+    }
+    if count < 2 {
+        return None;
+    }
+    Some(
+        minimum
+            .iter()
+            .zip(maximum.iter())
+            .map(|(low, high)| high - low)
+            .collect(),
+    )
+}
+
+fn diagonal_curvature(table: &CategoryTable, parameters: &[f64]) -> Option<Vec<f64>> {
+    let (lower, upper) = parameter_bounds(table.categories.len());
+    let center = objective(table, parameters);
+    if !center.is_finite() {
+        return None;
+    }
+    let mut curvature = Vec::with_capacity(parameters.len());
+    for index in 0..parameters.len() {
+        let step = 1.0e-3 * parameters[index].abs().max(1.0);
+        if parameters[index] - step <= lower[index]
+            || parameters[index] + step >= upper[index]
+        {
+            return None;
+        }
+        let mut plus = parameters.to_vec();
+        let mut minus = parameters.to_vec();
+        plus[index] += step;
+        minus[index] -= step;
+        let high = objective(table, &plus);
+        let low = objective(table, &minus);
+        let value = (high - 2.0 * center + low) / (step * step);
+        if !value.is_finite() {
+            return None;
+        }
+        curvature.push(value);
+    }
+    Some(curvature)
 }
 
 fn standardize_boundary(value: f64, mu: f64, sigma: f64) -> f64 {
