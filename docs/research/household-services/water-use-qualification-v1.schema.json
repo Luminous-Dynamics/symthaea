@@ -235,7 +235,8 @@
       "required": [
         "boundary_id",
         "boundary_kind",
-        "sample_point_relationship"
+        "sample_point_relationship",
+        "sample_point_id"
       ],
       "properties": {
         "boundary_id": {
@@ -267,6 +268,10 @@
             "string",
             "null"
           ]
+        },
+        "sample_point_id": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
