@@ -338,7 +338,7 @@ jobs:
               raise SystemExit("retrieved joint support route was not recovered")
           if row["minimal_route_coverage_at_returned_k"] != 0.5 or row["best_route_completion_rank"] != 2:
               raise SystemExit("retrieved route coverage or completion rank changed")
-          if row["necessary_declaration_count"] != 0 or row["useful_novel_premise_rate"] != 1.0:
+          if row["necessary_declaration_count"] != 0 or row["useful_route_premise_rate"] != 1.0:
               raise SystemExit("alternative/conjunctive support semantics changed")
           if "never promotes" not in report["admission_boundary"]:
               raise SystemExit("candidate-only admission boundary changed")
