@@ -1451,7 +1451,7 @@ mod tests {
 
     #[test]
     fn no_social_baseline_never_schedules_transmissions() {
-        let task = InnovationTask::family_task(TaskFamily.Layered);
+        let task = InnovationTask::family_task(TaskFamily::Layered);
         let config = deterministic_config(TransmissionPolicy::NoSocial);
         let run = simulate(&task, config, 44).unwrap();
         assert!(run.history.iter().all(|m| m.transmissions_scheduled == 0));
@@ -1459,7 +1459,7 @@ mod tests {
 
     #[test]
     fn fixed_seed_simulation_is_deterministic() {
-        let task = InnovationTask::family_task(TaskFamily.Convergent);
+        let task = InnovationTask::family_task(TaskFamily::Convergent);
         let config = deterministic_config(TransmissionPolicy::StateAwareFrontier);
         let a = simulate(&task, config, 404).unwrap();
         let b = simulate(&task, config, 404).unwrap();
@@ -1468,7 +1468,7 @@ mod tests {
 
     #[test]
     fn state_aware_frontier_does_not_send_recipe_already_known_by_receiver() {
-        let task = InnovationTask::family_task(TaskFamily.Layered);
+        let task = InnovationTask::family_task(TaskFamily::Layered);
         let config = deterministic_config(TransmissionPolicy::StateAwareFrontier);
         let mut rng = Rng::new(9);
         let graph = SocialGraph::generate(config.population_size, 0.0, &mut rng);
@@ -1481,7 +1481,7 @@ mod tests {
 
     #[test]
     fn metrics_keep_result_coverage_and_transmission_cost_separate() {
-        let task = InnovationTask::family_task(TaskFamily.Layered);
+        let task = InnovationTask::family_task(TaskFamily::Layered);
         let config = deterministic_config(TransmissionPolicy::StateAwareFrontier);
         let run = simulate(&task, config, 606).unwrap();
         let metrics = run.final_metrics().unwrap();
