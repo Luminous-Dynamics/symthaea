@@ -4,6 +4,30 @@ This directory isolates the exact production energy-counter and energy-receipt
 modules from the full Symthaea workspace. It is not a replacement for full
 workspace integration tests.
 
+## Runtime hardware probe
+
+The harness includes an opt-in runtime probe binary. On Linux it enumerates
+caller-visible kernel powercap zones below `/sys/class/powercap`; with the
+`nvml` feature it initializes NVML once and enumerates GPU devices by UUID.
+It reads each supported cumulative counter twice across one declared interval
+and prints a JSON report containing sensor identity/scope, capability status,
+raw readings, measured delta and interval-average watts. Unsupported,
+permission-denied, missing and malformed sensors remain explicit result
+statuses rather than numeric zero.
+
+Run it with:
+
+```sh
+cargo run --locked --all-features --manifest-path research/energy-meter-001/Cargo.toml --bin energy-meter-probe -- 500
+```
+
+The final argument is the sample interval in milliseconds (default 500).
+Running without `--all-features` omits NVML. This probe does not attribute
+whole-GPU energy to individual processes, does not equate a package zone with
+whole-workstation energy, and does not infer uncovered sensor domains. Its JSON
+is a capability and short-interval diagnostic, not by itself a matched-quality
+benchmark receipt.
+
 ## Evidence classes
 
 Keep these classes separate in every report:
