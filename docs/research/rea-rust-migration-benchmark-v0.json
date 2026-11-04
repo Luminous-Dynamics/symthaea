@@ -314,7 +314,9 @@
         "zip_rs_header_consistency_and_overlapping_entry_oracle",
         "rawzip_052_structural_oracle_consumer_policy_controls",
         "oracle_dependency_and_codec_commonality_audit",
-        "content_addressed_minimized_regression_corpus"
+        "content_addressed_minimized_regression_corpus",
+        "custom_crc32_standard_123456789_known_answer",
+        "shared_crc32fast_dependency_common_mode_not_independent_checksum_evidence"
       ],
       "metrics": [
         "entry_occurrence_precision_recall",
@@ -345,7 +347,9 @@
         "minimized_disagreement_adjudication_completeness",
         "fuzz_crashes_and_reproducer_count",
         "coverage_guided_fuzz_execs_per_second",
-        "oracle_dependency_overlap_by_parser_and_codec"
+        "oracle_dependency_overlap_by_parser_and_codec",
+        "checksum_known_answer_correctness",
+        "shared_checksum_dependency_correlation_reported"
       ],
       "target": "100_percent supported-subset parity against pinned upstream REA and separately pinned decoder oracles; zero false accepts for CRC/size corruption, partial streams, metadata disagreement, source mutation or actual-output limit violations; bounded memory independent of member size; performance scored only after correctness gates pass.",
       "boundaries": {
@@ -365,7 +369,7 @@
         "upstream": "pinned REA TypeScript ArtifactReader/ZipArtifactReader at upstream SHA 8250bf2320ea57aab4e664db4b4d44b8abd2004e remains the behavioral oracle",
         "note": "An oracle disagreement is retained with provenance and minimized fixture; it is not resolved by selecting the majority implementation.",
         "rawzip": "rawzip 0.5.2 evaluation candidate for low-level structure/wayfinder oracle only. It delegates bomb limits, overlapping extent checks, duplicate names and expected central-directory entry-count reconciliation to the consumer; these are required adapter controls.",
-        "independence": "Parser implementation diversity does not prove independent codec or CRC lineage. Record the shared dependency and codec graph per method before granting independent-oracle credit."
+        "independence": "The current committed Cargo.lock resolves zipcore 0.10.2 and zip 9.3.0 to the same crc32fast 1.5.4 implementation. They are distinct container parsers but must not count as independent CRC oracles. Symthaea's custom bitwise CRC function is separately implemented and checked against the standard CRC-32/ISO-HDLC 123456789 vector (0xcbf43926). No independent Deflate implementation is yet integrated into the qualification harness."
       },
       "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10368",
       "related_owners": [
@@ -383,7 +387,10 @@
         "run deterministic mutation smoke and preserve seed, corpus hash, mutation schedule and panic/error result; follow with coverage-guided fuzzing for promoted reader revisions",
         "include a test-only zip 9.3.0 parser arm and compare its indexed metadata and Stored stream against custom inventory",
         "audit zipcore, zip and optional rawzip parser/codec dependency ancestry before classifying any oracle as independent",
-        "content-address every seed and minimized disagreement; retain unresolved oracle outcomes rather than voting"
+        "content-address every seed and minimized disagreement; retain unresolved oracle outcomes rather than voting",
+        "audit exact Cargo.lock dependency edges and checksum implementations; zipcore and zip share crc32fast 1.5.4 in the current resolved graph",
+        "do not count two parsers using the same CRC crate as independent checksum corroboration; retain Symthaea custom CRC as a separately implemented known-answer arm",
+        "report independent parser, codec and checksum ancestry separately"
       ]
     },
     {
