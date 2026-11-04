@@ -310,7 +310,6 @@ pub enum GroundedParticipationIssueV1 {
     AskRequiresAmbiguousGrounding,
     AbstainRequiresNonGroundedEvidence,
     StreamUnavailableRequiresAbstain,
-    EffectWindowBeyondArtifact,
 }
 
 impl std::fmt::Display for GroundedParticipationIssueV1 {
@@ -1017,8 +1016,8 @@ mod tests {
     fn abstain_can_cite_unavailable_grounding_as_a_reason_to_withhold() {
         let mut evidence = bundle();
         evidence.claims[0].kind = GroundedMusicalClaimKindV1::StreamUnavailable;
-        evidence.claims[0].status = GroundedClaimStatusV1::Unavailable;
-        evidence.claims[0].reason = Some("input chunk was unavailable".to_owned());
+        evidence.claims[0].status = GroundedClaimStatusV1::Grounded;
+        evidence.claims[0].reason = None;
         evidence.claim_set_sha256 = evidence.expected_claim_set_sha256().unwrap();
         evidence.evidence_bundle_sha256 = evidence.expected_evidence_bundle_sha256().unwrap();
         let receipt = decision(
@@ -1067,22 +1066,36 @@ mod tests {
     }
 
     #[test]
-    fn effect_window_must_remain_inside_the_exact_audio_artifact() {
+    fn effect_window_duration_is_bounded_in_runner_clock_domain() {
         let evidence = bundle();
         let receipt = decision(
             &evidence,
             GroundedMusicalActionV1::Respond,
             vec!["invitation-001"],
             Some(GroundedParticipationEffectWindowV1 {
-                interval: GroundedFrameIntervalV1 {
-                    start_frame: 47_900,
-                    end_frame: 48_100,
-                },
+                not_before_runner_time_ns: 10_000_120,
+                expires_at_runner_time_ns: 10_000_120
+                    + policy().maximum_effect_window_ns
+                    + 1,
                 authorization_id: "auth-001".to_owned(),
             }),
         );
         assert!(validate_grounded_decision_v1(&evidence, &receipt, &policy())
-            .contains(&GroundedParticipationIssueV1::EffectWindowBeyondArtifact));
+            .contains(&GroundedParticipationIssueV1::EffectWindowDurationOutsidePolicy));
+    }
+
+    #[test]
+    fn decision_effect_clock_origin_must_match_evidence_origin() {
+        let evidence = bundle();
+        let mut receipt = decision(
+            &evidence,
+            GroundedMusicalActionV1::Respond,
+            vec!["invitation-001"],
+            effect(),
+        );
+        receipt.runner_origin_id = "different-origin".to_owned();
+        assert!(validate_grounded_decision_v1(&evidence, &receipt, &policy())
+            .contains(&GroundedParticipationIssueV1::RunnerClockMismatch));
     }
 
     #[test]
@@ -1149,15 +1162,13 @@ mod tests {
             GroundedMusicalActionV1::Respond,
             vec!["invitation-001"],
             Some(GroundedParticipationEffectWindowV1 {
-                interval: GroundedFrameIntervalV1 {
-                    start_frame: 11_000,
-                    end_frame: 12_500,
-                },
+                not_before_runner_time_ns: 121,
+                expires_at_runner_time_ns: 10_000_121,
                 authorization_id: "auth-001".to_owned(),
             }),
         );
         assert!(validate_grounded_decision_v1(&evidence, &receipt, &policy())
-            .contains(&GroundedParticipationIssueV1::EffectWindowBeforeObservedPrefix));
+            .contains(&GroundedParticipationIssueV1::EffectWindowBeforeDecision));
     }
 
     #[test]
