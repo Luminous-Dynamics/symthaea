@@ -51,3 +51,12 @@ The uploaded script was fetched from the public branch and reconstructed byte-fo
 - Exact run: 86,016 queries, 43,384 identical positive memberships across all four layouts.
 
 Lookup times are a single process run and remain indicative only; do not infer CakeML performance from them.
+
+
+## Prior-art correction: CakeML already has verified array and bitset optimizations
+
+The CakeML cake_lpr checker already uses native byte arrays for a compact bitset-like assignment, array-based clause storage, a lazily maintained active-clause index, per-literal first-occurrence lookup arrays, verified hashtables for compositional inclusion checks, and buffered proof streaming. The paper reports proof files from 300 MB to 4 GB being streamed line by line. These are established CakeML techniques, not new Symthaea contributions.
+
+This v1 microbenchmark therefore does not justify proposing "use arrays/bitsets in CakeML" as a novelty. Its narrower question is how to represent the quantified-literal sets attached to SCPOG Skolem nodes, and how to evaluate membership under the actual clause-by-node query pattern. V2 models that clause-intersection operation more directly. Any CakeML implementation must reuse the existing verified optimization/refinement pattern and show a POG-specific benefit.
+
+Source: Tan, Heule and Myreen, *Verified Propagation Redundancy and Compositional UNSAT Checking in CakeML*, 2023, Section 5.3.1–5.3.4.
