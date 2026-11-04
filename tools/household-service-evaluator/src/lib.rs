@@ -154,7 +154,10 @@ pub fn evaluate_water_balance(
                 .calibration_record_sha256
                 .as_deref()
                 .ok_or_else(|| {
-                    EvaluationError::new(name, "qualified calibration requires a record digest reference")
+                    EvaluationError::new(
+                        name,
+                        "qualified calibration requires a record digest reference",
+                    )
                 })?;
             validate_sha256(digest, name)?;
         } else {
