@@ -626,7 +626,7 @@ pub fn fit_cpal_callback_playback_v1(
         })?;
 
     Ok(CpalCallbackPlaybackFitV1 {
-        schema_version: "mel-cpal-callback-playback-fit-v1".to_owned(),
+        schema_version: CPAL_CALLBACK_PLAYBACK_FIT_SCHEMA_V1.to_owned(),
         stream_instance_id: descriptor.stream_instance_id,
         cpal_stream_configuration_digest_sha256: descriptor.configuration_digest_sha256.clone(),
         sample_rate_hz: descriptor.sample_rate_hz,
@@ -1529,6 +1529,105 @@ mod tests {
                 timestamp_uncertainty_ns: None,
             },
         ];
+        let policy = CpalCallbackPlaybackFitPolicyV1 {
+            maximum_abs_residual_ns: 100.0,
+            ..CpalCallbackPlaybackFitPolicyV1::default()
+        };
+        assert!(matches!(
+            fit_cpal_callback_playback_v1(&descriptor, &anchors, policy),
+            Err(CpalCallbackPlaybackFitErrorV1::ResidualOutsidePolicy { .. })
+        ));
+    }
+
+    #[test]
+    fn callback_playback_fit_rejects_an_anchor_set_different_from_output_fit() {
+        use crate::output_clock::{
+            OutputClockAnchorSchemaV1, OutputClockAnchorSourceV1,
+        };
+        let descriptor = OutputClockStreamDescriptorV1::from_cpal_device_id(
+            7, "callback-playback-digest-device", 48_000, 2,
+        ).unwrap();
+        let make = |uncertainty| vec![
+            OutputClockAnchorV1 {
+                schema_version: OutputClockAnchorSchemaV1::V1,
+                source: OutputClockAnchorSourceV1::SyntheticFixtureV1,
+                stream_instance_id: 7, anchor_index: 0,
+                first_output_frame_index: 0, frame_count: 480,
+                sample_rate_hz: 48_000, channel_count: 2,
+                callback_stream_time_ns: 0, playback_stream_time_ns: 5_000_000,
+                callback_to_playback_ns: 5_000_000, timestamp_uncertainty_ns: uncertainty,
+            },
+            OutputClockAnchorV1 {
+                schema_version: OutputClockAnchorSchemaV1::V1,
+                source: OutputClockAnchorSourceV1::SyntheticFixtureV1,
+                stream_instance_id: 7, anchor_index: 1,
+                first_output_frame_index: 480, frame_count: 480,
+                sample_rate_hz: 48_000, channel_count: 2,
+                callback_stream_time_ns: 10_000_000, playback_stream_time_ns: 15_000_000,
+                callback_to_playback_ns: 5_000_000, timestamp_uncertainty_ns: uncertainty,
+            },
+            OutputClockAnchorV1 {
+                schema_version: OutputClockAnchorSchemaV1::V1,
+                source: OutputClockAnchorSourceV1::SyntheticFixtureV1,
+                stream_instance_id: 7, anchor_index: 2,
+                first_output_frame_index: 960, frame_count: 480,
+                sample_rate_hz: 48_000, channel_count: 2,
+                callback_stream_time_ns: 20_000_000, playback_stream_time_ns: 25_000_000,
+                callback_to_playback_ns: 5_000_000, timestamp_uncertainty_ns: uncertainty,
+            },
+            OutputClockAnchorV1 {
+                schema_version: OutputClockAnchorSchemaV1::V1,
+                source: OutputClockAnchorSourceV1::SyntheticFixtureV1,
+                stream_instance_id: 7, anchor_index: 3,
+                first_output_frame_index: 1440, frame_count: 480,
+                sample_rate_hz: 48_000, channel_count: 2,
+                callback_stream_time_ns: 30_000_000, playback_stream_time_ns: 35_000_000,
+                callback_to_playback_ns: 5_000_000, timestamp_uncertainty_ns: uncertainty,
+            },
+        ];
+        let anchors_a = make(None);
+        let anchors_b = make(Some(1_000));
+        let fit_a = fit_cpal_callback_playback_v1(
+            &descriptor, &anchors_a, CpalCallbackPlaybackFitPolicyV1::default()
+        ).unwrap();
+        let bundle_b = crate::output_clock::fit_output_clock_bundle_v1(
+            &descriptor, &anchors_b, crate::output_clock::OutputClockFitPolicyV1::default()
+        ).unwrap();
+        assert_ne!(fit_a.anchor_set_sha256, bundle_b.anchor_set_sha256);
+        assert_eq!(
+            fit_a.schema_version,
+            CPAL_CALLBACK_PLAYBACK_FIT_SCHEMA_V1
+        );
+    }
+
+    #[test]
+    fn callback_playback_fit_rejects_schedule_residual_outlier() {
+        use crate::output_clock::{OutputClockAnchorSchemaV1, OutputClockAnchorSourceV1};
+        let descriptor = OutputClockStreamDescriptorV1::from_cpal_device_id(
+            7, "callback-playback-residual-device", 48_000, 2,
+        ).unwrap();
+        let mut anchors = Vec::new();
+        for (index, callback_ns, playback_ns) in [
+            (0, 0, 5_000_000),
+            (1, 10_000_000, 15_000_000),
+            (2, 20_000_000, 25_010_000),
+            (3, 30_000_000, 35_000_000),
+        ] {
+            anchors.push(OutputClockAnchorV1 {
+                schema_version: OutputClockAnchorSchemaV1::V1,
+                source: OutputClockAnchorSourceV1::SyntheticFixtureV1,
+                stream_instance_id: 7,
+                anchor_index: index,
+                first_output_frame_index: index * 480,
+                frame_count: 480,
+                sample_rate_hz: 48_000,
+                channel_count: 2,
+                callback_stream_time_ns: callback_ns,
+                playback_stream_time_ns: playback_ns,
+                callback_to_playback_ns: playback_ns - callback_ns,
+                timestamp_uncertainty_ns: None,
+            });
+        }
         let policy = CpalCallbackPlaybackFitPolicyV1 {
             maximum_abs_residual_ns: 100.0,
             ..CpalCallbackPlaybackFitPolicyV1::default()
