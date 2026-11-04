@@ -1280,17 +1280,30 @@ mod tests {
             report.water_corpus_id,
             "HOME-UTILITY-COORD-001-WATER-CONTINUITY-SYNTHETIC-001"
         );
+        assert_eq!(report.report_schema_version, "0.2");
         assert_eq!(
-            report.receipts[7].derived_metrics["mass_balance_residual_l"],
+            report.evidence_class,
+            EvidenceClass::SyntheticFixtureOnly
+        );
+        assert_eq!(
+            report.water_source.digest_scope,
+            DigestScope::CanonicalizedJsonValue
+        );
+        assert_eq!(
+            quantity_value(&report.receipts[7], "mass_balance_residual_l"),
             -200.0
         );
         assert_eq!(
-            report.receipts[7].derived_metrics["mass_balance_residual_lower_l"],
+            quantity_value(&report.receipts[7], "mass_balance_residual_lower_l"),
             -220.0
         );
         assert_eq!(
-            report.receipts[7].derived_metrics["mass_balance_residual_upper_l"],
+            quantity_value(&report.receipts[7], "mass_balance_residual_upper_l"),
             -180.0
+        );
+        assert_eq!(
+            metric_unit(&report.receipts[7], "mass_balance_residual_l"),
+            "L"
         );
         assert_eq!(
             report.receipts[7].disposition,
@@ -1309,6 +1322,101 @@ mod tests {
         let second = serde_json::to_vec(&evaluate_batch(&water, &repair).unwrap()).unwrap();
         assert_eq!(first, second, "batch report must be byte-deterministic");
         assert_eq!(report.disposition_counts.values().sum::<usize>(), 20);
+    }
+
+
+    fn quantity_value(receipt: &BatchReceipt, name: &str) -> f64 {
+        match &receipt.derived_metrics[name] {
+            DerivedMetric::Quantity { value, .. } => *value,
+            other => panic!("expected quantity metric, found {other:?}"),
+        }
+    }
+
+    fn metric_unit<'a>(receipt: &'a BatchReceipt, name: &str) -> &'a str {
+        match &receipt.derived_metrics[name] {
+            DerivedMetric::Quantity { unit, .. } => unit,
+            other => panic!("expected quantity metric, found {other:?}"),
+        }
+    }
+
+    #[test]
+    fn exact_source_bytes_are_bound_and_a_one_byte_change_changes_the_digest() {
+        let water = include_bytes!(
+            "../../../docs/research/household-services/fixtures/water-continuity-scenarios-v0.1.json"
+        );
+        let repair = include_bytes!(
+            "../../../docs/research/household-services/fixtures/repairability-scenarios-v0.1.json"
+        );
+        let original = evaluate_batch_from_bytes(water, repair).unwrap();
+        let mut changed_water = water.to_vec();
+        changed_water.push(b' ');
+        let changed = evaluate_batch_from_bytes(&changed_water, repair).unwrap();
+
+        assert_eq!(original.water_source.digest_scope, DigestScope::ExactSourceBytes);
+        assert_eq!(original.water_source.source_byte_length, water.len());
+        assert_eq!(
+            original.water_source.source_sha256,
+            sha256_hex(water)
+        );
+        assert_ne!(
+            original.water_source.source_sha256,
+            changed.water_source.source_sha256
+        );
+        assert_eq!(
+            changed.water_source.source_byte_length,
+            water.len() + 1
+        );
+        assert_eq!(
+            original.repair_source.source_sha256,
+            changed.repair_source.source_sha256
+        );
+    }
+
+    #[test]
+    fn boolean_metrics_remain_json_booleans_and_quantities_retain_units() {
+        let (water, repair) = fixtures();
+        let report = evaluate_batch(&water, &repair).unwrap();
+        let command = &report.receipts[8].derived_metrics["commanded_refill"];
+        assert_eq!(
+            serde_json::to_value(command).unwrap()["value"],
+            serde_json::Value::Bool(true)
+        );
+        assert_eq!(
+            serde_json::to_value(command).unwrap()["kind"],
+            "boolean"
+        );
+        let flow = &report.receipts[8].derived_metrics["measured_inlet_flow_l_min"];
+        assert_eq!(
+            serde_json::to_value(flow).unwrap()["unit"],
+            "L/min"
+        );
+        assert!(matches!(
+            report.receipts[8].derived_metrics["commanded_refill"],
+            DerivedMetric::Boolean { value: true, .. }
+        ));
+    }
+
+    #[test]
+    fn output_envelope_hashes_report_body_without_self_reference() {
+        let (water, repair) = fixtures();
+        let report = evaluate_batch(&water, &repair).unwrap();
+        let expected_bytes = serde_json::to_vec(&report).unwrap();
+        let envelope = BatchOutputEnvelope::from_report(report.clone()).unwrap();
+        assert_eq!(envelope.report_sha256, sha256_hex(&expected_bytes));
+        assert_eq!(envelope.report_byte_length, expected_bytes.len());
+        assert_eq!(
+            envelope.report_serialization,
+            "serde_json_compact_struct_order_btree_maps_v1"
+        );
+        assert_eq!(envelope.report, report);
+    }
+
+    #[test]
+    fn sha256_helper_matches_published_known_answer() {
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
     }
 
     #[test]
