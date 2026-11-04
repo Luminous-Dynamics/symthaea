@@ -206,10 +206,7 @@ impl EnergyDelta {
         }
 
         if let Some(modulus) = earlier.descriptor.wrap_modulus {
-            if modulus == 0
-                || earlier.raw_counter >= modulus
-                || later.raw_counter >= modulus
-            {
+            if modulus == 0 || earlier.raw_counter >= modulus || later.raw_counter >= modulus {
                 return Err(EnergyDeltaError::CounterOutsideModulus);
             }
         }
@@ -372,12 +369,11 @@ pub mod linux_powercap {
             }
             let current = Some(range);
             if current != self.descriptor.wrap_modulus {
-                self.counter_epoch = self
-                    .counter_epoch
-                    .checked_add(1)
-                    .ok_or_else(|| EnergyMeterError::BackendFailure {
+                self.counter_epoch = self.counter_epoch.checked_add(1).ok_or_else(|| {
+                    EnergyMeterError::BackendFailure {
                         reason: "counter epoch overflow".into(),
-                    })?;
+                    }
+                })?;
                 self.descriptor.wrap_modulus = current;
             }
             Ok(())
@@ -490,10 +486,8 @@ pub mod linux_powercap {
                     .duration_since(UNIX_EPOCH)
                     .unwrap()
                     .as_nanos();
-                let directory = std::env::temp_dir().join(format!(
-                    "symthaea-powercap-{}-{nonce}",
-                    std::process::id()
-                ));
+                let directory = std::env::temp_dir()
+                    .join(format!("symthaea-powercap-{}-{nonce}", std::process::id()));
                 fs::create_dir(&directory).unwrap();
                 let energy_path = directory.join("energy_uj");
                 let range_path = directory.join("max_energy_range_uj");
@@ -527,7 +521,10 @@ pub mod linux_powercap {
 
             assert_eq!(meter.availability(), EnergyMeterAvailability::Available);
             assert_eq!(meter.descriptor().unit, EnergyCounterUnit::Microjoules);
-            assert_eq!(meter.descriptor().scope, EnergyScope::CpuPackage { package_id: 0 });
+            assert_eq!(
+                meter.descriptor().scope,
+                EnergyScope::CpuPackage { package_id: 0 }
+            );
             assert_eq!(meter.read_counter().unwrap().raw_counter, 10_000);
         }
 
@@ -547,7 +544,10 @@ pub mod linux_powercap {
             let second = meter.read_counter().unwrap();
 
             assert_ne!(first.counter_epoch, second.counter_epoch);
-            assert_ne!(first.descriptor.wrap_modulus, second.descriptor.wrap_modulus);
+            assert_ne!(
+                first.descriptor.wrap_modulus,
+                second.descriptor.wrap_modulus
+            );
             assert_eq!(
                 EnergyDelta::between(&first, &second),
                 Err(EnergyDeltaError::CounterEpochChanged)
