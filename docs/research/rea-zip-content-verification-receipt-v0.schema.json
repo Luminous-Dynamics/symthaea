@@ -1,0 +1,529 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/rea-zip-content-verification-receipt-v0.schema.json",
+  "title": "REA ZIP member content-verification receipt",
+  "description": "A versioned record of one member-occurrence verification attempt. This is not a producer attestation, authenticity claim, whole-archive verification, or security-control verdict.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "outcome",
+    "source",
+    "occurrence",
+    "verifier",
+    "limits",
+    "observations",
+    "claim_scope",
+    "attestation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "outcome": {
+      "enum": [
+        "verified",
+        "rejected",
+        "unsupported",
+        "source_changed",
+        "limit_exceeded",
+        "abstained"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "archive_size_bytes",
+        "binding_strength",
+        "identity_scheme",
+        "platform",
+        "held_descriptor_matches",
+        "selected_path_matches",
+        "identity_revalidated_after_attempt",
+        "archive_sha256"
+      ],
+      "properties": {
+        "archive_size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "binding_strength": {
+          "enum": [
+            "qualified_identity",
+            "best_effort",
+            "content_digest",
+            "immutable_snapshot",
+            "unknown"
+          ]
+        },
+        "identity_scheme": {
+          "enum": [
+            "unix_dev_ino_mode_mtime_ctime",
+            "handle_file_id",
+            "best_effort_size_mtime_readonly",
+            "archive_sha256",
+            "immutable_snapshot",
+            "unknown"
+          ]
+        },
+        "platform": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "os",
+            "architecture"
+          ],
+          "properties": {
+            "os": {
+              "type": "string",
+              "minLength": 1
+            },
+            "architecture": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kernel_or_filesystem": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "held_descriptor_matches": {
+          "type": "boolean"
+        },
+        "selected_path_matches": {
+          "type": "boolean"
+        },
+        "identity_revalidated_after_attempt": {
+          "type": "boolean"
+        },
+        "identity_commitment_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "archive_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "occurrence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "central_directory_index",
+        "raw_filename_base64",
+        "local_header_offset_absolute",
+        "data_offset_absolute",
+        "entry_kind",
+        "encrypted",
+        "general_purpose_flags",
+        "compression_method",
+        "declared_compressed_bytes",
+        "declared_uncompressed_bytes",
+        "declared_crc32"
+      ],
+      "properties": {
+        "central_directory_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "raw_filename_base64": {
+          "type": "string",
+          "contentEncoding": "base64"
+        },
+        "decoded_filename": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "duplicate_raw_name_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "local_header_offset_absolute": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "data_offset_absolute": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "entry_kind": {
+          "enum": [
+            "file",
+            "directory",
+            "symlink",
+            "unknown"
+          ]
+        },
+        "encrypted": {
+          "type": "boolean"
+        },
+        "general_purpose_flags": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "compression_method": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "declared_compressed_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "declared_uncompressed_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "declared_crc32": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}$"
+        }
+      }
+    },
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "implementation",
+        "source_commit",
+        "toolchain",
+        "target",
+        "cargo_lock_sha256",
+        "sha256_implementation",
+        "independent_crc_implementation",
+        "secondary_decoder",
+        "secondary_decoder_crc_implementation",
+        "differential_oracles"
+      ],
+      "properties": {
+        "implementation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40,64}$"
+        },
+        "toolchain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cargo_lock_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sha256_implementation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "independent_crc_implementation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "secondary_decoder": {
+          "type": "string",
+          "minLength": 1
+        },
+        "secondary_decoder_crc_implementation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "differential_oracles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "version",
+              "role",
+              "used_in_this_attempt"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "used_in_this_attempt": {
+                "type": "boolean"
+              },
+              "dependency_commonality": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_archive_bytes",
+        "max_central_directory_bytes",
+        "max_entries",
+        "max_total_declared_uncompressed_bytes",
+        "max_entry_declared_uncompressed_bytes",
+        "max_member_output_bytes",
+        "read_buffer_bytes"
+      ],
+      "properties": {
+        "max_archive_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_central_directory_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_entries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_total_declared_uncompressed_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_entry_declared_uncompressed_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_member_output_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "read_buffer_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1048576
+        }
+      }
+    },
+    "observations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observed_uncompressed_bytes",
+        "observed_crc32",
+        "payload_sha256",
+        "decoder_reached_eof",
+        "decoder_crc32_valid",
+        "decoder_size_valid",
+        "independent_crc32_valid",
+        "metadata_parity_valid",
+        "source_revalidated"
+      ],
+      "properties": {
+        "observed_uncompressed_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "observed_crc32": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{8}$"
+        },
+        "payload_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "decoder_reached_eof": {
+          "type": "boolean"
+        },
+        "decoder_crc32_valid": {
+          "type": "boolean"
+        },
+        "decoder_size_valid": {
+          "type": "boolean"
+        },
+        "independent_crc32_valid": {
+          "type": "boolean"
+        },
+        "metadata_parity_valid": {
+          "type": "boolean"
+        },
+        "source_revalidated": {
+          "type": "boolean"
+        },
+        "failure_kind": {
+          "enum": [
+            "io",
+            "invalid_archive",
+            "unsupported",
+            "limit_exceeded",
+            "source_changed",
+            "abstained",
+            null
+          ]
+        },
+        "failure_detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "claim_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asserted_claim",
+        "not_established"
+      ],
+      "properties": {
+        "asserted_claim": {
+          "const": "member_content_integrity_only"
+        },
+        "not_established": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "producer_authenticity",
+              "producer_identity",
+              "apk_signature_validity",
+              "ipa_code_signature_validity",
+              "whole_archive_completeness",
+              "package_installability",
+              "runtime_behavior",
+              "masvs_control_pass",
+              "semantic_truth",
+              "absence_of_malicious_writer"
+            ]
+          }
+        }
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "envelope_reference"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_provided",
+            "separate_envelope_reference"
+          ]
+        },
+        "envelope_reference": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "verified"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "properties": {
+              "binding_strength": {
+                "enum": [
+                  "qualified_identity",
+                  "content_digest",
+                  "immutable_snapshot"
+                ]
+              },
+              "held_descriptor_matches": {
+                "const": true
+              },
+              "selected_path_matches": {
+                "const": true
+              },
+              "identity_revalidated_after_attempt": {
+                "const": true
+              }
+            }
+          },
+          "observations": {
+            "properties": {
+              "observed_uncompressed_bytes": {
+                "type": "integer"
+              },
+              "observed_crc32": {
+                "type": "string"
+              },
+              "payload_sha256": {
+                "type": "string"
+              },
+              "decoder_reached_eof": {
+                "const": true
+              },
+              "decoder_crc32_valid": {
+                "const": true
+              },
+              "decoder_size_valid": {
+                "const": true
+              },
+              "independent_crc32_valid": {
+                "const": true
+              },
+              "metadata_parity_valid": {
+                "const": true
+              },
+              "source_revalidated": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
