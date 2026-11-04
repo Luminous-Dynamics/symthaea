@@ -5,6 +5,7 @@ on:
     paths:
       - "tools/pitb-graph-evidence/**"
       - "tools/pitb-sorrydb-audit/**"
+      - "tools/pitb-sorrydb-evidence-closure/**"
       - ".github/workflows/pitb-typed-graph-evidence.yml"
   workflow_dispatch:
 
@@ -450,5 +451,132 @@ jobs:
             ${{ runner.temp }}/sorrydb-input/
             ${{ runner.temp }}/pitb-sorrydb-audit/src/main.rs
             ${{ runner.temp }}/pitb-sorrydb-audit/Cargo.lock
+          if-no-files-found: warn
+          retention-days: 30
+
+
+  sorrydb-evidence-closure-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Install JSON Schema validator
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pitb-sorrydb-closure-venv"
+          "$RUNNER_TEMP/pitb-sorrydb-closure-venv/bin/pip" install "jsonschema==4.25.1"
+
+      - name: Stage isolated evidence-closure validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/pitb-sorrydb-evidence-closure"
+          mkdir -p "$staged/src"
+          cp tools/pitb-sorrydb-evidence-closure/Cargo.toml "$staged/Cargo.toml"
+          cp tools/pitb-sorrydb-evidence-closure/Cargo.lock "$staged/Cargo.lock"
+          cp tools/pitb-sorrydb-evidence-closure/src/main.rs "$staged/src/main.rs"
+          echo "PITB_SORRYDB_CLOSURE_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+          echo "PITB_SORRYDB_CLOSURE_DIR=$staged" >> "$GITHUB_ENV"
+
+      - name: Format and test evidence-closure validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2021 "$PITB_SORRYDB_CLOSURE_DIR/src/main.rs"
+          cargo fmt --check --manifest-path "$PITB_SORRYDB_CLOSURE_MANIFEST"
+          cargo test --locked --manifest-path "$PITB_SORRYDB_CLOSURE_MANIFEST"
+
+      - name: Generate complete synthetic proof evidence bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path "$PITB_SORRYDB_CLOSURE_MANIFEST" -- \
+            --self-test-report \
+            "$RUNNER_TEMP/sorrydb-evidence-closure-report.json" \
+            "$RUNNER_TEMP/sorrydb-evidence-bundle"
+          echo "PITB_SORRYDB_EVIDENCE_BUNDLE=$RUNNER_TEMP/sorrydb-evidence-bundle" >> "$GITHUB_ENV"
+
+      - name: Validate proof-run, sidecar receipt and closure report schemas
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-sorrydb-closure-venv/bin/python" - \
+            "$PITB_SORRYDB_EVIDENCE_BUNDLE" \
+            "$RUNNER_TEMP/sorrydb-evidence-closure-report.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          bundle = Path(sys.argv[1])
+          report_path = Path(sys.argv[2])
+          schemas = {
+              "proof-run": Path("tools/pitb-sorrydb-audit/schema/sorrydb-proof-run-v0.schema.json"),
+              "source-binding": Path("tools/pitb-sorrydb-evidence-closure/schema/sorrydb-source-binding-receipt-v1.schema.json"),
+              "checker": Path("tools/pitb-sorrydb-evidence-closure/schema/sorrydb-checker-receipt-v1.schema.json"),
+              "semantic-gate": Path("tools/pitb-sorrydb-evidence-closure/schema/sorrydb-semantic-gate-receipt-v1.schema.json"),
+              "closure-report": Path("tools/pitb-sorrydb-evidence-closure/schema/sorrydb-evidence-closure-report-v0.schema.json"),
+          }
+          validators = {}
+          for name, path in schemas.items():
+              schema = json.loads(path.read_text())
+              Draft202012Validator.check_schema(schema)
+              validators[name] = Draft202012Validator(schema)
+
+          run_rows = [
+              json.loads(line)
+              for line in (bundle / "proof-runs.jsonl").read_text().splitlines()
+              if line.strip()
+          ]
+          if len(run_rows) != 1:
+              raise SystemExit("synthetic closure must contain exactly one proof-run row")
+          errors = list(validators["proof-run"].iter_errors(run_rows[0]))
+          if errors:
+              raise SystemExit("proof-run schema errors: " + "; ".join(e.message for e in errors))
+
+          evidence_dir = bundle / run_rows[0]["run_id"]
+          receipts = (
+              ("source-binding", "source-binding-receipt.json"),
+              ("checker", "checker-receipt.json"),
+              ("semantic-gate", "semantic-gate-receipt.json"),
+          )
+          for schema_name, filename in receipts:
+              value = json.loads((evidence_dir / filename).read_text())
+              errors = list(validators[schema_name].iter_errors(value))
+              if errors:
+                  raise SystemExit(f"{filename} schema errors: " + "; ".join(e.message for e in errors))
+
+          report = json.loads(report_path.read_text())
+          errors = list(validators["closure-report"].iter_errors(report))
+          if errors:
+              raise SystemExit("closure report schema errors: " + "; ".join(e.message for e in errors))
+          if report["attempt_count"] != 1 or report["verified_success_run_count"] != 1:
+              raise SystemExit("synthetic closure denominators changed")
+          if report["closed_verified_success_run_count"] != 1 or report["closed_unique_task_count"] != 1:
+              raise SystemExit("synthetic evidence bundle did not close")
+          if report["run_closures"][0]["closure_status"] != "closed_verified_success":
+              raise SystemExit("synthetic proof success was not byte-closed")
+          print("PITB_SORRYDB_EVIDENCE_CLOSURE_SCHEMAS_PASS")
+          PY
+
+      - name: Retain complete synthetic evidence-closure bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-sorrydb-evidence-closure
+          path: |
+            ${{ runner.temp }}/sorrydb-evidence-closure-report.json
+            ${{ runner.temp }}/sorrydb-evidence-bundle/
+            ${{ runner.temp }}/pitb-sorrydb-evidence-closure/src/main.rs
+            ${{ runner.temp }}/pitb-sorrydb-evidence-closure/Cargo.lock
           if-no-files-found: warn
           retention-days: 30
