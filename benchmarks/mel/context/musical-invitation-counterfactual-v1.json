@@ -5,11 +5,12 @@
       "family_id": "MCTX-CADENCE-HANDOFF-001",
       "kind": "context_change_must_change_action",
       "changed_factor": "collaborator_intent",
-      "preserved_factor": "local_cue_signature,phrase_function,performer_role,surface_instrument",
+      "preserved_factor": "local_cue_signature,preceding_harmonic_context_signature,phrase_function,performer_role,surface_instrument",
       "members": [
         {
           "variant_id": "invitation",
           "local_cue_signature": "cadential-rest-2-beats",
+          "preceding_harmonic_context_signature": "dominant-to-tonic-resolution",
           "phrase_function": "cadence",
           "collaborator_intent": "invites_response",
           "performer_role": "lead_saxophone",
@@ -21,6 +22,7 @@
         {
           "variant_id": "floor-retained",
           "local_cue_signature": "cadential-rest-2-beats",
+          "preceding_harmonic_context_signature": "dominant-to-tonic-resolution",
           "phrase_function": "cadence",
           "collaborator_intent": "retains_floor",
           "performer_role": "lead_saxophone",
@@ -32,14 +34,47 @@
       ]
     },
     {
+      "family_id": "MCTX-HARMONIC-CONTEXT-001",
+      "kind": "context_change_must_change_action",
+      "changed_factor": "preceding_harmonic_context",
+      "preserved_factor": "local_cue_signature,phrase_function,collaborator_intent,performer_role,surface_instrument",
+      "members": [
+        {
+          "variant_id": "resolved-cadence",
+          "local_cue_signature": "cadential-rest-2-beats",
+          "preceding_harmonic_context_signature": "dominant-to-tonic-resolution",
+          "phrase_function": "cadence",
+          "collaborator_intent": "ambiguous",
+          "performer_role": "lead_saxophone",
+          "surface_instrument": "saxophone",
+          "valid_action_set": [
+            "RESPOND"
+          ]
+        },
+        {
+          "variant_id": "open-half-cadence",
+          "local_cue_signature": "cadential-rest-2-beats",
+          "preceding_harmonic_context_signature": "dominant-half-cadence-open",
+          "phrase_function": "cadence",
+          "collaborator_intent": "ambiguous",
+          "performer_role": "lead_saxophone",
+          "surface_instrument": "saxophone",
+          "valid_action_set": [
+            "CONTINUE"
+          ]
+        }
+      ]
+    },
+    {
       "family_id": "MCTX-INSTRUMENT-INVARIANCE-001",
       "kind": "surface_change_must_preserve_action",
       "changed_factor": "surface_instrument",
-      "preserved_factor": "local_cue_signature,phrase_function,collaborator_intent,performer_role",
+      "preserved_factor": "local_cue_signature,preceding_harmonic_context_signature,phrase_function,collaborator_intent,performer_role",
       "members": [
         {
           "variant_id": "piano-surface",
           "local_cue_signature": "call-response-cadence",
+          "preceding_harmonic_context_signature": "call-response-resolution",
           "phrase_function": "solo_handoff",
           "collaborator_intent": "invites_response",
           "performer_role": "accompanist",
@@ -51,12 +86,45 @@
         {
           "variant_id": "guitar-surface",
           "local_cue_signature": "call-response-cadence",
+          "preceding_harmonic_context_signature": "call-response-resolution",
           "phrase_function": "solo_handoff",
           "collaborator_intent": "invites_response",
           "performer_role": "accompanist",
           "surface_instrument": "guitar",
           "valid_action_set": [
             "RESPOND"
+          ]
+        }
+      ]
+    },
+    {
+      "family_id": "MCTX-INSTRUMENT-INVARIANCE-002",
+      "kind": "surface_change_must_preserve_action",
+      "changed_factor": "surface_instrument",
+      "preserved_factor": "local_cue_signature,preceding_harmonic_context_signature,phrase_function,collaborator_intent,performer_role",
+      "members": [
+        {
+          "variant_id": "flute-surface",
+          "local_cue_signature": "phrase-internal-breath",
+          "preceding_harmonic_context_signature": "phrase-midpoint-continuation",
+          "phrase_function": "phrase_internal_breath",
+          "collaborator_intent": "retains_floor",
+          "performer_role": "accompanist",
+          "surface_instrument": "flute",
+          "valid_action_set": [
+            "WAIT"
+          ]
+        },
+        {
+          "variant_id": "clarinet-surface",
+          "local_cue_signature": "phrase-internal-breath",
+          "preceding_harmonic_context_signature": "phrase-midpoint-continuation",
+          "phrase_function": "phrase_internal_breath",
+          "collaborator_intent": "retains_floor",
+          "performer_role": "accompanist",
+          "surface_instrument": "clarinet",
+          "valid_action_set": [
+            "WAIT"
           ]
         }
       ]
@@ -70,6 +138,7 @@
         {
           "variant_id": "unresolved-fermata",
           "local_cue_signature": "fermata-open-duration",
+          "preceding_harmonic_context_signature": "sustained-tonic-fermata",
           "phrase_function": "fermata",
           "collaborator_intent": "ambiguous",
           "performer_role": "ensemble",
