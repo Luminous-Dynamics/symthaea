@@ -1,0 +1,49 @@
+{
+  "schema_version": "0.1.0",
+  "world": {
+    "world_id": "target-world-fate-demo",
+    "source_dataset_id": "synthetic-dataset",
+    "source_volume_id": "synthetic-volume",
+    "release_id": "release-2",
+    "objects": [
+      {
+        "object_id": "segment-1",
+        "object_type": "SEGMENT",
+        "lineage_id": "lineage-segment-1",
+        "stable_anchor_id": null
+      },
+      {
+        "object_id": "neuron-5-candidate-a",
+        "object_type": "NEURON",
+        "lineage_id": null,
+        "stable_anchor_id": null
+      },
+      {
+        "object_id": "neuron-5-candidate-b",
+        "object_type": "NEURON",
+        "lineage_id": null,
+        "stable_anchor_id": null
+      },
+      {
+        "object_id": "synapse-target-only",
+        "object_type": "SYNAPSE",
+        "lineage_id": null,
+        "stable_anchor_id": null
+      },
+      {
+        "object_id": "debug-artifact-1",
+        "object_type": "ARTIFACT",
+        "lineage_id": null,
+        "stable_anchor_id": null
+      }
+    ]
+  },
+  "manifest": {
+    "segmentation_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "mesh_sha256": null,
+    "skeleton_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "synapse_annotations_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "coordinate_frame_id": "synthetic-frame-nm",
+    "voxel_size_nm": [8, 8, 40]
+  }
+}
