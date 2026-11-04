@@ -49,6 +49,28 @@ pub struct OutputClockStreamDescriptorV1 {
 }
 
 impl OutputClockStreamDescriptorV1 {
+    fn expected_configuration_digest_sha256(&self) -> String {
+        let canonical = format!(
+            "{OUTPUT_CLOCK_STREAM_DESCRIPTOR_SCHEMA_V1}\\n{}\\n{}\\n{}\\nf32",
+            self.device_identity_sha256,
+            self.sample_rate_hz,
+            self.channel_count
+        );
+        format!("{:x}", Sha256::digest(canonical.as_bytes()))
+    }
+
+    /// Validate schema, identifier digest shapes, and the canonical
+    /// configuration digest without needing access to the original device ID.
+    pub fn is_valid(&self) -> bool {
+        self.schema_version == OUTPUT_CLOCK_STREAM_DESCRIPTOR_SCHEMA_V1
+            && self.sample_rate_hz > 0
+            && self.channel_count > 0
+            && is_lower_hex_digest(&self.device_identity_sha256)
+            && is_lower_hex_digest(&self.configuration_digest_sha256)
+            && self.configuration_digest_sha256
+                == self.expected_configuration_digest_sha256()
+    }
+
     /// Build a stable, privacy-preserving stream descriptor from CPAL's
     /// stable device ID and the negotiated output configuration.
     pub fn from_cpal_device_id(
@@ -63,12 +85,12 @@ impl OutputClockStreamDescriptorV1 {
         let device_identity_sha256 =
             format!("{:x}", Sha256::digest(device_id.as_bytes()));
         let canonical = format!(
-            "{OUTPUT_CLOCK_STREAM_DESCRIPTOR_SCHEMA_V1}\\n{device_identity_sha256}\\n{sample_rate_hz}\\n{channel_count}\\nf32"
+            "{OUTPUT_CLOCK_STREAM_DESCRIPTOR_SCHEMA_V1}\n{device_identity_sha256}\n{sample_rate_hz}\n{channel_count}\nf32"
         );
         let configuration_digest_sha256 =
             format!("{:x}", Sha256::digest(canonical.as_bytes()));
 
-        Some(Self {
+        let descriptor = Self {
             schema_version: OUTPUT_CLOCK_STREAM_DESCRIPTOR_SCHEMA_V1.to_owned(),
             stream_instance_id,
             device_identity_sha256,
@@ -76,7 +98,8 @@ impl OutputClockStreamDescriptorV1 {
             channel_count,
             sample_format: OutputClockSampleFormatV1::F32,
             configuration_digest_sha256,
-        })
+        };
+        Some(descriptor)
     }
 }
 
@@ -660,6 +683,11 @@ mod tests {
                 "{} stream sample format",
                 fixture.fixture_id
             );
+            assert!(
+                fixture.stream_descriptor.is_valid(),
+                "{} stream descriptor digest",
+                fixture.fixture_id
+            );
 
             let result = fit_output_clock_v1(&fixture.anchors, policy());
             match fixture.expected_disposition.as_str() {
@@ -699,6 +727,10 @@ mod tests {
         assert_eq!(descriptor.channel_count, 2);
         assert_eq!(descriptor.sample_format, OutputClockSampleFormatV1::F32);
         assert_eq!(descriptor.configuration_digest_sha256.len(), 64);
+        assert!(descriptor.is_valid());
+        let mut tampered = descriptor.clone();
+        tampered.channel_count = 1;
+        assert!(!tampered.is_valid());
     }
 
     #[test]
