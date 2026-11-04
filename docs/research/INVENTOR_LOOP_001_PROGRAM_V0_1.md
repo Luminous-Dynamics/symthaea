@@ -135,11 +135,11 @@ The task is not a real bridge design and cannot be used for people, buildings, p
 
 Use existing external benchmarks as *separate diagnostic instruments*, not one blended leaderboard:
 
-- **Physical-Engineering's Last Exam (PLE):** long-horizon, multi-file professional engineering deliverables and hard constraints. Mercor's live leaderboard reports 48.3% on its 56-task hidden set; the PLE paper abstract separately reports a 50.6% strongest configuration. These are distinct published evaluation summaries and must not be treated as interchangeable. Mercor reports that only 41% of designs cleared every hard check in its reported analysis. These scores are comparable only under the exact official evaluator conditions.
+- **Physical-Engineering's Last Exam (PLE):** long-horizon, multi-file professional engineering deliverables and hard constraints. Mercor's live leaderboard reports 48.3% on its 56-task hidden set; the PLE paper abstract separately reports a 50.6% strongest configuration. These are distinct published evaluation summaries and must not be treated as interchangeable. Mercor reports that only 41% of designs cleared every hard check in its reported analysis. The leading run averages about 27 million tokens and 63 minutes per task, making cost and latency essential comparison dimensions. These scores are comparable only under the exact official evaluator conditions.
 - **EngiBench:** foundational retrieval, contextual reasoning and open-ended modelling; its authors report declining performance under increased complexity and perturbation.
-- **EngDesign:** simulation-graded multi-domain engineering design.
+- **EngDesign:** 101 structured tasks across nine domains, with 473 gradable items. Its public historical leaderboard reports o3 at 34.38% average pass rate; iterative refinement approached 60% after ten attempts on that older evaluation. Treat this as a historical benchmark result, not a current frontier-model baseline.
 - **CADGenBench:** valid STEP/BREP generation and editing, with validity, shape, interface and topology metrics.
-- **CADBench:** multimodal CAD programme reconstruction from image/mesh observations, with geometry, executability and compactness metrics. It is distinct from CADGenBench.
+- **CADBench:** 18,000 samples over six benchmark families and five input modalities, with geometric-fidelity, executability and program-compactness measures. Its paper reports that specialized mesh-to-CAD systems can outperform general VLMs under ideal inputs, while modality shift and geometric complexity still cause brittleness. It is distinct from CADGenBench.
 - **REA/SRE-Bench:** authorized reverse-engineering comparisons; use the existing REA owner rather than cloning private test assets.
 
 ### Evaluation axes
@@ -186,7 +186,7 @@ We should not attempt to replace mature CAD or solver companies with an immature
 
 - **Autodesk Fusion** already offers AI-assisted AutoTimeline reconstruction of editable design history from imported models, plus System Modeler workflow automation. The October 2026 release reports reconstruction of extrudes, revolves, chamfers, fillets, holes and basic sweeps. The correct Luminous strategy is interoperability and an evidence/learning loop around specialist CAD, not competing on feature-history reconstruction alone.
 - **NVIDIA PhysicsNeMo** is an open-source physics-ML stack for neural operators, GNNs, transformers and physics-informed learning. Use qualified models as acceleration/surrogate candidates, with Symtropy or independent solvers and physical data retaining the verification role.
-- **Commercial CAE platforms** offer powerful solvers and cloud execution. The distinctive opportunity is connecting requirements, multiple solvers, uncertainty, experiments, measured outcomes, learning and public provenance without tying the entire workflow to one vendor.
+- **Commercial CAE platforms** offer powerful solvers and cloud execution. The distinctive opportunity is connecting requirements, multiple solvers, uncertainty, experiments, measured outcomes, learning and public provenance without tying the entire workflow to one vendor. PhysicsNeMo is a capable open physics-ML stack for neural operators, GNNs, transformers and PINNs; treat its learned models as optional, versioned surrogate candidates, not replacements for qualified solvers or a validation authority.
 - SimScale's 2026 survey of 350 senior engineering leaders reports agent use in 19% of simulation/CAE workflows and 11% of CAD workflows; the survey is vendor-produced and self-reported, not a controlled performance benchmark. It suggests adoption is still early, but it does not prove any specific technical gap.
 
 Our differentiation should be **decision quality per independently accepted artifact**, with a human who learns, and an evidence record that an external reviewer can inspect.
@@ -198,7 +198,7 @@ Two 2026 syntheses provide useful starting evidence:
 - A preregistered meta-analysis of 22 GenAI-in-mathematics studies (46 samples, N=5,232) reported an average effect of g=0.534. Effects varied with how GenAI was integrated into instruction.
 - A 34-study meta-analysis of physically embodied educational robots (N=3,665) found r=0.31 overall; effects were stronger when robots played active collaborative/teaching roles, programmable kits were used and programmes lasted more than four weeks.
 
-These results support testing a sustained, active, scaffolded learning design. They do not establish the efficacy of Praxis; that requires its own controlled evaluation.
+These results support testing a sustained, active, scaffolded learning design, but do not establish the efficacy of Praxis. A crucial counterpoint is the October 2026 randomized university trial (2,379 undergraduates, 30 instructors) in which course-integrated tutor access reduced final grades by 0.37 SD and LMS participation by 0.90 SD in the studied setting. That study is not universal evidence against AI tutoring; it shows why support displacement, independent effort, accessibility, subgroup effects and delayed transfer must be measured as first-class outcomes. Praxis #5461 owns the non-harm protocol. Source: [Liu et al., IZA Discussion Paper 18989](https://iza.org/publications/dp/18989/the-effects-of-course-integrated-ai-tutoring-on-student-performance-and-engagement-a-randomized-university-trial).
 
 ## 8. Delivery sequence and gates
 
