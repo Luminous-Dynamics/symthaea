@@ -26,6 +26,7 @@ struct TrustRoot {
     schema_version: String,
     root_key_id: String,
     registry_id: String,
+    minimum_registry_version: u64,
     public_key_der_hex: String,
 }
 
@@ -60,9 +61,14 @@ struct SemanticAttestation {
     attestation_id: String,
     run_id: String,
     task_id: String,
+    repository_remote: String,
     repository_commit: String,
     lean_version: String,
     source_path: String,
+    start_line: u64,
+    start_column: u64,
+    end_line: u64,
+    end_column: u64,
     source_file_sha256: String,
     goal_sha256: String,
     declaration_signature_sha256: String,
@@ -79,78 +85,6 @@ struct SemanticAttestation {
     vacuity_gate_passed: bool,
     signature_algorithm: String,
     signature_hex: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RegistryPayload {
-    schema_version: String,
-    registry_id: String,
-    registry_version: u64,
-    generated_at_unix: u64,
-    authority_key_id: String,
-    keys: Vec<ReviewerKey>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct AttestationPayload {
-    schema_version: String,
-    attestation_id: String,
-    run_id: String,
-    task_id: String,
-    repository_commit: String,
-    lean_version: String,
-    source_path: String,
-    source_file_sha256: String,
-    goal_sha256: String,
-    declaration_signature_sha256: String,
-    source_binding_receipt_sha256: String,
-    source_correspondence_status: String,
-    hypothesis_audit_status: String,
-    vacuity_audit_status: String,
-    reviewer_decision: String,
-    reviewer_id: String,
-    reviewer_key_id: String,
-    issued_at_unix: u64,
-    semantic_log_sha256: String,
-    semantic_gate_passed: bool,
-    vacuity_gate_passed: bool,
-    signature_algorithm: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct VerificationReport {
-    schema_version: String,
-    receipt_sha256: String,
-    registry_sha256: String,
-    trust_root_sha256: String,
-    registry_id: String,
-    registry_version: u64,
-    root_key_id: String,
-    authority_key_id: String,
-    reviewer_id: String,
-    reviewer_key_id: String,
-    signer_status: String,
-    signer_scopes: Vec<String>,
-    signed_at_unix: u64,
-    registry_payload_sha256: String,
-    attestation_payload_sha256: String,
-    registry_signature_verified: bool,
-    reviewer_signature_verified: bool,
-    semantic_review_approved: bool,
-    openssl_version: String,
-    openssl_binary_sha256: String,
-    authenticated: bool,
-    scoring_admission: bool,
-    trust_boundary: String,
-}
-
-#[derive(Debug, Clone)]
-struct OpenSslEngine {
-    binary: PathBuf,
-    version: String,
-    binary_sha256: String,
 }
 
 fn sha256(bytes: &[u8]) -> String {
@@ -195,6 +129,9 @@ fn encode_hex(bytes: &[u8]) -> String {
 }
 
 fn validate_ed25519_public_der(value: &str, label: &str) -> Result<Vec<u8>, String> {
+    if !valid_hex(value, 88) {
+        return Err(format!("{label} must be 88 lowercase hexadecimal characters"));
+    }
     let bytes = decode_hex(value, label)?;
     // RFC 8410 SubjectPublicKeyInfo prefix for an Ed25519 public key.
     const PREFIX: &[u8] = &[
@@ -259,24 +196,29 @@ fn attestation_payload(receipt: &SemanticAttestation) -> Result<Vec<u8>, String>
     append_text(&mut out, 2, &receipt.attestation_id)?;
     append_text(&mut out, 3, &receipt.run_id)?;
     append_text(&mut out, 4, &receipt.task_id)?;
-    append_text(&mut out, 5, &receipt.repository_commit)?;
-    append_text(&mut out, 6, &receipt.lean_version)?;
-    append_text(&mut out, 7, &receipt.source_path)?;
-    append_text(&mut out, 8, &receipt.source_file_sha256)?;
-    append_text(&mut out, 9, &receipt.goal_sha256)?;
-    append_text(&mut out, 10, &receipt.declaration_signature_sha256)?;
-    append_text(&mut out, 11, &receipt.source_binding_receipt_sha256)?;
-    append_text(&mut out, 12, &receipt.source_correspondence_status)?;
-    append_text(&mut out, 13, &receipt.hypothesis_audit_status)?;
-    append_text(&mut out, 14, &receipt.vacuity_audit_status)?;
-    append_text(&mut out, 15, &receipt.reviewer_decision)?;
-    append_text(&mut out, 16, &receipt.reviewer_id)?;
-    append_text(&mut out, 17, &receipt.reviewer_key_id)?;
-    append_u64(&mut out, 18, receipt.issued_at_unix)?;
-    append_text(&mut out, 19, &receipt.semantic_log_sha256)?;
-    append_bool(&mut out, 20, receipt.semantic_gate_passed)?;
-    append_bool(&mut out, 21, receipt.vacuity_gate_passed)?;
-    append_text(&mut out, 22, &receipt.signature_algorithm)?;
+    append_text(&mut out, 5, &receipt.repository_remote)?;
+    append_text(&mut out, 6, &receipt.repository_commit)?;
+    append_text(&mut out, 7, &receipt.lean_version)?;
+    append_text(&mut out, 8, &receipt.source_path)?;
+    append_u64(&mut out, 9, receipt.start_line)?;
+    append_u64(&mut out, 10, receipt.start_column)?;
+    append_u64(&mut out, 11, receipt.end_line)?;
+    append_u64(&mut out, 12, receipt.end_column)?;
+    append_text(&mut out, 13, &receipt.source_file_sha256)?;
+    append_text(&mut out, 14, &receipt.goal_sha256)?;
+    append_text(&mut out, 15, &receipt.declaration_signature_sha256)?;
+    append_text(&mut out, 16, &receipt.source_binding_receipt_sha256)?;
+    append_text(&mut out, 17, &receipt.source_correspondence_status)?;
+    append_text(&mut out, 18, &receipt.hypothesis_audit_status)?;
+    append_text(&mut out, 19, &receipt.vacuity_audit_status)?;
+    append_text(&mut out, 20, &receipt.reviewer_decision)?;
+    append_text(&mut out, 21, &receipt.reviewer_id)?;
+    append_text(&mut out, 22, &receipt.reviewer_key_id)?;
+    append_u64(&mut out, 23, receipt.issued_at_unix)?;
+    append_text(&mut out, 24, &receipt.semantic_log_sha256)?;
+    append_bool(&mut out, 25, receipt.semantic_gate_passed)?;
+    append_bool(&mut out, 26, receipt.vacuity_gate_passed)?;
+    append_text(&mut out, 27, &receipt.signature_algorithm)?;
     Ok(out)
 }
 
@@ -393,6 +335,9 @@ fn validate_root(root: &TrustRoot) -> Result<Vec<u8>, String> {
     if root.schema_version != ROOT_SCHEMA {
         return Err("unsupported trust-root schema".into());
     }
+    if root.minimum_registry_version == 0 {
+        return Err("trust-root minimum_registry_version must be positive".into());
+    }
     non_empty(&root.root_key_id, "trust root key_id")?;
     non_empty(&root.registry_id, "trust root registry_id")?;
     validate_ed25519_public_der(&root.public_key_der_hex, "trust root public key")
@@ -416,6 +361,12 @@ fn validate_registry(
     non_empty(&registry.registry_id, "registry_id")?;
     if registry.registry_version == 0 || registry.generated_at_unix == 0 {
         return Err("registry version and generated_at_unix must be positive".into());
+    }
+    if registry.registry_version < root.minimum_registry_version {
+        return Err(format!(
+            "reviewer registry version {} is below trust-root minimum {}",
+            registry.registry_version, root.minimum_registry_version
+        ));
     }
     if registry.keys.is_empty() {
         return Err("reviewer registry cannot be empty".into());
@@ -445,6 +396,9 @@ fn validate_registry(
     }
     let payload = registry_signing_payload(registry)?;
     let payload_sha256 = sha256(&payload);
+    if !valid_hex(&registry.signature_hex, 128) {
+        return Err("registry signature must be 128 lowercase hexadecimal characters".into());
+    }
     let signature = decode_hex(&registry.signature_hex, "registry signature")?;
     verify_ed25519(engine, root_public_der, &payload, &signature)
         .map_err(|e| format!("reviewer registry signature invalid: {e}"))?;
@@ -499,6 +453,9 @@ fn validate_attestation(receipt: &SemanticAttestation) -> Result<(), String> {
     if receipt.signature_algorithm != "Ed25519" {
         return Err("semantic attestation signature_algorithm must be Ed25519".into());
     }
+    if !valid_hex(&receipt.signature_hex, 128) {
+        return Err("reviewer signature must be 128 lowercase hexadecimal characters".into());
+    }
     if receipt.reviewer_decision == "pass"
         && (!receipt.semantic_gate_passed
             || !receipt.vacuity_gate_passed
@@ -519,10 +476,34 @@ fn verify_all(
     receipt_bytes: &[u8],
     registry_bytes: &[u8],
     root_bytes: &[u8],
+    expected_root_sha256: &str,
+    expected_registry_sha256: &str,
+    expected_openssl_sha256: &str,
 ) -> Result<VerificationReport, String> {
     validate_attestation(receipt)?;
+    for (label, value) in [
+        ("expected trust-root SHA-256", expected_root_sha256),
+        ("expected reviewer-registry SHA-256", expected_registry_sha256),
+        ("expected OpenSSL-binary SHA-256", expected_openssl_sha256),
+    ] {
+        if !valid_hex(value, 64) {
+            return Err(format!("{label} must be 64 lowercase hexadecimal characters"));
+        }
+    }
+    if sha256(root_bytes) != expected_root_sha256 {
+        return Err("trusted reviewer root SHA-256 differs from the out-of-band pin".into());
+    }
+    if sha256(registry_bytes) != expected_registry_sha256 {
+        return Err("reviewer registry SHA-256 differs from the out-of-band pin".into());
+    }
+    if engine.binary_sha256 != expected_openssl_sha256 {
+        return Err("OpenSSL binary SHA-256 differs from the out-of-band pin".into());
+    }
     let root_public_der = validate_root(root)?;
     let (registry_payload_sha256, _) = validate_registry(registry, root, &root_public_der, engine)?;
+    if registry.generated_at_unix > receipt.issued_at_unix {
+        return Err("attestation predates the reviewer registry that claims to authorize it".into());
+    }
     let key = registry.keys.iter().find(|key| key.key_id == receipt.reviewer_key_id)
         .ok_or_else(|| format!("reviewer key {} is not present in the signed registry", receipt.reviewer_key_id))?;
     if key.reviewer_id != receipt.reviewer_id {
@@ -569,6 +550,7 @@ fn verify_all(
             && receipt.vacuity_gate_passed,
         openssl_version: engine.version.clone(),
         openssl_binary_sha256: engine.binary_sha256.clone(),
+        minimum_registry_version: root.minimum_registry_version,
         authenticated: true,
         scoring_admission: false,
         trust_boundary: "Both the reviewer registry and semantic-gate attestation are Ed25519-verified. The trust-root JSON is an out-of-band public-key pin and its SHA-256 must be independently pinned by the benchmark or deployment policy. Authentication does not establish the truth of the review, kernel correctness, source fidelity, or proof admissibility.".into(),
@@ -675,9 +657,14 @@ fn synthetic_receipt() -> SemanticAttestation {
         attestation_id: "synthetic-attestation-001".into(),
         run_id: "sorrydb-run-001".into(),
         task_id: "a".repeat(64),
+        repository_remote: "https://github.com/AlexKontorovich/PrimeNumberTheoremAnd".into(),
         repository_commit: "b".repeat(40),
         lean_version: "v4.26.0".into(),
         source_path: "PrimeNumberTheoremAnd/FioriKadiriSwidinsky.lean".into(),
+        start_line: 44,
+        start_column: 137,
+        end_line: 44,
+        end_column: 142,
         source_file_sha256: sha256(b"source file"),
         goal_sha256: sha256(b"exact target goal"),
         declaration_signature_sha256: sha256(b"target signature"),
@@ -707,6 +694,7 @@ fn create_synthetic_attestation_bundle(root: &Path) -> Result<VerificationReport
             schema_version: ROOT_SCHEMA.into(),
             root_key_id: "pitb-test-root-001".into(),
             registry_id: "pitb.synthetic-reviewer-registry".into(),
+            minimum_registry_version: 1,
             public_key_der_hex: root_public_hex,
         };
         let reviewer_key = ReviewerKey {
@@ -763,13 +751,17 @@ fn create_synthetic_attestation_bundle(root: &Path) -> Result<VerificationReport
         let mut revoked_registry = registry.clone();
         revoked_registry.keys[0].status = "revoked".into();
         sign_registry(&mut revoked_registry, &engine, &root_private, &signer_dir)?;
-        if verify_all(&receipt, &revoked_registry, &trust_root, &engine, &receipt_bytes, &serde_json::to_vec(&revoked_registry).unwrap(), &root_bytes).is_ok() {
+        let revoked_registry_bytes = serde_json::to_vec(&revoked_registry).unwrap();
+        if verify_all(&receipt, &revoked_registry, &trust_root, &engine, &receipt_bytes, &revoked_registry_bytes, &root_bytes,
+            &sha256(&root_bytes), &sha256(&revoked_registry_bytes), &engine.binary_sha256).is_ok() {
             return Err("revoked reviewer key was accepted".into());
         }
 
         let (_, wrong_root_public_hex) = generate_test_key(&engine, &signer_dir, "wrong-root")?;
         let wrong_root = TrustRoot { public_key_der_hex: wrong_root_public_hex, ..trust_root.clone() };
-        if verify_all(&receipt, &registry, &wrong_root, &engine, &receipt_bytes, &registry_bytes, &serde_json::to_vec(&wrong_root).unwrap()).is_ok() {
+        let wrong_root_bytes = serde_json::to_vec(&wrong_root).unwrap();
+        if verify_all(&receipt, &registry, &wrong_root, &engine, &receipt_bytes, &registry_bytes, &wrong_root_bytes,
+            &sha256(&wrong_root_bytes), &sha256(&registry_bytes), &engine.binary_sha256).is_ok() {
             return Err("registry signed by another root was accepted".into());
         }
         Ok(report)
@@ -800,9 +792,12 @@ fn execute() -> Result<(), String> {
         println!("PITB_SIGNED_SEMANTIC_ATTESTATION_SYNTHETIC_REPORT_OK");
         return Ok(());
     }
-    if args.len() != 6 || args[1] != "--verify" {
+    if args.len() != 12 || args[1] != "--verify"
+        || args[6] != "--expected-trust-root-sha256"
+        || args[8] != "--expected-registry-sha256"
+        || args[10] != "--expected-openssl-sha256" {
         return Err(format!(
-            "usage: {} --verify <attestation.json> <reviewer-registry.json> <trusted-root.json> <report.json> OR --self-test OR --self-test-report <report.json> <bundle-dir>",
+            "usage: {} --verify <attestation.json> <reviewer-registry.json> <trusted-root.json> <report.json> --expected-trust-root-sha256 <sha256> --expected-registry-sha256 <sha256> --expected-openssl-sha256 <sha256> OR --self-test OR --self-test-report <report.json> <bundle-dir>",
             args.first().map(String::as_str).unwrap_or("pitb-signed-semantic-attestation")
         ));
     }
@@ -816,7 +811,10 @@ fn execute() -> Result<(), String> {
     let root: TrustRoot = serde_json::from_slice(&root_bytes)
         .map_err(|e| format!("parse trusted reviewer root: {e}"))?;
     let engine = openssl_engine()?;
-    let report = verify_all(&receipt, &registry, &root, &engine, &receipt_bytes, &registry_bytes, &root_bytes)?;
+    let report = verify_all(
+        &receipt, &registry, &root, &engine, &receipt_bytes, &registry_bytes, &root_bytes,
+        &args[7], &args[9], &args[11],
+    )?;
     fs::write(&args[5], serde_json::to_vec_pretty(&report).map_err(|e| e.to_string())?)
         .map_err(|e| format!("write signature verification report: {e}"))?;
     println!("PITB_SIGNED_SEMANTIC_ATTESTATION_OK");
