@@ -2182,6 +2182,36 @@ mod tests {
     }
 
     #[test]
+    fn concurrent_content_verification_uses_independent_file_cursors() {
+        let payload = vec![0x5au8; 2 * 1024 * 1024];
+        let path = write_temp(&single_entry(b"concurrent.bin", &payload));
+        let reader = std::sync::Arc::new(
+            ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap(),
+        );
+        let workers: Vec<_> = (0..8)
+            .map(|_| {
+                let reader = std::sync::Arc::clone(&reader);
+                std::thread::spawn(move || {
+                    reader
+                        .verify_entry_content(0, ContentVerificationLimits::default())
+                        .unwrap()
+                })
+            })
+            .collect();
+        let results: Vec<_> = workers
+            .into_iter()
+            .map(|worker| worker.join().unwrap())
+            .collect();
+
+        assert_eq!(results.len(), 8);
+        assert!(results.windows(2).all(|pair| pair[0].sha256 == pair[1].sha256));
+        assert!(results.iter().all(|result| {
+            result.observed_uncompressed_bytes == 2 * 1024 * 1024 && result.verified_crc32
+        }));
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn verifies_empty_stored_member() {
         let path = write_temp(&single_entry(b"empty.bin", b""));
         let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
