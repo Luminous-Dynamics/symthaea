@@ -562,7 +562,7 @@ pub mod linux_powercap {
         #[test]
         fn availability_rejects_zero_range_and_counter_outside_range() {
             let zone = TestZone::new(10_000, 1_000_000);
-            let mut meter = LinuxPowercapMeter::open(
+            let meter = LinuxPowercapMeter::open(
                 "intel-rapl:0",
                 "package-0",
                 EnergyScope::CpuPackage { package_id: 0 },
