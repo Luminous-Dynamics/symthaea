@@ -182,3 +182,14 @@ For Mycelix, the relevant architecture is consentful, federated discovery rather
 - No simulation output or benchmark score is claimed in this document.
 - Exact-head cargo check and cargo test are required before treating the module as executable evidence.
 - No head-to-head paper reproduction or state-of-the-art superiority result is claimed.
+
+
+## 10. Bounded program-grid search and small-sample uncertainty
+
+The companion binary `src/bin/adaptive_program_grid_search.rs` evaluates 108 bounded `TransmissionProgram` candidates. It selects on Layered + Branching training task families (16 seeds per family), re-ranks the top eight on a disjoint validation seed range (12 seeds per family), and evaluates the selected program only once on the held-out Convergent task family (64 seeds). The same master seed is used for the selected program and each baseline within a held-out comparison.
+
+The program-grid runner reports conservative two-sided 95% Student-t intervals, not a fixed 1.96 normal interval. Its critical-value lookup rounds upward within degrees-of-freedom buckets, so it does not understate the t multiplier for the declared sample sizes. In particular, validation has 24 observations (two task families × 12 seeds), training has 32, and held-out test has 64 per candidate/baseline. The broader 378-condition adaptive-transmission mechanism sweep above remains a separate analysis and continues to report a normal-approximation interval over its 128 seeds.
+
+The reported paired delta is computed per seed as selected-program coverage minus baseline coverage. It is a paired-seed difference under shared graph/discovery/schedule/acquisition stream conventions, not an exact per-action random-number match: endogenous task inventories and action lists may differ between policies. A future stronger design should key individual discovery draws by (master seed, step, agent ID, recipe ID) and acquisition draws by (master seed, step, sender, receiver, message slot), then publish the pairing contract and test it independently.
+
+These confidence intervals are descriptive simulation-replicate intervals, not uncertainty intervals for human outcomes. Because the top-eight validation selection is data-dependent, the held-out test is the only stage that can support a generalization claim. Do not promote a candidate based on its training/validation interval alone.
