@@ -385,6 +385,11 @@ fn validate_receipt(receipt: &Receipt, index: usize) -> Result<(), String> {
         return Err(format!("{label} candidate pool count differs from node IDs"));
     }
     sorted_unique(&receipt.candidate_pool.candidate_node_ids, &format!("{label}.candidate_pool.candidate_node_ids"))?;
+    let candidate_ids: BTreeSet<String> = receipt.candidate_pool.candidate_node_ids.iter().cloned().collect();
+    let candidate_id_bytes = serde_json::to_vec(&candidate_ids).map_err(|e| format!("serialize candidate node ID set: {e}"))?;
+    if sha256(&candidate_id_bytes) != receipt.candidate_pool.node_id_set_sha256 {
+        return Err(format!("{label} candidate node-set digest does not match exact candidate IDs"));
+    }
     if receipt.candidate_pool.requested_top_k == 0
         || receipt.candidate_pool.requested_top_k > receipt.candidate_pool.candidate_count
         || receipt.ranking.candidates.len() > receipt.candidate_pool.requested_top_k
@@ -393,6 +398,7 @@ fn validate_receipt(receipt: &Receipt, index: usize) -> Result<(), String> {
     }
     let candidate_set: BTreeSet<&str> = receipt.candidate_pool.candidate_node_ids.iter().map(String::as_str).collect();
     let mut seen = BTreeSet::new();
+    let mut previous_score: Option<f64> = None;
     for (position, candidate) in receipt.ranking.candidates.iter().enumerate() {
         if candidate.rank != position + 1 {
             return Err(format!("{label} ranks must be contiguous and 1-based"));
@@ -401,6 +407,23 @@ fn validate_receipt(receipt: &Receipt, index: usize) -> Result<(), String> {
             return Err(format!("{label} contains duplicate or out-of-pool ranked candidate"));
         }
         digest(&candidate.evidence_artifact_sha256, &format!("{label}.candidate[{}].evidence", position + 1))?;
+        match (receipt.ranking.score_metric.as_str(), receipt.ranking.score_direction.as_str(), candidate.score) {
+            ("rank_only", "rank_only", None) => {}
+            ("rank_only", _, _) => return Err(format!("{label} rank_only score semantics are inconsistent")),
+            (_, "higher_better", Some(score)) if score.is_finite() => {
+                if previous_score.is_some_and(|previous| previous < score) {
+                    return Err(format!("{label} scores contradict higher_better ordering"));
+                }
+                previous_score = Some(score);
+            }
+            (_, "lower_better", Some(score)) if score.is_finite() => {
+                if previous_score.is_some_and(|previous| previous > score) {
+                    return Err(format!("{label} scores contradict lower_better ordering"));
+                }
+                previous_score = Some(score);
+            }
+            _ => return Err(format!("{label} has unsupported score/direction combination")),
+        }
     }
     Ok(())
 }
@@ -626,6 +649,10 @@ fn summarize(assessments: &[RouteAssessment]) -> Vec<ComparisonSummary> {
         let mean_route = rows.iter().map(|row| row.minimal_route_coverage_at_returned_k).sum::<f64>() / rows.len() as f64;
         let useful_values: Vec<f64> = rows.iter().filter_map(|row| row.useful_novel_premise_rate).collect();
         let necessary_values: Vec<f64> = rows.iter().filter_map(|row| row.necessary_declaration_recall).collect();
+        let mut unique_receipts = BTreeMap::<String, &RouteAssessment>::new();
+        for row in &rows {
+            unique_receipts.entry(row.receipt_sha256.clone()).or_insert(row);
+        }
         ComparisonSummary {
             retriever_kind: kind,
             retriever_name: name,
@@ -637,9 +664,9 @@ fn summarize(assessments: &[RouteAssessment]) -> Vec<ComparisonSummary> {
             mean_minimal_route_coverage: mean_route,
             mean_useful_novel_premise_rate: if useful_values.is_empty() { None } else { Some(useful_values.iter().sum::<f64>() / useful_values.len() as f64) },
             mean_necessary_declaration_recall: if necessary_values.is_empty() { None } else { Some(necessary_values.iter().sum::<f64>() / necessary_values.len() as f64) },
-            total_cost_microusd: rows.iter().map(|x| x.cost_microusd).sum(),
-            total_retrieval_wall_ms: rows.iter().map(|x| x.retrieval_wall_ms).sum(),
-            total_tokens: rows.iter().map(|x| x.tokens).sum(),
+            total_cost_microusd: unique_receipts.values().map(|x| x.cost_microusd).sum(),
+            total_retrieval_wall_ms: unique_receipts.values().map(|x| x.retrieval_wall_ms).sum(),
+            total_tokens: unique_receipts.values().map(|x| x.tokens).sum(),
         }
     }).collect()
 }
@@ -695,6 +722,7 @@ fn analyze(
             receipt.benchmark.split_id,
             receipt.retriever.kind,
             receipt.retriever.name,
+            receipt.retriever.version,
             receipt.query.query_id
         );
         if !seen_runs.insert(run_key.clone()) {
