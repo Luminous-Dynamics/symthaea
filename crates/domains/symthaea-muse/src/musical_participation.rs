@@ -638,6 +638,32 @@ pub fn score_musical_participation_set_v1(
 mod tests {
     use super::*;
 
+    #[derive(Deserialize)]
+    struct BaselineSetV1 {
+        schema_version: String,
+        baselines: Vec<BaselineV1>,
+    }
+
+    #[derive(Deserialize)]
+    struct BaselineV1 {
+        baseline_id: String,
+        description: String,
+        predictions_by_family: Vec<Vec<MusicalParticipationPredictionV1>>,
+        expected: BaselineExpectedV1,
+    }
+
+    #[derive(Deserialize)]
+    struct BaselineExpectedV1 {
+        valid_decision_support_count: usize,
+        paired_correct_count: usize,
+        false_entry_count: usize,
+        missed_invitation_count: usize,
+        intentional_wait_count: usize,
+        epistemic_abstain_count: usize,
+        clarification_ask_count: usize,
+        mean_brier_score: f64,
+    }
+
     fn fixture_set() -> MusicalParticipationSetV1 {
         serde_json::from_str(include_str!(
             "../../../../benchmarks/mel/participation/musical-participation-counterfactual-v1.json"
@@ -662,6 +688,77 @@ mod tests {
         let set = fixture_set();
         assert!(validate_musical_participation_set_v1(&set).is_empty());
         assert_eq!(set.families.len(), 4);
+    }
+
+    #[test]
+    fn checked_in_negative_controls_reproduce_frozen_expected_metrics() {
+        let set = fixture_set();
+        let baselines: BaselineSetV1 = serde_json::from_str(include_str!(
+            "../../../../benchmarks/mel/participation/musical-participation-baselines-v1.json"
+        ))
+        .expect("baseline fixture must parse");
+        assert_eq!(
+            baselines.schema_version,
+            "mel-musical-participation-baselines-v1"
+        );
+        assert_eq!(baselines.baselines.len(), 3);
+
+        for baseline in baselines.baselines {
+            assert!(!baseline.baseline_id.trim().is_empty());
+            assert!(!baseline.description.trim().is_empty());
+            let score = score_musical_participation_set_v1(
+                &set,
+                &baseline.predictions_by_family,
+            )
+            .unwrap_or_else(|error| panic!("{}: {error:?}", baseline.baseline_id));
+            assert_eq!(
+                score.valid_decision_support_count,
+                baseline.expected.valid_decision_support_count,
+                "{} support",
+                baseline.baseline_id
+            );
+            assert_eq!(
+                score.paired_correct_count,
+                baseline.expected.paired_correct_count,
+                "{} paired",
+                baseline.baseline_id
+            );
+            assert_eq!(
+                score.false_entry_count,
+                baseline.expected.false_entry_count,
+                "{} false entries",
+                baseline.baseline_id
+            );
+            assert_eq!(
+                score.missed_invitation_count,
+                baseline.expected.missed_invitation_count,
+                "{} missed invitations",
+                baseline.baseline_id
+            );
+            assert_eq!(
+                score.intentional_wait_count,
+                baseline.expected.intentional_wait_count,
+                "{} WAIT",
+                baseline.baseline_id
+            );
+            assert_eq!(
+                score.epistemic_abstain_count,
+                baseline.expected.epistemic_abstain_count,
+                "{} ABSTAIN",
+                baseline.baseline_id
+            );
+            assert_eq!(
+                score.clarification_ask_count,
+                baseline.expected.clarification_ask_count,
+                "{} ASK",
+                baseline.baseline_id
+            );
+            assert!(
+                (score.mean_brier_score - baseline.expected.mean_brier_score).abs() < 1e-9,
+                "{} Brier",
+                baseline.baseline_id
+            );
+        }
     }
 
     #[test]
