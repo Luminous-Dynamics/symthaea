@@ -694,7 +694,7 @@ mod tests {
         assert_eq!(report.minimum_plan_count, 2);
         assert_eq!(report.status, "MINIMUM_COST_DISAMBIGUATION_PLAN");
         assert_eq!(report.minimum_plan_within_budget, Some(true));
-        assert_eq!(report.subset_count_evaluated, 31);
+        assert_eq!(report.subset_count_evaluated, 63);
         assert!(
             report
                 .plans
