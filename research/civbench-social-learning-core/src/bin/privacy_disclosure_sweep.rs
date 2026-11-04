@@ -125,7 +125,7 @@ fn fmt(value: Option<f64>) -> String {
 
 fn main() {
     println!(
-        "task_family,disclosure_mode,replicates,coverage_mean,coverage_ci95_t,max_depth_mean,messages_per_run,attention_uses_per_run,disclosure_field_units_per_run,acquisitions_per_run,redundant_messages_per_run,individual_discoveries_per_run,paired_delta_vs_central_ci95_t"
+        "task_family,disclosure_mode,replicates,coverage_mean,coverage_ci95_t,max_depth_mean,messages_per_run,attention_uses_per_run,disclosure_field_units_per_run,acquisitions_per_run,redundant_messages_per_run,individual_discoveries_per_run,paired_delta_vs_central_mean,paired_delta_vs_central_ci95_t"
     );
 
     for family in TASK_FAMILIES {
@@ -174,21 +174,21 @@ fn main() {
             no_social_stats.observe(&no_social);
         }
 
-        for (name, stats, delta) in [
+        for (name, stats, paired_delta) in [
             ("central_full_inventory", &central_stats, None),
             (
                 "coarse_recipe_readiness",
                 &coarse_stats,
-                coarse_vs_central.ci95_half_width(),
+                Some(&coarse_vs_central),
             ),
             (
                 "no_social_control",
                 &no_social_stats,
-                no_social_vs_central.ci95_half_width(),
+                Some(&no_social_vs_central),
             ),
         ] {
             println!(
-                "{},{},{},{},{},{},{},{},{},{},{},{},{}",
+                "{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
                 family.name(),
                 name,
                 REPLICATES,
@@ -201,18 +201,10 @@ fn main() {
                 fmt(stats.acquisitions.mean()),
                 fmt(stats.redundancies.mean()),
                 fmt(stats.individual_discoveries.mean()),
-                fmt(delta),
+                fmt(paired_delta.and_then(OnlineStats::mean)),
+                fmt(paired_delta.and_then(OnlineStats::ci95_half_width)),
             );
         }
-
-        println!(
-            "# paired_deltas,{},coarse_minus_central_mean={},coarse_minus_central_ci95_t={},no_social_minus_central_mean={},no_social_minus_central_ci95_t={}",
-            family.name(),
-            fmt(coarse_vs_central.mean()),
-            fmt(coarse_vs_central.ci95_half_width()),
-            fmt(no_social_vs_central.mean()),
-            fmt(no_social_vs_central.ci95_half_width()),
-        );
     }
 }
 
