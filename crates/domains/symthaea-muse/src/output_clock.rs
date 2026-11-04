@@ -775,6 +775,24 @@ mod tests {
         assert_eq!(descriptor.sample_format, OutputClockSampleFormatV1::F32);
         assert_eq!(descriptor.configuration_digest_sha256.len(), 64);
         assert!(descriptor.is_valid());
+
+        let known = OutputClockStreamDescriptorV1::from_cpal_device_id(
+            7,
+            "synthetic-device-7",
+            48_000,
+            2,
+        )
+        .unwrap();
+        assert_eq!(
+            known.device_identity_sha256,
+            "91ecf2e58f41c6da44a5a98518827711459b170bf6bf3c62761f3e8ae281e33f"
+        );
+        assert_eq!(
+            known.configuration_digest_sha256,
+            "a18d7bb1d0c087b9502a2d858e4354c724486bc73a8648458054ba03005653aa"
+        );
+        let serialized = serde_json::to_string(&known).unwrap();
+        assert!(!serialized.contains("synthetic-device-7"));
         let mut tampered = descriptor.clone();
         tampered.channel_count = 1;
         assert!(!tampered.is_valid());
