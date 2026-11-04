@@ -317,6 +317,7 @@ fn audit_database(
     let mut locations = BTreeSet::<String>::new();
     let mut tasks_by_repo = BTreeMap::<String, usize>::new();
     let mut tasks_by_lean = BTreeMap::<String, usize>::new();
+    let mut repositories_by_lean = BTreeMap::<String, BTreeSet<String>>::new();
     let mut goal_counts = BTreeMap::<String, usize>::new();
     let mut task_records = BTreeSet::<String>::new();
 
@@ -332,6 +333,10 @@ fn audit_database(
         locations.insert(source_location_identity(task));
         *tasks_by_repo.entry(task.repo.remote.clone()).or_default() += 1;
         *tasks_by_lean.entry(task.repo.lean_version.clone()).or_default() += 1;
+        repositories_by_lean
+            .entry(task.repo.lean_version.clone())
+            .or_default()
+            .insert(task.repo.remote.clone());
         *goal_counts.entry(goal_key(task)).or_default() += 1;
         if !registry.is_empty() && !registry.contains(&task.repo.remote) {
             return Err(format!("{label} task references repository absent from repo registry: {}", task.repo.remote));
@@ -346,7 +351,7 @@ fn audit_database(
         .map(|(version, count)| Distribution {
             key: version.clone(),
             task_count: *count,
-            repository_count: 0,
+            repository_count: repositories_by_lean.get(version).map_or(0, BTreeSet::len),
         })
         .collect();
 
