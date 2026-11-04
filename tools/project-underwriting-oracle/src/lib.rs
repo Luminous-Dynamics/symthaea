@@ -118,6 +118,7 @@ fn claim_has_evidence(
     decision_time: &str,
     permitted_classes: &[&str],
     expected_subject: &str,
+    expected_boundary: &str,
     expected_issuer_role: &str,
     require_valid_at_decision: bool,
 ) -> bool {
