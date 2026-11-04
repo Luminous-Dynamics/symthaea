@@ -15,7 +15,7 @@ The signed equation is:
 
 A positive storage delta means the tank gained water; a negative delta means it lost water. The evaluator checks that four readings share one time window and use distinct stream and boundary identifiers. Each reading must have a qualified calibration state and a calibration-record digest reference before the result can be treated as calibration-qualified.
 
-The input carries a conservative aggregate absolute error bound for the complete residual. This crate does not assume independent errors, calculate covariance, or infer a residual uncertainty from a single meter's uncertainty. The supplied bound must come from the applicable metrology procedure.
+The input carries a conservative aggregate absolute error bound for the complete residual. This crate does not assume independent errors, calculate covariance, or infer a residual uncertainty from a single meter's uncertainty. The supplied bound must come from the applicable metrology procedure. The WCONT-008 fixture's single `meter_uncertainty_l` field has ambiguous scope; its integration test conservatively sums four 5 L per-term bounds to a 20 L residual bound and records that interpretation explicitly.
 
 If zero lies inside the residual interval, the result is ZeroNotExcludedByDeclaredBound, not a physical pass. If it lies outside, the result is ContradictionBeyondDeclaredBound. A topology-audit report reference is separately required; a digest string is not proof that the topology is physically independent or that the report/auditor is trustworthy.
 
