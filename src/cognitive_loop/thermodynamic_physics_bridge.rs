@@ -71,7 +71,7 @@ pub struct ThermodynamicPhysicsBridge {
     pub efficiency_ratio: f64,
 
     // ═══════════════════════════════════════════════════════════════════════
-    // Fluctuation Theorem for Insight
+    // Heuristic insight score
     // ═══════════════════════════════════════════════════════════════════════
     /// Heuristic insight score derived from order/entropy proxies; not a
     /// probability obtained from a fluctuation-theorem path ensemble.
@@ -274,7 +274,8 @@ impl ThermodynamicPhysicsBridge {
         let entropy_decrease = if entropy_production_rate < -0.01 {
             entropy_production_rate.abs()
         } else if order_delta > 0.1 {
-            // Sudden order increase = entropy-decreasing event
+            // Sudden increase in the configured order proxy; this is not
+            // an independently measured entropy decrease.
             order_delta
         } else {
             0.0
@@ -709,7 +710,7 @@ mod tests {
             "expected ESL 5.0, got {}",
             b.epistemic_speed_limit_violation
         );
-        // ESL > 1.0 → beliefs moved too fast
+        // Ratio > 1.0 crosses the configured heuristic threshold.
         assert!(b.epistemic_speed_limit_violation > 1.0);
     }
 
