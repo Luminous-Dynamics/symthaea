@@ -1594,7 +1594,7 @@ mod tests {
             stream_seed(seed, STREAM_SCHEDULE, step),
             stream_seed(seed, STREAM_ACQUISITION, step),
         ];
-        let mut sorted = streams;
+        let mut sorted = streams.to_vec();
         sorted.sort_unstable();
         sorted.dedup();
         assert_eq!(sorted.len(), streams.len());
