@@ -235,15 +235,25 @@ fn parse_utc_instant(value: &str, path: &'static str) -> Result<UtcInstant, Eval
     if !value.ends_with('Z') { return Err(invalid(path, "timestamp must be normalized to UTC and end in Z")); }
     let no_z = &value[..value.len() - 1];
     let (date, time) = no_z.split_once('T').ok_or_else(|| invalid(path, "expected RFC3339 date-time"))?;
-    if date.len() != 10 || date.as_bytes().get(4) != Some(&b'-') || date.as_bytes().get(7) != Some(&b'-') {
-        return Err(invalid(path, "date must use YYYY-MM-DD"));
+    let date_bytes = date.as_bytes();
+    if date_bytes.len() != 10
+        || date_bytes[4] != b'-'
+        || date_bytes[7] != b'-'
+        || !date_bytes.iter().enumerate().all(|(i, b)| matches!(i, 4 | 7) || b.is_ascii_digit())
+    {
+        return Err(invalid(path, "date must use ASCII YYYY-MM-DD"));
     }
     let year = date[0..4].parse::<u16>().map_err(|_| invalid(path, "invalid year"))?;
     let month = date[5..7].parse::<u8>().map_err(|_| invalid(path, "invalid month"))?;
     let day = date[8..10].parse::<u8>().map_err(|_| invalid(path, "invalid day"))?;
     let (clock, fraction) = match time.split_once('.') { Some((c, f)) => (c, Some(f)), None => (time, None) };
-    if clock.len() != 8 || clock.as_bytes().get(2) != Some(&b':') || clock.as_bytes().get(5) != Some(&b':') {
-        return Err(invalid(path, "time must use HH:MM:SS[.fraction]Z"));
+    let clock_bytes = clock.as_bytes();
+    if clock_bytes.len() != 8
+        || clock_bytes[2] != b':'
+        || clock_bytes[5] != b':'
+        || !clock_bytes.iter().enumerate().all(|(i, b)| matches!(i, 2 | 5) || b.is_ascii_digit())
+    {
+        return Err(invalid(path, "time must use ASCII HH:MM:SS[.fraction]Z"));
     }
     let hour = clock[0..2].parse::<u8>().map_err(|_| invalid(path, "invalid hour"))?;
     let minute = clock[3..5].parse::<u8>().map_err(|_| invalid(path, "invalid minute"))?;
@@ -347,8 +357,17 @@ pub fn validate_water_use_qualification(
     if unique_parents.len() != input.stream.blend_parent_ids.len() {
         return Err(invalid("stream.blend_parent_ids", "contains duplicate parent IDs"));
     }
+    if input.stream.blend_parent_ids.iter().any(|id| id.trim().is_empty()) {
+        return Err(invalid("stream.blend_parent_ids", "parent IDs must not be empty"));
+    }
     if input.stream.blend_parent_ids.iter().any(|id| id == &input.stream.stream_id) {
         return Err(invalid("stream.blend_parent_ids", "derived stream cannot be its own parent"));
+    }
+    let upstream_ids: BTreeSet<_> = input.source.upstream_source_ids.iter().collect();
+    if upstream_ids.len() != input.source.upstream_source_ids.len()
+        || input.source.upstream_source_ids.iter().any(|id| id.trim().is_empty() || id == &input.source.source_id)
+    {
+        return Err(invalid("source.upstream_source_ids", "upstream source IDs must be non-empty, unique and not self-referential"));
     }
     match input.stream.stream_kind {
         WaterStreamKind::DerivedBlend if input.stream.blend_parent_ids.len() < 2 =>
@@ -387,6 +406,13 @@ pub fn validate_water_use_qualification(
     }
 
     let decision_time = parse_utc_instant(&input.decision.decided_at, "decision.decided_at")?;
+    if input.evidence_lineage.source_record_ids.is_empty()
+        || input.evidence_lineage.source_record_ids.iter().any(|id| id.trim().is_empty())
+        || input.evidence_lineage.source_record_ids.iter().collect::<BTreeSet<_>>().len()
+            != input.evidence_lineage.source_record_ids.len()
+    {
+        return Err(invalid("evidence_lineage.source_record_ids", "requires non-empty, unique source record IDs"));
+    }
     let mut event_ids = BTreeSet::new();
     let mut parsed_events = Vec::with_capacity(input.event_history.len());
     for event in &input.event_history {
@@ -423,8 +449,14 @@ pub fn validate_water_use_qualification(
     }
 
     if let Some(valid_from) = &input.decision.valid_from {
-        if parse_utc_instant(valid_from, "decision.valid_from")? > decision_time {
+        let valid_from = parse_utc_instant(valid_from, "decision.valid_from")?;
+        if valid_from > decision_time {
             return Err(invalid("decision.valid_from", "must not occur after decision time"));
+        }
+        if let Some(latest_sample) = latest_supporting_sample {
+            if valid_from < latest_sample {
+                return Err(invalid("decision.valid_from", "qualification validity cannot begin before its latest supporting sample"));
+            }
         }
     }
     if let Some(valid_until) = &input.decision.valid_until {
