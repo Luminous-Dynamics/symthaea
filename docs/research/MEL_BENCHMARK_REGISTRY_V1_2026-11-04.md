@@ -1,12 +1,12 @@
 # MEL-BENCH-001 — Reproducible music benchmark registry v1
 
-**Status:** typed Rust profile/run manifest, rights and failure-accounting validator, direct-comparability classifier, two strict JSON schemas, one synthetic profile fixture, a CLI profile-check example and 14 authored Rust tests are committed. No external model run, SOTA reproduction, Rust compilation or CI result is claimed.
+**Status:** typed Rust profile/run manifest, rights and failure-accounting validator, direct-comparability classifier, two strict JSON schemas, one synthetic profile fixture, a CLI profile-check example and 15 authored Rust tests are committed. No external model run, SOTA reproduction, Rust compilation or CI result is claimed.
 
 ## Purpose
 
 Give every Melothaea/Muse benchmark result a reproducible identity and prevent an aggregate leaderboard from concealing incomparable protocols, model versions, rights restrictions, inference budgets or excluded failures.
 
-The module is a **music benchmark registry and adapter contract**. It does not implement evaluator isolation, candidate/oracle separation, signing or replay protection. Those belong to the shared EVAL-ORACLE work (#9437 / #9621). A run manifest references the independent evaluator receipt digest produced by that authority.
+The module is a **music benchmark registry and adapter contract**. The included CLI checks one synthetic profile only; it emits no model or benchmark score. It does not implement evaluator isolation, candidate/oracle separation, signing or replay protection. Those belong to the shared EVAL-ORACLE work (#9437 / #9621). A run manifest references the independent evaluator receipt digest produced by that authority.
 
 ## Profile contract
 
@@ -39,7 +39,7 @@ All attempted items must remain in the denominator. The contract does not permit
 
 ## Direct comparison rule
 
-The registry marks a pair **directly comparable** only when benchmark ID/version, native track, source/split/protocol/scorer digests, metric IDs, comparison scope, inference budget, prompts, adapters, preprocessing, decoding configuration, precision, runner commit, runtime environment and seed all match.
+The registry first validates both run manifests, then marks a pair **directly comparable** only when benchmark ID/version, native track, source/split/protocol/scorer digests, metric IDs, comparison scope, inference budget, prompts, adapters, preprocessing, decoding configuration, precision, runner commit, runtime environment and seed all match.
 
 Otherwise the result is **descriptive only**, with explicit mismatch reasons. Different benchmarks, different tracks, different scorers, different budgets, different prompts, or different preprocessing do not become comparable because their headline metric names look similar. In particular, never pool TAG-Bench mIoU, MusTBench Hit@3s, Arena Elo and a bespoke Melothaea score.
 
