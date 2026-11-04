@@ -600,5 +600,112 @@
       ]
     }
   ],
-  "connectivity_qualification_claim_ceiling": "Challenges are proposed test cases, not findings about the current Hydraloop, JoJo or Moen products. Exact SKU, firmware, network topology and manufacturer-approved test conditions must be frozen. No safety interlock is bypassed."
+  "connectivity_qualification_claim_ceiling": "Challenges are proposed test cases, not findings about the current Hydraloop, JoJo or Moen products. Exact SKU, firmware, network topology and manufacturer-approved test conditions must be frozen. No safety interlock is bypassed.",
+  "proposed_target_ladder": {
+    "status": "proposed_targets_not_results",
+    "frozen_comparator_requirement": "Exact SKU/hardware/firmware, installation topology, source, use class, demand trace, functional unit, pressure boundary, cost basis and test protocol must be frozen before comparative scoring.",
+    "outage_continuity": {
+      "comparator": "Best matched conventional storage tank + pump + automatic switching; municipal-only unbuffered reference is a separate baseline.",
+      "primary_metric": "Interval-valued cumulative qualified-service deficit at actual fixture boundaries.",
+      "targets": [
+        {
+          "id": "OUTAGE-UNBUFFERED-25",
+          "target": "At least 25% more time above declared critical-service floor than an unbuffered municipal-only baseline.",
+          "gate": "Stretch; not a substitute for incumbent comparison."
+        },
+        {
+          "id": "OUTAGE-INCUMBENT-10",
+          "target": "At least 10% lower worst-case cumulative service deficit than strongest matched conventional backup, with no critical floor or safety regression.",
+          "gate": "Primary incumbent-challenger target."
+        }
+      ],
+      "mandatory_dimensions": [
+        "initial reserve",
+        "source pressure",
+        "fixture demand trace",
+        "pressure/flow floor",
+        "pump/control energy",
+        "installation topology",
+        "service recovery",
+        "uncertainty interval"
+      ]
+    },
+    "greywater_substitution": {
+      "comparators": [
+        "Hydraloop exact certified configuration in same scope",
+        "INTEWA AQUALOOP exact certified configuration in same scope",
+        "other matched locally available certified candidate"
+      ],
+      "primary_metric": "Directly metered net mains litres displaced for equal declared non-potable demand, with quality and service hard gates.",
+      "preregister_one_of": [
+        "At least 10% more net mains displacement at equal or lower lifecycle cost and energy per qualified displaced litre.",
+        "Equal net mains displacement with at least 10% lower lifecycle cost per qualified displaced litre."
+      ],
+      "mandatory_dimensions": [
+        "source stream",
+        "incoming load",
+        "qualified output by use",
+        "rejected/purged volume",
+        "storage losses",
+        "metered mains change",
+        "electricity",
+        "consumables",
+        "maintenance time",
+        "installed footprint",
+        "lifecycle cost"
+      ]
+    },
+    "leak_containment": {
+      "comparators": [
+        "Moen Flo exact SKU/firmware",
+        "Phyn exact SKU/firmware",
+        "best matched local-market alternative"
+      ],
+      "targets": [
+        {
+          "id": "LEAK-RECALL-99",
+          "target": "At least 99% recall over preregistered consequential leak classes and declared flow/pressure envelopes."
+        },
+        {
+          "id": "LEAK-FALSE-ISOLATION-299",
+          "target": "Zero autonomous false isolations in at least 299 independent no-leak episodes, approximate one-sided 95% upper bound of 1% under IID assumptions.",
+          "note": "Not a field false-shutoff rate; measure household exposure hours and clustering separately."
+        },
+        {
+          "id": "LEAK-INCUMBENT-10",
+          "target": "At least 10% lower missed-leak volume or 10% shorter detection-to-isolation latency than strongest matched incumbent, without violating false-isolation bound.",
+          "note": "Preregister the primary comparative endpoint."
+        }
+      ],
+      "mandatory_dimensions": [
+        "leak class",
+        "event flow",
+        "pressure",
+        "pipe geometry",
+        "onset profile",
+        "detection latency",
+        "isolation latency",
+        "escaped volume",
+        "service interruption",
+        "manual override",
+        "recovery"
+      ]
+    },
+    "cross_cutting": {
+      "source_to_use_lineage": "100% of credited potable litres bind exact source, stream/batch, treatment state, sample ID/point, delivery boundary, declared use, SANS 241 edition and current risk/monitoring programme revision.",
+      "synthetic_negative_controls": "Zero false potable acceptance in frozen wrong-source, wrong-batch, wrong-outlet, stale-monitoring and non-potable-to-potable negative controls; all valid positive controls accepted.",
+      "independent_false_acceptance": "Stretch target: zero false potable acceptances in at least 299 independent externally adjudicated trials, with clustering correction; synthetic cases do not count.",
+      "offline_operation": "Essential local/manual controls, safe isolation, fault state and local evidence remain available for applicable NET-001…NET-008 failures where local power and physical conditions permit.",
+      "repairability": "At least 20% more independently verified durable repairs per operator-hour than matched baseline, with no increase in recurrence or unsafe work."
+    },
+    "protocol": [
+      "freeze exact comparator and installation configuration",
+      "matched best-operational baseline, not brochure-only comparison",
+      "randomized/counterbalanced order and independent calibrated instrumentation",
+      "blinded adjudication and preregistered criteria",
+      "report raw outcomes, uncertainty and missingness per track",
+      "progress E1 repeatability to E2 lab reproducibility to E3 production/source variation to E4 household validity"
+    ],
+    "claim_rule": "No WaterLoop superiority claim without a named functional unit, exact comparator, matched conditions and independent evidence. No scalar score may compensate for quality, safety or critical-service failure."
+  }
 }
