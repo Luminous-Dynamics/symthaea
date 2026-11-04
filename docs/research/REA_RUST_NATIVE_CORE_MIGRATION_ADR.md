@@ -1027,3 +1027,9 @@ This makes the decoder parse the archive in its native ZIP-relative coordinate s
 
 The prior ZIP64 negative test has been replaced by a positive intended test for ZIP64-with-prefix verification, plus a direct `ArchiveSlice` boundary test. These tests are authored, not yet confirmed passing. The exact-head REA artifact-reader workflow must determine whether this fixes zipcore's ZIP64 locator behavior; if it does not, retain fail-closed behavior and investigate the decoder's locator interpretation rather than reverting to unbounded whole-carrier parsing.
 
+### Fuzz compiler override correction
+
+The first fuzz runner successfully installed the dated nightly action, installed cargo-fuzz 0.13.2, resolved the fuzz lock, verified the seed and wrote the run-context receipt. It then failed before building the target because the root `rust-toolchain.toml` selected stable Rust 1.96.0 for the nested `cargo`/ `rustc` invocations, while cargo-fuzz supplied nightly-only sanitizer/coverage `-Z` flags.
+
+The workflow now explicitly uses `cargo +nightly-2026-11-03 fuzz run` and records `rustc +nightly-2026-11-03 --version --verbose` / `cargo +nightly-2026-11-03 --version` in the receipt. The repo-default stable toolchain remains unchanged for ordinary builds. This is a workflow correction; no fuzz execution was performed by the failed run.
+
