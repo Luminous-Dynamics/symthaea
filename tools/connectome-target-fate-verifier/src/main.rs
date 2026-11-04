@@ -389,7 +389,9 @@ fn verify(
             return Err(format!("{name} world_id disagrees with fate receipt"));
         }
     }
-    if manifest_release_id != fate_release_id || correspondence_mappings.release_id != fate_release_id {
+    if manifest_release_id != fate_release_id
+        || correspondence_mappings.release_id != fate_release_id
+    {
         return Err(
             "target release_id disagrees across fate receipt, manifest and correspondence"
                 .to_owned(),
@@ -402,14 +404,18 @@ fn verify(
                 "alternative set {group_id} must contain at least two mapping rows"
             ));
         }
-        let first = correspondence_mappings.mappings
+        let first = correspondence_mappings
+            .mappings
             .get(&mapping_ids[0])
             .ok_or_else(|| format!("alternative set {group_id}: missing mapping row"))?;
         let mut seen_targets = BTreeSet::new();
         for mapping_id in mapping_ids {
-            let mapping = correspondence_mappings.mappings.get(mapping_id).ok_or_else(|| {
-                format!("alternative set {group_id}: missing mapping {mapping_id}")
-            })?;
+            let mapping = correspondence_mappings
+                .mappings
+                .get(mapping_id)
+                .ok_or_else(|| {
+                    format!("alternative set {group_id}: missing mapping {mapping_id}")
+                })?;
             if mapping.relation_type != first.relation_type
                 || mapping.source_ids != first.source_ids
             {
