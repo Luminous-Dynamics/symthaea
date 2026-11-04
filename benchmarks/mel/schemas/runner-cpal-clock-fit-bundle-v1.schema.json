@@ -70,9 +70,9 @@
         "cpal_stream_descriptor_sha256",
         "runner_ns_per_cpal_ns",
         "reference_runner_time_ns",
-        "reference_cpal_callback_stream_time_ns",
-        "valid_from_cpal_callback_stream_time_ns",
-        "valid_until_cpal_callback_stream_time_ns",
+        "reference_cpal_playback_stream_time_ns",
+        "valid_from_cpal_playback_stream_time_ns",
+        "valid_until_cpal_playback_stream_time_ns",
         "valid_from_runner_time_ns",
         "valid_until_runner_time_ns",
         "maximum_extrapolation_ns",
@@ -122,18 +122,6 @@
         },
         "reference_runner_time_ns": {
           "type": "number"
-        },
-        "reference_cpal_callback_stream_time_ns": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "valid_from_cpal_callback_stream_time_ns": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "valid_until_cpal_callback_stream_time_ns": {
-          "type": "integer",
-          "minimum": 0
         },
         "valid_from_runner_time_ns": {
           "type": "number"
@@ -204,6 +192,18 @@
             "number",
             "null"
           ],
+          "minimum": 0
+        },
+        "reference_cpal_playback_stream_time_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_from_cpal_playback_stream_time_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_until_cpal_playback_stream_time_ns": {
+          "type": "integer",
           "minimum": 0
         }
       }
