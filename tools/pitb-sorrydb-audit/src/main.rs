@@ -590,6 +590,106 @@ fn verify_source_checkout(
     })
 }
 
+fn build_synthetic_checkout_receipt() -> Result<SourceCheckoutReceipt, String> {
+    let root = env::temp_dir().join(format!(
+        "pitb-sorrydb-checkout-self-test-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(root.join("Demo"))
+        .map_err(|e| format!("create synthetic repository: {e}"))?;
+    fs::write(root.join("lean-toolchain"), "v4.27.0\n")
+        .map_err(|e| format!("write synthetic lean-toolchain: {e}"))?;
+    let source = "import Lean\n theorem sample : True := by sorry\n";
+    fs::write(root.join("Demo/Sample.lean"), source)
+        .map_err(|e| format!("write synthetic Lean source: {e}"))?;
+
+    let run = |args: &[&str]| -> Result<(), String> {
+        let output = Command::new("git")
+            .args(args)
+            .current_dir(&root)
+            .output()
+            .map_err(|e| format!("run git {:?}: {e}", args))?;
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(format!(
+                "git {:?} failed: {}",
+                args,
+                String::from_utf8_lossy(&output.stderr).trim()
+            ))
+        }
+    };
+    run(&["init", "-q"])?;
+    run(&["config", "user.name", "PITB test"])?;
+    run(&["config", "user.email", "pitb@example.invalid"])?;
+    run(&[
+        "remote",
+        "add",
+        "origin",
+        "https://github.com/example/lean-demo.git",
+    ])?;
+    run(&["add", "."])?;
+    run(&["commit", "-q", "-m", "sorry fixture"])?;
+
+    let commit = String::from_utf8(git_output(&root, &["rev-parse", "HEAD"])?)
+        .map_err(|e| format!("decode synthetic commit: {e}"))?
+        .trim()
+        .to_owned();
+    let line = source.split('\n').nth(1).ok_or("synthetic Lean source line missing")?;
+    let start_column = line
+        .find("sorry")
+        .ok_or("synthetic sorry token missing")? as u64;
+    let mut record = SorryRecord {
+        id: sha256(b"source-task"),
+        repo: RepoInfo {
+            remote: "https://github.com/example/lean-demo".into(),
+            branch: "main".into(),
+            commit: commit.clone(),
+            lean_version: "v4.27.0".into(),
+        },
+        location: Location {
+            path: "Demo/Sample.lean".into(),
+            start_line: 2,
+            start_column,
+            end_line: 2,
+            end_column: start_column + 5,
+        },
+        debug_info: DebugInfo {
+            goal: "⊢ True".into(),
+            url: String::new(),
+        },
+        metadata: Metadata {
+            blame_email_hash: "0123456789ab".into(),
+            blame_date: "2026-01-01T00:00:00+00:00".into(),
+            inclusion_date: "2026-01-02T00:00:00+00:00".into(),
+        },
+    };
+    record.debug_info.url = format!(
+        "{}/blob/{}/{}#L2",
+        record.repo.remote, record.repo.commit, record.location.path
+    );
+
+    // Dirty the worktree after committing: the verifier must still read HEAD:path.
+    fs::write(root.join("Demo/Sample.lean"), "modified working tree\n")
+        .map_err(|e| format!("dirty synthetic source: {e}"))?;
+    let receipt = verify_source_checkout(&record, &root)?;
+    if !receipt.source_span_verified_as_sorry || receipt.source_span != "sorry" {
+        return Err("committed source span was not verified as sorry".into());
+    }
+    if receipt.scoring_admission {
+        return Err("source-only receipt incorrectly admitted a scored result".into());
+    }
+
+    let mut wrong_commit = record.clone();
+    wrong_commit.repo.commit = "2".repeat(40);
+    if verify_source_checkout(&wrong_commit, &root).is_ok() {
+        return Err("checkout verifier accepted a different repository commit".into());
+    }
+    fs::remove_dir_all(&root).map_err(|e| format!("remove synthetic repository: {e}"))?;
+    Ok(receipt)
+}
+
 fn validate_proof_run(
     run: &ProofRun,
     index: usize,
@@ -900,7 +1000,7 @@ fn audit(
 fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, PathBuf, Option<PathBuf>), String> {
     if args.len() < 7 || args[1] != "--verify" {
         return Err(format!(
-            "usage: {} --verify <full-snapshot.json> <evaluation-split.json> <report.json> [--runs proof-runs.jsonl] --pinned-source SorryDB/SorryDB@74b3b63f8ba890d675f362924b21ac55db410383 | --verify-checkout <sorry-record.json> <repo-root> <receipt.json>",
+            "usage: {} --verify <full-snapshot.json> <evaluation-split.json> <report.json> [--runs proof-runs.jsonl] --pinned-source SorryDB/SorryDB@74b3b63f8ba890d675f362924b21ac55db410383 | --verify-checkout <sorry-record.json> <repo-root> <receipt.json> | --self-test-checkout-report <receipt.json>",
             args.first().map(String::as_str).unwrap_or("pitb-sorrydb-audit")
         ));
     }
@@ -1232,6 +1332,15 @@ fn execute() -> Result<(), String> {
         println!("PITB_SORRYDB_AUDIT_SELF_TEST_PASS");
         return Ok(());
     }
+    if args.len() == 3 && args[1] == "--self-test-checkout-report" {
+        let receipt = build_synthetic_checkout_receipt()?;
+        let bytes = serde_json::to_vec_pretty(&receipt)
+            .map_err(|e| format!("serialize synthetic checkout receipt: {e}"))?;
+        fs::write(&args[2], bytes)
+            .map_err(|e| format!("write synthetic checkout receipt: {e}"))?;
+        println!("PITB_SORRYDB_CHECKOUT_RECEIPT_OK");
+        return Ok(());
+    }
     if (args.len() == 3 || args.len() == 4) && args[1] == "--self-test-report" {
         run_self_tests()?;
         let report = synthetic_report()?;
@@ -1324,74 +1433,11 @@ mod tests {
 
     #[test]
     fn checkout_verification_reads_source_and_toolchain_from_exact_git_commit() {
-        let root = std::env::temp_dir().join(format!(
-            "pitb-sorrydb-checkout-self-test-{}",
-            std::process::id()
-        ));
-        let _ = fs::remove_dir_all(&root);
-        fs::create_dir_all(root.join("Demo")).unwrap();
-        fs::write(root.join("lean-toolchain"), "v4.27.0\n").unwrap();
-        let source = "import Lean\n theorem sample : True := by sorry\n";
-        fs::write(root.join("Demo/Sample.lean"), source).unwrap();
-
-        assert!(Command::new("git").args(["init", "-q"]).current_dir(&root).status().unwrap().success());
-        for (key, value) in [("user.name", "PITB test"), ("user.email", "pitb@example.invalid")] {
-            assert!(Command::new("git").args(["config", key, value]).current_dir(&root).status().unwrap().success());
-        }
-        assert!(Command::new("git").args(["remote", "add", "origin", "https://github.com/example/lean-demo.git"]).current_dir(&root).status().unwrap().success());
-        assert!(Command::new("git").args(["add", "."]).current_dir(&root).status().unwrap().success());
-        assert!(Command::new("git").args(["commit", "-q", "-m", "sorry fixture"]).current_dir(&root).status().unwrap().success());
-
-        let commit = String::from_utf8(git_output(&root, &["rev-parse", "HEAD"]).unwrap()).unwrap().trim().to_owned();
-        let line = source.split('\n').nth(1).unwrap();
-        let start_column = line.find("sorry").unwrap() as u64;
-        let record = SorryRecord {
-            id: sha256(b"source-task"),
-            repo: RepoInfo {
-                remote: "https://github.com/example/lean-demo".into(),
-                branch: "main".into(),
-                commit,
-                lean_version: "v4.27.0".into(),
-            },
-            location: Location {
-                path: "Demo/Sample.lean".into(),
-                start_line: 2,
-                start_column,
-                end_line: 2,
-                end_column: start_column + 5,
-            },
-            debug_info: DebugInfo {
-                goal: "⊢ True".into(),
-                url: format!(
-                    "https://github.com/example/lean-demo/blob/{}/{}/#L2",
-                    "1".repeat(40),
-                    "Demo/Sample.lean"
-                ).replace("Demo/Sample.lean/", "Demo/Sample.lean"),
-            },
-            metadata: Metadata {
-                blame_email_hash: "0123456789ab".into(),
-                blame_date: "2026-01-01T00:00:00+00:00".into(),
-                inclusion_date: "2026-01-02T00:00:00+00:00".into(),
-            },
-        };
-        // Set the source URL to the actual immutable commit after building the task.
-        let mut record = record;
-        record.debug_info.url = format!(
-            "{}/blob/{}/{}#L2",
-            record.repo.remote, record.repo.commit, record.location.path
-        );
-
-        // A dirty worktree must not change which bytes are being audited.
-        fs::write(root.join("Demo/Sample.lean"), "modified working tree\n").unwrap();
-        let receipt = verify_source_checkout(&record, &root).unwrap();
+        let receipt = build_synthetic_checkout_receipt()
+            .expect("committed source should be verified despite a dirty worktree");
         assert!(receipt.source_span_verified_as_sorry);
         assert_eq!(receipt.source_span, "sorry");
         assert!(!receipt.scoring_admission);
-
-        let mut wrong_commit = record.clone();
-        wrong_commit.repo.commit = "2".repeat(40);
-        assert!(verify_source_checkout(&wrong_commit, &root).is_err());
-        fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]
