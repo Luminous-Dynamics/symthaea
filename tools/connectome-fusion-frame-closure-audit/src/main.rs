@@ -214,6 +214,19 @@ fn sorted_unique(values: &[String]) -> bool {
     values.windows(2).all(|pair| pair[0] < pair[1])
 }
 
+fn is_canonical_utc_timestamp(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    const DIGIT_POSITIONS: [usize; 14] = [0, 1, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18];
+    bytes.len() == 20
+        && bytes[4] == b'-'
+        && bytes[7] == b'-'
+        && bytes[10] == b'T'
+        && bytes[13] == b':'
+        && bytes[16] == b':'
+        && bytes[19] == b'Z'
+        && DIGIT_POSITIONS.iter().all(|position| bytes[*position].is_ascii_digit())
+}
+
 fn use_key(input: &Input, event: &Event) -> Result<String, String> {
     let mut releases = event.source_release_ids.clone();
     releases.sort();
@@ -292,7 +305,10 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
     if input.audit_id.trim().is_empty() || input.scope.scope_id.trim().is_empty() {
         errors.push("MISSING_STABLE_AUDIT_OR_SCOPE_ID".to_string());
     }
-    if input.scope.start_at >= input.scope.end_at || !input.scope.start_at.ends_with("Z") || !input.scope.end_at.ends_with("Z") {
+    if !is_canonical_utc_timestamp(&input.scope.start_at)
+        || !is_canonical_utc_timestamp(&input.scope.end_at)
+        || input.scope.start_at >= input.scope.end_at
+    {
         errors.push("INVALID_SCOPE_INTERVAL".to_string());
     }
     if !matches!(input.scope.event_time_basis.as_str(), "EVENT_TIME" | "INGESTION_TIME") {
@@ -404,8 +420,8 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
                 || event.certificate_id.trim().is_empty()
                 || event.evidence_ids.len() < 2
                 || event.source_release_ids.is_empty()
-                || !event.event_at.ends_with("Z")
-                || !event.ingested_at.ends_with("Z")
+                || !is_canonical_utc_timestamp(&event.event_at)
+                || !is_canonical_utc_timestamp(&event.ingested_at)
                 || event.ingested_at < event.event_at
                 || !sorted_unique(&event.source_release_ids)
                 || !sorted_unique(&event.evidence_ids)
