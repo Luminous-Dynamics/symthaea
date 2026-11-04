@@ -48,7 +48,10 @@ pub fn replay_member_claim(path: impl AsRef<Path>, receipt: &Value) -> Result<Re
     let archive_limit = decimal_at(receipt, &["limits", "max_archive_bytes"])?
         .min(HARD_ARCHIVE_LIMIT);
     let archive_size = decimal_at(receipt, &["source", "archive_size_bytes"])?;
-    let (archive_sha, actual_size) = hash_file(path.as_ref(), archive_limit)?;
+    // Keep one opened object for the entire operation. The parser receives a cloned handle
+    // to this same object, not a second path open that could resolve to a replacement file.
+    let mut source = File::open(path.as_ref()).map_err(io_error)?;
+    let (archive_sha, actual_size) = hash_open_file(&mut source, archive_limit)?;
     if actual_size != archive_size {
         return Err(ReplayError::Rejected("archive size differs from receipt".into()));
     }
@@ -56,7 +59,8 @@ pub fn replay_member_claim(path: impl AsRef<Path>, receipt: &Value) -> Result<Re
         return Err(ReplayError::Rejected("archive SHA-256 differs from receipt".into()));
     }
 
-    let mut archive = zip::ZipArchive::new(File::open(path.as_ref()).map_err(io_error)?)
+    let parser_handle = source.try_clone().map_err(io_error)?;
+    let mut archive = zip::ZipArchive::new(parser_handle)
         .map_err(|e| ReplayError::Unsupported(format!("zip-rs cannot parse this layout: {e}")))?;
     if archive.has_duplicate_names() {
         return Err(ReplayError::Unsupported(
@@ -150,7 +154,7 @@ pub fn replay_member_claim(path: impl AsRef<Path>, receipt: &Value) -> Result<Re
         return Err(ReplayError::Rejected("independent payload digest or CRC differs from receipt".into()));
     }
 
-    let (archive_sha_after, size_after) = hash_file(path.as_ref(), archive_limit)?;
+    let (archive_sha_after, size_after) = hash_open_file(&mut source, archive_limit)?;
     if archive_sha_after != archive_sha || size_after != actual_size {
         return Err(ReplayError::Rejected("archive changed during replay".into()));
     }
@@ -164,12 +168,12 @@ pub fn replay_member_claim(path: impl AsRef<Path>, receipt: &Value) -> Result<Re
     })
 }
 
-fn hash_file(path: &Path, limit: u64) -> Result<(String, u64), ReplayError> {
-    let mut file = File::open(path).map_err(io_error)?;
+fn hash_open_file(file: &mut File, limit: u64) -> Result<(String, u64), ReplayError> {
     let length = file.metadata().map_err(io_error)?.len();
     if length > limit {
         return Err(ReplayError::Rejected("archive exceeds byte limit".into()));
     }
+    file.seek(std::io::SeekFrom::Start(0)).map_err(io_error)?;
     let mut sha = Sha256::new();
     let mut buf = [0u8; 64 * 1024];
     let mut total = 0u64;
