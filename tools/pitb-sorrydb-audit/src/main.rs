@@ -264,12 +264,12 @@ fn validate_record(row: &SorryRecord, label: &str) -> Result<(), String> {
     }
     non_empty(&row.debug_info.goal, &format!("{label}.debug_info.goal"))?;
     let expected_url = format!(
-        "{}/blob/{}/{ }#L{}",
+        "{}/blob/{}/{}#L{}",
         row.repo.remote,
         row.repo.commit,
         row.location.path,
         row.location.start_line
-    ).replace("/{ }", "/");
+    );
     if row.debug_info.url != expected_url {
         return Err(format!("{label}.debug_info.url does not match pinned repo/commit/path/line"));
     }
