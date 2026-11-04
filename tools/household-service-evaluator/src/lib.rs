@@ -1,4 +1,6 @@
-#![forbid(unsafe_code)]
+#[forbid(unsafe_code)]
+
+pub mod batch;
 
 //! Deterministic, offline evaluation primitives for verified household services.
 //!
