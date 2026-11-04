@@ -29,17 +29,22 @@ leak detected != leak contained != service safely restored
 |---|---|---|---|
 | Outage continuity | JoJo municipal backup tank + pump | Automatic municipal fill and pressurized household delivery | Must beat or complement a properly installed, matched tank/pump system on measured fixture service, recovery and lifecycle cost |
 | Leak monitoring/containment | Moen Flo | Flow/pressure monitoring, learned usage, leak detection, automatic shutoff | Must not claim novelty for monitoring, leak alerts or shutoff; test false/missed events, isolation burden and offline behavior |
+| Leak monitoring/containment | Phyn Plus | In-line whole-home monitor, daily diagnostic tests, catastrophic-leak shutoff; manufacturer page states Wi-Fi requirement | Treat 0.1 GPM as manufacturer-declared diagnostic capability, not independently measured recall; test offline/local behavior and false isolation |
 | Greywater reuse | Hydraloop H300/H600 | Shower/bath (and model/configuration-specific additional streams) collection/treatment with non-potable reuse outputs | Must compare exact certification class, permitted end use, accepted output, net mains displacement, energy, maintenance and installation |
-| Greywater reuse | Other certified systems, including AQUALOOP listings | Certified treatment configurations with different classes and rated capacities | Only directly compare after exact certification scope and end-use class are matched |
+| Greywater reuse | INTEWA AQUALOOP GW300–GW5400 | NSF/ANSI 350 Class C Laundry & Bathing listings from 79 to 1,427 US gal/day; manufacturer describes prefilter, biological reactor and ultrafiltration | A Class C multifamily/commercial comparator, not a direct substitute for single-family Class R H300; exact installation and end-use scope must match |
 
 Official product/reference sources:
 - JoJo municipal backup: https://www.jojo.co.za/water-storage-solutions/municipal-backup-water-storage-solutions/
 - Moen Flo: https://flo.moen.com/pages/flo-smart-water-monitor
+- Phyn Plus: https://www.belkin.com/p/plus-smart-water-assistant-plus-shutoff/P-PHNSWA01.html
+- AQUALOOP NSF listing: https://info.nsf.org/Certified/Wastewater/Listings.asp?Standard=350
+- AQUALOOP GW300 system manual: https://www.intewa.com/fileadmin/documents/Anleitungen/AL_GW300_System_manuel_Vers.1.3_en.pdf
+- AQUALOOP GW600 project reference: https://www.intewa.com/en/references/greywater-treatment-in-multi-generational-house-hamburg/
 - Hydraloop H300: https://www.hydraloop.com/products/h300
 - NSF/ANSI 350 current listings: https://info.nsf.org/Certified/Wastewater/Listings.asp?Company=C0427542&Standard=350
 - NSF broader listing index (includes AQUALOOP entries): https://info.nsf.org/Certified/Wastewater/Listings.asp?Standard=350
 
-These products establish that automatic backup fill, leak detection/shutoff and residential greywater recycling already exist. They do not establish matched installation performance or South African product availability.
+These products establish that automatic backup fill, leak detection/shutoff and residential greywater recycling already exist. They do not establish matched installation performance or South African product availability. NSF's listing currently includes AQUALOOP Class C Laundry & Bathing models from 79 to 1,427 US gal/day; this provides a larger multifamily/commercial comparison but is not directly interchangeable with a Class R single-family H300 listing. Phyn Plus is another whole-home leak-monitoring/shutoff baseline; its manufacturer page declares 0.1 GPM daily checks and requires Wi-Fi. All such figures remain source claims until independently challenged.
 
 ## 3. Hydraloop H300 claim reconciliation
 
