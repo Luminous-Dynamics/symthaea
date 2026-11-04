@@ -354,24 +354,6 @@ pub fn irr_analysis(cash_flows: &[f64], options: IrrOptions) -> Result<IrrAnalys
     }
 
     let normalized: Vec<f64> = cash_flows.iter().map(|value| value / scale).collect();
-    if normalized
-        .iter()
-        .all(|flow| flow.timestamp_seconds == normalized[0].timestamp_seconds)
-    {
-        let (value, _) = xnpv_and_derivative(0.0, &normalized)?;
-        return Ok(IrrAnalysis {
-            roots: Vec::new(),
-            cash_flow_sign_changes: sign_changes,
-            status: if value.abs() <= options.tolerance {
-                IrrStatus::Indeterminate
-            } else {
-                IrrStatus::NoRoot
-            },
-            search_complete: true,
-            searched_rate_range: (options.min_rate, options.max_rate),
-        });
-    }
-
     let min_log = options.min_rate.ln_1p();
     let max_log = options.max_rate.ln_1p();
     let mut roots = Vec::new();
@@ -786,6 +768,24 @@ pub fn xirr_analysis(cash_flows: &[DatedCashFlow], options: IrrOptions) -> Resul
             amount: flow.amount / scale,
         })
         .collect();
+    if normalized
+        .iter()
+        .all(|flow| flow.timestamp_seconds == normalized[0].timestamp_seconds)
+    {
+        let (value, _) = xnpv_and_derivative(0.0, &normalized)?;
+        return Ok(IrrAnalysis {
+            roots: Vec::new(),
+            cash_flow_sign_changes: sign_changes,
+            status: if value.abs() <= options.tolerance {
+                IrrStatus::Indeterminate
+            } else {
+                IrrStatus::NoRoot
+            },
+            search_complete: true,
+            searched_rate_range: (options.min_rate, options.max_rate),
+        });
+    }
+
     let min_log = options.min_rate.ln_1p();
     let max_log = options.max_rate.ln_1p();
     let mut roots = Vec::new();
