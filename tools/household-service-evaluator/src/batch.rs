@@ -4,6 +4,7 @@ use crate::{
 };
 use serde::Serialize;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
@@ -62,6 +63,29 @@ pub enum BatchDisposition {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum MetricValue {
+    Quantity {
+        value: f64,
+        unit: String,
+        derivation: String,
+    },
+    Boolean {
+        value: bool,
+        interpretation: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SourceArtifact {
+    pub logical_name: String,
+    pub byte_length: usize,
+    pub digest_algorithm: String,
+    pub sha256: String,
+    pub digest_scope: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct BatchReceipt {
     pub domain: ServiceDomain,
     pub scenario_id: String,
@@ -69,7 +93,7 @@ pub struct BatchReceipt {
     pub fixture_expected_disposition: String,
     pub disposition: BatchDisposition,
     /// Deterministic metrics derived only from the synthetic fixture inputs.
-    pub derived_metrics: BTreeMap<String, f64>,
+    pub derived_metrics: BTreeMap<String, MetricValue>,
     pub evidence_notes: Vec<String>,
     pub unresolved_claims: Vec<String>,
 }
@@ -78,6 +102,11 @@ pub struct BatchReceipt {
 pub struct BatchReport {
     pub report_schema_version: String,
     pub evaluator_version: String,
+    pub adapter_version: String,
+    pub evidence_class: String,
+    pub source_commit: String,
+    pub serialization_contract: String,
+    pub source_artifacts: Vec<SourceArtifact>,
     pub water_corpus_id: String,
     pub repair_corpus_id: String,
     pub water_receipt_count: usize,
@@ -97,6 +126,28 @@ pub struct BatchReport {
 pub fn evaluate_batch(
     water_corpus: &Value,
     repair_corpus: &Value,
+) -> Result<BatchReport, EvaluationError> {
+    // Value-based callers bind the deterministic compact serde_json encoding.
+    // File-based callers below bind the exact raw source bytes instead.
+    let water_bytes = serde_json::to_vec(water_corpus)
+        .map_err(|error| EvaluationError::new("water_fixture_encode", error.to_string()))?;
+    let repair_bytes = serde_json::to_vec(repair_corpus)
+        .map_err(|error| EvaluationError::new("repair_fixture_encode", error.to_string()))?;
+    evaluate_batch_with_source_bytes(
+        water_corpus,
+        repair_corpus,
+        &water_bytes,
+        &repair_bytes,
+        "normalized_serde_json_value_bytes",
+    )
+}
+
+fn evaluate_batch_with_source_bytes(
+    water_corpus: &Value,
+    repair_corpus: &Value,
+    water_source_bytes: &[u8],
+    repair_source_bytes: &[u8],
+    digest_scope: &str,
 ) -> Result<BatchReport, EvaluationError> {
     let water_corpus_id = validate_corpus_header(
         water_corpus,
@@ -138,8 +189,30 @@ pub fn evaluate_batch(
         .collect();
 
     Ok(BatchReport {
-        report_schema_version: "0.1".to_owned(),
+        report_schema_version: "0.2".to_owned(),
         evaluator_version: env!("CARGO_PKG_VERSION").to_owned(),
+        adapter_version: "household-service-v0.1-water-repair-adapter.1".to_owned(),
+        evidence_class: "synthetic_software_conformance_only".to_owned(),
+        source_commit: option_env!("HOUSEHOLD_EVALUATOR_SOURCE_COMMIT")
+            .unwrap_or("not_recorded")
+            .to_owned(),
+        serialization_contract: "serde_json-1.0.150-pretty; struct-declaration-order; BTreeMap-lexicographic; frozen-corpus-array-order".to_owned(),
+        source_artifacts: vec![
+            SourceArtifact {
+                logical_name: "water_continuity_corpus".to_owned(),
+                byte_length: water_source_bytes.len(),
+                digest_algorithm: "sha-256".to_owned(),
+                sha256: sha256_hex(water_source_bytes),
+                digest_scope: digest_scope.to_owned(),
+            },
+            SourceArtifact {
+                logical_name: "repairability_corpus".to_owned(),
+                byte_length: repair_source_bytes.len(),
+                digest_algorithm: "sha-256".to_owned(),
+                sha256: sha256_hex(repair_source_bytes),
+                digest_scope: digest_scope.to_owned(),
+            },
+        ],
         water_corpus_id,
         repair_corpus_id,
         water_receipt_count: WATER_IDS.len(),
@@ -149,6 +222,15 @@ pub fn evaluate_batch(
         receipts,
         claim_ceiling,
     })
+}
+
+pub fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut result = String::with_capacity(64);
+    for byte in digest {
+        result.push_str(&format!("{byte:02x}"));
+    }
+    result
 }
 
 /// Read two JSON corpus files and evaluate them without network or clock input.
@@ -166,7 +248,13 @@ pub fn evaluate_batch_from_paths(
     let repair_corpus: Value = serde_json::from_slice(&repair_bytes)
         .map_err(|error| EvaluationError::new("repair_fixture_json", error.to_string()))?;
 
-    evaluate_batch(&water_corpus, &repair_corpus)
+    evaluate_batch_with_source_bytes(
+        &water_corpus,
+        &repair_corpus,
+        &water_bytes,
+        &repair_bytes,
+        "raw_file_bytes",
+    )
 }
 
 fn validate_corpus_header(
