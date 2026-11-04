@@ -173,6 +173,11 @@ A superiority claim requires matched inputs, budgets, safety settings, attempts 
 - #10451 — content-addressed ZIP corpus and bounded coverage-guided fuzz qualification.
 - #10452 — platform-qualified held-file identity; non-Unix content verification remains fail-closed until this is resolved.
 - #10455 — archive-session performance research without weakening per-member decompression limits.
+- #10477 — exact-head receipt validator qualification: 15/15 schema/semantic/JCS tests, formatting and Clippy passed at head `667e26121c371eadbfab6a8cd68729f5efb839c5`; replay remains a separate gate.
+- #10507 — independent zip-rs/zlib-rs receipt replay (draft implementation; exact-head compile/test qualification pending).
+- #10508 — Android APK v1–v4 and Apple code-signing/provisioning-profile evidence, separated by scheme and platform policy.
+- #10368 — exact-head ZIP verifier qualification passed 41/41 tests, formatting and Clippy at head `241b42feae94937bb1b0716841abcf77def2e1d1`.
+- #10451 — bounded 181-second fuzz smoke at head `d8d54f6e918838eabf9cb110db79d4f23986fede`: 3,371,635 executions, 18,627 exec/s, 283 MiB peak RSS, zero crashes/timeouts in that run; not sustained fuzz qualification.
 
 
 ## Verification refresh — 2026-11-04
