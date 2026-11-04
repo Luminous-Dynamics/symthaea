@@ -196,8 +196,26 @@ pub enum FitStatus {
     Converged,
     Boundary,
     NotIdentifiable,
+    WeaklyIdentified,
     NotConverged,
     NotEvaluable,
+}
+
+/// Expected Fisher information for the fitted category design. Eigenvalues
+/// use internal coordinates (mu, log-sigma, first threshold, log-gaps).
+#[derive(Debug, Clone, PartialEq)]
+pub struct FisherInformationDiagnostics {
+    pub eigenvalues_ascending: Vec<f64>,
+    pub parameter_dimension: usize,
+    pub effective_rank: usize,
+    pub condition_number: Option<f64>,
+    pub relative_minimum_eigenvalue: Option<f64>,
+    pub weakly_identified: bool,
+    pub mu_standard_error: Option<f64>,
+    pub sigma_standard_error: Option<f64>,
+    pub sigma_wald_95: Option<[f64; 2]>,
+    pub d_a_standard_error: Option<f64>,
+    pub d_a_wald_95: Option<[f64; 2]>,
 }
 
 /// Diagnostics are part of the result, not optional logging.
@@ -219,6 +237,7 @@ pub struct FitDiagnostics {
     /// Coordinate-wise observed second derivative at the selected solution; not a full Hessian,
     /// covariance matrix, or confidence interval.
     pub diagonal_curvature: Option<Vec<f64>>,
+    pub expected_fisher_information: Option<FisherInformationDiagnostics>,
     pub at_parameter_boundary: bool,
     pub note: Option<String>,
 }
@@ -258,6 +277,7 @@ impl FitResult {
                 solution_objective_spread: None,
                 solution_parameter_spread: None,
                 diagonal_curvature: None,
+                expected_fisher_information: None,
                 at_parameter_boundary: false,
                 note: Some(note.into()),
             },
@@ -325,6 +345,8 @@ pub fn fit_with_optimizer(
         FitStatus::NotConverged
     } else if best.at_boundary {
         FitStatus::Boundary
+    } else if fisher.as_ref().map(|value| value.weakly_identified).unwrap_or(true) {
+        FitStatus::WeaklyIdentified
     } else {
         FitStatus::Converged
     };
@@ -348,6 +370,7 @@ pub fn fit_with_optimizer(
             solution_objective_spread: spread,
             solution_parameter_spread: parameter_spread,
             diagonal_curvature: curvature,
+            expected_fisher_information: fisher,
             at_parameter_boundary: best.at_boundary,
             note: if status == FitStatus::Converged {
                 None
@@ -536,6 +559,257 @@ fn density_probability_ratio(z: f64, log_probability: f64) -> f64 {
 
 fn finite_z_ratio_product(z: f64, ratio: f64) -> f64 {
     if z.is_finite() { z * ratio } else { 0.0 }
+}
+
+fn expected_fisher_information(
+    table: &CategoryTable,
+    parameters: &[f64],
+) -> Option<FisherInformationDiagnostics> {
+    let (mu, sigma, thresholds, _) = decode_parameters(parameters, table.categories.len())?;
+    let _estimate = UvsdEstimate::new(mu, sigma, thresholds.clone())?;
+    let dimension = parameters.len();
+    let mut information = vec![vec![0.0; dimension]; dimension];
+    let inverse_sigma = 1.0 / sigma;
+
+    for index in 0..table.categories.len() {
+        let row = &table.categories[index];
+        let lower = if index == 0 { f64::NEG_INFINITY } else { thresholds[index - 1] };
+        let upper = if index == thresholds.len() { f64::INFINITY } else { thresholds[index] };
+
+        let noise_logp = normal_log_interval(lower, upper);
+        if !noise_logp.is_finite() { return None; }
+        let noise_p = noise_logp.exp();
+        let mut noise_score = vec![0.0; 2 + thresholds.len()];
+        if index > 0 {
+            noise_score[2 + index - 1] =
+                -density_probability_ratio(lower, noise_logp);
+        }
+        if index < thresholds.len() {
+            noise_score[2 + index] =
+                density_probability_ratio(upper, noise_logp);
+        }
+        let noise_score = natural_to_internal_score(&noise_score, parameters, thresholds.len());
+        add_information_outer(&mut information, table.noise_total as f64 * noise_p, &noise_score)?;
+
+        let signal_lower = standardize_boundary(lower, mu, sigma);
+        let signal_upper = standardize_boundary(upper, mu, sigma);
+        let signal_logp = normal_log_interval(signal_lower, signal_upper);
+        if !signal_logp.is_finite() { return None; }
+        let signal_p = signal_logp.exp();
+        let lower_ratio = density_probability_ratio(signal_lower, signal_logp);
+        let upper_ratio = density_probability_ratio(signal_upper, signal_logp);
+        let mut signal_score = vec![0.0; 2 + thresholds.len()];
+        signal_score[0] = (lower_ratio - upper_ratio) * inverse_sigma;
+        signal_score[1] =
+            finite_z_ratio_product(signal_lower, lower_ratio)
+            - finite_z_ratio_product(signal_upper, upper_ratio);
+        if index > 0 {
+            signal_score[2 + index - 1] = -lower_ratio * inverse_sigma;
+        }
+        if index < thresholds.len() {
+            signal_score[2 + index] = upper_ratio * inverse_sigma;
+        }
+        let signal_score = natural_to_internal_score(&signal_score, parameters, thresholds.len());
+        add_information_outer(&mut information, table.signal_total as f64 * signal_p, &signal_score)?;
+    }
+
+    let (eigenvalues, eigenvectors) = symmetric_eigen_decomposition(information)?;
+    let maximum = eigenvalues.iter().copied().fold(0.0_f64, f64::max);
+    if !maximum.is_finite() || maximum <= 0.0 { return None; }
+    let rank_tolerance = maximum * 1.0e-10;
+    let effective_rank = eigenvalues.iter().filter(|value| **value > rank_tolerance).count();
+    let minimum_positive = eigenvalues.iter().copied()
+        .filter(|value| *value > 0.0).fold(f64::INFINITY, f64::min);
+    let minimum_effective = eigenvalues.iter().copied()
+        .filter(|value| *value > rank_tolerance).fold(f64::INFINITY, f64::min);
+    let condition_number = if effective_rank == dimension && minimum_effective.is_finite() {
+        Some(maximum / minimum_effective)
+    } else {
+        None
+    };
+    let relative_minimum_eigenvalue = if minimum_positive.is_finite() {
+        Some(minimum_positive / maximum)
+    } else {
+        None
+    };
+    let weakly_identified = effective_rank < dimension
+        || condition_number.map(|value| value > 1.0e10).unwrap_or(true);
+
+    let covariance = if weakly_identified {
+        None
+    } else {
+        inverse_from_eigen(&eigenvalues, &eigenvectors)
+    };
+    let (mu_se, sigma_se, sigma_ci, da_se, da_ci) = if let Some(cov) = covariance {
+        let mu_se = cov[0][0].max(0.0).sqrt();
+        let log_sigma_se = cov[1][1].max(0.0).sqrt();
+        let sigma_se = sigma * log_sigma_se;
+        let sigma_ci = [
+            (parameters[1] - 1.959_963_984_540_054 * log_sigma_se).exp(),
+            (parameters[1] + 1.959_963_984_540_054 * log_sigma_se).exp(),
+        ];
+        let scale = ((1.0 + sigma * sigma) / 2.0).sqrt();
+        let mut gradient = vec![0.0; dimension];
+        gradient[0] = 1.0 / scale;
+        gradient[1] = -mu * sigma * sigma / (2.0 * scale.powi(3));
+        let mut variance = 0.0;
+        for row in 0..dimension {
+            for col in 0..dimension {
+                variance += gradient[row] * cov[row][col] * gradient[col];
+            }
+        }
+        let da_se = variance.max(0.0).sqrt();
+        let da = mu / scale;
+        (
+            Some(mu_se),
+            Some(sigma_se),
+            Some(sigma_ci),
+            Some(da_se),
+            Some([da - 1.959_963_984_540_054 * da_se, da + 1.959_963_984_540_054 * da_se]),
+        )
+    } else {
+        (None, None, None, None, None)
+    };
+
+    Some(FisherInformationDiagnostics {
+        eigenvalues_ascending: eigenvalues,
+        parameter_dimension: dimension,
+        effective_rank,
+        condition_number,
+        relative_minimum_eigenvalue,
+        weakly_identified,
+        mu_standard_error: mu_se,
+        sigma_standard_error: sigma_se,
+        sigma_wald_95: sigma_ci,
+        d_a_standard_error: da_se,
+        d_a_wald_95: da_ci,
+    })
+}
+
+fn natural_to_internal_score(
+    natural: &[f64],
+    parameters: &[f64],
+    threshold_count: usize,
+) -> Vec<f64> {
+    let mut score = vec![0.0; parameters.len()];
+    score[0] = natural[0];
+    score[1] = natural[1];
+    score[2] = natural[2..].iter().sum();
+    for gap_index in 0..threshold_count.saturating_sub(1) {
+        let gap = parameters[3 + gap_index].exp();
+        score[3 + gap_index] =
+            gap * natural[2 + gap_index + 1..].iter().sum::<f64>();
+    }
+    score
+}
+
+fn add_information_outer(
+    information: &mut [Vec<f64>],
+    weight: f64,
+    score: &[f64],
+) -> Option<()> {
+    if !weight.is_finite() || weight < 0.0 || score.len() != information.len() {
+        return None;
+    }
+    for row in 0..score.len() {
+        for col in 0..score.len() {
+            information[row][col] += weight * score[row] * score[col];
+            if !information[row][col].is_finite() { return None; }
+        }
+    }
+    Some(())
+}
+
+fn symmetric_eigen_decomposition(
+    mut matrix: Vec<Vec<f64>>,
+) -> Option<(Vec<f64>, Vec<Vec<f64>>)> {
+    let dimension = matrix.len();
+    if dimension == 0 || matrix.iter().any(|row| row.len() != dimension) {
+        return None;
+    }
+    let mut vectors = vec![vec![0.0; dimension]; dimension];
+    for index in 0..dimension { vectors[index][index] = 1.0; }
+
+    for _ in 0..(100 * dimension * dimension).max(1) {
+        let mut p = 0usize;
+        let mut q = 0usize;
+        let mut largest = 0.0_f64;
+        let mut diagonal_scale = 1.0_f64;
+        for row in 0..dimension {
+            diagonal_scale = diagonal_scale.max(matrix[row][row].abs());
+            for col in (row + 1)..dimension {
+                if matrix[row][col].abs() > largest {
+                    largest = matrix[row][col].abs();
+                    p = row;
+                    q = col;
+                }
+            }
+        }
+        if largest <= 1.0e-13 * diagonal_scale { break; }
+        let apq = matrix[p][q];
+        if !apq.is_finite() || apq == 0.0 { return None; }
+        let tau = (matrix[q][q] - matrix[p][p]) / (2.0 * apq);
+        let t = if tau >= 0.0 {
+            1.0 / (tau + (1.0 + tau * tau).sqrt())
+        } else {
+            -1.0 / (-tau + (1.0 + tau * tau).sqrt())
+        };
+        let cosine = 1.0 / (1.0 + t * t).sqrt();
+        let sine = t * cosine;
+        let pp = matrix[p][p];
+        let qq = matrix[q][q];
+        matrix[p][p] = pp - t * apq;
+        matrix[q][q] = qq + t * apq;
+        matrix[p][q] = 0.0;
+        matrix[q][p] = 0.0;
+        for index in 0..dimension {
+            if index != p && index != q {
+                let ip = matrix[index][p];
+                let iq = matrix[index][q];
+                matrix[index][p] = cosine * ip - sine * iq;
+                matrix[p][index] = matrix[index][p];
+                matrix[index][q] = sine * ip + cosine * iq;
+                matrix[q][index] = matrix[index][q];
+            }
+            let vp = vectors[index][p];
+            let vq = vectors[index][q];
+            vectors[index][p] = cosine * vp - sine * vq;
+            vectors[index][q] = sine * vp + cosine * vq;
+        }
+    }
+
+    let mut order: Vec<usize> = (0..dimension).collect();
+    order.sort_by(|left, right| matrix[*left][*left].total_cmp(&matrix[*right][*right]));
+    let eigenvalues = order.iter().map(|index| matrix[*index][*index]).collect();
+    let mut sorted_vectors = vec![vec![0.0; dimension]; dimension];
+    for (column, source) in order.iter().copied().enumerate() {
+        for row in 0..dimension {
+            sorted_vectors[row][column] = vectors[row][source];
+        }
+    }
+    Some((eigenvalues, sorted_vectors))
+}
+
+fn inverse_from_eigen(
+    eigenvalues: &[f64],
+    eigenvectors: &[Vec<f64>],
+) -> Option<Vec<Vec<f64>>> {
+    let dimension = eigenvalues.len();
+    if eigenvectors.len() != dimension || eigenvectors.iter().any(|row| row.len() != dimension) {
+        return None;
+    }
+    let mut inverse = vec![vec![0.0; dimension]; dimension];
+    for row in 0..dimension {
+        for col in 0..dimension {
+            for eigen in 0..dimension {
+                let value = eigenvalues[eigen];
+                if value <= 0.0 || !value.is_finite() { return None; }
+                inverse[row][col] +=
+                    eigenvectors[row][eigen] * eigenvectors[col][eigen] / value;
+            }
+        }
+    }
+    Some(inverse)
 }
 
 fn converged_parameter_spread(runs: &[RunResult]) -> Option<Vec<f64>> {
