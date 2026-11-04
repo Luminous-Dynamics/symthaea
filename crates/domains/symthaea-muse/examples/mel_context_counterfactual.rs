@@ -37,6 +37,16 @@ struct BaselineV1 {
     baseline_id: String,
     description: String,
     predictions_by_family: Vec<Vec<MusicalActionV1>>,
+    expected: BaselineExpectedV1,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct BaselineExpectedV1 {
+    member_action_accuracy: f64,
+    context_sensitivity_rate: f64,
+    surface_invariance_rate: f64,
+    ambiguous_valid_action_rate: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -44,6 +54,7 @@ struct BaselineReportV1 {
     schema_version: &'static str,
     baseline_id: String,
     description: String,
+    expected: BaselineExpectedV1,
     metrics: MusicalContextCounterfactualAggregateV1,
 }
 
@@ -53,11 +64,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let baselines: BaselineSetV1 = serde_json::from_str(BASELINES_JSON)?;
 
     if baselines.schema_version != "mel-musical-context-baselines-v1" {
-        return Err("unsupported musical-context baseline schema".into());
+        return Err(std::io::Error::other(
+            "unsupported musical-context baseline schema",
+        )
+        .into());
     }
     let validation = validate_musical_context_counterfactual_set_v1(&corpus);
     if !validation.is_empty() {
-        return Err(format!("invalid counterfactual corpus: {validation:?}").into());
+        return Err(std::io::Error::other(format!(
+            "invalid counterfactual corpus: {validation:?}"
+        ))
+        .into());
     }
 
     let mut reports = Vec::with_capacity(baselines.baselines.len());
@@ -66,10 +83,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &corpus,
             &baseline.predictions_by_family,
         )?;
+        let actual = [
+            metrics.member_action_accuracy,
+            metrics.context_sensitivity_rate.unwrap_or(f64::NAN),
+            metrics.surface_invariance_rate.unwrap_or(f64::NAN),
+            metrics.ambiguous_valid_action_rate.unwrap_or(f64::NAN),
+        ];
+        let expected = [
+            baseline.expected.member_action_accuracy,
+            baseline.expected.context_sensitivity_rate,
+            baseline.expected.surface_invariance_rate,
+            baseline.expected.ambiguous_valid_action_rate,
+        ];
+        if actual
+            .iter()
+            .zip(expected.iter())
+            .any(|(actual, expected)| !actual.is_finite() || (actual - expected).abs() > 1e-9)
+        {
+            return Err(std::io::Error::other(format!(
+                "baseline {} diverged from its frozen expected metrics: actual={actual:?}, expected={expected:?}",
+                baseline.baseline_id
+            ))
+            .into());
+        }
         reports.push(BaselineReportV1 {
             schema_version: "mel-musical-context-counterfactual-report-v1",
             baseline_id: baseline.baseline_id,
             description: baseline.description,
+            expected: baseline.expected,
             metrics,
         });
     }
