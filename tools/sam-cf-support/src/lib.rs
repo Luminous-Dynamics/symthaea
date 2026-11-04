@@ -267,10 +267,8 @@ mod tests {
     use super::*;
     use std::collections::{BTreeMap, BTreeSet};
 
-    const IDENTIFICATION_FIXTURES: &str =
-        include_str!("../fixtures/identification-cases-v0.1.tsv");
-    const CROSS_WORLD_FIXTURES: &str =
-        include_str!("../fixtures/cross-world-couplings-v0.1.tsv");
+    const IDENTIFICATION_FIXTURES: &str = include_str!("../fixtures/identification-cases-v0.1.tsv");
+    const CROSS_WORLD_FIXTURES: &str = include_str!("../fixtures/cross-world-couplings-v0.1.tsv");
 
     #[test]
     fn all_golden_cases_match_their_preregistered_dispositions() {
