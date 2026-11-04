@@ -51,3 +51,12 @@ There is deliberately no composite score. The checked-in `mctx-baselines-v1.json
 3. `EXPLICIT-CONTEXT-RULE-SANITY-001`: a hand-written symbolic rule sanity check that satisfies the toy fixture. This is not a learned model, an audio system, or a competitive result.
 
 These controls demonstrate that the paired fixture design distinguishes the behaviours it claims to measure. They do not establish real-world model performance.
+
+
+## Reproducible runner
+
+Run the frozen policy controls and emit machine-readable aggregate JSON:
+
+    cargo run -p symthaea-muse --example mel_context_counterfactual
+
+The runner validates the counterfactual corpus, computes the three policy reports, and fails closed if any metric differs from the values frozen in `mctx-baselines-v1.json`. It emits member action accuracy, intent-change sensitivity, irrelevant-surface invariance, ambiguous valid-action coverage and per-family scores. No composite score is generated.
