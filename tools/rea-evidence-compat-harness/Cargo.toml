@@ -24,3 +24,7 @@ sha2 = { version = "=0.10.9", features = ["oid"] }
 [[bin]]
 name = "rea-evidence-verify"
 path = "../rea-evidence-verify-cli/src/main.rs"
+
+[[test]]
+name = "cli_contract"
+path = "../rea-evidence-verify-cli/tests/cli_contract.rs"
