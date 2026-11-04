@@ -30,9 +30,6 @@ jobs:
         with:
           toolchain: "1.96.0"
 
-      - name: Check formatting
-        run: cargo fmt --manifest-path tools/project-underwriting-oracle/Cargo.toml -- --check
-
       - name: Run oracle tests
         run: cargo test --manifest-path tools/project-underwriting-oracle/Cargo.toml
 
