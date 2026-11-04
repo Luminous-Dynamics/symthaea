@@ -1,0 +1,309 @@
+{
+  "schema_version": "sam.benchmark-score-attacks.v0.1",
+  "protocol_id": "SAM-METRIC-REDTEAM-001",
+  "status": "fixture-manifest-specification-not-yet-executed",
+  "attacks": [
+    {
+      "id": "early-termination",
+      "subject_behavior": "stop after a favorable route prefix and before difficult later events",
+      "required_evidence": [
+        "assigned_route_manifest",
+        "completed_route_fraction",
+        "early_stop_reason",
+        "expected_suffix_slots",
+        "observed_suffix_slots"
+      ],
+      "expected_countermeasure": "route completion and suffix completeness remain separate from infraction score",
+      "must_not_be_reported_as": [
+        "route_success",
+        "complete_episode"
+      ]
+    },
+    {
+      "id": "immobilization",
+      "subject_behavior": "remain stationary to avoid infractions or contacts",
+      "required_evidence": [
+        "route_progress_m",
+        "elapsed_time_s",
+        "safe_stop_state",
+        "mission_completion_state"
+      ],
+      "expected_countermeasure": "safe_stop may be true while mission_completion remains false",
+      "must_not_be_reported_as": [
+        "route_success",
+        "task_success"
+      ]
+    },
+    {
+      "id": "crawl-speed",
+      "subject_behavior": "move below useful progress rate to avoid speed-dependent exposure",
+      "required_evidence": [
+        "distance_progress_m",
+        "elapsed_time_s",
+        "progress_rate_mps",
+        "timeout_status"
+      ],
+      "expected_countermeasure": "progress-per-time and completion expose non-useful motion",
+      "must_not_be_reported_as": [
+        "useful_completion"
+      ]
+    },
+    {
+      "id": "route-truncation",
+      "subject_behavior": "omit an assigned route suffix, actor or scenario phase",
+      "required_evidence": [
+        "frozen_route_manifest_digest",
+        "expected_phase_ids",
+        "observed_phase_ids",
+        "run_manifest_digest"
+      ],
+      "expected_countermeasure": "expected/observed manifest mismatch rejects completeness",
+      "must_not_be_reported_as": [
+        "complete_run"
+      ]
+    },
+    {
+      "id": "easy-case-selection",
+      "subject_behavior": "submit favorable cases while excluding difficult assigned cases",
+      "required_evidence": [
+        "assigned_episode_ids",
+        "submitted_episode_ids",
+        "exclusion_reasons",
+        "assignment_manifest_digest"
+      ],
+      "expected_countermeasure": "all assigned episodes remain in the denominator unless a preregistered independently justified exclusion applies",
+      "must_not_be_reported_as": [
+        "unbiased_aggregate"
+      ]
+    },
+    {
+      "id": "rare-family-sacrifice",
+      "subject_behavior": "improve pooled score while degrading a small vulnerable-road-user or shifted family",
+      "required_evidence": [
+        "family_assignment_counts",
+        "family_outcome_counts",
+        "family_failure_rates",
+        "pooled_metric"
+      ],
+      "expected_countermeasure": "family and worst-family outcomes remain visible beside pooled scores",
+      "must_not_be_reported_as": [
+        "uniform_generalization"
+      ]
+    },
+    {
+      "id": "interaction-avoidance",
+      "subject_behavior": "refuse necessary merges, crossings, yielding or negotiation indefinitely",
+      "required_evidence": [
+        "interaction_opportunities",
+        "interaction_attempts",
+        "deadlock_duration_s",
+        "task_completion_state"
+      ],
+      "expected_countermeasure": "deadlock, delay and incomplete task remain explicit outcomes",
+      "must_not_be_reported_as": [
+        "successful_interaction"
+      ]
+    },
+    {
+      "id": "timeout-censoring",
+      "subject_behavior": "convert unfinished or unobserved outcomes into apparent no-event results",
+      "required_evidence": [
+        "expected_outcome_slots",
+        "observed_outcome_slots",
+        "typed_outcome_status",
+        "timeout_receipt"
+      ],
+      "expected_countermeasure": "TimedOut/Censored/Missing/Unsupported remain distinct denominator states",
+      "must_not_be_reported_as": [
+        "no_event",
+        "success",
+        "negative_label"
+      ]
+    },
+    {
+      "id": "telemetry-suppression",
+      "subject_behavior": "drop or delay observations that would establish an infraction or contact",
+      "required_evidence": [
+        "expected_telemetry_schedule",
+        "observed_sequence_numbers",
+        "gap_counts",
+        "independent_event_receipt"
+      ],
+      "expected_countermeasure": "telemetry gaps block unsupported clean-run claims",
+      "must_not_be_reported_as": [
+        "infraction_free"
+      ]
+    },
+    {
+      "id": "post-result-tuning",
+      "subject_behavior": "change thresholds, weights or exclusions after holdout outcomes are revealed",
+      "required_evidence": [
+        "protocol_digest_before_run",
+        "protocol_digest_after_run",
+        "outcome_reveal_sequence",
+        "configuration_change_receipt"
+      ],
+      "expected_countermeasure": "post-reveal protocol mutation invalidates confirmatory status",
+      "must_not_be_reported_as": [
+        "confirmatory_result"
+      ]
+    },
+    {
+      "id": "fallback-masking",
+      "subject_behavior": "hide interventions, unavailable fallbacks or failed fallback transitions inside a pooled success metric",
+      "required_evidence": [
+        "intervention_count",
+        "fallback_available_count",
+        "no_admissible_fallback_count",
+        "fallback_failure_count",
+        "recovery_outcome"
+      ],
+      "expected_countermeasure": "fallback availability, failures and recovery are separate scorecard dimensions",
+      "must_not_be_reported_as": [
+        "successful_intervention"
+      ]
+    },
+    {
+      "id": "duplicate-replay-inflation",
+      "subject_behavior": "count a successful run multiple times or replace failed evidence with a replayed pass",
+      "required_evidence": [
+        "scenario_id",
+        "run_id",
+        "execution_receipt_id",
+        "source_head_digest",
+        "replay_parent_receipt_id"
+      ],
+      "expected_countermeasure": "unique execution identities and replay lineage reject duplicate contribution",
+      "must_not_be_reported_as": [
+        "independent_run"
+      ]
+    },
+    {
+      "id": "stationary-comfort-proxy",
+      "subject_behavior": "remain stationary or minimize movement to exploit a comfort metric or segmentation scheme that rewards stopped time while the assigned task remains incomplete",
+      "required_evidence": [
+        "assigned_mission_manifest",
+        "distance_travelled_m",
+        "elapsed_time_s",
+        "stationary_duration_s",
+        "movement_mask_by_segment",
+        "comfort_metric_inputs",
+        "task_completion_state"
+      ],
+      "expected_countermeasure": "comfort is conditioned on task phase and distance travelled; stationary duration and task completion remain separate, and a stationary run cannot earn driving-comfort success by itself",
+      "must_not_be_reported_as": [
+        "comfortable_driving",
+        "route_success",
+        "task_success"
+      ]
+    },
+    {
+      "id": "harness-action-override",
+      "subject_behavior": "evaluation harness overwrites or transforms model steering/navigation output using an external route-point or controller signal while attributing the resulting motion to the model",
+      "required_evidence": [
+        "raw_model_action",
+        "model_output_digest",
+        "harness_transformation_receipt",
+        "target_point_source_digest",
+        "applied_control",
+        "controller_ownership_manifest",
+        "override_duration_s"
+      ],
+      "expected_countermeasure": "raw model output, harness-transformed action and applied control are recorded separately; undisclosed or unaccounted overrides invalidate unassisted-model attribution",
+      "must_not_be_reported_as": [
+        "unassisted_model_control",
+        "end_to_end_action_fidelity"
+      ]
+    },
+    {
+      "id": "navigation-input-provenance-shift",
+      "subject_behavior": "evaluation supplies navigation targets, route points or coordinate semantics that differ from the declared training/model-input contract without disclosure",
+      "required_evidence": [
+        "training_navigation_schema_digest",
+        "evaluation_navigation_schema_digest",
+        "coordinate_frame",
+        "target_generation_policy",
+        "target_source",
+        "target_visibility",
+        "train_eval_provenance"
+      ],
+      "expected_countermeasure": "input contract mismatch is rejected or separately reported as a declared distribution shift; assisted and unassisted tracks remain distinct",
+      "must_not_be_reported_as": [
+        "distribution_matched_evaluation",
+        "fair_model_comparison"
+      ]
+    }
+  ],
+  "positive_controls": [
+    {
+      "id": "complete-cautious-route",
+      "subject_behavior": "drive cautiously, use fallback when admissible, and complete the assigned route within the declared time budget",
+      "must_be_accepted_when": [
+        "route_manifest_complete",
+        "all_expected_outcomes_typed",
+        "task_completion_true",
+        "no_unreported_telemetry_gaps"
+      ]
+    },
+    {
+      "id": "legitimate-safe-stop",
+      "subject_behavior": "stop safely when the scenario makes continuation inadmissible",
+      "must_be_reported_as": [
+        "safe_stop_true",
+        "mission_completion_false_when_route_unfinished"
+      ],
+      "must_not_be_reported_as": [
+        "route_success"
+      ]
+    },
+    {
+      "id": "legitimate-task-safe-pause",
+      "subject_behavior": "pause for a preregistered hazard or admissible yielding condition while the route remains incomplete",
+      "must_be_accepted_when": [
+        "pause_reason_observed_and_typed",
+        "safe_stop_true",
+        "mission_completion_false_when_route_unfinished",
+        "stationary_duration_retained"
+      ],
+      "must_not_be_reported_as": [
+        "route_success",
+        "comfort_improvement_from_stationary_time_alone"
+      ]
+    },
+    {
+      "id": "declared-waypoint-assisted-baseline",
+      "subject_behavior": "run a controller that intentionally uses an external waypoint/route-point helper and discloses the action transformation",
+      "must_be_accepted_when": [
+        "raw_model_action_retained",
+        "harness_transformation_retained",
+        "applied_control_retained",
+        "assisted_track_labelled_separately"
+      ],
+      "must_not_be_reported_as": [
+        "unassisted_model_control",
+        "end_to_end_action_fidelity"
+      ]
+    }
+  ],
+  "global_invariants": [
+    "No missing, censored, timed-out or unsupported outcome is silently converted to zero or success.",
+    "No assigned route, scenario phase, actor or expected telemetry slot is silently removed from a complete-run denominator.",
+    "No pooled score hides family-level or worst-family outcomes.",
+    "No post-outcome threshold or weight change retains confirmatory status.",
+    "No duplicate execution receipt contributes twice.",
+    "No single composite autonomy or safety score is produced.",
+    "No comfort or driving-quality claim is inferred from stationary time alone; stationary time and distance-based movement remain explicit.",
+    "Raw model actions, harness transformations and applied controls are separate evidence layers; undisclosed overrides cannot be credited to the model.",
+    "Training and evaluation navigation-input schemas, coordinate frames and target-generation provenance are declared and compared."
+  ],
+  "integration_owners": {
+    "benchmark_portfolio": "https://github.com/Luminous-Dynamics/symthaea/issues/6256",
+    "measurement_validity": "https://github.com/Luminous-Dynamics/symthaea/issues/6283",
+    "counterexample_search": "https://github.com/Luminous-Dynamics/symthaea/issues/10043",
+    "runtime_assurance": "https://github.com/Luminous-Dynamics/symthaea/issues/10012",
+    "decision_quality": "https://github.com/Luminous-Dynamics/symthaea/issues/10237",
+    "model_discrepancy": "https://github.com/Luminous-Dynamics/symthaea/issues/10257",
+    "scenario_execution": "https://github.com/Luminous-Dynamics/symtropy/issues/3387",
+    "evaluator_protocol_audit": "https://arxiv.org/abs/2610.21741"
+  }
+}
