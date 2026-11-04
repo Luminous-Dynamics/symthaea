@@ -817,6 +817,8 @@ mod tests {
             include_str!("../../../../benchmarks/mel/clock/mel-runner-cpal-missing-pair-001.json"),
             include_str!("../../../../benchmarks/mel/clock/mel-runner-cpal-wide-bracket-001.json"),
             include_str!("../../../../benchmarks/mel/clock/mel-runner-cpal-descriptor-mismatch-001.json"),
+            include_str!("../../../../benchmarks/mel/clock/mel-runner-cpal-drift-outside-policy-001.json"),
+            include_str!("../../../../benchmarks/mel/clock/mel-runner-cpal-residual-outlier-001.json"),
         ];
 
         for fixture_json in fixtures {
