@@ -537,7 +537,11 @@ fn verify_source_checkout(
         .map_err(|e| format!("committed lean-toolchain is not UTF-8: {e}"))?
         .trim()
         .to_owned();
-    if toolchain != record.repo.lean_version {
+    let normalized_toolchain = toolchain
+        .rsplit_once(':')
+        .map(|(_, version)| version.trim())
+        .unwrap_or(toolchain.as_str());
+    if normalized_toolchain != record.repo.lean_version {
         return Err(format!(
             "committed Lean toolchain mismatch: expected {}, got {toolchain}",
             record.repo.lean_version
@@ -1438,6 +1442,16 @@ mod tests {
         assert!(receipt.source_span_verified_as_sorry);
         assert_eq!(receipt.source_span, "sorry");
         assert!(!receipt.scoring_admission);
+    }
+
+    #[test]
+    fn namespaced_lean_toolchain_is_normalized_to_sorrydb_release() {
+        let toolchain = "leanprover/lean4:v4.26.0";
+        let normalized = toolchain
+            .rsplit_once(':')
+            .map(|(_, version)| version.trim())
+            .unwrap_or(toolchain);
+        assert_eq!(normalized, "v4.26.0");
     }
 
     #[test]
