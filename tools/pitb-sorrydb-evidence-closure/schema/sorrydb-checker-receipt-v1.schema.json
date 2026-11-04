@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-checker-receipt-v1.schema.json",
+  "title": "PITB SorryDB checker receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "task_id",
+    "repo_commit",
+    "lean_version",
+    "source_file_sha256",
+    "modified_source_sha256",
+    "replacement_patch_sha256",
+    "proof_artifact_sha256",
+    "declaration_signature_before_sha256",
+    "declaration_signature_after_sha256",
+    "target_is_prop",
+    "build_passed",
+    "kernel_passed",
+    "target_sorry_ax_absent",
+    "axiom_delta_zero",
+    "new_sorry_delta_zero",
+    "checker_binary_sha256",
+    "checker_command_sha256",
+    "environment_sha256",
+    "checker_log_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-checker-receipt.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "repo_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "lean_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_file_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "modified_source_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "replacement_patch_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "proof_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "declaration_signature_before_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "declaration_signature_after_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "target_is_prop": {
+      "type": "boolean"
+    },
+    "build_passed": {
+      "type": "boolean"
+    },
+    "kernel_passed": {
+      "type": "boolean"
+    },
+    "target_sorry_ax_absent": {
+      "type": "boolean"
+    },
+    "axiom_delta_zero": {
+      "type": "boolean"
+    },
+    "new_sorry_delta_zero": {
+      "type": "boolean"
+    },
+    "checker_binary_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "checker_command_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "environment_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "checker_log_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}
