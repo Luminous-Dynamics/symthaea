@@ -134,6 +134,8 @@ A run is counted as `verified_success` only if all of the following are true:
 
 - the proof was inserted and the exact recorded sorry range was replaced;
 - the original sorry is absent after replacement;
+- the target elaborates as a proposition (`Prop`);
+- the declaration signature digest before and after the replacement is identical, preventing theorem weakening or target substitution;
 - the project builds and Lean's kernel accepts the resulting proof;
 - independent semantic and non-vacuity gates pass;
 - source binding passes against the pinned repository commit and exact range;
