@@ -10,7 +10,9 @@
 //! Landauer reference.
 //!
 //! Counter readings preserve native integer units, device and sensor scope,
-//! counter epoch (changed on driver/device reset), and monotonic timestamp.
+//! counter epoch, and monotonic timestamp. Backends must assign a new epoch
+//! whenever they detect a reset or reinitialization; some hardware interfaces
+//! cannot distinguish an otherwise invisible reset from a documented wrap.
 //! EnergyDelta rejects incompatible/stale readings and only handles rollover
 //! when the backend provides an explicit modulus.
 //!
@@ -192,11 +194,11 @@ impl EnergyDelta {
         earlier: &EnergyCounterReading,
         later: &EnergyCounterReading,
     ) -> Result<Self, EnergyDeltaError> {
-        if earlier.descriptor != later.descriptor {
-            return Err(EnergyDeltaError::DescriptorMismatch);
-        }
         if earlier.counter_epoch != later.counter_epoch {
             return Err(EnergyDeltaError::CounterEpochChanged);
+        }
+        if earlier.descriptor != later.descriptor {
+            return Err(EnergyDeltaError::DescriptorMismatch);
         }
         if later.monotonic_timestamp_ns <= earlier.monotonic_timestamp_ns {
             return Err(EnergyDeltaError::TimestampDidNotAdvance);
@@ -274,9 +276,14 @@ impl EnergyDelta {
 
 /// Linux powercap/RAPL adapter backed by the kernel's energy counter files.
 ///
-/// The caller supplies paths and the physical sensor scope explicitly. This
+/// The caller supplies paths and physical sensor scope explicitly. This
 /// avoids assuming a particular Intel/AMD hierarchy or treating a package
-/// counter as whole-system energy. The adapter has no external crate dependency.
+/// counter as whole-system energy. The adapter has no external dependency.
+///
+/// Each opened instance has a distinct epoch, and a changed wrap range starts
+/// another epoch. A driver reset that leaves both sysfs files and the wrap
+/// range unchanged may be indistinguishable from a genuine wrap; these two
+/// counter files alone cannot prove otherwise.
 #[cfg(target_os = "linux")]
 pub mod linux_powercap {
     use super::*;
@@ -514,7 +521,7 @@ pub mod linux_powercap {
             assert_ne!(first.descriptor.wrap_modulus, second.descriptor.wrap_modulus);
             assert_eq!(
                 EnergyDelta::between(&first, &second),
-                Err(EnergyDeltaError::DescriptorMismatch)
+                Err(EnergyDeltaError::CounterEpochChanged)
             );
         }
 
