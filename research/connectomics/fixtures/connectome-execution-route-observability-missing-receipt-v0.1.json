@@ -1,0 +1,242 @@
+{
+  "schema_version": "0.1.0",
+  "audit_id": "synthetic-route-observability-missing-receipt-v0.1",
+  "build": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_tree_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "toolchain": "rustc-1.96.0",
+    "lock_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "target_triple": "x86_64-unknown-linux-gnu",
+    "features": [
+      "connectomics",
+      "proof-carrying"
+    ],
+    "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "config_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "discovery": {
+    "generator_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "source_scan_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "dispatch_registry_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "resolved_feature_set_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "deployment_routes_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+    "unresolved_dynamic_targets": [],
+    "discovery_disposition": "COMPLETE_WITHIN_DECLARED_SCOPE"
+  },
+  "routes": [
+    {
+      "route_id": "route-fusion-api",
+      "route_class": "FUSION",
+      "status": "ACTIVE",
+      "entrypoint": "FusionApi::execute",
+      "source_file": "src/connectomics/fusion_api.rs",
+      "implementation_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "build_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "query_types": [
+        "anatomical-pathway"
+      ],
+      "claim_types": [
+        "ANATOMICAL"
+      ],
+      "evidence_roles": [
+        "SPECIALIST_MODEL",
+        "REVIEWER"
+      ],
+      "instrumentation_contract_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "event_schema_version": "fusion-use-event-v0.1",
+      "expected_observer_ids": [
+        "observer-claim",
+        "observer-exec"
+      ],
+      "dispatch_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "route_id": "route-certificate-batch",
+      "route_class": "CERTIFICATE_ISSUANCE",
+      "status": "ACTIVE",
+      "entrypoint": "CertificateBatch::issue",
+      "source_file": "src/connectomics/certificate_batch.rs",
+      "implementation_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "build_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "query_types": [
+        "anatomical-pathway"
+      ],
+      "claim_types": [
+        "ANATOMICAL"
+      ],
+      "evidence_roles": [
+        "SPECIALIST_MODEL",
+        "VLM"
+      ],
+      "instrumentation_contract_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "event_schema_version": "fusion-use-event-v0.1",
+      "expected_observer_ids": [
+        "observer-claim",
+        "observer-exec"
+      ],
+      "dispatch_evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "route_id": "route-legacy-admin",
+      "route_class": "ADMIN_OVERRIDE",
+      "status": "DISABLED_WITH_PROOF",
+      "entrypoint": "LegacyAdmin::force_promote",
+      "source_file": "src/connectomics/legacy_admin.rs",
+      "implementation_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "build_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "query_types": [],
+      "claim_types": [],
+      "evidence_roles": [],
+      "instrumentation_contract_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "event_schema_version": "fusion-use-event-v0.1",
+      "expected_observer_ids": [],
+      "dispatch_evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "exclusion_evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "exclusion_rationale": "Feature is disabled in the frozen build configuration."
+    }
+  ],
+  "canaries": [
+    {
+      "canary_id": "canary-001",
+      "route_id": "route-fusion-api",
+      "build_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "nonce_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "synthetic_namespace": "synthetic-connectome-canary",
+      "synthetic_evidence_ids": [
+        "synthetic-evidence-a",
+        "synthetic-evidence-b"
+      ],
+      "query_id": "synthetic-query-01",
+      "claim_id": "synthetic-claim-01",
+      "fusion_policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "verifier_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "route_trace_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "handler_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+      "annotation_write_capability": false,
+      "training_export_capability": false,
+      "evaluation_export_capability": false,
+      "expected_observers": [
+        "observer-claim",
+        "observer-exec"
+      ],
+      "observed_receipts": [
+        {
+          "observer_id": "observer-exec",
+          "event_id": "event-canary-001-observer-exec",
+          "route_id": "route-fusion-api",
+          "canary_id": "canary-001",
+          "build_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "nonce_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "evidence_ids": [
+            "synthetic-evidence-a",
+            "synthetic-evidence-b"
+          ],
+          "fusion_policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "verifier_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "event_schema_version": "fusion-use-event-v0.1",
+          "receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        {
+          "observer_id": "observer-claim",
+          "event_id": "event-canary-001-observer-claim",
+          "route_id": "route-fusion-api",
+          "canary_id": "canary-001",
+          "build_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "nonce_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "evidence_ids": [
+            "synthetic-evidence-a",
+            "synthetic-evidence-b"
+          ],
+          "fusion_policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "verifier_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "event_schema_version": "fusion-use-event-v0.1",
+          "receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ],
+      "execution_disposition": "EXECUTED"
+    },
+    {
+      "canary_id": "canary-002",
+      "route_id": "route-certificate-batch",
+      "build_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "nonce_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "synthetic_namespace": "synthetic-connectome-canary",
+      "synthetic_evidence_ids": [
+        "synthetic-evidence-c",
+        "synthetic-evidence-d"
+      ],
+      "query_id": "synthetic-query-01",
+      "claim_id": "synthetic-claim-02",
+      "fusion_policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "verifier_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "route_trace_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "handler_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "annotation_write_capability": false,
+      "training_export_capability": false,
+      "evaluation_export_capability": false,
+      "expected_observers": [
+        "observer-claim",
+        "observer-exec"
+      ],
+      "observed_receipts": [
+        {
+          "observer_id": "observer-exec",
+          "event_id": "event-canary-002-observer-exec",
+          "route_id": "route-certificate-batch",
+          "canary_id": "canary-002",
+          "build_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "nonce_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+          "evidence_ids": [
+            "synthetic-evidence-c",
+            "synthetic-evidence-d"
+          ],
+          "fusion_policy_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "verifier_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "event_schema_version": "fusion-use-event-v0.1",
+          "receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+      ],
+      "execution_disposition": "EXECUTED"
+    }
+  ],
+  "observers": [
+    {
+      "observer_id": "observer-exec",
+      "custodian_ref": "synthetic-custodian-execution",
+      "source_role": "EXECUTION_LEDGER",
+      "implementation_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "storage_lineage_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "retention_profile_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "shared_controls": []
+    },
+    {
+      "observer_id": "observer-claim",
+      "custodian_ref": "synthetic-custodian-claim",
+      "source_role": "CLAIM_CERTIFICATE_LEDGER",
+      "implementation_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "storage_lineage_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "retention_profile_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "shared_controls": []
+    }
+  ],
+  "mutation_results": [
+    {
+      "mutation_id": "mutation-drop-observer",
+      "route_id": "route-certificate-batch",
+      "fault_class": "DROP_SINK",
+      "fault_injected": true,
+      "expected_detection": true,
+      "observed_detection": true,
+      "disposition": "DETECTED"
+    }
+  ],
+  "contamination": {
+    "synthetic_namespace_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "biological_annotation_write_attempts": 0,
+    "training_export_matches": 0,
+    "evaluation_export_matches": 0,
+    "isolation_check_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "disposition": "CLEAN"
+  }
+}
