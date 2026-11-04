@@ -20,8 +20,10 @@
 //! whole-system energy; CPU package, GPU, wall-meter and other domains remain
 //! distinct unless their coverage is known to be disjoint and complete.
 
+use serde::{Deserialize, Serialize};
+
 /// Backend family that supplied a cumulative energy counter.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EnergyMeterBackend {
     /// NVIDIA Management Library cumulative device-energy counter.
     Nvml,
@@ -34,7 +36,7 @@ pub enum EnergyMeterBackend {
 }
 
 /// Physical or measurement domain covered by a sensor.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EnergyScope {
     /// One GPU device; the UUID is stored in the descriptor.
     GpuDevice,
@@ -49,7 +51,7 @@ pub enum EnergyScope {
 }
 
 /// Unit used by the backend raw cumulative counter.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EnergyCounterUnit {
     /// Joules.
     Joules,
@@ -75,7 +77,7 @@ impl EnergyCounterUnit {
 /// counter wrapping at 2^32, the modulus is 2^32, not 2^32 - 1. If a backend
 /// cannot establish the wrap behavior, use None; a decreasing counter is
 /// rejected rather than guessed.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EnergyMeterDescriptor {
     /// Backend family.
     pub backend: EnergyMeterBackend,
@@ -95,7 +97,7 @@ pub struct EnergyMeterDescriptor {
 ///
 /// These states prevent unsupported sensors from being confused with zero
 /// energy consumption.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EnergyMeterAvailability {
     /// The counter can currently be read.
     Available,
@@ -113,7 +115,7 @@ pub enum EnergyMeterAvailability {
 /// counter_epoch must change whenever the backend detects a reset or
 /// reinitialization. Some hardware counters do not expose enough information
 /// to distinguish every silent reset from a documented rollover.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EnergyCounterReading {
     /// Descriptor of the exact sensor that supplied this reading.
     pub descriptor: EnergyMeterDescriptor,
@@ -178,7 +180,7 @@ pub enum EnergyDeltaError {
 /// The conversion uses integer arithmetic. This type does not assert that the
 /// meter covers a full device or system; retain the descriptor scope in any
 /// measurement receipt.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EnergyDelta {
     descriptor: EnergyMeterDescriptor,
     energy_microjoules: u128,
