@@ -222,7 +222,7 @@ pub struct CandidateRecord {
 impl CandidateRecord {
     pub fn new(
         candidate_id: impl Into<String>,
-        parent_ids: Vec<String>,
+        mut parent_ids: Vec<String>,
         source_tree_digest: impl Into<String>,
         receipt_digest: impl Into<String>,
         capabilities: CapabilityVector,
@@ -246,6 +246,8 @@ impl CandidateRecord {
             }
         }
 
+        parent_ids.sort_unstable();
+
         Ok(Self {
             candidate_id,
             parent_ids,
@@ -265,7 +267,7 @@ impl CandidateRecord {
     }
 
     pub fn has_parent(&self, parent_id: &str) -> bool {
-        self.parent_ids.iter().any(|id| id == parent_id)
+        self.parent_ids.iter().any(|id| id.as_str() == parent_id)
     }
 
     pub fn source_tree_digest(&self) -> &str {
@@ -563,7 +565,7 @@ mod tests {
 
         let hybrid = candidate(
             "hybrid",
-            &["left", "right"],
+            &["right", "left"],
             '3',
             'c',
             &[("coding", 0.9)],
