@@ -758,6 +758,102 @@ mod tests {
         })
     }
 
+    #[derive(Deserialize)]
+    struct GroundedParticipationFixtureSetV1 {
+        schema_version: String,
+        cases: Vec<GroundedParticipationFixtureCaseV1>,
+    }
+
+    #[derive(Deserialize)]
+    struct GroundedParticipationFixtureCaseV1 {
+        case_id: String,
+        expected_disposition: String,
+        evidence: GroundedMusicalEvidenceBundleV1,
+        decision: GroundedMusicalDecisionReceiptV1,
+        policy: GroundedParticipationPolicyV1,
+    }
+
+    #[test]
+    fn checked_in_evidence_to_action_cases_match_the_authorization_validator() {
+        let fixtures: GroundedParticipationFixtureSetV1 = serde_json::from_str(include_str!(
+            "../../../../benchmarks/mel/grounded-participation/grounded-participation-cases-v1.json"
+        ))
+        .expect("grounded participation fixture set must parse");
+        assert_eq!(
+            fixtures.schema_version,
+            "mel-grounded-participation-cases-v1"
+        );
+        assert_eq!(fixtures.cases.len(), 4);
+
+        for case in fixtures.cases {
+            let issues = validate_grounded_decision_v1(
+                &case.evidence,
+                &case.decision,
+                &case.policy,
+            );
+            match case.expected_disposition.as_str() {
+                "accept" => assert!(
+                    issues.is_empty(),
+                    "{} unexpectedly rejected: {issues:?}",
+                    case.case_id
+                ),
+                "reject_veto" => assert!(
+                    issues.contains(&GroundedParticipationIssueV1::VetoBlocksActiveIntervention),
+                    "{} must reject a vetoed intervention: {issues:?}",
+                    case.case_id
+                ),
+                other => panic!("{} has unsupported expected disposition {other}", case.case_id),
+            }
+        }
+    }
+
+    #[test]
+    fn ask_requires_ambiguous_grounding_instead_of_a_confident_invitation() {
+        let evidence = bundle();
+        let receipt = decision(
+            &evidence,
+            GroundedMusicalActionV1::Ask,
+            vec!["invitation-001"],
+            None,
+        );
+        assert!(validate_grounded_decision_v1(&evidence, &receipt, &policy())
+            .contains(&GroundedParticipationIssueV1::AskRequiresAmbiguousGrounding));
+    }
+
+    #[test]
+    fn unavailable_stream_cannot_authorize_wait_or_active_intervention() {
+        let mut evidence = bundle();
+        evidence.claims.push(claim(
+            "stream-unavailable-001",
+            GroundedMusicalClaimKindV1::StreamUnavailable,
+            GroundedClaimStatusV1::Grounded,
+            9_600,
+        ));
+        evidence.claim_set_sha256 = evidence.expected_claim_set_sha256().unwrap();
+        evidence.evidence_bundle_sha256 = evidence.expected_evidence_bundle_sha256().unwrap();
+
+        let receipt = decision(
+            &evidence,
+            GroundedMusicalActionV1::Wait,
+            vec!["retains-floor-001"],
+            None,
+        );
+        assert!(validate_grounded_decision_v1(&evidence, &receipt, &policy())
+            .contains(&GroundedParticipationIssueV1::StreamUnavailableRequiresAbstain));
+    }
+
+    #[test]
+    fn evidence_bundle_commitment_binds_policy_and_prefix_metadata() {
+        let evidence = bundle();
+        let mut changed_prefix = evidence.clone();
+        changed_prefix.permitted_prefix_end_frame -= 1;
+        assert!(!changed_prefix.is_commitment_valid());
+
+        let mut changed_policy = evidence;
+        changed_policy.annotation_policy_version = "other-annotation-policy".to_owned();
+        assert!(!changed_policy.is_commitment_valid());
+    }
+
     #[test]
     fn grounded_invitation_authorizes_a_bounded_response() {
         let evidence = bundle();
