@@ -1340,34 +1340,43 @@ fn synthetic_mapping(graph_sha: &str, node: &str, declaration: &str) -> Mapping 
 }
 
 fn run_self_tests() -> Result<(), String> {
+    let (graph_bytes, graph) = synthetic_graph_manifest()?;
     let support = synthetic_support_report();
     let support_bytes = serde_json::to_vec_pretty(&support).map_err(|e| e.to_string())?;
-    let receipt = synthetic_receipt();
+    let receipt = synthetic_receipt(&graph);
     let receipts_bytes = [serde_json::to_vec(&receipt).map_err(|e| e.to_string())?, b"\n".to_vec()].concat();
+    let graph_sha = graph.manifest_sha256.clone();
     let mappings = vec![
-        synthetic_mapping("node-h1","h1"),
-        synthetic_mapping("node-h2","h2")
+        synthetic_mapping(&graph_sha, "node-h1","h1"),
+        synthetic_mapping(&graph_sha, "node-h2","h2"),
+        synthetic_mapping(&graph_sha, "node-hx","not-in-universe"),
     ];
-    let mappings_bytes = mappings.iter().flat_map(|m| {
-        let mut b=serde_json::to_vec(m).unwrap(); b.push(b'\n'); b
+    let mappings_bytes = mappings.iter().flat_map(|mapping| {
+        let mut bytes = serde_json::to_vec(mapping).unwrap();
+        bytes.push(b'\n');
+        bytes
     }).collect::<Vec<_>>();
-    let report = analyze(&support_bytes, &receipts_bytes, &mappings_bytes)?;
+    let report = analyze(&graph_bytes, &support_bytes, &receipts_bytes, &mappings_bytes)?;
     if report.matched_assessment_count != 1
         || report.route_assessments[0].any_complete_route_covered_at_returned_k != true
         || report.route_assessments[0].minimal_routes_covered_at_returned_k != 1
         || report.route_assessments[0].best_route_completion_rank != Some(2)
         || report.route_assessments[0].useful_route_premise_rate != Some(1.0)
+        || report.route_assessments[0].mapped_out_of_universe_count != 1
     {
         return Err("retrieval route coverage positive control failed".into());
     }
+    println!("SELF_TEST_PASS exact formal-name crosswalk matches actual graph nodes");
     println!("SELF_TEST_PASS a retrieved AND-bundle covers its exact minimal support route");
 
     let mut only_one = receipt.clone();
-    only_one.ranking.candidates.pop();
+    only_one.ranking.candidates.truncate(1);
     let one_bytes = [serde_json::to_vec(&only_one).map_err(|e| e.to_string())?, b"\n".to_vec()].concat();
-    let one_mappings = vec![synthetic_mapping("node-h1","h1")];
-    let one_mapping_bytes = [serde_json::to_vec(&one_mappings[0]).map_err(|e| e.to_string())?, b"\n".to_vec()].concat();
-    let partial = analyze(&support_bytes, &one_bytes, &one_mapping_bytes)?;
+    let one_mapping_bytes = [
+        serde_json::to_vec(&mappings[0]).map_err(|e| e.to_string())?,
+        b"\n".to_vec()
+    ].concat();
+    let partial = analyze(&graph_bytes, &support_bytes, &one_bytes, &one_mapping_bytes)?;
     if partial.route_assessments[0].any_complete_route_covered_at_returned_k
         || partial.route_assessments[0].mean_partial_route_fraction <= 0.0
     {
@@ -1375,14 +1384,15 @@ fn run_self_tests() -> Result<(), String> {
     }
     println!("SELF_TEST_PASS partial AND-bundle is not counted as complete route");
 
-    let mut ambiguous = synthetic_mapping("node-h2","h2");
+    let mut ambiguous = mappings[1].clone();
     ambiguous.mapping_status = "ambiguous".into();
     ambiguous.declaration_id = None;
     let amb_bytes = [
         serde_json::to_vec(&mappings[0]).map_err(|e| e.to_string())?, b"\n".to_vec(),
-        serde_json::to_vec(&ambiguous).map_err(|e| e.to_string())?, b"\n".to_vec()
+        serde_json::to_vec(&ambiguous).map_err(|e| e.to_string())?, b"\n".to_vec(),
+        serde_json::to_vec(&mappings[2]).map_err(|e| e.to_string())?, b"\n".to_vec()
     ].concat();
-    let no_false = analyze(&support_bytes, &receipts_bytes, &amb_bytes)?;
+    let no_false = analyze(&graph_bytes, &support_bytes, &receipts_bytes, &amb_bytes)?;
     if no_false.route_assessments[0].any_complete_route_covered_at_returned_k
         || no_false.unmapped_candidate_count != 1
     {
@@ -1390,45 +1400,91 @@ fn run_self_tests() -> Result<(), String> {
     }
     println!("SELF_TEST_PASS ambiguous node-to-declaration mapping cannot create route coverage");
 
-    let mut wrong = synthetic_mapping("node-h2","not-in-universe");
-    let wrong_bytes = [
+    let mut wrong_name = mappings[1].clone();
+    wrong_name.declaration_id = Some("h3".into());
+    let wrong_name_bytes = [
         serde_json::to_vec(&mappings[0]).map_err(|e| e.to_string())?, b"\n".to_vec(),
-        serde_json::to_vec(&wrong).map_err(|e| e.to_string())?, b"\n".to_vec()
+        serde_json::to_vec(&wrong_name).map_err(|e| e.to_string())?, b"\n".to_vec(),
+        serde_json::to_vec(&mappings[2]).map_err(|e| e.to_string())?, b"\n".to_vec()
     ].concat();
-    let outside = analyze(&support_bytes, &receipts_bytes, &wrong_bytes)?;
+    if analyze(&graph_bytes, &support_bytes, &receipts_bytes, &wrong_name_bytes).is_ok() {
+        return Err("exact_formal_name crosswalk that disagrees with graph formal_name was accepted".into());
+    }
+    println!("SELF_TEST_PASS exact formal name must equal the pinned graph node formal_name");
+
+    let mut wrong_source = mappings[1].clone();
+    wrong_source.mapping_method = "exact_source_identity".into();
+    wrong_source.source_locator = Some("Demo.lean:999-999".into());
+    wrong_source.statement_sha256 = Some(sha256(b"wrong statement"));
+    let wrong_source_bytes = [
+        serde_json::to_vec(&mappings[0]).map_err(|e| e.to_string())?, b"\n".to_vec(),
+        serde_json::to_vec(&wrong_source).map_err(|e| e.to_string())?, b"\n".to_vec(),
+        serde_json::to_vec(&mappings[2]).map_err(|e| e.to_string())?, b"\n".to_vec()
+    ].concat();
+    if analyze(&graph_bytes, &support_bytes, &receipts_bytes, &wrong_source_bytes).is_ok() {
+        return Err("exact source identity crosswalk that disagrees with graph node was accepted".into());
+    }
+    println!("SELF_TEST_PASS exact source crosswalk must match graph locator and statement digest");
+
+    let mut outside_receipt = receipt.clone();
+    outside_receipt.ranking.candidates.retain(|candidate| candidate.node_id != "node-h2");
+    for (rank, candidate) in outside_receipt.ranking.candidates.iter_mut().enumerate() {
+        candidate.rank = rank + 1;
+    }
+    let outside_receipt_bytes = [
+        serde_json::to_vec(&outside_receipt).map_err(|e| e.to_string())?,
+        b"\n".to_vec()
+    ].concat();
+    let outside_mapping_bytes = [
+        serde_json::to_vec(&mappings[0]).map_err(|e| e.to_string())?, b"\n".to_vec(),
+        serde_json::to_vec(&mappings[2]).map_err(|e| e.to_string())?, b"\n".to_vec()
+    ].concat();
+    let outside = analyze(&graph_bytes, &support_bytes, &outside_receipt_bytes, &outside_mapping_bytes)?;
     if outside.route_assessments[0].mapped_out_of_universe_count != 1
         || outside.route_assessments[0].any_complete_route_covered_at_returned_k
     {
-        return Err("declaration outside mutable support universe was counted".into());
+        return Err("declaration outside mutable universe was counted toward sufficient route".into());
     }
     println!("SELF_TEST_PASS out-of-universe declaration is reported but not counted");
 
     let mut bad = support.clone();
     bad["groups"][0]["minimal_sufficient_support_antichain"] = json!([["h1"],["h1","h2"]]);
     let bad_support = serde_json::to_vec(&bad).map_err(|e| e.to_string())?;
-    if analyze(&bad_support,&receipts_bytes,&mappings_bytes).is_ok() {
+    if analyze(&graph_bytes, &bad_support, &receipts_bytes, &mappings_bytes).is_ok() {
         return Err("non-antichain support routes were accepted".into());
     }
     println!("SELF_TEST_PASS non-minimal support route lattice is rejected");
 
     let mut wrong_target = receipt.clone();
     wrong_target.query.target_statement_sha256 = Some(sha256(b"wrong target"));
-    let wrong_bytes = [serde_json::to_vec(&wrong_target).map_err(|e| e.to_string())?,b"\n".to_vec()].concat();
-    if analyze(&support_bytes,&wrong_bytes,&mappings_bytes).is_ok() {
+    let wrong_bytes = [serde_json::to_vec(&wrong_target).map_err(|e| e.to_string())?, b"\n".to_vec()].concat();
+    if analyze(&graph_bytes, &support_bytes, &wrong_bytes, &mappings_bytes).is_ok() {
         return Err("retrieval receipt matched to different target statement".into());
     }
     println!("SELF_TEST_PASS target statement mismatch is rejected");
 
-    let mut bad_mapping = synthetic_mapping("node-h2","h2");
-    bad_mapping.graph_manifest_sha256 = sha256(b"different graph");
+    let mut bad_graph_mapping = mappings[1].clone();
+    bad_graph_mapping.graph_manifest_sha256 = sha256(b"different graph");
     let bad_bytes = [
-        serde_json::to_vec(&mappings[0]).map_err(|e| e.to_string())?,b"\n".to_vec(),
-        serde_json::to_vec(&bad_mapping).map_err(|e| e.to_string())?,b"\n".to_vec()
+        serde_json::to_vec(&mappings[0]).map_err(|e| e.to_string())?, b"\n".to_vec(),
+        serde_json::to_vec(&bad_graph_mapping).map_err(|e| e.to_string())?, b"\n".to_vec(),
+        serde_json::to_vec(&mappings[2]).map_err(|e| e.to_string())?, b"\n".to_vec()
     ].concat();
-    if analyze(&support_bytes,&receipts_bytes,&bad_bytes).is_ok() {
+    if analyze(&graph_bytes, &support_bytes, &receipts_bytes, &bad_bytes).is_ok() {
         return Err("stale graph mapping was accepted".into());
     }
     println!("SELF_TEST_PASS declaration crosswalk binds exact graph manifest digest");
+
+    let mut wrong_graph_receipt = receipt.clone();
+    wrong_graph_receipt.graph.graph_manifest_sha256 = sha256(b"wrong graph");
+    let wrong_graph_receipt_bytes = [
+        serde_json::to_vec(&wrong_graph_receipt).map_err(|e| e.to_string())?,
+        b"\n".to_vec()
+    ].concat();
+    if analyze(&graph_bytes, &support_bytes, &wrong_graph_receipt_bytes, &mappings_bytes).is_ok() {
+        return Err("retrieval receipt for another graph snapshot was accepted".into());
+    }
+    println!("SELF_TEST_PASS retrieval receipt binds actual supplied graph bytes");
 
     let paired_report = synthetic_report()?;
     if paired_report.paired_comparisons.len() != 1 {
@@ -1450,7 +1506,6 @@ fn run_self_tests() -> Result<(), String> {
     }
     println!("SELF_TEST_PASS same-query retrieval comparison reports challenger route gain");
     println!("SELF_TEST_PASS single-component bootstrap interval remains unavailable rather than pretending IID");
-
     Ok(())
 }
 
