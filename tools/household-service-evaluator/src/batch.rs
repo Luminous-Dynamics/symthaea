@@ -108,6 +108,7 @@ pub struct SourceCorpusManifest {
     pub schema_version: String,
     pub status: String,
     pub scenario_set_revision: String,
+    pub scenario_set_sha256: String,
     pub source_byte_length: usize,
     pub source_sha256: String,
     pub digest_scope: DigestScope,
@@ -225,8 +226,14 @@ fn evaluate_batch_with_sources(
         "HOME-REPAIR-QUAL-001-SYNTHETIC-REPAIR-TASKS-001",
     )?;
 
-    let water_source = source_manifest(water_corpus, water_source_bytes, digest_scope)?;
-    let repair_source = source_manifest(repair_corpus, repair_source_bytes, digest_scope)?;
+    let water_source =
+        source_manifest(water_corpus, "scenarios", water_source_bytes, digest_scope)?;
+    let repair_source = source_manifest(
+        repair_corpus,
+        "task_profiles",
+        repair_source_bytes,
+        digest_scope,
+    )?;
 
     let water_scenarios = validate_scenarios(water_corpus, "scenarios", &WATER_IDS)?;
     let repair_scenarios = validate_scenarios(repair_corpus, "task_profiles", &REPAIR_IDS)?;
@@ -310,18 +317,29 @@ fn validate_source_commit(value: &str) -> Result<String, EvaluationError> {
 
 fn source_manifest(
     corpus: &Value,
+    scenario_collection: &'static str,
     source_bytes: &[u8],
     digest_scope: DigestScope,
 ) -> Result<SourceCorpusManifest, EvaluationError> {
     let corpus_id = required_str(corpus, "corpus_id", "corpus_manifest")?.to_owned();
     let schema_version = required_str(corpus, "schema_version", "corpus_manifest")?.to_owned();
     let status = required_str(corpus, "status", "corpus_manifest")?.to_owned();
+    let scenario_set = corpus[scenario_collection].as_array().ok_or_else(|| {
+        EvaluationError::new(
+            "corpus.scenario_set",
+            format!("{scenario_collection} must be an array"),
+        )
+    })?;
+    let scenario_set_bytes = serde_json::to_vec(scenario_set)
+        .map_err(|error| EvaluationError::new("corpus.scenario_set", error.to_string()))?;
+    let scenario_set_sha256 = sha256_hex(&scenario_set_bytes);
 
     Ok(SourceCorpusManifest {
         corpus_id,
-        schema_version: schema_version.clone(),
+        schema_version,
         status,
-        scenario_set_revision: schema_version,
+        scenario_set_revision: format!("sha256:{scenario_set_sha256}"),
+        scenario_set_sha256,
         source_byte_length: source_bytes.len(),
         source_sha256: sha256_hex(source_bytes),
         digest_scope,
@@ -1398,6 +1416,10 @@ mod tests {
         );
         assert_eq!(original.water_source.source_byte_length, water.len());
         assert_eq!(original.water_source.source_sha256, sha256_hex(water));
+        assert_eq!(
+            original.water_source.scenario_set_sha256,
+            changed.water_source.scenario_set_sha256
+        );
         assert_ne!(
             original.water_source.source_sha256,
             changed.water_source.source_sha256
@@ -1406,6 +1428,28 @@ mod tests {
         assert_eq!(
             original.repair_source.source_sha256,
             changed.repair_source.source_sha256
+        );
+    }
+
+    #[test]
+    fn scenario_set_digest_changes_when_a_scenario_value_changes() {
+        let (water, repair) = fixtures();
+        let before = evaluate_batch(&water, &repair).unwrap();
+        let mut altered = water.clone();
+        altered["scenarios"][0]["input"]["municipal_inlet_flow_l_min"] = json!(9.0);
+        let after = evaluate_batch(&altered, &repair).unwrap();
+
+        assert_eq!(
+            before.water_source.schema_version,
+            after.water_source.schema_version
+        );
+        assert_ne!(
+            before.water_source.scenario_set_sha256,
+            after.water_source.scenario_set_sha256
+        );
+        assert_ne!(
+            before.water_source.scenario_set_revision,
+            after.water_source.scenario_set_revision
         );
     }
 
