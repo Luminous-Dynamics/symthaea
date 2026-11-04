@@ -567,14 +567,73 @@ mod tests {
     #[test]
     fn query_work_grows_by_bitmap_levels_not_candidate_prefix_length() {
         let size = 65_537usize;
-        let mut active = vec![true; size];
-        active[0] = false;
-        let mut index = CandidateSuccessorIndex::new(size, vec![(0..size).collect()], &active).unwrap();
+        let mut active = vec![false; size];
+        active[size - 1] = true;
+        let mut index = CandidateSuccessorIndex::new(
+            size,
+            vec![(0..size).collect()],
+            &active,
+        )
+        .unwrap();
         let (candidate, position) = index.next_active_after_head(0).unwrap().unwrap();
-        assert_eq!((candidate, position), (1, 1));
+        assert_eq!((candidate, position), (size - 1, size - 1));
         let stats = index.stats();
         assert_eq!(stats.successor_queries, 1);
+        // A three-level hierarchy touches at most one word per level, plus
+        // the final selected word. This skips 65,535 inactive positions.
         assert!(stats.bitmap_words_read <= 4);
         assert_eq!(stats.promotions, 0);
+    }
+
+    #[test]
+    fn randomized_updates_match_linear_successor_oracle_after_promotions() {
+        let clause_count = 193usize;
+        let mut seed = 0xE7_032_2026u64;
+        let mut active: Vec<bool> = (0..clause_count)
+            .map(|_| next_random(&mut seed) & 1 == 1)
+            .collect();
+        let mut candidate_lists = Vec::new();
+        for record in 0..23usize {
+            let mut candidates: Vec<usize> = (0..clause_count)
+                .filter(|_| next_random(&mut seed) % 4 != 0)
+                .collect();
+            // Rotate records differently so reverse incidence is nontrivial.
+            let rotate = record % candidates.len().max(1);
+            if !candidates.is_empty() {
+                candidates.rotate_left(rotate);
+            }
+            candidate_lists.push(candidates);
+        }
+        let mut index = CandidateSuccessorIndex::new(
+            clause_count,
+            candidate_lists.clone(),
+            &active,
+        )
+        .unwrap();
+
+        for step in 0..4_000usize {
+            let clause = (next_random(&mut seed) as usize) % clause_count;
+            let value = next_random(&mut seed) & 1 == 1;
+            active[clause] = value;
+            index.set_clause_active(clause, value).unwrap();
+
+            for record in 0..candidate_lists.len() {
+                let current = index.candidates(record).unwrap().to_vec();
+                let expected_position = current
+                    .iter()
+                    .enumerate()
+                    .skip(1)
+                    .find_map(|(position, &candidate)| active[candidate].then_some(position));
+                let expected = expected_position.map(|position| {
+                    (current[position], position)
+                });
+                let actual = index.next_active_after_head(record).unwrap();
+                assert_eq!(actual, expected, "step={step}, record={record}");
+                if let Some((_, position)) = actual {
+                    index.promote_to_head(record, position).unwrap();
+                }
+            }
+            index.validate(&active).unwrap();
+        }
     }
 }
