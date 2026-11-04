@@ -1039,6 +1039,7 @@ pub mod midi_trainer;
 pub mod mixing;
 pub mod motif_memory;
 pub mod musical_inference;
+pub mod grounded_participation;
 pub mod narrative_bridge;
 pub mod param_tuner;
 pub mod percussion;
