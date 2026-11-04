@@ -390,7 +390,9 @@ pub fn validate_physical_run_bundle(
         if trace.start_utc_s < bundle.start_utc_s || trace.end_utc_s > bundle.end_utc_s {
             return Err(EvidenceBundleError::TraceOutsideRun(trace.artifact_id.clone()));
         }
-        if trace.sample_count == 0 || !trace.sample_rate_hz.is_finite() || trace.sample_rate_hz <= 0.0 {
+        // A regular time series needs at least two samples to establish a temporal span.
+        // Single observations belong in a point-observation representation, not this trace type.
+        if trace.sample_count < 2 || !trace.sample_rate_hz.is_finite() || trace.sample_rate_hz <= 0.0 {
             return Err(EvidenceBundleError::InvalidTraceSampling(trace.artifact_id.clone()));
         }
         // The schema stores interval endpoints at one-second resolution.
@@ -978,6 +980,18 @@ mod tests {
         assert!(matches!(
             validate_physical_run_bundle(&bundle, &[ResourceKind::FreshWater]),
             Err(EvidenceBundleError::TraceSamplingWindowMismatch(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_single_sample_trace_without_a_temporal_span() {
+        let mut bundle = valid_bundle();
+        bundle.sensor_traces[0].sample_count = 1;
+        bundle.sensor_traces[0].sample_rate_hz = 100.0;
+        bundle.sensor_traces[0].end_utc_s = bundle.sensor_traces[0].start_utc_s;
+        assert!(matches!(
+            validate_physical_run_bundle(&bundle, &[ResourceKind::FreshWater]),
+            Err(EvidenceBundleError::InvalidTraceSampling(_))
         ));
     }
 
