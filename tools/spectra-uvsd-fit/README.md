@@ -81,6 +81,26 @@ The `bootstrap_coverage` binary simulates known-answer Gaussian category counts 
 
 These are conditional category-count bootstrap intervals, not participant-level cluster bootstrap intervals or a proof of calibrated 95% coverage. They do not account for sampling variability across participants, sessions or sites, and their coverage must be benchmarked against known-answer synthetic campaigns and the external reference workflow before use for scientific conclusions. A large failed-fit fraction is itself a design/identifiability warning, not a nuisance to be silently filtered out.
 
+## Parametric bootstrap (distinct from nonparametric resampling)
+
+The crate also exposes `simulate_uvsd_category_table` and `parametric_bootstrap_intervals`. The sampler generates new signal/noise category counts from a supplied Gaussian UVSD estimate, preserves the frozen category order and each class total, and records a SplitMix64-v1 seed. The parametric bootstrap refits those generated tables and returns percentile intervals only when the successful interior-fit count and fraction meet their configured gates.
+
+This is a model-based sampling distribution under the supplied generating estimate. It is not the nonparametric conditional bootstrap described above: the nonparametric method resamples observed category assignments, while this method samples from Gaussian model-implied category probabilities. Do not pool their replicates or describe them as interchangeable.
+
+The parametric inference path rejects the Miyoshi reference correction. Its 1/K cell addition is a published-software compatibility convention, not the primary unsmoothed multinomial likelihood. The current API generates parameter-bootstrap intervals only. It does **not** yet implement the constrained equal-variance fit, parametric-bootstrap likelihood-ratio test, or profile-likelihood intervals; those remain tracked by [#10467](https://github.com/Luminous-Dynamics/symthaea/issues/10467).
+
+Example usage:
+
+```rust
+let intervals = parametric_bootstrap_intervals(
+    &observed_table,
+    &fitted_estimate,
+    ParametricBootstrapOptions::default(),
+);
+```
+
+A qualified result is still conditional on the Gaussian UVSD model and the supplied fit. It is not evidence of model adequacy or calibrated interval coverage. The Rust implementation and tests in this draft have not been compiled or executed.
+
 ## Run
 
     cargo test --manifest-path tools/spectra-uvsd-fit/Cargo.toml
