@@ -200,7 +200,7 @@ A separate public-development agent-view inventory verifier and `verify-agent-vi
 CLI have been added on a follow-on branch. It uses the same CEB-TREE-V1 commitment
 and requires the manifest and tree digests to be pinned out of band. It is not
 part of the currently merged verifier and is not compiled or tested yet.
-That follow-on branch adds ten inventory-specific unit tests (31 total `#[test]` functions in the current verifier source by static count). Coverage includes parity with the original CEB-TREE-V1 implementation, exact inventory, external pins, extra/missing paths, content/mode changes, unsafe Windows names and control characters, case-fold collisions, symlinks and symlink roots, duplicate/unsorted entries, sealed-status rejection and unknown fields. None of the 31 tests have been compiled or executed in this work session.
+That follow-on branch adds twelve inventory-specific unit tests (33 total `#[test]` functions in the current verifier source by static count). Coverage includes parity with the original CEB-TREE-V1 implementation, exact inventory, external pins, extra/missing paths, content/mode changes, unsafe Windows names and control characters, case-fold collisions, symlinks and symlink roots, duplicate/unsorted entries, sealed-status rejection, unknown fields, internal manifest tree/entry digest tampering and empty-view rejection. None of the 33 tests have been compiled or executed in this work session.
 
 The verifier still does not establish runner isolation, independently adjudicate
 test semantics, or authenticate that a named model provider served the claimed
