@@ -1155,7 +1155,7 @@ mod tests {
         regrade.id = "g2".into();
         regrade.kind = GradeKind::PristineRegrade;
         regrade.execution_id = "run-regrade".into();
-        regrade.sequence = 9;
+        regrade.sequence = 10;
         ledger.grades.push(regrade);
         assert_eq!(ledger.validate(), Ok(()));
     }
@@ -1201,9 +1201,9 @@ mod tests {
         revision_three.id = "h1-r3".into();
         revision_three.sequence = 8;
         ledger.hypotheses.extend([revision_two, revision_three]);
-        ledger.decisions[0].sequence = 7;
-        ledger.repairs[0].sequence = 9;
-        ledger.grades[0].sequence = 10;
+        ledger.decisions[0].sequence = 9;
+        ledger.repairs[0].sequence = 10;
+        ledger.grades[0].sequence = 11;
         assert_eq!(
             ledger.validate(),
             Err(ValidationError::HypothesisRevisionChain)
@@ -1237,6 +1237,7 @@ mod tests {
     fn repair_requires_an_explicit_proceed_decision() {
         let mut ledger = base_ledger();
         ledger.decisions[0].kind = DecisionKind::Abstain;
+        ledger.decisions[0].missing_requirements = vec!["A discriminating observation is unavailable.".into()];
         assert_eq!(
             ledger.validate(),
             Err(ValidationError::RepairWithoutProceedDecision)
@@ -1322,9 +1323,13 @@ mod tests {
         ledger.outcomes[0].status = OutcomeStatus::NotMeasurable;
         ledger.outcomes[0].observation_evidence_id = None;
         ledger.outcomes[0].realized_utility = MetricValue::NotMeasurable;
-        // The hypothesis can no longer claim intervention support.
+        ledger.evidence[0].authority = EvidenceAuthority::RuntimeObserved;
         ledger.hypotheses[0].status = HypothesisStatus::Unresolved;
         ledger.hypotheses[0].supporting_evidence_ids.clear();
+        ledger.decisions[0].kind = DecisionKind::Abstain;
+        ledger.decisions[0].missing_requirements = vec!["A measurable counterfactual is missing.".into()];
+        ledger.repairs.clear();
+        ledger.grades.clear();
         assert_eq!(ledger.validate(), Ok(()));
     }
 
@@ -1372,6 +1377,7 @@ mod tests {
             source_action_id: None,
             sequence: 9,
         });
+        ledger.grades[0].sequence = 10;
         assert_eq!(
             ledger.validate(),
             Err(ValidationError::EvidenceParentOutOfOrder)
