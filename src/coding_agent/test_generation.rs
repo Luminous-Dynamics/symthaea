@@ -26,6 +26,8 @@
 //! well enough to derive test cases, not just pattern-match from training data.
 
 use symthaea_core::synthesis_trait::SynthesisRequest;
+use quote::ToTokens;
+use syn::{FnArg, Pat, Type};
 
 /// A generated test case.
 #[derive(Debug, Clone)]
@@ -43,11 +45,11 @@ pub struct GeneratedTest {
 pub enum TestCategory {
     /// Derived from user-provided examples
     Example,
-    /// Boundary values (0, 1, empty, max)
+    /// Invocation-only smoke probes at common input boundaries; not behavioral oracles.
     Boundary,
-    /// Property-based (e.g., output type, non-negative, idempotent)
+    /// Reserved for checks backed by an independent behavioral contract.
     Property,
-    /// Error handling (invalid inputs, overflow)
+    /// Reserved until an error contract and valid inputs are supplied.
     ErrorCase,
 }
 
@@ -60,22 +62,21 @@ pub struct GeneratedTestSuite {
     pub tests: Vec<GeneratedTest>,
     /// The complete Rust test module source code
     pub source: String,
+    /// Checks not generated because their inputs or oracle were not established.
+    pub unsupported_reasons: Vec<String>,
 }
 
 /// Generates test suites from function specifications.
 pub struct TestGenerator;
 
 impl TestGenerator {
-    /// Generate a test suite from a SynthesisRequest.
-    ///
-    /// Produces tests from three sources:
-    /// 1. User-provided examples (exact I/O pairs)
-    /// 2. Boundary values (inferred from parameter types)
-    /// 3. Property-based checks (inferred from return type)
+    /// Generate tests from explicit examples and safe invocation-only smoke probes.
+    /// A return type alone does not define a behavioral property or error oracle.
     pub fn generate(request: &SynthesisRequest) -> GeneratedTestSuite {
         let mut tests = Vec::new();
+        let mut unsupported_reasons = Vec::new();
 
-        // 1. Example-based tests
+        // Explicit examples carry the expected-value oracle in this API.
         for (i, (input, expected)) in request.examples.iter().enumerate() {
             tests.push(GeneratedTest {
                 name: format!("test_{}_example_{}", request.name, i),
@@ -84,154 +85,237 @@ impl TestGenerator {
             });
         }
 
-        // 2. Boundary tests (inferred from signature)
-        if let Some(ref sig) = request.signature {
-            let boundary_tests = Self::generate_boundary_tests(&request.name, sig);
-            tests.extend(boundary_tests);
+        if let Some(signature) = request.signature.as_deref() {
+            match Self::parse_signature(&request.name, signature) {
+                Ok(parsed) => {
+                    let (boundary_tests, boundary_reasons) =
+                        Self::generate_boundary_tests(&request.name, &parsed.parameters);
+                    tests.extend(boundary_tests);
+                    for reason in boundary_reasons {
+                        Self::push_unique_reason(&mut unsupported_reasons, reason);
+                    }
+
+                    if matches!(
+                        parsed.return_type.as_ref(),
+                        Some(Type::Path(path))
+                            if path.path.segments.last().is_some_and(|segment| {
+                                matches!(segment.ident.to_string().as_str(), "bool" | "Option" | "Result")
+                            })
+                    ) {
+                        Self::push_unique_reason(
+                            &mut unsupported_reasons,
+                            "No property/error oracle was generated from the return type alone. Supply explicit expected examples or an independently sourced behavioral contract.".to_string(),
+                        );
+                    }
+                }
+                Err(reason) => Self::push_unique_reason(&mut unsupported_reasons, reason),
+            }
         }
 
-        // 3. Property tests (inferred from return type)
-        if let Some(ref sig) = request.signature {
-            let property_tests = Self::generate_property_tests(&request.name, sig);
-            tests.extend(property_tests);
-        }
-
-        // Build the test module source
         let source = Self::render_test_module(&request.name, &tests);
-
         GeneratedTestSuite {
             function_name: request.name.clone(),
             tests,
             source,
+            unsupported_reasons,
         }
     }
 
-    /// Generate boundary value tests from a function signature.
-    fn generate_boundary_tests(fn_name: &str, signature: &str) -> Vec<GeneratedTest> {
-        let mut tests = Vec::new();
+    /// Parse the declaration with Rust's AST rather than delimiter/string splitting.
+    /// Generic/method/async/unsafe/extern/variadic contexts are deliberately unsupported.
+    fn parse_signature(fn_name: &str, signature: &str) -> Result<ParsedSignature, String> {
+        let declaration = signature
+            .trim()
+            .trim_end_matches(';')
+            .trim()
+            .trim_end_matches('{')
+            .trim();
+        if declaration.is_empty() {
+            return Err("Signature was empty; no signature-derived tests were generated.".into());
+        }
 
-        // Parse parameter types from signature
-        let params = Self::extract_param_types(signature);
+        let source = format!("{declaration} {{}}");
+        let item = syn::parse_str::<syn::ItemFn>(&source).map_err(|error| {
+            format!("Signature could not be parsed as a Rust function: {error}; no signature-derived tests were generated.")
+        })?;
 
-        for (param_name, param_type) in &params {
-            match param_type.as_str() {
-                "u8" | "u16" | "u32" | "u64" | "usize" => {
-                    // Unsigned integer boundaries: 0, 1
-                    tests.push(GeneratedTest {
-                        name: format!("test_{fn_name}_boundary_{param_name}_zero"),
-                        assertion: format!(
-                            "let _ = {fn_name}({});",
-                            Self::make_call_with_value(&params, param_name, "0")
-                        ),
-                        category: TestCategory::Boundary,
-                    });
-                    tests.push(GeneratedTest {
-                        name: format!("test_{fn_name}_boundary_{param_name}_one"),
-                        assertion: format!(
-                            "let _ = {fn_name}({});",
-                            Self::make_call_with_value(&params, param_name, "1")
-                        ),
-                        category: TestCategory::Boundary,
+        if item.sig.ident.to_string() != fn_name {
+            return Err(format!(
+                "Signature names function {}, but request names {}; no signature-derived tests were generated.",
+                item.sig.ident, fn_name
+            ));
+        }
+        if !item.sig.generics.params.is_empty() || item.sig.generics.where_clause.is_some() {
+            return Err("Generic function signatures require caller-supplied typed examples; no guessed generic arguments were generated.".into());
+        }
+        if item.sig.asyncness.is_some()
+            || item.sig.unsafety.is_some()
+            || item.sig.abi.is_some()
+            || item.sig.variadic.is_some()
+        {
+            return Err("Async, unsafe, extern or variadic signatures require a specialized invocation harness; no signature-derived tests were generated.".into());
+        }
+
+        let mut parameters = Vec::new();
+        for input in &item.sig.inputs {
+            match input {
+                FnArg::Receiver(_) => {
+                    return Err("Method receivers require an instance construction contract; no signature-derived tests were generated.".into());
+                }
+                FnArg::Typed(argument) => {
+                    let Pat::Ident(pattern) = argument.pat.as_ref() else {
+                        return Err("Destructured parameter patterns require explicit typed examples; no signature-derived tests were generated.".into());
+                    };
+                    if pattern.by_ref.is_some() || pattern.subpat.is_some() {
+                        return Err("ref/subpattern parameters require an explicit invocation contract; no signature-derived tests were generated.".into());
+                    }
+                    parameters.push(ParsedParameter {
+                        name: pattern.ident.to_string(),
+                        ty: argument.ty.as_ref().clone(),
                     });
                 }
-                "i8" | "i16" | "i32" | "i64" | "isize" => {
-                    // Signed integer boundaries: -1, 0, 1
-                    tests.push(GeneratedTest {
-                        name: format!("test_{fn_name}_boundary_{param_name}_negative"),
-                        assertion: format!(
-                            "let _ = {fn_name}({});",
-                            Self::make_call_with_value(&params, param_name, "-1")
-                        ),
-                        category: TestCategory::Boundary,
-                    });
-                    tests.push(GeneratedTest {
-                        name: format!("test_{fn_name}_boundary_{param_name}_zero"),
-                        assertion: format!(
-                            "let _ = {fn_name}({});",
-                            Self::make_call_with_value(&params, param_name, "0")
-                        ),
-                        category: TestCategory::Boundary,
-                    });
-                }
-                "f32" | "f64" => {
-                    // Float boundaries: 0.0, -0.0, very small
-                    tests.push(GeneratedTest {
-                        name: format!("test_{fn_name}_boundary_{param_name}_zero"),
-                        assertion: format!(
-                            "let _ = {fn_name}({});",
-                            Self::make_call_with_value(&params, param_name, "0.0")
-                        ),
-                        category: TestCategory::Boundary,
-                    });
-                }
-                t if t.starts_with("&str") || t.starts_with("&String") || t == "String" => {
-                    // String boundaries: empty, single char
-                    tests.push(GeneratedTest {
-                        name: format!("test_{fn_name}_boundary_{param_name}_empty"),
-                        assertion: format!(
-                            "let _ = {fn_name}({});",
-                            Self::make_call_with_value(&params, param_name, "\"\"")
-                        ),
-                        category: TestCategory::Boundary,
-                    });
-                }
-                t if t.contains("Vec<") || t.contains("&[") => {
-                    // Collection boundaries: empty
-                    tests.push(GeneratedTest {
-                        name: format!("test_{fn_name}_boundary_{param_name}_empty"),
-                        assertion: format!(
-                            "let _ = {fn_name}({});",
-                            Self::make_call_with_value(&params, param_name, "&[]")
-                        ),
-                        category: TestCategory::Boundary,
-                    });
-                }
-                _ => {}
             }
         }
 
-        tests
+        let return_type = match &item.sig.output {
+            syn::ReturnType::Default => None,
+            syn::ReturnType::Type(_, ty) => Some(ty.as_ref().clone()),
+        };
+        Ok(ParsedSignature { parameters, return_type })
     }
 
-    /// Generate property-based tests from return type.
-    fn generate_property_tests(fn_name: &str, signature: &str) -> Vec<GeneratedTest> {
+    /// Generate invocation-only smoke probes. These do not assert semantic correctness.
+    fn generate_boundary_tests(
+        fn_name: &str,
+        params: &[ParsedParameter],
+    ) -> (Vec<GeneratedTest>, Vec<String>) {
         let mut tests = Vec::new();
+        let mut unsupported_reasons = Vec::new();
 
-        let return_type = Self::extract_return_type(signature);
+        for parameter in params {
+            let Some(boundaries) = Self::boundary_values_for_type(&parameter.ty) else {
+                Self::push_unique_reason(
+                    &mut unsupported_reasons,
+                    format!(
+                        "No safe boundary constructor is defined for parameter {} of type {}; no guessed Default::default() call was emitted.",
+                        parameter.name,
+                        Self::type_name(&parameter.ty)
+                    ),
+                );
+                continue;
+            };
 
-        match return_type.as_deref() {
-            Some("bool") => {
-                // Boolean return: test that it returns a bool (type check)
+            for (suffix, value) in boundaries {
+                let Some(arguments) = Self::make_call_with_value(params, &parameter.name, &value)
+                else {
+                    Self::push_unique_reason(
+                        &mut unsupported_reasons,
+                        format!(
+                            "Boundary probe for parameter {} was skipped because at least one other parameter has no safe constructor.",
+                            parameter.name
+                        ),
+                    );
+                    continue;
+                };
+
                 tests.push(GeneratedTest {
-                    name: format!("test_{fn_name}_returns_bool"),
-                    assertion: format!(
-                        "let result: bool = {fn_name}(Default::default()); let _ = result;"
-                    ),
-                    category: TestCategory::Property,
+                    name: format!("test_{fn_name}_boundary_{}_{}", parameter.name, suffix),
+                    assertion: format!("let _ = {fn_name}({arguments});"),
+                    category: TestCategory::Boundary,
                 });
             }
-            Some(t) if t.starts_with("Result<") => {
-                // Result return: test that it doesn't panic
-                tests.push(GeneratedTest {
-                    name: format!("test_{fn_name}_does_not_panic"),
-                    assertion: format!("let _ = std::panic::catch_unwind(|| {{ let _ = {fn_name}(Default::default()); }});"),
-                    category: TestCategory::ErrorCase,
-                });
-            }
-            Some(t) if t.starts_with("Option<") => {
-                // Option return: test None case
-                tests.push(GeneratedTest {
-                    name: format!("test_{fn_name}_can_return_none"),
-                    assertion: format!(
-                        "// Option return type: {fn_name} should handle None gracefully"
-                    ),
-                    category: TestCategory::Property,
-                });
-            }
-            _ => {}
         }
+        (tests, unsupported_reasons)
+    }
 
-        tests
+    /// Construct a call only when every other argument has a known type-directed expression.
+    fn make_call_with_value(
+        params: &[ParsedParameter],
+        target_param: &str,
+        value: &str,
+    ) -> Option<String> {
+        params
+            .iter()
+            .map(|parameter| {
+                if parameter.name == target_param {
+                    Some(value.to_string())
+                } else {
+                    Self::default_value_for_type(&parameter.ty)
+                }
+            })
+            .collect::<Option<Vec<_>>>()
+            .map(|arguments| arguments.join(", "))
+    }
+
+    /// Conservative constructors for a small explicit set of Rust input types.
+    fn default_value_for_type(ty: &Type) -> Option<String> {
+        match ty {
+            Type::Reference(reference) if reference.mutability.is_none() => {
+                match reference.elem.as_ref() {
+                    Type::Path(path) if path.path.is_ident("str") => Some("\"\"".into()),
+                    Type::Path(path) if path.path.segments.last().is_some_and(|segment| segment.ident.to_string() == "String") => Some("&String::new()".into()),
+                    Type::Slice(_) => Some("&[]".into()),
+                    _ => None,
+                }
+            }
+            Type::Path(path) if path.qself.is_none() => {
+                let ident = path.path.segments.last()?.ident.to_string();
+                match ident.as_str() {
+                    "u8" | "u16" | "u32" | "u64" | "u128" | "usize"
+                    | "i8" | "i16" | "i32" | "i64" | "i128" | "isize" => Some("0".into()),
+                    "f32" => Some("0.0f32".into()),
+                    "f64" => Some("0.0f64".into()),
+                    "bool" => Some("false".into()),
+                    "char" => Some("'\\0'".into()),
+                    "String" => Some("String::new()".into()),
+                    "Vec" => Some("Vec::new()".into()),
+                    "Option" => Some("None".into()),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Representative input expressions for a target parameter.
+    fn boundary_values_for_type(ty: &Type) -> Option<Vec<(&'static str, String)>> {
+        let values = match ty {
+            Type::Reference(reference) if reference.mutability.is_none() => {
+                match reference.elem.as_ref() {
+                    Type::Path(path) if path.path.is_ident("str") => vec![("empty", "\"\"".into())],
+                    Type::Path(path) if path.path.segments.last().is_some_and(|segment| segment.ident.to_string() == "String") => vec![("empty", "&String::new()".into())],
+                    Type::Slice(_) => vec![("empty", "&[]".into())],
+                    _ => return None,
+                }
+            }
+            Type::Path(path) if path.qself.is_none() => {
+                let ident = path.path.segments.last()?.ident.to_string();
+                match ident.as_str() {
+                    "u8" | "u16" | "u32" | "u64" | "u128" | "usize" => vec![("zero", "0".into()), ("one", "1".into())],
+                    "i8" | "i16" | "i32" | "i64" | "i128" | "isize" => vec![("negative", "-1".into()), ("zero", "0".into())],
+                    "f32" => vec![("zero", "0.0f32".into())],
+                    "f64" => vec![("zero", "0.0f64".into())],
+                    "bool" => vec![("false", "false".into()), ("true", "true".into())],
+                    "char" => vec![("null", "'\\0'".into()), ("letter", "'x'".into())],
+                    "String" => vec![("empty", "String::new()".into())],
+                    "Vec" => vec![("empty", "Vec::new()".into())],
+                    "Option" => vec![("none", "None".into())],
+                    _ => return None,
+                }
+            }
+            _ => return None,
+        };
+        Some(values)
+    }
+
+    fn type_name(ty: &Type) -> String {
+        ty.to_token_stream().to_string()
+    }
+
+    fn push_unique_reason(reasons: &mut Vec<String>, reason: String) {
+        if !reasons.contains(&reason) {
+            reasons.push(reason);
+        }
     }
 
     /// Render tests into a Rust `#[cfg(test)] mod tests` block.
@@ -256,120 +340,18 @@ impl TestGenerator {
         source
     }
 
-    /// Extract parameter names and types from a Rust function signature.
-    fn extract_param_types(signature: &str) -> Vec<(String, String)> {
-        let mut params = Vec::new();
+}
 
-        // Find the parameter list between ( and )
-        let open = match signature.find('(') {
-            Some(i) => i + 1,
-            None => return params,
-        };
-        let close = match signature.find(')') {
-            Some(i) => i,
-            None => return params,
-        };
+#[derive(Debug, Clone)]
+struct ParsedParameter {
+    name: String,
+    ty: Type,
+}
 
-        let param_str = &signature[open..close];
-        if param_str.trim().is_empty() {
-            return params;
-        }
-
-        // Split by comma, handling generic angle brackets
-        for param in Self::split_params(param_str) {
-            let param = param.trim();
-            if param.is_empty() || param == "&self" || param == "&mut self" || param == "self" {
-                continue;
-            }
-
-            // Split by `: ` to get name and type
-            if let Some(colon_pos) = param.find(':') {
-                let name = param[..colon_pos].trim().to_string();
-                let typ = param[colon_pos + 1..].trim().to_string();
-                params.push((name, typ));
-            }
-        }
-
-        params
-    }
-
-    /// Split parameter string by commas, respecting angle bracket nesting.
-    fn split_params(s: &str) -> Vec<String> {
-        let mut parts = Vec::new();
-        let mut current = String::new();
-        let mut depth = 0;
-
-        for ch in s.chars() {
-            match ch {
-                '<' => {
-                    depth += 1;
-                    current.push(ch);
-                }
-                '>' => {
-                    depth -= 1;
-                    current.push(ch);
-                }
-                ',' if depth == 0 => {
-                    parts.push(current.clone());
-                    current.clear();
-                }
-                _ => current.push(ch),
-            }
-        }
-        if !current.is_empty() {
-            parts.push(current);
-        }
-        parts
-    }
-
-    /// Extract return type from a Rust function signature.
-    fn extract_return_type(signature: &str) -> Option<String> {
-        let arrow_pos = signature.find("->")?;
-        let ret = signature[arrow_pos + 2..].trim();
-        // Remove trailing { if present
-        let ret = ret.trim_end_matches('{').trim();
-        if ret.is_empty() {
-            None
-        } else {
-            Some(ret.to_string())
-        }
-    }
-
-    /// Create a function call string with one parameter replaced by a specific value.
-    fn make_call_with_value(
-        params: &[(String, String)],
-        target_param: &str,
-        value: &str,
-    ) -> String {
-        params
-            .iter()
-            .map(|(name, typ)| {
-                if name == target_param {
-                    value.to_string()
-                } else {
-                    Self::default_value_for_type(typ)
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(", ")
-    }
-
-    /// Get a default value for a Rust type (for filling non-target parameters).
-    fn default_value_for_type(typ: &str) -> String {
-        match typ.trim() {
-            "u8" | "u16" | "u32" | "u64" | "usize" => "0".to_string(),
-            "i8" | "i16" | "i32" | "i64" | "isize" => "0".to_string(),
-            "f32" => "0.0f32".to_string(),
-            "f64" => "0.0f64".to_string(),
-            "bool" => "false".to_string(),
-            "&str" => "\"\"".to_string(),
-            "String" => "String::new()".to_string(),
-            t if t.contains("Vec<") => "vec![]".to_string(),
-            t if t.starts_with("&[") => "&[]".to_string(),
-            t if t.starts_with("Option<") => "None".to_string(),
-            _ => "Default::default()".to_string(),
-        }
-    }
+#[derive(Debug, Clone)]
+struct ParsedSignature {
+    parameters: Vec<ParsedParameter>,
+    return_type: Option<Type>,
 }
 
 #[cfg(test)]
@@ -450,36 +432,94 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_param_types() {
-        let params = TestGenerator::extract_param_types("fn add(a: i32, b: i32) -> i32");
-        assert_eq!(params.len(), 2);
-        assert_eq!(params[0].0, "a");
-        assert_eq!(params[0].1, "i32");
-        assert_eq!(params[1].0, "b");
-        assert_eq!(params[1].1, "i32");
+    fn test_signature_parser_uses_rust_ast_for_nested_types() {
+        let parsed = TestGenerator::parse_signature(
+            "find",
+            "fn find(haystack: &[u8], needle: Vec<(u16, Option<u8>)>) -> Option<usize>",
+        )
+        .unwrap();
+
+        assert_eq!(parsed.parameters.len(), 2);
+        assert_eq!(parsed.parameters[0].name, "haystack");
+        assert!(matches!(
+            &parsed.parameters[0].ty,
+            Type::Reference(reference) if matches!(reference.elem.as_ref(), Type::Slice(_))
+        ));
+        assert_eq!(parsed.parameters[1].name, "needle");
+        assert!(matches!(
+            &parsed.parameters[1].ty,
+            Type::Path(path) if path.path.segments.last().is_some_and(|segment| segment.ident.to_string() == "Vec")
+        ));
+        assert!(matches!(parsed.return_type, Some(Type::Path(_))));
     }
 
     #[test]
-    fn test_extract_param_types_generic() {
-        let params = TestGenerator::extract_param_types(
-            "fn find(haystack: &[u8], needle: Vec<u8>) -> Option<usize>",
-        );
-        assert_eq!(params.len(), 2);
-        assert_eq!(params[0].1, "&[u8]");
-        assert_eq!(params[1].1, "Vec<u8>");
+    fn test_signature_parser_rejects_generic_and_receiver_contexts() {
+        assert!(TestGenerator::parse_signature("first", "fn first<T>(items: Vec<T>) -> Option<T>").is_err());
+        assert!(TestGenerator::parse_signature("ready", "fn ready(&self) -> bool").is_err());
     }
 
     #[test]
-    fn test_extract_return_type() {
-        assert_eq!(
-            TestGenerator::extract_return_type("fn add(a: i32) -> i32"),
-            Some("i32".to_string())
-        );
-        assert_eq!(
-            TestGenerator::extract_return_type("fn check() -> Result<(), Error>"),
-            Some("Result<(), Error>".to_string())
-        );
-        assert_eq!(TestGenerator::extract_return_type("fn noop()"), None);
+    fn test_property_like_return_types_do_not_invent_oracles() {
+        let cases = [
+            ("is_ready", "fn is_ready(value: NonDefault) -> bool"),
+            ("parse", "fn parse(input: NonDefault) -> Result<u8, String>"),
+            ("first", "fn first(input: NonDefault) -> Option<u8>"),
+        ];
+
+        for (name, signature) in cases {
+            let request = SynthesisRequest::new("rust", name, "Check a value")
+                .with_signature(signature);
+            let suite = TestGenerator::generate(&request);
+
+            assert!(suite.tests.is_empty(), "{name} must not receive a guessed one-argument property test");
+            assert!(!suite.source.contains("Default::default()"));
+            assert!(
+                suite.unsupported_reasons.iter().any(|reason| reason.contains("No safe boundary constructor"))
+                    || suite.unsupported_reasons.iter().any(|reason| reason.contains("No property/error oracle")),
+                "unsupported construction/oracle must be explicit: {:?}",
+                suite.unsupported_reasons
+            );
+        }
+    }
+
+    #[test]
+    fn test_multi_parameter_smoke_calls_preserve_arity() {
+        let request = SynthesisRequest::new("rust", "clamp", "Clamp a value")
+            .with_signature("fn clamp(value: i32, min: i32, max: i32) -> i32");
+        let suite = TestGenerator::generate(&request);
+
+        assert_eq!(suite.tests.len(), 6);
+        for test in &suite.tests {
+            assert_eq!(test.category, TestCategory::Boundary);
+            let args = test.assertion.split_once("clamp(").unwrap().1.trim_end_matches(");");
+            assert_eq!(args.split(',').count(), 3, "{}", test.assertion);
+        }
+        assert!(suite.unsupported_reasons.is_empty());
+    }
+
+    #[test]
+    fn test_unknown_parameter_prevents_guessed_default_argument() {
+        let request = SynthesisRequest::new("rust", "check", "Check a value")
+            .with_signature("fn check(value: i32, context: NonDefault) -> bool");
+        let suite = TestGenerator::generate(&request);
+
+        assert!(suite.tests.is_empty());
+        assert!(!suite.source.contains("Default::default()"));
+        assert!(!suite.source.contains("check("));
+        assert!(suite.unsupported_reasons.iter().any(|reason| reason.contains("no safe constructor")));
+    }
+
+    #[test]
+    fn test_option_return_does_not_create_comment_only_test() {
+        let request = SynthesisRequest::new("rust", "lookup", "Look up an item")
+            .with_signature("fn lookup(key: u32) -> Option<String>");
+        let suite = TestGenerator::generate(&request);
+
+        assert!(!suite.source.contains("can_return_none"));
+        assert!(!suite.source.contains("Option return type"));
+        assert!(suite.tests.iter().all(|test| !test.assertion.trim_start().starts_with("//")));
+        assert!(suite.unsupported_reasons.iter().any(|reason| reason.contains("No property/error oracle")));
     }
 
     #[test]
