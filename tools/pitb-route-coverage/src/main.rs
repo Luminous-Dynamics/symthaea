@@ -1194,10 +1194,69 @@ fn synthetic_support_report() -> Value {
     })
 }
 
-fn synthetic_receipt() -> Receipt {
+fn synthetic_graph_manifest() -> Result<(Vec<u8>, GraphManifest), String> {
+    let value = json!({
+        "schema_version": "pitb.proof-graph-evidence.v0",
+        "evidence_class": "synthetic_contract_fixture",
+        "snapshot": {
+            "snapshot_id": "graph-a",
+            "repository_commit": "2".repeat(40),
+            "environment_sha256": sha256(b"environment"),
+            "extractor_id": "synthetic",
+            "extractor_version": "v0",
+            "extractor_config_sha256": sha256(b"extractor-config")
+        },
+        "nodes": [
+            {
+                "node_id": "node-h1",
+                "kind": "formal_declaration",
+                "label": "h1",
+                "formal_name": "h1",
+                "source_locator": "Demo.lean:1-1",
+                "statement_sha256": sha256(b"statement h1"),
+                "statement_artifact_id": "artifact-h1"
+            },
+            {
+                "node_id": "node-h2",
+                "kind": "formal_declaration",
+                "label": "h2",
+                "formal_name": "h2",
+                "source_locator": "Demo.lean:2-2",
+                "statement_sha256": sha256(b"statement h2"),
+                "statement_artifact_id": "artifact-h2"
+            },
+            {
+                "node_id": "node-h3",
+                "kind": "formal_declaration",
+                "label": "h3",
+                "formal_name": "h3",
+                "source_locator": "Demo.lean:3-3",
+                "statement_sha256": sha256(b"statement h3"),
+                "statement_artifact_id": "artifact-h3"
+            },
+            {
+                "node_id": "node-hx",
+                "kind": "formal_declaration",
+                "label": "not-in-universe",
+                "formal_name": "not-in-universe",
+                "source_locator": "Demo.lean:4-4",
+                "statement_sha256": sha256(b"statement not-in-universe"),
+                "statement_artifact_id": "artifact-hx"
+            }
+        ],
+        "edges": [],
+        "artifacts": [],
+        "upstream_provenance": null
+    });
+    let bytes = serde_json::to_vec_pretty(&value).map_err(|e| format!("serialize synthetic graph manifest: {e}"))?;
+    let graph = load_graph_manifest(&bytes)?;
+    Ok((bytes, graph))
+}
+
+fn synthetic_receipt(graph: &GraphManifest) -> Receipt {
     let target = sha256(b"target statement");
-    let env = sha256(b"environment");
-    let graph_sha = sha256(b"graph manifest");
+    let env = graph.environment_sha256.clone();
+    let graph_sha = graph.manifest_sha256.clone();
     let candidates = vec![
         RankedCandidate {
             rank: 1, node_id: "node-h1".into(), score: Some(0.9),
@@ -1209,10 +1268,21 @@ fn synthetic_receipt() -> Receipt {
             upstream_candidate_id: Some("u2".into()), source_relation_label: Some("USES_CLASS".into()),
             evidence_artifact_sha256: sha256(b"evidence-2")
         },
+        RankedCandidate {
+            rank: 3, node_id: "node-hx".into(), score: Some(0.7),
+            upstream_candidate_id: Some("u4".into()), source_relation_label: Some("USES_DEFINITION".into()),
+            evidence_artifact_sha256: sha256(b"evidence-x")
+        },
     ];
-    let mut ids = vec!["node-h1".to_string(),"node-h2".to_string(),"node-h3".to_string()];
+    let mut ids = vec![
+        "node-h1".to_string(),
+        "node-h2".to_string(),
+        "node-h3".to_string(),
+        "node-hx".to_string()
+    ];
     ids.sort();
-    let set_bytes = serde_json::to_vec(&ids).unwrap();
+    let id_set: BTreeSet<String> = ids.iter().cloned().collect();
+    let set_bytes = serde_json::to_vec(&id_set).unwrap();
     Receipt {
         schema_version: RETRIEVAL_SCHEMA.into(),
         evidence_class: "external_candidate_run".into(),
@@ -1235,11 +1305,13 @@ fn synthetic_receipt() -> Receipt {
             target_statement_sha256: Some(target), target_environment_sha256: env.clone()
         },
         graph: GraphBinding {
-            snapshot_id: "graph-a".into(), repository_commit: "2".repeat(40),
-            environment_sha256: env, graph_manifest_sha256: graph_sha.clone()
+            snapshot_id: graph.snapshot_id.clone(),
+            repository_commit: graph.repository_commit.clone(),
+            environment_sha256: env,
+            graph_manifest_sha256: graph_sha
         },
         candidate_pool: CandidatePool {
-            candidate_count: 3, requested_top_k: 2, candidate_node_ids: ids,
+            candidate_count: ids.len(), requested_top_k: 3, candidate_node_ids: ids,
             node_id_set_sha256: sha256(&set_bytes), candidate_policy_sha256: sha256(b"policy")
         },
         ranking: Ranking {
@@ -1252,16 +1324,18 @@ fn synthetic_receipt() -> Receipt {
     }
 }
 
-fn synthetic_mapping(node: &str, declaration: &str) -> Mapping {
+fn synthetic_mapping(graph_sha: &str, node: &str, declaration: &str) -> Mapping {
     Mapping {
         schema_version: MAPPING_SCHEMA.into(),
-        graph_manifest_sha256: sha256(b"graph manifest"),
+        graph_manifest_sha256: graph_sha.into(),
         node_id: node.into(),
         mapping_status: "exact".into(),
         declaration_id: Some(declaration.into()),
         mapping_method: "exact_formal_name".into(),
         mapping_evidence_sha256: sha256(format!("{node}:{declaration}").as_bytes()),
-        reviewer_attestation_sha256: None
+        reviewer_attestation_sha256: None,
+        source_locator: None,
+        statement_sha256: None
     }
 }
 
