@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-snapshot-integrity-report-v0.schema.json",
+  "title": "PITB SorryDB snapshot integrity report v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "database_sha256",
+    "evaluation_split_sha256",
+    "database_task_count",
+    "evaluation_task_count",
+    "training_pool_task_count",
+    "repository_count",
+    "duplicate_task_id_count",
+    "duplicate_source_location_count",
+    "evaluation_ids_sha256",
+    "repositories",
+    "source_identity_status",
+    "lean_replay_status",
+    "semantic_specification_status",
+    "proof_verification_status",
+    "trust_boundary",
+    "interpretation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-snapshot-integrity-report.v0"
+    },
+    "database_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "evaluation_split_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "database_task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evaluation_task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "training_pool_task_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "repository_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "duplicate_task_id_count": {
+      "const": 0
+    },
+    "duplicate_source_location_count": {
+      "const": 0
+    },
+    "evaluation_ids_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "repositories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "remote",
+          "task_count",
+          "evaluation_task_count",
+          "commits",
+          "lean_versions"
+        ],
+        "properties": {
+          "remote": {
+            "type": "string",
+            "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+          },
+          "task_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "evaluation_task_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "commits": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            }
+          },
+          "lean_versions": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "source_identity_status": {
+      "const": "database_and_evaluation_split_consistent"
+    },
+    "lean_replay_status": {
+      "const": "not_performed"
+    },
+    "semantic_specification_status": {
+      "const": "not_performed"
+    },
+    "proof_verification_status": {
+      "const": "not_performed"
+    },
+    "trust_boundary": {
+      "type": "string",
+      "minLength": 50
+    },
+    "interpretation": {
+      "type": "string",
+      "minLength": 50
+    }
+  }
+}
