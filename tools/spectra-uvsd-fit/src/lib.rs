@@ -1189,6 +1189,80 @@ mod tests {
     }
 
     #[test]
+    fn matches_published_miyoshi_reference_example_with_explicit_correction() {
+        // Source vectors from kiyomiyoshi/rt_type1_roc README. That reference
+        // orders strongest-Yes to strongest-No; this crate orders evidence
+        // from strongest-No to strongest-Yes, so reverse both vectors.
+        let absent_reference = [10_u64, 7, 16, 27, 29, 10];
+        let present_reference = [43_u64, 21, 10, 12, 8, 3];
+        let categories = (0..absent_reference.len())
+            .map(|index| {
+                let reverse = absent_reference.len() - 1 - index;
+                CategoryCount {
+                    order: index as i16,
+                    signal: present_reference[reverse],
+                    noise: absent_reference[reverse],
+                }
+            })
+            .collect();
+        let table = CategoryTable::new(categories).unwrap();
+        let options = FitOptions {
+            count_correction: CountCorrection::MiyoshiReferencePerCategory,
+            ..FitOptions::default()
+        };
+        let result = fit(&table, options);
+        assert_eq!(result.status, FitStatus::Converged, "{result:?}");
+        let estimate = result.estimate.unwrap();
+        assert!((estimate.mu - 1.231_417).abs() < 0.005, "{estimate:?}");
+        assert!((estimate.sigma - 1.252_275).abs() < 0.005, "{estimate:?}");
+        assert!((estimate.d_a - 1.086_691).abs() < 0.005, "{estimate:?}");
+        let nll = result.diagnostics.negative_log_likelihood.unwrap();
+        assert!((nll - 315.878_1).abs() < 0.01, "NLL={nll}");
+    }
+
+    #[test]
+    fn reference_count_correction_is_explicit_and_gradient_consistent() {
+        let table = synthetic_table(1.2, 1.4, 40_000);
+        let estimate = UvsdEstimate::new(1.1, 1.3, vec![-0.8, 0.1, 1.2]).unwrap();
+        let raw = negative_log_likelihood(&table, &estimate).unwrap();
+        let corrected = negative_log_likelihood_with_correction(
+            &table,
+            &estimate,
+            CountCorrection::MiyoshiReferencePerCategory,
+        )
+        .unwrap();
+        assert_ne!(raw, corrected);
+        let gradient = negative_log_likelihood_gradient_with_correction(
+            &table,
+            &estimate,
+            CountCorrection::MiyoshiReferencePerCategory,
+        )
+        .unwrap();
+        let epsilon = 1.0e-5;
+        let plus = UvsdEstimate::new(
+            estimate.mu + epsilon,
+            estimate.sigma,
+            estimate.thresholds.clone(),
+        )
+        .unwrap();
+        let minus = UvsdEstimate::new(
+            estimate.mu - epsilon,
+            estimate.sigma,
+            estimate.thresholds.clone(),
+        )
+        .unwrap();
+        let finite_difference = (
+            negative_log_likelihood_with_correction(
+                &table, &plus, CountCorrection::MiyoshiReferencePerCategory
+            ).unwrap()
+            - negative_log_likelihood_with_correction(
+                &table, &minus, CountCorrection::MiyoshiReferencePerCategory
+            ).unwrap()
+        ) / (2.0 * epsilon);
+        assert!((gradient.mu - finite_difference).abs() < 1.0e-3 * (1.0 + finite_difference.abs()));
+    }
+
+    #[test]
     fn derivative_free_optimizer_produces_inspectable_fit() {
         let table = synthetic_table(1.0, 1.35, 100_000);
         let options = FitOptions {
