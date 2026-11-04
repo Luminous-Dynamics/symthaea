@@ -39,6 +39,8 @@ impl Error for EvaluationError {}
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct MeterMeasurement {
     pub value_l: f64,
+    /// Conservative absolute error bound for this individual measurement term.
+    pub absolute_error_bound_l: f64,
     pub stream_id: String,
     pub measurement_boundary_id: String,
     pub window_start_unix_ms: i64,
@@ -63,10 +65,6 @@ pub struct WaterBalanceInput {
     pub tank_storage_delta: MeterMeasurement,
     pub delivered_outlet: MeterMeasurement,
     pub purge_and_overflow: MeterMeasurement,
-    /// Conservative aggregate absolute error bound for the complete residual.
-    /// This must already include all four terms; no independence or covariance
-    /// assumption is made by this crate.
-    pub residual_absolute_error_bound_l: f64,
     pub topology_audit: Option<TopologyAuditReference>,
 }
 
@@ -86,6 +84,7 @@ pub struct WaterBalanceResult {
     pub residual_l: f64,
     pub residual_lower_l: f64,
     pub residual_upper_l: f64,
+    pub aggregate_absolute_error_bound_l: f64,
     pub disposition: WaterBalanceDisposition,
     pub topology_audit_reference_present: bool,
     pub uncertainty_semantics: String,
@@ -121,11 +120,27 @@ pub fn evaluate_water_balance(
     }
 
     let mut all_calibrated = true;
+    let mut aggregate_absolute_error_bound_l = 0.0;
     for (name, measurement) in terms {
         if !measurement.value_l.is_finite() {
             return Err(EvaluationError::new(
                 name,
                 "measurement value must be finite",
+            ));
+        }
+        if !measurement.absolute_error_bound_l.is_finite()
+            || measurement.absolute_error_bound_l < 0.0
+        {
+            return Err(EvaluationError::new(
+                name,
+                "per-measurement absolute error bound must be finite and nonnegative",
+            ));
+        }
+        aggregate_absolute_error_bound_l += measurement.absolute_error_bound_l;
+        if !aggregate_absolute_error_bound_l.is_finite() {
+            return Err(EvaluationError::new(
+                "aggregate_absolute_error_bound_l",
+                "sum of per-measurement error bounds is not finite",
             ));
         }
         if measurement.stream_id.trim().is_empty() {
@@ -191,15 +206,6 @@ pub fn evaluate_water_balance(
         }
     }
 
-    if !input.residual_absolute_error_bound_l.is_finite()
-        || input.residual_absolute_error_bound_l < 0.0
-    {
-        return Err(EvaluationError::new(
-            "residual_absolute_error_bound_l",
-            "residual error bound must be finite and nonnegative",
-        ));
-    }
-
     if let Some(audit) = &input.topology_audit {
         validate_sha256(&audit.report_sha256, "topology_audit.report_sha256")?;
     }
@@ -215,8 +221,8 @@ pub fn evaluate_water_balance(
         ));
     }
 
-    let residual_lower_l = residual_l - input.residual_absolute_error_bound_l;
-    let residual_upper_l = residual_l + input.residual_absolute_error_bound_l;
+    let residual_lower_l = residual_l - aggregate_absolute_error_bound_l;
+    let residual_upper_l = residual_l + aggregate_absolute_error_bound_l;
     if !residual_lower_l.is_finite() || !residual_upper_l.is_finite() {
         return Err(EvaluationError::new(
             "residual_interval",
@@ -238,9 +244,10 @@ pub fn evaluate_water_balance(
         residual_l,
         residual_lower_l,
         residual_upper_l,
+        aggregate_absolute_error_bound_l,
         disposition,
         topology_audit_reference_present: input.topology_audit.is_some(),
-        uncertainty_semantics: "declared aggregate absolute residual-error bound; no independence or covariance assumption".to_owned(),
+        uncertainty_semantics: "worst-case interval propagation by summing per-term absolute error bounds; no independence or covariance assumption".to_owned(),
     })
 }
 
@@ -470,6 +477,7 @@ mod tests {
             measurement_boundary_id: boundary.to_owned(),
             window_start_unix_ms: start,
             window_end_unix_ms: end,
+            absolute_error_bound_l: 1.25,
             calibration_qualified: true,
             calibration_record_sha256: Some("a".repeat(64)),
         }
@@ -481,7 +489,6 @@ mod tests {
             tank_storage_delta: measurement(120.0, "tank-stream", "tank-boundary", 1, 1001),
             delivered_outlet: measurement(520.0, "outlet-stream", "outlet-boundary", 1, 1001),
             purge_and_overflow: measurement(40.0, "purge-stream", "purge-boundary", 1, 1001),
-            residual_absolute_error_bound_l: 5.0,
             topology_audit: Some(TopologyAuditReference {
                 report_sha256: "b".repeat(64),
             }),
@@ -510,6 +517,7 @@ mod tests {
         assert_eq!(result.residual_l, -200.0);
         assert_eq!(result.residual_lower_l, -205.0);
         assert_eq!(result.residual_upper_l, -195.0);
+        assert_eq!(result.aggregate_absolute_error_bound_l, 5.0);
         assert_eq!(
             result.disposition,
             WaterBalanceDisposition::ContradictionBeyondDeclaredBound
@@ -543,7 +551,6 @@ mod tests {
         input.tank_storage_delta.value_l = 0.0;
         input.delivered_outlet.value_l = 475.0;
         input.purge_and_overflow.value_l = 0.0;
-        input.residual_absolute_error_bound_l = 5.0;
         assert_eq!(
             evaluate_water_balance(&input).unwrap().disposition,
             WaterBalanceDisposition::ZeroNotExcludedByDeclaredBound
@@ -588,7 +595,35 @@ mod tests {
     #[test]
     fn negative_uncertainty_is_rejected() {
         let mut input = balance();
-        input.residual_absolute_error_bound_l = -0.1;
+        input.inlet.absolute_error_bound_l = -0.1;
+        assert!(evaluate_water_balance(&input).is_err());
+    }
+
+    #[test]
+    fn non_finite_per_measurement_uncertainty_is_rejected() {
+        let mut input = balance();
+        input.inlet.absolute_error_bound_l = f64::INFINITY;
+        assert!(evaluate_water_balance(&input).is_err());
+    }
+
+    #[test]
+    fn aggregate_uncertainty_is_the_conservative_sum_of_all_four_terms() {
+        let mut input = balance();
+        input.inlet.absolute_error_bound_l = 1.0;
+        input.tank_storage_delta.absolute_error_bound_l = 2.0;
+        input.delivered_outlet.absolute_error_bound_l = 3.0;
+        input.purge_and_overflow.absolute_error_bound_l = 4.0;
+        let result = evaluate_water_balance(&input).unwrap();
+        assert_eq!(result.aggregate_absolute_error_bound_l, 10.0);
+        assert_eq!(result.residual_lower_l, -210.0);
+        assert_eq!(result.residual_upper_l, -190.0);
+    }
+
+    #[test]
+    fn overflow_when_summing_measurement_bounds_is_rejected() {
+        let mut input = balance();
+        input.inlet.absolute_error_bound_l = f64::MAX;
+        input.tank_storage_delta.absolute_error_bound_l = f64::MAX;
         assert!(evaluate_water_balance(&input).is_err());
     }
 
