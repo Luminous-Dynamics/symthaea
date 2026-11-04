@@ -59,8 +59,8 @@ fn existing_wcont_008_fixture_is_recomputed_with_conservative_meter_bounds() {
             report_sha256: "b".repeat(64),
         }),
     };
-    let encoded_input = serde_json::to_vec(&input)
-        .expect("typed evidence input must serialize deterministically");
+    let encoded_input =
+        serde_json::to_vec(&input).expect("typed evidence input must serialize deterministically");
     let decoded_input: WaterBalanceInput = serde_json::from_slice(&encoded_input)
         .expect("typed evidence input must deserialize without changing its contract");
     let result = evaluate_water_balance(&decoded_input)
@@ -75,7 +75,10 @@ fn existing_wcont_008_fixture_is_recomputed_with_conservative_meter_bounds() {
     );
     let receipt = serde_json::to_value(&result)
         .expect("evaluation result must serialize as a machine-readable receipt");
-    assert_eq!(receipt["disposition"], "contradiction_beyond_declared_bound");
+    assert_eq!(
+        receipt["disposition"],
+        "contradiction_beyond_declared_bound"
+    );
     assert_eq!(receipt["residual_l"], -200.0);
     assert_eq!(receipt["residual_lower_l"], -220.0);
     assert_eq!(receipt["residual_upper_l"], -180.0);
