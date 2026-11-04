@@ -51,6 +51,10 @@ For demand interval [d-, d+] and qualified-delivery interval [q-, q+], the defic
 Unit rules are explicit and no implicit conversion is performed:
 - L/min integrates over minutes to L;
 - L/hour integrates over hours to L;
+- Electrical kW integrates over hours to kWh-electric;
+- Useful thermal kW integrates over hours to kWh-thermal. These energy carriers are distinct and cannot be mixed.
+- L/min integrates over minutes to L;
+- L/hour integrates over hours to L;
 - kW integrates over hours to kWh.
 
 The operation uses conservative interval bounds and assumes neither statistical independence nor a covariance model. Floating-point duration conversion, division, subtraction and integration are widened outward by adjacent representable f64 values so rounding-to-nearest does not silently shrink the interval; if outward widening becomes non-finite, evaluation fails closed. It rejects unit mismatch, non-finite/negative/reversed intervals, zero duration and non-finite integrated results.
