@@ -325,8 +325,8 @@ mod tests {
 
     #[test]
     fn qualified_delivery_uses_physical_interval() {
-        let result = evaluate_service_deficit(water_input(ServiceQualification::Qualified))
-            .expect("valid");
+        let result =
+            evaluate_service_deficit(water_input(ServiceQualification::Qualified)).expect("valid");
 
         assert_eq!(
             result.qualified_delivered,
