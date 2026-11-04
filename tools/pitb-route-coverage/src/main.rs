@@ -181,7 +181,7 @@ struct RouteAssessment {
     mapped_out_of_universe_count: usize,
     unresolved_or_ambiguous_candidate_count: usize,
     useful_route_candidate_count: usize,
-    useful_novel_premise_rate: Option<f64>,
+    useful_route_premise_rate: Option<f64>,
     necessary_declaration_count: usize,
     necessary_declaration_recall: Option<f64>,
     minimal_route_count: usize,
@@ -210,7 +210,7 @@ struct ComparisonSummary {
     any_complete_route_covered_count: usize,
     any_complete_route_coverage: f64,
     mean_minimal_route_coverage: f64,
-    mean_useful_novel_premise_rate: Option<f64>,
+    mean_useful_route_premise_rate: Option<f64>,
     mean_necessary_declaration_recall: Option<f64>,
     total_cost_microusd: u64,
     total_retrieval_wall_ms: u64,
@@ -635,7 +635,7 @@ fn build_coverage(
         mapped_out_of_universe_count: mapped_outside,
         unresolved_or_ambiguous_candidate_count: unresolved,
         useful_route_candidate_count: useful,
-        useful_novel_premise_rate: useful_rate,
+        useful_route_premise_rate: useful_rate,
         necessary_declaration_count: necessary.len(),
         necessary_declaration_recall: necessary_recall,
         minimal_route_count: route_count,
@@ -667,7 +667,7 @@ fn summarize(assessments: &[RouteAssessment]) -> Vec<ComparisonSummary> {
     groups.into_iter().map(|((kind, name, version), rows)| {
         let covered = rows.iter().filter(|row| row.any_complete_route_covered_at_returned_k).count();
         let mean_route = rows.iter().map(|row| row.minimal_route_coverage_at_returned_k).sum::<f64>() / rows.len() as f64;
-        let useful_values: Vec<f64> = rows.iter().filter_map(|row| row.useful_novel_premise_rate).collect();
+        let useful_values: Vec<f64> = rows.iter().filter_map(|row| row.useful_route_premise_rate).collect();
         let necessary_values: Vec<f64> = rows.iter().filter_map(|row| row.necessary_declaration_recall).collect();
         let mut unique_receipts = BTreeMap::<String, &RouteAssessment>::new();
         for row in &rows {
@@ -682,7 +682,7 @@ fn summarize(assessments: &[RouteAssessment]) -> Vec<ComparisonSummary> {
             any_complete_route_covered_count: covered,
             any_complete_route_coverage: covered as f64 / rows.len() as f64,
             mean_minimal_route_coverage: mean_route,
-            mean_useful_novel_premise_rate: if useful_values.is_empty() { None } else { Some(useful_values.iter().sum::<f64>() / useful_values.len() as f64) },
+            mean_useful_route_premise_rate: if useful_values.is_empty() { None } else { Some(useful_values.iter().sum::<f64>() / useful_values.len() as f64) },
             mean_necessary_declaration_recall: if necessary_values.is_empty() { None } else { Some(necessary_values.iter().sum::<f64>() / necessary_values.len() as f64) },
             total_cost_microusd: unique_receipts.values().map(|x| x.cost_microusd).sum(),
             total_retrieval_wall_ms: unique_receipts.values().map(|x| x.retrieval_wall_ms).sum(),
@@ -898,7 +898,7 @@ fn run_self_tests() -> Result<(), String> {
         || report.route_assessments[0].any_complete_route_covered_at_returned_k != true
         || report.route_assessments[0].minimal_routes_covered_at_returned_k != 1
         || report.route_assessments[0].best_route_completion_rank != Some(2)
-        || report.route_assessments[0].useful_novel_premise_rate != Some(1.0)
+        || report.route_assessments[0].useful_route_premise_rate != Some(1.0)
     {
         return Err("retrieval route coverage positive control failed".into());
     }
