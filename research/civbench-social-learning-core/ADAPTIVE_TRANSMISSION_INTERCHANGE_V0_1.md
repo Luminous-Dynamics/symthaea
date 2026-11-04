@@ -1,6 +1,6 @@
 # Adaptive transmission interchange v0.1
 
-**Status:** proposed cross-project contract; not an implemented authorization boundary.  
+**Status:** proposed cross-project contract with a partial synthetic disclosure-mode prototype; not an implemented authorization or consent-enforcement boundary.  
 **Purpose:** describe one knowledge/capability transmission decision and its observed outcomes across Symthaea, Symtropy, Mycelix and Sol-Atlas.  
 **Non-goal:** create a second general-purpose claim ledger, run manifest, identity system or source repository.
 
@@ -62,6 +62,14 @@ Possible disclosure modes:
 - `centralized_full_state`: permitted only as an explicit research upper-bound condition with access controls and a documented privacy assessment.
 
 Do not treat the centralized upper bound as the default deployment architecture.
+
+### Executable disclosure prototype boundary
+
+The Symthaea CivBench research crate now implements two simulated recipient-state modes in `adaptive_transmission.rs`:
+- `central_full_inventory`: full-state research upper bound;
+- `coarse_recipe_readiness`: recipient-side per-recipe readiness signal for unheld recipes, exposing a recipe ID and matched-prerequisite fraction rather than the complete element/recipe inventory.
+
+This maps to the schema's `centralized_full_state` and `coarse_need_signal` modes. The coarse signal is not anonymous and is not a formal privacy mechanism: repeated requests/readiness values may permit inference about private inventory. The executable mode also rejects collective-novelty program features because they require a global inventory view. The runtime does not yet enforce real consent, mandate validation, payload licensing, cryptographic identity or secure aggregation. See `PRIVACY_PRESERVING_TRANSMISSION_PROTOCOL_V0_1.md` for the performance/leakage benchmark.
 
 ## 5. Payload classes and negative knowledge
 
