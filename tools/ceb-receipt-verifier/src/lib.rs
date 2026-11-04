@@ -1103,6 +1103,17 @@ fn safe_agent_view_relative_path(path: &str) -> bool {
 fn hash_agent_view_snapshot(
     root: &Path,
 ) -> Result<(String, Vec<AgentViewManifestEntry>), Failure> {
+    let root_metadata = fs::symlink_metadata(root).map_err(|error| {
+        Failure::protocol(format!(
+            "cannot stat agent-view root {}: {error}",
+            root.display()
+        ))
+    })?;
+    if !root_metadata.file_type().is_dir() {
+        return Err(Failure::protocol(
+            "agent-view snapshot root must be a real directory, not a symlink or file",
+        ));
+    }
     let entries = collect_snapshot_entries(root)?;
     if entries.is_empty() {
         return Err(Failure::unresolved("agent view must not be empty"));
@@ -3498,6 +3509,75 @@ mod tests {
         fs::write(root.path().join("src/other.rs"), b"lower").unwrap();
         let tree_digest = hash_source_tree_inner(root.path()).unwrap();
         let report = verify_test_agent_view(root.path(), &manifest, "CEB-REPO-001", &tree_digest);
+        assert!(!report.accepted);
+    }
+
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_view_verifier_rejects_content_and_mode_changes() {
+        use std::fs;
+        use std::os::unix::fs::PermissionsExt;
+        let root = tempfile::tempdir().unwrap();
+        let file_path = root.path().join("lib.rs");
+        fs::write(&file_path, b"pub fn ok() {}\n").unwrap();
+        let manifest = test_agent_view_manifest(root.path(), "CEB-REPO-001");
+        let digest = hash_source_tree_inner(root.path()).unwrap();
+
+        fs::write(&file_path, b"pub fn no() {}\n").unwrap();
+        let changed_content = verify_test_agent_view(root.path(), &manifest, "CEB-REPO-001", &digest);
+        assert!(!changed_content.accepted);
+
+        fs::write(&file_path, b"pub fn ok() {}\n").unwrap();
+        let manifest = test_agent_view_manifest(root.path(), "CEB-REPO-001");
+        let digest = hash_source_tree_inner(root.path()).unwrap();
+        let mut permissions = fs::metadata(&file_path).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&file_path, permissions).unwrap();
+        let changed_mode = verify_test_agent_view(root.path(), &manifest, "CEB-REPO-001", &digest);
+        assert!(!changed_mode.accepted);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_view_verifier_rejects_reordered_duplicate_and_wrong_mode_entries() {
+        use std::fs;
+        let root = tempfile::tempdir().unwrap();
+        fs::write(root.path().join("a.rs"), b"a").unwrap();
+        fs::write(root.path().join("b.rs"), b"b").unwrap();
+        let manifest = test_agent_view_manifest(root.path(), "CEB-REPO-001");
+        let digest = hash_source_tree_inner(root.path()).unwrap();
+        let mut value: Value = serde_json::from_slice(&manifest).unwrap();
+
+        value["entries"].as_array_mut().unwrap().swap(0, 1);
+        let reordered = serde_json::to_vec(&value).unwrap();
+        assert!(!verify_test_agent_view(root.path(), &reordered, "CEB-REPO-001", &digest).accepted);
+
+        let mut value: Value = serde_json::from_slice(&manifest).unwrap();
+        value["entries"][1]["path"] = value["entries"][0]["path"].clone();
+        let duplicate = serde_json::to_vec(&value).unwrap();
+        assert!(!verify_test_agent_view(root.path(), &duplicate, "CEB-REPO-001", &digest).accepted);
+
+        let mut value: Value = serde_json::from_slice(&manifest).unwrap();
+        value["entries"][0]["mode"] = Value::String("100755".into());
+        let wrong_mode = serde_json::to_vec(&value).unwrap();
+        assert!(!verify_test_agent_view(root.path(), &wrong_mode, "CEB-REPO-001", &digest).accepted);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_view_verifier_rejects_symlink_snapshot_root() {
+        use std::fs;
+        use std::os::unix::fs::symlink;
+        let parent = tempfile::tempdir().unwrap();
+        let real_root = parent.path().join("real");
+        fs::create_dir_all(&real_root).unwrap();
+        fs::write(real_root.join("lib.rs"), b"pub fn ok() {}\n").unwrap();
+        let manifest = test_agent_view_manifest(&real_root, "CEB-REPO-001");
+        let digest = hash_source_tree_inner(&real_root).unwrap();
+        let linked_root = parent.path().join("linked");
+        symlink(&real_root, &linked_root).unwrap();
+        let report = verify_test_agent_view(&linked_root, &manifest, "CEB-REPO-001", &digest);
         assert!(!report.accepted);
     }
 
