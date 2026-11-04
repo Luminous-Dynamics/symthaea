@@ -18,7 +18,9 @@ The evaluator compares two already-frozen feasible actions for one metric across
 - pointwise-only diagnostics for point estimates;
 - explicit per-measurand applicability and qualification;
 - a frozen expected-reference manifest that blocks omitted reference rows;
-- scenario, action-set, reference, action, metric and unit identity checks;
+- scenario, action-set, reference, action, metric, unit and coordinate-frame identity checks;
+- frozen metric-definition and metric-evaluator digests;
+- shared execution-context, exact action-payload, output and source-artifact digest format checks;
 - shared execution-context, action-payload, output and source-artifact digest format checks;
 - exact action-payload matching across all admitted references;
 - incomplete outcomes for missing, censored, timed-out, unsupported and failed cells;
@@ -30,7 +32,7 @@ The caller must establish action-set completeness and hard-constraint feasibilit
 
 ## Deliberate limits
 
-- Digest fields are syntax-checked and matched to the supplied context, but the crate does not authenticate their source, recompute an external execution hash, or provide signature/non-repudiation verification.
+- Digest fields are syntax-checked and matched to the supplied context, but the crate does not authenticate their source, recompute the external execution/output/metric hashes, or provide signature/non-repudiation verification.
 - No reference independence proof; family IDs are caller-supplied dependency metadata.
 - No scalarization of multiple objectives.
 - No global optimum or population-probability claims.
