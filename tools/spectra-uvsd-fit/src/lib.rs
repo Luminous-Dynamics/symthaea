@@ -1,0 +1,879 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+//! Single-observer unequal-variance signal-detection likelihood fitting.
+//!
+//! This crate consumes frozen ordered category counts. It does not construct
+//! observations, pool participants, or implement ROC/AUC a second time.
+
+use std::fmt;
+
+use symthaea_statistics::{normal_log_interval, normal_quantile};
+
+const MU_BOUND: f64 = 12.0;
+const LOG_SIGMA_BOUND: f64 = 4.0;
+const FIRST_THRESHOLD_BOUND: f64 = 12.0;
+const LOG_GAP_MIN: f64 = -6.0;
+const LOG_GAP_MAX: f64 = 4.0;
+
+/// One ordered type-1 response category. Include zero-count categories from
+/// the frozen observation profile so the category boundaries are explicit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CategoryCount {
+    pub order: i16,
+    pub signal: u64,
+    pub noise: u64,
+}
+
+/// Errors detected while constructing a complete category table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableError {
+    TooFewCategories,
+    NonIncreasingCategoryOrder,
+    EmptySignalClass,
+    EmptyNoiseClass,
+    CountOverflow,
+}
+
+impl fmt::Display for TableError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let message = match self {
+            Self::TooFewCategories => "UVSD fitting requires at least three ordered categories",
+            Self::NonIncreasingCategoryOrder => "category order values must be strictly increasing",
+            Self::EmptySignalClass => "the table contains no signal trials",
+            Self::EmptyNoiseClass => "the table contains no noise trials",
+            Self::CountOverflow => "category count total overflowed u64",
+        };
+        f.write_str(message)
+    }
+}
+
+impl std::error::Error for TableError {}
+
+/// Validated, unpooled category frequencies for one participant/session unit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CategoryTable {
+    categories: Vec<CategoryCount>,
+    signal_total: u64,
+    noise_total: u64,
+}
+
+impl CategoryTable {
+    pub fn new(categories: Vec<CategoryCount>) -> Result<Self, TableError> {
+        if categories.len() < 3 {
+            return Err(TableError::TooFewCategories);
+        }
+        if categories.windows(2).any(|pair| pair[0].order >= pair[1].order) {
+            return Err(TableError::NonIncreasingCategoryOrder);
+        }
+        let mut signal_total = 0u64;
+        let mut noise_total = 0u64;
+        for row in &categories {
+            signal_total = signal_total.checked_add(row.signal).ok_or(TableError::CountOverflow)?;
+            noise_total = noise_total.checked_add(row.noise).ok_or(TableError::CountOverflow)?;
+        }
+        if signal_total == 0 {
+            return Err(TableError::EmptySignalClass);
+        }
+        if noise_total == 0 {
+            return Err(TableError::EmptyNoiseClass);
+        }
+        Ok(Self { categories, signal_total, noise_total })
+    }
+
+    pub fn categories(&self) -> &[CategoryCount] {
+        &self.categories
+    }
+
+    pub fn signal_total(&self) -> u64 {
+        self.signal_total
+    }
+
+    pub fn noise_total(&self) -> u64 {
+        self.noise_total
+    }
+}
+
+/// Optimizer used to find the maximum-likelihood estimate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Optimizer {
+    /// Multi-start BFGS with central finite-difference gradients.
+    Bfgs,
+    /// Derivative-free Nelder-Mead simplex.
+    NelderMead,
+}
+
+/// Deterministic fit controls. The default is deliberately modest so that
+/// individual participant/session fits remain practical.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FitOptions {
+    pub max_iterations: usize,
+    pub gradient_tolerance: f64,
+    pub starts: usize,
+}
+
+impl Default for FitOptions {
+    fn default() -> Self {
+        Self {
+            max_iterations: 800,
+            gradient_tolerance: 1.0e-6,
+            starts: 6,
+        }
+    }
+}
+
+/// Model parameters in the noise-reference parameterization.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UvsdEstimate {
+    /// Signal-distribution mean; the noise distribution is N(0, 1).
+    pub mu: f64,
+    /// Signal-distribution standard deviation (strictly positive).
+    pub sigma: f64,
+    /// Unequal-variance sensitivity index.
+    pub d_a: f64,
+    /// Ordered decision criteria, one fewer than the category count.
+    pub thresholds: Vec<f64>,
+}
+
+impl UvsdEstimate {
+    pub fn new(mu: f64, sigma: f64, thresholds: Vec<f64>) -> Option<Self> {
+        if !mu.is_finite()
+            || !sigma.is_finite()
+            || sigma <= 0.0
+            || thresholds.len() < 2
+            || thresholds.iter().any(|value| !value.is_finite())
+            || thresholds.windows(2).any(|pair| pair[0] >= pair[1])
+        {
+            return None;
+        }
+        let d_a = mu / ((1.0 + sigma * sigma) / 2.0).sqrt();
+        if !d_a.is_finite() {
+            return None;
+        }
+        Some(Self { mu, sigma, d_a, thresholds })
+    }
+}
+
+/// Explicit disposition. Only Converged is a successful interior fit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FitStatus {
+    Converged,
+    Boundary,
+    NotIdentifiable,
+    NotConverged,
+    NotEvaluable,
+}
+
+/// Diagnostics are part of the result, not optional logging.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FitDiagnostics {
+    pub optimizer: Optimizer,
+    pub negative_log_likelihood: Option<f64>,
+    pub gradient_norm: Option<f64>,
+    pub iterations: usize,
+    pub starts_attempted: usize,
+    pub solution_objective_spread: Option<f64>,
+    pub at_parameter_boundary: bool,
+    pub note: Option<String>,
+}
+
+/// An estimate is returned for Boundary and NotConverged to support inspection,
+/// but callers must not treat either status as a qualified point estimate.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FitResult {
+    pub status: FitStatus,
+    pub estimate: Option<UvsdEstimate>,
+    pub diagnostics: FitDiagnostics,
+}
+
+impl FitResult {
+    fn failure(status: FitStatus, optimizer: Optimizer, note: impl Into<String>) -> Self {
+        Self {
+            status,
+            estimate: None,
+            diagnostics: FitDiagnostics {
+                optimizer,
+                negative_log_likelihood: None,
+                gradient_norm: None,
+                iterations: 0,
+                starts_attempted: 0,
+                solution_objective_spread: None,
+                at_parameter_boundary: false,
+                note: Some(note.into()),
+            },
+        }
+    }
+}
+
+/// Fit with multi-start BFGS.
+pub fn fit(table: &CategoryTable, options: FitOptions) -> FitResult {
+    fit_with_optimizer(table, options, Optimizer::Bfgs)
+}
+
+/// Fit with an explicitly selected optimizer. Run BFGS and Nelder-Mead
+/// separately on identical frozen input when assessing optimizer agreement.
+pub fn fit_with_optimizer(
+    table: &CategoryTable,
+    options: FitOptions,
+    optimizer: Optimizer,
+) -> FitResult {
+    if !is_identifiable_from_category_support(table) {
+        return FitResult::failure(
+            FitStatus::NotIdentifiable,
+            optimizer,
+            "fewer than three categories are populated or one stimulus class occupies only one category",
+        );
+    }
+
+    let options = sanitized_options(options);
+    let mut runs = Vec::with_capacity(options.starts);
+    for start_index in 0..options.starts {
+        let initial = initial_parameters(table.categories.len(), start_index);
+        let run = match optimizer {
+            Optimizer::Bfgs => run_bfgs(table, initial, options),
+            Optimizer::NelderMead => run_nelder_mead(table, initial, options),
+        };
+        if run.objective.is_finite() {
+            runs.push(run);
+        }
+    }
+
+    if runs.is_empty() {
+        return FitResult::failure(
+            FitStatus::NotConverged,
+            optimizer,
+            "all optimizer starts produced non-finite likelihoods",
+        );
+    }
+
+    let has_converged = runs.iter().any(|run| run.converged);
+    runs.sort_by(|a, b| a.objective.total_cmp(&b.objective));
+    let best = runs.remove(0);
+    let estimate = decode_parameters(&best.parameters, table.categories.len())
+        .and_then(|(mu, sigma, thresholds, _)| UvsdEstimate::new(mu, sigma, thresholds));
+
+    let status = if !has_converged {
+        FitStatus::NotConverged
+    } else if best.at_boundary {
+        FitStatus::Boundary
+    } else {
+        FitStatus::Converged
+    };
+
+    let objective_values = std::iter::once(best.objective)
+        .chain(runs.iter().map(|run| run.objective));
+    let min_objective = objective_values.clone().fold(f64::INFINITY, f64::min);
+    let max_objective = objective_values.fold(f64::NEG_INFINITY, f64::max);
+    let spread = if min_objective.is_finite() && max_objective.is_finite() {
+        Some((max_objective - min_objective).max(0.0))
+    } else {
+        None
+    };
+
+    FitResult {
+        status,
+        estimate,
+        diagnostics: FitDiagnostics {
+            optimizer,
+            negative_log_likelihood: Some(best.objective),
+            gradient_norm: Some(best.gradient_norm),
+            iterations: best.iterations,
+            starts_attempted: options.starts,
+            solution_objective_spread: spread,
+            at_parameter_boundary: best.at_boundary,
+            note: if status == FitStatus::Converged {
+                None
+            } else {
+                Some("inspect boundary and convergence diagnostics; this result is not a qualified interior estimate".to_owned())
+            },
+        },
+    }
+}
+
+/// Validate raw counts and return NotEvaluable rather than panicking.
+pub fn fit_ordered_counts(
+    categories: Vec<CategoryCount>,
+    options: FitOptions,
+    optimizer: Optimizer,
+) -> FitResult {
+    match CategoryTable::new(categories) {
+        Ok(table) => fit_with_optimizer(&table, options, optimizer),
+        Err(error) => FitResult::failure(FitStatus::NotEvaluable, optimizer, error.to_string()),
+    }
+}
+
+/// Unsmoothed negative multinomial log likelihood for a supplied parameter set.
+/// Returns None for invalid parameters or a non-finite positive-count cell.
+pub fn negative_log_likelihood(
+    table: &CategoryTable,
+    estimate: &UvsdEstimate,
+) -> Option<f64> {
+    if !estimate.mu.is_finite()
+        || !estimate.sigma.is_finite()
+        || estimate.sigma <= 0.0
+        || estimate.thresholds.len() + 1 != table.categories.len()
+        || estimate.thresholds.windows(2).any(|pair| pair[0] >= pair[1])
+        || estimate.thresholds.iter().any(|value| !value.is_finite())
+    {
+        return None;
+    }
+
+    let mut nll = 0.0;
+    for (index, row) in table.categories.iter().enumerate() {
+        let lower = if index == 0 { f64::NEG_INFINITY } else { estimate.thresholds[index - 1] };
+        let upper = if index == estimate.thresholds.len() {
+            f64::INFINITY
+        } else {
+            estimate.thresholds[index]
+        };
+
+        if row.noise > 0 {
+            let log_probability = normal_log_interval(lower, upper);
+            if !log_probability.is_finite() {
+                return None;
+            }
+            nll -= row.noise as f64 * log_probability;
+        }
+        if row.signal > 0 {
+            let signal_lower = standardize_boundary(lower, estimate.mu, estimate.sigma);
+            let signal_upper = standardize_boundary(upper, estimate.mu, estimate.sigma);
+            let log_probability = normal_log_interval(signal_lower, signal_upper);
+            if !log_probability.is_finite() {
+                return None;
+            }
+            nll -= row.signal as f64 * log_probability;
+        }
+    }
+    if nll.is_finite() { Some(nll) } else { None }
+}
+
+fn standardize_boundary(value: f64, mu: f64, sigma: f64) -> f64 {
+    if value == f64::NEG_INFINITY {
+        f64::NEG_INFINITY
+    } else if value == f64::INFINITY {
+        f64::INFINITY
+    } else {
+        (value - mu) / sigma
+    }
+}
+
+fn is_identifiable_from_category_support(table: &CategoryTable) -> bool {
+    let populated = table.categories.iter().filter(|row| row.signal + row.noise > 0).count();
+    let signal_categories = table.categories.iter().filter(|row| row.signal > 0).count();
+    let noise_categories = table.categories.iter().filter(|row| row.noise > 0).count();
+    populated >= 3 && signal_categories >= 2 && noise_categories >= 2
+}
+
+fn sanitized_options(options: FitOptions) -> FitOptions {
+    FitOptions {
+        max_iterations: options.max_iterations.clamp(20, 20_000),
+        gradient_tolerance: if options.gradient_tolerance.is_finite()
+            && options.gradient_tolerance > 0.0
+        {
+            options.gradient_tolerance.clamp(1.0e-10, 1.0e-2)
+        } else {
+            FitOptions::default().gradient_tolerance
+        },
+        starts: options.starts.clamp(1, 16),
+    }
+}
+
+fn parameter_bounds(category_count: usize) -> (Vec<f64>, Vec<f64>) {
+    let dimension = category_count + 1;
+    let mut lower = vec![-12.0; dimension];
+    let mut upper = vec![12.0; dimension];
+    lower[0] = -MU_BOUND;
+    upper[0] = MU_BOUND;
+    lower[1] = -LOG_SIGMA_BOUND;
+    upper[1] = LOG_SIGMA_BOUND;
+    lower[2] = -FIRST_THRESHOLD_BOUND;
+    upper[2] = FIRST_THRESHOLD_BOUND;
+    for index in 3..dimension {
+        lower[index] = LOG_GAP_MIN;
+        upper[index] = LOG_GAP_MAX;
+    }
+    (lower, upper)
+}
+
+fn project(parameters: &mut [f64], lower: &[f64], upper: &[f64]) {
+    for index in 0..parameters.len() {
+        parameters[index] = parameters[index].clamp(lower[index], upper[index]);
+    }
+}
+
+fn decode_parameters(
+    parameters: &[f64],
+    category_count: usize,
+) -> Option<(f64, f64, Vec<f64>, bool)> {
+    if parameters.len() != category_count + 1 || parameters.iter().any(|value| !value.is_finite()) {
+        return None;
+    }
+    let (lower, upper) = parameter_bounds(category_count);
+    let mut at_boundary = false;
+    for index in 0..parameters.len() {
+        if parameters[index] <= lower[index] + 1.0e-5
+            || parameters[index] >= upper[index] - 1.0e-5
+        {
+            at_boundary = true;
+        }
+    }
+
+    let mu = parameters[0].clamp(-MU_BOUND, MU_BOUND);
+    let sigma = parameters[1].clamp(-LOG_SIGMA_BOUND, LOG_SIGMA_BOUND).exp();
+    let mut thresholds = Vec::with_capacity(category_count - 1);
+    let first = parameters[2].clamp(-FIRST_THRESHOLD_BOUND, FIRST_THRESHOLD_BOUND);
+    thresholds.push(first);
+    for value in parameters.iter().skip(3) {
+        let gap = value.clamp(LOG_GAP_MIN, LOG_GAP_MAX).exp();
+        let next = thresholds.last().copied().unwrap_or(first) + gap;
+        if !next.is_finite() {
+            return None;
+        }
+        thresholds.push(next);
+    }
+    Some((mu, sigma, thresholds, at_boundary))
+}
+
+fn objective(table: &CategoryTable, parameters: &[f64]) -> f64 {
+    match decode_parameters(parameters, table.categories.len()) {
+        Some((mu, sigma, thresholds, _)) => {
+            match UvsdEstimate::new(mu, sigma, thresholds)
+                .and_then(|estimate| negative_log_likelihood(table, &estimate))
+            {
+                Some(value) => value,
+                None => f64::INFINITY,
+            }
+        }
+        None => f64::INFINITY,
+    }
+}
+
+fn initial_parameters(category_count: usize, start_index: usize) -> Vec<f64> {
+    let starts = [
+        (0.75, 0.0, 0.0),
+        (1.50, 0.0, 0.0),
+        (2.50, 0.0, 0.0),
+        (1.50, -0.45, 0.25),
+        (1.50, 0.45, -0.25),
+        (-0.75, 0.0, 0.0),
+        (3.00, -0.7, 0.5),
+        (0.50, 0.7, -0.5),
+        (2.00, 0.0, 0.75),
+        (1.00, 0.0, -0.75),
+        (4.00, 0.3, 0.0),
+        (-1.50, 0.0, 0.25),
+        (0.25, -0.25, -0.25),
+        (2.00, 0.7, 0.5),
+        (3.00, -0.4, -0.5),
+        (-2.00, 0.4, 0.0),
+    ];
+    let (mu, log_sigma, shift) = starts[start_index % starts.len()];
+    let mut values = Vec::with_capacity(category_count + 1);
+    values.push(mu);
+    values.push(log_sigma);
+
+    let mut cuts = Vec::with_capacity(category_count - 1);
+    for index in 1..category_count {
+        let probability = index as f64 / category_count as f64;
+        cuts.push(normal_quantile(probability) + shift);
+    }
+    values.push(cuts[0]);
+    for pair in cuts.windows(2) {
+        values.push((pair[1] - pair[0]).ln());
+    }
+    values
+}
+
+#[derive(Debug, Clone)]
+struct RunResult {
+    parameters: Vec<f64>,
+    objective: f64,
+    gradient_norm: f64,
+    iterations: usize,
+    converged: bool,
+    at_boundary: bool,
+}
+
+fn numeric_gradient(table: &CategoryTable, x: &[f64], lower: &[f64], upper: &[f64]) -> Vec<f64> {
+    let mut gradient = vec![0.0; x.len()];
+    for index in 0..x.len() {
+        let step = 1.0e-5 * x[index].abs().max(1.0);
+        let mut plus = x.to_vec();
+        let mut minus = x.to_vec();
+        plus[index] = (x[index] + step).min(upper[index]);
+        minus[index] = (x[index] - step).max(lower[index]);
+        let width = plus[index] - minus[index];
+        if width > 0.0 {
+            gradient[index] = (objective(table, &plus) - objective(table, &minus)) / width;
+        }
+    }
+    gradient
+}
+
+fn vector_norm(values: &[f64]) -> f64 {
+    values.iter().map(|value| value * value).sum::<f64>().sqrt()
+}
+
+fn dot(left: &[f64], right: &[f64]) -> f64 {
+    left.iter().zip(right.iter()).map(|(a, b)| a * b).sum()
+}
+
+fn run_bfgs(table: &CategoryTable, mut x: Vec<f64>, options: FitOptions) -> RunResult {
+    let dimension = x.len();
+    let (lower, upper) = parameter_bounds(table.categories.len());
+    project(&mut x, &lower, &upper);
+    let mut inverse_hessian = vec![vec![0.0; dimension]; dimension];
+    for (index, row) in inverse_hessian.iter_mut().enumerate() {
+        row[index] = 1.0;
+    }
+    let mut value = objective(table, &x);
+    let mut gradient = numeric_gradient(table, &x, &lower, &upper);
+    let mut converged = false;
+    let mut iterations = 0usize;
+
+    for iteration in 0..options.max_iterations {
+        iterations = iteration + 1;
+        let gradient_norm = vector_norm(&gradient);
+        if gradient_norm.is_finite() && gradient_norm <= options.gradient_tolerance {
+            converged = true;
+            break;
+        }
+        if !value.is_finite() || !gradient_norm.is_finite() {
+            break;
+        }
+
+        let mut direction = vec![0.0; dimension];
+        for row in 0..dimension {
+            direction[row] = -dot(&inverse_hessian[row], &gradient);
+        }
+        let mut directional_derivative = dot(&gradient, &direction);
+        if !directional_derivative.is_finite() || directional_derivative >= -1.0e-12 {
+            for row in 0..dimension {
+                direction[row] = -gradient[row];
+            }
+            directional_derivative = -dot(&gradient, &gradient);
+            inverse_hessian.fill(vec![0.0; dimension]);
+            for index in 0..dimension {
+                inverse_hessian[index][index] = 1.0;
+            }
+        }
+
+        let mut step = 1.0;
+        let mut accepted = None;
+        for _ in 0..40 {
+            let mut candidate: Vec<f64> = x
+                .iter()
+                .zip(direction.iter())
+                .map(|(current, delta)| current + step * delta)
+                .collect();
+            project(&mut candidate, &lower, &upper);
+            let candidate_value = objective(table, &candidate);
+            if candidate_value.is_finite()
+                && candidate_value <= value + 1.0e-4 * step * directional_derivative
+            {
+                accepted = Some((candidate, candidate_value));
+                break;
+            }
+            step *= 0.5;
+        }
+        let Some((next_x, next_value)) = accepted else {
+            break;
+        };
+
+        let next_gradient = numeric_gradient(table, &next_x, &lower, &upper);
+        let s: Vec<f64> = next_x.iter().zip(x.iter()).map(|(a, b)| a - b).collect();
+        let y: Vec<f64> = next_gradient.iter().zip(gradient.iter()).map(|(a, b)| a - b).collect();
+        let ys = dot(&y, &s);
+        if ys > 1.0e-12 * vector_norm(&s) * vector_norm(&y) {
+            let rho = 1.0 / ys;
+            let hy: Vec<f64> = inverse_hessian
+                .iter()
+                .map(|row| dot(row, &y))
+                .collect();
+            let yhy = dot(&y, &hy);
+            for row in 0..dimension {
+                for col in 0..dimension {
+                    inverse_hessian[row][col] +=
+                        (1.0 + yhy * rho) * rho * s[row] * s[col]
+                            - rho * (s[row] * hy[col] + hy[row] * s[col]);
+                }
+            }
+        }
+
+        let relative_change = (value - next_value).abs() / (1.0 + value.abs());
+        x = next_x;
+        value = next_value;
+        gradient = next_gradient;
+        if relative_change <= options.gradient_tolerance * 1.0e-2
+            && vector_norm(&gradient) <= options.gradient_tolerance.sqrt()
+        {
+            converged = true;
+            break;
+        }
+    }
+
+    let gradient_norm = vector_norm(&numeric_gradient(table, &x, &lower, &upper));
+    let at_boundary = decode_parameters(&x, table.categories.len())
+        .map(|value| value.3)
+        .unwrap_or(true);
+    RunResult {
+        parameters: x,
+        objective: value,
+        gradient_norm,
+        iterations,
+        converged: converged || gradient_norm <= options.gradient_tolerance,
+        at_boundary,
+    }
+}
+
+#[derive(Clone)]
+struct Vertex {
+    point: Vec<f64>,
+    value: f64,
+}
+
+fn run_nelder_mead(table: &CategoryTable, initial: Vec<f64>, options: FitOptions) -> RunResult {
+    let dimension = initial.len();
+    let (lower, upper) = parameter_bounds(table.categories.len());
+    let mut simplex = Vec::with_capacity(dimension + 1);
+    simplex.push(Vertex {
+        value: objective(table, &initial),
+        point: initial.clone(),
+    });
+    for index in 0..dimension {
+        let mut point = initial.clone();
+        point[index] += 0.15 * (1.0 + point[index].abs());
+        project(&mut point, &lower, &upper);
+        simplex.push(Vertex {
+            value: objective(table, &point),
+            point,
+        });
+    }
+
+    let mut converged = false;
+    let mut iterations = 0usize;
+    for iteration in 0..options.max_iterations {
+        iterations = iteration + 1;
+        simplex.sort_by(|left, right| left.value.total_cmp(&right.value));
+        let best_value = simplex[0].value;
+        let worst_value = simplex[dimension].value;
+
+        let mut max_spread = 0.0f64;
+        for vertex in simplex.iter().skip(1) {
+            for (left, right) in vertex.point.iter().zip(simplex[0].point.iter()) {
+                max_spread = max_spread.max((left - right).abs());
+            }
+        }
+        if max_spread <= options.gradient_tolerance.sqrt()
+            && (worst_value - best_value).abs()
+                <= options.gradient_tolerance * (1.0 + best_value.abs())
+        {
+            converged = true;
+            break;
+        }
+
+        let mut centroid = vec![0.0; dimension];
+        for vertex in simplex.iter().take(dimension) {
+            for index in 0..dimension {
+                centroid[index] += vertex.point[index] / dimension as f64;
+            }
+        }
+
+        let worst = &simplex[dimension].point;
+        let mut reflected: Vec<f64> = centroid
+            .iter()
+            .zip(worst.iter())
+            .map(|(center, bad)| center + (center - bad))
+            .collect();
+        project(&mut reflected, &lower, &upper);
+        let reflected_value = objective(table, &reflected);
+
+        if reflected_value < best_value {
+            let mut expanded: Vec<f64> = centroid
+                .iter()
+                .zip(reflected.iter())
+                .map(|(center, reflected)| center + 2.0 * (reflected - center))
+                .collect();
+            project(&mut expanded, &lower, &upper);
+            let expanded_value = objective(table, &expanded);
+            if expanded_value < reflected_value {
+                simplex[dimension] = Vertex { point: expanded, value: expanded_value };
+            } else {
+                simplex[dimension] = Vertex { point: reflected, value: reflected_value };
+            }
+        } else if reflected_value < simplex[dimension - 1].value {
+            simplex[dimension] = Vertex { point: reflected, value: reflected_value };
+        } else {
+            let outside = reflected_value < worst_value;
+            let target = if outside { &reflected } else { worst };
+            let mut contracted: Vec<f64> = centroid
+                .iter()
+                .zip(target.iter())
+                .map(|(center, target)| center + 0.5 * (target - center))
+                .collect();
+            project(&mut contracted, &lower, &upper);
+            let contracted_value = objective(table, &contracted);
+            let should_accept = if outside {
+                contracted_value <= reflected_value
+            } else {
+                contracted_value < worst_value
+            };
+            if should_accept {
+                simplex[dimension] = Vertex { point: contracted, value: contracted_value };
+            } else {
+                let best = simplex[0].point.clone();
+                for vertex in simplex.iter_mut().skip(1) {
+                    for index in 0..dimension {
+                        vertex.point[index] = best[index] + 0.5 * (vertex.point[index] - best[index]);
+                    }
+                    project(&mut vertex.point, &lower, &upper);
+                    vertex.value = objective(table, &vertex.point);
+                }
+            }
+        }
+    }
+
+    simplex.sort_by(|left, right| left.value.total_cmp(&right.value));
+    let best = &simplex[0];
+    let gradient_norm = vector_norm(&numeric_gradient(table, &best.point, &lower, &upper));
+    let at_boundary = decode_parameters(&best.point, table.categories.len())
+        .map(|value| value.3)
+        .unwrap_or(true);
+    RunResult {
+        parameters: best.point.clone(),
+        objective: best.value,
+        gradient_norm,
+        iterations,
+        converged,
+        at_boundary,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn synthetic_table(mu: f64, sigma: f64, trials_per_class: u64) -> CategoryTable {
+        let cuts = [-1.0, 0.0, 1.0];
+        let mut categories = Vec::new();
+        let mut lower = f64::NEG_INFINITY;
+        let mut signal_used = 0u64;
+        let mut noise_used = 0u64;
+        for index in 0..4 {
+            let upper = if index == 3 { f64::INFINITY } else { cuts[index] };
+            let noise_probability = normal_log_interval(lower, upper).exp();
+            let signal_probability = normal_log_interval(
+                if lower.is_infinite() { lower } else { (lower - mu) / sigma },
+                if upper.is_infinite() { upper } else { (upper - mu) / sigma },
+            )
+            .exp();
+            let noise = if index == 3 {
+                trials_per_class - noise_used
+            } else {
+                (noise_probability * trials_per_class as f64).round() as u64
+            };
+            let signal = if index == 3 {
+                trials_per_class - signal_used
+            } else {
+                (signal_probability * trials_per_class as f64).round() as u64
+            };
+            noise_used += noise;
+            signal_used += signal;
+            categories.push(CategoryCount { order: index as i16, signal, noise });
+            lower = upper;
+        }
+        CategoryTable::new(categories).unwrap()
+    }
+
+    #[test]
+    fn table_requires_complete_order_and_both_classes() {
+        assert_eq!(
+            CategoryTable::new(vec![
+                CategoryCount { order: 0, signal: 1, noise: 1 },
+                CategoryCount { order: 1, signal: 1, noise: 1 },
+            ]),
+            Err(TableError::TooFewCategories)
+        );
+        assert_eq!(
+            CategoryTable::new(vec![
+                CategoryCount { order: 1, signal: 1, noise: 1 },
+                CategoryCount { order: 1, signal: 1, noise: 1 },
+                CategoryCount { order: 2, signal: 1, noise: 1 },
+            ]),
+            Err(TableError::NonIncreasingCategoryOrder)
+        );
+    }
+
+    #[test]
+    fn recovers_known_unequal_variance_parameters() {
+        let table = synthetic_table(1.4, 1.55, 250_000);
+        let result = fit(&table, FitOptions::default());
+        assert_eq!(result.status, FitStatus::Converged, "{result:?}");
+        let estimate = result.estimate.unwrap();
+        assert!((estimate.mu - 1.4).abs() < 0.08, "{estimate:?}");
+        assert!((estimate.sigma - 1.55).abs() < 0.08, "{estimate:?}");
+        let expected_da = 1.4 / ((1.0 + 1.55_f64.powi(2)) / 2.0).sqrt();
+        assert!((estimate.d_a - expected_da).abs() < 0.08);
+    }
+
+    #[test]
+    fn equal_variance_negative_control_is_recoverable() {
+        let table = synthetic_table(1.2, 1.0, 250_000);
+        let result = fit(&table, FitOptions::default());
+        assert!(matches!(result.status, FitStatus::Converged | FitStatus::Boundary), "{result:?}");
+        let estimate = result.estimate.unwrap();
+        assert!((estimate.sigma - 1.0).abs() < 0.08);
+    }
+
+    #[test]
+    fn derivative_free_optimizer_produces_inspectable_fit() {
+        let table = synthetic_table(1.0, 1.35, 100_000);
+        let options = FitOptions { max_iterations: 2_000, gradient_tolerance: 1.0e-5, starts: 3 };
+        let result = fit_with_optimizer(&table, options, Optimizer::NelderMead);
+        assert!(matches!(result.status, FitStatus::Converged | FitStatus::Boundary), "{result:?}");
+        assert!(result.estimate.is_some());
+        assert!(result.diagnostics.negative_log_likelihood.unwrap().is_finite());
+    }
+
+    #[test]
+    fn sparse_support_is_not_identifiable() {
+        let table = CategoryTable::new(vec![
+            CategoryCount { order: 0, signal: 0, noise: 10 },
+            CategoryCount { order: 1, signal: 10, noise: 0 },
+            CategoryCount { order: 2, signal: 0, noise: 0 },
+            CategoryCount { order: 3, signal: 0, noise: 0 },
+        ])
+        .unwrap();
+        let result = fit(&table, FitOptions::default());
+        assert_eq!(result.status, FitStatus::NotIdentifiable);
+        assert!(result.estimate.is_none());
+    }
+
+    #[test]
+    fn zero_cells_are_not_smoothed_or_discarded() {
+        let table = synthetic_table(1.5, 1.8, 50_000);
+        let estimate = UvsdEstimate::new(1.5, 1.8, vec![-1.0, 0.0, 1.0]).unwrap();
+        let nll = negative_log_likelihood(&table, &estimate).unwrap();
+        assert!(nll.is_finite());
+        let sparse = CategoryTable::new(vec![
+            CategoryCount { order: 0, signal: 0, noise: 10 },
+            CategoryCount { order: 1, signal: 1, noise: 9 },
+            CategoryCount { order: 2, signal: 9, noise: 1 },
+            CategoryCount { order: 3, signal: 10, noise: 0 },
+        ])
+        .unwrap();
+        let nll_sparse = negative_log_likelihood(&sparse, &estimate).unwrap();
+        assert!(nll_sparse.is_finite());
+    }
+
+    #[test]
+    fn invalid_raw_input_is_not_evaluable() {
+        let result = fit_ordered_counts(
+            vec![CategoryCount { order: 0, signal: 0, noise: 0 }],
+            FitOptions::default(),
+            Optimizer::Bfgs,
+        );
+        assert_eq!(result.status, FitStatus::NotEvaluable);
+        assert!(result.diagnostics.note.is_some());
+    }
+}
