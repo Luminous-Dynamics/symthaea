@@ -1814,18 +1814,26 @@ mod tests {
     }
 
     fn refresh_task_digests(value: &mut Value) {
-        let tasks = value["task_universe"].as_array().unwrap();
+        // Own the task universe before mutating sibling receipt fields. This
+        // keeps the digest inputs stable and avoids aliasing the mutable root.
+        let tasks = value["task_universe"].as_array().unwrap().clone();
         let mut eligible: Vec<String> = tasks
             .iter()
-            .filter(|t| t["eligibility"] == "eligible")
-            .map(|t| t["task_id"].as_str().unwrap().to_owned())
+            .filter(|task| task["eligibility"] == "eligible")
+            .map(|task| task["task_id"].as_str().unwrap().to_owned())
             .collect();
         eligible.sort();
-        value["eligible_task_set_sha256"] = json!(canonical_digest(&json!(eligible)).unwrap());
-        let mut sorted = tasks.clone();
-        sorted.sort_by(|a, b| a["task_id"].as_str().cmp(&b["task_id"].as_str()));
-        value["task_universe_sha256"] = json!(canonical_digest(&Value::Array(sorted)).unwrap());
-        value["comparison"]["eligible_task_set_sha256"] = value["eligible_task_set_sha256"].clone();
+        let eligible_digest = canonical_digest(&json!(eligible)).unwrap();
+
+        let mut sorted = tasks;
+        sorted.sort_by(|left, right| {
+            left["task_id"].as_str().cmp(&right["task_id"].as_str())
+        });
+        let universe_digest = canonical_digest(&Value::Array(sorted)).unwrap();
+
+        value["eligible_task_set_sha256"] = json!(eligible_digest);
+        value["task_universe_sha256"] = json!(universe_digest);
+        value["comparison"]["eligible_task_set_sha256"] = json!(eligible_digest);
     }
 
     #[test]
