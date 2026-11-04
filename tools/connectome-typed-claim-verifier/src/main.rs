@@ -375,7 +375,20 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                 }
             }
             let asserted = string_field(result, "asserted_claim_type", &result_context)?;
+            if !matches!(
+                asserted.as_str(),
+                "ANATOMICAL_PATH" | "CORRESPONDENCE_PATH" | "STATISTICAL_PATH"
+                    | "FUNCTIONAL_PATH" | "CAUSAL_EFFECT" | "MIXED_EVIDENCE_PATH"
+            ) {
+                return Err(format!("{result_context}.asserted_claim_type invalid"));
+            }
             let claimed_result_status = string_field(result, "result_status", &result_context)?;
+            if !matches!(
+                claimed_result_status.as_str(),
+                "CLAIMED_SUPPORTED" | "CLAIMED_CONDITIONAL" | "CLAIMED_NOT_ESTIMABLE" | "CLAIMED_REJECTED"
+            ) {
+                return Err(format!("{result_context}.result_status invalid"));
+            }
             let mut disposition = "ACCEPTED_WITHIN_TYPED_SCOPE";
             let mut reasons = Vec::<String>::new();
 
@@ -387,9 +400,25 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                 disposition = "REJECTED_PATH_GRAMMAR";
                 reasons.push("single-layer query contains more than one relation type".to_owned());
             }
-            if relation_set.len() > 1 && asserted != "MIXED_EVIDENCE_PATH" {
-                disposition = "REJECTED_TYPE_PROMOTION";
-                reasons.push("mixed relation types cannot be promoted to a single-layer claim".to_owned());
+            if query_mode == "SINGLE_RELATION_LAYER" && requested_type == "MIXED_EVIDENCE_PATH" {
+                disposition = "REJECTED_PATH_GRAMMAR";
+                reasons.push("single-layer query cannot request MIXED_EVIDENCE_PATH".to_owned());
+            }
+            if relation_set.len() > 1 {
+                let explicit_causal_composition = asserted == "CAUSAL_EFFECT"
+                    && requested_type == "CAUSAL_EFFECT"
+                    && query_mode == "DECLARED_MIXED_LAYERS"
+                    && contains_causal_claim;
+                if asserted != "MIXED_EVIDENCE_PATH" && !explicit_causal_composition {
+                    disposition = "REJECTED_TYPE_PROMOTION";
+                    reasons.push("mixed relation types require MIXED_EVIDENCE_PATH or an explicit supported causal-effect claim".to_owned());
+                }
+                if asserted == "MIXED_EVIDENCE_PATH"
+                    && (query_mode != "DECLARED_MIXED_LAYERS" || requested_type != "MIXED_EVIDENCE_PATH")
+                {
+                    disposition = "REJECTED_TYPE_PROMOTION";
+                    reasons.push("MIXED_EVIDENCE_PATH requires declared mixed-layer mode and mixed requested type".to_owned());
+                }
             }
             if asserted == "CAUSAL_EFFECT" && !contains_causal_claim {
                 disposition = "REJECTED_TYPE_PROMOTION";
@@ -398,7 +427,7 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
             if relation_set.len() == 1 {
                 let only_type = relation_set.iter().next().expect("one relation type");
                 let expected_claim_type = expected_path_claim_type(only_type)?;
-                if asserted != "MIXED_EVIDENCE_PATH" && asserted != expected_claim_type {
+                if asserted != expected_claim_type {
                     disposition = "REJECTED_TYPE_PROMOTION";
                     reasons.push(format!("{only_type} cannot support asserted claim type {asserted}"));
                 }
@@ -407,9 +436,24 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                 disposition = "REJECTED_TYPE_PROMOTION";
                 reasons.push(format!("asserted path type {asserted} differs from requested query type {requested_type}"));
             }
-            if !all_claims_supported && disposition == "ACCEPTED_WITHIN_TYPED_SCOPE" {
-                disposition = "NOT_ESTIMABLE";
-                reasons.push("one or more producer claims are not CLAIMED_SUPPORTED".to_owned());
+            if disposition == "ACCEPTED_WITHIN_TYPED_SCOPE" && claimed_result_status == "CLAIMED_REJECTED" {
+                disposition = "REJECTED_EVIDENCE_CLAIM";
+                reasons.push("the producer marks the path result rejected".to_owned());
+            }
+            if disposition == "ACCEPTED_WITHIN_TYPED_SCOPE" {
+                if used.iter().any(|claim_id| index.claims.get(claim_id).is_some_and(|claim| claim.claim_status == "CLAIMED_REJECTED")) {
+                    disposition = "REJECTED_EVIDENCE_CLAIM";
+                    reasons.push("path contains a producer-rejected claim".to_owned());
+                } else if used.iter().any(|claim_id| index.claims.get(claim_id).is_some_and(|claim| claim.claim_status == "CLAIMED_NOT_ESTIMABLE")) {
+                    disposition = "NOT_ESTIMABLE";
+                    reasons.push("path contains a NOT_ESTIMABLE claim".to_owned());
+                } else if used.iter().any(|claim_id| index.claims.get(claim_id).is_some_and(|claim| claim.claim_status == "CLAIMED_AMBIGUOUS")) {
+                    disposition = "AMBIGUOUS_NOT_PROMOTABLE";
+                    reasons.push("path contains an ambiguous claim".to_owned());
+                } else if !all_claims_supported || claimed_result_status == "CLAIMED_CONDITIONAL" {
+                    disposition = "CONDITIONAL_ONLY";
+                    reasons.push("one or more producer claims are conditional".to_owned());
+                }
             }
             if claimed_result_status == "CLAIMED_NOT_ESTIMABLE" {
                 let digest = query.get("result_sha256");
@@ -702,6 +746,59 @@ mod tests {
         let mut bundle = parse_fixture();
         bundle["queries"][0]["result_sha256"] = Value::Null;
         assert!(verify(&bundle).is_err());
+    }
+
+    #[test]
+    fn accepts_mixed_path_as_causal_only_with_supported_causal_claim() {
+        let mut bundle = parse_fixture();
+        bundle["claims"][4]["claim_status"] = Value::String("CLAIMED_SUPPORTED".to_owned());
+        bundle["claims"][4]["evidence"][0]["positivity_status"] =
+            Value::String("CLAIMED_ADEQUATE".to_owned());
+        bundle["claims"][4]["evidence"][0]["selection_status"] =
+            Value::String("CLAIMED_HANDLED".to_owned());
+        bundle["queries"][2]["allowed_relation_type_paths"][0]["relation_types"] =
+            json!(["ANATOMICAL_SYNAPSE_EDGE", "STATISTICAL_DEPENDENCE_EDGE", "CAUSAL_EFFECT_CLAIM"]);
+        bundle["queries"][2]["path_results"][0]["ordered_claim_ids"] =
+            json!(["anat-syn-17", "stat-edge-activity", "causal-edge-unresolved"]);
+        let report = verify(&bundle).expect("explicit causal evidence in mixed path");
+        assert_eq!(
+            report["query_path_results"][2]["recomputed_disposition"],
+            "ACCEPTED_WITHIN_TYPED_SCOPE"
+        );
+    }
+
+    #[test]
+    fn rejects_mixed_path_requested_in_single_layer_mode() {
+        let mut bundle = parse_fixture();
+        bundle["queries"][0]["requested_claim_type"] = Value::String("MIXED_EVIDENCE_PATH".to_owned());
+        bundle["queries"][0]["path_results"][0]["asserted_claim_type"] = Value::String("MIXED_EVIDENCE_PATH".to_owned());
+        let report = verify(&bundle).expect("bundle structurally valid");
+        assert_eq!(
+            report["query_path_results"][0]["recomputed_disposition"],
+            "REJECTED_PATH_GRAMMAR"
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_path_result_status() {
+        let mut bundle = parse_fixture();
+        bundle["queries"][0]["path_results"][0]["result_status"] =
+            Value::String("TRUSTED_VERIFIED".to_owned());
+        assert!(verify(&bundle).is_err());
+    }
+
+    #[test]
+    fn reports_conditional_claim_as_conditional_not_not_estimable() {
+        let mut bundle = parse_fixture();
+        let report = verify(&bundle).expect("known-answer bundle");
+        assert_eq!(
+            report["query_path_results"][0]["recomputed_disposition"],
+            "ACCEPTED_WITHIN_TYPED_SCOPE"
+        );
+        assert_eq!(
+            report["query_path_results"][0]["claimed_result_status"],
+            "CLAIMED_SUPPORTED"
+        );
     }
 
     #[test]
