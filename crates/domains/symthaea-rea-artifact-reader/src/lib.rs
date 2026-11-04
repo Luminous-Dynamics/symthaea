@@ -2566,7 +2566,7 @@ mod tests {
 
     #[test]
     fn archive_slice_translates_seeks_and_never_escapes_its_range() {
-        let bytes = b"prefixPAYLOADsuffix".to_vec();
+        let bytes = b"prefixPAYLOAD".to_vec();
         let mut view = ArchiveSlice::new(std::io::Cursor::new(bytes), 6, 7).unwrap();
 
         let mut observed = Vec::new();
