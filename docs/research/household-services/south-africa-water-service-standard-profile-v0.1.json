@@ -1,0 +1,291 @@
+{
+  "schema_version": "0.1",
+  "profile_id": "SA-WATER-SERVICE-STANDARD-GG52814-GON6292-2025",
+  "profile_revision_date": "2026-11-04",
+  "jurisdiction": "South Africa",
+  "legal_instrument": {
+    "act": "Water Services Act, 1997 (Act 108 of 1997)",
+    "title": "Compulsory National Water and Sanitation Services Standards",
+    "government_gazette": "52814",
+    "government_notice": "6292",
+    "published_on": "2025-06-06",
+    "section": "9(1)",
+    "repeal": {
+      "regulation": "29",
+      "instrument": "Regulations relating to compulsory national standards and measures to conserve water",
+      "government_notice_regulation": "GNR 509",
+      "published_on": "2001-06-08"
+    }
+  },
+  "profiles": [
+    {
+      "id": "BASIC_FORMAL_SETTLEMENT",
+      "regulation": "2(2)",
+      "applicable_boundary": "public_user_connection",
+      "requirements": [
+        {
+          "id": "quantity",
+          "measure": "drinking_water_volume",
+          "operator": ">=",
+          "value": 6000,
+          "unit": "L/household/calendar_month",
+          "gate": "hard",
+          "note": "Household basis; not a per-capita threshold."
+        },
+        {
+          "id": "minimum_flow",
+          "measure": "water_flow_rate",
+          "operator": ">=",
+          "value": 10,
+          "unit": "L/min",
+          "gate": "hard"
+        },
+        {
+          "id": "annual_availability",
+          "measure": "water_available_days",
+          "operator": ">=",
+          "value": 358,
+          "unit": "days/calendar_year",
+          "gate": "hard"
+        },
+        {
+          "id": "maximum_consecutive_interruption",
+          "measure": "longest_continuous_interruption",
+          "operator": "<=",
+          "value": 48,
+          "unit": "hours",
+          "gate": "hard"
+        },
+        {
+          "id": "drinking_water_quality",
+          "measure": "drinking_water_quality_status",
+          "operator": "==",
+          "value": "SANS_241_COMPLIANT",
+          "unit": "categorical",
+          "gate": "hard"
+        },
+        {
+          "id": "yard_boundary_access_transition",
+          "measure": "delivery_point_location",
+          "operator": "at_least",
+          "value": "END_OF_YARD_USER_CONNECTION_POINT",
+          "unit": "location_class",
+          "gate": "transition",
+          "target_date_derived": "2027-06-06",
+          "note": "Regulation 2(2)(a): within two years of promulgation."
+        }
+      ],
+      "maintenance_responsibility": {
+        "water_services_institution": "up_to_user_connection",
+        "property_owner": "within_property_boundary",
+        "regulation": "2(3)"
+      }
+    },
+    {
+      "id": "INTERIM_INFORMAL_SETTLEMENT",
+      "regulation": "3(5)",
+      "applicable_boundary": "communal_delivery_point",
+      "requirements": [
+        {
+          "id": "maximum_distance",
+          "measure": "walking_distance_to_delivery_point",
+          "operator": "<=",
+          "value": 200,
+          "unit": "m",
+          "gate": "hard",
+          "note": "Within reasonable walking distance from the furthest household."
+        },
+        {
+          "id": "quantity",
+          "measure": "drinking_water_volume",
+          "operator": ">=",
+          "value": 6000,
+          "unit": "L/household/calendar_month",
+          "gate": "hard"
+        },
+        {
+          "id": "minimum_flow",
+          "measure": "water_flow_rate",
+          "operator": ">=",
+          "value": 10,
+          "unit": "L/min",
+          "gate": "hard"
+        },
+        {
+          "id": "annual_availability",
+          "measure": "water_available_days",
+          "operator": ">=",
+          "value": 358,
+          "unit": "days/calendar_year",
+          "gate": "hard"
+        },
+        {
+          "id": "maximum_consecutive_interruption",
+          "measure": "longest_continuous_interruption",
+          "operator": "<=",
+          "value": 48,
+          "unit": "hours",
+          "gate": "hard"
+        },
+        {
+          "id": "drinking_water_quality",
+          "measure": "drinking_water_quality_status",
+          "operator": "==",
+          "value": "SANS_241_COMPLIANT",
+          "unit": "categorical",
+          "gate": "hard"
+        },
+        {
+          "id": "tanker_interim_duration",
+          "measure": "continuous_tanker_service_duration",
+          "operator": "<=",
+          "value": 12,
+          "unit": "calendar_months",
+          "gate": "hard",
+          "regulation": "3(7)"
+        }
+      ]
+    },
+    {
+      "id": "ALTERNATIVE_DRINKING_WATER_AFTER_LONG_INTERRUPTION",
+      "regulation": "4(1)-(3)",
+      "trigger": {
+        "measure": "continuous_water_supply_interruption",
+        "operator": ">",
+        "value": 48,
+        "unit": "hours"
+      },
+      "applicable_boundary": "designated_emergency_delivery_point",
+      "requirements": [
+        {
+          "id": "minimum_alternative_quantity",
+          "measure": "alternative_drinking_water_volume",
+          "operator": ">=",
+          "value": 15,
+          "unit": "L/person/day",
+          "gate": "hard"
+        },
+        {
+          "id": "delivery_point_safety_access",
+          "measure": "delivery_point_status",
+          "operator": "==",
+          "value": "STRATEGICALLY_DETERMINED_RELATIVELY_CONVENIENT_AND_SAFE",
+          "unit": "categorical",
+          "gate": "hard"
+        },
+        {
+          "id": "drinking_water_quality",
+          "measure": "drinking_water_quality_status",
+          "operator": "==",
+          "value": "SANS_241_COMPLIANT",
+          "unit": "categorical",
+          "gate": "hard"
+        }
+      ],
+      "extended_monitoring": {
+        "trigger": {
+          "measure": "alternative_drinking_water_service_duration",
+          "operator": ">",
+          "value": 7,
+          "unit": "days"
+        },
+        "registration_system": "DWS_IRIS",
+        "parameters": [
+          "disinfectant_residuals",
+          "turbidity",
+          "E_coli",
+          "heterotrophic_plate_count",
+          "conductivity",
+          "pH"
+        ],
+        "continue_until": "tankering_discontinued",
+        "regulation": "4(3)"
+      },
+      "tanker_records": [
+        "vehicle_type_and_registration",
+        "driver",
+        "volume_per_trip",
+        "delivery_schedule",
+        "delivery_point",
+        "vehicle_cleanliness_and_disinfection_evidence"
+      ],
+      "mid_long_term_policy": "Alternatives to tankering must be prioritised.",
+      "note": "The quantity applies at designated alternative-supply delivery points; do not infer delivery at each household fixture."
+    }
+  ],
+  "boundary_separation": [
+    {
+      "id": "PUBLIC_USER_CONNECTION",
+      "responsibility": "Water Services Institution up to user connection",
+      "do_not_infer": "internal fixture performance"
+    },
+    {
+      "id": "EMERGENCY_DELIVERY_POINT",
+      "responsibility": "designated alternative supply access point",
+      "do_not_infer": "delivery into the dwelling or household fixture"
+    },
+    {
+      "id": "PRIVATE_HOUSEHOLD_FIXTURE",
+      "responsibility": "within-property plumbing and fixture service",
+      "do_not_infer": "upstream utility compliance without user-connection evidence"
+    },
+    {
+      "id": "PRIVATE_NONPOTABLE_REUSE",
+      "responsibility": "separate private source and end-use qualification",
+      "do_not_infer": "drinking-water status or SANS 241 conformity"
+    }
+  ],
+  "interpretation_guards": [
+    "The 6 kL/month requirement is per household, not per person.",
+    "Do not use the repealed 2001 GNR 509 values as the current basic-service threshold.",
+    "The 358-days/year availability and 48-consecutive-hour interruption requirements are separate gates.",
+    "A monthly volume pass cannot compensate for a flow, continuity, quality or access failure.",
+    "The 15 L/person/day emergency alternative-supply quantity is assessed at designated delivery points, not assumed at household fixtures.",
+    "Unknown or stale drinking-water quality evidence is not a pass and is not a confirmed physical contamination failure.",
+    "Private stored water, borehole water and greywater output do not receive drinking-water credit solely from source or volume.",
+    "Regulation 27 progressive compliance plans, where evidenced and approved, must be recorded separately from observed service outcomes.",
+    "This profile is a benchmark interpretation, not legal advice, municipal compliance evidence, plumbing approval or product certification."
+  ],
+  "external_context_not_legal_thresholds": {
+    "who_document": "Domestic water quantity, service level and health, second edition (2020)",
+    "summary_access_levels": [
+      {
+        "level": "basic",
+        "typical_average_volume": "unlikely to exceed 20 L/person/day"
+      },
+      {
+        "level": "intermediate",
+        "typical_average_volume": "approximately 50 L/person/day"
+      },
+      {
+        "level": "optimal",
+        "typical_average_volume": "more than 100 L/person/day"
+      }
+    ],
+    "note": "WHO service-level context is not a substitute for the South African household-based statutory requirements."
+  },
+  "sources": [
+    {
+      "id": "SA_GG_52814_GON_6292_2025",
+      "publisher": "Department of Water and Sanitation",
+      "url": "https://www.gov.za/sites/default/files/gcis_document/202506/52814gon6292.pdf",
+      "clauses": [
+        "2(2)",
+        "2(3)",
+        "3(5)",
+        "3(7)",
+        "4(1)",
+        "4(2)",
+        "4(3)",
+        "27",
+        "29"
+      ]
+    },
+    {
+      "id": "WHO_DOMESTIC_WATER_QUANTITY_2020",
+      "publisher": "World Health Organization",
+      "url": "https://www.who.int/publications/i/item/9789240015241"
+    }
+  ],
+  "claim_ceiling": "No physical household performance, municipal compliance, drinking-water safety, product certification or local installation permission is established by this profile."
+}
