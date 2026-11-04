@@ -10,12 +10,11 @@ fn bundle_root_adapter_exports_public_contract() {
         rea_bundle_compat::canonical_evidence_bundle_bytes;
     let _verifier: fn(
         &Value,
-    ) -> Result<rea_bundle_compat::VerifiedEvidenceBundle, rea_bundle_compat::BundleError> =
-        rea_bundle_compat::verify_evidence_bundle_value;
-    let _target_projection: fn(
-        &Value,
-        &str,
-    ) -> Result<Value, rea_bundle_compat::BundleError> =
+    ) -> Result<
+        rea_bundle_compat::VerifiedEvidenceBundle,
+        rea_bundle_compat::BundleError,
+    > = rea_bundle_compat::verify_evidence_bundle_value;
+    let _target_projection: fn(&Value, &str) -> Result<Value, rea_bundle_compat::BundleError> =
         rea_bundle_compat::evidence_bundle_for_target;
     let _closure_audit: fn(
         &Value,
