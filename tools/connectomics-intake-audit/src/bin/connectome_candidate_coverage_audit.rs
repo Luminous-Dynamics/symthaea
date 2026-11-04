@@ -1705,6 +1705,9 @@ mod tests {
             psu_id: "psu-a3".into(),
             stratum_id: "region-a".into(),
         });
+        // Keep the fixture's source-frame binding valid so this test reaches
+        // the intended unselected-outcome rejection rather than failing early.
+        audit.source_population_frame_sha256 = frame_sha256(&audit.population_frame);
         audit.strata[0].sampled_psu_count = 2;
 
         let mut frame = BTreeMap::<String, Vec<String>>::new();
