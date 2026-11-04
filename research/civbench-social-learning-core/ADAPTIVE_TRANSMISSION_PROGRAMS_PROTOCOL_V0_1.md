@@ -106,7 +106,7 @@ The adaptive-transmission-sweep binary runs a predeclared grid:
 - per-step transmission budget equal to the population size;
 - successful acquisition probability 0.9.
 
-This is 378 conditions and 48,384 total simulation runs. All policies in a given task/population/topology/attention condition use the same seed IDs and configuration. The simulator now derives independent deterministic streams for graph generation, individual discovery, schedule randomness and message acquisition. All policies with the same master seed therefore share the same generated graph and subsystem seed schedule; scheduler RNG consumption cannot shift later acquisition outcomes. Acquisition draws are consumed per scheduled-message slot before redundancy checks, which preserves slot alignment for the two matched-schedule content ablations. This is stronger than merely reusing a seed, but not perfect per-action common-random-number pairing: policy-dependent inventories can change the candidate list/order used by individual exploration, and different schedules can associate the same acquisition slot with different messages. The held-out paired-difference estimator remains the correct basis for the comparison.
+This is 378 conditions and 48,384 total simulation runs. All policies in a given task/population/topology/attention condition use the same seed IDs and configuration. The simulator now uses domain-separated streams and identity-keyed random draws. Graph generation and schedule randomness have separate streams. Individual discovery priority and success are keyed by (master seed, step, agent ID, recipe ID), so reordering or adding other candidates cannot reassign a draw to a shared recipe. Message-acquisition success is keyed by (master seed, step, sender, receiver, route-slot), deliberately excluding payload identity; a content shuffle that preserves sender/receiver slots therefore preserves acquisition luck for that route. This is stronger common-random-number control than same-seed reuse. Remaining limitation: policy-dependent inventories change which recipes are eligible and which enter the top-k attempt budget; different route sets cannot be paired. The held-out paired-difference estimator remains the correct basis for comparison.
 
 Outputs include:
 - final collective result coverage and a 95% normal-approximation interval over simulation seeds;
@@ -119,7 +119,7 @@ Outputs include:
 - total recipient-attention uses;
 - new results per transmission.
 
-The experiment controls message budget and attention, but the current task is not a model of human learning time or cognitive effort. Do not equate one rule transfer with one human demonstration.
+The experiment controls message budget and attention, but the current task is not a model of human learning time or cognitive effort. Do not equate one rule transfer with one human demonstration. Individual-learning draws are identity-keyed by agent/recipe, and acquisition draws by sender/receiver/route-slot (not payload), to preserve the random opportunity assigned to a shared experimental unit across matched policy runs. Policies with different eligible recipe sets or route sets are not perfectly paired; this limitation remains part of the interpretation.
 
 ## 6. Proposed paradigm shifts
 
