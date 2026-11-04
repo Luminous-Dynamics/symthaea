@@ -53,13 +53,13 @@
             "type": "object",
             "additionalProperties": false,
             "required": [
-              "member_action_accuracy",
+              "member_valid_action_support_rate",
               "context_sensitivity_rate",
               "surface_invariance_rate",
               "ambiguous_valid_action_rate"
             ],
             "properties": {
-              "member_action_accuracy": {
+              "member_valid_action_support_rate": {
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1
