@@ -77,12 +77,15 @@ The crate exposes `bootstrap_intervals` for a deterministic nonparametric multin
 
 Only `Converged` fits enter the interval distribution. Boundary, weakly identified, non-identifiable, non-converged and non-evaluable replicates remain in the denominator and are returned separately. Insufficient success returns no intervals. The seed and count-correction mode are recorded.
 
+The `bootstrap_coverage` binary simulates known-answer Gaussian category counts and compares the returned mu, sigma and d_a intervals with the generating values. It reports the full-fit disposition counts, interval-return rate, coverage conditional on a returned qualified interval, mean interval widths and bootstrap failure fractions. Its defaults (50 outer campaigns × 100 bootstrap replicates) are a smoke/calibration pilot only; increase outer campaigns, bootstrap replicates and trial budgets for formal Monte Carlo assessment, and use disjoint calibration/held-out seed sets.
+
 These are conditional category-count bootstrap intervals, not participant-level cluster bootstrap intervals or a proof of calibrated 95% coverage. They do not account for sampling variability across participants, sessions or sites, and their coverage must be benchmarked against known-answer synthetic campaigns and the external reference workflow before use for scientific conclusions. A large failed-fit fraction is itself a design/identifiability warning, not a nuisance to be silently filtered out.
 
 ## Run
 
     cargo test --manifest-path tools/spectra-uvsd-fit/Cargo.toml
     cargo run --release --manifest-path tools/spectra-uvsd-fit/Cargo.toml --bin recovery_sweep > uvsd-recovery.csv
+    cargo run --release --manifest-path tools/spectra-uvsd-fit/Cargo.toml --bin bootstrap_coverage -- --outer=50 --bootstraps=100 --trials-per-class=400 > bootstrap-coverage.csv
 
 The recovery runner emits one CSV row per frozen synthetic campaign across mu, sigma and independent seeds, including optimizer and Fisher-information diagnostics. It is a parameter-recovery smoke benchmark only; its Wald intervals are not yet coverage-calibrated and the runner does not estimate false UVSD declaration rates, power, or empirical performance.
 
