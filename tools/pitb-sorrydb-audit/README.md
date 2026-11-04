@@ -99,6 +99,37 @@ These are proposed targets, not achieved results.
 
 A fair SOTA comparison must freeze model, scaffold, tool access, candidate pool, total wall/CPU/GPU budget, token budget, stopping policy, source visibility and verification path. Report Pass@1/Pass@k, unique solved tasks, cross-system union, cost per verified completion, abstention/coverage and confidence intervals clustered by repository and source file. Do not compare raw percentages across SorryDB, AutoformBench and FVSpec as if they measured the same task.
 
+## Assurance-adjusted proof-run receipts
+
+The snapshot auditor also accepts an optional JSONL file of proof attempts:
+
+```sh
+cargo run --locked --manifest-path tools/pitb-sorrydb-audit/Cargo.toml -- \
+  --verify \
+  /path/to/SorryDB_2601.json \
+  /path/to/SorryDB_2601_1000_evaluation_split.json \
+  /tmp/sorrydb-audit-report.json \
+  --runs /path/to/proof-runs.jsonl \
+  --pinned-source SorryDB/SorryDB@74b3b63f8ba890d675f362924b21ac55db410383
+```
+
+Each receipt binds the original SorryDB task ID to the exact repository commit, Lean version, source path and coordinate range, plus a SHA-256 of the recorded proof goal. It also carries digests for the source file, replacement patch, proposed proof, checker receipt, semantic-gate receipt and source-binding receipt.
+
+A run is counted as `verified_success` only if all of the following are true:
+
+- the proof was inserted and the exact recorded sorry range was replaced;
+- the original sorry is absent after replacement;
+- the project builds and Lean's kernel accepts the resulting proof;
+- independent semantic and non-vacuity gates pass;
+- source binding passes against the pinned repository commit and exact range;
+- no new axioms and no new sorry placeholders were introduced.
+
+The auditor rejects success receipts missing any gate, receipts for tasks outside the pinned 1,000-task evaluation split, mismatched commits/toolchains/coordinates/goals, invalid digests, duplicate run IDs, and infrastructure failures without a failure type. It emits per-strategy attempt counts, assurance-adjusted success rate, mean successful wall time and total recorded cost. Repeated attempts are allowed and are counted as attempts, not distinct solved tasks.
+
+The run verifier validates the receipt structure and identity bindings. It does not authenticate the referenced receipt bytes or independently rebuild the source repository. The separate checker/source-binding/semantic-gate evidence must be reopened and verified by the surrounding evaluator before using a receipt in a public score. In particular, a kernel pass alone is never enough for PITB's assurance-adjusted success label.
+
+Historic SorryDB task rows do not contain a source-file SHA-256. The task snapshot auditor therefore continues to establish dataset membership and reproducibility inputs, while each proof-run receipt supplies the source digest and carries an independent source-binding receipt. This is not a substitute for actually checking out and hashing the source file at the recorded commit.
+
 ## Trust boundary
 
 This crate verifies dataset bytes, record integrity and exact split membership. It does not download/build all 78 source repositories, prove that the sorry goal is the intended theorem, audit its assumptions for vacuity, or verify any proposed proof. Those are separate gates and must produce their own receipts before PITB counts a task as assurance-adjusted success.
