@@ -53,3 +53,8 @@ The 2×2 game kernel now treats both players symmetrically: best responses,
 strict and weak dominance, pure and interior mixed Nash equilibria, Pareto
 frontiers, social-welfare maximizers, constant-sum detection, and transposition
 are independently inspectable.
+
+
+## Dated cash-flow finance
+
+The finance module also exposes `DatedCashFlow`, `xnpv`, `xirr_analysis` and `xirr` for irregularly dated UTC cash flows. The current convention is explicitly **Actual/365 Fixed**: the first cash-flow timestamp is time zero, and later flows are discounted by elapsed Unix seconds divided by 365 days. Cash flows must be ordered and must share one currency/unit; no FX conversion is implied. `xirr_analysis` reports discovered roots and whether the bounded search completed, while `xirr` rejects ambiguous or incomplete results. These floating-point values are analytical calculation inputs, not canonical ledger-money records.
