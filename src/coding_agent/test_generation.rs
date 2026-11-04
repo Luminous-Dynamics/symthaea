@@ -26,7 +26,7 @@
 
 use symthaea_core::synthesis_trait::SynthesisRequest;
 use quote::ToTokens;
-use syn::{FnArg, Pat, Type};
+use syn::{Expr, FnArg, Pat, Type};
 
 /// A generated test case.
 #[derive(Debug, Clone)]
@@ -79,6 +79,20 @@ impl TestGenerator {
 
         // Explicit examples carry the expected-value oracle in this API.
         for (i, (input, expected)) in request.examples.iter().enumerate() {
+            if !Self::is_candidate_invocation(input, &request.name) {
+                Self::push_unique_reason(
+                    &mut unsupported_reasons,
+                    format!("Example {i} was skipped because its input is not a direct call to {}.", request.name),
+                );
+                continue;
+            }
+            if syn::parse_str::<Expr>(expected).is_err() {
+                Self::push_unique_reason(
+                    &mut unsupported_reasons,
+                    format!("Example {i} was skipped because its expected value is not a valid Rust expression."),
+                );
+                continue;
+            }
             tests.push(GeneratedTest {
                 name: format!("test_{}_example_{}", request.name, i),
                 assertion: format!("assert_eq!({}, {});", input, expected),
@@ -324,6 +338,23 @@ impl TestGenerator {
         }
     }
 
+    /// Accept explicit examples only when the input is a parsed call to the requested function.
+    fn is_candidate_invocation(expression: &str, fn_name: &str) -> bool {
+        let Ok(expression) = syn::parse_str::<Expr>(expression) else {
+            return false;
+        };
+        let Expr::Call(call) = expression else {
+            return false;
+        };
+        let Expr::Path(path) = call.func.as_ref() else {
+            return false;
+        };
+        path.path
+            .segments
+            .last()
+            .is_some_and(|segment| segment.ident.to_string() == fn_name)
+    }
+
     /// Render tests into a Rust `#[cfg(test)] mod tests` block.
     fn render_test_module(fn_name: &str, tests: &[GeneratedTest]) -> String {
         if tests.is_empty() {
@@ -378,6 +409,36 @@ mod tests {
         assert!(suite.source.contains("#[cfg(test)]"));
         assert!(suite.source.contains("test_add_example_0"));
         assert!(suite.source.contains("assert_eq!(add(2, 3), 5)"));
+    }
+
+    #[test]
+    fn test_non_invocation_examples_are_not_emitted_as_candidate_tests() {
+        let request = SynthesisRequest::new("rust", "double", "Double an integer")
+            .with_signature("fn double(value: i32) -> i32")
+            .with_example("1 + 2", "3")
+            .with_example("other(2)", "4")
+            .with_example("double(2)", "4");
+        let suite = TestGenerator::generate(&request);
+
+        assert_eq!(
+            suite.tests.iter().filter(|test| test.category == TestCategory::Example).count(),
+            1
+        );
+        assert!(suite.source.contains("assert_eq!(double(2), 4)"));
+        assert!(!suite.source.contains("assert_eq!(1 + 2, 3)"));
+        assert!(!suite.source.contains("assert_eq!(other(2), 4)"));
+        assert_eq!(suite.unsupported_reasons.len(), 2);
+    }
+
+    #[test]
+    fn test_invalid_expected_expression_is_not_emitted() {
+        let request = SynthesisRequest::new("rust", "double", "Double an integer")
+            .with_example("double(2)", "not valid rust !");
+        let suite = TestGenerator::generate(&request);
+
+        assert!(suite.tests.is_empty());
+        assert!(!suite.source.contains("assert_eq!"));
+        assert!(suite.unsupported_reasons.iter().any(|reason| reason.contains("expected value")));
     }
 
     #[test]
