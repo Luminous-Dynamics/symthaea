@@ -714,7 +714,7 @@ fn create_synthetic_attestation_bundle(root: &Path) -> Result<VerificationReport
             schema_version: REGISTRY_SCHEMA.into(),
             registry_id: trust_root.registry_id.clone(),
             registry_version: 1,
-            generated_at_unix: 1_800_000_100,
+            generated_at_unix: 1_799_999_900,
             authority_key_id: trust_root.root_key_id.clone(),
             keys: vec![reviewer_key],
             signature_hex: String::new(),
@@ -729,6 +729,7 @@ fn create_synthetic_attestation_bundle(root: &Path) -> Result<VerificationReport
         let report = verify_all(
             &receipt, &registry, &trust_root, &engine,
             &receipt_bytes, &registry_bytes, &root_bytes,
+            &sha256(&root_bytes), &sha256(&registry_bytes), &engine.binary_sha256,
         )?;
 
         fs::create_dir_all(root).map_err(|e| format!("create synthetic signed-attestation bundle: {e}"))?;
@@ -744,7 +745,8 @@ fn create_synthetic_attestation_bundle(root: &Path) -> Result<VerificationReport
         // Negative controls: tampered payload, revoked key, and wrong root must fail.
         let mut tampered = receipt.clone();
         tampered.semantic_log_sha256 = sha256(b"changed review log");
-        if verify_all(&tampered, &registry, &trust_root, &engine, &receipt_bytes, &registry_bytes, &root_bytes).is_ok() {
+        if verify_all(&tampered, &registry, &trust_root, &engine, &receipt_bytes, &registry_bytes, &root_bytes,
+            &sha256(&root_bytes), &sha256(&registry_bytes), &engine.binary_sha256).is_ok() {
             return Err("tampered reviewer payload was accepted".into());
         }
 
