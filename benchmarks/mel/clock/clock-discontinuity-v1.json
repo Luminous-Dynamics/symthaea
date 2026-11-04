@@ -15,7 +15,8 @@
       "callback_stream_time_ns": 0,
       "playback_stream_time_ns": 5000000,
       "callback_to_playback_ns": 5000000,
-      "timestamp_uncertainty_ns": null
+      "timestamp_uncertainty_ns": null,
+      "channel_count": 2
     },
     {
       "schema_version": "mel-output-clock-anchor-v1",
@@ -28,7 +29,8 @@
       "callback_stream_time_ns": 10000000,
       "playback_stream_time_ns": 15000000,
       "callback_to_playback_ns": 5000000,
-      "timestamp_uncertainty_ns": null
+      "timestamp_uncertainty_ns": null,
+      "channel_count": 2
     },
     {
       "schema_version": "mel-output-clock-anchor-v1",
@@ -41,7 +43,8 @@
       "callback_stream_time_ns": 20000000,
       "playback_stream_time_ns": 25000000,
       "callback_to_playback_ns": 5000000,
-      "timestamp_uncertainty_ns": null
+      "timestamp_uncertainty_ns": null,
+      "channel_count": 2
     },
     {
       "schema_version": "mel-output-clock-anchor-v1",
@@ -54,7 +57,17 @@
       "callback_stream_time_ns": 30000000,
       "playback_stream_time_ns": 35000000,
       "callback_to_playback_ns": 5000000,
-      "timestamp_uncertainty_ns": null
+      "timestamp_uncertainty_ns": null,
+      "channel_count": 2
     }
-  ]
+  ],
+  "stream_descriptor": {
+    "schema_version": "mel-output-clock-stream-descriptor-v1",
+    "stream_instance_id": 10,
+    "device_identity_sha256": "478b306ccd9d8e4f8cf0671f87b99b0b8a944d66f9f3998c2c3b5add511c43bf",
+    "sample_rate_hz": 48000,
+    "channel_count": 2,
+    "sample_format": "f32",
+    "configuration_digest_sha256": "426e453cda3f2ea0fa97b04078b4da9b3909c0e034ad66980cc8070d24a36baa"
+  }
 }
