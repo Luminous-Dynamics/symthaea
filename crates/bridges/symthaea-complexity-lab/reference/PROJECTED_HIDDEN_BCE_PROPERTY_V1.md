@@ -29,3 +29,15 @@ Run python3 projected_bce_property_microbench.py. The runner writes projected_hi
 ## Next
 
 Extend to dynamic context traces by generating a branch decision tree, conditioning formula at each node, verifying branch-local BCE receipts and checking backtrack restoration. Then differentially replay event sequences against an unchanged D4 BCEi build.
+
+
+## Exact uploaded-script execution
+
+The uploaded property runner was fetched and reconstructed byte-for-byte; its Git blob SHA-1 matched before execution.
+
+- Script Git blob SHA-1: f13a13fcb31bfd3aef993d1204e3b50424118271
+- Script SHA-256: 21d61838130b10e70f68a3638186c78bc118986dd1b0258d554522daa2bc67d8
+- Runtime: Python 3.13.5, Linux.
+- Result: 2,000/2,000 positive cases passed; 1,420 changed full-model count; the nonblocked counterexample correctly changed projected support from {1} to {0,1}.
+
+The result manifest records the exact script identities and uploaded-script execution. The finite small-formula claim ceiling is unchanged.
