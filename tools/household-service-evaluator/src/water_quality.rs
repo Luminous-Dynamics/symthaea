@@ -740,6 +740,20 @@ pub fn validate_water_use_qualification(
         let sample_time = *sample_times
             .get(sample_id.as_str())
             .expect("sample time inserted with sample");
+        if sample_time < stream_start {
+            return Err(invalid(
+                "decision.supporting_sample_ids",
+                "supporting sample predates the declared stream observation window",
+            ));
+        }
+        if let Some(until) = &input.stream.observed_until
+            && sample_time > parse_utc_instant(until, "stream.observed_until")?
+        {
+            return Err(invalid(
+                "decision.supporting_sample_ids",
+                "supporting sample occurs after the declared stream observation window",
+            ));
+        }
         if sample_time > decision_time {
             return Err(invalid(
                 "decision.supporting_sample_ids",
@@ -1236,6 +1250,21 @@ mod tests {
             WaterQualificationStatus::UnknownEvidenceInsufficient
         );
         assert!(!result.physical_water_safety_established);
+    }
+
+    #[test]
+    fn rejects_supporting_sample_before_stream_window() {
+        let mut record = valid_record();
+        record.sample_observations[0].collected_at = "2026-11-04T07:59:59Z".into();
+        assert!(validate_water_use_qualification(&record).is_err());
+    }
+
+    #[test]
+    fn rejects_supporting_sample_after_stream_window_end() {
+        let mut record = valid_record();
+        record.stream.observed_until = Some("2026-11-04T09:30:00Z".into());
+        record.sample_observations[0].collected_at = "2026-11-04T09:30:01Z".into();
+        assert!(validate_water_use_qualification(&record).is_err());
     }
 
     #[test]
