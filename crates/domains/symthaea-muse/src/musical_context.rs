@@ -105,6 +105,8 @@ pub enum MusicalContextValidationIssueV1 {
     ContextCounterfactualChangedLocalCue { family_index: usize },
     ContextCounterfactualDidNotChangeIntent { family_index: usize },
     ContextCounterfactualChangedPhraseFunction { family_index: usize },
+    ContextCounterfactualChangedRole { family_index: usize },
+    ContextCounterfactualChangedInstrument { family_index: usize },
     ContextCounterfactualActionSetsOverlap { family_index: usize },
     SurfaceCounterfactualChangedLocalCue { family_index: usize },
     SurfaceCounterfactualChangedIntent { family_index: usize },
@@ -241,6 +243,18 @@ pub fn validate_musical_context_family_v1(
             if left.phrase_function != right.phrase_function {
                 issues.push(
                     MusicalContextValidationIssueV1::ContextCounterfactualChangedPhraseFunction {
+                        family_index,
+                    },
+                );
+            }
+            if left.performer_role != right.performer_role {
+                issues.push(MusicalContextValidationIssueV1::ContextCounterfactualChangedRole {
+                    family_index,
+                });
+            }
+            if left.surface_instrument != right.surface_instrument {
+                issues.push(
+                    MusicalContextValidationIssueV1::ContextCounterfactualChangedInstrument {
                         family_index,
                     },
                 );
@@ -455,6 +469,27 @@ mod tests {
         assert!(continue_phrase.passed);
         assert!(!invalid.passed);
         assert_eq!(wait.pair_relation_correct, None);
+    }
+
+
+    #[test]
+    fn context_change_family_must_preserve_role_and_instrument() {
+        let set = fixture_set();
+        let mut family = set.families[0].clone();
+        family.members[1].performer_role = "bass_player".to_owned();
+        family.members[1].surface_instrument = "bass".to_owned();
+
+        let issues = validate_musical_context_family_v1(&family, 0);
+        assert!(issues.contains(
+            &MusicalContextValidationIssueV1::ContextCounterfactualChangedRole {
+                family_index: 0
+            }
+        ));
+        assert!(issues.contains(
+            &MusicalContextValidationIssueV1::ContextCounterfactualChangedInstrument {
+                family_index: 0
+            }
+        ));
     }
 
     #[test]
