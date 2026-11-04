@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-rea-compat"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+
+[lib]
+path = "../../../crates/domains/symthaea-rea-compat/src/lib.rs"
+
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = { version = "=1.0.150", features = ["preserve_order"] }
+serde_json_canonicalizer = "=0.3.2"
+sha2 = { version = "=0.10.9", features = ["oid"] }
