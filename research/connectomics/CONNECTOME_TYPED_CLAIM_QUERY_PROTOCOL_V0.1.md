@@ -25,6 +25,10 @@ Every query freezes a formal definition, analysis digest, single-layer or declar
 
 The semantic verifier must recompute relation-type sequences from referenced claim IDs and compare them with the allowed path grammar. A producer cannot label an anatomical-plus-statistical path as causal. Mixed evidence remains mixed evidence until a separate relation-specific claim and evidence adapter justifies any stronger interpretation.
 
+For multi-claim paths, adjacent **traversable** relations must compose exactly: the previous claim's target object ID, object kind and world/release must equal the next claim's source object ID, kind and world/release. A mismatch is `REJECTED_PATH_COMPOSITION`, even when the relation-type sequence is permitted. Reconstruction correspondence may intentionally cross releases, but the next relation must begin at its declared target-side object and world.
+
+A `CAUSAL_EFFECT_CLAIM` is not a traversable anatomical/statistical edge. It is an attached estimand/identification assertion and is checked separately for intervention, target population, outcome, positivity and selection. Its endpoints therefore do not participate in ordinary graph-edge continuity. This keeps causal inference attached to a declared query without pretending an intervention record is another anatomical synapse.
+
 ## Non-laundering rules
 
 1. Every claim has exactly one primary relation type.
