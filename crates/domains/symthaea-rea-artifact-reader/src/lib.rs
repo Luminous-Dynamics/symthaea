@@ -2183,6 +2183,40 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn zip_rs_zlib_rs_deflate_decoder_agrees_with_symthaea_verifier() {
+        let payload = b"independent deflate decoder corpus: ".repeat(4096);
+        let mut writer = zipcore::ZipWriter::new(std::io::Cursor::new(Vec::new())).unwrap();
+        writer
+            .add_file(
+                "independent-deflate.bin",
+                &payload,
+                &zipcore::FileOptions::deflate(6),
+            )
+            .unwrap();
+        let bytes = writer.finish().unwrap().into_inner();
+        let path = write_temp(&bytes);
+
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let symthaea = reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap();
+        assert_eq!(symthaea.observed_uncompressed_bytes, payload.len() as u64);
+        assert!(symthaea.verified_crc32);
+
+        // The harness enables zip 9.3.0's flate2/zlib-rs backend. This independently
+        // decodes the exact same raw Deflate stream produced by zipcore/miniz_oxide.
+        let mut oracle =
+            zip::ZipArchive::new(std::io::Cursor::new(bytes)).expect("zip-rs parses the archive");
+        let mut entry = oracle.by_index(0).expect("zip-rs opens occurrence zero");
+        let mut observed = Vec::new();
+        entry.read_to_end(&mut observed).unwrap();
+        assert_eq!(observed, payload);
+        assert_eq!(observed.len() as u64, symthaea.observed_uncompressed_bytes);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn verifies_deflate_member_stream() {
         let mut writer = zipcore::ZipWriter::new(std::io::Cursor::new(Vec::new())).unwrap();
         writer
