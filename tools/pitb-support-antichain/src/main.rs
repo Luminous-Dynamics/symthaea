@@ -743,10 +743,18 @@ fn synthetic_report() -> Result<Report, String> {
         }
         reports
     };
+    let alternative_group_id = reports.iter()
+        .find(|group| group.target_id == "alternative")
+        .ok_or("synthetic alternative group missing")?
+        .group_id.clone();
+    let conjunctive_group_id = reports.iter()
+        .find(|group| group.target_id == "conjunctive")
+        .ok_or("synthetic conjunctive group missing")?
+        .group_id.clone();
     let predictions = vec![
         Prediction {
             schema_version: PREDICTION_SCHEMA.into(),
-            group_id: reports[0].group_id.clone(),
+            group_id: alternative_group_id,
             model_id: "synthetic-model".into(),
             model_version: "self-test".into(),
             abstained: false,
@@ -757,7 +765,7 @@ fn synthetic_report() -> Result<Report, String> {
         },
         Prediction {
             schema_version: PREDICTION_SCHEMA.into(),
-            group_id: reports[1].group_id.clone(),
+            group_id: conjunctive_group_id,
             model_id: "synthetic-model".into(),
             model_version: "self-test".into(),
             abstained: false,
