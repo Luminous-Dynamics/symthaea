@@ -181,6 +181,15 @@ def self_test():
     sample = "cargo test --locked --manifest-path " + chr(92) + "\n tools/example/Cargo.toml --bin example_audit"
     refs, errors = cargo_references(sample)
     assert not errors and refs == [("tools/example/Cargo.toml", ["example_audit"])]
+    multi = (
+        "cargo test --manifest-path tools/first/Cargo.toml --bin first\n"
+        "cargo test --manifest-path tools/second/Cargo.toml --bin second"
+    )
+    refs, errors = cargo_references(multi)
+    assert not errors and refs == [
+        ("tools/first/Cargo.toml", ["first"]),
+        ("tools/second/Cargo.toml", ["second"]),
+    ]
     refs, errors = cargo_references('cargo test --manifest-path "$TOOLS_DIR/Cargo.toml"')
     assert not errors and is_dynamic(refs[0][0])
     note = "Design specification only: tools/missing/Cargo.toml is not currently runnable."
