@@ -1,9 +1,11 @@
 //! Small, dependency-free qualification harness for counterfactual identification.
- //!
- //! This is a fixture evaluator, not a causal estimator or a general identifiability
- //! engine. It checks that the declared support/assumption evidence leads to the
- //! conservative disposition preregistered by each analytic fixture.
- 
+//!
+//! This is a fixture evaluator, not a causal estimator or a general identifiability
+//! engine. It checks that declared support and assumption evidence leads to the
+//! conservative disposition preregistered by each analytic fixture.
+
+use std::collections::{BTreeMap, BTreeSet};
+
 const EPSILON: f64 = 1.0e-12;
 const IDENTIFICATION_FIXTURES: &str =
     include_str!("../fixtures/identification-cases-v0.1.tsv");
@@ -252,8 +254,11 @@ mod tests {
 
     #[test]
     fn same_marginals_can_hide_different_episode_counterfactuals() {
-        let mut marginals = std::collections::BTreeMap::new();
-        let mut conditional = std::collections::BTreeMap::new();
+        let mut marginals =
+            BTreeMap::<(String, String), BTreeMap<u64, f64>>::new();
+        let mut conditional = BTreeMap::<String, f64>::new();
+        let mut totals = BTreeMap::<String, f64>::new();
+        let mut world_ids = BTreeSet::new();
 
         for (line_index, line) in CROSS_WORLD_FIXTURES.lines().enumerate() {
             if line_index == 0 || line.trim().is_empty() {
@@ -261,28 +266,40 @@ mod tests {
             }
             let fields: Vec<&str> = line.split('|').collect();
             assert_eq!(fields.len(), 5, "bad coupling fixture row");
+
+            let coupling = fields[0];
+            let world_id = fields[1];
+            assert!(
+                world_ids.insert((coupling.to_owned(), world_id.to_owned())),
+                "duplicate world id"
+            );
+
             let probability: f64 = fields[2].parse().expect("probability");
             let factual: f64 = fields[3].parse().expect("factual outcome");
             let alternative: f64 = fields[4].parse().expect("alternative outcome");
             assert!(probability.is_finite() && probability > 0.0);
+            assert!(factual.is_finite() && alternative.is_finite());
 
-            let coupling = fields[0];
+            *totals.entry(coupling.to_owned()).or_insert(0.0) += probability;
+
             let marginal = marginals
                 .entry((coupling.to_owned(), "factual".to_owned()))
-                .or_insert_with(std::collections::BTreeMap::<i64, f64>::new);
-            *marginal.entry((factual * 1000.0) as i64).or_insert(0.0) += probability;
+                .or_default();
+            *marginal.entry(factual.to_bits()).or_insert(0.0) += probability;
 
             let alternative_marginal = marginals
                 .entry((coupling.to_owned(), "alternative".to_owned()))
-                .or_insert_with(std::collections::BTreeMap::<i64, f64>::new);
+                .or_default();
             *alternative_marginal
-                .entry((alternative * 1000.0) as i64)
+                .entry(alternative.to_bits())
                 .or_insert(0.0) += probability;
 
-            if (factual - 0.0).abs() < EPSILON {
+            if factual.abs() < EPSILON {
                 conditional.insert(coupling.to_owned(), alternative);
             }
         }
+
+        assert!(totals.values().all(|total| (*total - 1.0).abs() < EPSILON));
 
         let positive_factual = marginals
             .get(&("POSITIVE".to_owned(), "factual".to_owned()))
@@ -308,6 +325,15 @@ mod tests {
         let cases = parse_cases(IDENTIFICATION_FIXTURES).expect("valid fixture set");
         let case = cases.iter().find(|case| case.id == "CFI-09").expect("CFI-09");
         assert_eq!(assess(case).disposition, Disposition::FalsePrecisionRejected);
+    }
+
+    #[test]
+    fn decision_can_be_invariant_even_when_the_outcome_is_set_identified() {
+        let cases = parse_cases(IDENTIFICATION_FIXTURES).expect("valid fixture set");
+        let case = cases.iter().find(|case| case.id == "CFI-10").expect("CFI-10");
+        let result = assess(case);
+        assert_eq!(result.disposition, Disposition::SetIdentified);
+        assert_eq!(result.decision_invariant, Some(true));
     }
 
     #[test]
