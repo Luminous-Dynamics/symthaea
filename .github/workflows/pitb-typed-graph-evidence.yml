@@ -211,30 +211,50 @@ jobs:
           cargo fmt --check --manifest-path "$PITB_SORRYDB_MANIFEST"
           cargo test --locked --manifest-path "$PITB_SORRYDB_MANIFEST"
 
-      - name: Generate schema-checkable audit report
+      - name: Generate schema-checkable audit report and proof-run JSONL
         shell: bash
         run: |
           set -euo pipefail
           cargo run --locked --manifest-path "$PITB_SORRYDB_MANIFEST" -- \
-            --self-test-report "$RUNNER_TEMP/sorrydb-audit.synthetic.json"
+            --self-test-report \
+            "$RUNNER_TEMP/sorrydb-audit.synthetic.json" \
+            "$RUNNER_TEMP/sorrydb-audit.synthetic-runs.jsonl"
 
-      - name: Validate audit report schema
+      - name: Validate audit report and proof-run schemas
         shell: bash
         run: |
           set -euo pipefail
-          "$RUNNER_TEMP/pitb-sorrydb-venv/bin/python" - "$RUNNER_TEMP/sorrydb-audit.synthetic.json" <<'PY'
+          "$RUNNER_TEMP/pitb-sorrydb-venv/bin/python" - \
+            "$RUNNER_TEMP/sorrydb-audit.synthetic.json" \
+            "$RUNNER_TEMP/sorrydb-audit.synthetic-runs.jsonl" <<'PY'
           import json
           import sys
           from pathlib import Path
           from jsonschema import Draft202012Validator
 
-          schema = json.loads(Path("tools/pitb-sorrydb-audit/schema/sorrydb-snapshot-audit-report-v0.schema.json").read_text())
-          Draft202012Validator.check_schema(schema)
+          root = Path("tools/pitb-sorrydb-audit/schema")
+          report_schema = json.loads((root / "sorrydb-snapshot-audit-report-v0.schema.json").read_text())
+          run_schema = json.loads((root / "sorrydb-proof-run-v0.schema.json").read_text())
+          Draft202012Validator.check_schema(report_schema)
+          Draft202012Validator.check_schema(run_schema)
           report = json.loads(Path(sys.argv[1]).read_text())
-          errors = list(Draft202012Validator(schema).iter_errors(report))
+          errors = list(Draft202012Validator(report_schema).iter_errors(report))
           if errors:
               raise SystemExit("synthetic report schema errors: " + "; ".join(e.message for e in errors))
-          print("PITB_SORRYDB_REPORT_SCHEMA_PASS")
+          runs = [
+              json.loads(line)
+              for line in Path(sys.argv[2]).read_text().splitlines()
+              if line.strip()
+          ]
+          for run in runs:
+              errors = list(Draft202012Validator(run_schema).iter_errors(run))
+              if errors:
+                  raise SystemExit("synthetic proof-run schema errors: " + "; ".join(e.message for e in errors))
+          if len(runs) != 2 or report["run_count"] != 2 or report["verified_success_count"] != 1:
+              raise SystemExit("synthetic proof-run denominators changed")
+          if report["strategy_summaries"][0]["attempts"] != 2:
+              raise SystemExit("synthetic per-strategy attempt denominator changed")
+          print("PITB_SORRYDB_REPORT_AND_PROOF_RUN_SCHEMA_PASS")
           PY
 
       - name: Audit real pinned SorryDB snapshot and evaluation split
@@ -272,6 +292,10 @@ jobs:
               "zero_based_start_column_task_count_full": 19,
               "zero_based_start_column_task_count_evaluation": 2,
               "full_count_documentation_drift": True,
+              "run_count": 0,
+              "verified_success_count": 0,
+              "strategy_summaries": [],
+              "run_input_sha256": None,
           }
           for key, value in expected.items():
               if report[key] != value:
@@ -297,6 +321,7 @@ jobs:
           path: |
             ${{ runner.temp }}/sorrydb-audit.json
             ${{ runner.temp }}/sorrydb-audit.synthetic.json
+            ${{ runner.temp }}/sorrydb-audit.synthetic-runs.jsonl
             ${{ runner.temp }}/sorrydb-input/
             ${{ runner.temp }}/pitb-sorrydb-audit/src/main.rs
             ${{ runner.temp }}/pitb-sorrydb-audit/Cargo.lock
