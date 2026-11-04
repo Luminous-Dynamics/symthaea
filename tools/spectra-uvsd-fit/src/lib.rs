@@ -1742,3 +1742,6 @@ mod tests {
         assert!(result.diagnostics.note.is_some());
     }
 }
+
+/// Operational sequential action-selection primitives for SPECTRA.
+pub mod sequential;
