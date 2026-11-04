@@ -859,7 +859,7 @@ mod tests {
     }
 
     #[test]
-    fn stream_descriptor_redacts_device_id_and_binds_output_configuration() {
+    fn stream_descriptor_hashes_device_id_and_binds_output_configuration() {
         let descriptor = OutputClockStreamDescriptorV1::from_cpal_device_id(
             12,
             "synthetic-device-private-id",
