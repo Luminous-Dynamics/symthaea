@@ -91,6 +91,72 @@ struct SourceFileCluster {
     distinct_repository_commits: usize,
 }
 
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+struct Strategy {
+    name: String,
+    version: String,
+    implementation_sha256: String,
+    model_id: Option<String>,
+    model_version: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+struct ProofRun {
+    schema_version: String,
+    run_id: String,
+    task_id: String,
+    repo_commit: String,
+    lean_version: String,
+    source_path: String,
+    start_line: u64,
+    start_column: u64,
+    end_line: u64,
+    end_column: u64,
+    goal_sha256: String,
+    source_file_sha256: String,
+    replacement_patch_sha256: String,
+    proof_artifact_sha256: String,
+    checker_receipt_sha256: String,
+    semantic_gate_receipt_sha256: String,
+    source_binding_receipt_sha256: String,
+    strategy: Strategy,
+    outcome: String,
+    proof_inserted: bool,
+    exact_sorry_replaced: bool,
+    sorry_absent_after_replacement: bool,
+    build_passed: bool,
+    kernel_passed: bool,
+    semantic_gate_passed: bool,
+    source_binding_passed: bool,
+    vacuity_gate_passed: bool,
+    axiom_delta_zero: bool,
+    new_sorry_delta_zero: bool,
+    wall_time_ms: u64,
+    input_tokens: u64,
+    output_tokens: u64,
+    cost_microusd: u64,
+    failure_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct StrategySummary {
+    strategy_name: String,
+    strategy_version: String,
+    model_id: Option<String>,
+    model_version: Option<String>,
+    attempts: usize,
+    verified_successes: usize,
+    non_solves: usize,
+    infrastructure_failures: usize,
+    invalid_targets: usize,
+    success_rate_per_attempt: f64,
+    mean_success_wall_time_ms: Option<f64>,
+    total_cost_usd: f64,
+}
+
 #[derive(Debug, Clone, Serialize)]
 struct Report {
     schema_version: String,
@@ -102,6 +168,10 @@ struct Report {
     evaluation_split_git_blob_sha1: String,
     full_dataset_raw_sha256: String,
     evaluation_split_raw_sha256: String,
+    run_input_sha256: Option<String>,
+    run_count: usize,
+    verified_success_count: usize,
+    strategy_summaries: Vec<StrategySummary>,
     full_task_count: usize,
     evaluation_task_count: usize,
     documented_full_task_count: usize,
@@ -353,11 +423,174 @@ fn cluster_summary(rows: &[SorryRecord]) -> ClusterSummary {
     }
 }
 
+
+fn validate_proof_run(
+    run: &ProofRun,
+    index: usize,
+    evaluation_by_id: &BTreeMap<&str, &SorryRecord>,
+) -> Result<(), String> {
+    let label = format!("proof_run[{index}]");
+    if run.schema_version != "pitb.sorrydb-proof-run.v0" {
+        return Err(format!("{label} has unsupported schema_version"));
+    }
+    non_empty(&run.run_id, &format!("{label}.run_id"))?;
+    let task = evaluation_by_id
+        .get(run.task_id.as_str())
+        .copied()
+        .ok_or_else(|| format!("{label} task_id is not in the pinned evaluation split"))?;
+    if run.repo_commit != task.repo.commit || run.lean_version != task.repo.lean_version {
+        return Err(format!("{label} repository commit or Lean version differs from the exact task record"));
+    }
+    if run.source_path != task.location.path
+        || run.start_line != task.location.start_line
+        || run.start_column != task.location.start_column
+        || run.end_line != task.location.end_line
+        || run.end_column != task.location.end_column
+    {
+        return Err(format!("{label} source range differs from the exact SorryDB record"));
+    }
+    if run.goal_sha256 != sha256(task.debug_info.goal.as_bytes()) {
+        return Err(format!("{label} goal digest differs from the pinned SorryDB goal"));
+    }
+    for (field, value) in [
+        ("goal_sha256", &run.goal_sha256),
+        ("source_file_sha256", &run.source_file_sha256),
+        ("replacement_patch_sha256", &run.replacement_patch_sha256),
+        ("proof_artifact_sha256", &run.proof_artifact_sha256),
+        ("checker_receipt_sha256", &run.checker_receipt_sha256),
+        ("semantic_gate_receipt_sha256", &run.semantic_gate_receipt_sha256),
+        ("source_binding_receipt_sha256", &run.source_binding_receipt_sha256),
+        ("strategy.implementation_sha256", &run.strategy.implementation_sha256),
+    ] {
+        if !valid_hex(value, 64) {
+            return Err(format!("{label}.{field} must be a 64-character lowercase SHA-256"));
+        }
+    }
+    non_empty(&run.strategy.name, &format!("{label}.strategy.name"))?;
+    non_empty(&run.strategy.version, &format!("{label}.strategy.version"))?;
+    if let Some(model_id) = &run.strategy.model_id {
+        non_empty(model_id, &format!("{label}.strategy.model_id"))?;
+    }
+    if let Some(model_version) = &run.strategy.model_version {
+        non_empty(model_version, &format!("{label}.strategy.model_version"))?;
+    }
+    if !matches!(
+        run.outcome.as_str(),
+        "verified_success" | "non_solve" | "infrastructure_failure" | "invalid_target"
+    ) {
+        return Err(format!("{label} has unsupported outcome"));
+    }
+    let all_gates = [
+        run.proof_inserted,
+        run.exact_sorry_replaced,
+        run.sorry_absent_after_replacement,
+        run.build_passed,
+        run.kernel_passed,
+        run.semantic_gate_passed,
+        run.source_binding_passed,
+        run.vacuity_gate_passed,
+        run.axiom_delta_zero,
+        run.new_sorry_delta_zero,
+    ];
+    if run.outcome == "verified_success" && all_gates.iter().any(|passed| !passed) {
+        return Err(format!(
+            "{label} claims verified_success without exact replacement, build, kernel, source, semantic, vacuity, axiom and sorry gates"
+        ));
+    }
+    if run.outcome != "verified_success" && all_gates.iter().all(|passed| *passed) {
+        return Err(format!("{label} passes every success gate but is labeled as a non-success"));
+    }
+    if run.outcome == "infrastructure_failure"
+        && run.failure_type.as_deref().unwrap_or("").trim().is_empty()
+    {
+        return Err(format!("{label} infrastructure failure requires failure_type"));
+    }
+    Ok(())
+}
+
+fn parse_proof_runs(bytes: &[u8]) -> Result<Vec<ProofRun>, String> {
+    let text = std::str::from_utf8(bytes).map_err(|e| format!("proof-run JSONL is not UTF-8: {e}"))?;
+    let mut runs = Vec::new();
+    for (index, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let run: ProofRun = serde_json::from_str(line)
+            .map_err(|e| format!("proof-run JSONL line {}: {e}", index + 1))?;
+        runs.push(run);
+    }
+    Ok(runs)
+}
+
+fn summarize_proof_runs(
+    runs: &[ProofRun],
+    evaluation: &Dataset,
+) -> Result<(usize, Vec<StrategySummary>), String> {
+    let evaluation_by_id: BTreeMap<&str, &SorryRecord> = evaluation
+        .sorries
+        .iter()
+        .map(|row| (row.id.as_str(), row))
+        .collect();
+    let mut run_ids = BTreeSet::new();
+    let mut groups = BTreeMap::<(String, String, Option<String>, Option<String>), Vec<&ProofRun>>::new();
+    let mut verified_success_count = 0usize;
+    for (index, run) in runs.iter().enumerate() {
+        validate_proof_run(run, index + 1, &evaluation_by_id)?;
+        if !run_ids.insert(run.run_id.as_str()) {
+            return Err(format!("duplicate proof-run ID {}", run.run_id));
+        }
+        if run.outcome == "verified_success" {
+            verified_success_count += 1;
+        }
+        groups.entry((
+            run.strategy.name.clone(),
+            run.strategy.version.clone(),
+            run.strategy.model_id.clone(),
+            run.strategy.model_version.clone(),
+        )).or_default().push(run);
+    }
+
+    let mut summaries = Vec::new();
+    for ((name, version, model_id, model_version), group) in groups {
+        let attempts = group.len();
+        let verified = group.iter().filter(|run| run.outcome == "verified_success").count();
+        let non_solves = group.iter().filter(|run| run.outcome == "non_solve").count();
+        let infra = group.iter().filter(|run| run.outcome == "infrastructure_failure").count();
+        let invalid = group.iter().filter(|run| run.outcome == "invalid_target").count();
+        let successful_times: Vec<u64> = group.iter()
+            .filter(|run| run.outcome == "verified_success")
+            .map(|run| run.wall_time_ms)
+            .collect();
+        let total_cost: u128 = group.iter().map(|run| run.cost_microusd as u128).sum();
+        summaries.push(StrategySummary {
+            strategy_name: name,
+            strategy_version: version,
+            model_id,
+            model_version,
+            attempts,
+            verified_successes: verified,
+            non_solves,
+            infrastructure_failures: infra,
+            invalid_targets: invalid,
+            success_rate_per_attempt: verified as f64 / attempts as f64,
+            mean_success_wall_time_ms: if successful_times.is_empty() {
+                None
+            } else {
+                Some(successful_times.iter().sum::<u64>() as f64 / successful_times.len() as f64)
+            },
+            total_cost_usd: total_cost as f64 / 1_000_000.0,
+        });
+    }
+    Ok((verified_success_count, summaries))
+}
+
 fn audit(
     full: &Dataset,
     evaluation: &Dataset,
     full_bytes: &[u8],
     evaluation_bytes: &[u8],
+    proof_runs: &[ProofRun],
+    run_input_sha256: Option<String>,
 ) -> Result<Report, String> {
     validate_dataset(full, "full_snapshot")?;
     validate_dataset(evaluation, "evaluation_split")?;
@@ -423,6 +656,8 @@ fn audit(
     if exact_matches != evaluation.sorries.len() {
         return Err("evaluation split is not an exact subset of full snapshot".into());
     }
+    let (verified_success_count, strategy_summaries) =
+        summarize_proof_runs(proof_runs, evaluation)?;
 
     let documentation_drift = full.sorries.len() != DOCUMENTED_FULL_COUNT;
     let mut warnings = Vec::new();
@@ -456,6 +691,10 @@ fn audit(
         evaluation_split_git_blob_sha1: split_blob,
         full_dataset_raw_sha256: sha256(full_bytes),
         evaluation_split_raw_sha256: sha256(evaluation_bytes),
+        run_input_sha256,
+        run_count: proof_runs.len(),
+        verified_success_count,
+        strategy_summaries,
         full_task_count: full.sorries.len(),
         evaluation_task_count: evaluation.sorries.len(),
         documented_full_task_count: DOCUMENTED_FULL_COUNT,
@@ -477,18 +716,42 @@ fn audit(
     })
 }
 
-fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, PathBuf), String> {
-    if args.len() != 7 || args[1] != "--verify" {
+fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, PathBuf, Option<PathBuf>), String> {
+    if args.len() < 7 || args[1] != "--verify" {
         return Err(format!(
-            "usage: {} --verify <full-snapshot.json> <evaluation-split.json> <report.json> --pinned-source SorryDB/SorryDB@74b3b63f8ba890d675f362924b21ac55db410383",
+            "usage: {} --verify <full-snapshot.json> <evaluation-split.json> <report.json> [--runs proof-runs.jsonl] --pinned-source SorryDB/SorryDB@74b3b63f8ba890d675f362924b21ac55db410383",
             args.first().map(String::as_str).unwrap_or("pitb-sorrydb-audit")
         ));
     }
-    let source = format!("{}@{}", UPSTREAM_REPOSITORY, UPSTREAM_COMMIT);
-    if args[5] != "--pinned-source" || args[6] != source {
-        return Err("SorryDB source repository/commit does not match the frozen audit identity".into());
+    let mut runs_path = None;
+    let mut pinned_source_seen = false;
+    let expected_source = format!("{}@{}", UPSTREAM_REPOSITORY, UPSTREAM_COMMIT);
+    let mut index = 5;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--runs" if index + 1 < args.len() && runs_path.is_none() => {
+                runs_path = Some(PathBuf::from(&args[index + 1]));
+                index += 2;
+            }
+            "--pinned-source" if index + 1 < args.len() && !pinned_source_seen => {
+                if args[index + 1] != expected_source {
+                    return Err("SorryDB source repository/commit does not match the frozen audit identity".into());
+                }
+                pinned_source_seen = true;
+                index += 2;
+            }
+            other => return Err(format!("unknown or duplicate option {other}")),
+        }
     }
-    Ok((PathBuf::from(&args[2]), PathBuf::from(&args[3]), PathBuf::from(&args[4])))
+    if !pinned_source_seen {
+        return Err("missing --pinned-source for frozen SorryDB source identity".into());
+    }
+    Ok((
+        PathBuf::from(&args[2]),
+        PathBuf::from(&args[3]),
+        PathBuf::from(&args[4]),
+        runs_path,
+    ))
 }
 
 fn synthetic_record(id: &str, goal: &str, path: &str, column: u64) -> SorryRecord {
@@ -665,7 +928,7 @@ fn execute() -> Result<(), String> {
         println!("PITB_SORRYDB_AUDIT_SYNTHETIC_REPORT_OK");
         return Ok(());
     }
-    let (full_path, evaluation_path, report_path) = parse_args(&args)?;
+    let (full_path, evaluation_path, report_path, runs_path) = parse_args(&args)?;
     let full_bytes = fs::read(&full_path).map_err(|e| format!("read full SorryDB snapshot: {e}"))?;
     let evaluation_bytes =
         fs::read(&evaluation_path).map_err(|e| format!("read SorryDB evaluation split: {e}"))?;
@@ -673,7 +936,21 @@ fn execute() -> Result<(), String> {
         .map_err(|e| format!("parse full SorryDB snapshot: {e}"))?;
     let evaluation: Dataset = serde_json::from_slice(&evaluation_bytes)
         .map_err(|e| format!("parse SorryDB evaluation split: {e}"))?;
-    let report = audit(&full, &evaluation, &full_bytes, &evaluation_bytes)?;
+    let (proof_runs, run_hash) = if let Some(path) = runs_path {
+        let bytes = fs::read(path).map_err(|e| format!("read proof-run JSONL: {e}"))?;
+        let rows = parse_proof_runs(&bytes)?;
+        (rows, Some(sha256(&bytes)))
+    } else {
+        (Vec::new(), None)
+    };
+    let report = audit(
+        &full,
+        &evaluation,
+        &full_bytes,
+        &evaluation_bytes,
+        &proof_runs,
+        run_hash,
+    )?;
     let bytes = serde_json::to_vec_pretty(&report)
         .map_err(|e| format!("serialize SorryDB audit report: {e}"))?;
     fs::write(&report_path, bytes).map_err(|e| format!("write SorryDB audit report: {e}"))?;
