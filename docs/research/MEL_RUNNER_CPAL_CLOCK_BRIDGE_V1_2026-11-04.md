@@ -4,11 +4,11 @@
 
 ## Objective
 
-Bridge the runner monotonic clock used by turn-taking/effect receipts to the callback clock of one CPAL output stream. This enables a later composition with MEL-CLOCK-001's CPAL stream-time → output-frame fit, without assuming shared clock origins.
+Bridge the runner monotonic clock used by turn-taking/effect receipts directly to the **CPAL predicted-playback clock** of one output stream. Retain CPAL callback time as a separate diagnostic. This allows direct composition with MEL-CLOCK-001's playback-stream-time → output-frame fit without assuming shared clock origins.
 
 The v1 mapping is:
 
-`runner monotonic time ~= offset + rate * CPAL callback-stream time`
+`runner monotonic time ~= offset + rate * CPAL playback-stream time`
 
 Its inverse estimates the CPAL stream-clock instant corresponding to a runner timestamp.
 
@@ -23,17 +23,18 @@ Persist only session-relative nanoseconds, never `Instant` internals. `runner_or
 
 ## Callback-pair capture
 
-At callback entry, bracket the observation of `OutputStreamTimestamp.callback` with runner time samples from the shared origin:
+At callback entry, bracket the observation and normalization of both CPAL timestamps with runner time samples from the shared origin. Regress against `OutputStreamTimestamp.playback`; retain `OutputStreamTimestamp.callback` for monotonicity/diagnostic comparison.
 
-1. sample runner monotonic time before reading/normalizing the CPAL callback timestamp;
-2. read CPAL's callback timestamp and normalize it relative to the first callback timestamp in that stream;
+1. sample runner monotonic time before reading/normalizing the CPAL timestamp pair;
+2. read both `OutputStreamTimestamp.callback` and `OutputStreamTimestamp.playback`, normalizing both to the same first-callback stream origin;
 3. sample runner monotonic time immediately after;
+4. persist both CPAL timestamps; fit runner monotonic time against the **playback** timestamp, not callback invocation time;
 4. enqueue a fixed-size `RunnerCpalClockPairV1` to a bounded SPSC ring;
 5. increment the pair index even when the record cannot be retained, so gaps remain visible.
 
 The callback record is `Copy` and contains only integers, an enum and a fixed 32-byte descriptor-identity digest. The identity digest is computed off the real-time thread. No allocation, mutex, blocking call, formatting or logging is needed for the pair record.
 
-The before/after bracket is an observed software capture interval. It is not a guarantee about backend callback-start error or absolute CPAL timestamp accuracy. Fit residuals are not converted to accuracy bounds.
+The callback timestamp remains a diagnostic and must also be monotonic. The before/after bracket is an observed software capture interval. It is not a guarantee about backend callback-start error, predicted playback accuracy or DAC time. Fit residuals are not converted to accuracy bounds.
 
 ## Identity and replay
 
@@ -65,11 +66,11 @@ The fitter never silently removes outliers. A device restart, new stream instanc
 
 ## Composition with output-frame fit
 
-A caller may:
-1. map a runner timestamp to a CPAL callback-stream time using `cpal_time_at_runner_time`;
-2. pass that CPAL stream time to MEL-CLOCK-001's output-frame fit, which maps the CPAL stream clock to cumulative output frames.
+The module now provides `estimate_output_frame_at_runner_time_v1`, which composes:
+1. runner monotonic time → CPAL predicted-playback stream time;
+2. CPAL predicted-playback stream time → cumulative output frame.
 
-Both fits must match the same session/stream identity and remain inside their respective validity windows.
+It checks stream instance, CPAL configuration digest, output-fit descriptor validity and both fit validity windows. The callback timestamp is retained in each pair as a distinct diagnostic; it is **not** substituted for the playback timestamp.
 
 **This composition is a point estimate only in v1.** It must not be labelled calibrated latency, absolute timing accuracy, DAC output or acoustic observation. A physical output claim still requires independent electrical/acoustic loopback.
 
@@ -78,6 +79,8 @@ Both fits must match the same session/stream identity and remain inside their re
 The checked-in fixtures cover:
 - exact nominal mapping;
 - +25 ppm and -25 ppm in-policy drift;
+- callback-time monotonicity and predicted-playback-time monotonicity as distinct checks;
+- exact runner → predicted-playback → output-frame composition with matching stream/configuration identity;
 - missing pair records with continuous clock progression;
 - over-wide observation bracket rejection;
 - descriptor/origin identity mismatch rejection;
