@@ -34,6 +34,10 @@ The following pull requests form the household synthetic-evidence and receipt se
 2. [#10388 — offline synthetic fixture validator](https://github.com/Luminous-Dynamics/symthaea/pull/10388)
 3. [#10389 — deterministic water and repair evaluator](https://github.com/Luminous-Dynamics/symthaea/pull/10389)
 4. [#10407 — typed receipts bound to exact source bytes](https://github.com/Luminous-Dynamics/symthaea/pull/10407)
+5. [#10476 — restore the exact known-good Cargo dependency/lockfile pair](https://github.com/Luminous-Dynamics/symthaea/pull/10476), stacked on #10407
+6. [#10475 — interval-valued qualified service-deficit evaluator](https://github.com/Luminous-Dynamics/symthaea/pull/10475), stacked on #10476 and tracked by [#10474](https://github.com/Luminous-Dynamics/symthaea/issues/10474)
+
+The #10476 exact-head focused evaluator workflow passed formatting, locked tests, strict Clippy and all 20 synthetic case evaluations. #10475 has authored unit tests; its latest exact-head workflow is being checked separately and must pass before merge.
 
 The current follow-on research documentation is under review:
 - [#10432 — repair recurrence and post-repair durability](https://github.com/Luminous-Dynamics/symthaea/pull/10432)
