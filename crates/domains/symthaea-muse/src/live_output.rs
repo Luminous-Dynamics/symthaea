@@ -26,6 +26,7 @@
 
 use crate::output_clock::{
     OutputClockAnchorSchemaV1, OutputClockAnchorSourceV1, OutputClockAnchorV1,
+    OutputClockStreamDescriptorV1,
 };
 use crate::streaming::StreamingSynth;
 use crate::{MuseConfig, MusicalState};
@@ -44,6 +45,7 @@ pub enum LiveError {
     DeviceError(String),
     StreamError(String),
     StreamInstanceIdExhausted,
+    InvalidClockStreamDescriptor,
 }
 
 impl std::fmt::Display for LiveError {
@@ -54,6 +56,7 @@ impl std::fmt::Display for LiveError {
             Self::DeviceError(e) => write!(f, "audio device error: {e}"),
             Self::StreamError(e) => write!(f, "audio stream error: {e}"),
             Self::StreamInstanceIdExhausted => write!(f, "CPAL stream instance ID space exhausted"),
+            Self::InvalidClockStreamDescriptor => write!(f, "invalid CPAL output clock stream descriptor"),
         }
     }
 }
@@ -83,6 +86,8 @@ pub struct LiveMuseOutput {
     clock_anchor_dropped_callbacks: Arc<AtomicU64>,
     /// Stable identity for this CPAL stream instance's clock domain.
     stream_instance_id: u64,
+    /// Stream-level clock and device configuration identity shared by anchors.
+    clock_stream_descriptor: OutputClockStreamDescriptorV1,
 }
 
 impl LiveMuseOutput {
@@ -92,6 +97,10 @@ impl LiveMuseOutput {
         let device = host
             .default_output_device()
             .ok_or(LiveError::NoOutputDevice)?;
+        let device_id = device
+            .id()
+            .map_err(|error| LiveError::DeviceError(error.to_string()))?
+            .to_string();
 
         // Negotiate output config — prefer f32 stereo
         let supported = device
@@ -121,13 +130,22 @@ impl LiveMuseOutput {
         };
 
         let sample_rate = stream_config.sample_rate;
-        let channels = (stream_config.channels as usize).max(1);
+        let channel_count = stream_config.channels;
+        let channels = (channel_count as usize).max(1);
 
         let stream_instance_id = NEXT_STREAM_INSTANCE_ID
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
                 current.checked_add(1)
             })
             .map_err(|_| LiveError::StreamInstanceIdExhausted)?;
+        let clock_stream_descriptor =
+            OutputClockStreamDescriptorV1::from_cpal_device_id(
+                stream_instance_id,
+                &device_id,
+                sample_rate,
+                channel_count,
+            )
+            .ok_or(LiveError::InvalidClockStreamDescriptor)?;
 
         // Ring buffer: 4096 stereo frames (~93ms at 44100Hz)
         let ring_capacity = 4096 * channels;
@@ -250,6 +268,7 @@ impl LiveMuseOutput {
                                     first_output_frame_index: output_frame_cursor,
                                     frame_count,
                                     sample_rate_hz: sample_rate,
+                                    channel_count,
                                     callback_stream_time_ns: callback_ns,
                                     playback_stream_time_ns: playback_ns,
                                     callback_to_playback_ns: delay_ns,
@@ -299,6 +318,7 @@ impl LiveMuseOutput {
             clock_anchor_consumer: Mutex::new(anchor_cons),
             clock_anchor_dropped_callbacks,
             stream_instance_id,
+            clock_stream_descriptor,
         })
     }
 
@@ -329,6 +349,13 @@ impl LiveMuseOutput {
             }
         }
         anchors
+    }
+
+    /// Stream-level device/config identity shared by the anchors returned
+    /// from drain_output_clock_anchors. The hardware device ID is represented
+    /// by a SHA-256 fingerprint rather than a raw host identifier.
+    pub fn clock_stream_descriptor(&self) -> &OutputClockStreamDescriptorV1 {
+        &self.clock_stream_descriptor
     }
 
     /// Number of callbacks whose timestamp/frame anchor could not be retained.
