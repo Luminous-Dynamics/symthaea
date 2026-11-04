@@ -58,7 +58,8 @@
       "pair_index": 0,
       "cpal_callback_stream_time_ns": 5000000,
       "runner_time_before_ns": 104999950,
-      "runner_time_after_ns": 105000050
+      "runner_time_after_ns": 105000050,
+      "cpal_playback_stream_time_ns": 10000000
     },
     {
       "schema_version": "mel-runner-cpal-clock-pair-v1",
@@ -100,7 +101,8 @@
       "pair_index": 1,
       "cpal_callback_stream_time_ns": 15000000,
       "runner_time_before_ns": 114999950,
-      "runner_time_after_ns": 115000050
+      "runner_time_after_ns": 115000050,
+      "cpal_playback_stream_time_ns": 20000000
     },
     {
       "schema_version": "mel-runner-cpal-clock-pair-v1",
@@ -142,7 +144,8 @@
       "pair_index": 2,
       "cpal_callback_stream_time_ns": 25000000,
       "runner_time_before_ns": 124999950,
-      "runner_time_after_ns": 125000050
+      "runner_time_after_ns": 125000050,
+      "cpal_playback_stream_time_ns": 30000000
     },
     {
       "schema_version": "mel-runner-cpal-clock-pair-v1",
@@ -184,7 +187,8 @@
       "pair_index": 3,
       "cpal_callback_stream_time_ns": 35000000,
       "runner_time_before_ns": 134999950,
-      "runner_time_after_ns": 135000050
+      "runner_time_after_ns": 135000050,
+      "cpal_playback_stream_time_ns": 40000000
     }
   ]
 }
