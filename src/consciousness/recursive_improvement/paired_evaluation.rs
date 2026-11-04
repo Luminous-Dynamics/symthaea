@@ -1,31 +1,34 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Matched per-case evaluation receipts for recursive-improvement candidates.
+//! In-memory paired-analysis adapter for recursive-improvement candidates.
 //!
-//! A receipt is comparable only with another receipt from the exact same
-//! evaluation context and case set. Candidate capability summaries are derived
-//! from per-case evidence in deterministic case-ID order; callers cannot supply
-//! an unrelated aggregate score.
+//! This module is not a persisted receipt format. It projects task-level rows
+//! from the shared benchmark-run receipt contract into a deterministic,
+//! matched per-case comparison. Integration must first validate the shared
+//! receipt and its attestation/regrade using the common benchmark evidence
+//! pipeline (see Symthaea issues #10314, #10167, and #10370).
+//!
+//! Candidate summaries are derived from sorted per-case rows; callers cannot
+//! supply an unrelated aggregate score. The archive's receipt digest should
+//! identify the canonical shared benchmark receipt, not this in-memory view.
 //!
 //! The paired sign test is a diagnostic for directional consistency. It is
 //! not a promotion rule, does not establish practical significance, and does
 //! not correct for repeated candidate selection or multiple metrics.
 //!
-//! These types intentionally do not implement Deserialize. A trusted evaluator
-//! must reconstruct receipts from authenticated raw outcomes and retain an
-//! independently signed or append-only evidence record. Digests alone do not
-//! authenticate a receipt.
+//! This adapter does not authenticate input rows, evaluator identity, or
+//! benchmark isolation. A digest is an identity commitment, not a signature
+//! or proof.
 
 use super::candidate_archive::{
     CandidateArchiveError, CandidateRecord, CapabilityVector, EvaluationContext,
 };
-use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fmt;
 
 /// One candidate's normalized capability scores for one benchmark case.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CaseScore {
     case_id: String,
     scores: CapabilityVector,
@@ -102,20 +105,21 @@ impl From<CandidateArchiveError> for PairedEvaluationError {
     }
 }
 
-/// Per-candidate evidence for one exact evaluation context and case set.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct CandidateEvaluationReceipt {
+/// In-memory projection of one candidate's task-level outcomes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CandidateEvaluationView {
     context: EvaluationContext,
     candidate: CandidateRecord,
     cases: BTreeMap<String, CaseScore>,
 }
 
-impl CandidateEvaluationReceipt {
-    /// Construct a receipt and derive the candidate's aggregate capability
-    /// vector from the sorted per-case scores.
+impl CandidateEvaluationView {
+    /// Construct an in-memory view from task-level rows that have already
+    /// passed the shared benchmark-receipt and attestation/regrade validators.
     ///
-    /// The caller-supplied receipt digest is an identity commitment only. It
-    /// must be authenticated and retained by an independent evidence system.
+    /// The supplied digest must identify that shared canonical run receipt.
+    /// This constructor does not verify it, authenticate it, or prove that the
+    /// input rows came from the referenced artifact.
     pub fn new(
         context: EvaluationContext,
         candidate_id: impl Into<String>,
@@ -207,7 +211,7 @@ impl CandidateEvaluationReceipt {
 
 /// Per-metric paired comparison. A positive delta means the successor scored
 /// higher than its parent. Ties are excluded from the sign-test denominator.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MetricPairedResult {
     metric_id: String,
     wins: usize,
@@ -245,7 +249,7 @@ impl MetricPairedResult {
 }
 
 /// Paired comparison between a candidate and its declared direct parent.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PairedComparison {
     parent_candidate_id: String,
     candidate_id: String,
@@ -255,8 +259,8 @@ pub struct PairedComparison {
 
 impl PairedComparison {
     pub fn compare(
-        parent: &CandidateEvaluationReceipt,
-        candidate: &CandidateEvaluationReceipt,
+        parent: &CandidateEvaluationView,
+        candidate: &CandidateEvaluationView,
         tie_epsilon: f64,
     ) -> Result<Self, PairedEvaluationError> {
         if !tie_epsilon.is_finite() || !(0.0..=1.0).contains(&tie_epsilon) {
@@ -458,8 +462,8 @@ mod tests {
         source_byte: char,
         receipt_byte: char,
         cases: Vec<CaseScore>,
-    ) -> CandidateEvaluationReceipt {
-        CandidateEvaluationReceipt::new(
+    ) -> CandidateEvaluationView {
+        CandidateEvaluationView::new(
             context,
             candidate_id,
             parent_id.map(str::to_owned),
@@ -531,7 +535,7 @@ mod tests {
     fn rejects_duplicate_and_empty_case_sets() {
         let ctx = context(EvaluationPartition::Development, "dev");
         assert_eq!(
-            CandidateEvaluationReceipt::new(
+            CandidateEvaluationView::new(
                 ctx.clone(),
                 "candidate",
                 None,
@@ -543,7 +547,7 @@ mod tests {
             PairedEvaluationError::DuplicateCase("same".into())
         );
         assert_eq!(
-            CandidateEvaluationReceipt::new(
+            CandidateEvaluationView::new(
                 ctx,
                 "candidate",
                 None,
@@ -559,7 +563,7 @@ mod tests {
     #[test]
     fn rejects_metric_schema_drift_within_one_receipt() {
         let ctx = context(EvaluationPartition::Development, "dev");
-        let result = CandidateEvaluationReceipt::new(
+        let result = CandidateEvaluationView::new(
             ctx,
             "candidate",
             None,
@@ -651,7 +655,7 @@ mod tests {
             'a',
             vec![score("a", 0.5, 0.5)],
         );
-        let child = CandidateEvaluationReceipt::new(
+        let child = CandidateEvaluationView::new(
             ctx,
             "child",
             Some("parent".into()),
