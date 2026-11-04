@@ -950,6 +950,60 @@ mod tests {
     }
 
     #[test]
+    fn overlapping_rendered_ranges_reject_without_consuming_the_producer_operation() {
+        let mut ledger = authorized_ledger();
+        ledger
+            .apply(producer_start_event(2, "producer-1", 0))
+            .unwrap();
+        ledger
+            .apply(render_complete_event(3, "producer-1", 1))
+            .unwrap();
+        ledger
+            .apply(producer_start_event(4, "producer-2", 0))
+            .unwrap();
+
+        let overlap = event(
+            5,
+            "overlap-attempt",
+            EventKind::RenderCompleted {
+                producer_id: "producer-2".into(),
+                frame_id: 2,
+                range: FrameRange {
+                    start: 150,
+                    end: 250,
+                },
+            },
+        );
+        assert_eq!(
+            ledger.apply(overlap),
+            Err(RaceError::OverlappingFrameRange {
+                existing_frame_id: 1,
+                incoming_frame_id: 2,
+            })
+        );
+        assert!(!ledger.producer("producer-2").unwrap().completed);
+
+        // A rejected event must not partially consume the operation or the
+        // linearization order; corrected evidence can be replayed at order 5.
+        ledger
+            .apply(event(
+                5,
+                "non-overlapping-completion",
+                EventKind::RenderCompleted {
+                    producer_id: "producer-2".into(),
+                    frame_id: 2,
+                    range: FrameRange {
+                        start: 200,
+                        end: 300,
+                    },
+                },
+            ))
+            .unwrap();
+        assert!(ledger.producer("producer-2").unwrap().completed);
+        assert_eq!(ledger.summary().rendered_frames, 200);
+    }
+
+    #[test]
     fn epoch_exhaustion_rejects_veto_without_wrapping() {
         let mut ledger = RaceLedger::new(u64::MAX);
         ledger
