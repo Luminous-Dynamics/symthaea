@@ -37,11 +37,13 @@ Mapping row:
   "declaration_id": "Mathlib.Algebra.Group.Defs.mul_assoc",
   "mapping_method": "exact_formal_name",
   "mapping_evidence_sha256": "<64 lowercase hex>",
-  "reviewer_attestation_sha256": null
+  "reviewer_attestation_sha256": null,
+  "source_locator": null,
+  "statement_sha256": null
 }
 ```
 
-`mapping_status` is `exact`, `unresolved`, or `ambiguous`. Non-exact rows must have a null `declaration_id` and cannot contribute to route coverage. Mapping methods are `exact_formal_name`, `exact_source_identity`, or `human_reviewed`. Human-reviewed mappings require a reviewer-attestation digest. The analyzer checks digest syntax and graph binding; it does not open or authenticate the referenced evidence bytes. “Novel” is deliberately not claimed: novelty requires a matched baseline candidate-set comparison.
+`mapping_status` is `exact`, `unresolved`, or `ambiguous`. Non-exact rows must have a null `declaration_id` and cannot contribute to route coverage. Mapping methods are `exact_formal_name`, `exact_source_identity`, or `human_reviewed`. Exact formal-name mappings are checked against the actual graph node's `formal_name`. Exact source-identity mappings must provide `source_locator` and `statement_sha256`, both checked against the graph node. Human-reviewed mappings require a reviewer-attestation digest and must resolve to a formal declaration node. The analyzer checks the referenced graph bytes and the declared node fields, but does not open or authenticate the mapping-evidence or reviewer-attestation bytes; those remain a separate verifier responsibility. “Novel” is deliberately not claimed: novelty requires a matched baseline candidate-set comparison.
 
 ## Paired comparisons and uncertainty
 
@@ -59,8 +61,8 @@ cargo test --locked --manifest-path tools/pitb-route-coverage/Cargo.toml
 cargo run --locked --manifest-path tools/pitb-route-coverage/Cargo.toml -- --self-test
 
 cargo run --locked --manifest-path tools/pitb-route-coverage/Cargo.toml -- \
-  --analyze support-antichain-report.json retrieval-runs.jsonl \
-  declaration-mappings.jsonl retrieval-route-coverage.json
+  --analyze graph-manifest.json support-antichain-report.json \
+  retrieval-runs.jsonl declaration-mappings.jsonl retrieval-route-coverage.json
 ```
 
 ## Interpretation boundaries
