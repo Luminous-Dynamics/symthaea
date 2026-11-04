@@ -471,25 +471,48 @@ impl ZipArtifactReader {
         let decoder_limit = limits
             .max_uncompressed_bytes
             .min(expected.declared_uncompressed_size);
+        let archive_start = self.inventory.regions.leading_bytes;
+        let normalized_central_directory_offset = self
+            .inventory
+            .regions
+            .central_directory_offset
+            .checked_sub(archive_start)
+            .ok_or_else(|| {
+                ReaderError::new(
+                    ReaderErrorKind::InvalidArchive,
+                    "central-directory offset precedes the admitted ZIP structure",
+                )
+            })?;
+        let archive_length = self.inventory.source_bytes.checked_sub(archive_start).ok_or_else(
+            || {
+                ReaderError::new(
+                    ReaderErrorKind::InvalidArchive,
+                    "admitted ZIP structure begins beyond the selected source length",
+                )
+            },
+        )?;
         let options = DecoderReadOptions {
             verify_crc: true,
             verify_size: true,
             max_entry_size: Some(decoder_limit),
-            offset_correction: true,
+            // The secondary decoder sees a virtual archive beginning at the ZIP structure,
+            // so its stored relative offsets must match exactly; no heuristic correction.
+            offset_correction: false,
             password: None,
         };
 
         // Keep all decoder setup and streaming in one result scope so the descriptors and
         // selected path are revalidated even when the secondary parser rejects metadata.
         let stream_result = (move || {
+            let virtual_archive = ArchiveSlice::new(decoder_file, archive_start, archive_length)
+                .map_err(|error| ReaderError::io("cannot create bounded ZIP-relative view", error))?;
             let mut archive =
-                DecoderArchive::new_with_options(decoder_file, options).map_err(|error| {
+                DecoderArchive::new_with_options(virtual_archive, options).map_err(|error| {
                     map_zipcore_error("secondary ZIP parser rejected archive", error)
                 })?;
 
             if archive.len() != self.inventory.entries.len()
-                || archive.central_directory_offset()
-                    != self.inventory.regions.central_directory_offset
+                || archive.central_directory_offset() != normalized_central_directory_offset
                 || archive.is_zip64() != self.inventory.regions.zip64
             {
                 return Err(ReaderError::new(
@@ -504,9 +527,7 @@ impl ZipArtifactReader {
                     "secondary ZIP parser omitted the selected member occurrence",
                 )
             })?;
-            let corrected_header_offset = decoder_entry
-                .header_offset()
-                .checked_add(self.inventory.regions.leading_bytes);
+            let corrected_header_offset = decoder_entry.header_offset().checked_add(archive_start);
             let decoder_kind_matches = match expected.kind {
                 EntryKind::File => !decoder_entry.is_dir() && !decoder_entry.is_symlink(),
                 EntryKind::Directory => decoder_entry.is_dir() && !decoder_entry.is_symlink(),
@@ -666,6 +687,111 @@ struct EndRecord {
 struct EntryRange {
     start: u64,
     end: u64,
+}
+
+/// A virtual ZIP-relative view over the admitted carrier file.
+///
+/// The ZIP64 EOCD locator stores offsets relative to the beginning of the ZIP structure, not
+/// necessarily the beginning of an APK/IPA/self-extractor carrier. Exposing a bounded view that
+/// starts at the custom parser's admitted archive offset lets the secondary decoder consume
+/// those offsets without heuristic offset correction or access to prefix bytes.
+struct ArchiveSlice<R> {
+    inner: R,
+    start: u64,
+    length: u64,
+    position: u64,
+}
+
+impl<R: Read + Seek> ArchiveSlice<R> {
+    fn new(mut inner: R, start: u64, length: u64) -> io::Result<Self> {
+        let end = start
+            .checked_add(length)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "archive slice overflow"))?;
+        let physical_length = inner.seek(SeekFrom::End(0))?;
+        if end != physical_length {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "archive slice must end at the admitted source boundary",
+            ));
+        }
+        inner.seek(SeekFrom::Start(start))?;
+        Ok(Self {
+            inner,
+            start,
+            length,
+            position: 0,
+        })
+    }
+
+    fn set_position(&mut self, position: u64) -> io::Result<u64> {
+        if position > self.length {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "seek would escape the admitted ZIP-relative view",
+            ));
+        }
+        let physical_position = self
+            .start
+            .checked_add(position)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "archive seek overflow"))?;
+        self.inner.seek(SeekFrom::Start(physical_position))?;
+        self.position = position;
+        Ok(position)
+    }
+}
+
+impl<R: Read + Seek> Read for ArchiveSlice<R> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let remaining = self.length.saturating_sub(self.position);
+        if remaining == 0 || buffer.is_empty() {
+            return Ok(0);
+        }
+        let physical_position = self
+            .start
+            .checked_add(self.position)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "archive read overflow"))?;
+        self.inner.seek(SeekFrom::Start(physical_position))?;
+        let allowed = buffer.len().min(usize::try_from(remaining).unwrap_or(usize::MAX));
+        let read = self.inner.read(&mut buffer[..allowed])?;
+        self.position = self
+            .position
+            .checked_add(read as u64)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "archive position overflow"))?;
+        Ok(read)
+    }
+}
+
+impl<R: Read + Seek> Seek for ArchiveSlice<R> {
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        let target = match position {
+            SeekFrom::Start(offset) => offset,
+            SeekFrom::Current(offset) => {
+                let target = i128::from(self.position) + i128::from(offset);
+                if target < 0 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "seek would precede the admitted ZIP-relative view",
+                    ));
+                }
+                u64::try_from(target).map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "archive seek overflow")
+                })?
+            }
+            SeekFrom::End(offset) => {
+                let target = i128::from(self.length) + i128::from(offset);
+                if target < 0 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "seek would precede the admitted ZIP-relative view",
+                    ));
+                }
+                u64::try_from(target).map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "archive seek overflow")
+                })?
+            }
+        };
+        self.set_position(target)
+    }
 }
 
 #[derive(Debug)]
