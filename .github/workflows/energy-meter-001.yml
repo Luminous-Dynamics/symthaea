@@ -38,7 +38,7 @@ jobs:
         run: cargo fmt --manifest-path research/energy-meter-001/Cargo.toml -- --check
 
       - name: Run energy meter unit tests
-        run: cargo test --locked --manifest-path research/energy-meter-001/Cargo.toml
+        run: cargo test --locked --all-features --manifest-path research/energy-meter-001/Cargo.toml
 
       - name: Strict Clippy
-        run: cargo clippy --locked --manifest-path research/energy-meter-001/Cargo.toml --all-targets -- -D warnings
+        run: cargo clippy --locked --all-features --manifest-path research/energy-meter-001/Cargo.toml --all-targets -- -D warnings
