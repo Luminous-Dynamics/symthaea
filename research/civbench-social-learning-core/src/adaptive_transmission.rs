@@ -701,6 +701,9 @@ pub struct Run {
     pub history: Vec<StepMetrics>,
     pub program_identity: Option<ProgramIdentity>,
     pub recipient_state_disclosure: RecipientStateDisclosure,
+    /// Cumulative disclosed field-count proxy across all simulation steps.
+    /// This is not an information-theoretic leakage or formal privacy metric.
+    pub recipient_state_disclosure_units: usize,
 }
 
 impl Run {
@@ -1133,40 +1136,61 @@ struct CoarseNeedSignal {
     prerequisite_match_milli: u16,
 }
 
+/// The recipient releases at most two prioritized need signals per step.
+/// This avoids publishing the complete set of unheld recipes (whose
+/// complement would reconstruct its full recipe inventory).
+const COARSE_NEED_SIGNAL_BUDGET_PER_RECIPIENT: usize = 2;
+
 fn build_coarse_need_signals(
     task: &InnovationTask,
     agents: &[AgentKnowledge],
 ) -> Vec<BTreeMap<u16, CoarseNeedSignal>> {
     agents.iter().map(|agent| {
-        task.recipes().iter()
+        let mut candidates: Vec<(u16, u16, usize)> = task.recipes().iter()
             .filter(|recipe| !agent.known_recipes.contains(&recipe.recipe_id))
             .map(|recipe| {
                 let matched = recipe.ingredients.iter()
                     .filter(|ingredient| agent.known_elements.contains(ingredient))
                     .count();
-                let signal = CoarseNeedSignal {
-                    recipe_id: recipe.recipe_id,
-                    prerequisite_match_milli:
-                        (matched * 1_000 / recipe.ingredients.len()) as u16,
-                };
-                (recipe.recipe_id, signal)
+                let readiness = (matched * 1_000 / recipe.ingredients.len()) as u16;
+                (recipe.recipe_id, readiness, task.descendant_count(recipe.output_element))
             })
-            .collect()
+            .collect();
+        candidates.sort_by(|left, right| {
+            right.1.cmp(&left.1)
+                .then_with(|| right.2.cmp(&left.2))
+                .then_with(|| left.0.cmp(&right.0))
+        });
+        candidates.truncate(COARSE_NEED_SIGNAL_BUDGET_PER_RECIPIENT);
+        candidates.into_iter().map(|(recipe_id, readiness, _)| {
+            (
+                recipe_id,
+                CoarseNeedSignal {
+                    recipe_id,
+                    prerequisite_match_milli: readiness,
+                },
+            )
+        }).collect()
     }).collect()
 }
 
 /// Schedule using only recipient-local coarse need signals. The planner sees
-/// sender-owned recipes, graph neighbours, public task structure, and a
-/// recipe-scoped readiness scalar. It does not inspect receiver inventories.
-/// Recipients filter already-held recipes locally at the acquisition boundary.
+/// up to two recipient-selected recipe needs per step, sender-owned recipes,
+/// graph neighbours, public task structure, and readiness scalars. It does not
+/// inspect receiver inventories. Recipients filter already-held recipes
+/// locally at the acquisition boundary.
 fn program_schedule_coarse_need(
     task: &InnovationTask,
     graph: &SocialGraph,
     agents: &[AgentKnowledge],
     config: Config,
     program: &TransmissionProgram,
-) -> Vec<TransmissionAction> {
+) -> (Vec<TransmissionAction>, usize) {
     let need_signals = build_coarse_need_signals(task, agents);
+    // Count three disclosed scalar fields per need: recipient reference,
+    // recipe reference and readiness value. This is a field-volume proxy, not
+    // an information-theoretic leakage or privacy metric.
+    let disclosure_units = need_signals.iter().map(|signals| signals.len() * 3).sum();
     let mut schedule = Vec::new();
     let mut recipient_load = vec![0usize; agents.len()];
     let mut sender_load = vec![0usize; agents.len()];
@@ -1231,7 +1255,7 @@ fn program_schedule_coarse_need(
         sender_load[action.sender] += 1;
         schedule.push(action);
     }
-    schedule
+    (schedule, disclosure_units)
 }
 
 fn fixed_ring_pairs(population_size: usize) -> Vec<(usize, usize)> {
@@ -1494,6 +1518,7 @@ fn simulate_internal(
 
     let mut history = Vec::with_capacity(config.steps + 1);
     history.push(collective_metrics(0, task, &agents, 0, 0, 0, 0, 0, 0));
+    let mut recipient_state_disclosure_units = 0usize;
 
     for step in 1..=config.steps {
         let mut schedule_rng = Rng::new(stream_seed(seed, STREAM_SCHEDULE, step));
@@ -1509,10 +1534,16 @@ fn simulate_internal(
         let actions = match program {
             Some(program) => match disclosure {
                 RecipientStateDisclosure::CentralFullInventory => {
+                    recipient_state_disclosure_units += agents.iter()
+                        .map(|agent| agent.known_elements.len() + agent.known_recipes.len())
+                        .sum::<usize>();
                     program_schedule(task, &graph, &agents, config, program)
                 }
                 RecipientStateDisclosure::CoarseRecipeReadiness => {
-                    program_schedule_coarse_need(task, &graph, &agents, config, program)
+                    let (actions, disclosure_units) =
+                        program_schedule_coarse_need(task, &graph, &agents, config, program);
+                    recipient_state_disclosure_units += disclosure_units;
+                    actions
                 }
             },
             None => build_schedule(config.policy, task, &graph, &agents, config, &mut schedule_rng),
@@ -1545,6 +1576,7 @@ fn simulate_internal(
         history,
         program_identity: program.map(TransmissionProgram::identity),
         recipient_state_disclosure: disclosure,
+        recipient_state_disclosure_units,
     })
 }
 
@@ -1577,6 +1609,7 @@ mod tests {
         let signals = build_coarse_need_signals(&task, &agents);
         assert_eq!(signals.len(), 1);
         assert!(!signals[0].contains_key(&already_held));
+        assert!(signals[0].len() <= COARSE_NEED_SIGNAL_BUDGET_PER_RECIPIENT);
         let signal = signals[0].values().next().unwrap();
         assert!((0..=1_000).contains(&signal.prerequisite_match_milli));
         assert!(task.recipe(signal.recipe_id).is_some());
@@ -1643,6 +1676,13 @@ mod tests {
             coarse.recipient_state_disclosure,
             RecipientStateDisclosure::CoarseRecipeReadiness
         );
+        assert!(coarse.recipient_state_disclosure_units
+            <= config.steps
+                * config.population_size
+                * COARSE_NEED_SIGNAL_BUDGET_PER_RECIPIENT
+                * 3);
+        assert!(central.recipient_state_disclosure_units
+            > coarse.recipient_state_disclosure_units);
         assert!(central.history.iter().all(|step| {
             step.transmissions_scheduled <= config.transmission_budget_per_step
         }));
