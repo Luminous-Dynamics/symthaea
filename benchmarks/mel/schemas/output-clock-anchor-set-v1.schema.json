@@ -7,6 +7,7 @@
   "required": [
     "schema_version",
     "fixture_id",
+    "stream_descriptor",
     "anchors"
   ],
   "properties": {
@@ -34,6 +35,7 @@
           "first_output_frame_index",
           "frame_count",
           "sample_rate_hz",
+          "channel_count",
           "callback_stream_time_ns",
           "playback_stream_time_ns",
           "callback_to_playback_ns",
@@ -89,6 +91,11 @@
               "null"
             ],
             "minimum": 0
+          },
+          "channel_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 256
           }
         }
       }
@@ -101,6 +108,49 @@
         "reject_residual",
         "reject_discontinuity"
       ]
+    },
+    "stream_descriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "stream_instance_id",
+        "device_identity_sha256",
+        "sample_rate_hz",
+        "channel_count",
+        "sample_format",
+        "configuration_digest_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mel-output-clock-stream-descriptor-v1"
+        },
+        "stream_instance_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "device_identity_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 768000
+        },
+        "channel_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        },
+        "sample_format": {
+          "const": "f32"
+        },
+        "configuration_digest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
     }
   }
 }
