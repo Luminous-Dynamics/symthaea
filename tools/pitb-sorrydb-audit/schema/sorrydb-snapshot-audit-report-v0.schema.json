@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-snapshot-audit-report-v0.schema.json",
+  "title": "PITB SorryDB source and split audit report v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "upstream_repository",
+    "upstream_repository_commit",
+    "full_dataset_path",
+    "evaluation_split_path",
+    "full_dataset_git_blob_sha1",
+    "evaluation_split_git_blob_sha1",
+    "full_dataset_raw_sha256",
+    "evaluation_split_raw_sha256",
+    "full_task_count",
+    "evaluation_task_count",
+    "documented_full_task_count",
+    "full_count_documentation_drift",
+    "full_unique_task_id_count",
+    "full_unique_goal_count",
+    "evaluation_unique_task_id_count",
+    "evaluation_unique_goal_count",
+    "evaluation_exact_record_matches_in_full_snapshot",
+    "repository_count_full",
+    "repository_count_evaluation",
+    "lean_version_counts_evaluation",
+    "zero_based_start_column_task_count_full",
+    "zero_based_start_column_task_count_evaluation",
+    "cluster_summary_evaluation",
+    "source_reconstruction_requirement",
+    "benchmark_integrity_warnings",
+    "admission_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-snapshot-audit.v0"
+    },
+    "upstream_repository": {
+      "const": "SorryDB/SorryDB"
+    },
+    "upstream_repository_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "full_dataset_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_split_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "full_dataset_git_blob_sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "evaluation_split_git_blob_sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "full_dataset_raw_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "evaluation_split_raw_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "full_task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evaluation_task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "documented_full_task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "full_count_documentation_drift": {
+      "type": "boolean"
+    },
+    "full_unique_task_id_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "full_unique_goal_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evaluation_unique_task_id_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evaluation_unique_goal_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evaluation_exact_record_matches_in_full_snapshot": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "repository_count_full": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "repository_count_evaluation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "lean_version_counts_evaluation": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "zero_based_start_column_task_count_full": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "zero_based_start_column_task_count_evaluation": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cluster_summary_evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_count",
+        "repository_commit_count",
+        "source_file_count",
+        "tasks_per_repository_min",
+        "tasks_per_repository_max",
+        "tasks_per_source_file_max",
+        "source_file_task_histogram",
+        "top_source_file_clusters"
+      ],
+      "properties": {
+        "repository_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "repository_commit_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_file_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tasks_per_repository_min": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tasks_per_repository_max": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tasks_per_source_file_max": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_file_task_histogram": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "top_source_file_clusters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "repository",
+              "path",
+              "task_count",
+              "distinct_repository_commits"
+            ],
+            "properties": {
+              "repository": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "task_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "distinct_repository_commits": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "source_reconstruction_requirement": {
+      "type": "string",
+      "minLength": 30
+    },
+    "benchmark_integrity_warnings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 20
+      }
+    },
+    "admission_boundary": {
+      "type": "string",
+      "minLength": 50
+    }
+  }
+}
