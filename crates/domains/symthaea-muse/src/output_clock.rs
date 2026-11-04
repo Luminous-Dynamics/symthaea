@@ -197,6 +197,10 @@ pub struct OutputClockFitV1 {
     pub valid_until_playback_stream_time_ns: u64,
     pub maximum_extrapolation_ns: u64,
     pub anchor_count: usize,
+    /// Anchor indices absent before the first retained observation or
+    /// between retained observations. Trailing drops are tracked by the live
+    /// stream's callback-drop counter and cannot be inferred from this slice.
+    pub missing_anchor_records_before_or_between_observations: u64,
     pub maximum_abs_drift_ppm: f64,
     pub estimated_drift_ppm: f64,
     pub median_abs_residual_frames: f64,
@@ -459,6 +463,13 @@ pub fn fit_output_clock_v1(
         });
     }
 
+    let mut missing_anchor_records_before_or_between_observations =
+        anchors[0].anchor_index;
+    for pair in anchors.windows(2) {
+        missing_anchor_records_before_or_between_observations +=
+            pair[1].anchor_index - pair[0].anchor_index - 1;
+    }
+
     // Retain each raw timestamp uncertainty on its anchor, but do not
     // promote it to a frame-position bound until regression uncertainty is
     // propagated with a separately qualified method.
@@ -480,6 +491,7 @@ pub fn fit_output_clock_v1(
             .unwrap_or(t0),
         maximum_extrapolation_ns: policy.maximum_extrapolation_ns,
         anchor_count: anchors.len(),
+        missing_anchor_records_before_or_between_observations,
         maximum_abs_drift_ppm: policy.maximum_abs_drift_ppm,
         estimated_drift_ppm,
         median_abs_residual_frames,
@@ -558,6 +570,21 @@ mod tests {
     }
 
     #[test]
+    fn exact_fit_reports_no_missing_anchor_records() {
+        let anchors = vec![
+            anchor(0, 0, 5_000_000),
+            anchor(1, 480, 15_000_000),
+            anchor(2, 960, 25_000_000),
+            anchor(3, 1440, 35_000_000),
+        ];
+        let fit = fit_output_clock_v1(&anchors, policy()).unwrap();
+        assert_eq!(
+            fit.missing_anchor_records_before_or_between_observations,
+            0
+        );
+    }
+
+    #[test]
     fn nominal_clock_fit_maps_playback_time_to_frame_position() {
         let anchors = vec![
             anchor(0, 0, 5_000_000),
@@ -627,6 +654,10 @@ mod tests {
         let fit = fit_output_clock_v1(&anchors, policy()).unwrap();
         assert!((fit.estimated_drift_ppm).abs() < 1e-6);
         assert_eq!(fit.anchor_count, 4);
+        assert_eq!(
+            fit.missing_anchor_records_before_or_between_observations,
+            1
+        );
     }
 
     #[test]
