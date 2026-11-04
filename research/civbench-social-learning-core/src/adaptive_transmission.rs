@@ -337,6 +337,29 @@ pub enum TransmissionPolicy {
     StateAwareRecipientShuffled,
 }
 
+/// Recipient-state disclosure made available to a transmission program.
+///
+/// This is a benchmark information boundary, not a cryptographic privacy
+/// guarantee. The coarse mode exposes only a recipe-scoped readiness value
+/// emitted by a recipient-side feature extractor; it does not expose the
+/// recipient's element or recipe inventory to the scheduler.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecipientStateDisclosure {
+    /// Research upper bound: the scheduler can inspect the full recipient inventory.
+    CentralFullInventory,
+    /// Minimized need signal: per-recipe prerequisite coverage only.
+    CoarseRecipeReadiness,
+}
+
+impl RecipientStateDisclosure {
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::CentralFullInventory => "central_full_inventory",
+            Self::CoarseRecipeReadiness => "coarse_recipe_readiness",
+        }
+    }
+}
+
 impl TransmissionPolicy {
     pub const fn name(self) -> &'static str {
         match self {
@@ -398,6 +421,7 @@ pub enum ConfigError {
     InvalidProgramPrerequisiteThreshold { threshold_milli: u16 },
     InvalidProgramMessageLimit,
     InvalidProgramScoreWeights,
+    UnsupportedFeatureForDisclosure { feature: &'static str },
 }
 
 impl fmt::Display for ConfigError {
@@ -427,6 +451,10 @@ impl fmt::Display for ConfigError {
             Self::InvalidProgramScoreWeights => write!(
                 f,
                 "program score weights must be bounded, nonzero in total, and no greater than the declared maximum"
+            ),
+            Self::UnsupportedFeatureForDisclosure { feature } => write!(
+                f,
+                "program feature {feature} is unavailable under the selected recipient-state disclosure mode"
             ),
         }
     }
@@ -672,6 +700,7 @@ pub struct Run {
     pub agents: Vec<AgentKnowledge>,
     pub history: Vec<StepMetrics>,
     pub program_identity: Option<ProgramIdentity>,
+    pub recipient_state_disclosure: RecipientStateDisclosure,
 }
 
 impl Run {
@@ -1096,6 +1125,115 @@ fn program_schedule(
     schedule
 }
 
+/// A recipient-local, minimized need signal for one unheld recipe.
+/// It contains no element identities and no complete recipient inventory.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct CoarseNeedSignal {
+    recipe_id: u16,
+    prerequisite_match_milli: u16,
+}
+
+fn build_coarse_need_signals(
+    task: &InnovationTask,
+    agents: &[AgentKnowledge],
+) -> Vec<BTreeMap<u16, CoarseNeedSignal>> {
+    agents.iter().map(|agent| {
+        task.recipes().iter()
+            .filter(|recipe| !agent.known_recipes.contains(&recipe.recipe_id))
+            .map(|recipe| {
+                let matched = recipe.ingredients.iter()
+                    .filter(|ingredient| agent.known_elements.contains(ingredient))
+                    .count();
+                let signal = CoarseNeedSignal {
+                    recipe_id: recipe.recipe_id,
+                    prerequisite_match_milli:
+                        (matched * 1_000 / recipe.ingredients.len()) as u16,
+                };
+                (recipe.recipe_id, signal)
+            })
+            .collect()
+    }).collect()
+}
+
+/// Schedule using only recipient-local coarse need signals. The planner sees
+/// sender-owned recipes, graph neighbours, public task structure, and a
+/// recipe-scoped readiness scalar. It does not inspect receiver inventories.
+/// Recipients filter already-held recipes locally at the acquisition boundary.
+fn program_schedule_coarse_need(
+    task: &InnovationTask,
+    graph: &SocialGraph,
+    agents: &[AgentKnowledge],
+    config: Config,
+    program: &TransmissionProgram,
+) -> Vec<TransmissionAction> {
+    let need_signals = build_coarse_need_signals(task, agents);
+    let mut schedule = Vec::new();
+    let mut recipient_load = vec![0usize; agents.len()];
+    let mut sender_load = vec![0usize; agents.len()];
+    let mut used_actions = BTreeSet::new();
+    let budget = program.max_messages_per_step.min(config.transmission_budget_per_step);
+
+    while schedule.len() < budget {
+        let mut best: Option<(u64, TransmissionAction)> = None;
+        for sender in 0..agents.len() {
+            if sender_load[sender] >= program.max_messages_per_sender {
+                continue;
+            }
+            let Some(neighbors) = graph.neighbors(sender) else { continue };
+            if agents[sender].known_recipes.is_empty() {
+                continue;
+            }
+            for &receiver in neighbors {
+                if recipient_load[receiver] >= config.attention_capacity_per_recipient {
+                    continue;
+                }
+                for &recipe_id in &agents[sender].known_recipes {
+                    let Some(signal) = need_signals[receiver].get(&recipe_id) else {
+                        continue;
+                    };
+                    if signal.prerequisite_match_milli
+                        < program.minimum_prerequisite_match_milli
+                    {
+                        continue;
+                    }
+
+                    let action = TransmissionAction { sender, receiver, recipe_id };
+                    if used_actions.contains(&(sender, receiver, recipe_id)) {
+                        continue;
+                    }
+                    let weights = program.weights;
+                    let ready = signal.prerequisite_match_milli == 1_000;
+                    let recipe = task.recipe(recipe_id)
+                        .expect("sender recipe ID must exist in task");
+                    let score =
+                        (if ready { u64::from(weights.immediate_executability) } else { 0 })
+                        + u64::from(signal.prerequisite_match_milli)
+                            * u64::from(weights.prerequisite_match) / 1_000
+                        + task.descendant_count(recipe.output_element) as u64
+                            * u64::from(weights.downstream_unlocks)
+                        + agents[sender].known_recipes.len() as u64
+                            * u64::from(weights.sender_knowledge);
+                    let replace = match best {
+                        None => true,
+                        Some((best_score, best_action)) => {
+                            score > best_score || (score == best_score && action < best_action)
+                        }
+                    };
+                    if replace {
+                        best = Some((score, action));
+                    }
+                }
+            }
+        }
+        let Some((_, action)) = best else { break };
+        used_actions.insert((action.sender, action.receiver, action.recipe_id));
+        recipient_load[action.receiver] += 1;
+        sender_load[action.sender] += 1;
+        schedule.push(action);
+    }
+    schedule
+}
+
 fn fixed_ring_pairs(population_size: usize) -> Vec<(usize, usize)> {
     (0..population_size)
         .map(|sender| (sender, (sender + 1) % population_size))
@@ -1273,7 +1411,13 @@ pub fn simulate(
     config: Config,
     seed: u64,
 ) -> Result<Run, ConfigError> {
-    simulate_internal(task, config, seed, None)
+    simulate_internal(
+        task,
+        config,
+        seed,
+        None,
+        RecipientStateDisclosure::CentralFullInventory,
+    )
 }
 
 /// Simulate with an inspectable, bounded data program instead of a fixed policy
@@ -1285,8 +1429,35 @@ pub fn simulate_with_program(
     seed: u64,
     program: &TransmissionProgram,
 ) -> Result<Run, ConfigError> {
+    simulate_with_program_and_disclosure(
+        task,
+        config,
+        seed,
+        program,
+        RecipientStateDisclosure::CentralFullInventory,
+    )
+}
+
+/// Run a bounded program with an explicit recipient-state disclosure boundary.
+///
+/// The coarse-readiness mode rejects collective-novelty filters/weights because
+/// they require a global inventory signal outside the declared disclosure view.
+pub fn simulate_with_program_and_disclosure(
+    task: &InnovationTask,
+    config: Config,
+    seed: u64,
+    program: &TransmissionProgram,
+    disclosure: RecipientStateDisclosure,
+) -> Result<Run, ConfigError> {
     program.validate(config)?;
-    simulate_internal(task, config, seed, Some(program))
+    if disclosure == RecipientStateDisclosure::CoarseRecipeReadiness
+        && (program.require_collective_novelty || program.weights.collective_novelty != 0)
+    {
+        return Err(ConfigError::UnsupportedFeatureForDisclosure {
+            feature: "collective_novelty",
+        });
+    }
+    simulate_internal(task, config, seed, Some(program), disclosure)
 }
 
 fn simulate_internal(
@@ -1294,6 +1465,7 @@ fn simulate_internal(
     config: Config,
     seed: u64,
     program: Option<&TransmissionProgram>,
+    disclosure: RecipientStateDisclosure,
 ) -> Result<Run, ConfigError> {
     config.validate(task)?;
     let mut graph_rng = Rng::new(stream_seed(seed, STREAM_GRAPH, 0));
@@ -1335,7 +1507,14 @@ fn simulate_internal(
             step,
         );
         let actions = match program {
-            Some(program) => program_schedule(task, &graph, &agents, config, program),
+            Some(program) => match disclosure {
+                RecipientStateDisclosure::CentralFullInventory => {
+                    program_schedule(task, &graph, &agents, config, program)
+                }
+                RecipientStateDisclosure::CoarseRecipeReadiness => {
+                    program_schedule_coarse_need(task, &graph, &agents, config, program)
+                }
+            },
             None => build_schedule(config.policy, task, &graph, &agents, config, &mut schedule_rng),
         };
         let (redundant, acquisitions, new_results, attention_used) = apply_actions(
@@ -1365,6 +1544,7 @@ fn simulate_internal(
         agents,
         history,
         program_identity: program.map(TransmissionProgram::identity),
+        recipient_state_disclosure: disclosure,
     })
 }
 
@@ -1386,6 +1566,91 @@ mod tests {
             acquisition_probability: 1.0,
             policy,
         }
+    }
+
+    #[test]
+    fn coarse_need_signal_contains_recipe_identity_and_readiness_only() {
+        let task = InnovationTask::family_task(TaskFamily::Layered);
+        let mut agents = vec![AgentKnowledge::new(&task)];
+        let already_held = task.recipes()[0].recipe_id;
+        agents[0].known_recipes.insert(already_held);
+        let signals = build_coarse_need_signals(&task, &agents);
+        assert_eq!(signals.len(), 1);
+        assert!(!signals[0].contains_key(&already_held));
+        let signal = signals[0].values().next().unwrap();
+        assert!((0..=1_000).contains(&signal.prerequisite_match_milli));
+        assert!(task.recipe(signal.recipe_id).is_some());
+    }
+
+    #[test]
+    fn coarse_disclosure_rejects_global_collective_novelty_features() {
+        let task = InnovationTask::family_task(TaskFamily::Layered);
+        let config = deterministic_config(TransmissionPolicy::StateAwareFrontier);
+        let program = TransmissionProgram::frontier_v1(config);
+        assert_eq!(
+            simulate_with_program_and_disclosure(
+                &task,
+                config,
+                17,
+                &program,
+                RecipientStateDisclosure::CoarseRecipeReadiness,
+            ),
+            Err(ConfigError::UnsupportedFeatureForDisclosure {
+                feature: "collective_novelty",
+            })
+        );
+    }
+
+    #[test]
+    fn centralized_and_coarse_disclosure_modes_record_boundaries_and_budgets() {
+        let task = InnovationTask::family_task(TaskFamily::Branching);
+        let config = deterministic_config(TransmissionPolicy::StateAwareFrontier);
+        let program = TransmissionProgram {
+            program_id: "coarse-readiness-v1".to_owned(),
+            version: 1,
+            minimum_prerequisite_match_milli: 0,
+            require_collective_novelty: false,
+            max_messages_per_step: config.transmission_budget_per_step,
+            max_messages_per_sender: config.transmission_budget_per_step,
+            weights: TransmissionScoreWeights {
+                immediate_executability: 100_000,
+                prerequisite_match: 10_000,
+                collective_novelty: 0,
+                downstream_unlocks: 1_000,
+                sender_knowledge: 1,
+            },
+        };
+        let central = simulate_with_program_and_disclosure(
+            &task,
+            config,
+            707,
+            &program,
+            RecipientStateDisclosure::CentralFullInventory,
+        ).unwrap();
+        let coarse = simulate_with_program_and_disclosure(
+            &task,
+            config,
+            707,
+            &program,
+            RecipientStateDisclosure::CoarseRecipeReadiness,
+        ).unwrap();
+        assert_eq!(central.graph, coarse.graph);
+        assert_eq!(
+            central.recipient_state_disclosure,
+            RecipientStateDisclosure::CentralFullInventory
+        );
+        assert_eq!(
+            coarse.recipient_state_disclosure,
+            RecipientStateDisclosure::CoarseRecipeReadiness
+        );
+        assert!(central.history.iter().all(|step| {
+            step.transmissions_scheduled <= config.transmission_budget_per_step
+        }));
+        assert!(coarse.history.iter().all(|step| {
+            step.transmissions_scheduled <= config.transmission_budget_per_step
+                && step.attention_capacity_used
+                    <= config.population_size * config.attention_capacity_per_recipient
+        }));
     }
 
     #[test]
