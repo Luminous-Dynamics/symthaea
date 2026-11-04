@@ -105,11 +105,11 @@ def repo_path(root: Path, value: str):
     return resolved
 
 
-def has_unavailable_note(markdown: str, path: str) -> bool:
+def has_unavailable_note(markdown: str, path: str, target: str | None = None) -> bool:
     normalized = path.replace("\\", "/").removeprefix("./")
-    return normalized in markdown and UNAVAILABLE.search(markdown) is not None
-
-
+    path_is_named = normalized in markdown
+    target_is_named = target is None or target in markdown
+    return path_is_named and target_is_named and UNAVAILABLE.search(markdown) is not None
 def bin_source(manifest: Path, name: str):
     try:
         parsed = tomllib.loads(manifest.read_text(encoding="utf-8"))
@@ -160,7 +160,7 @@ def audit_markdown(root: Path, file: Path):
                     continue
                 target = bin_source(manifest, name)
                 if target is None or not target.is_file():
-                    if has_unavailable_note(text, reference):
+                    if has_unavailable_note(text, reference, name):
                         unavailable += 1
                     else:
                         failures.append(
@@ -186,6 +186,9 @@ def self_test():
     note = "Design specification only: tools/missing/Cargo.toml is not currently runnable."
     assert has_unavailable_note(note, "tools/missing/Cargo.toml")
     assert not has_unavailable_note("Run this command.", "tools/missing/Cargo.toml")
+    target_note = note + " --bin example_audit has no checked-in source."
+    assert has_unavailable_note(target_note, "tools/missing/Cargo.toml", "example_audit")
+    assert not has_unavailable_note(target_note, "tools/missing/Cargo.toml", "different_target")
 
 
 def main() -> int:
