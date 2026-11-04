@@ -4,6 +4,7 @@ use crate::{
 };
 use serde::Serialize;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
@@ -62,6 +63,29 @@ pub enum BatchDisposition {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum MetricValue {
+    Quantity {
+        value: f64,
+        unit: String,
+        derivation: String,
+    },
+    Boolean {
+        value: bool,
+        interpretation: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SourceArtifact {
+    pub logical_name: String,
+    pub byte_length: usize,
+    pub digest_algorithm: String,
+    pub sha256: String,
+    pub digest_scope: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct BatchReceipt {
     pub domain: ServiceDomain,
     pub scenario_id: String,
@@ -69,7 +93,7 @@ pub struct BatchReceipt {
     pub fixture_expected_disposition: String,
     pub disposition: BatchDisposition,
     /// Deterministic metrics derived only from the synthetic fixture inputs.
-    pub derived_metrics: BTreeMap<String, f64>,
+    pub derived_metrics: BTreeMap<String, MetricValue>,
     pub evidence_notes: Vec<String>,
     pub unresolved_claims: Vec<String>,
 }
@@ -78,6 +102,11 @@ pub struct BatchReceipt {
 pub struct BatchReport {
     pub report_schema_version: String,
     pub evaluator_version: String,
+    pub adapter_version: String,
+    pub evidence_class: String,
+    pub source_commit: String,
+    pub serialization_contract: String,
+    pub source_artifacts: Vec<SourceArtifact>,
     pub water_corpus_id: String,
     pub repair_corpus_id: String,
     pub water_receipt_count: usize,
@@ -97,6 +126,28 @@ pub struct BatchReport {
 pub fn evaluate_batch(
     water_corpus: &Value,
     repair_corpus: &Value,
+) -> Result<BatchReport, EvaluationError> {
+    // Value-based callers bind the deterministic compact serde_json encoding.
+    // File-based callers below bind the exact raw source bytes instead.
+    let water_bytes = serde_json::to_vec(water_corpus)
+        .map_err(|error| EvaluationError::new("water_fixture_encode", error.to_string()))?;
+    let repair_bytes = serde_json::to_vec(repair_corpus)
+        .map_err(|error| EvaluationError::new("repair_fixture_encode", error.to_string()))?;
+    evaluate_batch_with_source_bytes(
+        water_corpus,
+        repair_corpus,
+        &water_bytes,
+        &repair_bytes,
+        "normalized_serde_json_value_bytes",
+    )
+}
+
+fn evaluate_batch_with_source_bytes(
+    water_corpus: &Value,
+    repair_corpus: &Value,
+    water_source_bytes: &[u8],
+    repair_source_bytes: &[u8],
+    digest_scope: &str,
 ) -> Result<BatchReport, EvaluationError> {
     let water_corpus_id = validate_corpus_header(
         water_corpus,
@@ -138,8 +189,30 @@ pub fn evaluate_batch(
         .collect();
 
     Ok(BatchReport {
-        report_schema_version: "0.1".to_owned(),
+        report_schema_version: "0.2".to_owned(),
         evaluator_version: env!("CARGO_PKG_VERSION").to_owned(),
+        adapter_version: "household-service-v0.1-water-repair-adapter.1".to_owned(),
+        evidence_class: "synthetic_software_conformance_only".to_owned(),
+        source_commit: option_env!("HOUSEHOLD_EVALUATOR_SOURCE_COMMIT")
+            .unwrap_or("not_recorded")
+            .to_owned(),
+        serialization_contract: "serde_json-1.0.150-pretty; struct-declaration-order; BTreeMap-lexicographic; frozen-corpus-array-order".to_owned(),
+        source_artifacts: vec![
+            SourceArtifact {
+                logical_name: "water_continuity_corpus".to_owned(),
+                byte_length: water_source_bytes.len(),
+                digest_algorithm: "sha-256".to_owned(),
+                sha256: sha256_hex(water_source_bytes),
+                digest_scope: digest_scope.to_owned(),
+            },
+            SourceArtifact {
+                logical_name: "repairability_corpus".to_owned(),
+                byte_length: repair_source_bytes.len(),
+                digest_algorithm: "sha-256".to_owned(),
+                sha256: sha256_hex(repair_source_bytes),
+                digest_scope: digest_scope.to_owned(),
+            },
+        ],
         water_corpus_id,
         repair_corpus_id,
         water_receipt_count: WATER_IDS.len(),
@@ -149,6 +222,15 @@ pub fn evaluate_batch(
         receipts,
         claim_ceiling,
     })
+}
+
+pub fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut result = String::with_capacity(64);
+    for byte in digest {
+        result.push_str(&format!("{byte:02x}"));
+    }
+    result
 }
 
 /// Read two JSON corpus files and evaluate them without network or clock input.
@@ -166,7 +248,13 @@ pub fn evaluate_batch_from_paths(
     let repair_corpus: Value = serde_json::from_slice(&repair_bytes)
         .map_err(|error| EvaluationError::new("repair_fixture_json", error.to_string()))?;
 
-    evaluate_batch(&water_corpus, &repair_corpus)
+    evaluate_batch_with_source_bytes(
+        &water_corpus,
+        &repair_corpus,
+        &water_bytes,
+        &repair_bytes,
+        "raw_file_bytes",
+    )
 }
 
 fn validate_corpus_header(
@@ -287,10 +375,11 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
         "WCONT-001" => {
             let flow = required_number(input, "municipal_inlet_flow_l_min")?;
             let duration = required_number(input, "duration_h")?;
-            metrics.insert(
-                "synthetic_inlet_volume_l".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "synthetic_inlet_volume_l",
                 flow * duration * 60.0,
-            );
+            )?;
             notes.push(
                 "Inlet volume is integrated from the fixture's constant synthetic flow assumption."
                     .to_owned(),
@@ -302,14 +391,16 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
             BatchDisposition::ProcessAccountingOnly
         }
         "WCONT-002" => {
-            metrics.insert(
-                "gross_tank_sensor_inventory_l".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "gross_tank_sensor_inventory_l",
                 required_number(input, "tank_level_sensor_l")?,
-            );
-            metrics.insert(
-                "municipal_inlet_flow_l_min".to_owned(),
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "municipal_inlet_flow_l_min",
                 required_number(input, "municipal_inlet_flow_l_min")?,
-            );
+            )?;
             notes.push(
                 "Zero municipal inflow is preserved for the declared 48-hour interruption."
                     .to_owned(),
@@ -323,14 +414,16 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
         "WCONT-003" => {
             let flow = required_number(input, "municipal_inlet_flow_l_min")?;
             let duration = required_number(input, "duration_h")?;
-            metrics.insert(
-                "synthetic_inlet_volume_l_under_constant_flow".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "synthetic_inlet_volume_l_under_constant_flow",
                 flow * duration * 60.0,
-            );
-            metrics.insert(
-                "gross_tank_sensor_inventory_l".to_owned(),
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "gross_tank_sensor_inventory_l",
                 required_number(input, "tank_level_sensor_l")?,
-            );
+            )?;
             notes.push(
                 "The 576 L inlet figure assumes the fixture's 0.8 L/min flow remains constant for all 12 hours."
                     .to_owned(),
@@ -344,12 +437,13 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
         "WCONT-004" => {
             let sensor = required_number(input, "tank_level_sensor_l")?;
             let reference = required_number(input, "independent_reference_tank_level_l")?;
-            metrics.insert("tank_sensor_l".to_owned(), sensor);
-            metrics.insert("independent_reference_l".to_owned(), reference);
-            metrics.insert(
-                "absolute_sensor_disagreement_l".to_owned(),
+            insert_quantity(&mut metrics, "tank_sensor_l", sensor)?;
+            insert_quantity(&mut metrics, "independent_reference_l", reference)?;
+            insert_quantity(
+                &mut metrics,
+                "absolute_sensor_disagreement_l",
                 (sensor - reference).abs(),
-            );
+            )?;
             notes.push(
                 "The sensor and independent reference remain separate observations; neither is silently selected as truth."
                     .to_owned(),
@@ -363,10 +457,11 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
         "WCONT-005" => {
             let flow = required_number(input, "measured_unexplained_flow_l_min")?;
             let duration = required_number(input, "duration_h")?;
-            metrics.insert(
-                "unexplained_flow_volume_l_under_constant_rate".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "unexplained_flow_volume_l_under_constant_rate",
                 flow * duration * 60.0,
-            );
+            )?;
             notes.push(
                 "The unexplained 0.5 L/min signal integrates to 240 L over the synthetic 8-hour window if constant."
                     .to_owned(),
@@ -378,13 +473,17 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
             BatchDisposition::HumanReviewRequired
         }
         "WCONT-006" => {
-            metrics.insert(
-                "gross_tank_sensor_inventory_l".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "gross_tank_sensor_inventory_l",
                 required_number(input, "tank_level_sensor_l")?,
-            );
+            )?;
             let grid = required_bool(input, "grid_available")?;
             let pump = required_bool(input, "pump_available")?;
             let backup = required_bool(input, "backup_power_available")?;
+            insert_boolean(&mut metrics, "grid_available", grid)?;
+            insert_boolean(&mut metrics, "pump_available", pump)?;
+            insert_boolean(&mut metrics, "backup_power_available", backup)?;
             notes.push(format!(
                 "Delivery path inputs: grid_available={grid}, pump_available={pump}, backup_power_available={backup}."
             ));
@@ -395,14 +494,16 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
             BatchDisposition::DeliveryUnavailable
         }
         "WCONT-007" => {
-            metrics.insert(
-                "stored_water_age_h".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "stored_water_age_h",
                 required_number(input, "stored_water_age_h")?,
-            );
-            metrics.insert(
-                "gross_tank_sensor_inventory_l".to_owned(),
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "gross_tank_sensor_inventory_l",
                 required_number(input, "tank_level_sensor_l")?,
-            );
+            )?;
             notes.push(format!(
                 "Water-quality evidence state: {}.",
                 required_str(input, "water_quality_evidence", "WCONT-007.input")?
@@ -455,23 +556,27 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
                 ),
                 topology_audit: None::<TopologyAuditReference>,
             })?;
-            metrics.insert("mass_balance_residual_l".to_owned(), balance.residual_l);
-            metrics.insert(
-                "mass_balance_residual_lower_l".to_owned(),
+            insert_quantity(&mut metrics, "mass_balance_residual_l", balance.residual_l)?;
+            insert_quantity(
+                &mut metrics,
+                "mass_balance_residual_lower_l",
                 balance.residual_lower_l,
-            );
-            metrics.insert(
-                "mass_balance_residual_upper_l".to_owned(),
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "mass_balance_residual_upper_l",
                 balance.residual_upper_l,
-            );
-            metrics.insert(
-                "assumed_per_term_absolute_error_bound_l".to_owned(),
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "assumed_per_term_absolute_error_bound_l",
                 per_term_bound,
-            );
-            metrics.insert(
-                "conservative_aggregate_absolute_error_bound_l".to_owned(),
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "conservative_aggregate_absolute_error_bound_l",
                 balance.aggregate_absolute_error_bound_l,
-            );
+            )?;
             notes.push(
                 "meter_uncertainty_l has ambiguous scope; the software-only negative control conservatively sums four per-term absolute bounds."
                     .to_owned(),
@@ -489,8 +594,8 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
         "WCONT-009" => {
             let command = required_bool(input, "commanded_refill")?;
             let flow = required_number(input, "municipal_inlet_flow_l_min")?;
-            metrics.insert("commanded_refill".to_owned(), bool_as_f64(command));
-            metrics.insert("measured_inlet_flow_l_min".to_owned(), flow);
+            insert_boolean(&mut metrics, "commanded_refill", command)?;
+            insert_quantity(&mut metrics, "measured_inlet_flow_l_min", flow)?;
             notes.push(
                 "Open-valve feedback and a refill command are not treated as proof of physical inflow."
                     .to_owned(),
@@ -502,10 +607,11 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
             BatchDisposition::CommandObservationMismatch
         }
         "WCONT-010" => {
-            metrics.insert(
-                "observation_duration_h".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "observation_duration_h",
                 required_number(input, "duration_h")?,
-            );
+            )?;
             notes.push(
                 "The fixture describes unstable flow and a surge-then-decay pressure profile without numerical time series."
                     .to_owned(),
@@ -545,18 +651,21 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
 
     let disposition = match id {
         "REPAIR-001" => {
-            metrics.insert(
-                "access_fasteners".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "access_fasteners",
                 required_number(baseline, "access_fasteners")?,
-            );
-            metrics.insert(
-                "disassembly_steps".to_owned(),
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "disassembly_steps",
                 required_number(baseline, "disassembly_steps")?,
-            );
-            metrics.insert(
-                "synthetic_part_lead_time_days".to_owned(),
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "synthetic_part_lead_time_days",
                 required_number(baseline, "part_lead_time_days")?,
-            );
+            )?;
             notes.push(
                 "Fixture documents a user-serviceable access path and offline instructions; no physical replacement task was executed."
                     .to_owned(),
@@ -568,18 +677,21 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
             BatchDisposition::RepairNotExecuted
         }
         "REPAIR-002" => {
-            metrics.insert(
-                "access_fasteners".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "access_fasteners",
                 required_number(baseline, "access_fasteners")?,
-            );
-            metrics.insert(
-                "disassembly_steps".to_owned(),
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "disassembly_steps",
                 required_number(baseline, "disassembly_steps")?,
-            );
-            metrics.insert(
-                "synthetic_part_lead_time_days".to_owned(),
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "synthetic_part_lead_time_days",
                 required_number(baseline, "part_lead_time_days")?,
-            );
+            )?;
             notes.push(
                 "This is a trained-technician pump-module task; fixture counts describe access complexity, not measured repair time."
                     .to_owned(),
@@ -591,21 +703,21 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
             BatchDisposition::RepairHeld
         }
         "REPAIR-003" => {
-            metrics.insert(
-                "access_fasteners".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "access_fasteners",
                 required_number(baseline, "access_fasteners")?,
-            );
-            metrics.insert(
-                "disassembly_steps".to_owned(),
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "disassembly_steps",
                 required_number(baseline, "disassembly_steps")?,
-            );
-            metrics.insert(
-                "adhesive_or_destructive_disassembly".to_owned(),
-                bool_as_f64(required_bool(
-                    baseline,
-                    "adhesive_or_destructive_disassembly",
-                )?),
-            );
+            )?;
+            insert_boolean(
+                &mut metrics,
+                "adhesive_or_destructive_disassembly",
+                required_bool(baseline, "adhesive_or_destructive_disassembly")?,
+            )?;
             notes.push(
                 "The synthetic task declares non-destructive access; it does not demonstrate an actual seal replacement."
                     .to_owned(),
@@ -617,14 +729,16 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
             BatchDisposition::RepairHeld
         }
         "REPAIR-004" => {
-            metrics.insert(
-                "synthetic_part_lead_time_days".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "synthetic_part_lead_time_days",
                 required_number(baseline, "part_lead_time_days")?,
-            );
-            metrics.insert(
-                "calibration_required".to_owned(),
-                bool_as_f64(required_bool(baseline, "calibration_required")?),
-            );
+            )?;
+            insert_boolean(
+                &mut metrics,
+                "calibration_required",
+                required_bool(baseline, "calibration_required")?,
+            )?;
             notes.push(
                 "Calibration is explicitly required by the synthetic task profile.".to_owned(),
             );
@@ -637,14 +751,12 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
         "REPAIR-005" => {
             let signed_image = required_bool(baseline, "signed_image_available")?;
             let previous_image = required_bool(baseline, "previous_known_good_image_available")?;
-            metrics.insert(
-                "signed_image_available".to_owned(),
-                bool_as_f64(signed_image),
-            );
-            metrics.insert(
-                "previous_known_good_image_available".to_owned(),
-                bool_as_f64(previous_image),
-            );
+            insert_boolean(&mut metrics, "signed_image_available", signed_image)?;
+            insert_boolean(
+                &mut metrics,
+                "previous_known_good_image_available",
+                previous_image,
+            )?;
             notes.push(
                 "Both offline recovery artifacts are declared available while internet access is absent."
                     .to_owned(),
@@ -673,14 +785,16 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
                 recurrence_observed: false,
             };
             let result = evaluate_repair_attempt(&attempt, 30)?;
-            metrics.insert(
-                "catalog_part_exists".to_owned(),
-                bool_as_f64(required_bool(baseline, "catalog_part_exists")?),
-            );
-            metrics.insert(
-                "local_stock".to_owned(),
-                bool_as_f64(required_bool(baseline, "local_stock")?),
-            );
+            insert_boolean(
+                &mut metrics,
+                "catalog_part_exists",
+                required_bool(baseline, "catalog_part_exists")?,
+            )?;
+            insert_boolean(
+                &mut metrics,
+                "local_stock",
+                required_bool(baseline, "local_stock")?,
+            )?;
             notes.push(
                 "Catalog presence is kept separate from target-market stock; unknown quoted lead time is not coerced to zero."
                     .to_owned(),
@@ -718,18 +832,21 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
                 recurrence_observed: false,
             };
             let result = evaluate_repair_attempt(&attempt, 30)?;
-            metrics.insert(
-                "physical_fit".to_owned(),
-                bool_as_f64(required_bool(baseline, "physical_fit")?),
-            );
-            metrics.insert(
-                "electrical_interface_match".to_owned(),
-                bool_as_f64(required_bool(baseline, "electrical_interface_match")?),
-            );
-            metrics.insert(
-                "material_grade_known".to_owned(),
-                bool_as_f64(required_bool(baseline, "material_grade_known")?),
-            );
+            insert_boolean(
+                &mut metrics,
+                "physical_fit",
+                required_bool(baseline, "physical_fit")?,
+            )?;
+            insert_boolean(
+                &mut metrics,
+                "electrical_interface_match",
+                required_bool(baseline, "electrical_interface_match")?,
+            )?;
+            insert_boolean(
+                &mut metrics,
+                "material_grade_known",
+                required_bool(baseline, "material_grade_known")?,
+            )?;
             notes.push(
                 "Physical fit and an electrical connector match are not treated as qualified compatibility."
                     .to_owned(),
@@ -765,11 +882,12 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
                 recurrence_observed: required_bool(baseline, "recurrence_observed_after_30_days")?,
             };
             let result = evaluate_repair_attempt(&attempt, 30)?;
-            metrics.insert("follow_up_days_observed".to_owned(), 30.0);
-            metrics.insert(
-                "recurrence_observed".to_owned(),
-                bool_as_f64(attempt.recurrence_observed),
-            );
+            insert_quantity(&mut metrics, "follow_up_days_observed", 30.0)?;
+            insert_boolean(
+                &mut metrics,
+                "recurrence_observed",
+                attempt.recurrence_observed,
+            )?;
             notes.push(
                 "Initial function restoration and later fault recurrence are represented as distinct outcomes."
                     .to_owned(),
@@ -805,18 +923,21 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
                 recurrence_observed: false,
             };
             let result = evaluate_repair_attempt(&attempt, 30)?;
-            metrics.insert(
-                "vendor_cloud_available".to_owned(),
-                bool_as_f64(required_bool(baseline, "vendor_cloud_available")?),
-            );
-            metrics.insert(
-                "offline_diagnostics_available".to_owned(),
-                bool_as_f64(required_bool(baseline, "offline_diagnostics_available")?),
-            );
-            metrics.insert(
-                "manual_available".to_owned(),
-                bool_as_f64(required_bool(baseline, "manual_available")?),
-            );
+            insert_boolean(
+                &mut metrics,
+                "vendor_cloud_available",
+                required_bool(baseline, "vendor_cloud_available")?,
+            )?;
+            insert_boolean(
+                &mut metrics,
+                "offline_diagnostics_available",
+                required_bool(baseline, "offline_diagnostics_available")?,
+            )?;
+            insert_boolean(
+                &mut metrics,
+                "manual_available",
+                required_bool(baseline, "manual_available")?,
+            )?;
             notes.push(
                 "A manual is present, but the declared diagnostic workflow requires a vendor cloud account."
                     .to_owned(),
@@ -855,14 +976,16 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
                 recurrence_observed: false,
             };
             let result = evaluate_repair_attempt(&attempt, 30)?;
-            metrics.insert(
-                "critical_interface_changed".to_owned(),
-                bool_as_f64(required_bool(baseline, "critical_interface_changed")?),
-            );
-            metrics.insert(
-                "post_repair_test_available".to_owned(),
-                bool_as_f64(required_bool(baseline, "post_repair_test_available")?),
-            );
+            insert_boolean(
+                &mut metrics,
+                "critical_interface_changed",
+                required_bool(baseline, "critical_interface_changed")?,
+            )?;
+            insert_boolean(
+                &mut metrics,
+                "post_repair_test_available",
+                required_bool(baseline, "post_repair_test_available")?,
+            )?;
             notes.push(
                 "A critical safety/hygiene interface change reopens the affected qualification."
                     .to_owned(),
@@ -899,6 +1022,96 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
     })
 }
 
+fn insert_quantity(
+    metrics: &mut BTreeMap<String, MetricValue>,
+    key: &'static str,
+    value: f64,
+) -> Result<(), EvaluationError> {
+    if !value.is_finite() {
+        return Err(EvaluationError::new(
+            "derived_metrics",
+            format!("quantity metric {key} must be finite"),
+        ));
+    }
+    let unit = match key {
+        "synthetic_inlet_volume_l"
+        | "gross_tank_sensor_inventory_l"
+        | "tank_sensor_l"
+        | "independent_reference_l"
+        | "absolute_sensor_disagreement_l"
+        | "unexplained_flow_volume_l_under_constant_rate"
+        | "mass_balance_residual_l"
+        | "mass_balance_residual_lower_l"
+        | "mass_balance_residual_upper_l"
+        | "assumed_per_term_absolute_error_bound_l"
+        | "conservative_aggregate_absolute_error_bound_l" => "L",
+        "municipal_inlet_flow_l_min" | "measured_inlet_flow_l_min" => "L/min",
+        "synthetic_inlet_volume_l_under_constant_flow" => "L",
+        "stored_water_age_h" | "observation_duration_h" => "h",
+        "access_fasteners" | "disassembly_steps" => "count",
+        "synthetic_part_lead_time_days" | "follow_up_days_observed" => "day",
+        _ => {
+            return Err(EvaluationError::new(
+                "derived_metrics",
+                format!("no explicit unit contract for quantity metric {key}"),
+            ));
+        }
+    };
+    metrics.insert(
+        key.to_owned(),
+        MetricValue::Quantity {
+            value,
+            unit: unit.to_owned(),
+            derivation: "synthetic_fixture_input_or_deterministic_calculation".to_owned(),
+        },
+    );
+    Ok(())
+}
+
+fn insert_boolean(
+    metrics: &mut BTreeMap<String, MetricValue>,
+    key: &'static str,
+    value: bool,
+) -> Result<(), EvaluationError> {
+    let interpretation = match key {
+        "grid_available" => "grid supply declared available in the fixture",
+        "pump_available" => "pump declared available in the fixture",
+        "backup_power_available" => "backup power declared available in the fixture",
+        "commanded_refill" => "refill command declared active; not proof of physical inflow",
+        "adhesive_or_destructive_disassembly" => "destructive or adhesive disassembly declared",
+        "calibration_required" => "post-replacement calibration declared necessary",
+        "signed_image_available" => "signed firmware image declared available",
+        "previous_known_good_image_available" => {
+            "previous known-good firmware image declared available"
+        }
+        "catalog_part_exists" => "part appears in catalog; not proof of local stock",
+        "local_stock" => "exact spare declared in local stock",
+        "physical_fit" => "replacement declared to physically fit",
+        "electrical_interface_match" => "electrical interface declared to match",
+        "material_grade_known" => "replacement material grade declared known",
+        "recurrence_observed" => "fault recurrence declared observed during the stated follow-up",
+        "vendor_cloud_available" => "vendor cloud service declared available",
+        "offline_diagnostics_available" => "offline diagnostics declared available",
+        "manual_available" => "repair manual declared available",
+        "critical_interface_changed" => "repair declared to change a critical interface",
+        "post_repair_test_available" => "product-specific post-repair test declared available",
+        _ => {
+            return Err(EvaluationError::new(
+                "derived_metrics",
+                format!("no boolean interpretation contract for metric {key}"),
+            ));
+        }
+    };
+    metrics.insert(
+        key.to_owned(),
+        MetricValue::Boolean {
+            value,
+            interpretation: interpretation.to_owned(),
+        },
+    );
+    Ok(())
+}
+
 fn required_str<'a>(
     object: &'a Value,
     key: &'static str,
@@ -932,10 +1145,6 @@ fn required_bool(object: &Value, key: &'static str) -> Result<bool, EvaluationEr
             format!("required boolean {key} is missing"),
         )
     })
-}
-
-fn bool_as_f64(value: bool) -> f64 {
-    if value { 1.0 } else { 0.0 }
 }
 
 fn disposition_name(disposition: BatchDisposition) -> &'static str {
@@ -992,18 +1201,39 @@ mod tests {
             report.water_corpus_id,
             "HOME-UTILITY-COORD-001-WATER-CONTINUITY-SYNTHETIC-001"
         );
+        assert_eq!(report.report_schema_version, "0.2");
+        assert_eq!(report.evidence_class, "synthetic_software_conformance_only");
         assert_eq!(
-            report.receipts[7].derived_metrics["mass_balance_residual_l"],
-            -200.0
+            report.adapter_version,
+            "household-service-v0.1-water-repair-adapter.1"
         );
-        assert_eq!(
-            report.receipts[7].derived_metrics["mass_balance_residual_lower_l"],
-            -220.0
-        );
-        assert_eq!(
-            report.receipts[7].derived_metrics["mass_balance_residual_upper_l"],
-            -180.0
-        );
+        assert_eq!(report.source_artifacts.len(), 2);
+        assert!(report.source_artifacts.iter().all(|item| {
+            item.digest_algorithm == "sha-256"
+                && item.sha256.len() == 64
+                && item.byte_length > 0
+                && item.digest_scope == "normalized_serde_json_value_bytes"
+        }));
+        assert!(matches!(
+            &report.receipts[7].derived_metrics["mass_balance_residual_l"],
+            MetricValue::Quantity { value, unit, .. } if *value == -200.0 && unit == "L"
+        ));
+        assert!(matches!(
+            &report.receipts[7].derived_metrics["mass_balance_residual_lower_l"],
+            MetricValue::Quantity { value, unit, .. } if *value == -220.0 && unit == "L"
+        ));
+        assert!(matches!(
+            &report.receipts[7].derived_metrics["mass_balance_residual_upper_l"],
+            MetricValue::Quantity { value, unit, .. } if *value == -180.0 && unit == "L"
+        ));
+        assert!(matches!(
+            &report.receipts[5].derived_metrics["grid_available"],
+            MetricValue::Boolean { value: false, .. }
+        ));
+        assert!(matches!(
+            &report.receipts[8].derived_metrics["commanded_refill"],
+            MetricValue::Boolean { value: true, .. }
+        ));
         assert_eq!(
             report.receipts[7].disposition,
             BatchDisposition::MassBalanceContradictionUnqualified
@@ -1021,6 +1251,76 @@ mod tests {
         let second = serde_json::to_vec(&evaluate_batch(&water, &repair).unwrap()).unwrap();
         assert_eq!(first, second, "batch report must be byte-deterministic");
         assert_eq!(report.disposition_counts.values().sum::<usize>(), 20);
+    }
+
+    #[test]
+    fn exact_source_byte_changes_change_the_recorded_sha256() {
+        let (water, repair) = fixtures();
+        let water_bytes = serde_json::to_vec(&water).unwrap();
+        let repair_bytes = serde_json::to_vec(&repair).unwrap();
+
+        let original = evaluate_batch_with_source_bytes(
+            &water,
+            &repair,
+            &water_bytes,
+            &repair_bytes,
+            "raw_file_bytes",
+        )
+        .unwrap();
+
+        // Leading JSON whitespace changes the source bytes but not the parsed
+        // corpus semantics; the detached receipt must still bind the new bytes.
+        let mut modified_water_bytes = vec![b' '];
+        modified_water_bytes.extend_from_slice(&water_bytes);
+        let modified = evaluate_batch_with_source_bytes(
+            &water,
+            &repair,
+            &modified_water_bytes,
+            &repair_bytes,
+            "raw_file_bytes",
+        )
+        .unwrap();
+
+        assert_ne!(
+            original.source_artifacts[0].sha256,
+            modified.source_artifacts[0].sha256
+        );
+        assert_eq!(
+            modified.source_artifacts[0].byte_length,
+            original.source_artifacts[0].byte_length + 1
+        );
+        assert_eq!(original.receipts, modified.receipts);
+    }
+
+    #[test]
+    fn sha256_uses_the_known_rustcrypto_test_vector() {
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn metric_wire_types_keep_boolean_and_quantity_values_distinct() {
+        let boolean = serde_json::to_value(MetricValue::Boolean {
+            value: false,
+            interpretation: "test boolean".to_owned(),
+        })
+        .unwrap();
+        assert_eq!(boolean["kind"], "boolean");
+        assert_eq!(boolean["value"], false);
+        assert!(boolean["value"].is_boolean());
+
+        let quantity = serde_json::to_value(MetricValue::Quantity {
+            value: 6.0,
+            unit: "L".to_owned(),
+            derivation: "test quantity".to_owned(),
+        })
+        .unwrap();
+        assert_eq!(quantity["kind"], "quantity");
+        assert_eq!(quantity["value"], 6.0);
+        assert_eq!(quantity["unit"], "L");
+        assert!(quantity["value"].is_number());
     }
 
     #[test]

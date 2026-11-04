@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - research/household-service-evaluator-v0.1-stacked-10388
+      - research/household-service-receipt-v0.1-stacked-10403
   pull_request:
     paths:
       - "tools/household-service-evaluator/**"
@@ -22,6 +23,8 @@ jobs:
   evaluator:
     name: Household Service Evaluator
     runs-on: ubuntu-latest
+    env:
+      HOUSEHOLD_EVALUATOR_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,11 +51,14 @@ jobs:
           cargo run --locked --manifest-path tools/household-service-evaluator/Cargo.toml -- \
             --water docs/research/household-services/fixtures/water-continuity-scenarios-v0.1.json \
             --repair docs/research/household-services/fixtures/repairability-scenarios-v0.1.json \
-            --output target/household-service-batch-report.json
+            --output target/household-service-batch-report.json \
+            --digest-output target/household-service-batch-report.json.sha256
 
       - name: Upload synthetic batch report
         uses: actions/upload-artifact@v4
         with:
           name: household-service-batch-report-${{ github.sha }}
-          path: target/household-service-batch-report.json
+          path: |
+            target/household-service-batch-report.json
+            target/household-service-batch-report.json.sha256
           if-no-files-found: error
