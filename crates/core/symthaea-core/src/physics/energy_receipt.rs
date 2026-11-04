@@ -232,6 +232,16 @@ impl EnergyRunReceipt {
     pub fn meter_descriptor(&self) -> &EnergyMeterDescriptor {
         self.energy_delta.descriptor()
     }
+
+    /// Compute a content fingerprint over the serialized receipt.
+    ///
+    /// The digest binds the receipt's schema version, provenance, quality gate,
+    /// raw counter readings and derived energy interval. It is a content hash,
+    /// not a digital signature or proof that the source metadata is truthful.
+    pub fn content_digest(&self) -> Result<[u8; 32], serde_json::Error> {
+        let encoded = serde_json::to_vec(self)?;
+        Ok(*blake3::hash(&encoded).as_bytes())
+    }
 }
 
 fn validate_context(context: &EnergyRunContext) -> Result<(), EnergyReceiptError> {
@@ -383,6 +393,31 @@ mod tests {
         assert!((receipt.joules_per_work_unit() - 0.00125).abs() < 1e-12);
         assert_eq!(receipt.meter_descriptor().scope, EnergyScope::GpuDevice);
         assert_eq!(receipt.context().measured_work_units, 80);
+    }
+
+    #[test]
+    fn receipt_content_digest_is_stable_and_binds_provenance() {
+        let receipt = EnergyRunReceipt::new(
+            context(),
+            quality_gate(0.97),
+            reading(1_000, 1_000),
+            reading(1_100, 2_000_000_000),
+        )
+        .unwrap();
+        let first = receipt.content_digest().unwrap();
+        let second = receipt.content_digest().unwrap();
+        assert_eq!(first, second);
+
+        let mut changed_context = context();
+        changed_context.configuration_digest = "d".repeat(64);
+        let changed = EnergyRunReceipt::new(
+            changed_context,
+            quality_gate(0.97),
+            reading(1_000, 1_000),
+            reading(1_100, 2_000_000_000),
+        )
+        .unwrap();
+        assert_ne!(first, changed.content_digest().unwrap());
     }
 
     #[test]
