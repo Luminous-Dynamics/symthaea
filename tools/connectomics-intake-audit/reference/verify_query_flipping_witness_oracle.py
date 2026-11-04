@@ -393,19 +393,24 @@ def negative_controls(input_bytes: bytes, source: dict[str, Any], report: dict[s
     detected = 0
     mutations = []
 
-    changed_cost = copy.deepcopy(report)
-    changed_cost["minimal_witness_effort_units"] = (
-        changed_cost["minimal_witness_effort_units"] + 1
-    )
-    mutations.append(changed_cost)
+    if report.get("witnesses"):
+        changed_cost = copy.deepcopy(report)
+        changed_cost["minimal_witness_effort_units"] = (
+            changed_cost["minimal_witness_effort_units"] + 1
+        )
+        mutations.append(changed_cost)
 
-    changed_membership = copy.deepcopy(report)
-    changed_membership["witnesses"][0]["edit_ids"].pop()
-    mutations.append(changed_membership)
+        changed_membership = copy.deepcopy(report)
+        changed_membership["witnesses"][0]["edit_ids"].pop()
+        mutations.append(changed_membership)
 
-    changed_graph = copy.deepcopy(report)
-    changed_graph["witnesses"][0]["resulting_graph_sha256"] = "0" * 64
-    mutations.append(changed_graph)
+        changed_graph = copy.deepcopy(report)
+        changed_graph["witnesses"][0]["resulting_graph_sha256"] = "0" * 64
+        mutations.append(changed_graph)
+    else:
+        changed_status = copy.deepcopy(report)
+        changed_status["status"] = "COUNTEREXAMPLE_FOUND"
+        mutations.append(changed_status)
 
     for mutated in mutations:
         try:
