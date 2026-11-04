@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Held-out finite-sample recovery comparison for latent UVSD threshold designs.
+//! Frozen-seed finite-sample recovery comparison for latent UVSD threshold designs.
 //!
 //! The threshold vectors in this runner are latent evidence-space conditions.
 //! This is a conditional Gaussian simulation benchmark, not an executable
@@ -131,7 +131,9 @@ impl IntervalSummary {
         if let Some([lower, upper]) = interval {
             if lower.is_finite() && upper.is_finite() && lower <= upper {
                 self.returned += 1;
-                self.covered += usize::from(lower <= truth && truth <= upper);
+                if lower <= truth && truth <= upper {
+                    self.covered += 1;
+                }
                 self.width_sum += upper - lower;
             }
         }
@@ -182,21 +184,42 @@ struct Summary {
 
 impl Summary {
     fn record_fit(&mut self, result: spectra_uvsd_fit::FitResult, mu: f64, sigma: f64, true_da: f64) {
-        match result.status {
-            FitStatus::Converged => self.converged += 1,
-            FitStatus::Boundary => self.boundary += 1,
-            FitStatus::WeaklyIdentified => self.weakly_identified += 1,
-            FitStatus::NotIdentifiable => self.not_identifiable += 1,
-            FitStatus::NotConverged => self.not_converged += 1,
-            FitStatus::NotEvaluable => self.not_evaluable += 1,
-        }
-
-        if result.status != FitStatus::Converged {
-            return;
-        }
-        let Some(estimate) = result.estimate else {
-            self.not_evaluable += 1;
-            return;
+        let spectra_uvsd_fit::FitResult {
+            status,
+            estimate,
+            diagnostics,
+        } = result;
+        let estimate = match status {
+            FitStatus::Converged => match estimate {
+                Some(value) => {
+                    self.converged += 1;
+                    value
+                }
+                None => {
+                    self.not_evaluable += 1;
+                    return;
+                }
+            },
+            FitStatus::Boundary => {
+                self.boundary += 1;
+                return;
+            }
+            FitStatus::WeaklyIdentified => {
+                self.weakly_identified += 1;
+                return;
+            }
+            FitStatus::NotIdentifiable => {
+                self.not_identifiable += 1;
+                return;
+            }
+            FitStatus::NotConverged => {
+                self.not_converged += 1;
+                return;
+            }
+            FitStatus::NotEvaluable => {
+                self.not_evaluable += 1;
+                return;
+            }
         };
 
         self.estimate_count += 1;
@@ -210,7 +233,7 @@ impl Summary {
         self.da_error_sum += da_error;
         self.da_squared_error_sum += da_error * da_error;
 
-        let Some(information) = result.diagnostics.expected_fisher_information else {
+        let Some(information) = diagnostics.expected_fisher_information else {
             return;
         };
         let mu_interval = information
@@ -226,9 +249,9 @@ impl Summary {
         if let (Some(mu_ci), Some(sigma_ci), Some(da_ci)) =
             (mu_interval, sigma_interval, da_interval)
         {
-            if mu_ci.iter().all(|value| value.is_finite())
-                && sigma_ci.iter().all(|value| value.is_finite())
-                && da_ci.iter().all(|value| value.is_finite())
+            if mu_ci.iter().all(|value| value.is_finite() && value >= mu_ci[0] && value <= mu_ci[1])
+                && sigma_ci.iter().all(|value| value.is_finite() && value >= sigma_ci[0] && value <= sigma_ci[1])
+                && da_ci.iter().all(|value| value.is_finite() && value >= da_ci[0] && value <= da_ci[1])
             {
                 self.joint_interval_returned += 1;
                 if mu_ci[0] <= mu
@@ -244,7 +267,6 @@ impl Summary {
         }
     }
 }
-
 fn ratio(numerator: usize, denominator: usize) -> f64 {
     if denominator > 0 {
         numerator as f64 / denominator as f64
@@ -297,7 +319,7 @@ fn main() {
     };
 
     println!(
-        "design_class,design,mu_true,sigma_true,d_a_true,outer_attempted,trials_per_class,fit_converged,fit_boundary,fit_weakly_identified,fit_not_identifiable,fit_not_converged,fit_not_evaluable,estimate_availability,mu_bias,mu_rmse,sigma_bias,sigma_rmse,d_a_bias,d_a_rmse,fisher_rank,fisher_dimension,fisher_condition_at_truth,fisher_d_a_se_at_truth,mu_interval_returned,mu_interval_availability,mu_coverage_conditional,mu_coverage_wilson_low,mu_coverage_wilson_high,mu_mean_width,sigma_interval_returned,sigma_interval_availability,sigma_coverage_conditional,sigma_coverage_wilson_low,sigma_coverage_wilson_high,sigma_mean_width,d_a_interval_returned,d_a_interval_availability,d_a_coverage_conditional,d_a_coverage_wilson_low,d_a_coverage_wilson_high,d_a_mean_width,joint_interval_returned,joint_interval_availability,joint_coverage_conditional"
+        "design_class,seed_root,rng,design,mu_true,sigma_true,d_a_true,outer_attempted,trials_per_class,fit_converged,fit_boundary,fit_weakly_identified,fit_not_identifiable,fit_not_converged,fit_not_evaluable,estimate_availability,mu_bias,mu_rmse,sigma_bias,sigma_rmse,d_a_bias,d_a_rmse,fisher_rank,fisher_dimension,fisher_condition_at_truth,fisher_d_a_se_at_truth,mu_interval_returned,mu_interval_availability,mu_coverage_conditional,mu_coverage_wilson_low,mu_coverage_wilson_high,mu_mean_width,sigma_interval_returned,sigma_interval_availability,sigma_coverage_conditional,sigma_coverage_wilson_low,sigma_coverage_wilson_high,sigma_mean_width,d_a_interval_returned,d_a_interval_availability,d_a_coverage_conditional,d_a_coverage_wilson_low,d_a_coverage_wilson_high,d_a_mean_width,joint_interval_returned,joint_interval_availability,joint_coverage_conditional"
     );
 
     for (design_index, (design_name, thresholds)) in DESIGNS.iter().enumerate() {
@@ -345,7 +367,7 @@ fn main() {
                     summary.joint_interval_returned,
                 );
                 println!(
-                    "LATENT_CONDITIONAL_ONLY,{design_name},{mu},{sigma},{true_da},{outer},{trials},{},{},{},{},{},{},{},{},{},{},{},{},{},{fisher_rank},{fisher_dimension},{fisher_condition},{fisher_da_se},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+                    "LATENT_CONDITIONAL_ONLY,{seed_root},SplitMix64-v1,{design_name},{mu},{sigma},{true_da},{outer},{trials},{},{},{},{},{},{},{},{},{},{},{},{},{},{fisher_rank},{fisher_dimension},{fisher_condition},{fisher_da_se},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}{},
                     summary.converged,
                     summary.boundary,
                     summary.weakly_identified,
