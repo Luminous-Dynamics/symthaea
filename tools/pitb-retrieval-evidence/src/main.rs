@@ -546,7 +546,7 @@ fn synthetic_receipt(graph: &Value, graph_bytes: &[u8]) -> Receipt {
             candidate_policy_sha256: sha256(b"all-formal-declarations"),
         },
         ranking: Ranking {
-            score_metric: "cosine_similarity".into(),
+            score_metric: "dot_product".into(),
             score_direction: "higher_better".into(),
             calibration: "uncalibrated".into(),
             candidates: vec![
