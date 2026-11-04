@@ -311,14 +311,13 @@ fn scale_interval(
 
     // Exact zero products remain exactly zero; widening them would turn a
     // known-failed end-use gate into a fictitious positive delivery interval.
-    let outward_lower = if scaled_lower == 0.0 {
+    let outward_lower = next_down_nonnegative(scaled_lower);
+    let outward_upper = if upper == 0.0 || scale_upper == 0.0 {
+        // Both factors were exactly zero, so the exact product is zero.
         0.0
     } else {
-        next_down_nonnegative(scaled_lower)
-    };
-    let outward_upper = if scaled_upper == 0.0 {
-        0.0
-    } else {
+        // If a positive product underflowed to zero, next_up returns the
+        // smallest positive subnormal, retaining a conservative upper bound.
         next_up_nonnegative(scaled_upper)
     };
 
@@ -481,6 +480,25 @@ mod tests {
         let error =
             evaluate_service_deficit(input).expect_err("integrated quantity must remain finite");
         assert_eq!(error.path, "service_deficit.requested");
+    }
+
+    #[test]
+    fn positive_subnormal_delivery_does_not_underflow_to_exact_zero() {
+        let smallest_positive = f64::from_bits(1);
+        let result = evaluate_service_deficit(ServiceDeficitInput {
+            demand_rate: rate(0.0, smallest_positive, RateUnit::Kilowatts),
+            physical_delivery_rate: rate(0.0, smallest_positive, RateUnit::Kilowatts),
+            qualification: ServiceQualification::Unknown,
+            duration_seconds: 1,
+        })
+        .expect("finite positive subnormal input remains bounded");
+
+        assert_eq!(result.qualified_delivered.lower, 0.0);
+        assert!(
+            result.qualified_delivered.upper >= smallest_positive,
+            "positive physical delivery must not be collapsed to exact zero"
+        );
+        assert_eq!(result.qualification, ServiceQualification::Unknown);
     }
 
     #[test]
