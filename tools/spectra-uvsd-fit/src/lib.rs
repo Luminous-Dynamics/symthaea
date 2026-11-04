@@ -182,6 +182,10 @@ pub struct FitDiagnostics {
     pub gradient_norm: Option<f64>,
     pub iterations: usize,
     pub starts_attempted: usize,
+    /// Starts that satisfied the optimizer's numerical stopping criterion.
+    pub starts_converged: usize,
+    /// Starts whose objective was non-finite and therefore could not be ranked.
+    pub starts_non_finite: usize,
     pub solution_objective_spread: Option<f64>,
     /// Per-parameter max-minus-min across converged starts, in internal optimizer coordinates
     /// (mu, log-sigma, first threshold, then log-gaps), when at least two converge.
@@ -212,6 +216,7 @@ impl FitResult {
         optimizer: Optimizer,
         note: impl Into<String>,
         starts_attempted: usize,
+        starts_non_finite: usize,
     ) -> Self {
         Self {
             status,
@@ -222,6 +227,8 @@ impl FitResult {
                 gradient_norm: None,
                 iterations: 0,
                 starts_attempted,
+                starts_converged: 0,
+                starts_non_finite,
                 solution_objective_spread: None,
                 solution_parameter_spread: None,
                 diagonal_curvature: None,
@@ -271,9 +278,12 @@ pub fn fit_with_optimizer(
             optimizer,
             "all optimizer starts produced non-finite likelihoods",
             options.starts,
+            options.starts,
         );
     }
 
+    let starts_converged = runs.iter().filter(|run| run.converged).count();
+    let starts_non_finite = options.starts.saturating_sub(runs.len());
     let mut all_objectives: Vec<f64> = runs.iter().map(|run| run.objective).collect();
     all_objectives.sort_by(f64::total_cmp);
     let parameter_spread = converged_parameter_spread(&runs);
@@ -307,6 +317,8 @@ pub fn fit_with_optimizer(
             gradient_norm: Some(best.gradient_norm),
             iterations: best.iterations,
             starts_attempted: options.starts,
+            starts_converged,
+            starts_non_finite,
             solution_objective_spread: spread,
             solution_parameter_spread: parameter_spread,
             diagonal_curvature: curvature,
