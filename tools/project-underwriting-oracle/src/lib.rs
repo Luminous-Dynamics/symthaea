@@ -104,7 +104,7 @@ fn evidence_usable(
     if !timestamp_le(known_at, decision_time) {
         return false;
     }
-    if evidence_class == "issuer_signed"
+    if matches!(evidence_class, "issuer_signed" | "official_source_publication")
         && string(evidence, "authenticity_status") != Some("verified")
     {
         return false;
@@ -401,7 +401,7 @@ fn has_fx_evidence(case: &Value, decision_time: &str) -> bool {
                 evidence,
                 "fx_basis",
                 decision_time,
-                &["issuer_signed"],
+                &["official_source_publication"],
                 case.get("site")
                     .and_then(|site| string(site, "site_id"))
                     .unwrap_or_default(),
