@@ -49,39 +49,46 @@ def fenced_blocks(markdown: str):
 
 
 def cargo_references(source: str):
+    # Preserve shell line continuations, then separate distinct commands so
+    # --bin targets from one Cargo invocation are not applied to another.
     flattened = re.sub(r"\\\r?\n", " ", source)
-    try:
-        tokens = shlex.split(flattened, comments=True, posix=True)
-    except ValueError as error:
-        return [], [f"cannot tokenize Cargo command block: {error}"]
-    if "cargo" not in tokens:
-        return [], []
-
-    bins = []
-    for index, token in enumerate(tokens):
-        if token == "--bin":
-            if index + 1 >= len(tokens):
-                return [], ["--bin has no target name"]
-            bins.append(tokens[index + 1])
-        elif token.startswith("--bin="):
-            bins.append(token.split("=", 1)[1])
-
-    manifests = []
-    index = 0
-    while index < len(tokens):
-        token = tokens[index]
-        if token == "--manifest-path":
-            if index + 1 >= len(tokens):
-                return [], ["--manifest-path has no path"]
-            manifests.append(tokens[index + 1])
-            index += 2
+    commands = re.split(r"&&|\|\||[;|\n]", flattened)
+    references = []
+    errors = []
+    for command in commands:
+        try:
+            tokens = shlex.split(command, comments=True, posix=True)
+        except ValueError as error:
+            if "--manifest-path" in command:
+                errors.append(f"cannot tokenize Cargo command: {error}")
             continue
-        if token.startswith("--manifest-path="):
-            manifests.append(token.split("=", 1)[1])
-        index += 1
-    return [(item, bins) for item in manifests], []
+        if "cargo" not in tokens:
+            continue
 
+        bins = []
+        for index, token in enumerate(tokens):
+            if token == "--bin":
+                if index + 1 >= len(tokens):
+                    errors.append("--bin has no target name")
+                    break
+                bins.append(tokens[index + 1])
+            elif token.startswith("--bin="):
+                bins.append(token.split("=", 1)[1])
 
+        index = 0
+        while index < len(tokens):
+            token = tokens[index]
+            if token == "--manifest-path":
+                if index + 1 >= len(tokens):
+                    errors.append("--manifest-path has no path")
+                    break
+                references.append((tokens[index + 1], bins))
+                index += 2
+                continue
+            if token.startswith("--manifest-path="):
+                references.append((token.split("=", 1)[1], bins))
+            index += 1
+    return references, errors
 def is_dynamic(value: str) -> bool:
     return not value or any(marker in value for marker in DYNAMIC)
 
