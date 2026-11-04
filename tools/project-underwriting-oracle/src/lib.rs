@@ -190,20 +190,14 @@ fn evidence_references_resolve(case: &Value) -> bool {
     }
 
     let mut references = Vec::new();
-    let mut collect = |value: &Value, key: &str| {
-        references.extend(array(value, key).iter().filter_map(Value::as_str));
-    };
     for claim in array(case, "claims") {
-        collect(claim, "evidence_refs");
-    }
-    for evidence_item in array(case, "grid_connection") {
-        let _ = evidence_item;
+        extend_references(&mut references, claim, "evidence_refs");
     }
     if let Some(grid) = case.get("grid_connection") {
-        collect(grid, "evidence_refs");
+        extend_references(&mut references, grid, "evidence_refs");
     }
     if let Some(model) = case.get("physical_model") {
-        collect(model, "calibration_evidence_refs");
+        extend_references(&mut references, model, "calibration_evidence_refs");
         for measurement in array(model, "measurements") {
             if let Some(reference) = string(measurement, "evidence_ref") {
                 references.push(reference);
@@ -211,15 +205,19 @@ fn evidence_references_resolve(case: &Value) -> bool {
         }
     }
     if let Some(finance) = case.get("financial_case") {
-        collect(finance, "fx_evidence_refs");
+        extend_references(&mut references, finance, "fx_evidence_refs");
         for flow in array(finance, "cash_flows") {
-            collect(flow, "evidence_refs");
+            extend_references(&mut references, flow, "evidence_refs");
         }
     }
     for scenario in array(case, "scenarios") {
-        collect(scenario, "evidence_refs");
+        extend_references(&mut references, scenario, "evidence_refs");
     }
     references.into_iter().all(|reference| evidence_ids.contains(reference))
+}
+
+fn extend_references<'a>(target: &mut Vec<&'a str>, value: &'a Value, key: &str) {
+    target.extend(array(value, key).iter().filter_map(Value::as_str));
 }
 
 fn model_domain_qualified(case: &Value, decision_time: &str) -> bool {
