@@ -116,9 +116,9 @@ The default is to split the domain at the boundary or mark the affected cell unr
 
 ## 5. Decision-sufficiency and regret
 
-For one frozen maximization utility, a complete admissible partition and a selected feasible action (a^*) with evaluated value (U(a^*)), compute:
+For one frozen maximization utility, a complete admissible partition and a selected feasible action (a^*) with evaluated value (U(a^*)), compute the upper bound over cells not proven infeasible:
 
-`U_domain_upper = max_C U_upper(C)`
+`U_domain_upper = max_{C not DefinitelyInfeasible} U_upper(C)`
 
 `regret_upper(a*) = max(0, U_domain_upper - U(a*))`
 
