@@ -4,7 +4,6 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     env, fs,
-    path::PathBuf,
     process::ExitCode,
 };
 
@@ -737,7 +736,7 @@ fn analyze(
         let target_groups = groups_by_target.get(&key)
             .ok_or_else(|| format!("retrieval query {} has no matching exact target/environment support group", receipt.query.query_id))?;
         let run_key = format!(
-            "{}|{}|{}|{}|{}",
+            "{}|{}|{}|{}|{}|{}",
             receipt.benchmark.benchmark_id,
             receipt.benchmark.split_id,
             receipt.retriever.kind,
