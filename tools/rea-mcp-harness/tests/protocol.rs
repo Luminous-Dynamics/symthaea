@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use symthaea_rea_mcp::ReaEvidenceMcpServer;
+use symthaea_rea_mcp::{MAX_MCP_JSON_BYTES, ReaEvidenceMcpServer};
 use rmcp::{
     RoleClient, ServiceExt,
     model::{CallToolRequestParams, CallToolResponse},
@@ -189,6 +189,30 @@ async fn malformed_bundle_returns_stable_error_category() {
     assert_eq!(response.is_error, Some(false));
     assert_eq!(structured(&response)["status"], "rejected");
     assert_eq!(structured(&response)["error_code"], "schema_violation");
+
+    client.cancel().await.unwrap();
+    server_task.await.unwrap();
+}
+
+#[tokio::test]
+async fn mcp_boundary_rejects_oversized_inline_json() {
+    let (client, server_task) = start_server().await;
+    let oversized = "x".repeat(MAX_MCP_JSON_BYTES + 1);
+    let arguments = json!({ "evidence_json": oversized });
+    let response = client
+        .call_tool(
+            CallToolRequestParams::new("rea_verify_evidence_json")
+                .with_arguments(arguments.as_object().unwrap().clone()),
+        )
+        .await
+        .unwrap();
+    let CallToolResponse::Complete(response) = response else {
+        panic!("expected a completed tool response");
+    };
+    let value = structured(&response);
+    assert_eq!(value["status"], "rejected");
+    assert_eq!(value["error_code"], "input_too_large");
+    assert_eq!(value["raw_input_sha256"], Value::Null);
 
     client.cancel().await.unwrap();
     server_task.await.unwrap();
