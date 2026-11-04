@@ -20,7 +20,8 @@
     "available_declarations",
     "local_context_sha256",
     "outcome",
-    "kernel_passed",
+    "attempt_finished",
+    "terminal_reason_evidence_sha256",
     "semantic_gate_passed",
     "state_receipt_sha256",
     "run_receipt_sha256",
@@ -117,6 +118,86 @@
     "semantic_gate_receipt_sha256": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
+    },
+    "terminal_reason": {
+      "enum": [
+        "verified_success",
+        "budget_exhausted",
+        "search_exhausted",
+        "interrupted",
+        "infrastructure_failure",
+        "invalid_target",
+        "checker_failure",
+        "unresolved"
+      ]
+    },
+    "terminal_reason_evidence_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "attempt_finished": {
+      "type": "boolean"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "verified_success"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "terminal_reason": {
+            "const": "verified_success"
+          },
+          "attempt_finished": {
+            "const": true
+          },
+          "kernel_passed": {
+            "const": true
+          },
+          "semantic_gate_passed": {
+            "const": true
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "non_solve"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "terminal_reason": {
+            "enum": [
+              "budget_exhausted",
+              "search_exhausted"
+            ]
+          },
+          "attempt_finished": {
+            "const": true
+          },
+          "kernel_passed": {
+            "const": false
+          },
+          "semantic_gate_passed": {
+            "const": false
+          }
+        }
+      }
+    }
+  ]
 }
