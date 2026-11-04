@@ -122,6 +122,26 @@ struct Mapping {
     mapping_method: String,
     mapping_evidence_sha256: String,
     reviewer_attestation_sha256: Option<String>,
+    source_locator: Option<String>,
+    statement_sha256: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct GraphNode {
+    node_id: String,
+    kind: String,
+    formal_name: Option<String>,
+    source_locator: String,
+    statement_sha256: String,
+}
+
+#[derive(Debug, Clone)]
+struct GraphManifest {
+    manifest_sha256: String,
+    snapshot_id: String,
+    repository_commit: String,
+    environment_sha256: String,
+    nodes: BTreeMap<String, GraphNode>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
