@@ -1,0 +1,347 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/benchmark-runs/v0/comparison-plan.schema.json",
+  "title": "Knowledge benchmark comparison plan v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "phase",
+    "synthetic_only",
+    "benchmark",
+    "primary_endpoint",
+    "secondary_metrics",
+    "shared_budgets",
+    "systems",
+    "candidate_system_id",
+    "preregistration",
+    "claims_policy",
+    "bootstrap"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "knowledge-comparison-plan-v0"
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "phase": {
+      "enum": [
+        "synthetic_control",
+        "development_pilot",
+        "preregistered_held_out"
+      ]
+    },
+    "synthetic_only": {
+      "type": "boolean"
+    },
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "benchmark_id",
+        "version",
+        "split",
+        "case_manifest_sha256",
+        "source_catalog_sha256",
+        "source_family_disjoint",
+        "rights_review_status",
+        "source_pack_sha256"
+      ],
+      "properties": {
+        "benchmark_id": {
+          "enum": [
+            "esoterica-bench",
+            "mythology-bench",
+            "knowledge-annotation"
+          ]
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split": {
+          "enum": [
+            "synthetic",
+            "development",
+            "validation",
+            "test",
+            "holdout"
+          ]
+        },
+        "case_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "source_catalog_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "source_pack_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "source_family_disjoint": {
+          "type": "boolean"
+        },
+        "rights_review_status": {
+          "enum": [
+            "approved",
+            "pending",
+            "denied",
+            "metadata_only"
+          ]
+        }
+      }
+    },
+    "primary_endpoint": {
+      "enum": [
+        "paired_intervention_fidelity",
+        "citation_precision",
+        "unsupported_claim_rate",
+        "typed_relation_macro_f1",
+        "variant_isolation_accuracy",
+        "calibrated_risk_coverage",
+        "worst_group_score"
+      ]
+    },
+    "secondary_metrics": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "paired_intervention_fidelity",
+          "citation_precision",
+          "unsupported_claim_rate",
+          "typed_relation_macro_f1",
+          "variant_isolation_accuracy",
+          "plurality_retention",
+          "evidence_withdrawal_accuracy",
+          "rights_gate_violations",
+          "calibrated_risk_coverage",
+          "worst_group_score",
+          "latency_ms",
+          "peak_memory_bytes",
+          "input_tokens",
+          "output_tokens",
+          "cost_per_accepted_answer"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "shared_budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_evidence_tokens",
+        "max_context_tokens",
+        "max_output_tokens",
+        "max_tool_calls",
+        "max_wall_clock_ms",
+        "max_retries"
+      ],
+      "properties": {
+        "max_evidence_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_context_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_output_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_tool_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_wall_clock_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_retries": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "systems": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "system_id",
+          "baseline_family",
+          "implementation",
+          "revision",
+          "prompt_sha256",
+          "retriever_revision",
+          "decoder_config",
+          "evidence_policy"
+        ],
+        "properties": {
+          "system_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseline_family": {
+            "enum": [
+              "bm25",
+              "dense_retrieval",
+              "standard_rag",
+              "source_aware_rag",
+              "typed_graph",
+              "typed_graph_hdc",
+              "expert_human",
+              "other"
+            ]
+          },
+          "implementation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prompt_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "retriever_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "decoder_config": {
+            "type": "object",
+            "minProperties": 1
+          },
+          "evidence_policy": {
+            "enum": [
+              "same_source_pack",
+              "source_witness_scoped",
+              "typed_provenance_gated",
+              "human_reviewed"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "preregistration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hypothesis",
+        "analysis_plan",
+        "stopping_rule",
+        "seed_policy",
+        "held_out_access"
+      ],
+      "properties": {
+        "hypothesis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "analysis_plan": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stopping_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "held_out_access": {
+          "enum": [
+            "not_applicable_synthetic",
+            "sealed_until_freeze",
+            "independent_evaluator",
+            "not_sealed"
+          ]
+        }
+      }
+    },
+    "claims_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "report_grouped_metrics",
+        "report_worst_group",
+        "paired_source_family_bootstrap",
+        "human_adjudication_required",
+        "critical_gates_are_non_compensatory"
+      ],
+      "properties": {
+        "report_grouped_metrics": {
+          "const": true
+        },
+        "report_worst_group": {
+          "const": true
+        },
+        "paired_source_family_bootstrap": {
+          "const": true
+        },
+        "human_adjudication_required": {
+          "const": true
+        },
+        "critical_gates_are_non_compensatory": {
+          "const": true
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    },
+    "candidate_system_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "replicates",
+        "seed",
+        "confidence_level",
+        "multiple_comparison_correction",
+        "minimum_independent_clusters"
+      ],
+      "properties": {
+        "replicates": {
+          "type": "integer",
+          "minimum": 1000
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0.5,
+          "exclusiveMaximum": 1
+        },
+        "multiple_comparison_correction": {
+          "enum": [
+            "none",
+            "bonferroni"
+          ]
+        },
+        "minimum_independent_clusters": {
+          "type": "integer",
+          "minimum": 30
+        }
+      }
+    }
+  }
+}

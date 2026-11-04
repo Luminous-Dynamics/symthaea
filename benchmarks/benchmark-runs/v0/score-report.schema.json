@@ -1,0 +1,398 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/benchmark-runs/v0/score-report.schema.json",
+  "title": "Paired intervention score report v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_schema_version",
+    "tool_version",
+    "plan_id",
+    "phase",
+    "synthetic_only",
+    "qualification_only",
+    "primary_endpoint",
+    "candidate_system_id",
+    "candidate_critical_gates_pass",
+    "report_schema_sha256",
+    "plan_sha256",
+    "pair_manifest_sha256",
+    "result_rows_sha256",
+    "dependency_lock_sha256",
+    "benchmark_case_manifest_sha256",
+    "source_catalog_sha256",
+    "source_pack_sha256",
+    "bootstrap_replicates",
+    "bootstrap_seed",
+    "minimum_independent_clusters",
+    "confidence_level",
+    "source_family_cluster_count",
+    "comparisons",
+    "pair_count",
+    "system_count",
+    "systems",
+    "nonclaims"
+  ],
+  "properties": {
+    "report_schema_version": {
+      "const": "paired-intervention-score-report-v0"
+    },
+    "tool_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "phase": {
+      "enum": [
+        "synthetic_control",
+        "development_pilot",
+        "preregistered_held_out"
+      ]
+    },
+    "synthetic_only": {
+      "type": "boolean"
+    },
+    "qualification_only": {
+      "type": "boolean"
+    },
+    "primary_endpoint": {
+      "enum": [
+        "paired_intervention_fidelity",
+        "citation_identity_rate",
+        "typed_relation_macro_f1",
+        "worst_dimension_score"
+      ]
+    },
+    "candidate_system_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "candidate_critical_gates_pass": {
+      "type": "boolean"
+    },
+    "report_schema_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "plan_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "pair_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "result_rows_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "dependency_lock_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "benchmark_case_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_catalog_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_pack_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "pair_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "system_count": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "systems": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/system"
+      }
+    },
+    "nonclaims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "bootstrap_replicates": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 100000
+    },
+    "bootstrap_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "confidence_level": {
+      "type": "number",
+      "exclusiveMinimum": 0.5,
+      "exclusiveMaximum": 1
+    },
+    "source_family_cluster_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "comparisons": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/pairwiseComparison"
+      }
+    },
+    "minimum_independent_clusters": {
+      "type": "integer",
+      "minimum": 30
+    }
+  },
+  "$defs": {
+    "rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system_id",
+        "baseline_family",
+        "pair_count",
+        "relation_accuracy",
+        "preservation_rate",
+        "change_satisfaction_rate",
+        "citation_identity_rate",
+        "forbidden_behavior_rows",
+        "critical_gate_violations",
+        "critical_gates_pass",
+        "paired_intervention_fidelity",
+        "typed_relation_macro_f1",
+        "worst_dimension_score",
+        "primary_metric",
+        "primary_metric_value",
+        "per_dimension"
+      ],
+      "properties": {
+        "system_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseline_family": {
+          "enum": [
+            "bm25",
+            "dense_retrieval",
+            "standard_rag",
+            "source_aware_rag",
+            "typed_graph",
+            "typed_graph_hdc",
+            "expert_human",
+            "other"
+          ]
+        },
+        "pair_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "relation_accuracy": {
+          "$ref": "#/$defs/rate"
+        },
+        "preservation_rate": {
+          "$ref": "#/$defs/rate"
+        },
+        "change_satisfaction_rate": {
+          "$ref": "#/$defs/rate"
+        },
+        "citation_identity_rate": {
+          "$ref": "#/$defs/rate"
+        },
+        "forbidden_behavior_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "critical_gate_violations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "critical_gates_pass": {
+          "type": "boolean"
+        },
+        "paired_intervention_fidelity": {
+          "$ref": "#/$defs/rate"
+        },
+        "typed_relation_macro_f1": {
+          "$ref": "#/$defs/rate"
+        },
+        "worst_dimension_score": {
+          "$ref": "#/$defs/rate"
+        },
+        "primary_metric": {
+          "enum": [
+            "paired_intervention_fidelity",
+            "citation_identity_rate",
+            "typed_relation_macro_f1",
+            "worst_dimension_score"
+          ]
+        },
+        "primary_metric_value": {
+          "$ref": "#/$defs/rate"
+        },
+        "per_dimension": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/dimension"
+          }
+        }
+      }
+    },
+    "dimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pair_count",
+        "relation_accuracy",
+        "preservation_rate",
+        "change_satisfaction_rate",
+        "citation_identity_rate",
+        "forbidden_behavior_rows",
+        "paired_intervention_fidelity"
+      ],
+      "properties": {
+        "pair_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "relation_accuracy": {
+          "$ref": "#/$defs/rate"
+        },
+        "preservation_rate": {
+          "$ref": "#/$defs/rate"
+        },
+        "change_satisfaction_rate": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/rate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "citation_identity_rate": {
+          "$ref": "#/$defs/rate"
+        },
+        "forbidden_behavior_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "paired_intervention_fidelity": {
+          "$ref": "#/$defs/rate"
+        }
+      }
+    },
+    "pairwiseComparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_system_id",
+        "candidate_system_id",
+        "primary_endpoint",
+        "baseline_value",
+        "candidate_value",
+        "absolute_difference",
+        "confidence_interval_low",
+        "confidence_interval_high",
+        "confidence_level",
+        "source_family_cluster_count",
+        "minimum_independent_clusters",
+        "bootstrap_replicates",
+        "bootstrap_seed",
+        "candidate_improvement_supported",
+        "multiple_comparison_correction"
+      ],
+      "properties": {
+        "baseline_system_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_system_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "primary_endpoint": {
+          "enum": [
+            "paired_intervention_fidelity",
+            "citation_identity_rate",
+            "typed_relation_macro_f1",
+            "worst_dimension_score"
+          ]
+        },
+        "baseline_value": {
+          "$ref": "#/$defs/rate"
+        },
+        "candidate_value": {
+          "$ref": "#/$defs/rate"
+        },
+        "absolute_difference": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "confidence_interval_low": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "confidence_interval_high": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0.5,
+          "exclusiveMaximum": 1
+        },
+        "source_family_cluster_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "bootstrap_replicates": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 100000
+        },
+        "bootstrap_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidate_improvement_supported": {
+          "type": "boolean"
+        },
+        "multiple_comparison_correction": {
+          "enum": [
+            "none",
+            "bonferroni"
+          ]
+        },
+        "minimum_independent_clusters": {
+          "type": "integer",
+          "minimum": 30
+        }
+      }
+    }
+  }
+}
