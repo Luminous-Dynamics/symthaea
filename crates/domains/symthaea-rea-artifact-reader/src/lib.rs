@@ -426,16 +426,30 @@ impl ZipArtifactReader {
             ));
         }
 
-        // Each call opens an independent file descriptor. File::try_clone can share the
-        // underlying file cursor on Unix, so two simultaneous verifications must not share seeks.
+        // Each call opens two independent descriptors: one for the decoder and one retained
+        // solely as an identity witness. Do not use File::try_clone here; it can share a seek
+        // cursor on Unix, and parallel verifications must never share file positions.
+        let identity_witness = OpenOptions::new()
+            .read(true)
+            .open(&self.path)
+            .map_err(|error| ReaderError::io("cannot open archive identity witness", error))?;
+        let witness_identity = identity_witness
+            .metadata()
+            .map_err(|error| ReaderError::io("cannot stat archive identity witness", error))?;
+        if !self.initial_identity.matches(&witness_identity) {
+            return Err(ReaderError::new(
+                ReaderErrorKind::SourceChanged,
+                "identity witness does not identify the admitted archive source",
+            ));
+        }
         let decoder_file = OpenOptions::new()
             .read(true)
             .open(&self.path)
             .map_err(|error| ReaderError::io("cannot open archive for independent content verification", error))?;
-        let opened_identity = decoder_file
+        let decoder_identity = decoder_file
             .metadata()
             .map_err(|error| ReaderError::io("cannot stat content-verification descriptor", error))?;
-        if !self.initial_identity.matches(&opened_identity) {
+        if !self.initial_identity.matches(&decoder_identity) {
             return Err(ReaderError::new(
                 ReaderErrorKind::SourceChanged,
                 "content-verification descriptor does not identify the admitted archive source",
@@ -454,13 +468,11 @@ impl ZipArtifactReader {
             password: None,
         };
 
-        // Keep all decoder setup and streaming in one result scope so the descriptor and selected
-        // path are revalidated even when the secondary parser rejects the archive or metadata.
+        // Keep all decoder setup and streaming in one result scope so the descriptors and
+        // selected path are revalidated even when the secondary parser rejects metadata.
         let stream_result = (|| {
-            let mut archive = DecoderArchive::new_with_options(decoder_file.try_clone().map_err(
-                |error| ReaderError::io("cannot clone independent content descriptor", error),
-            )?, options)
-            .map_err(|error| map_zipcore_error("secondary ZIP parser rejected archive", error))?;
+            let mut archive = DecoderArchive::new_with_options(decoder_file, options)
+                .map_err(|error| map_zipcore_error("secondary ZIP parser rejected archive", error))?;
 
             if archive.len() != self.inventory.entries.len()
                 || archive.central_directory_offset()
@@ -552,13 +564,13 @@ impl ZipArtifactReader {
             ))
         })();
 
-        let final_decoder_identity = decoder_file
+        let final_witness_identity = identity_witness
             .metadata()
-            .map_err(|error| ReaderError::io("cannot revalidate content-verification descriptor", error))?;
-        if !self.initial_identity.matches(&final_decoder_identity) {
+            .map_err(|error| ReaderError::io("cannot revalidate archive identity witness", error))?;
+        if !self.initial_identity.matches(&final_witness_identity) {
             return Err(ReaderError::new(
                 ReaderErrorKind::SourceChanged,
-                "content-verification descriptor identity changed during the stream",
+                "archive source identity changed during the member stream",
             ));
         }
         self.verify_source()?;
