@@ -287,10 +287,7 @@ const MAX_PATCH_RECONSTRUCTION_BYTES: u64 = 512 * 1024 * 1024;
 #[derive(Clone, Debug)]
 enum TreeEntryContent {
     File(PathBuf),
-    Symlink {
-        path: PathBuf,
-        target: Vec<u8>,
-    },
+    Symlink { path: PathBuf, target: Vec<u8> },
 }
 
 #[derive(Clone, Debug)]
@@ -1029,7 +1026,6 @@ fn hash_source_tree_inner(root: &Path) -> Result<String, Failure> {
     Ok(format!("{:x}", tree_hasher.finalize()))
 }
 
-
 const MAX_AGENT_VIEW_MANIFEST_BYTES: usize = 8 * 1024 * 1024;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -1089,10 +1085,11 @@ fn safe_agent_view_relative_path(path: &str) -> bool {
         return false;
     }
     path.split('/').all(|component| {
-        if component.ends_with('.') || component.ends_with(' ')
-            || component.bytes().any(|byte| {
-                byte < 0x20 || matches!(byte, b'<' | b'>' | b'"' | b'|' | b'?' | b'*')
-            })
+        if component.ends_with('.')
+            || component.ends_with(' ')
+            || component
+                .bytes()
+                .any(|byte| byte < 0x20 || matches!(byte, b'<' | b'>' | b'"' | b'|' | b'?' | b'*'))
         {
             return false;
         }
@@ -1109,9 +1106,7 @@ fn safe_agent_view_relative_path(path: &str) -> bool {
     })
 }
 
-fn hash_agent_view_snapshot(
-    root: &Path,
-) -> Result<(String, Vec<AgentViewManifestEntry>), Failure> {
+fn hash_agent_view_snapshot(root: &Path) -> Result<(String, Vec<AgentViewManifestEntry>), Failure> {
     let root_metadata = fs::symlink_metadata(root).map_err(|error| {
         Failure::protocol(format!(
             "cannot stat agent-view root {}: {error}",
@@ -1166,7 +1161,10 @@ fn hash_agent_view_snapshot(
             )));
         };
         let metadata = fs::symlink_metadata(&path).map_err(|error| {
-            Failure::protocol(format!("cannot stat agent-view file {}: {error}", path.display()))
+            Failure::protocol(format!(
+                "cannot stat agent-view file {}: {error}",
+                path.display()
+            ))
         })?;
         if !metadata.file_type().is_file()
             || metadata.len() != entry.size
@@ -1179,19 +1177,26 @@ fn hash_agent_view_snapshot(
         }
 
         let mut file = File::open(&path).map_err(|error| {
-            Failure::protocol(format!("cannot open agent-view file {}: {error}", path.display()))
+            Failure::protocol(format!(
+                "cannot open agent-view file {}: {error}",
+                path.display()
+            ))
         })?;
         let mut content_hasher = Sha256::new();
         let mut total = 0u64;
         let mut buffer = [0u8; 64 * 1024];
         loop {
             let read = file.read(&mut buffer).map_err(|error| {
-                Failure::protocol(format!("cannot read agent-view file {}: {error}", path.display()))
+                Failure::protocol(format!(
+                    "cannot read agent-view file {}: {error}",
+                    path.display()
+                ))
             })?;
             if read == 0 {
                 break;
             }
-            total = total.checked_add(read as u64)
+            total = total
+                .checked_add(read as u64)
                 .ok_or_else(|| Failure::protocol("agent-view file length overflow"))?;
             if total > entry.size || total > MAX_TREE_BYTES {
                 return Err(Failure::unresolved(format!(
@@ -1232,7 +1237,9 @@ fn hash_agent_view_snapshot(
 
 fn verify_agent_view_inner(inputs: &AgentViewInputs) -> Result<AgentViewReport, Failure> {
     if inputs.manifest.len() > MAX_AGENT_VIEW_MANIFEST_BYTES {
-        return Err(Failure::protocol("agent-view manifest exceeds the 8 MiB limit"));
+        return Err(Failure::protocol(
+            "agent-view manifest exceeds the 8 MiB limit",
+        ));
     }
     if !is_sha256(&inputs.expected_manifest_sha256)
         || sha256_hex(&inputs.manifest) != inputs.expected_manifest_sha256
@@ -3366,7 +3373,6 @@ mod tests {
         .unwrap()
     }
 
-
     #[cfg(unix)]
     fn test_agent_view_manifest(root: &Path, task_id: &str) -> Vec<u8> {
         let (tree_sha256, entries) = hash_agent_view_snapshot(root).unwrap();
@@ -3408,8 +3414,16 @@ mod tests {
         use std::fs;
         let root = tempfile::tempdir().unwrap();
         fs::create_dir_all(root.path().join("src")).unwrap();
-        fs::write(root.path().join("Cargo.toml"), b"[package]\nname = \"demo\"\n").unwrap();
-        fs::write(root.path().join("src/lib.rs"), b"pub fn answer() -> u8 { 42 }\n").unwrap();
+        fs::write(
+            root.path().join("Cargo.toml"),
+            b"[package]\nname = \"demo\"\n",
+        )
+        .unwrap();
+        fs::write(
+            root.path().join("src/lib.rs"),
+            b"pub fn answer() -> u8 { 42 }\n",
+        )
+        .unwrap();
 
         let (view_digest, entries) = hash_agent_view_snapshot(root.path()).unwrap();
         let receipt_digest = hash_source_tree_inner(root.path()).unwrap();
@@ -3435,7 +3449,11 @@ mod tests {
         assert_eq!(report.status, "inventory_verified");
         assert_eq!(report.entry_count, 2);
         assert_eq!(report.tree_sha256.as_deref(), Some(tree_digest.as_str()));
-        assert!(report.claim_ceiling.contains("does not establish hidden-oracle custody"));
+        assert!(
+            report
+                .claim_ceiling
+                .contains("does not establish hidden-oracle custody")
+        );
     }
 
     #[cfg(unix)]
@@ -3466,7 +3484,10 @@ mod tests {
         let manifest = test_agent_view_manifest(root.path(), "CEB-REPO-001");
         let tree_digest = hash_source_tree_inner(root.path()).unwrap();
 
-        assert!(!verify_test_agent_view(root.path(), &manifest, "CEB-REVIEW-001", &tree_digest).accepted);
+        assert!(
+            !verify_test_agent_view(root.path(), &manifest, "CEB-REVIEW-001", &tree_digest)
+                .accepted
+        );
         let wrong_tree_pin = verify_agent_view(AgentViewInputs {
             snapshot_dir: root.path().to_path_buf(),
             manifest: manifest.clone(),
@@ -3532,7 +3553,6 @@ mod tests {
         assert!(!report.accepted);
     }
 
-
     #[cfg(unix)]
     #[test]
     fn agent_view_verifier_rejects_content_and_mode_changes() {
@@ -3545,7 +3565,8 @@ mod tests {
         let digest = hash_source_tree_inner(root.path()).unwrap();
 
         fs::write(&file_path, b"pub fn no() {}\n").unwrap();
-        let changed_content = verify_test_agent_view(root.path(), &manifest, "CEB-REPO-001", &digest);
+        let changed_content =
+            verify_test_agent_view(root.path(), &manifest, "CEB-REPO-001", &digest);
         assert!(!changed_content.accepted);
 
         fs::write(&file_path, b"pub fn ok() {}\n").unwrap();
@@ -3581,7 +3602,9 @@ mod tests {
         let mut value: Value = serde_json::from_slice(&manifest).unwrap();
         value["entries"][0]["mode"] = Value::String("100755".into());
         let wrong_mode = serde_json::to_vec(&value).unwrap();
-        assert!(!verify_test_agent_view(root.path(), &wrong_mode, "CEB-REPO-001", &digest).accepted);
+        assert!(
+            !verify_test_agent_view(root.path(), &wrong_mode, "CEB-REPO-001", &digest).accepted
+        );
     }
 
     #[cfg(unix)]
@@ -3601,7 +3624,6 @@ mod tests {
         assert!(!report.accepted);
     }
 
-
     #[cfg(unix)]
     #[test]
     fn agent_view_verifier_rejects_manifest_tree_and_entry_digest_tampering() {
@@ -3614,17 +3636,26 @@ mod tests {
         let mut value: Value = serde_json::from_slice(&manifest).unwrap();
         value["tree_sha256"] = Value::String("a".repeat(64));
         let wrong_tree = serde_json::to_vec(&value).unwrap();
-        assert!(!verify_test_agent_view(root.path(), &wrong_tree, "CEB-REPO-001", &tree_digest).accepted);
+        assert!(
+            !verify_test_agent_view(root.path(), &wrong_tree, "CEB-REPO-001", &tree_digest)
+                .accepted
+        );
 
         let mut value: Value = serde_json::from_slice(&manifest).unwrap();
         value["entries"][0]["sha256"] = Value::String("b".repeat(64));
         let wrong_entry = serde_json::to_vec(&value).unwrap();
-        assert!(!verify_test_agent_view(root.path(), &wrong_entry, "CEB-REPO-001", &tree_digest).accepted);
+        assert!(
+            !verify_test_agent_view(root.path(), &wrong_entry, "CEB-REPO-001", &tree_digest)
+                .accepted
+        );
 
         let mut value: Value = serde_json::from_slice(&manifest).unwrap();
         value["entries"][0]["size_bytes"] = Value::from(999u64);
         let wrong_size = serde_json::to_vec(&value).unwrap();
-        assert!(!verify_test_agent_view(root.path(), &wrong_size, "CEB-REPO-001", &tree_digest).accepted);
+        assert!(
+            !verify_test_agent_view(root.path(), &wrong_size, "CEB-REPO-001", &tree_digest)
+                .accepted
+        );
     }
 
     #[cfg(unix)]
@@ -3652,12 +3683,16 @@ mod tests {
         let mut value: Value = serde_json::from_slice(&manifest).unwrap();
         value["status"] = Value::String("sealed_private_holdout".into());
         let sealed = serde_json::to_vec(&value).unwrap();
-        assert!(!verify_test_agent_view(root.path(), &sealed, "CEB-REPO-001", &tree_digest).accepted);
+        assert!(
+            !verify_test_agent_view(root.path(), &sealed, "CEB-REPO-001", &tree_digest).accepted
+        );
 
         value["status"] = Value::String("public_development_only_not_sealed".into());
         value["unexpected"] = Value::Bool(true);
         let unknown = serde_json::to_vec(&value).unwrap();
-        assert!(!verify_test_agent_view(root.path(), &unknown, "CEB-REPO-001", &tree_digest).accepted);
+        assert!(
+            !verify_test_agent_view(root.path(), &unknown, "CEB-REPO-001", &tree_digest).accepted
+        );
     }
 
     #[test]
@@ -4138,5 +4173,4 @@ mod tests {
         let repository = git2::Repository::init_bare(&object_database).unwrap();
         assert!(build_git_tree_from_entries(&repository, &entries, "").is_err());
     }
-
 }
