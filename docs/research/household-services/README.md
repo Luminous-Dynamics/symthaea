@@ -20,8 +20,8 @@ The governing principle is:
 
 ## Current research specifications under review
 
-- [WaterLoop competitive evidence v0.1](waterloop-competitive-evidence-v0.1.md) — separates outage backup, greywater source substitution and leak containment; reconciles manufacturer capacity with certification listing scope.
-- [WaterLoop machine-readable competitor ledger v0.1](waterloop-competitive-comparator-ledger-v0.1.json) — source-level claims, model/class scope, converted listing units, unresolved discrepancies and functional-unit boundaries.
+- [WaterLoop competitive evidence v0.1](waterloop-competitive-evidence-v0.1.md) — separates outage backup, greywater source substitution and leak containment; reconciles manufacturer capacity with certification listing scope, source-stream classes, local jurisdiction and offline connectivity.
+- [WaterLoop machine-readable competitor ledger v0.1](waterloop-competitive-comparator-ledger-v0.1.json) — source-level claims, exact model/class scope, converted listing units, unresolved discrepancies and functional-unit boundaries; includes JoJo, Moen, Hydraloop, AQUALOOP and Phyn.
 
 - [PR #10386 — household services charter, physical validation protocols and competitive frontier](https://github.com/Luminous-Dynamics/symthaea/pull/10386). Those research files are on the PR branch and should not be assumed present on main until merged.
 - [PR #10432 — repair recurrence and post-repair durability contract](https://github.com/Luminous-Dynamics/symthaea/pull/10432). Defines repair episode identity, independent restoration, use exposure, competing events, recurrent burden and censoring.
@@ -42,7 +42,7 @@ The following pull requests form the household synthetic-evidence and receipt se
 
 The #10476 exact-head focused evaluator workflow passed formatting, locked tests, strict Clippy and all 20 synthetic case evaluations. The #10480 exact-head focused workflow passed on commit `2399a0d2c00e90d3e259dc9835c85c0776a8ce9e`: 42 tests passed (31 existing + 11 new), formatting, strict Clippy and all 20 synthetic case evaluations; batch artifact uploaded at [run #41902426526](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41902426526). Repository-wide CI, PR Governance and Workflow Syntax were skipped, not passed. The earlier pre-rebase PR #10475 is closed as superseded.
 
-A subsequent #10480 change is being qualified: it separates electrical kWh from useful thermal kWh, preventing cross-carrier comparisons. It is tracked by [HOME-SVC-ENERGY-CARRIER-001 #10486](https://github.com/Luminous-Dynamics/symthaea/issues/10486). The 42-test PASS above predates this latest carrier-specific change; do not inherit that PASS until its exact-head workflow completes.
+The latest #10480 implementation also separates electrical kWh from useful thermal kWh, preventing cross-carrier comparisons. It is tracked by [HOME-SVC-ENERGY-CARRIER-001 #10486](https://github.com/Luminous-Dynamics/symthaea/issues/10486). Its exact-head focused workflow passed on commit `f3a1e47bf541d96d3a768979e48725fe2d3e7f55`: 44 tests passed (31 existing + 13 new), formatting, strict Clippy and all 20 synthetic scenarios; artifact uploaded at [run #41904012267](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41904012267). Repository-wide CI, PR Governance and Workflow Syntax were skipped, not passed.
 
 WaterLoop's separate competitive work is tracked by [#10483](https://github.com/Luminous-Dynamics/symthaea/issues/10483) and draft [PR #10485](https://github.com/Luminous-Dynamics/symthaea/pull/10485), which separates outage backup, greywater substitution and leak containment and adds source-stream, local-installation and offline-operation qualification.
 
