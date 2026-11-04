@@ -62,7 +62,9 @@
         "intentional_wait_count": 8,
         "epistemic_abstain_count": 0,
         "clarification_ask_count": 0,
-        "mean_brier_score": 0.4525
+        "mean_brier_score": 0.4525,
+        "unauthorized_yield_count": 0,
+        "withhold_violation_count": 0
       }
     },
     {
@@ -126,7 +128,9 @@
         "intentional_wait_count": 0,
         "epistemic_abstain_count": 0,
         "clarification_ask_count": 0,
-        "mean_brier_score": 0.4525
+        "mean_brier_score": 0.4525,
+        "unauthorized_yield_count": 0,
+        "withhold_violation_count": 4
       }
     },
     {
@@ -190,7 +194,9 @@
         "intentional_wait_count": 2,
         "epistemic_abstain_count": 1,
         "clarification_ask_count": 1,
-        "mean_brier_score": 0.01
+        "mean_brier_score": 0.01,
+        "unauthorized_yield_count": 0,
+        "withhold_violation_count": 0
       }
     }
   ]
