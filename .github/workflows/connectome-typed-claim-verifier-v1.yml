@@ -1,0 +1,66 @@
+name: Typed Connectome Claim Verifier
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [research/connectome-typed-claim-queries-v0-1-20261104]
+    paths:
+      - "tools/connectome-typed-claim-verifier/**"
+      - "research/connectomics/connectome-typed-claim-bundle-v0.1.schema.json"
+      - "research/connectomics/fixtures/connectome-typed-claim-bundle-known-answer-v0.1.json"
+      - ".github/workflows/connectome-typed-claim-verifier-v1.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: connectome-typed-claim-verifier-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier:
+    name: Typed claim schema, path semantics and non-laundering
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Formatting
+        run: cargo fmt --manifest-path tools/connectome-typed-claim-verifier/Cargo.toml -- --check
+      - name: Validate Draft 2020-12 schema and known-answer fixture
+        run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("research/connectomics/connectome-typed-claim-bundle-v0.1.schema.json").read_text())
+          bundle = json.loads(Path("research/connectomics/fixtures/connectome-typed-claim-bundle-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(bundle)
+          claims = {item["claim_id"]: item for item in bundle["claims"]}
+          queries = {item["query_id"]: item for item in bundle["queries"]}
+          assert len(claims) == len(bundle["claims"])
+          assert len(queries) == len(bundle["queries"])
+          expected = {
+              "ANATOMICAL_SYNAPSE_EDGE": "ANATOMICAL_SYNAPSE_EVIDENCE",
+              "RECONSTRUCTION_CORRESPONDENCE": "RECONSTRUCTION_CORRESPONDENCE_EVIDENCE",
+              "STATISTICAL_DEPENDENCE_EDGE": "STATISTICAL_DEPENDENCE_EVIDENCE",
+              "FUNCTIONAL_ASSOCIATION_EDGE": "FUNCTIONAL_ASSOCIATION_EVIDENCE",
+              "CAUSAL_EFFECT_CLAIM": "CAUSAL_EFFECT_EVIDENCE",
+          }
+          for claim in claims.values():
+              assert all(e["evidence_type"] == expected[claim["relation_type"]] for e in claim["evidence"])
+          bad = queries["invalid-anatomy-to-causality-attempt"]["path_results"][0]
+          assert bad["asserted_claim_type"] == "CAUSAL_EFFECT"
+          assert [claims[c]["relation_type"] for c in bad["ordered_claim_ids"]] == [
+              "ANATOMICAL_SYNAPSE_EDGE", "STATISTICAL_DEPENDENCE_EDGE"
+          ]
+          PY
+      - name: Tests
+        run: cargo test --manifest-path tools/connectome-typed-claim-verifier/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path tools/connectome-typed-claim-verifier/Cargo.toml --locked --all-targets -- -D warnings
