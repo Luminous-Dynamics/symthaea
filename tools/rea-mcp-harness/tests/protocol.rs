@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use rea_mcp_harness::ReaEvidenceMcpServer;
+use symthaea_rea_mcp::ReaEvidenceMcpServer;
 use rmcp::{
-    ServiceExt,
+    CallToolResponse, RoleClient, ServiceExt,
     model::CallToolRequestParams,
 };
 use serde_json::{Value, json};
@@ -12,7 +12,7 @@ fn fixture_dir() -> Option<PathBuf> {
 }
 
 async fn start_server() -> (
-    rmcp::service::RunningService<rmcp::RoleClient, ()>,
+    rmcp::service::RunningService<RoleClient, ()>,
     tokio::task::JoinHandle<()>,
 ) {
     let (server_transport, client_transport) = tokio::io::duplex(2 * 1024 * 1024);
@@ -81,6 +81,9 @@ async fn evidence_tool_verifies_semantic_identity_and_redacts_payloads() {
         )
         .await
         .unwrap();
+    let CallToolResponse::Complete(response) = response else {
+        panic!("expected a completed tool response");
+    };
 
     assert_eq!(response.is_error, Some(false));
     let value = structured(&response);
@@ -112,6 +115,9 @@ async fn rejected_evidence_returns_stable_category_without_echoing_input() {
         )
         .await
         .unwrap();
+    let CallToolResponse::Complete(response) = response else {
+        panic!("expected a completed tool response");
+    };
     assert_eq!(response.is_error, Some(false));
     let value = structured(&response);
     assert_eq!(value["status"], "rejected");
@@ -144,6 +150,9 @@ async fn bundle_tool_uses_the_upstream_generated_bundle_when_available() {
         )
         .await
         .unwrap();
+    let CallToolResponse::Complete(response) = response else {
+        panic!("expected a completed tool response");
+    };
     assert_eq!(response.is_error, Some(false));
     let value = structured(&response);
     assert_eq!(value["status"], "verified_bundle_consistency");
@@ -174,6 +183,9 @@ async fn malformed_bundle_returns_stable_error_category() {
         )
         .await
         .unwrap();
+    let CallToolResponse::Complete(response) = response else {
+        panic!("expected a completed tool response");
+    };
     assert_eq!(response.is_error, Some(false));
     assert_eq!(structured(&response)["status"], "rejected");
     assert_eq!(structured(&response)["error_code"], "schema_violation");
