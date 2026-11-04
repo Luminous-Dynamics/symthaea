@@ -1,0 +1,260 @@
+{
+  "format": "symthaea.nested-dynamic-projected-bce-trace",
+  "version": 1,
+  "root": {
+    "variables": [
+      "x",
+      "y",
+      "a",
+      "h"
+    ],
+    "visible": [
+      "x",
+      "y",
+      "a"
+    ],
+    "hidden": [
+      "h"
+    ],
+    "clauses": [
+      {
+        "id": "c1",
+        "literals": [
+          "h",
+          "x",
+          "y",
+          "a"
+        ]
+      },
+      {
+        "id": "c2",
+        "literals": [
+          "!h",
+          "x",
+          "y",
+          "!a"
+        ]
+      }
+    ],
+    "formula_digest": "sha256:52c31d2ccb505320ae6a3f61d7cbc4bc4d188a63c87c3a8be2117ee9c6286bf3",
+    "weights": {
+      "x": {
+        "false": "1/2",
+        "true": "1/2"
+      },
+      "y": {
+        "false": "1/2",
+        "true": "1/2"
+      },
+      "a": {
+        "false": "1/3",
+        "true": "2/3"
+      }
+    },
+    "context_digest": "sha256:b49147af3aa165bf6df2d13422bb69a7858dcb2be140ba138db92a7f024ca36e"
+  },
+  "nodes": [
+    {
+      "node_id": "x0",
+      "parent_context_id": "root",
+      "parent_formula_digest": "sha256:52c31d2ccb505320ae6a3f61d7cbc4bc4d188a63c87c3a8be2117ee9c6286bf3",
+      "assignment_delta": {
+        "x": false
+      },
+      "cumulative_assignment": {
+        "x": false
+      },
+      "context_digest": "sha256:8cd73c4a16519ebc1e4ae23b4af9f6a5fc4305ca0a748bd068331297d1aecf08",
+      "conditioned": {
+        "variables": [
+          "y",
+          "a",
+          "h"
+        ],
+        "visible": [
+          "y",
+          "a"
+        ],
+        "hidden": [
+          "h"
+        ],
+        "clauses": [
+          {
+            "id": "c1",
+            "literals": [
+              "h",
+              "y",
+              "a"
+            ]
+          },
+          {
+            "id": "c2",
+            "literals": [
+              "!h",
+              "y",
+              "!a"
+            ]
+          }
+        ],
+        "formula_digest": "sha256:e1c8d90387ab568c5bc59a635fc6dcd643e1f72316e0c2b6dbcb0a793b298d68"
+      },
+      "operations": [],
+      "final_formula_digest": "sha256:e1c8d90387ab568c5bc59a635fc6dcd643e1f72316e0c2b6dbcb0a793b298d68",
+      "backtrack": {
+        "restored_context_id": "root",
+        "restored_context_digest": "sha256:b49147af3aa165bf6df2d13422bb69a7858dcb2be140ba138db92a7f024ca36e",
+        "restored_formula_digest": "sha256:52c31d2ccb505320ae6a3f61d7cbc4bc4d188a63c87c3a8be2117ee9c6286bf3",
+        "child_final_formula_digest": "sha256:e1c8d90387ab568c5bc59a635fc6dcd643e1f72316e0c2b6dbcb0a793b298d68"
+      }
+    },
+    {
+      "node_id": "x0y0",
+      "parent_context_id": "x0",
+      "parent_formula_digest": "sha256:e1c8d90387ab568c5bc59a635fc6dcd643e1f72316e0c2b6dbcb0a793b298d68",
+      "assignment_delta": {
+        "y": false
+      },
+      "cumulative_assignment": {
+        "x": false,
+        "y": false
+      },
+      "context_digest": "sha256:3b5d3fddd18786ee418f65f433026f3fd3ff3dfe832cf72f914db3849759c895",
+      "conditioned": {
+        "variables": [
+          "a",
+          "h"
+        ],
+        "visible": [
+          "a"
+        ],
+        "hidden": [
+          "h"
+        ],
+        "clauses": [
+          {
+            "id": "c1",
+            "literals": [
+              "h",
+              "a"
+            ]
+          },
+          {
+            "id": "c2",
+            "literals": [
+              "!h",
+              "!a"
+            ]
+          }
+        ],
+        "formula_digest": "sha256:d21b43db6beaf60656122ead665fded77b4a5c2426abe75d481067bc13220629"
+      },
+      "operations": [
+        {
+          "type": "remove_blocked_clause",
+          "context_digest": "sha256:3b5d3fddd18786ee418f65f433026f3fd3ff3dfe832cf72f914db3849759c895",
+          "source_formula_digest": "sha256:d21b43db6beaf60656122ead665fded77b4a5c2426abe75d481067bc13220629",
+          "removed_clause_id": "c1",
+          "blocking_literal": "h",
+          "opposing_clause_checks": [
+            {
+              "clause_id": "c2",
+              "resolvent": [
+                "!a",
+                "a"
+              ],
+              "tautology_variable": "a"
+            }
+          ],
+          "target_clauses": [
+            {
+              "id": "c2",
+              "literals": [
+                "!h",
+                "!a"
+              ]
+            }
+          ],
+          "target_formula_digest": "sha256:38818568711255479594bcd142be69908719bb13814141898876f2eb162c6b45"
+        }
+      ],
+      "final_formula_digest": "sha256:38818568711255479594bcd142be69908719bb13814141898876f2eb162c6b45",
+      "backtrack": {
+        "restored_context_id": "x0",
+        "restored_context_digest": "sha256:8cd73c4a16519ebc1e4ae23b4af9f6a5fc4305ca0a748bd068331297d1aecf08",
+        "restored_formula_digest": "sha256:e1c8d90387ab568c5bc59a635fc6dcd643e1f72316e0c2b6dbcb0a793b298d68",
+        "child_final_formula_digest": "sha256:38818568711255479594bcd142be69908719bb13814141898876f2eb162c6b45"
+      }
+    },
+    {
+      "node_id": "x0y1",
+      "parent_context_id": "x0",
+      "parent_formula_digest": "sha256:e1c8d90387ab568c5bc59a635fc6dcd643e1f72316e0c2b6dbcb0a793b298d68",
+      "assignment_delta": {
+        "y": true
+      },
+      "cumulative_assignment": {
+        "x": false,
+        "y": true
+      },
+      "context_digest": "sha256:e65d02923c9fbfb4521a759b94d72ba0a8a10baca4becd5926af03052eecd6f4",
+      "conditioned": {
+        "variables": [
+          "a",
+          "h"
+        ],
+        "visible": [
+          "a"
+        ],
+        "hidden": [
+          "h"
+        ],
+        "clauses": [],
+        "formula_digest": "sha256:96b3f00bc06b14a9735dad298a6e85869337f5351a2843827019c27bc55eeea9"
+      },
+      "operations": [],
+      "final_formula_digest": "sha256:96b3f00bc06b14a9735dad298a6e85869337f5351a2843827019c27bc55eeea9",
+      "backtrack": {
+        "restored_context_id": "x0",
+        "restored_context_digest": "sha256:8cd73c4a16519ebc1e4ae23b4af9f6a5fc4305ca0a748bd068331297d1aecf08",
+        "restored_formula_digest": "sha256:e1c8d90387ab568c5bc59a635fc6dcd643e1f72316e0c2b6dbcb0a793b298d68",
+        "child_final_formula_digest": "sha256:96b3f00bc06b14a9735dad298a6e85869337f5351a2843827019c27bc55eeea9"
+      }
+    },
+    {
+      "node_id": "x1",
+      "parent_context_id": "root",
+      "parent_formula_digest": "sha256:52c31d2ccb505320ae6a3f61d7cbc4bc4d188a63c87c3a8be2117ee9c6286bf3",
+      "assignment_delta": {
+        "x": true
+      },
+      "cumulative_assignment": {
+        "x": true
+      },
+      "context_digest": "sha256:e7bcbd8e9be8ef368d11a09470433edf98e221954f3e7cd32e9d49b2521f53f4",
+      "conditioned": {
+        "variables": [
+          "y",
+          "a",
+          "h"
+        ],
+        "visible": [
+          "y",
+          "a"
+        ],
+        "hidden": [
+          "h"
+        ],
+        "clauses": [],
+        "formula_digest": "sha256:d922fbba089a6986e40f4e05c2d0fcde62a20f7c39289381e07e53fd29bc5f11"
+      },
+      "operations": [],
+      "final_formula_digest": "sha256:d922fbba089a6986e40f4e05c2d0fcde62a20f7c39289381e07e53fd29bc5f11",
+      "backtrack": {
+        "restored_context_id": "root",
+        "restored_context_digest": "sha256:b49147af3aa165bf6df2d13422bb69a7858dcb2be140ba138db92a7f024ca36e",
+        "restored_formula_digest": "sha256:52c31d2ccb505320ae6a3f61d7cbc4bc4d188a63c87c3a8be2117ee9c6286bf3",
+        "child_final_formula_digest": "sha256:d922fbba089a6986e40f4e05c2d0fcde62a20f7c39289381e07e53fd29bc5f11"
+      }
+    }
+  ]
+}
