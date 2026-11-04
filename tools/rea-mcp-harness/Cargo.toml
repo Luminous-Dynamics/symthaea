@@ -1,0 +1,23 @@
+[workspace]
+members = [".", "symthaea-rea-compat"]
+resolver = "2"
+
+[package]
+name = "rea-mcp-harness"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+
+[lib]
+path = "../../crates/domains/symthaea-rea-mcp/src/lib.rs"
+
+[[test]]
+name = "protocol"
+path = "tests/protocol.rs"
+
+[dependencies]
+rmcp = { version = "=3.8.0", default-features = false, features = ["server", "client", "macros", "transport-io"] }
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = { version = "=1.0.150", features = ["preserve_order"] }
+symthaea-rea-compat = { path = "symthaea-rea-compat" }
+tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread", "io-std", "io-util", "net", "sync", "time"] }
