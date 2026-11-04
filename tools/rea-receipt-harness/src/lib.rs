@@ -3,6 +3,7 @@
 //! The JSON Schema provides structural validation. This module adds cross-field invariants
 //! that are security-relevant and awkward to express in JSON Schema alone.
 
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use jsonschema::draft202012;
 use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde_json::{Map, Number, Value};
@@ -269,7 +270,40 @@ fn validate_semantics(receipt: &Value) -> Result<(), ReceiptError> {
                 "non-verified outcome must not publish a successful payload SHA-256".into(),
             ));
         }
+        let failure_kind = observations
+            .get("failure_kind")
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                ReceiptError::SemanticViolation(
+                    "non-verified outcome requires a non-null failure_kind".into(),
+                )
+            })?;
+        let disposition_matches = match outcome {
+            "rejected" => matches!(failure_kind, "io" | "invalid_archive"),
+            "unsupported" => failure_kind == "unsupported",
+            "source_changed" => failure_kind == "source_changed",
+            "limit_exceeded" => failure_kind == "limit_exceeded",
+            "abstained" => failure_kind == "abstained",
+            _ => false,
+        };
+        if !disposition_matches {
+            return Err(ReceiptError::SemanticViolation(format!(
+                "failure_kind {failure_kind:?} does not match outcome {outcome:?}"
+            )));
+        }
         return Ok(());
+    }
+
+    if !observations
+        .get("failure_kind")
+        .is_some_and(Value::is_null)
+        || !observations
+            .get("failure_detail")
+            .is_some_and(Value::is_null)
+    {
+        return Err(ReceiptError::SemanticViolation(
+            "verified outcome must not carry a failure kind or failure detail".into(),
+        ));
     }
 
     let binding_strength = string_at(source, &["binding_strength"])?;
@@ -280,6 +314,21 @@ fn validate_semantics(receipt: &Value) -> Result<(), ReceiptError> {
         return Err(ReceiptError::SemanticViolation(
             "verified outcome requires qualified source identity, content digest, or immutable snapshot"
                 .into(),
+        ));
+    }
+    let identity_scheme = string_at(source, &["identity_scheme"])?;
+    let scheme_matches = match binding_strength {
+        "qualified_identity" => matches!(
+            identity_scheme,
+            "unix_dev_ino_mode_mtime_ctime" | "handle_file_id"
+        ),
+        "content_digest" => identity_scheme == "archive_sha256",
+        "immutable_snapshot" => identity_scheme == "immutable_snapshot",
+        _ => false,
+    };
+    if !scheme_matches {
+        return Err(ReceiptError::SemanticViolation(
+            "source identity scheme does not support the declared binding strength".into(),
         ));
     }
 
@@ -299,6 +348,13 @@ fn validate_semantics(receipt: &Value) -> Result<(), ReceiptError> {
     if !is_sha256(archive_sha256) {
         return Err(ReceiptError::SemanticViolation(
             "verified outcome requires a whole-archive SHA-256 for replay binding".into(),
+        ));
+    }
+    let archive_size = decimal_at(source, &["archive_size_bytes"])?;
+    let max_archive = decimal_at(limits, &["max_archive_bytes"])?;
+    if archive_size > max_archive {
+        return Err(ReceiptError::SemanticViolation(
+            "archive source size exceeds the configured archive-byte limit".into(),
         ));
     }
 
@@ -324,6 +380,52 @@ fn validate_semantics(receipt: &Value) -> Result<(), ReceiptError> {
             "verified outcome only supports unencrypted regular-file occurrences".into(),
         ));
     }
+
+    let raw_name_base64 = string_at(occurrence, &["raw_filename_base64"])?;
+    let raw_name = BASE64_STANDARD.decode(raw_name_base64).map_err(|error| {
+        ReceiptError::SemanticViolation(format!("raw_filename_base64 is invalid: {error}"))
+    })?;
+    if BASE64_STANDARD.encode(raw_name) != raw_name_base64 {
+        return Err(ReceiptError::SemanticViolation(
+            "raw_filename_base64 must use canonical standard base64".into(),
+        ));
+    }
+    if let Some(duplicate_count) = occurrence
+        .get("duplicate_raw_name_count")
+        .filter(|value| !value.is_null())
+    {
+        let count = duplicate_count.as_str().ok_or_else(|| {
+            ReceiptError::SemanticViolation(
+                "duplicate_raw_name_count must be a decimal string or null".into(),
+            )
+        })?;
+        if count.parse::<u64>().unwrap_or(0) == 0 {
+            return Err(ReceiptError::SemanticViolation(
+                "duplicate_raw_name_count, when present, must be positive".into(),
+            ));
+        }
+    }
+
+    let occurrence_index = decimal_at(occurrence, &["central_directory_index"])?;
+    let max_entries = decimal_at(limits, &["max_entries"])?;
+    if occurrence_index >= max_entries {
+        return Err(ReceiptError::SemanticViolation(
+            "central-directory occurrence index exceeds the configured entry-count limit".into(),
+        ));
+    }
+    let local_header_offset = decimal_at(occurrence, &["local_header_offset_absolute"])?;
+    let data_offset = decimal_at(occurrence, &["data_offset_absolute"])?;
+    let declared_compressed = decimal_at(occurrence, &["declared_compressed_bytes"])?;
+    if local_header_offset > data_offset
+        || data_offset > archive_size
+        || declared_compressed > archive_size
+    {
+        return Err(ReceiptError::SemanticViolation(
+            "member offsets or compressed length are inconsistent with the admitted archive size"
+                .into(),
+        ));
+    }
+
     let compression_method = occurrence
         .get("compression_method")
         .and_then(Value::as_u64)
@@ -340,9 +442,16 @@ fn validate_semantics(receipt: &Value) -> Result<(), ReceiptError> {
     let observed_size = decimal_at(observations, &["observed_uncompressed_bytes"])?;
     let member_limit = decimal_at(limits, &["max_member_output_bytes"])?;
     let entry_limit = decimal_at(limits, &["max_entry_declared_uncompressed_bytes"])?;
+    let aggregate_declared_limit =
+        decimal_at(limits, &["max_total_declared_uncompressed_bytes"])?;
     if observed_size != declared_size {
         return Err(ReceiptError::SemanticViolation(
             "observed decompressed byte count must equal declared uncompressed size".into(),
+        ));
+    }
+    if declared_size > aggregate_declared_limit {
+        return Err(ReceiptError::SemanticViolation(
+            "member declared size exceeds the aggregate declared-output limit".into(),
         ));
     }
     if observed_size > member_limit || observed_size > entry_limit {
