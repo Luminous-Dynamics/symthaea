@@ -638,9 +638,20 @@ fn run(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
     }).collect::<Vec<_>>();
     // The random baseline is keyed only by the reference-free ranking view.
     // The raw input digest above remains an audit binding and is not exposed to rankers.
+    // JSON object keys must be strings. Graph uses tuple keys internally,
+    // so serialize its already-canonical BTreeMap order as an explicit edge
+    // sequence for the reference-free ranking view.
+    let ranking_graph = baseline_graph
+        .iter()
+        .map(|(&(source, target), &weight)| Edge {
+            source,
+            target,
+            weight,
+        })
+        .collect::<Vec<_>>();
     let ranking_view_bytes = serde_json::to_vec(&(
         &input.candidates,
-        &baseline_graph,
+        &ranking_graph,
         &ranking_specs,
     )).map_err(|error| format!("could not serialize reference-free ranking view: {error}"))?;
     let ranking_view_sha256 = sha256(&ranking_view_bytes);
