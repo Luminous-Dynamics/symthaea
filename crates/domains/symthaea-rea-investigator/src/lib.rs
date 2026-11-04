@@ -1363,3 +1363,4 @@ mod tests {
 
 /// Robust expected / worst-case / lower-tail EIG planning over likelihood scenarios.
 pub mod robust;
+pub mod decision;
