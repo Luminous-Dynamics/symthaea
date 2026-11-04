@@ -1,6 +1,6 @@
 # CEB Documentation Executability Audit V0 — 2026-11-04
 
-**Status:** Static documentation-control implementation. The first repository-wide run passed on the earlier exact head noted below; the current self-test/count-label refinement is awaiting its own exact-head workflow result.
+**Status:** Static documentation-control implementation. The CEB contract and audit passed on exact head `2af26b690b417132db5d82ad5ab07163b04ef723` in workflow run #211.
 
 ## Why this is needed
 
@@ -37,6 +37,14 @@ The first repository-wide CEB validation plus documentation audit passed on comm
 The manifest/unavailable counts above are **reference occurrences, not distinct path counts**. A later self-test/count-label refinement is intended to make that distinction explicit in CI output; this document must be updated if its exact-head rerun changes the counts.
 
 A separate Beverage Benchmark Contract run triggered by the beverage documentation correction failed at its first rustfmt step because the declared source file crates/domains/symthaea-culinary/src/bin/beverage_benchmark_receipt.rs is absent. The beverage unit tests, schema run, Clippy and receipt steps were skipped. This is not a CEB test failure and is not a test verdict; it confirms that the beverage CLI is not qualified by the current checkout.
+
+The output-label refinement then passed again in CEB Contract Validation V0 run #211 on exact head `2af26b690b417132db5d82ad5ab07163b04ef723`:
+
+- `CEB_CONTRACT_SCHEMA_PASS: tasks=10 unique_tasks=10 schemas=4 negative_controls=39 worlds=10 conditional_facts=7`
+- `DOC_COMMAND_AUDIT_SELF_TEST_PASS`
+- `DOC_COMMAND_AUDIT_PASS: markdown_files=1426 manifest_references_checked=15 documented_unavailable_references=14 dynamic_references=0 errors=0`
+
+A separate Beverage Benchmark Contract run #2586 on that exact head again failed at the first rustfmt step for the same missing `beverage_benchmark_receipt.rs` source; beverage tests, schema validation, Clippy and receipt generation were skipped.
 
 ## Claim boundary and limitations
 
