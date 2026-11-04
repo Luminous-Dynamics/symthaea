@@ -6,12 +6,14 @@
 
 Can a policy use collaborator intent and musical context to distinguish an invitation to take the floor from an acoustically similar pause, while remaining invariant to irrelevant changes such as instrument timbre?
 
-## Four test types
+## Six test types
 
 1. Explicit-intent change must change action: keep the local cue, preceding harmonic context, phrase function, performer role and instrument fixed; change collaborator intent. Example: the same cadential rest invites a response in one condition but retains the floor in the other.
 2. Preceding-harmonic-context change must change action: keep the local cue, phrase function, explicit collaborator-intent label, performer role and instrument fixed; change only the preceding harmonic progression/context. Example: an otherwise identical cadential rest follows a resolved dominant-to-tonic cadence in one member and an open half-cadence in the other. The annotation must specify why the valid next action differs.
-3. Surface change must preserve action: keep cue, preceding harmonic context, phrase function, collaborator intent and performer role fixed; change only the surface instrument. Two families cover lead-invitation and phrase-internal-breath cases.
-4. Ambiguous valid-action set: preserve a set of musically defensible actions, rather than forcing one canonical response.
+4. Phrase-function change must change action: preserve the local cue, preceding harmonic context, collaborator intent, performer role and instrument; change only the annotated phrase function (for example, a phrase-internal breath versus a solo handoff).
+5. Performer-role change must change action: preserve the local cue, harmonic context, phrase function, collaborator intent and instrument; change only the declared ensemble role.
+6. Surface change must preserve action: keep cue, preceding harmonic context, phrase function, collaborator intent and performer role fixed; change only the surface instrument. The set includes both a musical continuation case and a technical-dropout case.
+7. Ambiguous valid-action set: preserve a set of musically defensible actions, rather than forcing one canonical response.
 
 ## Evaluator
 
@@ -22,6 +24,12 @@ The Rust evaluator validates the family contract and scores a policy's predictio
 - set membership without a forced exact action for ambiguous cases.
 
 The score is intentionally not an audio classifier score. The supplied v1 fixtures are symbolic and synthetic. A later corpus must bind exact source audio, renderer, sample rate, performance-time map, annotation provenance and permitted input prefix.
+
+
+
+## Expanded symbolic corpus v1
+
+The checked-in fixture now contains 11 families and 21 annotated members: three additional collaborator-intent pairs (pickup, motif completion and dramatic silence), one phrase-function pair, one performer-role pair, a technical-dropout surface-invariance pair, and the original cadence, harmonic-context, instrument-invariance and ambiguous-fermata cases. The evaluator still scores member support, context sensitivity, surface invariance and ambiguity coverage separately; no composite score is introduced. The fixture remains symbolic and synthetic: local-cue signatures are controlled labels, not evidence of waveform equivalence.
 
 ## Falsifiers
 
