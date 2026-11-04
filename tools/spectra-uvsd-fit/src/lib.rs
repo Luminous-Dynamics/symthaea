@@ -646,7 +646,8 @@ fn expected_fisher_information(
         let lower_ratio = density_probability_ratio(signal_lower, signal_logp);
         let upper_ratio = density_probability_ratio(signal_upper, signal_logp);
         let mut signal_score = vec![0.0; 2 + thresholds.len()];
-        signal_score[0] = (lower_ratio - upper_ratio) * inverse_sigma;
+        // Score of log probability (not the negative log likelihood).
+        signal_score[0] = (upper_ratio - lower_ratio) * inverse_sigma;
         signal_score[1] =
             finite_z_ratio_product(signal_lower, lower_ratio)
             - finite_z_ratio_product(signal_upper, upper_ratio);
@@ -783,6 +784,7 @@ fn symmetric_eigen_decomposition(
     let mut vectors = vec![vec![0.0; dimension]; dimension];
     for index in 0..dimension { vectors[index][index] = 1.0; }
 
+    let mut converged = false;
     for _ in 0..(100 * dimension * dimension).max(1) {
         let mut p = 0usize;
         let mut q = 0usize;
@@ -798,7 +800,10 @@ fn symmetric_eigen_decomposition(
                 }
             }
         }
-        if largest <= 1.0e-13 * diagonal_scale { break; }
+        if largest <= 1.0e-13 * diagonal_scale {
+            converged = true;
+            break;
+        }
         let apq = matrix[p][q];
         if !apq.is_finite() || apq == 0.0 { return None; }
         let tau = (matrix[q][q] - matrix[p][p]) / (2.0 * apq);
@@ -829,6 +834,10 @@ fn symmetric_eigen_decomposition(
             vectors[index][p] = cosine * vp - sine * vq;
             vectors[index][q] = sine * vp + cosine * vq;
         }
+    }
+
+    if !converged {
+        return None;
     }
 
     let mut order: Vec<usize> = (0..dimension).collect();
