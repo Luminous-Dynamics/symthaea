@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-goal-replay-v0.schema.json",
+  "title": "PITB SorryDB Lean goal replay receipt v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_database_task_id",
+    "repository_remote",
+    "repository_commit",
+    "lean_version",
+    "source_path",
+    "start_line",
+    "start_column",
+    "end_line",
+    "end_column",
+    "goal_sha256",
+    "source_file_sha256",
+    "instrumented_source_sha256",
+    "toolchain_file_sha256",
+    "lake_manifest_sha256",
+    "repository_tree_sha256",
+    "replay_command",
+    "replay_command_sha256",
+    "replay_log_sha256",
+    "replay_exit_code",
+    "goal_reproduced",
+    "scoring_admission",
+    "limitation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-goal-replay.v0"
+    },
+    "source_database_task_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "repository_remote": {
+      "type": "string",
+      "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "repository_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "lean_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "start_line": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "start_column": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "end_line": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "end_column": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "goal_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_file_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "instrumented_source_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "toolchain_file_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "lake_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "repository_tree_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "replay_command": {
+      "type": "string",
+      "minLength": 1
+    },
+    "replay_command_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "replay_log_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "replay_exit_code": {
+      "type": "integer"
+    },
+    "goal_reproduced": {
+      "type": "boolean"
+    },
+    "scoring_admission": {
+      "const": false
+    },
+    "limitation": {
+      "type": "string",
+      "minLength": 50
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "goal_reproduced": {
+            "const": true
+          }
+        },
+        "required": [
+          "goal_reproduced"
+        ]
+      },
+      "then": {
+        "properties": {
+          "replay_exit_code": {
+            "const": 0
+          }
+        }
+      }
+    }
+  ]
+}
