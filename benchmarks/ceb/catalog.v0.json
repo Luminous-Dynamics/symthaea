@@ -4,7 +4,7 @@
   "release": "v0-design-catalog",
   "status": "design_only",
   "created_at": "2026-11-02",
-  "task_count": 10,
+  "task_count": 12,
   "tasks": [
     {
       "schema_version": 0,
@@ -614,6 +614,152 @@
         "Gold labels separate syntax-declared facts, manifest-declared feature/target edges and expected semantic relationships.",
         "Evaluate retrieval and change-impact precision/recall independently; do not count inferred links as compiler-resolved truth.",
         "The static-only fixture intake does not execute build scripts, tests or generated code. Any later execution lane remains subject to issue #10064."
+      ]
+    },
+    {
+      "schema_version": 0,
+      "benchmark_id": "CEB",
+      "task_id": "CEB-SPEC-001",
+      "execution_status": "design_only",
+      "lane": "repository_intelligence",
+      "title": "Recover public trait and caller contracts across Rust crate boundaries",
+      "objective": "Recover the scoped obligations and observable source-level behavior of public traits, their implementations, generic consumers and API re-exports across a small Rust workspace. Separate explicit signatures, source-derived control flow, compiler-established relationships and unresolved product intent.",
+      "agent_prompt": "Inspect only the source files named in the task's source-only view. Recover the public obligations and data/control-flow contracts connecting the Authorizer and Store traits, their concrete implementations, UserService and the public Profile API. Return atomic claims with exact file/line evidence, scope, evidence authority and confidence. Separate: (1) declarations and explicit generic bounds, (2) relationships inferred from source syntax/control flow, (3) facts that would require compiler or runtime evidence, and (4) intent that cannot be determined from the available sources. For each claim, state one concrete counterexample or falsification condition. Do not infer that comments are normative requirements, do not claim compiler resolution or runtime execution, and do not invent why UserId(0) is denied. Do not inspect evaluator annotations, gold-graph, worlds or mutation files. No build, test, macro or candidate execution is authorized.",
+      "source_snapshot": {
+        "kind": "synthetic_fixture",
+        "uri": "https://github.com/Luminous-Dynamics/symthaea/tree/f09e5d642ea5f13a4888553c94d799c62c7b1f83/benchmarks/ceb/fixtures/repository-twin-synthetic-v0",
+        "revision": "f09e5d642ea5f13a4888553c94d799c62c7b1f83",
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
+      },
+      "environment": {
+        "image": null,
+        "toolchain_lock_sha256": null,
+        "runner_profile": "not_provisioned",
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
+      },
+      "agent_policy": {
+        "writable_paths": [],
+        "read_only_paths": [
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/domain/src/lib.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/store/src/lib.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/service/src/lib.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/api/src/lib.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/api/src/profile_api.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/api/Cargo.toml"
+        ],
+        "secrets_exposed": false,
+        "grader_visible": false,
+        "human_approval_required": [
+          "execution of repository-controlled code",
+          "changes to the task or grader contract",
+          "promotion from design_only"
+        ]
+      },
+      "acceptance": {
+        "reference_patch_sha256": null,
+        "empty_patch_must_fail": true,
+        "independent_grader": null,
+        "grader_sha256": null,
+        "checks": []
+      },
+      "budget": {
+        "wall_clock_seconds": null,
+        "max_turns": null,
+        "max_tool_calls": null,
+        "input_token_budget": null,
+        "output_token_budget": null,
+        "cost_budget_usd": null
+      },
+      "split": {
+        "partition": "development",
+        "sealed": false,
+        "leakage_groups": [
+          "repository-twin-synthetic-v0",
+          "spec-api-contracts-v0"
+        ],
+        "freshness_policy": "Design-only static task. Before any evaluation, create a source-only agent view, separate evaluator-only annotations, pin the tree digest and independently qualify the grader."
+      },
+      "notes": [
+        "Blueprint: CEB-SPEC-001 in the CEB specification task-bank document.",
+        "Design-only source scope: public trait signatures, implementation bodies, generic bounds, call flow and re-export declarations.",
+        "Provisional reviewer annotations are stored separately and are not a sealed oracle.",
+        "The source-only agent view is not yet materialized; the current fixture directory also contains evaluator/design artifacts. This task is not admissible for agent scoring.",
+        "No compiler, rust-analyzer, runtime or test evidence is attached. Semantic relationships remain source-inferred or underdetermined."
+      ]
+    },
+    {
+      "schema_version": 0,
+      "benchmark_id": "CEB",
+      "task_id": "CEB-SPEC-004",
+      "execution_status": "design_only",
+      "lane": "repository_intelligence",
+      "title": "Derive Cargo feature and target applicability without conflating their scopes",
+      "objective": "Recover the configuration contract of a Rust API crate by separating Cargo default features, explicitly selected features, target-specific dependencies and Rust cfg conditions across Linux and Windows target worlds.",
+      "agent_prompt": "Inspect only the API crate's Cargo manifest, crate root and the conditional module source files in the source-only view. Derive the effective feature state and module/dependency applicability for Linux and Windows under these five modes: default features; no default features; no defaults plus audit; no defaults plus windows-native; and no defaults plus both features. Distinguish a feature being enabled from a target-gated module or dependency being active. Present a 10-row truth table with the source expression supporting each result, identify what is merely a static evaluation of declared conditions, and list what would still require Cargo/compiler evidence. Explicitly analyze whether windows-native can be enabled on Linux without activating the Windows-only module/dependency. Do not read worlds.v0.json, gold-graph.v0.json or mutations.v0.json; they contain expected design labels. Do not run Cargo or any repository-controlled code.",
+      "source_snapshot": {
+        "kind": "synthetic_fixture",
+        "uri": "https://github.com/Luminous-Dynamics/symthaea/tree/f09e5d642ea5f13a4888553c94d799c62c7b1f83/benchmarks/ceb/fixtures/repository-twin-synthetic-v0",
+        "revision": "f09e5d642ea5f13a4888553c94d799c62c7b1f83",
+        "tree_sha256": null,
+        "tree_digest_algorithm": "ceb-tree-v1"
+      },
+      "environment": {
+        "image": null,
+        "toolchain_lock_sha256": null,
+        "runner_profile": "not_provisioned",
+        "network_policy": "disabled",
+        "runner_policy_sha256": null
+      },
+      "agent_policy": {
+        "writable_paths": [],
+        "read_only_paths": [
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/domain/src/lib.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/store/src/lib.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/service/src/lib.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/api/src/lib.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/api/src/profile_api.rs",
+          "benchmarks/ceb/fixtures/repository-twin-synthetic-v0/crates/api/Cargo.toml"
+        ],
+        "secrets_exposed": false,
+        "grader_visible": false,
+        "human_approval_required": [
+          "execution of repository-controlled code",
+          "changes to the task or grader contract",
+          "promotion from design_only"
+        ]
+      },
+      "acceptance": {
+        "reference_patch_sha256": null,
+        "empty_patch_must_fail": true,
+        "independent_grader": null,
+        "grader_sha256": null,
+        "checks": []
+      },
+      "budget": {
+        "wall_clock_seconds": null,
+        "max_turns": null,
+        "max_tool_calls": null,
+        "input_token_budget": null,
+        "output_token_budget": null,
+        "cost_budget_usd": null
+      },
+      "split": {
+        "partition": "development",
+        "sealed": false,
+        "leakage_groups": [
+          "repository-twin-synthetic-v0",
+          "spec-feature-target-v0"
+        ],
+        "freshness_policy": "Design-only static task. Before any evaluation, create a source-only agent view, separate evaluator-only annotations, pin the tree digest and independently qualify the grader."
+      },
+      "notes": [
+        "Blueprint: CEB-SPEC-004 in the CEB specification task-bank document.",
+        "Ten target/configuration rows are requested; the expected table is evaluator material and is not exposed to the agent.",
+        "Provisional reviewer annotations are stored separately and are not a sealed oracle.",
+        "The source-only agent view is not yet materialized; the current fixture directory also contains evaluator/design artifacts. This task is not admissible for agent scoring.",
+        "The truth table is a static evaluation of manifest/cfg declarations, not Cargo metadata or compiler-verified evidence."
       ]
     }
   ]
