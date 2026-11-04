@@ -1088,8 +1088,12 @@ fn run_self_tests() -> Result<(), String> {
     let root = env::temp_dir().join(format!("pitb-sorrydb-evidence-closure-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(&root).map_err(|e| e.to_string())?;
-    let (evaluation_bytes, runs_bytes) = make_synthetic_bundle(&root)?;
-    let report = verify_all(&evaluation_bytes, &runs_bytes, &root, false)?;
+    let (evaluation_bytes, runs_bytes, reviewer_registry_bytes, reviewer_registry_sha256) =
+        make_synthetic_bundle(&root)?;
+    let report = verify_all(
+        &evaluation_bytes, &runs_bytes, &root,
+        &reviewer_registry_bytes, &reviewer_registry_sha256, false,
+    )?;
     if report.closed_verified_success_run_count != 1 || report.closed_unique_task_count != 1 {
         return Err("synthetic evidence closure denominator control failed".into());
     }
@@ -1099,7 +1103,7 @@ fn run_self_tests() -> Result<(), String> {
     let source_after_path = run_dir.join("source-after.lean");
     let valid_after = fs::read(&source_after_path).map_err(|e| e.to_string())?;
     fs::write(&source_after_path, b"unrelated source edit\n").map_err(|e| e.to_string())?;
-    if verify_all(&evaluation_bytes, &runs_bytes, &root, false).is_ok() {
+    if verify_all(&evaluation_bytes, &runs_bytes, &root, &reviewer_registry_bytes, &reviewer_registry_sha256, false).is_ok() {
         return Err("unrelated source edit was accepted".into());
     }
     fs::write(&source_after_path, &valid_after).map_err(|e| e.to_string())?;
@@ -1115,7 +1119,7 @@ fn run_self_tests() -> Result<(), String> {
     let mut run_value: Value = serde_json::from_slice(run_line).map_err(|e| e.to_string())?;
     run_value["semantic_gate_receipt_sha256"] = Value::String(sha256(&semantic_mutated_bytes));
     let rebound_runs = [serde_json::to_vec(&run_value).map_err(|e| e.to_string())?, b"\\n".to_vec()].concat();
-    if verify_all(&evaluation_bytes, &rebound_runs, &root, false).is_ok() {
+    if verify_all(&evaluation_bytes, &rebound_runs, &root, &reviewer_registry_bytes, &reviewer_registry_sha256, false).is_ok() {
         return Err("unresolved semantic review was accepted after valid digest rebinding".into());
     }
     println!("SELF_TEST_PASS unresolved semantic status is rejected after digest rebinding");
@@ -1153,8 +1157,14 @@ fn execute() -> Result<(), String> {
         run_self_tests()?;
         let root = PathBuf::from(&args[3]);
         fs::create_dir_all(&root).map_err(|e| format!("create evidence bundle root: {e}"))?;
-        let (evaluation, runs) = make_synthetic_bundle(&root)?;
-        let report = verify_all(&evaluation, &runs, &root, false)?;
+        let (evaluation, runs, reviewer_registry, reviewer_registry_sha256) = make_synthetic_bundle(&root)?;
+        fs::write(root.join("reviewer-key-registry.json"), &reviewer_registry)
+            .map_err(|e| format!("write synthetic reviewer registry: {e}"))?;
+        fs::write(root.join("reviewer-key-registry.sha256"), &reviewer_registry_sha256)
+            .map_err(|e| format!("write synthetic reviewer registry pin: {e}"))?;
+        let report = verify_all(
+            &evaluation, &runs, &root, &reviewer_registry, &reviewer_registry_sha256, false,
+        )?;
         fs::write(root.join("evaluation-split.json"), &evaluation)
             .map_err(|e| format!("write synthetic evaluation split: {e}"))?;
         fs::write(root.join("proof-runs.jsonl"), &runs)
@@ -1164,16 +1174,19 @@ fn execute() -> Result<(), String> {
         println!("PITB_SORRYDB_EVIDENCE_CLOSURE_SYNTHETIC_REPORT_OK");
         return Ok(());
     }
-    if args.len() != 6 || args[1] != "--verify" {
+    if args.len() != 8 || args[1] != "--verify" {
         return Err(format!(
-            "usage: {} --verify <evaluation-split.json> <proof-runs.jsonl> <evidence-root> <report.json> OR --self-test OR --self-test-report <report.json> <evidence-bundle-dir>",
+            "usage: {} --verify <evaluation-split.json> <proof-runs.jsonl> <evidence-root> <reviewer-key-registry.json> <pinned-registry-sha256> <report.json> OR --self-test OR --self-test-report <report.json> <evidence-bundle-dir>",
             args.first().map(String::as_str).unwrap_or("pitb-sorrydb-evidence-closure")
         ));
     }
     let evaluation = fs::read(&args[2]).map_err(|e| format!("read evaluation split: {e}"))?;
     let runs = fs::read(&args[3]).map_err(|e| format!("read proof runs JSONL: {e}"))?;
-    let report = verify_all(&evaluation, &runs, Path::new(&args[4]), true)?;
-    fs::write(&args[5], serde_json::to_vec_pretty(&report).map_err(|e| e.to_string())?)
+    let reviewer_registry = fs::read(&args[5]).map_err(|e| format!("read reviewer key registry: {e}"))?;
+    let report = verify_all(
+        &evaluation, &runs, Path::new(&args[4]), &reviewer_registry, &args[6], true,
+    )?;
+    fs::write(&args[7], serde_json::to_vec_pretty(&report).map_err(|e| e.to_string())?)
         .map_err(|e| format!("write closure report: {e}"))?;
     println!("PITB_SORRYDB_EVIDENCE_CLOSURE_OK");
     println!(
