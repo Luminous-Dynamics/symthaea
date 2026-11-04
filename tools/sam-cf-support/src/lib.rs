@@ -154,10 +154,7 @@ pub fn parse_cases(input: &str) -> Result<Vec<Case>, String> {
                 line_index + 1
             ));
         }
-        if !matches!(
-            case.factual_tail.as_str(),
-            "PRESENT" | "MISSING" | "NA"
-        ) {
+        if !matches!(case.factual_tail.as_str(), "PRESENT" | "MISSING" | "NA") {
             return Err(format!(
                 "line {}: invalid factual_tail disposition",
                 line_index + 1
