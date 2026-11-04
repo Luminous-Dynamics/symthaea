@@ -1,0 +1,3498 @@
+{
+  "schema_version": "1.0",
+  "corpus_id": "sym-inv-underwrite-public-synthetic-v1",
+  "disclosure": "Public development corpus containing synthetic cases only. Cases and reference outcomes are transparent and are NOT a sealed certification set, bankability assessment, investment recommendation, or evidence about any real South African project.",
+  "cases": [
+    {
+      "case_id": "solar-storage-base-001",
+      "synthetic": true,
+      "decision_time": "2026-08-01T00:00:00Z",
+      "project": {
+        "name": "Synthetic Northern Cape Solar + Storage Project",
+        "asset_class": "hybrid_generation_storage",
+        "technology": "utility_scale_pv_lithium_ion_bess",
+        "capacity_mw": "100",
+        "storage_power_mw": "50",
+        "storage_energy_mwh": "200",
+        "lifecycle_stage": "financing"
+      },
+      "site": {
+        "country_code": "ZA",
+        "region": "Northern Cape",
+        "latitude": "-29.0",
+        "longitude": "22.0",
+        "site_id": "synthetic-site-nc-001",
+        "point_of_connection_id": "synthetic-poc-001"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_grid_agreement",
+          "claim_id": "grid_right",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "operator-grid-doc-001",
+          "source_ref": "urn:synthetic:operator:connection-agreement:001",
+          "valid_time": {
+            "from": "2026-06-01T00:00:00Z",
+            "to": "2029-06-01T00:00:00Z"
+          },
+          "known_at": "2026-06-03T09:00:00Z",
+          "value": "120",
+          "unit": "MW",
+          "subject_id": "synthetic-poc-001",
+          "boundary_id": "grid-poc-synthetic-poc-001",
+          "issuer_id": "did:synthetic:grid-operator",
+          "issuer_role": "system_operator",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_yield_meter",
+          "claim_id": "yield_baseline",
+          "evidence_class": "independently_reconciled_measurement",
+          "record_state": "current",
+          "source_family_id": "independent-mv-lab-001",
+          "source_ref": "urn:synthetic:mv:irradiance-and-energy:001",
+          "valid_time": {
+            "from": "2025-07-01T00:00:00Z",
+            "to": "2026-06-30T23:59:59Z"
+          },
+          "known_at": "2026-07-10T12:00:00Z",
+          "value": "221000",
+          "unit": "MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-metering-boundary-v1",
+          "issuer_id": "did:synthetic:independent-verifier",
+          "issuer_role": "independent_verifier",
+          "authenticity_status": "not_applicable"
+        },
+        {
+          "evidence_id": "ev_model",
+          "claim_id": "physical_performance",
+          "evidence_class": "validated_model_output",
+          "record_state": "current",
+          "source_family_id": "model-registry-symtropy-001",
+          "source_ref": "urn:synthetic:model-run:hybrid-001",
+          "valid_time": {
+            "from": "2026-07-01T00:00:00Z",
+            "to": "2026-07-31T23:59:59Z"
+          },
+          "known_at": "2026-07-31T17:00:00Z",
+          "model_id": "pv-bess-model-v1",
+          "value": "0.84",
+          "unit": "capacity_factor",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-ac-boundary-v1",
+          "issuer_id": "did:synthetic:model-registry",
+          "issuer_role": "model_registry",
+          "authenticity_status": "not_applicable"
+        },
+        {
+          "evidence_id": "ev_tariff",
+          "claim_id": "revenue_tariff",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "offtaker-contract-001",
+          "source_ref": "urn:synthetic:contract:ppa:001",
+          "valid_time": {
+            "from": "2026-07-01T00:00:00Z",
+            "to": "2036-06-30T23:59:59Z"
+          },
+          "known_at": "2026-07-15T12:00:00Z",
+          "value": "1450",
+          "unit": "ZAR/MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-offtake-boundary-v1",
+          "issuer_id": "did:synthetic:offtaker",
+          "issuer_role": "offtaker",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_capex",
+          "claim_id": "capex_basis",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "epc-bid-family-001",
+          "source_ref": "urn:synthetic:epc:bid:001",
+          "valid_time": {
+            "from": "2026-06-15T00:00:00Z",
+            "to": "2026-12-15T23:59:59Z"
+          },
+          "known_at": "2026-06-20T10:00:00Z",
+          "value": "2500000000",
+          "unit": "ZAR",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-epc-cost-boundary-v1",
+          "issuer_id": "did:synthetic:epc-contractor",
+          "issuer_role": "epc_contractor",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_fx",
+          "claim_id": "fx_basis",
+          "evidence_class": "official_source_publication",
+          "record_state": "current",
+          "source_family_id": "central-bank-series-001",
+          "source_ref": "urn:synthetic:fx:zar-usd:2026-07-31",
+          "valid_time": {
+            "from": "2026-07-31T00:00:00Z",
+            "to": "2026-07-31T23:59:59Z"
+          },
+          "known_at": "2026-08-01T12:00:00Z",
+          "value": "18.2",
+          "unit": "ZAR/USD",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "fx-observation-boundary-v1",
+          "issuer_id": "did:synthetic:central-bank",
+          "issuer_role": "central_bank",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_opex",
+          "claim_id": "operating_cost_basis",
+          "evidence_class": "analyst_assumption",
+          "record_state": "current",
+          "source_family_id": "analyst-assumption-family-v1",
+          "source_ref": "urn:synthetic:analyst-assumption:operating-cost",
+          "valid_time": {
+            "from": "2026-08-01T00:00:00Z",
+            "to": "2036-12-31T23:59:59Z"
+          },
+          "known_at": "2026-08-01T00:00:00Z",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-operating-cost-assumption-v1",
+          "issuer_id": "did:synthetic:analyst",
+          "issuer_role": "other",
+          "authenticity_status": "not_applicable",
+          "value": "75000000",
+          "unit": "ZAR/year",
+          "uncertainty": {
+            "kind": "range",
+            "lower": "60000000",
+            "upper": "100000000"
+          }
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "grid_right",
+          "proposition": "The project has a documented right to connect 100 MW at the named point of connection.",
+          "materiality": "critical",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_grid_agreement"
+          ]
+        },
+        {
+          "claim_id": "yield_baseline",
+          "proposition": "A reconciled historical energy-yield observation exists for the declared site boundary.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_yield_meter"
+          ]
+        },
+        {
+          "claim_id": "physical_performance",
+          "proposition": "The model output is within its declared validation scope for this project capacity.",
+          "materiality": "critical",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_model"
+          ]
+        },
+        {
+          "claim_id": "revenue_tariff",
+          "proposition": "The decision-time revenue tariff is supported by an effective offtake document.",
+          "materiality": "critical",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_tariff"
+          ]
+        },
+        {
+          "claim_id": "capex_basis",
+          "proposition": "The EPC capital-cost basis is supported by an issuer-provided offer.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_capex"
+          ]
+        },
+        {
+          "claim_id": "fx_basis",
+          "proposition": "The USD/ZAR conversion basis is evidenced for the declared reporting date.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_fx"
+          ]
+        },
+        {
+          "claim_id": "operating_cost_basis",
+          "proposition": "A declared operating-cost assumption is available for scenario analysis.",
+          "materiality": "medium",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_opex"
+          ],
+          "notes": "Synthetic analyst assumption; not an observed cost or a qualified supplier quote."
+        }
+      ],
+      "physical_model": {
+        "model_id": "pv-bess-model-v1",
+        "model_version": "1.0.0",
+        "model_family": "hybrid_plant",
+        "qualification": "qualified",
+        "qualification_scope": {
+          "boundary": "synthetic 50–120 MW PV plus 0–250 MWh BESS; declared weather and dispatch basis",
+          "max_capacity_mw": "120",
+          "effective_from": "2026-01-01T00:00:00Z",
+          "effective_until": "2027-12-31T23:59:59Z"
+        },
+        "measurements": [
+          {
+            "name": "annual_net_generation",
+            "value": "221000",
+            "unit": "MWh",
+            "evidence_ref": "ev_model"
+          },
+          {
+            "name": "availability",
+            "value": "0.98",
+            "unit": "fraction",
+            "evidence_ref": "ev_model"
+          },
+          {
+            "name": "battery_round_trip_efficiency",
+            "value": "0.88",
+            "unit": "fraction",
+            "evidence_ref": "ev_model"
+          }
+        ],
+        "calibration_evidence_refs": [
+          "ev_yield_meter"
+        ],
+        "yield_assessment": {
+          "horizon_years": 1,
+          "quantile_convention": "exceedance_probability",
+          "p50_net_energy_mwh": "221000",
+          "p90_net_energy_mwh": "188000",
+          "p95_net_energy_mwh": "180000",
+          "method": "joint_monte_carlo",
+          "uncertainty_components": [
+            {
+              "component_id": "interannual-resource-variability",
+              "uncertainty_type": "aleatory",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "resource-data-and-site-adaptation",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "model-parameter-and-structure",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            },
+            {
+              "component_id": "availability-and-degradation",
+              "uncertainty_type": "mixed",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            }
+          ]
+        }
+      },
+      "grid_connection": {
+        "point_of_connection_id": "synthetic-poc-001",
+        "status": "connection_agreement_signed",
+        "requested_capacity_mw": "100",
+        "allocated_capacity_mw": "120",
+        "evidence_refs": [
+          "ev_grid_agreement"
+        ],
+        "curtailment_basis": "system_operator_assessment",
+        "curtailment_fraction": "0.04"
+      },
+      "financial_case": {
+        "reporting_currency": "ZAR",
+        "cash_flow_currency": "ZAR",
+        "day_count": "actual_365_fixed",
+        "fx_status": "not_required",
+        "cash_flows": [
+          {
+            "date": "2026-12-01T00:00:00Z",
+            "amount_decimal": "-2500000000",
+            "currency": "ZAR",
+            "flow_type": "construction_capex",
+            "evidence_refs": [
+              "ev_capex"
+            ]
+          },
+          {
+            "date": "2027-12-31T00:00:00Z",
+            "amount_decimal": "-75000000",
+            "currency": "ZAR",
+            "flow_type": "operating_cost",
+            "evidence_refs": [
+              "ev_opex"
+            ]
+          },
+          {
+            "date": "2027-12-31T00:00:00Z",
+            "amount_decimal": "230000000",
+            "currency": "ZAR",
+            "flow_type": "operating_revenue",
+            "evidence_refs": [
+              "ev_tariff",
+              "ev_model"
+            ]
+          },
+          {
+            "date": "2028-12-31T00:00:00Z",
+            "amount_decimal": "240000000",
+            "currency": "ZAR",
+            "flow_type": "operating_revenue",
+            "evidence_refs": [
+              "ev_tariff",
+              "ev_model"
+            ]
+          },
+          {
+            "date": "2036-12-31T00:00:00Z",
+            "amount_decimal": "-120000000",
+            "currency": "ZAR",
+            "flow_type": "replacement_capex",
+            "evidence_refs": [
+              "ev_model"
+            ]
+          }
+        ]
+      },
+      "scenarios": [
+        {
+          "scenario_id": "base_joint_001",
+          "description": "Synthetic base case with shared weather, grid and price drivers.",
+          "dependence": "joint_modelled",
+          "variables": [
+            {
+              "name": "net_generation_mwh",
+              "unit": "MWh/year",
+              "base": "221000",
+              "low": "188000",
+              "high": "232000",
+              "correlation_group": "weather_grid"
+            },
+            {
+              "name": "realized_price",
+              "unit": "ZAR/MWh",
+              "base": "1450",
+              "low": "950",
+              "high": "1550",
+              "correlation_group": "power_market"
+            },
+            {
+              "name": "curtailment_fraction",
+              "unit": "fraction",
+              "base": "0.04",
+              "low": "0.02",
+              "high": "0.20",
+              "correlation_group": "weather_grid"
+            },
+            {
+              "name": "construction_delay_months",
+              "unit": "month",
+              "base": "0",
+              "low": "0",
+              "high": "12",
+              "correlation_group": "supply_chain_fx"
+            }
+          ],
+          "evidence_refs": [
+            "ev_model",
+            "ev_tariff",
+            "ev_grid_agreement"
+          ]
+        }
+      ],
+      "required_gates": [
+        {
+          "gate_id": "grid-evidence",
+          "claim_ids": [
+            "grid_right"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-poc-001",
+          "expected_boundary_id": "grid-poc-synthetic-poc-001",
+          "expected_issuer_role": "system_operator",
+          "require_valid_at_decision": true
+        },
+        {
+          "gate_id": "physical-model-scope",
+          "claim_ids": [
+            "physical_performance"
+          ],
+          "required_evidence_classes": [
+            "validated_model_output"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-ac-boundary-v1",
+          "expected_issuer_role": "model_registry",
+          "require_valid_at_decision": false
+        },
+        {
+          "gate_id": "yield-evidence",
+          "claim_ids": [
+            "yield_baseline"
+          ],
+          "required_evidence_classes": [
+            "independently_reconciled_measurement"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-metering-boundary-v1",
+          "expected_issuer_role": "independent_verifier",
+          "require_valid_at_decision": false
+        },
+        {
+          "gate_id": "tariff-evidence",
+          "claim_ids": [
+            "revenue_tariff"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-offtake-boundary-v1",
+          "expected_issuer_role": "offtaker",
+          "require_valid_at_decision": true
+        },
+        {
+          "gate_id": "capex-evidence",
+          "claim_ids": [
+            "capex_basis"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-epc-cost-boundary-v1",
+          "expected_issuer_role": "epc_contractor",
+          "require_valid_at_decision": true
+        }
+      ]
+    },
+    {
+      "case_id": "grid-assertion-only-002",
+      "synthetic": true,
+      "decision_time": "2026-08-01T00:00:00Z",
+      "project": {
+        "name": "Synthetic Northern Cape Solar + Storage Project",
+        "asset_class": "hybrid_generation_storage",
+        "technology": "utility_scale_pv_lithium_ion_bess",
+        "capacity_mw": "100",
+        "storage_power_mw": "50",
+        "storage_energy_mwh": "200",
+        "lifecycle_stage": "financing"
+      },
+      "site": {
+        "country_code": "ZA",
+        "region": "Northern Cape",
+        "latitude": "-29.0",
+        "longitude": "22.0",
+        "site_id": "synthetic-site-nc-001",
+        "point_of_connection_id": "synthetic-poc-001"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_yield_meter",
+          "claim_id": "yield_baseline",
+          "evidence_class": "independently_reconciled_measurement",
+          "record_state": "current",
+          "source_family_id": "independent-mv-lab-001",
+          "source_ref": "urn:synthetic:mv:irradiance-and-energy:001",
+          "valid_time": {
+            "from": "2025-07-01T00:00:00Z",
+            "to": "2026-06-30T23:59:59Z"
+          },
+          "known_at": "2026-07-10T12:00:00Z",
+          "value": "221000",
+          "unit": "MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-metering-boundary-v1",
+          "issuer_id": "did:synthetic:independent-verifier",
+          "issuer_role": "independent_verifier",
+          "authenticity_status": "not_applicable"
+        },
+        {
+          "evidence_id": "ev_model",
+          "claim_id": "physical_performance",
+          "evidence_class": "validated_model_output",
+          "record_state": "current",
+          "source_family_id": "model-registry-symtropy-001",
+          "source_ref": "urn:synthetic:model-run:hybrid-001",
+          "valid_time": {
+            "from": "2026-07-01T00:00:00Z",
+            "to": "2026-07-31T23:59:59Z"
+          },
+          "known_at": "2026-07-31T17:00:00Z",
+          "model_id": "pv-bess-model-v1",
+          "value": "0.84",
+          "unit": "capacity_factor",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-ac-boundary-v1",
+          "issuer_id": "did:synthetic:model-registry",
+          "issuer_role": "model_registry",
+          "authenticity_status": "not_applicable"
+        },
+        {
+          "evidence_id": "ev_tariff",
+          "claim_id": "revenue_tariff",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "offtaker-contract-001",
+          "source_ref": "urn:synthetic:contract:ppa:001",
+          "valid_time": {
+            "from": "2026-07-01T00:00:00Z",
+            "to": "2036-06-30T23:59:59Z"
+          },
+          "known_at": "2026-07-15T12:00:00Z",
+          "value": "1450",
+          "unit": "ZAR/MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-offtake-boundary-v1",
+          "issuer_id": "did:synthetic:offtaker",
+          "issuer_role": "offtaker",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_capex",
+          "claim_id": "capex_basis",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "epc-bid-family-001",
+          "source_ref": "urn:synthetic:epc:bid:001",
+          "valid_time": {
+            "from": "2026-06-15T00:00:00Z",
+            "to": "2026-12-15T23:59:59Z"
+          },
+          "known_at": "2026-06-20T10:00:00Z",
+          "value": "2500000000",
+          "unit": "ZAR",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-epc-cost-boundary-v1",
+          "issuer_id": "did:synthetic:epc-contractor",
+          "issuer_role": "epc_contractor",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_fx",
+          "claim_id": "fx_basis",
+          "evidence_class": "official_source_publication",
+          "record_state": "current",
+          "source_family_id": "central-bank-series-001",
+          "source_ref": "urn:synthetic:fx:zar-usd:2026-07-31",
+          "valid_time": {
+            "from": "2026-07-31T00:00:00Z",
+            "to": "2026-07-31T23:59:59Z"
+          },
+          "known_at": "2026-08-01T12:00:00Z",
+          "value": "18.2",
+          "unit": "ZAR/USD",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "fx-observation-boundary-v1",
+          "issuer_id": "did:synthetic:central-bank",
+          "issuer_role": "central_bank",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_grid_dev",
+          "claim_id": "grid_right",
+          "evidence_class": "self_asserted",
+          "record_state": "current",
+          "source_family_id": "developer-submission-001",
+          "source_ref": "urn:synthetic:developer:grid-letter:002",
+          "valid_time": {
+            "from": "2026-06-01T00:00:00Z",
+            "to": "2029-06-01T00:00:00Z"
+          },
+          "known_at": "2026-07-20T10:00:00Z",
+          "value": "120",
+          "unit": "MW",
+          "subject_id": "synthetic-poc-001",
+          "boundary_id": "grid-poc-synthetic-poc-001",
+          "issuer_id": "did:synthetic:developer",
+          "issuer_role": "developer",
+          "authenticity_status": "not_applicable"
+        },
+        {
+          "evidence_id": "ev_opex",
+          "claim_id": "operating_cost_basis",
+          "evidence_class": "analyst_assumption",
+          "record_state": "current",
+          "source_family_id": "analyst-assumption-family-v1",
+          "source_ref": "urn:synthetic:analyst-assumption:operating-cost",
+          "valid_time": {
+            "from": "2026-08-01T00:00:00Z",
+            "to": "2036-12-31T23:59:59Z"
+          },
+          "known_at": "2026-08-01T00:00:00Z",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-operating-cost-assumption-v1",
+          "issuer_id": "did:synthetic:analyst",
+          "issuer_role": "other",
+          "authenticity_status": "not_applicable",
+          "value": "75000000",
+          "unit": "ZAR/year",
+          "uncertainty": {
+            "kind": "range",
+            "lower": "60000000",
+            "upper": "100000000"
+          }
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "grid_right",
+          "proposition": "The project has a documented right to connect 100 MW at the named point of connection.",
+          "materiality": "critical",
+          "assessment": "unresolved",
+          "evidence_refs": [
+            "ev_grid_dev"
+          ],
+          "notes": "Developer assertion is not operator allocation or signed connection evidence."
+        },
+        {
+          "claim_id": "yield_baseline",
+          "proposition": "A reconciled historical energy-yield observation exists for the declared site boundary.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_yield_meter"
+          ]
+        },
+        {
+          "claim_id": "physical_performance",
+          "proposition": "The model output is within its declared validation scope for this project capacity.",
+          "materiality": "critical",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_model"
+          ]
+        },
+        {
+          "claim_id": "revenue_tariff",
+          "proposition": "The decision-time revenue tariff is supported by an effective offtake document.",
+          "materiality": "critical",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_tariff"
+          ]
+        },
+        {
+          "claim_id": "capex_basis",
+          "proposition": "The EPC capital-cost basis is supported by an issuer-provided offer.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_capex"
+          ]
+        },
+        {
+          "claim_id": "fx_basis",
+          "proposition": "The USD/ZAR conversion basis is evidenced for the declared reporting date.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_fx"
+          ]
+        },
+        {
+          "claim_id": "operating_cost_basis",
+          "proposition": "A declared operating-cost assumption is available for scenario analysis.",
+          "materiality": "medium",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_opex"
+          ],
+          "notes": "Synthetic analyst assumption; not an observed cost or a qualified supplier quote."
+        }
+      ],
+      "physical_model": {
+        "model_id": "pv-bess-model-v1",
+        "model_version": "1.0.0",
+        "model_family": "hybrid_plant",
+        "qualification": "qualified",
+        "qualification_scope": {
+          "boundary": "synthetic 50–120 MW PV plus 0–250 MWh BESS; declared weather and dispatch basis",
+          "max_capacity_mw": "120",
+          "effective_from": "2026-01-01T00:00:00Z",
+          "effective_until": "2027-12-31T23:59:59Z"
+        },
+        "measurements": [
+          {
+            "name": "annual_net_generation",
+            "value": "221000",
+            "unit": "MWh",
+            "evidence_ref": "ev_model"
+          },
+          {
+            "name": "availability",
+            "value": "0.98",
+            "unit": "fraction",
+            "evidence_ref": "ev_model"
+          },
+          {
+            "name": "battery_round_trip_efficiency",
+            "value": "0.88",
+            "unit": "fraction",
+            "evidence_ref": "ev_model"
+          }
+        ],
+        "calibration_evidence_refs": [
+          "ev_yield_meter"
+        ],
+        "yield_assessment": {
+          "horizon_years": 1,
+          "quantile_convention": "exceedance_probability",
+          "p50_net_energy_mwh": "221000",
+          "p90_net_energy_mwh": "188000",
+          "p95_net_energy_mwh": "180000",
+          "method": "joint_monte_carlo",
+          "uncertainty_components": [
+            {
+              "component_id": "interannual-resource-variability",
+              "uncertainty_type": "aleatory",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "resource-data-and-site-adaptation",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "model-parameter-and-structure",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            },
+            {
+              "component_id": "availability-and-degradation",
+              "uncertainty_type": "mixed",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            }
+          ]
+        }
+      },
+      "grid_connection": {
+        "point_of_connection_id": "synthetic-poc-001",
+        "status": "developer_claim",
+        "requested_capacity_mw": "100",
+        "allocated_capacity_mw": "120",
+        "evidence_refs": [
+          "ev_grid_dev"
+        ],
+        "curtailment_basis": "system_operator_assessment",
+        "curtailment_fraction": "0.04"
+      },
+      "financial_case": {
+        "reporting_currency": "ZAR",
+        "cash_flow_currency": "ZAR",
+        "day_count": "actual_365_fixed",
+        "fx_status": "not_required",
+        "cash_flows": [
+          {
+            "date": "2026-12-01T00:00:00Z",
+            "amount_decimal": "-2500000000",
+            "currency": "ZAR",
+            "flow_type": "construction_capex",
+            "evidence_refs": [
+              "ev_capex"
+            ]
+          },
+          {
+            "date": "2027-12-31T00:00:00Z",
+            "amount_decimal": "-75000000",
+            "currency": "ZAR",
+            "flow_type": "operating_cost",
+            "evidence_refs": [
+              "ev_opex"
+            ]
+          },
+          {
+            "date": "2027-12-31T00:00:00Z",
+            "amount_decimal": "230000000",
+            "currency": "ZAR",
+            "flow_type": "operating_revenue",
+            "evidence_refs": [
+              "ev_tariff",
+              "ev_model"
+            ]
+          },
+          {
+            "date": "2028-12-31T00:00:00Z",
+            "amount_decimal": "240000000",
+            "currency": "ZAR",
+            "flow_type": "operating_revenue",
+            "evidence_refs": [
+              "ev_tariff",
+              "ev_model"
+            ]
+          },
+          {
+            "date": "2036-12-31T00:00:00Z",
+            "amount_decimal": "-120000000",
+            "currency": "ZAR",
+            "flow_type": "replacement_capex",
+            "evidence_refs": [
+              "ev_model"
+            ]
+          }
+        ]
+      },
+      "scenarios": [
+        {
+          "scenario_id": "base_joint_001",
+          "description": "Synthetic base case with shared weather, grid and price drivers.",
+          "dependence": "joint_modelled",
+          "variables": [
+            {
+              "name": "net_generation_mwh",
+              "unit": "MWh/year",
+              "base": "221000",
+              "low": "188000",
+              "high": "232000",
+              "correlation_group": "weather_grid"
+            },
+            {
+              "name": "realized_price",
+              "unit": "ZAR/MWh",
+              "base": "1450",
+              "low": "950",
+              "high": "1550",
+              "correlation_group": "power_market"
+            },
+            {
+              "name": "curtailment_fraction",
+              "unit": "fraction",
+              "base": "0.04",
+              "low": "0.02",
+              "high": "0.20",
+              "correlation_group": "weather_grid"
+            },
+            {
+              "name": "construction_delay_months",
+              "unit": "month",
+              "base": "0",
+              "low": "0",
+              "high": "12",
+              "correlation_group": "supply_chain_fx"
+            }
+          ],
+          "evidence_refs": [
+            "ev_model",
+            "ev_tariff",
+            "ev_grid_dev"
+          ]
+        }
+      ],
+      "required_gates": [
+        {
+          "gate_id": "grid-evidence",
+          "claim_ids": [
+            "grid_right"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-poc-001",
+          "expected_boundary_id": "grid-poc-synthetic-poc-001",
+          "expected_issuer_role": "system_operator",
+          "require_valid_at_decision": true
+        },
+        {
+          "gate_id": "physical-model-scope",
+          "claim_ids": [
+            "physical_performance"
+          ],
+          "required_evidence_classes": [
+            "validated_model_output"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-ac-boundary-v1",
+          "expected_issuer_role": "model_registry",
+          "require_valid_at_decision": false
+        },
+        {
+          "gate_id": "yield-evidence",
+          "claim_ids": [
+            "yield_baseline"
+          ],
+          "required_evidence_classes": [
+            "independently_reconciled_measurement"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-metering-boundary-v1",
+          "expected_issuer_role": "independent_verifier",
+          "require_valid_at_decision": false
+        },
+        {
+          "gate_id": "tariff-evidence",
+          "claim_ids": [
+            "revenue_tariff"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-offtake-boundary-v1",
+          "expected_issuer_role": "offtaker",
+          "require_valid_at_decision": true
+        },
+        {
+          "gate_id": "capex-evidence",
+          "claim_ids": [
+            "capex_basis"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-epc-cost-boundary-v1",
+          "expected_issuer_role": "epc_contractor",
+          "require_valid_at_decision": true
+        }
+      ]
+    },
+    {
+      "case_id": "model-domain-exceeded-003",
+      "synthetic": true,
+      "decision_time": "2026-08-01T00:00:00Z",
+      "project": {
+        "name": "Synthetic Northern Cape Solar + Storage Project",
+        "asset_class": "hybrid_generation_storage",
+        "technology": "utility_scale_pv_lithium_ion_bess",
+        "capacity_mw": "180",
+        "storage_power_mw": "50",
+        "storage_energy_mwh": "200",
+        "lifecycle_stage": "financing"
+      },
+      "site": {
+        "country_code": "ZA",
+        "region": "Northern Cape",
+        "latitude": "-29.0",
+        "longitude": "22.0",
+        "site_id": "synthetic-site-nc-001",
+        "point_of_connection_id": "synthetic-poc-001"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_grid_agreement",
+          "claim_id": "grid_right",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "operator-grid-doc-001",
+          "source_ref": "urn:synthetic:operator:connection-agreement:001",
+          "valid_time": {
+            "from": "2026-06-01T00:00:00Z",
+            "to": "2029-06-01T00:00:00Z"
+          },
+          "known_at": "2026-06-03T09:00:00Z",
+          "value": "120",
+          "unit": "MW",
+          "subject_id": "synthetic-poc-001",
+          "boundary_id": "grid-poc-synthetic-poc-001",
+          "issuer_id": "did:synthetic:grid-operator",
+          "issuer_role": "system_operator",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_yield_meter",
+          "claim_id": "yield_baseline",
+          "evidence_class": "independently_reconciled_measurement",
+          "record_state": "current",
+          "source_family_id": "independent-mv-lab-001",
+          "source_ref": "urn:synthetic:mv:irradiance-and-energy:001",
+          "valid_time": {
+            "from": "2025-07-01T00:00:00Z",
+            "to": "2026-06-30T23:59:59Z"
+          },
+          "known_at": "2026-07-10T12:00:00Z",
+          "value": "221000",
+          "unit": "MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-metering-boundary-v1",
+          "issuer_id": "did:synthetic:independent-verifier",
+          "issuer_role": "independent_verifier",
+          "authenticity_status": "not_applicable"
+        },
+        {
+          "evidence_id": "ev_model",
+          "claim_id": "physical_performance",
+          "evidence_class": "unvalidated_model_output",
+          "record_state": "current",
+          "source_family_id": "model-registry-symtropy-001",
+          "source_ref": "urn:synthetic:model-run:hybrid-001",
+          "valid_time": {
+            "from": "2026-07-01T00:00:00Z",
+            "to": "2026-07-31T23:59:59Z"
+          },
+          "known_at": "2026-07-31T17:00:00Z",
+          "model_id": "pv-bess-model-v1",
+          "value": "0.84",
+          "unit": "capacity_factor",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-ac-boundary-v1",
+          "issuer_id": "did:synthetic:model-registry",
+          "issuer_role": "model_registry",
+          "authenticity_status": "not_applicable"
+        },
+        {
+          "evidence_id": "ev_tariff",
+          "claim_id": "revenue_tariff",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "offtaker-contract-001",
+          "source_ref": "urn:synthetic:contract:ppa:001",
+          "valid_time": {
+            "from": "2026-07-01T00:00:00Z",
+            "to": "2036-06-30T23:59:59Z"
+          },
+          "known_at": "2026-07-15T12:00:00Z",
+          "value": "1450",
+          "unit": "ZAR/MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-offtake-boundary-v1",
+          "issuer_id": "did:synthetic:offtaker",
+          "issuer_role": "offtaker",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_capex",
+          "claim_id": "capex_basis",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "epc-bid-family-001",
+          "source_ref": "urn:synthetic:epc:bid:001",
+          "valid_time": {
+            "from": "2026-06-15T00:00:00Z",
+            "to": "2026-12-15T23:59:59Z"
+          },
+          "known_at": "2026-06-20T10:00:00Z",
+          "value": "2500000000",
+          "unit": "ZAR",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-epc-cost-boundary-v1",
+          "issuer_id": "did:synthetic:epc-contractor",
+          "issuer_role": "epc_contractor",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_fx",
+          "claim_id": "fx_basis",
+          "evidence_class": "official_source_publication",
+          "record_state": "current",
+          "source_family_id": "central-bank-series-001",
+          "source_ref": "urn:synthetic:fx:zar-usd:2026-07-31",
+          "valid_time": {
+            "from": "2026-07-31T00:00:00Z",
+            "to": "2026-07-31T23:59:59Z"
+          },
+          "known_at": "2026-08-01T12:00:00Z",
+          "value": "18.2",
+          "unit": "ZAR/USD",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "fx-observation-boundary-v1",
+          "issuer_id": "did:synthetic:central-bank",
+          "issuer_role": "central_bank",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_opex",
+          "claim_id": "operating_cost_basis",
+          "evidence_class": "analyst_assumption",
+          "record_state": "current",
+          "source_family_id": "analyst-assumption-family-v1",
+          "source_ref": "urn:synthetic:analyst-assumption:operating-cost",
+          "valid_time": {
+            "from": "2026-08-01T00:00:00Z",
+            "to": "2036-12-31T23:59:59Z"
+          },
+          "known_at": "2026-08-01T00:00:00Z",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-operating-cost-assumption-v1",
+          "issuer_id": "did:synthetic:analyst",
+          "issuer_role": "other",
+          "authenticity_status": "not_applicable",
+          "value": "75000000",
+          "unit": "ZAR/year",
+          "uncertainty": {
+            "kind": "range",
+            "lower": "60000000",
+            "upper": "100000000"
+          }
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "grid_right",
+          "proposition": "The project has a documented right to connect 100 MW at the named point of connection.",
+          "materiality": "critical",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_grid_agreement"
+          ]
+        },
+        {
+          "claim_id": "yield_baseline",
+          "proposition": "A reconciled historical energy-yield observation exists for the declared site boundary.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_yield_meter"
+          ]
+        },
+        {
+          "claim_id": "physical_performance",
+          "proposition": "The model output is within its declared validation scope for this project capacity.",
+          "materiality": "critical",
+          "assessment": "unresolved",
+          "evidence_refs": [
+            "ev_model"
+          ],
+          "notes": "Project capacity exceeds the model's qualified capacity domain."
+        },
+        {
+          "claim_id": "revenue_tariff",
+          "proposition": "The decision-time revenue tariff is supported by an effective offtake document.",
+          "materiality": "critical",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_tariff"
+          ]
+        },
+        {
+          "claim_id": "capex_basis",
+          "proposition": "The EPC capital-cost basis is supported by an issuer-provided offer.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_capex"
+          ]
+        },
+        {
+          "claim_id": "fx_basis",
+          "proposition": "The USD/ZAR conversion basis is evidenced for the declared reporting date.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_fx"
+          ]
+        },
+        {
+          "claim_id": "operating_cost_basis",
+          "proposition": "A declared operating-cost assumption is available for scenario analysis.",
+          "materiality": "medium",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_opex"
+          ],
+          "notes": "Synthetic analyst assumption; not an observed cost or a qualified supplier quote."
+        }
+      ],
+      "physical_model": {
+        "model_id": "pv-bess-model-v1",
+        "model_version": "1.0.0",
+        "model_family": "hybrid_plant",
+        "qualification": "limited",
+        "qualification_scope": {
+          "boundary": "synthetic 50–120 MW PV plus 0–250 MWh BESS; declared weather and dispatch basis",
+          "max_capacity_mw": "120",
+          "effective_from": "2026-01-01T00:00:00Z",
+          "effective_until": "2027-12-31T23:59:59Z"
+        },
+        "measurements": [
+          {
+            "name": "annual_net_generation",
+            "value": "221000",
+            "unit": "MWh",
+            "evidence_ref": "ev_model"
+          },
+          {
+            "name": "availability",
+            "value": "0.98",
+            "unit": "fraction",
+            "evidence_ref": "ev_model"
+          },
+          {
+            "name": "battery_round_trip_efficiency",
+            "value": "0.88",
+            "unit": "fraction",
+            "evidence_ref": "ev_model"
+          }
+        ],
+        "calibration_evidence_refs": [
+          "ev_yield_meter"
+        ],
+        "yield_assessment": {
+          "horizon_years": 1,
+          "quantile_convention": "exceedance_probability",
+          "p50_net_energy_mwh": "221000",
+          "p90_net_energy_mwh": "188000",
+          "p95_net_energy_mwh": "180000",
+          "method": "joint_monte_carlo",
+          "uncertainty_components": [
+            {
+              "component_id": "interannual-resource-variability",
+              "uncertainty_type": "aleatory",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "resource-data-and-site-adaptation",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "model-parameter-and-structure",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            },
+            {
+              "component_id": "availability-and-degradation",
+              "uncertainty_type": "mixed",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            }
+          ]
+        }
+      },
+      "grid_connection": {
+        "point_of_connection_id": "synthetic-poc-001",
+        "status": "connection_agreement_signed",
+        "requested_capacity_mw": "100",
+        "allocated_capacity_mw": "120",
+        "evidence_refs": [
+          "ev_grid_agreement"
+        ],
+        "curtailment_basis": "system_operator_assessment",
+        "curtailment_fraction": "0.04"
+      },
+      "financial_case": {
+        "reporting_currency": "ZAR",
+        "cash_flow_currency": "ZAR",
+        "day_count": "actual_365_fixed",
+        "fx_status": "not_required",
+        "cash_flows": [
+          {
+            "date": "2026-12-01T00:00:00Z",
+            "amount_decimal": "-2500000000",
+            "currency": "ZAR",
+            "flow_type": "construction_capex",
+            "evidence_refs": [
+              "ev_capex"
+            ]
+          },
+          {
+            "date": "2027-12-31T00:00:00Z",
+            "amount_decimal": "-75000000",
+            "currency": "ZAR",
+            "flow_type": "operating_cost",
+            "evidence_refs": [
+              "ev_opex"
+            ]
+          },
+          {
+            "date": "2027-12-31T00:00:00Z",
+            "amount_decimal": "230000000",
+            "currency": "ZAR",
+            "flow_type": "operating_revenue",
+            "evidence_refs": [
+              "ev_tariff",
+              "ev_model"
+            ]
+          },
+          {
+            "date": "2028-12-31T00:00:00Z",
+            "amount_decimal": "240000000",
+            "currency": "ZAR",
+            "flow_type": "operating_revenue",
+            "evidence_refs": [
+              "ev_tariff",
+              "ev_model"
+            ]
+          },
+          {
+            "date": "2036-12-31T00:00:00Z",
+            "amount_decimal": "-120000000",
+            "currency": "ZAR",
+            "flow_type": "replacement_capex",
+            "evidence_refs": [
+              "ev_model"
+            ]
+          }
+        ]
+      },
+      "scenarios": [
+        {
+          "scenario_id": "base_joint_001",
+          "description": "Synthetic base case with shared weather, grid and price drivers.",
+          "dependence": "joint_modelled",
+          "variables": [
+            {
+              "name": "net_generation_mwh",
+              "unit": "MWh/year",
+              "base": "221000",
+              "low": "188000",
+              "high": "232000",
+              "correlation_group": "weather_grid"
+            },
+            {
+              "name": "realized_price",
+              "unit": "ZAR/MWh",
+              "base": "1450",
+              "low": "950",
+              "high": "1550",
+              "correlation_group": "power_market"
+            },
+            {
+              "name": "curtailment_fraction",
+              "unit": "fraction",
+              "base": "0.04",
+              "low": "0.02",
+              "high": "0.20",
+              "correlation_group": "weather_grid"
+            },
+            {
+              "name": "construction_delay_months",
+              "unit": "month",
+              "base": "0",
+              "low": "0",
+              "high": "12",
+              "correlation_group": "supply_chain_fx"
+            }
+          ],
+          "evidence_refs": [
+            "ev_model",
+            "ev_tariff",
+            "ev_grid_agreement"
+          ]
+        }
+      ],
+      "required_gates": [
+        {
+          "gate_id": "grid-evidence",
+          "claim_ids": [
+            "grid_right"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-poc-001",
+          "expected_boundary_id": "grid-poc-synthetic-poc-001",
+          "expected_issuer_role": "system_operator",
+          "require_valid_at_decision": true
+        },
+        {
+          "gate_id": "physical-model-scope",
+          "claim_ids": [
+            "physical_performance"
+          ],
+          "required_evidence_classes": [
+            "validated_model_output"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-ac-boundary-v1",
+          "expected_issuer_role": "model_registry",
+          "require_valid_at_decision": false
+        },
+        {
+          "gate_id": "yield-evidence",
+          "claim_ids": [
+            "yield_baseline"
+          ],
+          "required_evidence_classes": [
+            "independently_reconciled_measurement"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-metering-boundary-v1",
+          "expected_issuer_role": "independent_verifier",
+          "require_valid_at_decision": false
+        },
+        {
+          "gate_id": "tariff-evidence",
+          "claim_ids": [
+            "revenue_tariff"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-offtake-boundary-v1",
+          "expected_issuer_role": "offtaker",
+          "require_valid_at_decision": true
+        },
+        {
+          "gate_id": "capex-evidence",
+          "claim_ids": [
+            "capex_basis"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-epc-cost-boundary-v1",
+          "expected_issuer_role": "epc_contractor",
+          "require_valid_at_decision": true
+        }
+      ]
+    },
+    {
+      "case_id": "fx-conversion-missing-004",
+      "synthetic": true,
+      "decision_time": "2026-08-01T00:00:00Z",
+      "project": {
+        "name": "Synthetic Northern Cape Solar + Storage Project",
+        "asset_class": "hybrid_generation_storage",
+        "technology": "utility_scale_pv_lithium_ion_bess",
+        "capacity_mw": "100",
+        "storage_power_mw": "50",
+        "storage_energy_mwh": "200",
+        "lifecycle_stage": "financing"
+      },
+      "site": {
+        "country_code": "ZA",
+        "region": "Northern Cape",
+        "latitude": "-29.0",
+        "longitude": "22.0",
+        "site_id": "synthetic-site-nc-001",
+        "point_of_connection_id": "synthetic-poc-001"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_grid_agreement",
+          "claim_id": "grid_right",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "operator-grid-doc-001",
+          "source_ref": "urn:synthetic:operator:connection-agreement:001",
+          "valid_time": {
+            "from": "2026-06-01T00:00:00Z",
+            "to": "2029-06-01T00:00:00Z"
+          },
+          "known_at": "2026-06-03T09:00:00Z",
+          "value": "120",
+          "unit": "MW",
+          "subject_id": "synthetic-poc-001",
+          "boundary_id": "grid-poc-synthetic-poc-001",
+          "issuer_id": "did:synthetic:grid-operator",
+          "issuer_role": "system_operator",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_yield_meter",
+          "claim_id": "yield_baseline",
+          "evidence_class": "independently_reconciled_measurement",
+          "record_state": "current",
+          "source_family_id": "independent-mv-lab-001",
+          "source_ref": "urn:synthetic:mv:irradiance-and-energy:001",
+          "valid_time": {
+            "from": "2025-07-01T00:00:00Z",
+            "to": "2026-06-30T23:59:59Z"
+          },
+          "known_at": "2026-07-10T12:00:00Z",
+          "value": "221000",
+          "unit": "MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-metering-boundary-v1",
+          "issuer_id": "did:synthetic:independent-verifier",
+          "issuer_role": "independent_verifier",
+          "authenticity_status": "not_applicable"
+        },
+        {
+          "evidence_id": "ev_model",
+          "claim_id": "physical_performance",
+          "evidence_class": "validated_model_output",
+          "record_state": "current",
+          "source_family_id": "model-registry-symtropy-001",
+          "source_ref": "urn:synthetic:model-run:hybrid-001",
+          "valid_time": {
+            "from": "2026-07-01T00:00:00Z",
+            "to": "2026-07-31T23:59:59Z"
+          },
+          "known_at": "2026-07-31T17:00:00Z",
+          "model_id": "pv-bess-model-v1",
+          "value": "0.84",
+          "unit": "capacity_factor",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-ac-boundary-v1",
+          "issuer_id": "did:synthetic:model-registry",
+          "issuer_role": "model_registry",
+          "authenticity_status": "not_applicable"
+        },
+        {
+          "evidence_id": "ev_tariff",
+          "claim_id": "revenue_tariff",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "offtaker-contract-001",
+          "source_ref": "urn:synthetic:contract:ppa:001",
+          "valid_time": {
+            "from": "2026-07-01T00:00:00Z",
+            "to": "2036-06-30T23:59:59Z"
+          },
+          "known_at": "2026-07-15T12:00:00Z",
+          "value": "1450",
+          "unit": "ZAR/MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-offtake-boundary-v1",
+          "issuer_id": "did:synthetic:offtaker",
+          "issuer_role": "offtaker",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_capex",
+          "claim_id": "capex_basis",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "epc-bid-family-001",
+          "source_ref": "urn:synthetic:epc:bid:001",
+          "valid_time": {
+            "from": "2026-06-15T00:00:00Z",
+            "to": "2026-12-15T23:59:59Z"
+          },
+          "known_at": "2026-06-20T10:00:00Z",
+          "value": "2500000000",
+          "unit": "ZAR",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-epc-cost-boundary-v1",
+          "issuer_id": "did:synthetic:epc-contractor",
+          "issuer_role": "epc_contractor",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_fx",
+          "claim_id": "fx_basis",
+          "evidence_class": "official_source_publication",
+          "record_state": "current",
+          "source_family_id": "central-bank-series-001",
+          "source_ref": "urn:synthetic:fx:zar-usd:2026-07-31",
+          "valid_time": {
+            "from": "2026-07-31T00:00:00Z",
+            "to": "2026-07-31T23:59:59Z"
+          },
+          "known_at": "2026-08-01T12:00:00Z",
+          "value": "18.2",
+          "unit": "ZAR/USD",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "fx-observation-boundary-v1",
+          "issuer_id": "did:synthetic:central-bank",
+          "issuer_role": "central_bank",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_opex",
+          "claim_id": "operating_cost_basis",
+          "evidence_class": "analyst_assumption",
+          "record_state": "current",
+          "source_family_id": "analyst-assumption-family-v1",
+          "source_ref": "urn:synthetic:analyst-assumption:operating-cost",
+          "valid_time": {
+            "from": "2026-08-01T00:00:00Z",
+            "to": "2036-12-31T23:59:59Z"
+          },
+          "known_at": "2026-08-01T00:00:00Z",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-operating-cost-assumption-v1",
+          "issuer_id": "did:synthetic:analyst",
+          "issuer_role": "other",
+          "authenticity_status": "not_applicable",
+          "value": "75000000",
+          "unit": "ZAR/year",
+          "uncertainty": {
+            "kind": "range",
+            "lower": "60000000",
+            "upper": "100000000"
+          }
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "grid_right",
+          "proposition": "The project has a documented right to connect 100 MW at the named point of connection.",
+          "materiality": "critical",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_grid_agreement"
+          ]
+        },
+        {
+          "claim_id": "yield_baseline",
+          "proposition": "A reconciled historical energy-yield observation exists for the declared site boundary.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_yield_meter"
+          ]
+        },
+        {
+          "claim_id": "physical_performance",
+          "proposition": "The model output is within its declared validation scope for this project capacity.",
+          "materiality": "critical",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_model"
+          ]
+        },
+        {
+          "claim_id": "revenue_tariff",
+          "proposition": "The decision-time revenue tariff is supported by an effective offtake document.",
+          "materiality": "critical",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_tariff"
+          ]
+        },
+        {
+          "claim_id": "capex_basis",
+          "proposition": "The EPC capital-cost basis is supported by an issuer-provided offer.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_capex"
+          ]
+        },
+        {
+          "claim_id": "operating_cost_basis",
+          "proposition": "A declared operating-cost assumption is available for scenario analysis.",
+          "materiality": "medium",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_opex"
+          ],
+          "notes": "Synthetic analyst assumption; not an observed cost or a qualified supplier quote."
+        },
+        {
+          "claim_id": "fx_basis",
+          "proposition": "An evidenced FX conversion is available for translating USD cash flows into ZAR.",
+          "materiality": "critical",
+          "assessment": "unresolved",
+          "evidence_refs": [],
+          "notes": "No conversion observation is supplied."
+        }
+      ],
+      "physical_model": {
+        "model_id": "pv-bess-model-v1",
+        "model_version": "1.0.0",
+        "model_family": "hybrid_plant",
+        "qualification": "qualified",
+        "qualification_scope": {
+          "boundary": "synthetic 50–120 MW PV plus 0–250 MWh BESS; declared weather and dispatch basis",
+          "max_capacity_mw": "120",
+          "effective_from": "2026-01-01T00:00:00Z",
+          "effective_until": "2027-12-31T23:59:59Z"
+        },
+        "measurements": [
+          {
+            "name": "annual_net_generation",
+            "value": "221000",
+            "unit": "MWh",
+            "evidence_ref": "ev_model"
+          },
+          {
+            "name": "availability",
+            "value": "0.98",
+            "unit": "fraction",
+            "evidence_ref": "ev_model"
+          },
+          {
+            "name": "battery_round_trip_efficiency",
+            "value": "0.88",
+            "unit": "fraction",
+            "evidence_ref": "ev_model"
+          }
+        ],
+        "calibration_evidence_refs": [
+          "ev_yield_meter"
+        ],
+        "yield_assessment": {
+          "horizon_years": 1,
+          "quantile_convention": "exceedance_probability",
+          "p50_net_energy_mwh": "221000",
+          "p90_net_energy_mwh": "188000",
+          "p95_net_energy_mwh": "180000",
+          "method": "joint_monte_carlo",
+          "uncertainty_components": [
+            {
+              "component_id": "interannual-resource-variability",
+              "uncertainty_type": "aleatory",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "resource-data-and-site-adaptation",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "model-parameter-and-structure",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            },
+            {
+              "component_id": "availability-and-degradation",
+              "uncertainty_type": "mixed",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            }
+          ]
+        }
+      },
+      "grid_connection": {
+        "point_of_connection_id": "synthetic-poc-001",
+        "status": "connection_agreement_signed",
+        "requested_capacity_mw": "100",
+        "allocated_capacity_mw": "120",
+        "evidence_refs": [
+          "ev_grid_agreement"
+        ],
+        "curtailment_basis": "system_operator_assessment",
+        "curtailment_fraction": "0.04"
+      },
+      "financial_case": {
+        "reporting_currency": "ZAR",
+        "cash_flow_currency": "USD",
+        "day_count": "actual_365_fixed",
+        "fx_status": "missing",
+        "cash_flows": [
+          {
+            "date": "2026-12-01T00:00:00Z",
+            "amount_decimal": "-2500000000",
+            "currency": "USD",
+            "flow_type": "construction_capex",
+            "evidence_refs": [
+              "ev_capex"
+            ]
+          },
+          {
+            "date": "2027-12-31T00:00:00Z",
+            "amount_decimal": "-75000000",
+            "currency": "USD",
+            "flow_type": "operating_cost",
+            "evidence_refs": [
+              "ev_opex"
+            ]
+          },
+          {
+            "date": "2027-12-31T00:00:00Z",
+            "amount_decimal": "230000000",
+            "currency": "USD",
+            "flow_type": "operating_revenue",
+            "evidence_refs": [
+              "ev_tariff",
+              "ev_model"
+            ]
+          },
+          {
+            "date": "2028-12-31T00:00:00Z",
+            "amount_decimal": "240000000",
+            "currency": "USD",
+            "flow_type": "operating_revenue",
+            "evidence_refs": [
+              "ev_tariff",
+              "ev_model"
+            ]
+          },
+          {
+            "date": "2036-12-31T00:00:00Z",
+            "amount_decimal": "-120000000",
+            "currency": "USD",
+            "flow_type": "replacement_capex",
+            "evidence_refs": [
+              "ev_model"
+            ]
+          }
+        ],
+        "fx_evidence_refs": []
+      },
+      "scenarios": [
+        {
+          "scenario_id": "base_joint_001",
+          "description": "Synthetic base case with shared weather, grid and price drivers.",
+          "dependence": "joint_modelled",
+          "variables": [
+            {
+              "name": "net_generation_mwh",
+              "unit": "MWh/year",
+              "base": "221000",
+              "low": "188000",
+              "high": "232000",
+              "correlation_group": "weather_grid"
+            },
+            {
+              "name": "realized_price",
+              "unit": "ZAR/MWh",
+              "base": "1450",
+              "low": "950",
+              "high": "1550",
+              "correlation_group": "power_market"
+            },
+            {
+              "name": "curtailment_fraction",
+              "unit": "fraction",
+              "base": "0.04",
+              "low": "0.02",
+              "high": "0.20",
+              "correlation_group": "weather_grid"
+            },
+            {
+              "name": "construction_delay_months",
+              "unit": "month",
+              "base": "0",
+              "low": "0",
+              "high": "12",
+              "correlation_group": "supply_chain_fx"
+            }
+          ],
+          "evidence_refs": [
+            "ev_model",
+            "ev_tariff",
+            "ev_grid_agreement"
+          ]
+        }
+      ],
+      "required_gates": [
+        {
+          "gate_id": "grid-evidence",
+          "claim_ids": [
+            "grid_right"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-poc-001",
+          "expected_boundary_id": "grid-poc-synthetic-poc-001",
+          "expected_issuer_role": "system_operator",
+          "require_valid_at_decision": true
+        },
+        {
+          "gate_id": "physical-model-scope",
+          "claim_ids": [
+            "physical_performance"
+          ],
+          "required_evidence_classes": [
+            "validated_model_output"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-ac-boundary-v1",
+          "expected_issuer_role": "model_registry",
+          "require_valid_at_decision": false
+        },
+        {
+          "gate_id": "yield-evidence",
+          "claim_ids": [
+            "yield_baseline"
+          ],
+          "required_evidence_classes": [
+            "independently_reconciled_measurement"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-metering-boundary-v1",
+          "expected_issuer_role": "independent_verifier",
+          "require_valid_at_decision": false
+        },
+        {
+          "gate_id": "tariff-evidence",
+          "claim_ids": [
+            "revenue_tariff"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-offtake-boundary-v1",
+          "expected_issuer_role": "offtaker",
+          "require_valid_at_decision": true
+        },
+        {
+          "gate_id": "capex-evidence",
+          "claim_ids": [
+            "capex_basis"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-epc-cost-boundary-v1",
+          "expected_issuer_role": "epc_contractor",
+          "require_valid_at_decision": true
+        },
+        {
+          "gate_id": "fx-evidence",
+          "claim_ids": [
+            "fx_basis"
+          ],
+          "required_evidence_classes": [
+            "official_source_publication"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "fx-observation-boundary-v1",
+          "expected_issuer_role": "central_bank",
+          "require_valid_at_decision": true
+        }
+      ]
+    },
+    {
+      "case_id": "future-known-tariff-005",
+      "synthetic": true,
+      "decision_time": "2026-08-01T00:00:00Z",
+      "project": {
+        "name": "Synthetic Northern Cape Solar + Storage Project",
+        "asset_class": "hybrid_generation_storage",
+        "technology": "utility_scale_pv_lithium_ion_bess",
+        "capacity_mw": "100",
+        "storage_power_mw": "50",
+        "storage_energy_mwh": "200",
+        "lifecycle_stage": "financing"
+      },
+      "site": {
+        "country_code": "ZA",
+        "region": "Northern Cape",
+        "latitude": "-29.0",
+        "longitude": "22.0",
+        "site_id": "synthetic-site-nc-001",
+        "point_of_connection_id": "synthetic-poc-001"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_grid_agreement",
+          "claim_id": "grid_right",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "operator-grid-doc-001",
+          "source_ref": "urn:synthetic:operator:connection-agreement:001",
+          "valid_time": {
+            "from": "2026-06-01T00:00:00Z",
+            "to": "2029-06-01T00:00:00Z"
+          },
+          "known_at": "2026-06-03T09:00:00Z",
+          "value": "120",
+          "unit": "MW",
+          "subject_id": "synthetic-poc-001",
+          "boundary_id": "grid-poc-synthetic-poc-001",
+          "issuer_id": "did:synthetic:grid-operator",
+          "issuer_role": "system_operator",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_yield_meter",
+          "claim_id": "yield_baseline",
+          "evidence_class": "independently_reconciled_measurement",
+          "record_state": "current",
+          "source_family_id": "independent-mv-lab-001",
+          "source_ref": "urn:synthetic:mv:irradiance-and-energy:001",
+          "valid_time": {
+            "from": "2025-07-01T00:00:00Z",
+            "to": "2026-06-30T23:59:59Z"
+          },
+          "known_at": "2026-07-10T12:00:00Z",
+          "value": "221000",
+          "unit": "MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-metering-boundary-v1",
+          "issuer_id": "did:synthetic:independent-verifier",
+          "issuer_role": "independent_verifier",
+          "authenticity_status": "not_applicable"
+        },
+        {
+          "evidence_id": "ev_model",
+          "claim_id": "physical_performance",
+          "evidence_class": "validated_model_output",
+          "record_state": "current",
+          "source_family_id": "model-registry-symtropy-001",
+          "source_ref": "urn:synthetic:model-run:hybrid-001",
+          "valid_time": {
+            "from": "2026-07-01T00:00:00Z",
+            "to": "2026-07-31T23:59:59Z"
+          },
+          "known_at": "2026-07-31T17:00:00Z",
+          "model_id": "pv-bess-model-v1",
+          "value": "0.84",
+          "unit": "capacity_factor",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-ac-boundary-v1",
+          "issuer_id": "did:synthetic:model-registry",
+          "issuer_role": "model_registry",
+          "authenticity_status": "not_applicable"
+        },
+        {
+          "evidence_id": "ev_tariff",
+          "claim_id": "revenue_tariff",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "offtaker-contract-001",
+          "source_ref": "urn:synthetic:contract:ppa:001",
+          "valid_time": {
+            "from": "2026-07-01T00:00:00Z",
+            "to": "2036-06-30T23:59:59Z"
+          },
+          "known_at": "2026-08-15T12:00:00Z",
+          "value": "1450",
+          "unit": "ZAR/MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-offtake-boundary-v1",
+          "issuer_id": "did:synthetic:offtaker",
+          "issuer_role": "offtaker",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_capex",
+          "claim_id": "capex_basis",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "epc-bid-family-001",
+          "source_ref": "urn:synthetic:epc:bid:001",
+          "valid_time": {
+            "from": "2026-06-15T00:00:00Z",
+            "to": "2026-12-15T23:59:59Z"
+          },
+          "known_at": "2026-06-20T10:00:00Z",
+          "value": "2500000000",
+          "unit": "ZAR",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-epc-cost-boundary-v1",
+          "issuer_id": "did:synthetic:epc-contractor",
+          "issuer_role": "epc_contractor",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_fx",
+          "claim_id": "fx_basis",
+          "evidence_class": "official_source_publication",
+          "record_state": "current",
+          "source_family_id": "central-bank-series-001",
+          "source_ref": "urn:synthetic:fx:zar-usd:2026-07-31",
+          "valid_time": {
+            "from": "2026-07-31T00:00:00Z",
+            "to": "2026-07-31T23:59:59Z"
+          },
+          "known_at": "2026-08-01T12:00:00Z",
+          "value": "18.2",
+          "unit": "ZAR/USD",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "fx-observation-boundary-v1",
+          "issuer_id": "did:synthetic:central-bank",
+          "issuer_role": "central_bank",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_opex",
+          "claim_id": "operating_cost_basis",
+          "evidence_class": "analyst_assumption",
+          "record_state": "current",
+          "source_family_id": "analyst-assumption-family-v1",
+          "source_ref": "urn:synthetic:analyst-assumption:operating-cost",
+          "valid_time": {
+            "from": "2026-08-01T00:00:00Z",
+            "to": "2036-12-31T23:59:59Z"
+          },
+          "known_at": "2026-08-01T00:00:00Z",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-operating-cost-assumption-v1",
+          "issuer_id": "did:synthetic:analyst",
+          "issuer_role": "other",
+          "authenticity_status": "not_applicable",
+          "value": "75000000",
+          "unit": "ZAR/year",
+          "uncertainty": {
+            "kind": "range",
+            "lower": "60000000",
+            "upper": "100000000"
+          }
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "grid_right",
+          "proposition": "The project has a documented right to connect 100 MW at the named point of connection.",
+          "materiality": "critical",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_grid_agreement"
+          ]
+        },
+        {
+          "claim_id": "yield_baseline",
+          "proposition": "A reconciled historical energy-yield observation exists for the declared site boundary.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_yield_meter"
+          ]
+        },
+        {
+          "claim_id": "physical_performance",
+          "proposition": "The model output is within its declared validation scope for this project capacity.",
+          "materiality": "critical",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_model"
+          ]
+        },
+        {
+          "claim_id": "revenue_tariff",
+          "proposition": "The decision-time revenue tariff is supported by an effective offtake document.",
+          "materiality": "critical",
+          "assessment": "unresolved",
+          "evidence_refs": [
+            "ev_tariff"
+          ],
+          "notes": "The tariff document was not known at the 2026-08-01 decision time."
+        },
+        {
+          "claim_id": "capex_basis",
+          "proposition": "The EPC capital-cost basis is supported by an issuer-provided offer.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_capex"
+          ]
+        },
+        {
+          "claim_id": "fx_basis",
+          "proposition": "The USD/ZAR conversion basis is evidenced for the declared reporting date.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_fx"
+          ]
+        },
+        {
+          "claim_id": "operating_cost_basis",
+          "proposition": "A declared operating-cost assumption is available for scenario analysis.",
+          "materiality": "medium",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_opex"
+          ],
+          "notes": "Synthetic analyst assumption; not an observed cost or a qualified supplier quote."
+        }
+      ],
+      "physical_model": {
+        "model_id": "pv-bess-model-v1",
+        "model_version": "1.0.0",
+        "model_family": "hybrid_plant",
+        "qualification": "qualified",
+        "qualification_scope": {
+          "boundary": "synthetic 50–120 MW PV plus 0–250 MWh BESS; declared weather and dispatch basis",
+          "max_capacity_mw": "120",
+          "effective_from": "2026-01-01T00:00:00Z",
+          "effective_until": "2027-12-31T23:59:59Z"
+        },
+        "measurements": [
+          {
+            "name": "annual_net_generation",
+            "value": "221000",
+            "unit": "MWh",
+            "evidence_ref": "ev_model"
+          },
+          {
+            "name": "availability",
+            "value": "0.98",
+            "unit": "fraction",
+            "evidence_ref": "ev_model"
+          },
+          {
+            "name": "battery_round_trip_efficiency",
+            "value": "0.88",
+            "unit": "fraction",
+            "evidence_ref": "ev_model"
+          }
+        ],
+        "calibration_evidence_refs": [
+          "ev_yield_meter"
+        ],
+        "yield_assessment": {
+          "horizon_years": 1,
+          "quantile_convention": "exceedance_probability",
+          "p50_net_energy_mwh": "221000",
+          "p90_net_energy_mwh": "188000",
+          "p95_net_energy_mwh": "180000",
+          "method": "joint_monte_carlo",
+          "uncertainty_components": [
+            {
+              "component_id": "interannual-resource-variability",
+              "uncertainty_type": "aleatory",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "resource-data-and-site-adaptation",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "model-parameter-and-structure",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            },
+            {
+              "component_id": "availability-and-degradation",
+              "uncertainty_type": "mixed",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            }
+          ]
+        }
+      },
+      "grid_connection": {
+        "point_of_connection_id": "synthetic-poc-001",
+        "status": "connection_agreement_signed",
+        "requested_capacity_mw": "100",
+        "allocated_capacity_mw": "120",
+        "evidence_refs": [
+          "ev_grid_agreement"
+        ],
+        "curtailment_basis": "system_operator_assessment",
+        "curtailment_fraction": "0.04"
+      },
+      "financial_case": {
+        "reporting_currency": "ZAR",
+        "cash_flow_currency": "ZAR",
+        "day_count": "actual_365_fixed",
+        "fx_status": "not_required",
+        "cash_flows": [
+          {
+            "date": "2026-12-01T00:00:00Z",
+            "amount_decimal": "-2500000000",
+            "currency": "ZAR",
+            "flow_type": "construction_capex",
+            "evidence_refs": [
+              "ev_capex"
+            ]
+          },
+          {
+            "date": "2027-12-31T00:00:00Z",
+            "amount_decimal": "-75000000",
+            "currency": "ZAR",
+            "flow_type": "operating_cost",
+            "evidence_refs": [
+              "ev_opex"
+            ]
+          },
+          {
+            "date": "2027-12-31T00:00:00Z",
+            "amount_decimal": "230000000",
+            "currency": "ZAR",
+            "flow_type": "operating_revenue",
+            "evidence_refs": [
+              "ev_tariff",
+              "ev_model"
+            ]
+          },
+          {
+            "date": "2028-12-31T00:00:00Z",
+            "amount_decimal": "240000000",
+            "currency": "ZAR",
+            "flow_type": "operating_revenue",
+            "evidence_refs": [
+              "ev_tariff",
+              "ev_model"
+            ]
+          },
+          {
+            "date": "2036-12-31T00:00:00Z",
+            "amount_decimal": "-120000000",
+            "currency": "ZAR",
+            "flow_type": "replacement_capex",
+            "evidence_refs": [
+              "ev_model"
+            ]
+          }
+        ]
+      },
+      "scenarios": [
+        {
+          "scenario_id": "base_joint_001",
+          "description": "Synthetic base case with shared weather, grid and price drivers.",
+          "dependence": "joint_modelled",
+          "variables": [
+            {
+              "name": "net_generation_mwh",
+              "unit": "MWh/year",
+              "base": "221000",
+              "low": "188000",
+              "high": "232000",
+              "correlation_group": "weather_grid"
+            },
+            {
+              "name": "realized_price",
+              "unit": "ZAR/MWh",
+              "base": "1450",
+              "low": "950",
+              "high": "1550",
+              "correlation_group": "power_market"
+            },
+            {
+              "name": "curtailment_fraction",
+              "unit": "fraction",
+              "base": "0.04",
+              "low": "0.02",
+              "high": "0.20",
+              "correlation_group": "weather_grid"
+            },
+            {
+              "name": "construction_delay_months",
+              "unit": "month",
+              "base": "0",
+              "low": "0",
+              "high": "12",
+              "correlation_group": "supply_chain_fx"
+            }
+          ],
+          "evidence_refs": [
+            "ev_model",
+            "ev_tariff",
+            "ev_grid_agreement"
+          ]
+        }
+      ],
+      "required_gates": [
+        {
+          "gate_id": "grid-evidence",
+          "claim_ids": [
+            "grid_right"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-poc-001",
+          "expected_boundary_id": "grid-poc-synthetic-poc-001",
+          "expected_issuer_role": "system_operator",
+          "require_valid_at_decision": true
+        },
+        {
+          "gate_id": "physical-model-scope",
+          "claim_ids": [
+            "physical_performance"
+          ],
+          "required_evidence_classes": [
+            "validated_model_output"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-ac-boundary-v1",
+          "expected_issuer_role": "model_registry",
+          "require_valid_at_decision": false
+        },
+        {
+          "gate_id": "yield-evidence",
+          "claim_ids": [
+            "yield_baseline"
+          ],
+          "required_evidence_classes": [
+            "independently_reconciled_measurement"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-metering-boundary-v1",
+          "expected_issuer_role": "independent_verifier",
+          "require_valid_at_decision": false
+        },
+        {
+          "gate_id": "tariff-evidence",
+          "claim_ids": [
+            "revenue_tariff"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-offtake-boundary-v1",
+          "expected_issuer_role": "offtaker",
+          "require_valid_at_decision": true
+        },
+        {
+          "gate_id": "capex-evidence",
+          "claim_ids": [
+            "capex_basis"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-epc-cost-boundary-v1",
+          "expected_issuer_role": "epc_contractor",
+          "require_valid_at_decision": true
+        }
+      ]
+    },
+    {
+      "case_id": "joint-dependence-unknown-006",
+      "synthetic": true,
+      "decision_time": "2026-08-01T00:00:00Z",
+      "project": {
+        "name": "Synthetic Northern Cape Solar + Storage Project",
+        "asset_class": "hybrid_generation_storage",
+        "technology": "utility_scale_pv_lithium_ion_bess",
+        "capacity_mw": "100",
+        "storage_power_mw": "50",
+        "storage_energy_mwh": "200",
+        "lifecycle_stage": "financing"
+      },
+      "site": {
+        "country_code": "ZA",
+        "region": "Northern Cape",
+        "latitude": "-29.0",
+        "longitude": "22.0",
+        "site_id": "synthetic-site-nc-001",
+        "point_of_connection_id": "synthetic-poc-001"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_grid_agreement",
+          "claim_id": "grid_right",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "operator-grid-doc-001",
+          "source_ref": "urn:synthetic:operator:connection-agreement:001",
+          "valid_time": {
+            "from": "2026-06-01T00:00:00Z",
+            "to": "2029-06-01T00:00:00Z"
+          },
+          "known_at": "2026-06-03T09:00:00Z",
+          "value": "120",
+          "unit": "MW",
+          "subject_id": "synthetic-poc-001",
+          "boundary_id": "grid-poc-synthetic-poc-001",
+          "issuer_id": "did:synthetic:grid-operator",
+          "issuer_role": "system_operator",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_yield_meter",
+          "claim_id": "yield_baseline",
+          "evidence_class": "independently_reconciled_measurement",
+          "record_state": "current",
+          "source_family_id": "independent-mv-lab-001",
+          "source_ref": "urn:synthetic:mv:irradiance-and-energy:001",
+          "valid_time": {
+            "from": "2025-07-01T00:00:00Z",
+            "to": "2026-06-30T23:59:59Z"
+          },
+          "known_at": "2026-07-10T12:00:00Z",
+          "value": "221000",
+          "unit": "MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-metering-boundary-v1",
+          "issuer_id": "did:synthetic:independent-verifier",
+          "issuer_role": "independent_verifier",
+          "authenticity_status": "not_applicable"
+        },
+        {
+          "evidence_id": "ev_model",
+          "claim_id": "physical_performance",
+          "evidence_class": "validated_model_output",
+          "record_state": "current",
+          "source_family_id": "model-registry-symtropy-001",
+          "source_ref": "urn:synthetic:model-run:hybrid-001",
+          "valid_time": {
+            "from": "2026-07-01T00:00:00Z",
+            "to": "2026-07-31T23:59:59Z"
+          },
+          "known_at": "2026-07-31T17:00:00Z",
+          "model_id": "pv-bess-model-v1",
+          "value": "0.84",
+          "unit": "capacity_factor",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-ac-boundary-v1",
+          "issuer_id": "did:synthetic:model-registry",
+          "issuer_role": "model_registry",
+          "authenticity_status": "not_applicable"
+        },
+        {
+          "evidence_id": "ev_tariff",
+          "claim_id": "revenue_tariff",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "offtaker-contract-001",
+          "source_ref": "urn:synthetic:contract:ppa:001",
+          "valid_time": {
+            "from": "2026-07-01T00:00:00Z",
+            "to": "2036-06-30T23:59:59Z"
+          },
+          "known_at": "2026-07-15T12:00:00Z",
+          "value": "1450",
+          "unit": "ZAR/MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-offtake-boundary-v1",
+          "issuer_id": "did:synthetic:offtaker",
+          "issuer_role": "offtaker",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_capex",
+          "claim_id": "capex_basis",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "epc-bid-family-001",
+          "source_ref": "urn:synthetic:epc:bid:001",
+          "valid_time": {
+            "from": "2026-06-15T00:00:00Z",
+            "to": "2026-12-15T23:59:59Z"
+          },
+          "known_at": "2026-06-20T10:00:00Z",
+          "value": "2500000000",
+          "unit": "ZAR",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-epc-cost-boundary-v1",
+          "issuer_id": "did:synthetic:epc-contractor",
+          "issuer_role": "epc_contractor",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_fx",
+          "claim_id": "fx_basis",
+          "evidence_class": "official_source_publication",
+          "record_state": "current",
+          "source_family_id": "central-bank-series-001",
+          "source_ref": "urn:synthetic:fx:zar-usd:2026-07-31",
+          "valid_time": {
+            "from": "2026-07-31T00:00:00Z",
+            "to": "2026-07-31T23:59:59Z"
+          },
+          "known_at": "2026-08-01T12:00:00Z",
+          "value": "18.2",
+          "unit": "ZAR/USD",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "fx-observation-boundary-v1",
+          "issuer_id": "did:synthetic:central-bank",
+          "issuer_role": "central_bank",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_opex",
+          "claim_id": "operating_cost_basis",
+          "evidence_class": "analyst_assumption",
+          "record_state": "current",
+          "source_family_id": "analyst-assumption-family-v1",
+          "source_ref": "urn:synthetic:analyst-assumption:operating-cost",
+          "valid_time": {
+            "from": "2026-08-01T00:00:00Z",
+            "to": "2036-12-31T23:59:59Z"
+          },
+          "known_at": "2026-08-01T00:00:00Z",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-operating-cost-assumption-v1",
+          "issuer_id": "did:synthetic:analyst",
+          "issuer_role": "other",
+          "authenticity_status": "not_applicable",
+          "value": "75000000",
+          "unit": "ZAR/year",
+          "uncertainty": {
+            "kind": "range",
+            "lower": "60000000",
+            "upper": "100000000"
+          }
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "grid_right",
+          "proposition": "The project has a documented right to connect 100 MW at the named point of connection.",
+          "materiality": "critical",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_grid_agreement"
+          ]
+        },
+        {
+          "claim_id": "yield_baseline",
+          "proposition": "A reconciled historical energy-yield observation exists for the declared site boundary.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_yield_meter"
+          ]
+        },
+        {
+          "claim_id": "physical_performance",
+          "proposition": "The model output is within its declared validation scope for this project capacity.",
+          "materiality": "critical",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_model"
+          ]
+        },
+        {
+          "claim_id": "revenue_tariff",
+          "proposition": "The decision-time revenue tariff is supported by an effective offtake document.",
+          "materiality": "critical",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_tariff"
+          ]
+        },
+        {
+          "claim_id": "capex_basis",
+          "proposition": "The EPC capital-cost basis is supported by an issuer-provided offer.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_capex"
+          ]
+        },
+        {
+          "claim_id": "fx_basis",
+          "proposition": "The USD/ZAR conversion basis is evidenced for the declared reporting date.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_fx"
+          ]
+        },
+        {
+          "claim_id": "operating_cost_basis",
+          "proposition": "A declared operating-cost assumption is available for scenario analysis.",
+          "materiality": "medium",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_opex"
+          ],
+          "notes": "Synthetic analyst assumption; not an observed cost or a qualified supplier quote."
+        }
+      ],
+      "physical_model": {
+        "model_id": "pv-bess-model-v1",
+        "model_version": "1.0.0",
+        "model_family": "hybrid_plant",
+        "qualification": "qualified",
+        "qualification_scope": {
+          "boundary": "synthetic 50–120 MW PV plus 0–250 MWh BESS; declared weather and dispatch basis",
+          "max_capacity_mw": "120",
+          "effective_from": "2026-01-01T00:00:00Z",
+          "effective_until": "2027-12-31T23:59:59Z"
+        },
+        "measurements": [
+          {
+            "name": "annual_net_generation",
+            "value": "221000",
+            "unit": "MWh",
+            "evidence_ref": "ev_model"
+          },
+          {
+            "name": "availability",
+            "value": "0.98",
+            "unit": "fraction",
+            "evidence_ref": "ev_model"
+          },
+          {
+            "name": "battery_round_trip_efficiency",
+            "value": "0.88",
+            "unit": "fraction",
+            "evidence_ref": "ev_model"
+          }
+        ],
+        "calibration_evidence_refs": [
+          "ev_yield_meter"
+        ],
+        "yield_assessment": {
+          "horizon_years": 1,
+          "quantile_convention": "exceedance_probability",
+          "p50_net_energy_mwh": "221000",
+          "p90_net_energy_mwh": "188000",
+          "p95_net_energy_mwh": "180000",
+          "method": "empirical_bootstrap",
+          "uncertainty_components": [
+            {
+              "component_id": "interannual-resource-variability",
+              "uncertainty_type": "aleatory",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "resource-data-and-site-adaptation",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "model-parameter-and-structure",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            },
+            {
+              "component_id": "availability-and-degradation",
+              "uncertainty_type": "mixed",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            }
+          ]
+        }
+      },
+      "grid_connection": {
+        "point_of_connection_id": "synthetic-poc-001",
+        "status": "connection_agreement_signed",
+        "requested_capacity_mw": "100",
+        "allocated_capacity_mw": "120",
+        "evidence_refs": [
+          "ev_grid_agreement"
+        ],
+        "curtailment_basis": "system_operator_assessment",
+        "curtailment_fraction": "0.04"
+      },
+      "financial_case": {
+        "reporting_currency": "ZAR",
+        "cash_flow_currency": "ZAR",
+        "day_count": "actual_365_fixed",
+        "fx_status": "not_required",
+        "cash_flows": [
+          {
+            "date": "2026-12-01T00:00:00Z",
+            "amount_decimal": "-2500000000",
+            "currency": "ZAR",
+            "flow_type": "construction_capex",
+            "evidence_refs": [
+              "ev_capex"
+            ]
+          },
+          {
+            "date": "2027-12-31T00:00:00Z",
+            "amount_decimal": "-75000000",
+            "currency": "ZAR",
+            "flow_type": "operating_cost",
+            "evidence_refs": [
+              "ev_opex"
+            ]
+          },
+          {
+            "date": "2027-12-31T00:00:00Z",
+            "amount_decimal": "230000000",
+            "currency": "ZAR",
+            "flow_type": "operating_revenue",
+            "evidence_refs": [
+              "ev_tariff",
+              "ev_model"
+            ]
+          },
+          {
+            "date": "2028-12-31T00:00:00Z",
+            "amount_decimal": "240000000",
+            "currency": "ZAR",
+            "flow_type": "operating_revenue",
+            "evidence_refs": [
+              "ev_tariff",
+              "ev_model"
+            ]
+          },
+          {
+            "date": "2036-12-31T00:00:00Z",
+            "amount_decimal": "-120000000",
+            "currency": "ZAR",
+            "flow_type": "replacement_capex",
+            "evidence_refs": [
+              "ev_model"
+            ]
+          }
+        ]
+      },
+      "scenarios": [
+        {
+          "scenario_id": "base_joint_001",
+          "description": "Synthetic downside case where dependence between generation, curtailment, price and construction delay is not established.",
+          "dependence": "unknown",
+          "variables": [
+            {
+              "name": "net_generation_mwh",
+              "unit": "MWh/year",
+              "base": "221000",
+              "low": "188000",
+              "high": "232000",
+              "correlation_group": null
+            },
+            {
+              "name": "realized_price",
+              "unit": "ZAR/MWh",
+              "base": "1450",
+              "low": "950",
+              "high": "1550",
+              "correlation_group": null
+            },
+            {
+              "name": "curtailment_fraction",
+              "unit": "fraction",
+              "base": "0.04",
+              "low": "0.02",
+              "high": "0.20",
+              "correlation_group": null
+            },
+            {
+              "name": "construction_delay_months",
+              "unit": "month",
+              "base": "0",
+              "low": "0",
+              "high": "12",
+              "correlation_group": null
+            }
+          ],
+          "evidence_refs": [
+            "ev_model",
+            "ev_tariff",
+            "ev_grid_agreement"
+          ]
+        }
+      ],
+      "required_gates": [
+        {
+          "gate_id": "grid-evidence",
+          "claim_ids": [
+            "grid_right"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-poc-001",
+          "expected_boundary_id": "grid-poc-synthetic-poc-001",
+          "expected_issuer_role": "system_operator",
+          "require_valid_at_decision": true
+        },
+        {
+          "gate_id": "physical-model-scope",
+          "claim_ids": [
+            "physical_performance"
+          ],
+          "required_evidence_classes": [
+            "validated_model_output"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-ac-boundary-v1",
+          "expected_issuer_role": "model_registry",
+          "require_valid_at_decision": false
+        },
+        {
+          "gate_id": "yield-evidence",
+          "claim_ids": [
+            "yield_baseline"
+          ],
+          "required_evidence_classes": [
+            "independently_reconciled_measurement"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-metering-boundary-v1",
+          "expected_issuer_role": "independent_verifier",
+          "require_valid_at_decision": false
+        },
+        {
+          "gate_id": "tariff-evidence",
+          "claim_ids": [
+            "revenue_tariff"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-offtake-boundary-v1",
+          "expected_issuer_role": "offtaker",
+          "require_valid_at_decision": true
+        },
+        {
+          "gate_id": "capex-evidence",
+          "claim_ids": [
+            "capex_basis"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-epc-cost-boundary-v1",
+          "expected_issuer_role": "epc_contractor",
+          "require_valid_at_decision": true
+        }
+      ]
+    },
+    {
+      "case_id": "conflicting-grid-evidence-007",
+      "synthetic": true,
+      "decision_time": "2026-08-01T00:00:00Z",
+      "project": {
+        "name": "Synthetic Northern Cape Solar + Storage Project",
+        "asset_class": "hybrid_generation_storage",
+        "technology": "utility_scale_pv_lithium_ion_bess",
+        "capacity_mw": "100",
+        "storage_power_mw": "50",
+        "storage_energy_mwh": "200",
+        "lifecycle_stage": "financing"
+      },
+      "site": {
+        "country_code": "ZA",
+        "region": "Northern Cape",
+        "latitude": "-29.0",
+        "longitude": "22.0",
+        "site_id": "synthetic-site-nc-001",
+        "point_of_connection_id": "synthetic-poc-001"
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev_grid_agreement",
+          "claim_id": "grid_right",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "operator-grid-doc-001",
+          "source_ref": "urn:synthetic:operator:connection-agreement:001",
+          "valid_time": {
+            "from": "2026-06-01T00:00:00Z",
+            "to": "2029-06-01T00:00:00Z"
+          },
+          "known_at": "2026-06-03T09:00:00Z",
+          "value": "120",
+          "unit": "MW",
+          "subject_id": "synthetic-poc-001",
+          "boundary_id": "grid-poc-synthetic-poc-001",
+          "issuer_id": "did:synthetic:grid-operator",
+          "issuer_role": "system_operator",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_yield_meter",
+          "claim_id": "yield_baseline",
+          "evidence_class": "independently_reconciled_measurement",
+          "record_state": "current",
+          "source_family_id": "independent-mv-lab-001",
+          "source_ref": "urn:synthetic:mv:irradiance-and-energy:001",
+          "valid_time": {
+            "from": "2025-07-01T00:00:00Z",
+            "to": "2026-06-30T23:59:59Z"
+          },
+          "known_at": "2026-07-10T12:00:00Z",
+          "value": "221000",
+          "unit": "MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-metering-boundary-v1",
+          "issuer_id": "did:synthetic:independent-verifier",
+          "issuer_role": "independent_verifier",
+          "authenticity_status": "not_applicable"
+        },
+        {
+          "evidence_id": "ev_model",
+          "claim_id": "physical_performance",
+          "evidence_class": "validated_model_output",
+          "record_state": "current",
+          "source_family_id": "model-registry-symtropy-001",
+          "source_ref": "urn:synthetic:model-run:hybrid-001",
+          "valid_time": {
+            "from": "2026-07-01T00:00:00Z",
+            "to": "2026-07-31T23:59:59Z"
+          },
+          "known_at": "2026-07-31T17:00:00Z",
+          "model_id": "pv-bess-model-v1",
+          "value": "0.84",
+          "unit": "capacity_factor",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "plant-ac-boundary-v1",
+          "issuer_id": "did:synthetic:model-registry",
+          "issuer_role": "model_registry",
+          "authenticity_status": "not_applicable"
+        },
+        {
+          "evidence_id": "ev_tariff",
+          "claim_id": "revenue_tariff",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "offtaker-contract-001",
+          "source_ref": "urn:synthetic:contract:ppa:001",
+          "valid_time": {
+            "from": "2026-07-01T00:00:00Z",
+            "to": "2036-06-30T23:59:59Z"
+          },
+          "known_at": "2026-07-15T12:00:00Z",
+          "value": "1450",
+          "unit": "ZAR/MWh",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-offtake-boundary-v1",
+          "issuer_id": "did:synthetic:offtaker",
+          "issuer_role": "offtaker",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_capex",
+          "claim_id": "capex_basis",
+          "evidence_class": "issuer_signed",
+          "record_state": "current",
+          "source_family_id": "epc-bid-family-001",
+          "source_ref": "urn:synthetic:epc:bid:001",
+          "valid_time": {
+            "from": "2026-06-15T00:00:00Z",
+            "to": "2026-12-15T23:59:59Z"
+          },
+          "known_at": "2026-06-20T10:00:00Z",
+          "value": "2500000000",
+          "unit": "ZAR",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-epc-cost-boundary-v1",
+          "issuer_id": "did:synthetic:epc-contractor",
+          "issuer_role": "epc_contractor",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_fx",
+          "claim_id": "fx_basis",
+          "evidence_class": "official_source_publication",
+          "record_state": "current",
+          "source_family_id": "central-bank-series-001",
+          "source_ref": "urn:synthetic:fx:zar-usd:2026-07-31",
+          "valid_time": {
+            "from": "2026-07-31T00:00:00Z",
+            "to": "2026-07-31T23:59:59Z"
+          },
+          "known_at": "2026-08-01T12:00:00Z",
+          "value": "18.2",
+          "unit": "ZAR/USD",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "fx-observation-boundary-v1",
+          "issuer_id": "did:synthetic:central-bank",
+          "issuer_role": "central_bank",
+          "authenticity_status": "verified"
+        },
+        {
+          "evidence_id": "ev_grid_conflict",
+          "claim_id": "grid_right",
+          "evidence_class": "contradictory_document",
+          "record_state": "current",
+          "source_family_id": "operator-grid-doc-002",
+          "source_ref": "urn:synthetic:operator:capacity-not-available:007",
+          "valid_time": {
+            "from": "2026-06-01T00:00:00Z",
+            "to": "2029-06-01T00:00:00Z"
+          },
+          "known_at": "2026-07-25T10:00:00Z",
+          "value": "0",
+          "unit": "MW",
+          "subject_id": "synthetic-poc-001",
+          "boundary_id": "grid-poc-synthetic-poc-001",
+          "issuer_id": "did:synthetic:grid-operator",
+          "issuer_role": "system_operator",
+          "authenticity_status": "not_applicable"
+        },
+        {
+          "evidence_id": "ev_opex",
+          "claim_id": "operating_cost_basis",
+          "evidence_class": "analyst_assumption",
+          "record_state": "current",
+          "source_family_id": "analyst-assumption-family-v1",
+          "source_ref": "urn:synthetic:analyst-assumption:operating-cost",
+          "valid_time": {
+            "from": "2026-08-01T00:00:00Z",
+            "to": "2036-12-31T23:59:59Z"
+          },
+          "known_at": "2026-08-01T00:00:00Z",
+          "subject_id": "synthetic-site-nc-001",
+          "boundary_id": "project-operating-cost-assumption-v1",
+          "issuer_id": "did:synthetic:analyst",
+          "issuer_role": "other",
+          "authenticity_status": "not_applicable",
+          "value": "75000000",
+          "unit": "ZAR/year",
+          "uncertainty": {
+            "kind": "range",
+            "lower": "60000000",
+            "upper": "100000000"
+          }
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "grid_right",
+          "proposition": "The project has a documented right to connect 100 MW at the named point of connection.",
+          "materiality": "critical",
+          "assessment": "unresolved",
+          "evidence_refs": [
+            "ev_grid_agreement",
+            "ev_grid_conflict"
+          ],
+          "notes": "Two source families conflict on capacity at the same point of connection."
+        },
+        {
+          "claim_id": "yield_baseline",
+          "proposition": "A reconciled historical energy-yield observation exists for the declared site boundary.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_yield_meter"
+          ]
+        },
+        {
+          "claim_id": "physical_performance",
+          "proposition": "The model output is within its declared validation scope for this project capacity.",
+          "materiality": "critical",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_model"
+          ]
+        },
+        {
+          "claim_id": "revenue_tariff",
+          "proposition": "The decision-time revenue tariff is supported by an effective offtake document.",
+          "materiality": "critical",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_tariff"
+          ]
+        },
+        {
+          "claim_id": "capex_basis",
+          "proposition": "The EPC capital-cost basis is supported by an issuer-provided offer.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_capex"
+          ]
+        },
+        {
+          "claim_id": "fx_basis",
+          "proposition": "The USD/ZAR conversion basis is evidenced for the declared reporting date.",
+          "materiality": "high",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_fx"
+          ]
+        },
+        {
+          "claim_id": "operating_cost_basis",
+          "proposition": "A declared operating-cost assumption is available for scenario analysis.",
+          "materiality": "medium",
+          "assessment": "supported",
+          "evidence_refs": [
+            "ev_opex"
+          ],
+          "notes": "Synthetic analyst assumption; not an observed cost or a qualified supplier quote."
+        }
+      ],
+      "physical_model": {
+        "model_id": "pv-bess-model-v1",
+        "model_version": "1.0.0",
+        "model_family": "hybrid_plant",
+        "qualification": "qualified",
+        "qualification_scope": {
+          "boundary": "synthetic 50–120 MW PV plus 0–250 MWh BESS; declared weather and dispatch basis",
+          "max_capacity_mw": "120",
+          "effective_from": "2026-01-01T00:00:00Z",
+          "effective_until": "2027-12-31T23:59:59Z"
+        },
+        "measurements": [
+          {
+            "name": "annual_net_generation",
+            "value": "221000",
+            "unit": "MWh",
+            "evidence_ref": "ev_model"
+          },
+          {
+            "name": "availability",
+            "value": "0.98",
+            "unit": "fraction",
+            "evidence_ref": "ev_model"
+          },
+          {
+            "name": "battery_round_trip_efficiency",
+            "value": "0.88",
+            "unit": "fraction",
+            "evidence_ref": "ev_model"
+          }
+        ],
+        "calibration_evidence_refs": [
+          "ev_yield_meter"
+        ],
+        "yield_assessment": {
+          "horizon_years": 1,
+          "quantile_convention": "exceedance_probability",
+          "p50_net_energy_mwh": "221000",
+          "p90_net_energy_mwh": "188000",
+          "p95_net_energy_mwh": "180000",
+          "method": "joint_monte_carlo",
+          "uncertainty_components": [
+            {
+              "component_id": "interannual-resource-variability",
+              "uncertainty_type": "aleatory",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "resource-data-and-site-adaptation",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "model-parameter-and-structure",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            },
+            {
+              "component_id": "availability-and-degradation",
+              "uncertainty_type": "mixed",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            }
+          ]
+        }
+      },
+      "grid_connection": {
+        "point_of_connection_id": "synthetic-poc-001",
+        "status": "disputed",
+        "requested_capacity_mw": "100",
+        "allocated_capacity_mw": "120",
+        "evidence_refs": [
+          "ev_grid_agreement",
+          "ev_grid_conflict"
+        ],
+        "curtailment_basis": "system_operator_assessment",
+        "curtailment_fraction": "0.04"
+      },
+      "financial_case": {
+        "reporting_currency": "ZAR",
+        "cash_flow_currency": "ZAR",
+        "day_count": "actual_365_fixed",
+        "fx_status": "not_required",
+        "cash_flows": [
+          {
+            "date": "2026-12-01T00:00:00Z",
+            "amount_decimal": "-2500000000",
+            "currency": "ZAR",
+            "flow_type": "construction_capex",
+            "evidence_refs": [
+              "ev_capex"
+            ]
+          },
+          {
+            "date": "2027-12-31T00:00:00Z",
+            "amount_decimal": "-75000000",
+            "currency": "ZAR",
+            "flow_type": "operating_cost",
+            "evidence_refs": [
+              "ev_opex"
+            ]
+          },
+          {
+            "date": "2027-12-31T00:00:00Z",
+            "amount_decimal": "230000000",
+            "currency": "ZAR",
+            "flow_type": "operating_revenue",
+            "evidence_refs": [
+              "ev_tariff",
+              "ev_model"
+            ]
+          },
+          {
+            "date": "2028-12-31T00:00:00Z",
+            "amount_decimal": "240000000",
+            "currency": "ZAR",
+            "flow_type": "operating_revenue",
+            "evidence_refs": [
+              "ev_tariff",
+              "ev_model"
+            ]
+          },
+          {
+            "date": "2036-12-31T00:00:00Z",
+            "amount_decimal": "-120000000",
+            "currency": "ZAR",
+            "flow_type": "replacement_capex",
+            "evidence_refs": [
+              "ev_model"
+            ]
+          }
+        ]
+      },
+      "scenarios": [
+        {
+          "scenario_id": "base_joint_001",
+          "description": "Synthetic base case with shared weather, grid and price drivers.",
+          "dependence": "joint_modelled",
+          "variables": [
+            {
+              "name": "net_generation_mwh",
+              "unit": "MWh/year",
+              "base": "221000",
+              "low": "188000",
+              "high": "232000",
+              "correlation_group": "weather_grid"
+            },
+            {
+              "name": "realized_price",
+              "unit": "ZAR/MWh",
+              "base": "1450",
+              "low": "950",
+              "high": "1550",
+              "correlation_group": "power_market"
+            },
+            {
+              "name": "curtailment_fraction",
+              "unit": "fraction",
+              "base": "0.04",
+              "low": "0.02",
+              "high": "0.20",
+              "correlation_group": "weather_grid"
+            },
+            {
+              "name": "construction_delay_months",
+              "unit": "month",
+              "base": "0",
+              "low": "0",
+              "high": "12",
+              "correlation_group": "supply_chain_fx"
+            }
+          ],
+          "evidence_refs": [
+            "ev_model",
+            "ev_tariff",
+            "ev_grid_agreement"
+          ]
+        }
+      ],
+      "required_gates": [
+        {
+          "gate_id": "grid-evidence",
+          "claim_ids": [
+            "grid_right"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-poc-001",
+          "expected_boundary_id": "grid-poc-synthetic-poc-001",
+          "expected_issuer_role": "system_operator",
+          "require_valid_at_decision": true
+        },
+        {
+          "gate_id": "physical-model-scope",
+          "claim_ids": [
+            "physical_performance"
+          ],
+          "required_evidence_classes": [
+            "validated_model_output"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-ac-boundary-v1",
+          "expected_issuer_role": "model_registry",
+          "require_valid_at_decision": false
+        },
+        {
+          "gate_id": "yield-evidence",
+          "claim_ids": [
+            "yield_baseline"
+          ],
+          "required_evidence_classes": [
+            "independently_reconciled_measurement"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-metering-boundary-v1",
+          "expected_issuer_role": "independent_verifier",
+          "require_valid_at_decision": false
+        },
+        {
+          "gate_id": "tariff-evidence",
+          "claim_ids": [
+            "revenue_tariff"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-offtake-boundary-v1",
+          "expected_issuer_role": "offtaker",
+          "require_valid_at_decision": true
+        },
+        {
+          "gate_id": "capex-evidence",
+          "claim_ids": [
+            "capex_basis"
+          ],
+          "required_evidence_classes": [
+            "issuer_signed"
+          ],
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-epc-cost-boundary-v1",
+          "expected_issuer_role": "epc_contractor",
+          "require_valid_at_decision": true
+        }
+      ]
+    }
+  ]
+}

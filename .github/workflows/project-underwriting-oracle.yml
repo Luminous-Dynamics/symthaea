@@ -1,0 +1,54 @@
+name: Project underwriting synthetic oracle
+
+on:
+  pull_request:
+    paths:
+      - "tools/project-underwriting-oracle/**"
+      - "docs/research/PROJECT_UNDERWRITING_CASE_V1.md"
+      - "docs/research/project-underwriting/v1/**"
+      - ".github/workflows/project-underwriting-oracle.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/project-underwriting-oracle/**"
+      - "docs/research/PROJECT_UNDERWRITING_CASE_V1.md"
+      - "docs/research/project-underwriting/v1/**"
+      - ".github/workflows/project-underwriting-oracle.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-reference:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Capture exact checked-out commit
+        run: echo "UNDERWRITING_SOURCE_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.96.0"
+
+      - name: Run oracle tests
+        run: cargo test --manifest-path tools/project-underwriting-oracle/Cargo.toml
+
+      - name: Produce deterministic reference receipt
+        run: >-
+          cargo run --manifest-path tools/project-underwriting-oracle/Cargo.toml --
+          docs/research/project-underwriting/v1/public-cases.json
+          docs/research/project-underwriting/v1/reference-expected.json
+          > project-underwriting-reference-receipt.json
+
+      - name: Preserve receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-underwriting-reference-receipt
+          path: project-underwriting-reference-receipt.json
+          if-no-files-found: ignore

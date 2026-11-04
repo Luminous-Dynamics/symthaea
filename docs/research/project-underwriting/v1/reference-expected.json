@@ -1,0 +1,85 @@
+{
+  "schema_version": "1.0",
+  "corpus_id": "sym-inv-underwrite-public-synthetic-v1",
+  "disclosure": "Transparent expected dispositions for public synthetic development cases. This file is evaluator-only by convention, but is public and therefore NOT suitable as a hidden certification oracle.",
+  "expected": [
+    {
+      "case_id": "solar-storage-base-001",
+      "input_disposition": "eligible_for_synthetic_valuation",
+      "risk_disposition": "scenario_model_qualified_for_synthetic_use",
+      "decision_authority": "none",
+      "blockers": [],
+      "warnings": []
+    },
+    {
+      "case_id": "grid-assertion-only-002",
+      "input_disposition": "blocked",
+      "risk_disposition": "not_evaluated",
+      "decision_authority": "none",
+      "blockers": [
+        "GRID_EVIDENCE_BELOW_REQUIRED_CLASS",
+        "REQUIRED_EVIDENCE_GATE_FAILED"
+      ],
+      "warnings": []
+    },
+    {
+      "case_id": "model-domain-exceeded-003",
+      "input_disposition": "blocked",
+      "risk_disposition": "not_evaluated",
+      "decision_authority": "none",
+      "blockers": [
+        "PHYSICAL_MODEL_OUTSIDE_QUALIFIED_DOMAIN",
+        "REQUIRED_EVIDENCE_GATE_FAILED"
+      ],
+      "warnings": []
+    },
+    {
+      "case_id": "fx-conversion-missing-004",
+      "input_disposition": "blocked",
+      "risk_disposition": "not_evaluated",
+      "decision_authority": "none",
+      "blockers": [
+        "REPORTING_CURRENCY_CONVERSION_MISSING",
+        "REQUIRED_EVIDENCE_GATE_FAILED"
+      ],
+      "warnings": []
+    },
+    {
+      "case_id": "future-known-tariff-005",
+      "input_disposition": "blocked",
+      "risk_disposition": "not_evaluated",
+      "decision_authority": "none",
+      "blockers": [
+        "NO_DECISION_TIME_VALID_TARIFF_EVIDENCE",
+        "REQUIRED_EVIDENCE_GATE_FAILED"
+      ],
+      "warnings": [
+        "Evidence with known_at after decision_time must be excluded even when valid_time overlaps."
+      ]
+    },
+    {
+      "case_id": "joint-dependence-unknown-006",
+      "input_disposition": "eligible_for_synthetic_valuation",
+      "risk_disposition": "indeterminate",
+      "decision_authority": "none",
+      "blockers": [],
+      "warnings": [
+        "Do not report joint tail-risk probabilities as calibrated when dependence is unknown."
+      ]
+    },
+    {
+      "case_id": "conflicting-grid-evidence-007",
+      "input_disposition": "blocked",
+      "risk_disposition": "not_evaluated",
+      "decision_authority": "none",
+      "blockers": [
+        "GRID_EVIDENCE_BELOW_REQUIRED_CLASS",
+        "MATERIAL_SOURCE_CONFLICT",
+        "REQUIRED_EVIDENCE_GATE_FAILED"
+      ],
+      "warnings": [
+        "Conflicting current evidence remains visible; do not majority-vote source count."
+      ]
+    }
+  ]
+}

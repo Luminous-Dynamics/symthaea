@@ -1,0 +1,835 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/project-underwriting/v1/public-corpus.schema.json",
+  "title": "Symthaea Project Underwriting Public Corpus v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "corpus_id",
+    "disclosure",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "corpus_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "disclosure": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "rfc3339": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"
+    },
+    "decimal": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+    },
+    "refArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "timeRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "to"
+      ],
+      "properties": {
+        "from": {
+          "$ref": "#/$defs/rfc3339"
+        },
+        "to": {
+          "$ref": "#/$defs/rfc3339"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "claim_id",
+        "evidence_class",
+        "record_state",
+        "source_family_id",
+        "source_ref",
+        "valid_time",
+        "known_at",
+        "subject_id",
+        "boundary_id",
+        "issuer_id",
+        "issuer_role",
+        "authenticity_status"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_class": {
+          "enum": [
+            "self_asserted",
+            "issuer_signed",
+            "official_source_publication",
+            "authenticated_meter",
+            "independently_reconciled_measurement",
+            "validated_model_output",
+            "unvalidated_model_output",
+            "analyst_assumption",
+            "contradictory_document"
+          ]
+        },
+        "record_state": {
+          "enum": [
+            "current",
+            "superseded",
+            "disputed",
+            "retracted"
+          ]
+        },
+        "source_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_digest": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "valid_time": {
+          "$ref": "#/$defs/timeRange"
+        },
+        "known_at": {
+          "$ref": "#/$defs/rfc3339"
+        },
+        "observed_at": {
+          "$ref": "#/$defs/rfc3339"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "$ref": "#/$defs/decimal"
+        },
+        "uncertainty": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "none_declared",
+                "standard_uncertainty",
+                "confidence_interval",
+                "prediction_interval",
+                "range",
+                "qualitative"
+              ]
+            },
+            "lower": {
+              "$ref": "#/$defs/decimal"
+            },
+            "upper": {
+              "$ref": "#/$defs/decimal"
+            },
+            "coverage": {
+              "$ref": "#/$defs/decimal"
+            }
+          }
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subject_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "boundary_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issuer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issuer_role": {
+          "enum": [
+            "developer",
+            "system_operator",
+            "offtaker",
+            "independent_verifier",
+            "model_registry",
+            "epc_contractor",
+            "central_bank",
+            "other"
+          ]
+        },
+        "authenticity_status": {
+          "enum": [
+            "not_applicable",
+            "unverified",
+            "verified",
+            "failed"
+          ]
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id",
+        "proposition",
+        "materiality",
+        "assessment",
+        "evidence_refs"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "proposition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "materiality": {
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "assessment": {
+          "enum": [
+            "unresolved",
+            "supported",
+            "contradicted",
+            "not_applicable"
+          ]
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/refArray"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "modelMeasurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "value",
+        "unit"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "$ref": "#/$defs/decimal"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_ref": {
+          "type": "string"
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "synthetic",
+        "decision_time",
+        "project",
+        "site",
+        "evidence",
+        "claims",
+        "physical_model",
+        "grid_connection",
+        "financial_case",
+        "scenarios",
+        "required_gates"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]+$"
+        },
+        "synthetic": {
+          "const": true
+        },
+        "decision_time": {
+          "$ref": "#/$defs/rfc3339"
+        },
+        "project": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "asset_class",
+            "technology",
+            "capacity_mw",
+            "storage_power_mw",
+            "storage_energy_mwh",
+            "lifecycle_stage"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "asset_class": {
+              "enum": [
+                "renewable_generation",
+                "storage",
+                "hybrid_generation_storage",
+                "transport",
+                "water",
+                "housing",
+                "industrial",
+                "other"
+              ]
+            },
+            "technology": {
+              "type": "string",
+              "minLength": 1
+            },
+            "capacity_mw": {
+              "$ref": "#/$defs/decimal"
+            },
+            "storage_power_mw": {
+              "$ref": "#/$defs/decimal"
+            },
+            "storage_energy_mwh": {
+              "$ref": "#/$defs/decimal"
+            },
+            "lifecycle_stage": {
+              "enum": [
+                "concept",
+                "feasibility",
+                "permitting",
+                "financing",
+                "construction",
+                "operational",
+                "repowering",
+                "decommissioning"
+              ]
+            }
+          }
+        },
+        "site": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "country_code",
+            "region",
+            "latitude",
+            "longitude",
+            "site_id"
+          ],
+          "properties": {
+            "country_code": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$"
+            },
+            "region": {
+              "type": "string",
+              "minLength": 1
+            },
+            "latitude": {
+              "$ref": "#/$defs/decimal"
+            },
+            "longitude": {
+              "$ref": "#/$defs/decimal"
+            },
+            "site_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "point_of_connection_id": {
+              "type": "string"
+            }
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "claims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/claim"
+          }
+        },
+        "physical_model": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "model_id",
+            "model_version",
+            "model_family",
+            "qualification",
+            "qualification_scope",
+            "measurements",
+            "calibration_evidence_refs",
+            "yield_assessment"
+          ],
+          "properties": {
+            "model_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "model_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "model_family": {
+              "enum": [
+                "pv_performance",
+                "battery_dispatch_degradation",
+                "hybrid_plant",
+                "grid_interconnection",
+                "independent_reference",
+                "other"
+              ]
+            },
+            "qualification": {
+              "enum": [
+                "not_qualified",
+                "limited",
+                "qualified"
+              ]
+            },
+            "qualification_scope": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "boundary",
+                "max_capacity_mw",
+                "effective_from",
+                "effective_until"
+              ],
+              "properties": {
+                "boundary": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "max_capacity_mw": {
+                  "$ref": "#/$defs/decimal"
+                },
+                "effective_from": {
+                  "$ref": "#/$defs/rfc3339"
+                },
+                "effective_until": {
+                  "$ref": "#/$defs/rfc3339"
+                }
+              }
+            },
+            "measurements": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/modelMeasurement"
+              }
+            },
+            "calibration_evidence_refs": {
+              "$ref": "#/$defs/refArray"
+            },
+            "yield_assessment": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "horizon_years",
+                "quantile_convention",
+                "p50_net_energy_mwh",
+                "p90_net_energy_mwh",
+                "p95_net_energy_mwh",
+                "method",
+                "uncertainty_components"
+              ],
+              "properties": {
+                "horizon_years": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "quantile_convention": {
+                  "const": "exceedance_probability"
+                },
+                "p50_net_energy_mwh": {
+                  "$ref": "#/$defs/decimal"
+                },
+                "p90_net_energy_mwh": {
+                  "$ref": "#/$defs/decimal"
+                },
+                "p95_net_energy_mwh": {
+                  "$ref": "#/$defs/decimal"
+                },
+                "method": {
+                  "enum": [
+                    "empirical_bootstrap",
+                    "joint_monte_carlo",
+                    "parametric",
+                    "not_established"
+                  ]
+                },
+                "uncertainty_components": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "component_id",
+                      "uncertainty_type",
+                      "evidence_refs"
+                    ],
+                    "properties": {
+                      "component_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uncertainty_type": {
+                        "enum": [
+                          "aleatory",
+                          "epistemic",
+                          "systematic",
+                          "mixed"
+                        ]
+                      },
+                      "evidence_refs": {
+                        "$ref": "#/$defs/refArray"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "grid_connection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "point_of_connection_id",
+            "status",
+            "requested_capacity_mw",
+            "evidence_refs",
+            "curtailment_basis"
+          ],
+          "properties": {
+            "point_of_connection_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "status": {
+              "enum": [
+                "unknown",
+                "developer_claim",
+                "application_submitted",
+                "budget_quote_issued",
+                "capacity_allocated",
+                "connection_agreement_signed",
+                "energized",
+                "disputed"
+              ]
+            },
+            "requested_capacity_mw": {
+              "$ref": "#/$defs/decimal"
+            },
+            "allocated_capacity_mw": {
+              "$ref": "#/$defs/decimal"
+            },
+            "evidence_refs": {
+              "$ref": "#/$defs/refArray"
+            },
+            "curtailment_basis": {
+              "enum": [
+                "unknown",
+                "none_claimed",
+                "historical_observation",
+                "contractual_limit",
+                "system_operator_assessment",
+                "modelled_scenario"
+              ]
+            },
+            "curtailment_fraction": {
+              "$ref": "#/$defs/decimal"
+            }
+          }
+        },
+        "financial_case": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reporting_currency",
+            "cash_flow_currency",
+            "day_count",
+            "fx_status",
+            "cash_flows"
+          ],
+          "properties": {
+            "reporting_currency": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            "cash_flow_currency": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            "day_count": {
+              "const": "actual_365_fixed"
+            },
+            "fx_status": {
+              "enum": [
+                "not_required",
+                "evidenced",
+                "missing",
+                "stale",
+                "disputed"
+              ]
+            },
+            "fx_rate": {
+              "$ref": "#/$defs/decimal"
+            },
+            "fx_evidence_refs": {
+              "$ref": "#/$defs/refArray"
+            },
+            "cash_flows": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "date",
+                  "amount_decimal",
+                  "currency",
+                  "flow_type",
+                  "evidence_refs"
+                ],
+                "properties": {
+                  "date": {
+                    "$ref": "#/$defs/rfc3339"
+                  },
+                  "amount_decimal": {
+                    "$ref": "#/$defs/decimal"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$"
+                  },
+                  "flow_type": {
+                    "enum": [
+                      "development_capex",
+                      "construction_capex",
+                      "operating_revenue",
+                      "operating_cost",
+                      "debt_drawdown",
+                      "interest",
+                      "principal",
+                      "tax",
+                      "replacement_capex",
+                      "decommissioning",
+                      "salvage",
+                      "other"
+                    ]
+                  },
+                  "evidence_refs": {
+                    "$ref": "#/$defs/refArray"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "scenarios": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scenario_id",
+              "description",
+              "dependence",
+              "variables",
+              "evidence_refs"
+            ],
+            "properties": {
+              "scenario_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1
+              },
+              "dependence": {
+                "enum": [
+                  "joint_modelled",
+                  "common_factor_modelled",
+                  "independence_assumed",
+                  "unknown"
+                ]
+              },
+              "variables": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "unit",
+                    "base",
+                    "low",
+                    "high",
+                    "correlation_group"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "unit": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "base": {
+                      "$ref": "#/$defs/decimal"
+                    },
+                    "low": {
+                      "$ref": "#/$defs/decimal"
+                    },
+                    "high": {
+                      "$ref": "#/$defs/decimal"
+                    },
+                    "correlation_group": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              },
+              "evidence_refs": {
+                "$ref": "#/$defs/refArray"
+              }
+            }
+          }
+        },
+        "required_gates": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "gate_id",
+              "claim_ids",
+              "required_evidence_classes",
+              "fail_closed",
+              "expected_subject_id",
+              "expected_boundary_id",
+              "expected_issuer_role",
+              "require_valid_at_decision"
+            ],
+            "properties": {
+              "gate_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "claim_ids": {
+                "$ref": "#/$defs/refArray"
+              },
+              "required_evidence_classes": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "issuer_signed",
+                    "authenticated_meter",
+                    "independently_reconciled_measurement",
+                    "validated_model_output",
+                    "official_source_publication"
+                  ]
+                }
+              },
+              "fail_closed": {
+                "const": true
+              },
+              "expected_subject_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "expected_boundary_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "expected_issuer_role": {
+                "enum": [
+                  "developer",
+                  "system_operator",
+                  "offtaker",
+                  "independent_verifier",
+                  "model_registry",
+                  "epc_contractor",
+                  "central_bank",
+                  "other"
+                ]
+              },
+              "require_valid_at_decision": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
