@@ -224,3 +224,16 @@ The boundary record includes both boundary_id and sample_point_id. They identify
 ### Sample source and stream binding
 
 Every sample observation carries both source_id and stream_id. A supporting sample must match the qualification record's exact source and stream/batch. A sample from a different batch at the same physical tap is not a supporting sample; neither matching outlet geometry nor a similar result can repair that identity mismatch. A validated boundary transfer is a separate relation and does not erase source/stream lineage.
+
+
+## 12. Sample time must fall within the declared stream window
+
+In addition to exact source, stream/batch and sample-point binding, every supporting sample's collection timestamp must lie within the declared stream observation interval:
+- collection before `stream.observed_from` is rejected;
+- collection after a non-null `stream.observed_until` is rejected;
+- timestamps are normalized to UTC before temporal comparison;
+- a matching ID or sample point cannot override a temporal mismatch.
+
+This prevents an old batch observation or a future sample from being attached to a different claimed service interval. It does not define a universal freshness period: after the stream window check, evidence currentness still follows the applicable standard, risk assessment, monitoring programme, storage/treatment events and declared validity interval.
+
+The Rust adapter includes WQ-015 / WQ-016 regression controls for samples immediately outside the stream window. Software validation of the latest commit remains pending until its exact-head workflow completes.
