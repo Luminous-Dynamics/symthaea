@@ -488,7 +488,7 @@ impl ThermodynamicPhysicsBridge {
             *m /= n as f64;
         }
 
-        // Compute covariance matrix (proxy for Onsager L_ij)
+        // Compute the covariance of cognitive telemetry channels.
         let mut cov = [[0.0f64; 4]; 4];
         for s in &self.history {
             for i in 0..4 {
