@@ -75,12 +75,16 @@ Both fits must match the same session/stream identity and remain inside their re
 
 ## Synthetic fixtures
 
-The initial checked-in fixtures cover:
+The checked-in fixtures cover:
 - exact nominal mapping;
-- +25 ppm and -25 ppm drift;
+- +25 ppm and -25 ppm in-policy drift;
 - missing pair records with continuous clock progression;
 - over-wide observation bracket rejection;
-- descriptor/origin identity mismatch rejection.
+- descriptor/origin identity mismatch rejection;
+- out-of-policy drift rejection;
+- residual outlier rejection without silently dropping the record.
+
+The unit suite also rejects runner-clock regression even when CPAL callback time continues increasing.
 
 These are conformance fixtures, not device measurements.
 
