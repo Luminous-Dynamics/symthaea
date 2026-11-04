@@ -1033,3 +1033,28 @@ The first fuzz runner successfully installed the dated nightly action, installed
 
 The workflow now explicitly uses `cargo +nightly-2026-11-03 fuzz run` and records `rustc +nightly-2026-11-03 --version --verbose` / `cargo +nightly-2026-11-03 --version` in the receipt. The repo-default stable toolchain remains unchanged for ordinary builds. This is a workflow correction; no fuzz execution was performed by the failed run.
 
+## 25. 2026-11-04 — independent replay of member-verification receipts
+
+A receipt's schema validity and canonical digest are not evidence that it describes the archive supplied to a verifier. The next assurance layer is an independent replay tool, owned by [#10492](https://github.com/Luminous-Dynamics/symthaea/issues/10492), with the detailed contract in `docs/research/rea-member-receipt-replay-v0.md`.
+
+The replay verifier treats the receipt as a falsifiable claim:
+1. parse raw receipt bytes with duplicate-key rejection;
+2. validate schema, semantic invariants and JCS, recomputing its statement digest;
+3. stream SHA-256 over the supplied original archive and compare with the receipt's whole-archive commitment;
+4. use a separate file-backed parser to iterate central-directory records in order and reconcile actual count with EOCD/ZIP64 hints;
+5. identify the exact occurrence by central-directory index and raw filename bytes, not decoded path or name-map lookup;
+6. compare local header, descriptor, raw offsets, flags, method, declared sizes and CRC;
+7. check every compressed-data extent, overlap, boundary and resource budget;
+8. decode the selected Stored/Deflate stream with a separately pinned implementation, compute SHA-256 and an independent incremental CRC, require EOF/size/CRC, and compare all observations;
+9. revalidate source binding and return an explicit replay outcome.
+
+### Candidate independent parser
+
+The candidate is `rawzip 0.5.2`: a low-level, zero-runtime-dependency Rust ZIP reader with file-backed parsing, central-directory iteration, per-entry wayfinders, local-header inspection, compressed-data range access and a verifying reader. Its security guide expressly makes consumers responsible for zip-bomb limits, overlapping extents, duplicate filenames and expected central-directory count reconciliation. Those become replay invariants, not accepted defaults.
+
+For Deflate, replay should use flate2 with the zlib-rs backend, separately versioned from the original zipcore/miniz_oxide path. Rawzip parser independence, codec independence, CRC independence and source-binding strength remain separate lineage dimensions. The replay implementation computes its own incremental CRC-32 and must preserve duplicate occurrences by index and wayfinder.
+
+The new manifest family is `independent_artifact_member_receipt_replay`. It specifies frozen archive+receipt mutation pairs, full false-accept accounting, duplicate-occurrence parity, directory count reconciliation, extent/overlap checking, source mutation, p50/p95/p99 replay time, peak RSS and energy per verified MiB.
+
+No replay implementation or success result is claimed. The first implementation should be test-harness-only, preserve abstentions for formats/platforms not yet qualified, and never upgrade a replay match into producer authenticity, package installability, runtime behavior or semantic truth.
+
