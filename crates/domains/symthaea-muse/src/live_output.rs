@@ -14,7 +14,10 @@
 //! operating system / device queue also cannot be recalled. Acoustic silence
 //! needs a separate loopback or physical-output observation.
 
-use crate::output_epoch::{EpochTaggedStereoFrame, OutputEpochClock, OutputEpochError};
+use crate::output_epoch::{
+    pop_current_epoch_frame, EpochTaggedStereoFrame, OutputEpochClock, OutputEpochError,
+    OutputQueueRead, MAX_STALE_FRAMES_PER_CALLBACK,
+};
 use crate::streaming::StreamingSynth;
 use crate::{MuseConfig, MusicalState};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -235,39 +238,52 @@ impl LiveMuseOutput {
                         return;
                     }
 
-                    for output_frame in data.chunks_mut(channels) {
-                        // Keep popping obsolete frames until a current frame
-                        // is found or the application queue is empty.
-                        let current = loop {
-                            match cons.try_pop() {
-                                Some(frame) if audio_epoch.accepts(frame.epoch) => {
-                                    break Some(frame);
-                                }
-                                Some(_) => {
-                                    audio_stale_frames.fetch_add(1, Ordering::Relaxed);
-                                }
-                                None => break None,
-                            }
-                        };
+                    // Bound total stale scanning per callback, not per
+                    // output frame. A large invalidated backlog therefore
+                    // cannot monopolize one callback deadline.
+                    let mut stale_budget = MAX_STALE_FRAMES_PER_CALLBACK;
+                    let mut stale_dropped = 0_u64;
+                    let mut underrun_frames = 0_u64;
 
-                        match current {
-                            Some(frame) if channels == 1 => {
+                    for output_frame in data.chunks_mut(channels) {
+                        if output_frame.len() != channels {
+                            output_frame.fill(0.0);
+                            underrun_frames = underrun_frames.saturating_add(1);
+                            continue;
+                        }
+
+                        let read = pop_current_epoch_frame(
+                            &audio_epoch,
+                            &mut stale_budget,
+                            &mut stale_dropped,
+                            || cons.try_pop(),
+                        );
+
+                        match read {
+                            OutputQueueRead::Current(frame) if channels == 1 => {
                                 output_frame[0] = (frame.samples[0] + frame.samples[1]) * 0.5;
                             }
-                            Some(frame) => {
+                            OutputQueueRead::Current(frame) => {
                                 output_frame[0] = frame.samples[0];
-                                if channels > 1 {
-                                    output_frame[1] = frame.samples[1];
-                                }
+                                output_frame[1] = frame.samples[1];
                                 for extra_channel in output_frame.iter_mut().skip(2) {
                                     *extra_channel = 0.0;
                                 }
                             }
-                            None => {
+                            OutputQueueRead::Empty | OutputQueueRead::StaleBudgetExhausted => {
                                 output_frame.fill(0.0);
-                                audio_underrun_frames.fetch_add(1, Ordering::Relaxed);
+                                underrun_frames = underrun_frames.saturating_add(1);
                             }
                         }
+                    }
+
+                    // Aggregate atomics once per callback rather than once
+                    // for every stale frame or underrun frame.
+                    if stale_dropped > 0 {
+                        audio_stale_frames.fetch_add(stale_dropped, Ordering::Relaxed);
+                    }
+                    if underrun_frames > 0 {
+                        audio_underrun_frames.fetch_add(underrun_frames, Ordering::Relaxed);
                     }
                 },
                 move |err| {
