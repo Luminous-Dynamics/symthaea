@@ -89,6 +89,12 @@ For each product profile, identify the exact current appliance-specific test met
 
 Use household IEC 60436, matched commercial rack/glasswasher cohorts, and a separate QuickCell micro-batch cohort. Report item-level cleaning/rinse/cross-transfer outcomes, first-pass yield, quality-qualified throughput, all retries, resource boundaries and maintenance. Multi-compartment layout, turbidity sensing and genetic optimization are not novelty claims by themselves.
 
+For acquisition/reference context, current EPREL records include:
+- Miele G 7040 SCU AutoDos: 14 rated place settings, 0.540 kWh and 8.4 L per Eco cycle, 3:50 programme duration, cleaning performance index 1.125: https://eprel.ec.europa.eu/screen/product/dishwashers2019/2241809
+- Bosch SMD6YCX01G: 14 rated place settings, 0.543 kWh and 9.5 L per Eco cycle, 4:55 programme duration, cleaning performance index 1.121: https://eprel.ec.europa.eu/screen/product/dishwashers2019/1656051
+
+These are exact public label records, not independently replicated current-IEC comparisons. The existing 0.39 kWh / 6 L / 16-place-setting aspiration implies roughly 37% less energy and water per rated place setting than the Miele example. Retain it as a stretch research hypothesis. Add intermediate gates of 10% and 20% lower energy and/or water per independently accepted place setting against a named matched incumbent, without quality, reliability, maintenance or operator-time regression. Freeze the applicable test protocol and independent endpoints before tuning.
+
 ### WaterLoop — water continuity and approved non-potable service
 
 Separate these use cases rather than merging them:
