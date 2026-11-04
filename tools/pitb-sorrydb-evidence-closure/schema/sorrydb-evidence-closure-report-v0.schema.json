@@ -15,7 +15,8 @@
     "closed_unique_task_count",
     "non_success_run_count",
     "run_closures",
-    "admission_boundary"
+    "admission_boundary",
+    "reviewer_key_registry_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -166,6 +167,10 @@
     "admission_boundary": {
       "type": "string",
       "minLength": 60
+    },
+    "reviewer_key_registry_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
     }
   }
 }
