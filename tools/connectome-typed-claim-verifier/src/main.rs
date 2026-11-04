@@ -520,6 +520,17 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                 disposition = "REJECTED_TYPE_PROMOTION";
                 reasons.push(format!("asserted path type {asserted} differs from requested query type {requested_type}"));
             }
+
+            // Path-grammar violations take precedence over later type-promotion
+            // checks. A mixed path in SINGLE_RELATION_LAYER is malformed query
+            // composition, even when the asserted output type is also wrong.
+            let violates_path_grammar = used != *allowed_sequence
+                || (query_mode == "SINGLE_RELATION_LAYER" && relation_set.len() != 1)
+                || (query_mode == "SINGLE_RELATION_LAYER"
+                    && requested_type == "MIXED_EVIDENCE_PATH");
+            if violates_path_grammar {
+                disposition = "REJECTED_PATH_GRAMMAR";
+            }
             if disposition == "ACCEPTED_WITHIN_TYPED_SCOPE"
                 && claimed_result_status == "CLAIMED_REJECTED"
             {
@@ -791,7 +802,7 @@ mod tests {
     #[test]
     fn rejects_functional_time_window_with_nonpositive_duration() {
         let mut bundle = parse_fixture();
-        bundle["claims"][3]["evidence"][0]["time_window_end_ms"] = Value::from(0);
+        bundle["claims"][3]["evidence"][0]["window_end_ms"] = Value::from(0);
         assert!(verify(&bundle).is_err());
     }
 
