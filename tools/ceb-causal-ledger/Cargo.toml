@@ -10,5 +10,8 @@ description = "Pure, deterministic validation model for CEB causal-investigation
 # dependency of symthaea-core and is not added to the main workspace until its
 # contract and implementation have been independently reviewed.
 
+# Keep this package outside the parent production workspace.
+[workspace]
+
 [lib]
 path = "src/lib.rs"
