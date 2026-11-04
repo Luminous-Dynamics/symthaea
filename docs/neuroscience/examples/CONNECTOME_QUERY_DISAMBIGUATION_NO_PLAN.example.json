@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "analysis_id": "synthetic-no-complete-observation-plan-v1",
+  "dataset_revision_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "query_id": "circuit-connectivity-is-functionally-present",
+  "query_spec_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "scenario_set_scope": "sampled_sensitivity_set",
+  "scenario_set_sha256": "3248a064aa8a08e46106cc480c321ffac5ebc583944be14898a6c3c79e976872",
+  "effort_unit": "expert_review_minutes",
+  "max_total_effort_units": 2,
+  "scenarios": [
+    { "scenario_id": "world-supports", "graph_sha256": "1111111111111111111111111111111111111111111111111111111111111111", "decision_met": true },
+    { "scenario_id": "world-refutes", "graph_sha256": "2222222222222222222222222222222222222222222222222222222222222222", "decision_met": false }
+  ],
+  "actions": [
+    {
+      "action_id": "ambiguous-low-resolution-inspection",
+      "action_kind": "image_inspection",
+      "effort_units": 1,
+      "source_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "observation_model_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "dependence_groups": ["same-low-resolution-source"],
+      "outcomes": [
+        { "scenario_id": "world-supports", "outcome_id": "indeterminate" },
+        { "scenario_id": "world-refutes", "outcome_id": "indeterminate" }
+      ]
+    }
+  ]
+}
