@@ -14,10 +14,71 @@
 //! or acoustic-output claim.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 pub const OUTPUT_CLOCK_ANCHOR_SCHEMA_V1: &str = "mel-output-clock-anchor-v1";
 pub const OUTPUT_CLOCK_FIT_SCHEMA_V1: &str = "mel-output-clock-fit-v1";
 
+
+
+pub const OUTPUT_CLOCK_STREAM_DESCRIPTOR_SCHEMA_V1: &str =
+    "mel-output-clock-stream-descriptor-v1";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OutputClockSampleFormatV1 {
+    F32,
+}
+
+/// Stream-level metadata shared by all callback anchors in one CPAL stream.
+///
+/// The raw CPAL device ID is deliberately not persisted. Its SHA-256
+/// fingerprint supports device-stratified analysis without publishing a
+/// potentially identifying host/device string. The configuration digest
+/// binds that fingerprint to the negotiated output format.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OutputClockStreamDescriptorV1 {
+    pub schema_version: String,
+    pub stream_instance_id: u64,
+    pub device_identity_sha256: String,
+    pub sample_rate_hz: u32,
+    pub channel_count: u16,
+    pub sample_format: OutputClockSampleFormatV1,
+    pub configuration_digest_sha256: String,
+}
+
+impl OutputClockStreamDescriptorV1 {
+    /// Build a stable, privacy-preserving stream descriptor from CPAL's
+    /// stable device ID and the negotiated output configuration.
+    pub fn from_cpal_device_id(
+        stream_instance_id: u64,
+        device_id: &str,
+        sample_rate_hz: u32,
+        channel_count: u16,
+    ) -> Option<Self> {
+        if device_id.trim().is_empty() || sample_rate_hz == 0 || channel_count == 0 {
+            return None;
+        }
+        let device_identity_sha256 =
+            format!("{:x}", Sha256::digest(device_id.as_bytes()));
+        let canonical = format!(
+            "{OUTPUT_CLOCK_STREAM_DESCRIPTOR_SCHEMA_V1}\\n{device_identity_sha256}\\n{sample_rate_hz}\\n{channel_count}\\nf32"
+        );
+        let configuration_digest_sha256 =
+            format!("{:x}", Sha256::digest(canonical.as_bytes()));
+
+        Some(Self {
+            schema_version: OUTPUT_CLOCK_STREAM_DESCRIPTOR_SCHEMA_V1.to_owned(),
+            stream_instance_id,
+            device_identity_sha256,
+            sample_rate_hz,
+            channel_count,
+            sample_format: OutputClockSampleFormatV1::F32,
+            configuration_digest_sha256,
+        })
+    }
+}
 
 /// Versioned schema identity for a callback anchor. An enum rather than a
 /// String makes the record Copy and safe to enqueue from a real-time callback
@@ -52,6 +113,7 @@ pub struct OutputClockAnchorV1 {
     pub first_output_frame_index: u64,
     pub frame_count: u32,
     pub sample_rate_hz: u32,
+    pub channel_count: u16,
     pub callback_stream_time_ns: u64,
     pub playback_stream_time_ns: u64,
     pub callback_to_playback_ns: u64,
@@ -124,11 +186,13 @@ pub struct OutputClockFitV1 {
 pub enum OutputClockFitErrorV1 {
     TooFewAnchors { actual: usize, required: usize },
     InvalidSampleRate,
+    InvalidChannelCount,
     InvalidAnchorSchema { index: usize },
     InvalidAnchorFrameCount { index: usize },
     CallbackPlaybackMismatch { index: usize },
     StreamIdentityMismatch { index: usize },
     SampleRateMismatch { index: usize },
+    ChannelCountMismatch { index: usize },
     NonMonotonicAnchorIndex { index: usize },
     NonMonotonicPlaybackTime { index: usize },
     NonContiguousFrameIndex { index: usize },
@@ -228,6 +292,9 @@ pub fn fit_output_clock_v1(
         if anchor.frame_count == 0 {
             return Err(OutputClockFitErrorV1::InvalidAnchorFrameCount { index });
         }
+        if anchor.channel_count == 0 {
+            return Err(OutputClockFitErrorV1::InvalidChannelCount);
+        }
         let delta = anchor
             .playback_stream_time_ns
             .checked_sub(anchor.callback_stream_time_ns);
@@ -241,6 +308,9 @@ pub fn fit_output_clock_v1(
             }
             if anchor.sample_rate_hz != previous.sample_rate_hz {
                 return Err(OutputClockFitErrorV1::SampleRateMismatch { index });
+            }
+            if anchor.channel_count != previous.channel_count {
+                return Err(OutputClockFitErrorV1::ChannelCountMismatch { index });
             }
             if anchor.anchor_index <= previous.anchor_index {
                 return Err(OutputClockFitErrorV1::NonMonotonicAnchorIndex { index });
@@ -380,6 +450,7 @@ mod tests {
             first_output_frame_index: first_frame,
             frame_count: 480,
             sample_rate_hz: 48_000,
+            channel_count: 2,
             callback_stream_time_ns: playback_ns.saturating_sub(5_000_000),
             playback_stream_time_ns: playback_ns,
             callback_to_playback_ns: 5_000_000,
@@ -585,6 +656,40 @@ mod tests {
                 other => panic!("{} has unsupported expected disposition {other}", fixture.fixture_id),
             }
         }
+    }
+
+
+    #[test]
+    fn stream_descriptor_redacts_device_id_and_binds_output_configuration() {
+        let descriptor = OutputClockStreamDescriptorV1::from_cpal_device_id(
+            12,
+            "synthetic-device-private-id",
+            48_000,
+            2,
+        )
+        .unwrap();
+        assert_eq!(descriptor.schema_version, OUTPUT_CLOCK_STREAM_DESCRIPTOR_SCHEMA_V1);
+        assert_ne!(descriptor.device_identity_sha256, "synthetic-device-private-id");
+        assert_eq!(descriptor.sample_rate_hz, 48_000);
+        assert_eq!(descriptor.channel_count, 2);
+        assert_eq!(descriptor.sample_format, OutputClockSampleFormatV1::F32);
+        assert_eq!(descriptor.configuration_digest_sha256.len(), 64);
+    }
+
+    #[test]
+    fn channel_count_change_requires_a_new_clock_segment() {
+        let mut anchors = vec![
+            anchor(0, 0, 5_000_000),
+            anchor(1, 480, 15_000_000),
+            anchor(2, 960, 25_000_000),
+            anchor(3, 1440, 35_000_000),
+        ];
+        anchors[2].channel_count = 1;
+
+        assert!(matches!(
+            fit_output_clock_v1(&anchors, policy()),
+            Err(OutputClockFitErrorV1::ChannelCountMismatch { index: 2 })
+        ));
     }
 
     #[test]
