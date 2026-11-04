@@ -34,9 +34,22 @@ const importFromRea = async (relativePath) =>
 const [
   { createEvidence, withEvidenceCallerInputPath, parseEvidence },
   { createAnalysisProfile },
+  {
+    createResidualUnknown,
+    recordUnknownInputSchema,
+    updateResidualUnknown,
+  },
+  {
+    createEvidenceBundle,
+    evidenceBundleForTarget,
+    parseEvidenceBundle,
+    serializeEvidenceBundle,
+  },
 ] = await Promise.all([
   importFromRea("domain/evidence.ts"),
   importFromRea("domain/analysisProfile.ts"),
+  importFromRea("domain/residualUnknown.ts"),
+  importFromRea("domain/evidenceBundle.ts"),
 ]);
 
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -427,6 +440,395 @@ await writeFile(resolve(outputDirectory, surrogateFile), surrogateBytes, {
   mode: 0o600,
 });
 
+
+const baseFixture = fixtureRecords.find((item) => item.name === "apk-profile-complete");
+if (!baseFixture) throw new Error("Missing base Evidence fixture for bundle oracle");
+const baseEvidence = JSON.parse(
+  await readFile(resolve(outputDirectory, baseFixture.file), "utf8"),
+);
+const scopeDigest = baseEvidence.subject.digest.sha256;
+
+const createMutationEvidence = (operation, question, revision) =>
+  createEvidence(undefined, provider, {
+    predicateType: "rea.residual-unknown-mutation",
+    operation,
+    parameters: { question, revision },
+    result: { action: operation, question, revision },
+  });
+
+const rootInput = recordUnknownInputSchema.parse({
+  question: "APK artifact inventory coverage",
+  domain: "archive-inventory",
+  severity: "medium",
+  supporting_evidence_ids: [baseEvidence.evidence_id],
+  contradicting_evidence_ids: [],
+  required_authority: null,
+  required_confidence: "derived",
+  required_environment: null,
+  recommended_probes: [
+    {
+      operation: "inspect_apk_signing_block",
+      rationale: "Determine whether pre-central-directory bytes require a separate region inventory",
+    },
+  ],
+  relationships: [],
+});
+const rootMutation = createMutationEvidence(
+  "record_unknown",
+  rootInput.question,
+  1,
+);
+const rootRevision1 = createResidualUnknown(
+  rootInput,
+  rootMutation.evidence_id,
+  scopeDigest,
+);
+
+const rootUpdateInput = {
+  unknown_id: rootRevision1.unknown_id,
+  expected_revision: 1,
+  status: "investigating",
+  severity: "high",
+  supporting_evidence_ids: [baseEvidence.evidence_id],
+  contradicting_evidence_ids: [],
+  required_authority: null,
+  required_confidence: "observed",
+  required_environment: null,
+  recommended_probes: [
+    {
+      operation: "inspect_apk_signing_block",
+      rationale: "Compare archive entry inventory with the APK Signing Block region boundary",
+    },
+  ],
+  relationships: [],
+  resolution: null,
+};
+const rootMutation2 = createMutationEvidence(
+  "update_unknown",
+  rootInput.question,
+  2,
+);
+const rootRevision2 = updateResidualUnknown(
+  rootRevision1,
+  rootUpdateInput,
+  rootMutation2.evidence_id,
+);
+
+const childInput = recordUnknownInputSchema.parse({
+  question: "APK package signature region semantics",
+  domain: "archive-inventory",
+  severity: "medium",
+  supporting_evidence_ids: [baseEvidence.evidence_id],
+  contradicting_evidence_ids: [],
+  required_authority: null,
+  required_confidence: "derived",
+  required_environment: null,
+  recommended_probes: [],
+  relationships: [
+    { type: "depends-on", unknown_id: rootRevision1.unknown_id },
+  ],
+});
+const childMutation = createMutationEvidence(
+  "record_unknown",
+  childInput.question,
+  1,
+);
+const childRevision1 = createResidualUnknown(
+  childInput,
+  childMutation.evidence_id,
+  scopeDigest,
+);
+
+const verifiedInput = recordUnknownInputSchema.parse({
+  question: "The declared APK classes.dex entry has the measured size",
+  domain: "archive-inventory",
+  severity: "low",
+  supporting_evidence_ids: [baseEvidence.evidence_id],
+  contradicting_evidence_ids: [],
+  required_authority: "shipped-artifact",
+  required_confidence: "observed",
+  required_environment: null,
+  recommended_probes: [],
+  relationships: [],
+});
+const verifiedMutation = createMutationEvidence(
+  "record_unknown",
+  verifiedInput.question,
+  1,
+);
+const verifiedRevision1 = createResidualUnknown(
+  verifiedInput,
+  verifiedMutation.evidence_id,
+  scopeDigest,
+);
+const verifiedUpdate = {
+  unknown_id: verifiedRevision1.unknown_id,
+  expected_revision: 1,
+  status: "resolved",
+  severity: "low",
+  supporting_evidence_ids: [baseEvidence.evidence_id],
+  contradicting_evidence_ids: [],
+  required_authority: "shipped-artifact",
+  required_confidence: "observed",
+  required_environment: null,
+  recommended_probes: [],
+  relationships: [],
+  resolution: {
+    disposition: "verified",
+    rationale: "The artifact-bound observed Evidence satisfies the declared authority and confidence",
+    evidence_ids: [baseEvidence.evidence_id],
+  },
+};
+const verifiedMutation2 = createMutationEvidence(
+  "update_unknown",
+  verifiedInput.question,
+  2,
+);
+const verifiedRevision2 = updateResidualUnknown(
+  verifiedRevision1,
+  verifiedUpdate,
+  verifiedMutation2.evidence_id,
+);
+
+const bundleRecords = [
+  baseEvidence,
+  rootMutation,
+  rootMutation2,
+  childMutation,
+  verifiedMutation,
+  verifiedMutation2,
+];
+const bundleUnknowns = [
+  rootRevision1,
+  rootRevision2,
+  childRevision1,
+  verifiedRevision1,
+  verifiedRevision2,
+];
+const upstreamBundle = createEvidenceBundle(bundleRecords, bundleUnknowns);
+const parsedUpstreamBundle = parseEvidenceBundle(upstreamBundle);
+const bundleRawBytes = Buffer.from(
+  JSON.stringify(parsedUpstreamBundle, null, 2) + "\n",
+);
+const bundleCanonicalBytes = Buffer.from(
+  serializeEvidenceBundle(parsedUpstreamBundle),
+);
+const bundleFile = "evidence-bundle-v1.json";
+await writeFile(resolve(outputDirectory, bundleFile), bundleRawBytes, {
+  flag: "wx",
+  mode: 0o600,
+});
+const bundleManifest = {
+  file: bundleFile,
+  bytes: bundleRawBytes.length,
+  raw_file_sha256: digest(bundleRawBytes),
+  canonical_sha256: digest(bundleCanonicalBytes),
+  record_count: parsedUpstreamBundle.records.length,
+  unknown_revision_count: parsedUpstreamBundle.unknowns.length,
+  unknown_ids: [...new Set(parsedUpstreamBundle.unknowns.map((item) => item.unknown_id))].sort(),
+};
+
+const targetBundle = evidenceBundleForTarget(parsedUpstreamBundle, scopeDigest);
+const targetBundleBytes = Buffer.from(JSON.stringify(targetBundle, null, 2) + "\n");
+const targetBundleCanonicalBytes = Buffer.from(serializeEvidenceBundle(targetBundle));
+const targetBundleFile = "evidence-bundle-target-v1.json";
+await writeFile(resolve(outputDirectory, targetBundleFile), targetBundleBytes, {
+  flag: "wx",
+  mode: 0o600,
+});
+const targetBundleManifest = {
+  file: targetBundleFile,
+  target_sha256: scopeDigest,
+  bytes: targetBundleBytes.length,
+  raw_file_sha256: digest(targetBundleBytes),
+  canonical_sha256: digest(targetBundleCanonicalBytes),
+  record_count: targetBundle.records.length,
+  unknown_revision_count: targetBundle.unknowns.length,
+  unknown_ids: [...new Set(targetBundle.unknowns.map((item) => item.unknown_id))].sort(),
+};
+
+const otherTargetSha = "b".repeat(64);
+const otherTargetBundle = evidenceBundleForTarget(parsedUpstreamBundle, otherTargetSha);
+const otherTargetBundleBytes = Buffer.from(
+  JSON.stringify(otherTargetBundle, null, 2) + "\n",
+);
+const otherTargetBundleFile = "evidence-bundle-other-target-v1.json";
+await writeFile(resolve(outputDirectory, otherTargetBundleFile), otherTargetBundleBytes, {
+  flag: "wx",
+  mode: 0o600,
+});
+const otherTargetBundleCanonicalBytes = Buffer.from(
+  serializeEvidenceBundle(otherTargetBundle),
+);
+const otherTargetBundleManifest = {
+  file: otherTargetBundleFile,
+  target_sha256: otherTargetSha,
+  bytes: otherTargetBundleBytes.length,
+  raw_file_sha256: digest(otherTargetBundleBytes),
+  canonical_sha256: digest(otherTargetBundleCanonicalBytes),
+  record_count: otherTargetBundle.records.length,
+  unknown_revision_count: otherTargetBundle.unknowns.length,
+};
+
+const bundleNegativeInputs = [];
+const expectBundleReject = (name, candidate, expectedError) => {
+  let caught;
+  try {
+    parseEvidenceBundle(candidate);
+  } catch (error) {
+    caught = error;
+  }
+  if (!caught) {
+    throw new Error("Upstream REA unexpectedly accepted bundle negative control " + name);
+  }
+  const actualName = caught.constructor?.name ?? "Error";
+  if (actualName !== expectedError) {
+    throw new Error(
+      "Bundle negative control " + name + " produced " + actualName + ", expected " + expectedError,
+    );
+  }
+  bundleNegativeInputs.push({ name, value: candidate, expected_error: expectedError });
+};
+
+expectBundleReject(
+  "duplicate-evidence-record",
+  {
+    ...parsedUpstreamBundle,
+    records: [...parsedUpstreamBundle.records, parsedUpstreamBundle.records[0]],
+  },
+  "DuplicateEvidenceRecordError",
+);
+expectBundleReject(
+  "noncanonical-record-order",
+  {
+    ...parsedUpstreamBundle,
+    records: [...parsedUpstreamBundle.records].reverse(),
+  },
+  "NonCanonicalEvidenceBundleError",
+);
+
+const missingSupport = "ev_" + "f".repeat(64);
+const missingSupportMutation = createMutationEvidence(
+  "update_unknown",
+  rootInput.question,
+  3,
+);
+const rootRevision3MissingSupport = updateResidualUnknown(
+  rootRevision2,
+  {
+    ...rootUpdateInput,
+    expected_revision: 2,
+    supporting_evidence_ids: [missingSupport],
+    status: "blocked",
+    severity: "critical",
+  },
+  missingSupportMutation.evidence_id,
+);
+expectBundleReject(
+  "missing-evidence-reference",
+  createEvidenceBundle(
+    [...bundleRecords, missingSupportMutation],
+    [...bundleUnknowns, rootRevision3MissingSupport],
+  ),
+  "InvalidResidualUnknownGraphError",
+);
+
+const gapMutation = createMutationEvidence(
+  "update_unknown",
+  rootInput.question,
+  4,
+);
+const rootRevision3 = updateResidualUnknown(
+  rootRevision2,
+  {
+    ...rootUpdateInput,
+    expected_revision: 2,
+    status: "blocked",
+    severity: "high",
+  },
+  gapMutation.evidence_id,
+);
+expectBundleReject(
+  "revision-history-gap",
+  createEvidenceBundle(
+    [...bundleRecords, gapMutation],
+    [
+      rootRevision1,
+      rootRevision3,
+      childRevision1,
+      verifiedRevision1,
+      verifiedRevision2,
+    ],
+  ),
+  "InvalidResidualUnknownGraphError",
+);
+
+const cycleAQuestion = "Mutually dependent archive claim A";
+const cycleBQuestion = "Mutually dependent archive claim B";
+const cycleASeed = recordUnknownInputSchema.parse({
+  question: cycleAQuestion,
+  domain: "archive-cycle",
+  severity: "medium",
+  required_authority: null,
+  required_confidence: "inferred",
+  required_environment: null,
+  recommended_probes: [],
+  relationships: [],
+});
+const cycleBSeed = recordUnknownInputSchema.parse({
+  question: cycleBQuestion,
+  domain: "archive-cycle",
+  severity: "medium",
+  required_authority: null,
+  required_confidence: "inferred",
+  required_environment: null,
+  recommended_probes: [],
+  relationships: [],
+});
+const cycleAId = createResidualUnknown(cycleASeed, rootMutation.evidence_id, scopeDigest).unknown_id;
+const cycleBId = createResidualUnknown(cycleBSeed, childMutation.evidence_id, scopeDigest).unknown_id;
+const cycleA = createResidualUnknown(
+  recordUnknownInputSchema.parse({
+    ...cycleASeed,
+    relationships: [{ type: "depends-on", unknown_id: cycleBId }],
+  }),
+  rootMutation.evidence_id,
+  scopeDigest,
+);
+const cycleB = createResidualUnknown(
+  recordUnknownInputSchema.parse({
+    ...cycleBSeed,
+    relationships: [{ type: "depends-on", unknown_id: cycleAId }],
+  }),
+  childMutation.evidence_id,
+  scopeDigest,
+);
+expectBundleReject(
+  "dependency-cycle",
+  createEvidenceBundle(
+    bundleRecords,
+    [...bundleUnknowns, cycleA, cycleB],
+  ),
+  "InvalidResidualUnknownGraphError",
+);
+
+const bundleNegativeControls = [];
+for (const item of bundleNegativeInputs) {
+  const file = "negative-bundle-" + item.name + ".json";
+  const bytes = Buffer.from(JSON.stringify(item.value, null, 2) + "\n");
+  await writeFile(resolve(outputDirectory, file), bytes, {
+    flag: "wx",
+    mode: 0o600,
+  });
+  bundleNegativeControls.push({
+    name: item.name,
+    file,
+    bytes: bytes.length,
+    raw_file_sha256: digest(bytes),
+    expected_error: item.expected_error,
+  });
+}
+
 const manifest = {
   schema: "luminous.rea-upstream-evidence-corpus.v1",
   producer: {
@@ -448,6 +850,10 @@ const manifest = {
   display_only_mutations: displayOnlyMutations,
   key_order_mutations: keyOrderMutations,
   negative_controls: invalidCases,
+  evidence_bundle: bundleManifest,
+  evidence_bundle_target: targetBundleManifest,
+  evidence_bundle_other_target: otherTargetBundleManifest,
+  bundle_negative_controls: bundleNegativeControls,
   stricter_importer_cases: [
     {
       name: "unpaired-utf16-surrogate",
@@ -476,6 +882,13 @@ await writeFile(
       key_order_mutation_count: keyOrderMutations.length,
       negative_control_count: invalidCases.length,
       stricter_importer_count: 1,
+      evidence_bundle_raw_sha256: bundleManifest.raw_file_sha256,
+      evidence_bundle_canonical_sha256: bundleManifest.canonical_sha256,
+      evidence_bundle_target_raw_sha256: targetBundleManifest.raw_file_sha256,
+      evidence_bundle_target_canonical_sha256: targetBundleManifest.canonical_sha256,
+      evidence_bundle_other_target_raw_sha256: otherTargetBundleManifest.raw_file_sha256,
+      evidence_bundle_other_target_canonical_sha256: otherTargetBundleManifest.canonical_sha256,
+      bundle_negative_control_count: bundleNegativeControls.length,
       producer: manifest.producer,
       generator: manifest.generator,
     },
