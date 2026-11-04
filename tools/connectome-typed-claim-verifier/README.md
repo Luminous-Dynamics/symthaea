@@ -27,6 +27,6 @@ The report is `STRUCTURE_RECOMPUTED` with `trusted_promotion=false`. It does not
 
 ## Tests
 
-Twenty Rust tests are authored for known-answer, relation/evidence mismatch, same-world anatomical and correspondence errors, ambiguous polarity, statistical range, functional window, causal positivity, invalid causal promotion, query grammar, duplicate IDs and counter corruption.
+Twenty-four Rust tests are authored for known-answer, relation/evidence mismatch, same-world anatomical and correspondence errors, ambiguous polarity, statistical range, functional window, causal positivity, invalid causal promotion, query grammar, duplicate IDs and counter corruption.
 
 Tests are authored for exact-head execution by the isolated pinned Rust 1.96.0 workflow. They have not been executed locally in this authoring environment.
