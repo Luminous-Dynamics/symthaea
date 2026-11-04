@@ -162,10 +162,12 @@ fn git_blob_sha1(raw: &[u8]) -> String {
     let mut object = Vec::with_capacity(header.len() + raw.len());
     object.extend_from_slice(header.as_bytes());
     object.extend_from_slice(raw);
-    sha1_digest(&object)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+    let mut output = String::with_capacity(40);
+    for byte in sha1_digest(&object) {
+        use std::fmt::Write as _;
+        write!(&mut output, "{byte:02x}").expect("writing to a String cannot fail");
+    }
+    output
 }
 
 fn require_nonempty(value: &str, label: &str) -> Result<(), String> {
