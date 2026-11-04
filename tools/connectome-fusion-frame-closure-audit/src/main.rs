@@ -269,14 +269,14 @@ fn assertion_keys(event: &Event) -> Vec<AssertionKey> {
     let mut ids = event.evidence_ids.clone();
     ids.sort();
     let mut result = Vec::new();
-    for i in 0..ids.len() {
-        for j in (i + 1)..ids.len() {
+    for (i, left) in ids.iter().enumerate() {
+        for right in ids.iter().skip(i + 1) {
             result.push(AssertionKey {
                 canonical_use_key: event.canonical_use_key.clone(),
                 claim_id: event.claim_id.clone(),
                 query_id: event.query_id.clone(),
-                left_evidence_id: ids[i].clone(),
-                right_evidence_id: ids[j].clone(),
+                left_evidence_id: left.clone(),
+                right_evidence_id: right.clone(),
                 fusion_policy_sha256: event.fusion_policy_sha256.clone(),
                 dependence_bundle_sha256: event.dependence_bundle_sha256.clone(),
             });
@@ -320,7 +320,9 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
     if input.scope.release_ids.is_empty() || !sorted_unique(&input.scope.release_ids) {
         errors.push("RELEASE_SCOPE_IDS_EMPTY_DUPLICATED_OR_UNSORTED".to_string());
     }
-    if input.reconciliation_policy.shared_control_policy != "FAIL_CLOSED_ON_DECLARED_SHARED_CONTROL" {
+    if input.reconciliation_policy.shared_control_policy
+        != "FAIL_CLOSED_ON_DECLARED_SHARED_CONTROL"
+    {
         errors.push("UNSUPPORTED_SHARED_CONTROL_POLICY".to_string());
     }
 
@@ -341,9 +343,16 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
         errors.push("UNSUPPORTED_FUSION_POLICY_PROJECTION".to_string());
     }
 
-    let required_roles: BTreeSet<&str> = input.reconciliation_policy.required_source_roles.iter().map(String::as_str).collect();
+    let required_roles: BTreeSet<&str> = input
+        .reconciliation_policy
+        .required_source_roles
+        .iter()
+        .map(String::as_str)
+        .collect();
     let expected_roles: BTreeSet<&str> = [EXECUTION_ROLE, CLAIM_ROLE].into_iter().collect();
-    if required_roles != expected_roles || input.reconciliation_policy.required_source_roles.len() != 2 {
+    if required_roles != expected_roles
+        || input.reconciliation_policy.required_source_roles.len() != 2
+    {
         errors.push("REQUIRED_SOURCE_ROLE_SET_UNSUPPORTED".to_string());
     }
 
@@ -373,12 +382,18 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
         let unique_use_keys: BTreeSet<&str> = source.events.iter().map(|e| e.canonical_use_key.as_str()).collect();
         let sequence_contiguous = source.events.len() as u64 == source.record_count
             && seqs.len() == source.events.len()
-            && source.events.iter().enumerate().all(|(i, e)| source.sequence_start.checked_add(i as u64) == Some(e.sequence))
+            && source.events.iter().enumerate().all(|(i, e)| {
+                source.sequence_start.checked_add(i as u64) == Some(e.sequence)
+            })
             && if source.events.is_empty() {
                 source.sequence_end == source.sequence_start
             } else {
                 source.events.last().map(|e| e.sequence) == Some(source.sequence_end)
-                    && source.sequence_end.saturating_sub(source.sequence_start).saturating_add(1) == source.record_count
+                    && source
+                        .sequence_end
+                        .saturating_sub(source.sequence_start)
+                        .saturating_add(1)
+                        == source.record_count
             };
         let event_digest_valid = computed_events.as_ref().is_ok_and(|digest| digest == &source.ordered_events_sha256);
         let extraction_digest_valid = computed_extraction == source.extraction_sha256;
@@ -439,7 +454,10 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
             {
                 errors.push(format!("EVENT_OUTSIDE_DECLARED_SCOPE:{}:{}", source.source_id, event.event_id));
             }
-            if !matches!(event.outcome.as_str(), "CONTRIBUTED" | "FAILED_BEFORE_CLAIM" | "CANCELLED" | "RETRY_OF_PRIOR_EVENT") {
+            if !matches!(
+                event.outcome.as_str(),
+                "CONTRIBUTED" | "FAILED_BEFORE_CLAIM" | "CANCELLED" | "RETRY_OF_PRIOR_EVENT"
+            ) {
                 errors.push(format!("UNSUPPORTED_EVENT_OUTCOME:{}:{}", source.source_id, event.event_id));
             }
             match use_key(input, event) {
@@ -458,7 +476,8 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
             event_digest_valid,
             extraction_digest_valid,
             scope_match,
-            coverage_qualified: source.coverage_disposition == "QUALIFIED_COMPLETE_WITHIN_DECLARED_SCOPE",
+            coverage_qualified: source.coverage_disposition
+                == "QUALIFIED_COMPLETE_WITHIN_DECLARED_SCOPE",
             custodian_unique,
             shared_controls_empty: source.shared_controls.is_empty(),
         });
@@ -512,7 +531,8 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
             errors,
             limitations: vec![
                 "Structural and digest checks qualify only the supplied records.".to_string(),
-                "This report cannot establish that an event source recorded every real-world evidence use.".to_string(),
+                "This report cannot establish that an event source recorded every real-world evidence use."
+                    .to_string(),
                 "This report does not establish biological independence or biological truth.".to_string(),
             ],
         };
@@ -594,10 +614,12 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
 
     let closed = disposition == "FRAME_CLOSED_WITHIN_DECLARED_SCOPE";
     let mut limitations = vec![
-        "Closure is bounded to the named event exports, custodians, query/release scope, and event-time convention.".to_string(),
+        "Closure is bounded to the named event exports, custodians, query/release scope, and event-time convention."
+            .to_string(),
         "Agreement between two exports does not prove that every real-world operation was logged.".to_string(),
         "Shared or undisclosed common controls may invalidate apparent source separation.".to_string(),
-        "A closed frame is not proof of biological independence, biological truth, or causal identification.".to_string(),
+        "A closed frame is not proof of biological independence, biological truth, or causal identification."
+            .to_string(),
     ];
     if shared_control {
         limitations.push("At least one source declares shared control; promotion is blocked.".to_string());
@@ -665,7 +687,9 @@ fn main() {
 mod tests {
     use super::*;
 
-    const FIXTURE: &str = include_str!("../../../research/connectomics/fixtures/connectome-fusion-frame-closure-omitted-use-v0.1.json");
+    const FIXTURE: &str = include_str!(
+        "../../../research/connectomics/fixtures/connectome-fusion-frame-closure-omitted-use-v0.1.json"
+    );
 
     fn parse_fixture() -> (Input, Vec<u8>) {
         let raw = FIXTURE.as_bytes().to_vec();
