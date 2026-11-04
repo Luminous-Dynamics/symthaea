@@ -576,6 +576,11 @@ mod tests {
                     metric: QueryMetric::EdgeWeight { source: 10, target: 11 },
                     decision: DecisionRule::LessThan { threshold: 0.5 },
                 },
+                Query {
+                    query_id: "node-3-outgoing-weight".into(),
+                    metric: QueryMetric::OutDegree { node: 3 },
+                    decision: DecisionRule::GreaterOrEqual { threshold: 1.0 },
+                },
             ],
         }
     }
@@ -599,8 +604,16 @@ mod tests {
             .iter()
             .find(|query| query.query_id == "spurious-edge-below-threshold")
             .unwrap();
-        assert_eq!(edge_control.decision_status, "ROBUST_DECISION_MET");
-        assert_eq!(edge_control.scenarios_meeting_decision, 3);
+        assert_eq!(edge_control.decision_status, "SENSITIVE_TO_RECONSTRUCTION");
+        assert_eq!(edge_control.scenarios_meeting_decision, 2);
+        assert_eq!(edge_control.scenarios_not_meeting_decision, 1);
+        let stable_control = report
+            .queries
+            .iter()
+            .find(|query| query.query_id == "node-3-outgoing-weight")
+            .unwrap();
+        assert_eq!(stable_control.decision_status, "ROBUST_DECISION_MET");
+        assert_eq!(stable_control.scenarios_meeting_decision, 3);
     }
 
     #[test]

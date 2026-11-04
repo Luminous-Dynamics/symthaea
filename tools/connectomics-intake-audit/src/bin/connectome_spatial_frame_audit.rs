@@ -880,6 +880,9 @@ mod tests {
         frame.eligibility_mask.artifact_sha256 = sha256(&mask);
         let mut extra = mask.clone();
         extra.push(0);
+        // Bind the mutated bytes so this assertion reaches the exact-length
+        // check rather than being rejected earlier by the digest check.
+        frame.eligibility_mask.artifact_sha256 = sha256(&extra);
         let mut report = validate(&frame).unwrap();
         assert!(validate_mask_bytes(&frame, &extra, &mut report).unwrap_err().contains("expected"));
     }
@@ -1032,7 +1035,13 @@ mod tests {
     #[test]
     fn overflowing_declared_volume_is_rejected() {
         let mut frame = fixture();
-        frame.extent_voxels = [u64::MAX, u64::MAX, u64::MAX];
+        // Stay within the signed coordinate range so this reaches the
+        // checked u128 volume multiplication rather than failing the
+        // earlier i64 coordinate-bound check.
+        frame.extent_voxels = [i64::MAX as u64, i64::MAX as u64, i64::MAX as u64];
+        // Keep origin + extent inside i64 so checked volume multiplication is
+        // the first failing invariant.
+        frame.origin_voxel = [i64::MIN, i64::MIN, i64::MIN];
         frame.tile_shape_voxels = [1, 1, 1];
         assert!(validate(&frame).unwrap_err().contains("voxel count overflows u128"));
     }

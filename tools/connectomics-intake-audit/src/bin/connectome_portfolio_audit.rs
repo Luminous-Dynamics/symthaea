@@ -162,6 +162,26 @@ struct PortfolioResult {
 
 type Graph = BTreeMap<(u64, u64), f64>;
 
+fn reference_free_ranking_view_sha256(
+    candidates: &[Candidate],
+    baseline_graph: &Graph,
+    ranking_specs: &[QueryRankingSpec],
+) -> Result<String, String> {
+    // JSON object keys must be strings. Graph uses tuple keys internally,
+    // so encode its canonical BTreeMap order as an explicit edge sequence.
+    let canonical_edges = baseline_graph
+        .iter()
+        .map(|(&(source, target), &weight)| Edge {
+            source,
+            target,
+            weight,
+        })
+        .collect::<Vec<_>>();
+    let bytes = serde_json::to_vec(&(candidates, &canonical_edges, ranking_specs))
+        .map_err(|error| format!("could not serialize reference-free ranking view: {error}"))?;
+    Ok(sha256(&bytes))
+}
+
 fn sha256(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
@@ -638,12 +658,11 @@ fn run(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
     }).collect::<Vec<_>>();
     // The random baseline is keyed only by the reference-free ranking view.
     // The raw input digest above remains an audit binding and is not exposed to rankers.
-    let ranking_view_bytes = serde_json::to_vec(&(
+    let ranking_view_sha256 = reference_free_ranking_view_sha256(
         &input.candidates,
         &baseline_graph,
         &ranking_specs,
-    )).map_err(|error| format!("could not serialize reference-free ranking view: {error}"))?;
-    let ranking_view_sha256 = sha256(&ranking_view_bytes);
+    )?;
     let rankings = policy_names
         .iter()
         .map(|name| (
@@ -977,7 +996,9 @@ mod tests {
         let input = base_input(candidates, vec![query], vec![Edge { source: 9, target: 10, weight: 1.0 }]);
         let ranking_specs_a = ranking_specs(&input);
         let baseline_a = graph_from_edges(&input.graph);
-        let view_a = sha256(&serde_json::to_vec(&(&input.candidates, &baseline_a, &ranking_specs_a)).unwrap());
+        let view_a = reference_free_ranking_view_sha256(
+            &input.candidates, &baseline_a, &ranking_specs_a
+        ).unwrap();
         let policies = [
             "probability_weighted_query_sensitivity_per_minute",
             "probability_per_minute",
@@ -992,7 +1013,9 @@ mod tests {
         changed_reference.queries[0].reference_value = 99.0;
         let ranking_specs_b = ranking_specs(&changed_reference);
         let baseline_b = graph_from_edges(&changed_reference.graph);
-        let view_b = sha256(&serde_json::to_vec(&(&changed_reference.candidates, &baseline_b, &ranking_specs_b)).unwrap());
+        let view_b = reference_free_ranking_view_sha256(
+            &changed_reference.candidates, &baseline_b, &ranking_specs_b
+        ).unwrap();
         assert_eq!(view_a, view_b);
         let rankings_b = policies.iter().map(|policy| {
             rank_candidates(&changed_reference.candidates, &baseline_b, &ranking_specs_b, &view_b, policy)

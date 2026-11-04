@@ -958,6 +958,8 @@ mod tests {
         assert_eq!(audit.schema_version,1);
         assert_eq!(audit.strata.len(),2);
         let protocol=include_str!("../../../../docs/neuroscience/CONNECTOME_SAMPLING_AUDIT_PROTOCOL_V1.md");
-        assert!(protocol.contains("one-stage stratified cluster"));
+        assert!(protocol.contains("stratified one-stage cluster sample without replacement"));
+        assert!(protocol.contains("positive inclusion probability"));
+        assert!(protocol.contains("finite frozen candidate pool"));
     }
 }

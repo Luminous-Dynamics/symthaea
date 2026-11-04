@@ -2433,9 +2433,17 @@ mod tests {
             first.expected_calibration_error_95.map(|x| (x.lower, x.upper)),
             second.expected_calibration_error_95.map(|x| (x.lower, x.upper))
         );
-        assert_eq!(first.brier_score_95, Some(Interval { lower: 0.04, upper: 0.04 }));
-        assert_eq!(first.adaptive_confidence_ece_15_95, Some(Interval { lower: 0.2, upper: 0.2 }));
-        assert_eq!(first.reliability_curve_ece_12_95, Some(Interval { lower: 0.2, upper: 0.2 }));
+        let brier = first.brier_score_95.expect("Brier interval should be estimable");
+        assert!((brier.lower - 0.04).abs() < 1.0e-12);
+        assert!((brier.upper - 0.04).abs() < 1.0e-12);
+        let adaptive_ece = first.adaptive_confidence_ece_15_95
+            .expect("adaptive confidence ECE interval should be estimable");
+        assert!((adaptive_ece.lower - 0.2).abs() < 1.0e-12);
+        assert!((adaptive_ece.upper - 0.2).abs() < 1.0e-12);
+        let reliability_ece = first.reliability_curve_ece_12_95
+            .expect("reliability-curve ECE interval should be estimable");
+        assert!((reliability_ece.lower - 0.2).abs() < 1.0e-12);
+        assert!((reliability_ece.upper - 0.2).abs() < 1.0e-12);
     }
 
     #[test]
@@ -2659,7 +2667,8 @@ mod tests {
         ];
         let refs = rows.iter().collect::<Vec<_>>();
         let metrics = calibration_diagnostics(&refs);
-        assert_eq!(metrics.normalized_sharpness, Some(0.64));
+        let normalized_sharpness = metrics.normalized_sharpness.expect("sharpness should be defined");
+        assert!((normalized_sharpness - 0.64).abs() < 1.0e-12);
 
         let unsharp = vec![
             row("flat-1", true, 0.5, 0.5, 1.0, 1.0, "merge"),
@@ -2892,7 +2901,7 @@ mod tests {
     }
 
     #[test]
-    fn development_threshold_selection_refuses_five_percent_fpr_if_no_threshold_is_feasible() {
+    fn development_threshold_selection_uses_upper_bound_when_no_positive_recall_is_feasible() {
         let rows = vec![
             tagged_row("dev-in-1", false, 0.1, "mouse", false, 0.9),
             tagged_row("dev-in-2", false, 0.1, "mouse", false, 0.8),
@@ -2902,8 +2911,14 @@ mod tests {
             tagged_row("dev-ood-2", true, 0.9, "zebrafish", true, 0.4),
         ];
         let result = select_ood_threshold_from_development(&rows, "b".repeat(64), 0.05).unwrap();
-        assert_eq!(result.status, "NO_FEASIBLE_THRESHOLD");
-        assert_eq!(result.selected_threshold, None);
+        // A threshold of 1.0 is in the admitted closed unit interval and
+        // yields zero false-OOD rate. It is feasible even though it detects
+        // no held-out OOD examples, so the selector must report that
+        // zero-recall operating point rather than claim no feasible threshold.
+        assert_eq!(result.status, "SELECTED");
+        assert_eq!(result.selected_threshold, Some(1.0));
+        assert_eq!(result.false_ood_rate_on_in_domain, Some(0.0));
+        assert_eq!(result.held_out_domain_recall, Some(0.0));
     }
 
     #[test]
