@@ -38,6 +38,7 @@ struct Input {
     baseline_graph_sha256: String,
     baseline_graph: Vec<Edge>,
     query: Query,
+    effort_unit: String,
     max_total_effort_units: u64,
     edits: Vec<EditAtom>,
 }
@@ -119,6 +120,7 @@ struct Report {
     baseline_graph_sha256: String,
     query_id: String,
     query_spec_sha256: String,
+    effort_unit: String,
     edit_universe_sha256: String,
     baseline_query_value: f64,
     baseline_decision_met: bool,
@@ -326,6 +328,9 @@ fn validate(input: &Input) -> Result<Graph, String> {
     }
     if !valid_hex(&input.baseline_graph_sha256, 64) {
         return Err("baseline_graph_sha256 must be lowercase SHA-256".into());
+    }
+    if !nonempty(&input.effort_unit) {
+        return Err("effort_unit must be non-empty and explicit".into());
     }
     if input.max_total_effort_units == 0 {
         return Err("max_total_effort_units must be positive".into());
@@ -619,6 +624,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         baseline_graph_sha256: input.baseline_graph_sha256.clone(),
         query_id: input.query.query_id.clone(),
         query_spec_sha256: query_sha,
+        effort_unit: input.effort_unit.clone(),
         edit_universe_sha256: universe_sha,
         baseline_query_value: baseline_value,
         baseline_decision_met: baseline_met,
@@ -705,7 +711,7 @@ mod tests {
     fn exact_search_finds_minimum_two_edit_synergy_with_evidence_gate() {
         let input = fixture();
         let report = evaluate(&input, &fixture_bytes()).unwrap();
-        assert_eq!(report.baseline_query_value, 1.8);
+        assert!((report.baseline_query_value - 1.8).abs() < 1.0e-12);
         assert!(report.baseline_decision_met);
         assert_eq!(report.minimal_witness_effort_units, Some(5));
         assert_eq!(report.minimal_witness_count, 5);
