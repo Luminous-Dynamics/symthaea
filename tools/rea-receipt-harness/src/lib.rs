@@ -243,10 +243,15 @@ fn validate_semantics(receipt: &Value) -> Result<(), ReceiptError> {
     let claim_scope = object_at(receipt, &["claim_scope"])?;
     let attestation = object_at(receipt, &["attestation"])?;
 
-    if string_at(claim_scope, &["asserted_claim"])? != "member_content_integrity_only" {
-        return Err(ReceiptError::SemanticViolation(
-            "asserted_claim must remain member_content_integrity_only".into(),
-        ));
+    let expected_asserted_claim = if outcome == "verified" {
+        "member_content_integrity_only"
+    } else {
+        "none"
+    };
+    if string_at(claim_scope, &["asserted_claim"])? != expected_asserted_claim {
+        return Err(ReceiptError::SemanticViolation(format!(
+            "outcome {outcome:?} requires asserted_claim={expected_asserted_claim:?}"
+        )));
     }
 
     let not_established = claim_scope
@@ -801,6 +806,9 @@ mod tests {
         assert!(validate_receipt(&schema, &rejected).is_err());
 
         rejected["observations"]["payload_sha256"] = Value::Null;
+        assert!(validate_receipt(&schema, &rejected).is_err());
+
+        rejected["claim_scope"]["asserted_claim"] = json!("none");
         rejected["observations"]["failure_kind"] = json!("invalid_archive");
         rejected["observations"]["failure_detail"] = json!("seeded malformed input");
         assert!(validate_receipt(&schema, &rejected).is_ok());
