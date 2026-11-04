@@ -1,0 +1,22 @@
+[package]
+name = "rea-zip-fuzz"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "=0.4.13"
+symthaea-rea-artifact-reader = { path = "../crates/domains/symthaea-rea-artifact-reader" }
+
+[[bin]]
+name = "zip_inventory_and_content"
+path = "fuzz_targets/zip_inventory_and_content.rs"
+test = false
+doc = false
+
+[workspace]
+members = ["."]
+resolver = "2"
