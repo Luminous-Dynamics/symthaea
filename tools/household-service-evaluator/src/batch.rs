@@ -1,6 +1,6 @@
 use crate::{
     EvaluationError, MeterMeasurement, RepairAttempt, RepairDisposition, TopologyAuditReference,
-    WaterBalanceDisposition, WaterBalanceInput, evaluate_repair_attempt, evaluate_water_balance,
+    WaterBalanceInput, evaluate_repair_attempt, evaluate_water_balance,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -197,7 +197,10 @@ fn validate_corpus_header(
             format!("unexpected corpus identifier: {corpus_id}"),
         ));
     }
-    if corpus["claim_ceiling"].as_array().is_none_or(Vec::is_empty) {
+    let claim_ceiling = corpus["claim_ceiling"]
+        .as_array()
+        .ok_or_else(|| EvaluationError::new("corpus.claim_ceiling", "claim ceiling must be an array"))?;
+    if claim_ceiling.is_empty() {
         return Err(EvaluationError::new(
             "corpus.claim_ceiling",
             "a non-empty claim ceiling is required",
@@ -477,7 +480,7 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
         "WCONT-009" => {
             let command = required_bool(input, "commanded_refill")?;
             let flow = required_number(input, "municipal_inlet_flow_l_min")?;
-            metrics.insert("commanded_refill".to_owned(), f64::from(command));
+            metrics.insert("commanded_refill".to_owned(), bool_as_f64(command));
             metrics.insert("measured_inlet_flow_l_min".to_owned(), flow);
             notes.push(
                 "Open-valve feedback and a refill command are not treated as proof of physical inflow."
@@ -611,7 +614,7 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
             );
             metrics.insert(
                 "calibration_required".to_owned(),
-                f64::from(required_bool(baseline, "calibration_required")?),
+                bool_as_f64(required_bool(baseline, "calibration_required")?),
             );
             notes.push(
                 "Calibration is explicitly required by the synthetic task profile."
@@ -627,10 +630,10 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
             let signed_image = required_bool(baseline, "signed_image_available")?;
             let previous_image =
                 required_bool(baseline, "previous_known_good_image_available")?;
-            metrics.insert("signed_image_available".to_owned(), f64::from(signed_image));
+            metrics.insert("signed_image_available".to_owned(), bool_as_f64(signed_image));
             metrics.insert(
                 "previous_known_good_image_available".to_owned(),
-                f64::from(previous_image),
+                bool_as_f64(previous_image),
             );
             notes.push(
                 "Both offline recovery artifacts are declared available while internet access is absent."
@@ -662,11 +665,11 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
             let result = evaluate_repair_attempt(&attempt, 30)?;
             metrics.insert(
                 "catalog_part_exists".to_owned(),
-                f64::from(required_bool(baseline, "catalog_part_exists")?),
+                bool_as_f64(required_bool(baseline, "catalog_part_exists")?),
             );
             metrics.insert(
                 "local_stock".to_owned(),
-                f64::from(required_bool(baseline, "local_stock")?),
+                bool_as_f64(required_bool(baseline, "local_stock")?),
             );
             notes.push(
                 "Catalog presence is kept separate from target-market stock; unknown quoted lead time is not coerced to zero."
@@ -705,15 +708,15 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
             let result = evaluate_repair_attempt(&attempt, 30)?;
             metrics.insert(
                 "physical_fit".to_owned(),
-                f64::from(required_bool(baseline, "physical_fit")?),
+                bool_as_f64(required_bool(baseline, "physical_fit")?),
             );
             metrics.insert(
                 "electrical_interface_match".to_owned(),
-                f64::from(required_bool(baseline, "electrical_interface_match")?),
+                bool_as_f64(required_bool(baseline, "electrical_interface_match")?),
             );
             metrics.insert(
                 "material_grade_known".to_owned(),
-                f64::from(required_bool(baseline, "material_grade_known")?),
+                bool_as_f64(required_bool(baseline, "material_grade_known")?),
             );
             notes.push(
                 "Physical fit and an electrical connector match are not treated as qualified compatibility."
@@ -756,7 +759,7 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
             metrics.insert("follow_up_days_observed".to_owned(), 30.0);
             metrics.insert(
                 "recurrence_observed".to_owned(),
-                f64::from(attempt.recurrence_observed),
+                bool_as_f64(attempt.recurrence_observed),
             );
             notes.push(
                 "Initial function restoration and later fault recurrence are represented as distinct outcomes."
@@ -795,15 +798,15 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
             let result = evaluate_repair_attempt(&attempt, 30)?;
             metrics.insert(
                 "vendor_cloud_available".to_owned(),
-                f64::from(required_bool(baseline, "vendor_cloud_available")?),
+                bool_as_f64(required_bool(baseline, "vendor_cloud_available")?),
             );
             metrics.insert(
                 "offline_diagnostics_available".to_owned(),
-                f64::from(required_bool(baseline, "offline_diagnostics_available")?),
+                bool_as_f64(required_bool(baseline, "offline_diagnostics_available")?),
             );
             metrics.insert(
                 "manual_available".to_owned(),
-                f64::from(required_bool(baseline, "manual_available")?),
+                bool_as_f64(required_bool(baseline, "manual_available")?),
             );
             notes.push(
                 "A manual is present, but the declared diagnostic workflow requires a vendor cloud account."
@@ -848,11 +851,11 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
             let result = evaluate_repair_attempt(&attempt, 30)?;
             metrics.insert(
                 "critical_interface_changed".to_owned(),
-                f64::from(required_bool(baseline, "critical_interface_changed")?),
+                bool_as_f64(required_bool(baseline, "critical_interface_changed")?),
             );
             metrics.insert(
                 "post_repair_test_available".to_owned(),
-                f64::from(required_bool(baseline, "post_repair_test_available")?),
+                bool_as_f64(required_bool(baseline, "post_repair_test_available")?),
             );
             notes.push(
                 "A critical safety/hygiene interface change reopens the affected qualification."
@@ -925,6 +928,10 @@ fn required_bool(
         .ok_or_else(|| EvaluationError::new("scenario.input", format!("required boolean {key} is missing")))
 }
 
+fn bool_as_f64(value: bool) -> f64 {
+    if value { 1.0 } else { 0.0 }
+}
+
 fn disposition_name(disposition: BatchDisposition) -> &'static str {
     match disposition {
         BatchDisposition::ProcessAccountingOnly => "process_accounting_only",
@@ -975,7 +982,10 @@ mod tests {
         assert_eq!(report.repair_receipt_count, 10);
         assert_eq!(report.total_receipt_count, 20);
         assert_eq!(report.receipts.len(), 20);
-        assert_eq!(report.water_corpus_id, WATER_IDS[0].replace("WCONT-001", "HOME-UTILITY-COORD-001-WATER-CONTINUITY-SYNTHETIC-001"));
+        assert_eq!(
+            report.water_corpus_id,
+            "HOME-UTILITY-COORD-001-WATER-CONTINUITY-SYNTHETIC-001"
+        );
         assert_eq!(
             report.receipts[7].derived_metrics["mass_balance_residual_l"],
             -200.0
