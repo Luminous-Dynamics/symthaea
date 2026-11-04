@@ -1365,7 +1365,6 @@ mod tests {
         assert_eq!(report.disposition_counts.values().sum::<usize>(), 20);
     }
 
-
     fn quantity_value(receipt: &BatchReceipt, name: &str) -> f64 {
         match &receipt.derived_metrics[name] {
             DerivedMetric::Quantity { value, .. } => *value,
