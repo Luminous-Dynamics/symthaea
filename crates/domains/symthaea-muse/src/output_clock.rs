@@ -18,6 +18,7 @@ use sha2::{Digest, Sha256};
 
 pub const OUTPUT_CLOCK_ANCHOR_SCHEMA_V1: &str = "mel-output-clock-anchor-v1";
 pub const OUTPUT_CLOCK_FIT_SCHEMA_V1: &str = "mel-output-clock-fit-v1";
+pub const OUTPUT_CLOCK_FIT_BUNDLE_SCHEMA_V1: &str = "mel-output-clock-fit-bundle-v1";
 
 
 
@@ -184,6 +185,7 @@ pub struct OutputClockFitV1 {
     pub schema_version: String,
     pub stream_instance_id: u64,
     pub sample_rate_hz: u32,
+    pub channel_count: u16,
     /// Output frames per nanosecond of the CPAL playback stream clock.
     pub frames_per_ns: f64,
     /// Frame position at reference_playback_stream_time_ns.
@@ -213,6 +215,9 @@ pub enum OutputClockFitErrorV1 {
     InvalidAnchorSchema { index: usize },
     InvalidAnchorFrameCount { index: usize },
     CallbackPlaybackMismatch { index: usize },
+    NonMonotonicCallbackTime { index: usize },
+    InvalidStreamDescriptor,
+    StreamDescriptorMismatch { index: usize },
     StreamIdentityMismatch { index: usize },
     SampleRateMismatch { index: usize },
     ChannelCountMismatch { index: usize },
@@ -339,6 +344,9 @@ pub fn fit_output_clock_v1(
             if anchor.anchor_index <= previous.anchor_index {
                 return Err(OutputClockFitErrorV1::NonMonotonicAnchorIndex { index });
             }
+            if anchor.callback_stream_time_ns <= previous.callback_stream_time_ns {
+                return Err(OutputClockFitErrorV1::NonMonotonicCallbackTime { index });
+            }
             if anchor.playback_stream_time_ns <= previous.playback_stream_time_ns {
                 return Err(OutputClockFitErrorV1::NonMonotonicPlaybackTime { index });
             }
@@ -459,6 +467,7 @@ pub fn fit_output_clock_v1(
         schema_version: OUTPUT_CLOCK_FIT_SCHEMA_V1.to_owned(),
         stream_instance_id: anchors[0].stream_instance_id,
         sample_rate_hz,
+        channel_count: anchors[0].channel_count,
         frames_per_ns,
         reference_frame_position,
         reference_playback_stream_time_ns,
@@ -476,6 +485,43 @@ pub fn fit_output_clock_v1(
         maximum_abs_residual_frames,
         accuracy_status,
         reported_uncertainty_frames,
+    })
+}
+
+
+/// A fit bound to the stream/device/configuration descriptor that produced
+/// its raw callback anchors. Persist this as the report artifact rather than
+/// exporting a bare fit detached from its clock domain.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OutputClockFitBundleV1 {
+    pub schema_version: String,
+    pub stream_descriptor: OutputClockStreamDescriptorV1,
+    pub fit: OutputClockFitV1,
+}
+
+/// Validate descriptor-to-anchor identity and fit the complete stream bundle.
+pub fn fit_output_clock_bundle_v1(
+    descriptor: &OutputClockStreamDescriptorV1,
+    anchors: &[OutputClockAnchorV1],
+    policy: OutputClockFitPolicyV1,
+) -> Result<OutputClockFitBundleV1, OutputClockFitErrorV1> {
+    if !descriptor.is_valid() {
+        return Err(OutputClockFitErrorV1::InvalidStreamDescriptor);
+    }
+    for (index, anchor) in anchors.iter().enumerate() {
+        if anchor.stream_instance_id != descriptor.stream_instance_id
+            || anchor.sample_rate_hz != descriptor.sample_rate_hz
+            || anchor.channel_count != descriptor.channel_count
+        {
+            return Err(OutputClockFitErrorV1::StreamDescriptorMismatch { index });
+        }
+    }
+    let fit = fit_output_clock_v1(anchors, policy)?;
+    Ok(OutputClockFitBundleV1 {
+        schema_version: OUTPUT_CLOCK_FIT_BUNDLE_SCHEMA_V1.to_owned(),
+        stream_descriptor: descriptor.clone(),
+        fit,
     })
 }
 
@@ -736,12 +782,24 @@ mod tests {
                 fixture.fixture_id
             );
 
-            let result = fit_output_clock_v1(&fixture.anchors, policy());
+            let result = fit_output_clock_bundle_v1(
+                &fixture.stream_descriptor,
+                &fixture.anchors,
+                policy(),
+            );
             match fixture.expected_disposition.as_str() {
                 "fit" => {
-                    result.unwrap_or_else(|error| {
+                    let bundle = result.unwrap_or_else(|error| {
                         panic!("{} unexpectedly rejected: {error}", fixture.fixture_id)
                     });
+                    assert_eq!(
+                        bundle.schema_version,
+                        OUTPUT_CLOCK_FIT_BUNDLE_SCHEMA_V1
+                    );
+                    assert_eq!(
+                        bundle.fit.channel_count,
+                        fixture.stream_descriptor.channel_count
+                    );
                 }
                 "reject_residual" => assert!(
                     matches!(result, Err(OutputClockFitErrorV1::ResidualOutsidePolicy { .. })),
@@ -758,6 +816,45 @@ mod tests {
         }
     }
 
+
+
+    #[test]
+    fn callback_clock_regression_is_rejected_even_when_playback_time_increases() {
+        let mut anchors = vec![
+            anchor(0, 0, 5_000_000),
+            anchor(1, 480, 15_000_000),
+            anchor(2, 960, 25_000_000),
+            anchor(3, 1440, 35_000_000),
+        ];
+        anchors[2].callback_stream_time_ns = 19_000_000;
+        anchors[2].callback_to_playback_ns = 6_000_000;
+
+        assert!(matches!(
+            fit_output_clock_v1(&anchors, policy()),
+            Err(OutputClockFitErrorV1::NonMonotonicCallbackTime { index: 2 })
+        ));
+    }
+
+    #[test]
+    fn descriptor_mismatch_prevents_fit_bundle_creation() {
+        let anchors = vec![
+            anchor(0, 0, 5_000_000),
+            anchor(1, 480, 15_000_000),
+            anchor(2, 960, 25_000_000),
+            anchor(3, 1440, 35_000_000),
+        ];
+        let descriptor = OutputClockStreamDescriptorV1::from_cpal_device_id(
+            99,
+            "different-device",
+            48_000,
+            2,
+        ).unwrap();
+
+        assert!(matches!(
+            fit_output_clock_bundle_v1(&descriptor, &anchors, policy()),
+            Err(OutputClockFitErrorV1::StreamDescriptorMismatch { index: 0 })
+        ));
+    }
 
     #[test]
     fn stream_descriptor_redacts_device_id_and_binds_output_configuration() {
