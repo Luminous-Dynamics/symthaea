@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-integrity-report-v0.schema.json",
+  "title": "PITB SorryDB integrity report v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "provenance",
+    "task_count",
+    "unique_task_count",
+    "unique_repository_commit_count",
+    "lean_version_count",
+    "source_database_id_count",
+    "duplicate_source_database_ids",
+    "task_records",
+    "scoring_admission",
+    "interpretation_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-integrity-report.v0"
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "upstream_repository",
+        "upstream_repository_commit",
+        "snapshot_path",
+        "upstream_git_blob_sha1",
+        "raw_input_sha256",
+        "snapshot_kind",
+        "goal_field_policy"
+      ],
+      "properties": {
+        "upstream_repository": {
+          "const": "SorryDB/SorryDB"
+        },
+        "upstream_repository_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "snapshot_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "upstream_git_blob_sha1": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "raw_input_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "snapshot_kind": {
+          "enum": [
+            "frozen_evaluation_split",
+            "frozen_paper_snapshot",
+            "dynamic_or_other_snapshot"
+          ]
+        },
+        "goal_field_policy": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "unique_task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "unique_repository_commit_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "lean_version_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "source_database_id_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "duplicate_source_database_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "task_records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/task"
+      }
+    },
+    "scoring_admission": {
+      "const": false
+    },
+    "interpretation_boundary": {
+      "type": "string",
+      "minLength": 40
+    }
+  },
+  "$defs": {
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "task_id",
+        "source_database_id",
+        "repository_remote",
+        "repository_branch",
+        "repository_commit",
+        "lean_version",
+        "source_path",
+        "start_line",
+        "start_column",
+        "end_line",
+        "end_column",
+        "debug_goal_sha256",
+        "debug_url",
+        "source_goal_trust",
+        "prop_parent_type_trust"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "pitb.sorrydb-task-identity.v0"
+        },
+        "task_id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "source_database_id": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ]
+        },
+        "repository_remote": {
+          "type": "string",
+          "pattern": "^(https://github\\.com/|git@github\\.com:)"
+        },
+        "repository_branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "lean_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "start_column": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "end_column": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "debug_goal_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "debug_url": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ]
+        },
+        "source_goal_trust": {
+          "const": "debug_hint_not_reproduced"
+        },
+        "prop_parent_type_trust": {
+          "const": "database_inclusion_claim_not_independently_rechecked"
+        }
+      }
+    }
+  }
+}
