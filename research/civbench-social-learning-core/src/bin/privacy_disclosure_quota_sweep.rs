@@ -270,7 +270,9 @@ mod tests {
         )
         .unwrap();
         let no_social = simulate(&task, config, 811).unwrap();
-        assert!(central.final_metrics().unwrap().result_coverage() >= 0.0);
+        let central_coverage = central.final_metrics().unwrap().result_coverage();
+        assert!(central_coverage.is_finite());
+        assert!((0.0..=1.0).contains(&central_coverage));
         assert_eq!(
             no_social.history.iter().map(|s| s.transmissions_scheduled).sum::<usize>(),
             0
