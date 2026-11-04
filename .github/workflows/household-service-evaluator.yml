@@ -1,6 +1,9 @@
 name: Household Service Evaluator
 
 on:
+  push:
+    branches:
+      - research/household-service-evaluator-v0.1-stacked-10388
   pull_request:
     paths:
       - "tools/household-service-evaluator/**"
