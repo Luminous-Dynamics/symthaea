@@ -1,0 +1,85 @@
+{
+  "schema_version": "mel-musical-context-counterfactual-set-v1",
+  "families": [
+    {
+      "family_id": "MCTX-CADENCE-HANDOFF-001",
+      "kind": "context_change_must_change_action",
+      "changed_factor": "collaborator_intent",
+      "preserved_factor": "local_cue_signature,phrase_function,performer_role,surface_instrument",
+      "members": [
+        {
+          "variant_id": "invitation",
+          "local_cue_signature": "cadential-rest-2-beats",
+          "phrase_function": "cadence",
+          "collaborator_intent": "invites_response",
+          "performer_role": "lead_saxophone",
+          "surface_instrument": "saxophone",
+          "valid_action_set": [
+            "RESPOND"
+          ]
+        },
+        {
+          "variant_id": "floor-retained",
+          "local_cue_signature": "cadential-rest-2-beats",
+          "phrase_function": "cadence",
+          "collaborator_intent": "retains_floor",
+          "performer_role": "lead_saxophone",
+          "surface_instrument": "saxophone",
+          "valid_action_set": [
+            "WAIT"
+          ]
+        }
+      ]
+    },
+    {
+      "family_id": "MCTX-INSTRUMENT-INVARIANCE-001",
+      "kind": "surface_change_must_preserve_action",
+      "changed_factor": "surface_instrument",
+      "preserved_factor": "local_cue_signature,phrase_function,collaborator_intent,performer_role",
+      "members": [
+        {
+          "variant_id": "piano-surface",
+          "local_cue_signature": "call-response-cadence",
+          "phrase_function": "solo_handoff",
+          "collaborator_intent": "invites_response",
+          "performer_role": "accompanist",
+          "surface_instrument": "piano",
+          "valid_action_set": [
+            "RESPOND"
+          ]
+        },
+        {
+          "variant_id": "guitar-surface",
+          "local_cue_signature": "call-response-cadence",
+          "phrase_function": "solo_handoff",
+          "collaborator_intent": "invites_response",
+          "performer_role": "accompanist",
+          "surface_instrument": "guitar",
+          "valid_action_set": [
+            "RESPOND"
+          ]
+        }
+      ]
+    },
+    {
+      "family_id": "MCTX-FERMATA-AMBIGUOUS-001",
+      "kind": "ambiguous_valid_action_set",
+      "changed_factor": "not_applicable",
+      "preserved_factor": "declared_fermata_context",
+      "members": [
+        {
+          "variant_id": "unresolved-fermata",
+          "local_cue_signature": "fermata-open-duration",
+          "phrase_function": "fermata",
+          "collaborator_intent": "ambiguous",
+          "performer_role": "ensemble",
+          "surface_instrument": "mixed_ensemble",
+          "valid_action_set": [
+            "WAIT",
+            "CONTINUE"
+          ]
+        }
+      ]
+    }
+  ]
+}
