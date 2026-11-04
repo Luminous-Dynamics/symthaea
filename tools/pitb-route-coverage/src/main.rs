@@ -1510,18 +1510,19 @@ fn run_self_tests() -> Result<(), String> {
 }
 
 fn synthetic_report() -> Result<Report, String> {
+    let (graph_bytes, graph) = synthetic_graph_manifest()?;
     let support = synthetic_support_report();
     let support_bytes = serde_json::to_vec_pretty(&support).map_err(|e| e.to_string())?;
 
     // LeanSearch v2 control returns one member of the AND-route.
-    let mut reference = synthetic_receipt();
+    let mut reference = synthetic_receipt(&graph);
     reference.retriever.kind = "leansearch_v2".into();
     reference.retriever.name = "LeanSearch v2".into();
     reference.retriever.version = "synthetic-v0".into();
-    reference.ranking.candidates.pop();
+    reference.ranking.candidates.truncate(1);
 
     // PITB union returns both members of the same minimal sufficient route.
-    let mut challenger = synthetic_receipt();
+    let mut challenger = synthetic_receipt(&graph);
     challenger.retriever.kind = "pitb_union".into();
     challenger.retriever.name = "PITB union".into();
     challenger.retriever.version = "synthetic-v0".into();
@@ -1531,16 +1532,18 @@ fn synthetic_report() -> Result<Report, String> {
         receipts_bytes.extend(serde_json::to_vec(receipt).map_err(|e| e.to_string())?);
         receipts_bytes.push(b'\n');
     }
+    let graph_sha = graph.manifest_sha256.clone();
     let mappings = vec![
-        synthetic_mapping("node-h1","h1"),
-        synthetic_mapping("node-h2","h2")
+        synthetic_mapping(&graph_sha, "node-h1", "h1"),
+        synthetic_mapping(&graph_sha, "node-h2", "h2"),
+        synthetic_mapping(&graph_sha, "node-hx", "not-in-universe")
     ];
     let mut mapping_bytes = Vec::new();
     for mapping in &mappings {
         mapping_bytes.extend(serde_json::to_vec(mapping).map_err(|e| e.to_string())?);
         mapping_bytes.push(b'\n');
     }
-    analyze(&support_bytes, &receipts_bytes, &mapping_bytes)
+    analyze(&graph_bytes, &support_bytes, &receipts_bytes, &mapping_bytes)
 }
 
 fn execute() -> Result<(), String> {
@@ -1596,11 +1599,12 @@ mod tests {
 
     #[test]
     fn empty_ranked_receipts_do_not_create_false_coverage() {
+        let (graph_bytes, graph) = synthetic_graph_manifest().unwrap();
         let support = synthetic_support_report();
         let support_bytes = serde_json::to_vec(&support).unwrap();
-        let mut receipt = synthetic_receipt();
+        let mut receipt = synthetic_receipt(&graph);
         receipt.ranking.candidates.clear();
         let receipt_bytes = [serde_json::to_vec(&receipt).unwrap(), b"\n".to_vec()].concat();
-        assert!(analyze(&support_bytes,&receipt_bytes,b"{}\n").is_err());
+        assert!(analyze(&graph_bytes,&support_bytes,&receipt_bytes,b"{}\n").is_err());
     }
 }
