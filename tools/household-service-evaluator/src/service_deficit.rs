@@ -175,14 +175,8 @@ pub fn evaluate_service_deficit(
         },
     };
 
-    let deficit_rate_lower = subtract_rate_lower(
-        input.demand_rate.lower,
-        qualified_rate.upper,
-    );
-    let deficit_rate_upper = subtract_rate_upper(
-        input.demand_rate.upper,
-        qualified_rate.lower,
-    );
+    let deficit_rate_lower = subtract_rate_lower(input.demand_rate.lower, qualified_rate.upper);
+    let deficit_rate_upper = subtract_rate_upper(input.demand_rate.upper, qualified_rate.lower);
 
     let qualified_delivered = scale_interval(
         "service_deficit.qualified_delivered",
@@ -278,10 +272,7 @@ fn subtract_rate_upper(left: f64, right: f64) -> f64 {
 
 /// Enclose the exact positive duration/unit ratio despite f64 integer conversion
 /// and division rounding. This returns a lower and upper scale interval.
-fn duration_scale(
-    duration_seconds: u64,
-    unit: RateUnit,
-) -> Result<(f64, f64), EvaluationError> {
+fn duration_scale(duration_seconds: u64, unit: RateUnit) -> Result<(f64, f64), EvaluationError> {
     let duration = duration_seconds as f64;
     let duration_lower = next_down_nonnegative(duration);
     let duration_upper = next_up_nonnegative(duration);
