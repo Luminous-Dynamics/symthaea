@@ -23,8 +23,9 @@
 //! ```
 //!
 
-use symthaea_core::synthesis_trait::SynthesisRequest;
 use quote::ToTokens;
+use symthaea_core::synthesis_trait::SynthesisRequest;
+use syn::ext::IdentExt;
 use syn::{Expr, FnArg, Pat, Type};
 
 /// A generated test case.
@@ -73,6 +74,23 @@ impl TestGenerator {
     /// Generate tests from explicit examples and safe invocation-only smoke probes.
     /// A return type alone does not define a behavioral property or error oracle.
     pub fn generate(request: &SynthesisRequest) -> GeneratedTestSuite {
+        let function_ident = match syn::parse_str::<syn::Ident>(&request.name) {
+            Ok(ident) => ident,
+            Err(_) => {
+                return GeneratedTestSuite {
+                    function_name: request.name.clone(),
+                    tests: Vec::new(),
+                    source: "// No tests generated: invalid Rust function identifier.\\n".into(),
+                    unsupported_reasons: vec![
+                        "Requested function name is not a valid Rust identifier; no test source was generated."
+                            .into(),
+                    ],
+                };
+            }
+        };
+        // Raw identifiers such as r#type are valid call targets but cannot be
+        // copied verbatim into a generated test function identifier.
+        let test_name_prefix = function_ident.unraw().to_string();
         let mut tests = Vec::new();
         let mut unsupported_reasons = Vec::new();
 
@@ -93,7 +111,7 @@ impl TestGenerator {
                 continue;
             }
             tests.push(GeneratedTest {
-                name: format!("test_{}_example_{}", request.name, i),
+                name: format!("test_{}_example_{}", test_name_prefix, i),
                 assertion: format!("assert_eq!({}, {});", input, expected),
                 category: TestCategory::Example,
             });
@@ -103,7 +121,7 @@ impl TestGenerator {
             match Self::parse_signature(&request.name, signature) {
                 Ok(parsed) => {
                     let (boundary_tests, boundary_reasons) =
-                        Self::generate_boundary_tests(&request.name, &parsed.parameters);
+                        Self::generate_boundary_tests(&request.name, &test_name_prefix, &parsed.parameters);
                     tests.extend(boundary_tests);
                     for reason in boundary_reasons {
                         Self::push_unique_reason(&mut unsupported_reasons, reason);
@@ -131,7 +149,7 @@ impl TestGenerator {
             );
         }
 
-        let source = Self::render_test_module(&request.name, &tests);
+        let source = Self::render_test_module(&tests);
         GeneratedTestSuite {
             function_name: request.name.clone(),
             tests,
@@ -158,7 +176,7 @@ impl TestGenerator {
             format!("Signature could not be parsed as a Rust function: {error}; no signature-derived tests were generated.")
         })?;
 
-        if item.sig.ident.to_string() != fn_name {
+        if item.sig.ident.unraw().to_string() != fn_name.trim_start_matches("r#") {
             return Err(format!(
                 "Signature names function {}, but request names {}; no signature-derived tests were generated.",
                 item.sig.ident, fn_name
@@ -189,7 +207,7 @@ impl TestGenerator {
                         return Err("ref/subpattern parameters require an explicit invocation contract; no signature-derived tests were generated.".into());
                     }
                     parameters.push(ParsedParameter {
-                        name: pattern.ident.to_string(),
+                        name: pattern.ident.unraw().to_string(),
                         ty: argument.ty.as_ref().clone(),
                     });
                 }
@@ -206,6 +224,7 @@ impl TestGenerator {
     /// Generate invocation-only smoke probes. These do not assert semantic correctness.
     fn generate_boundary_tests(
         fn_name: &str,
+        test_name_prefix: &str,
         params: &[ParsedParameter],
     ) -> (Vec<GeneratedTest>, Vec<String>) {
         let mut tests = Vec::new();
@@ -238,7 +257,7 @@ impl TestGenerator {
                 };
 
                 tests.push(GeneratedTest {
-                    name: format!("test_{fn_name}_boundary_{}_{}", parameter.name, suffix),
+                    name: format!("test_{test_name_prefix}_boundary_{}_{}", parameter.name, suffix),
                     assertion: format!("let _ = {fn_name}({arguments});"),
                     category: TestCategory::InvocationSmoke,
                 });
@@ -393,6 +412,42 @@ struct ParsedSignature {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_invalid_function_name_fails_closed_without_source_injection() {
+        let request = SynthesisRequest::new(
+            "rust",
+            "double\\n#[test] fn injected() {}",
+            "Double an integer",
+        )
+        .with_example("double(2)", "4");
+        let suite = TestGenerator::generate(&request);
+
+        assert!(suite.tests.is_empty());
+        assert_eq!(
+            suite.source,
+            "// No tests generated: invalid Rust function identifier.\\n"
+        );
+        assert!(!suite.source.contains("injected"));
+        assert!(suite
+            .unsupported_reasons
+            .iter()
+            .any(|reason| reason.contains("not a valid Rust identifier")));
+    }
+
+    #[test]
+    fn test_raw_function_identifier_uses_safe_test_names() {
+        let request = SynthesisRequest::new("rust", "r#type", "Call a raw-identifier function")
+            .with_signature("fn r#type(value: i32) -> i32")
+            .with_example("r#type(1)", "2");
+        let suite = TestGenerator::generate(&request);
+
+        assert!(suite.source.contains("fn test_type_example_0()"));
+        assert!(suite.source.contains("assert_eq!(r#type(1), 2);"));
+        assert!(suite.source.contains("fn test_type_boundary_value_zero()"));
+        assert!(!suite.source.contains("fn test_r#type"));
+        assert!(suite.unsupported_reasons.is_empty());
+    }
 
     #[test]
     fn test_generate_from_examples() {
