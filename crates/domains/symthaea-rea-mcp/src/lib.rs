@@ -252,7 +252,10 @@ mod tests {
 
         assert_eq!(value["status"], "verified_semantic_consistency");
         assert_eq!(value["evidence_id"], fixture["evidence_id"]);
-        assert_eq!(value["claim_ceiling"]["producer_authenticity_verified"], false);
+        assert_eq!(
+            value["claim_ceiling"]["producer_authenticity_verified"],
+            false
+        );
         assert_eq!(value["claim_ceiling"]["observation_truth_verified"], false);
         let rendered = value.to_string();
         assert!(!rendered.contains("/tmp/"));
