@@ -528,6 +528,7 @@ fn verify_bundle(bytes: &[u8]) -> Result<Value, String> {
     let rejected = query_results.iter().filter(|row| {
         row["recomputed_disposition"] == "REJECTED_TYPE_PROMOTION"
             || row["recomputed_disposition"] == "REJECTED_PATH_GRAMMAR"
+            || row["recomputed_disposition"] == "REJECTED_EVIDENCE_CLAIM"
     }).count();
     Ok(json!({
         "schema_version": VERSION,
@@ -790,14 +791,13 @@ mod tests {
     #[test]
     fn reports_conditional_claim_as_conditional_not_not_estimable() {
         let mut bundle = parse_fixture();
-        let report = verify(&bundle).expect("known-answer bundle");
+        bundle["claims"][2]["claim_status"] = Value::String("CLAIMED_CONDITIONAL".to_owned());
+        bundle["queries"][1]["path_results"][0]["result_status"] =
+            Value::String("CLAIMED_CONDITIONAL".to_owned());
+        let report = verify(&bundle).expect("conditional statistical claim");
         assert_eq!(
-            report["query_path_results"][0]["recomputed_disposition"],
-            "ACCEPTED_WITHIN_TYPED_SCOPE"
-        );
-        assert_eq!(
-            report["query_path_results"][0]["claimed_result_status"],
-            "CLAIMED_SUPPORTED"
+            report["query_path_results"][1]["recomputed_disposition"],
+            "CONDITIONAL_ONLY"
         );
     }
 
