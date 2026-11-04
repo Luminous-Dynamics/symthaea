@@ -725,12 +725,22 @@ fn run_self_tests() -> Result<(), String> {
     }
     println!("SELF_TEST_PASS infrastructure failure must be excluded and rerun");
 
+    let mut semantic_rejection = alternative[0].clone();
+    semantic_rejection.outcome = "non_solve".into();
+    semantic_rejection.terminal_reason = "semantic_rejection".into();
+    semantic_rejection.kernel_passed = true;
+    semantic_rejection.semantic_gate_passed = false;
+    if validate_outcome(&semantic_rejection, 1002, 12).is_ok() {
+        return Err("kernel-valid semantic rejection was accepted as a support non-solve".into());
+    }
+    println!("SELF_TEST_PASS kernel-valid semantic rejection cannot count as a support non-solve");
+
     let mut fake_non_solve = alternative[0].clone();
     fake_non_solve.outcome = "non_solve".into();
     fake_non_solve.terminal_reason = "verified_success".into();
     fake_non_solve.kernel_passed = false;
     fake_non_solve.semantic_gate_passed = false;
-    if validate_outcome(&fake_non_solve, 1002, 12).is_ok() {
+    if validate_outcome(&fake_non_solve, 1003, 12).is_ok() {
         return Err("verified-success terminal reason was accepted as a non-solve".into());
     }
     println!("SELF_TEST_PASS terminal reason must agree with outcome and proof gates");
@@ -741,7 +751,7 @@ fn run_self_tests() -> Result<(), String> {
     unfinished.attempt_finished = false;
     unfinished.kernel_passed = false;
     unfinished.semantic_gate_passed = false;
-    if validate_outcome(&unfinished, 1003, 12).is_ok() {
+    if validate_outcome(&unfinished, 1004, 12).is_ok() {
         return Err("unfinished budget-limited run was accepted in the support lattice".into());
     }
     println!("SELF_TEST_PASS unfinished attempts cannot contaminate exhaustive support analysis");
