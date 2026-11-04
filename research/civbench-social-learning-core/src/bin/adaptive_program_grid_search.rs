@@ -6,6 +6,10 @@
 //! This is an interpretable parameter search over TransmissionProgram values,
 //! not LLM-guided evolutionary search and not a reproduction of Colas et al.
 //! (2026). All candidates compile to the same bounded Rust program IR.
+//!
+//! The simulator uses domain-separated graph/discovery/schedule/acquisition RNG
+//! streams. Same master seeds reuse the exact graph and subsystem seed schedule;
+//! endogenous candidate sets still prevent perfect per-action random pairing.
 
 use civbench_social_learning_core::adaptive_transmission::{
     simulate, simulate_with_program, Config, InnovationTask, TaskFamily, TransmissionPolicy,
