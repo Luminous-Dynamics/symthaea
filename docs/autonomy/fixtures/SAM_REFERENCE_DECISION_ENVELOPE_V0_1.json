@@ -1,0 +1,487 @@
+{
+  "schema": "sam-reference-decision-envelope-v0.1",
+  "status": "analytic-golden-fixtures",
+  "claim_ceiling": "Illustrative arithmetic and classification tests only; no physical or behavioral validation.",
+  "comparison_rule": {
+    "direction_normalization": "higher_is_better",
+    "difference_interval": "[L_A - U_B, U_A - L_B]",
+    "margin": 0.02,
+    "portfolio_dominance": "lower_difference_bound > margin for every applicable admitted reference",
+    "reverse_dominance": "upper_difference_bound < -margin for every applicable admitted reference",
+    "reference_sensitive": "opposite strict preferences supported by at least two applicable references",
+    "point_estimates": "Never converted to zero-width uncertainty intervals"
+  },
+  "reference_families": [
+    {
+      "id": "family-analytic",
+      "dependency_roots": [
+        "analytic-equations-v1"
+      ],
+      "independent_claim": "not-assessed"
+    },
+    {
+      "id": "family-independent-code",
+      "dependency_roots": [
+        "separate-implementation-v1"
+      ],
+      "independent_claim": "qualification-required"
+    },
+    {
+      "id": "family-shared",
+      "dependency_roots": [
+        "shared-calibration-v1",
+        "shared-labels-v1"
+      ],
+      "independent_claim": "shared-roots-disclosed"
+    }
+  ],
+  "cases": [
+    {
+      "id": "agree-strict",
+      "measurand": {
+        "id": "synthetic-clearance-margin",
+        "unit": "m",
+        "direction": "higher_is_better",
+        "equivalence_margin": 0.02
+      },
+      "actions": [
+        "continue",
+        "yield"
+      ],
+      "references": [
+        {
+          "id": "analytic-r0",
+          "family": "family-analytic",
+          "qualification": "qualified-for-synthetic-crossing",
+          "applicability": "Applicable",
+          "outcomes": {
+            "continue": {
+              "status": "Observed",
+              "uncertainty": "SourceBoundedInterval",
+              "interval": [
+                -0.1,
+                -0.05
+              ]
+            },
+            "yield": {
+              "status": "Observed",
+              "uncertainty": "SourceBoundedInterval",
+              "interval": [
+                0.2,
+                0.25
+              ]
+            }
+          }
+        },
+        {
+          "id": "independent-r1",
+          "family": "family-independent-code",
+          "qualification": "qualified-for-synthetic-crossing",
+          "applicability": "Applicable",
+          "outcomes": {
+            "continue": {
+              "status": "Observed",
+              "uncertainty": "SourceBoundedInterval",
+              "interval": [
+                -0.08,
+                -0.02
+              ]
+            },
+            "yield": {
+              "status": "Observed",
+              "uncertainty": "SourceBoundedInterval",
+              "interval": [
+                0.15,
+                0.22
+              ]
+            }
+          }
+        }
+      ],
+      "expected": {
+        "classification": "PortfolioDominates",
+        "preferred_action": "yield",
+        "applicable_reference_count": 2,
+        "dependency_family_count": 2
+      }
+    },
+    {
+      "id": "opposite-reference-preferences",
+      "measurand": {
+        "id": "synthetic-clearance-margin",
+        "unit": "m",
+        "direction": "higher_is_better",
+        "equivalence_margin": 0.02
+      },
+      "actions": [
+        "continue",
+        "yield"
+      ],
+      "references": [
+        {
+          "id": "analytic-r0",
+          "family": "family-analytic",
+          "qualification": "qualified-for-synthetic-crossing",
+          "applicability": "Applicable",
+          "outcomes": {
+            "continue": {
+              "status": "Observed",
+              "uncertainty": "SourceBoundedInterval",
+              "interval": [
+                -0.1,
+                -0.05
+              ]
+            },
+            "yield": {
+              "status": "Observed",
+              "uncertainty": "SourceBoundedInterval",
+              "interval": [
+                0.15,
+                0.2
+              ]
+            }
+          }
+        },
+        {
+          "id": "independent-r1",
+          "family": "family-independent-code",
+          "qualification": "qualified-for-synthetic-crossing",
+          "applicability": "Applicable",
+          "outcomes": {
+            "continue": {
+              "status": "Observed",
+              "uncertainty": "SourceBoundedInterval",
+              "interval": [
+                0.2,
+                0.25
+              ]
+            },
+            "yield": {
+              "status": "Observed",
+              "uncertainty": "SourceBoundedInterval",
+              "interval": [
+                -0.1,
+                -0.05
+              ]
+            }
+          }
+        }
+      ],
+      "expected": {
+        "classification": "ReferenceSensitive",
+        "no_universal_preference": true,
+        "preserve_both_reference_results": true
+      }
+    },
+    {
+      "id": "overlapping-intervals",
+      "measurand": {
+        "id": "synthetic-progress",
+        "unit": "m",
+        "direction": "higher_is_better",
+        "equivalence_margin": 0.02
+      },
+      "actions": [
+        "continue",
+        "yield"
+      ],
+      "references": [
+        {
+          "id": "analytic-r0",
+          "family": "family-analytic",
+          "qualification": "qualified-for-synthetic-crossing",
+          "applicability": "Applicable",
+          "outcomes": {
+            "continue": {
+              "status": "Observed",
+              "uncertainty": "SourceBoundedInterval",
+              "interval": [
+                0.72,
+                0.82
+              ]
+            },
+            "yield": {
+              "status": "Observed",
+              "uncertainty": "SourceBoundedInterval",
+              "interval": [
+                0.78,
+                0.88
+              ]
+            }
+          }
+        },
+        {
+          "id": "independent-r1",
+          "family": "family-independent-code",
+          "qualification": "qualified-for-synthetic-crossing",
+          "applicability": "Applicable",
+          "outcomes": {
+            "continue": {
+              "status": "Observed",
+              "uncertainty": "SourceBoundedInterval",
+              "interval": [
+                0.7,
+                0.8
+              ]
+            },
+            "yield": {
+              "status": "Observed",
+              "uncertainty": "SourceBoundedInterval",
+              "interval": [
+                0.76,
+                0.86
+              ]
+            }
+          }
+        }
+      ],
+      "expected": {
+        "classification": "Unresolved",
+        "reason": "interval_difference_overlaps_margin"
+      }
+    },
+    {
+      "id": "metric-specific-inapplicability",
+      "measurands": [
+        {
+          "id": "braking-distance",
+          "unit": "m",
+          "direction": "lower_is_better",
+          "equivalence_margin": 0.01
+        },
+        {
+          "id": "pedestrian-intent-class",
+          "unit": "category",
+          "direction": "not_ordered"
+        }
+      ],
+      "actions": [
+        "continue",
+        "yield"
+      ],
+      "references": [
+        {
+          "id": "analytic-r0",
+          "family": "family-analytic",
+          "qualification": "qualified-for-braking-only",
+          "applicability": {
+            "braking-distance": "Applicable",
+            "pedestrian-intent-class": "Inapplicable: no actor-policy semantics"
+          }
+        },
+        {
+          "id": "actor-reference-r1",
+          "family": "family-independent-code",
+          "qualification": "qualified-for-synthetic-actor-policy",
+          "applicability": {
+            "braking-distance": "Inapplicable: no vehicle braking semantics",
+            "pedestrian-intent-class": "Applicable"
+          }
+        }
+      ],
+      "expected": {
+        "classification": "MetricScopedApplicability",
+        "never_inherit_applicability_across_measurands": true
+      }
+    },
+    {
+      "id": "point-estimates-only",
+      "measurand": {
+        "id": "synthetic-progress",
+        "unit": "m",
+        "direction": "higher_is_better",
+        "equivalence_margin": 0.02
+      },
+      "actions": [
+        "continue",
+        "yield"
+      ],
+      "references": [
+        {
+          "id": "point-r0",
+          "family": "family-analytic",
+          "qualification": "qualified-for-synthetic-progress",
+          "applicability": "Applicable",
+          "outcomes": {
+            "continue": {
+              "status": "Observed",
+              "uncertainty": "PointEstimateOnly",
+              "value": 20
+            },
+            "yield": {
+              "status": "Observed",
+              "uncertainty": "PointEstimateOnly",
+              "value": 18
+            }
+          }
+        },
+        {
+          "id": "point-r1",
+          "family": "family-independent-code",
+          "qualification": "qualified-for-synthetic-progress",
+          "applicability": "Applicable",
+          "outcomes": {
+            "continue": {
+              "status": "Observed",
+              "uncertainty": "PointEstimateOnly",
+              "value": 19.5
+            },
+            "yield": {
+              "status": "Observed",
+              "uncertainty": "PointEstimateOnly",
+              "value": 17.5
+            }
+          }
+        }
+      ],
+      "expected": {
+        "classification": "PointwisePreference",
+        "preferred_action": "continue",
+        "interval_robust": false,
+        "uncertainty_zero_inferred": false
+      }
+    },
+    {
+      "id": "required-reference-timeout",
+      "measurand": {
+        "id": "synthetic-clearance-margin",
+        "unit": "m",
+        "direction": "higher_is_better",
+        "equivalence_margin": 0.02
+      },
+      "actions": [
+        "continue",
+        "yield"
+      ],
+      "references": [
+        {
+          "id": "analytic-r0",
+          "family": "family-analytic",
+          "qualification": "qualified-for-synthetic-crossing",
+          "applicability": "Applicable",
+          "outcomes": {
+            "continue": {
+              "status": "Observed",
+              "uncertainty": "SourceBoundedInterval",
+              "interval": [
+                -0.1,
+                -0.05
+              ]
+            },
+            "yield": {
+              "status": "Observed",
+              "uncertainty": "SourceBoundedInterval",
+              "interval": [
+                0.1,
+                0.2
+              ]
+            }
+          }
+        },
+        {
+          "id": "required-r1",
+          "family": "family-independent-code",
+          "qualification": "qualified-for-synthetic-crossing",
+          "applicability": "Applicable",
+          "outcomes": {
+            "continue": {
+              "status": "TimedOut"
+            },
+            "yield": {
+              "status": "Observed",
+              "uncertainty": "SourceBoundedInterval",
+              "interval": [
+                0.1,
+                0.2
+              ]
+            }
+          }
+        }
+      ],
+      "expected": {
+        "classification": "Incomplete",
+        "reason": "required_applicable_cell_timed_out",
+        "numeric_preference_suppressed": true
+      }
+    },
+    {
+      "id": "shared-common-mode-family",
+      "measurand": {
+        "id": "synthetic-clearance-margin",
+        "unit": "m",
+        "direction": "higher_is_better",
+        "equivalence_margin": 0.02
+      },
+      "actions": [
+        "continue",
+        "yield"
+      ],
+      "references": [
+        {
+          "id": "shared-r0",
+          "family": "family-shared",
+          "qualification": "qualified-but-correlated",
+          "applicability": "Applicable",
+          "outcomes": {
+            "continue": {
+              "status": "Observed",
+              "uncertainty": "SourceBoundedInterval",
+              "interval": [
+                -0.1,
+                -0.05
+              ]
+            },
+            "yield": {
+              "status": "Observed",
+              "uncertainty": "SourceBoundedInterval",
+              "interval": [
+                0.1,
+                0.2
+              ]
+            }
+          }
+        },
+        {
+          "id": "shared-r1",
+          "family": "family-shared",
+          "qualification": "qualified-but-correlated",
+          "applicability": "Applicable",
+          "outcomes": {
+            "continue": {
+              "status": "Observed",
+              "uncertainty": "SourceBoundedInterval",
+              "interval": [
+                -0.08,
+                -0.02
+              ]
+            },
+            "yield": {
+              "status": "Observed",
+              "uncertainty": "SourceBoundedInterval",
+              "interval": [
+                0.12,
+                0.22
+              ]
+            }
+          }
+        }
+      ],
+      "expected": {
+        "classification": "PortfolioDominates",
+        "preferred_action": "yield",
+        "applicable_reference_count": 2,
+        "dependency_family_count": 1,
+        "independent_votes": 0
+      }
+    }
+  ],
+  "global_invariants": [
+    "No missing or failed applicable reference cell is treated as agreement.",
+    "PointEstimateOnly never becomes a zero-width interval.",
+    "Inapplicability is evaluated per measurand and scenario context.",
+    "Shared dependency-family count is not an independent sample size.",
+    "No multi-objective scalarization occurs without a separately frozen utility contract.",
+    "An incomplete action set suppresses complete-best and complete-regret claims.",
+    "Permutation of input row/reference order leaves canonical output unchanged."
+  ]
+}
