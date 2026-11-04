@@ -432,7 +432,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-poc-001",
+          "expected_boundary_id": "grid-poc-synthetic-poc-001",
+          "expected_issuer_role": "system_operator",
+          "require_valid_at_decision": true
         },
         {
           "gate_id": "physical-model-scope",
@@ -442,7 +446,11 @@
           "required_evidence_classes": [
             "validated_model_output"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-ac-boundary-v1",
+          "expected_issuer_role": "model_registry",
+          "require_valid_at_decision": false
         },
         {
           "gate_id": "yield-evidence",
@@ -452,7 +460,11 @@
           "required_evidence_classes": [
             "independently_reconciled_measurement"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-metering-boundary-v1",
+          "expected_issuer_role": "independent_verifier",
+          "require_valid_at_decision": false
         },
         {
           "gate_id": "tariff-evidence",
@@ -462,7 +474,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-offtake-boundary-v1",
+          "expected_issuer_role": "offtaker",
+          "require_valid_at_decision": true
         },
         {
           "gate_id": "capex-evidence",
@@ -472,7 +488,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-epc-cost-boundary-v1",
+          "expected_issuer_role": "epc_contractor",
+          "require_valid_at_decision": true
         }
       ]
     },
@@ -906,7 +926,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-poc-001",
+          "expected_boundary_id": "grid-poc-synthetic-poc-001",
+          "expected_issuer_role": "system_operator",
+          "require_valid_at_decision": true
         },
         {
           "gate_id": "physical-model-scope",
@@ -916,7 +940,11 @@
           "required_evidence_classes": [
             "validated_model_output"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-ac-boundary-v1",
+          "expected_issuer_role": "model_registry",
+          "require_valid_at_decision": false
         },
         {
           "gate_id": "yield-evidence",
@@ -926,7 +954,11 @@
           "required_evidence_classes": [
             "independently_reconciled_measurement"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-metering-boundary-v1",
+          "expected_issuer_role": "independent_verifier",
+          "require_valid_at_decision": false
         },
         {
           "gate_id": "tariff-evidence",
@@ -936,7 +968,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-offtake-boundary-v1",
+          "expected_issuer_role": "offtaker",
+          "require_valid_at_decision": true
         },
         {
           "gate_id": "capex-evidence",
@@ -946,7 +982,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-epc-cost-boundary-v1",
+          "expected_issuer_role": "epc_contractor",
+          "require_valid_at_decision": true
         }
       ]
     },
@@ -1380,7 +1420,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-poc-001",
+          "expected_boundary_id": "grid-poc-synthetic-poc-001",
+          "expected_issuer_role": "system_operator",
+          "require_valid_at_decision": true
         },
         {
           "gate_id": "physical-model-scope",
@@ -1390,7 +1434,11 @@
           "required_evidence_classes": [
             "validated_model_output"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-ac-boundary-v1",
+          "expected_issuer_role": "model_registry",
+          "require_valid_at_decision": false
         },
         {
           "gate_id": "yield-evidence",
@@ -1400,7 +1448,11 @@
           "required_evidence_classes": [
             "independently_reconciled_measurement"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-metering-boundary-v1",
+          "expected_issuer_role": "independent_verifier",
+          "require_valid_at_decision": false
         },
         {
           "gate_id": "tariff-evidence",
@@ -1410,7 +1462,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-offtake-boundary-v1",
+          "expected_issuer_role": "offtaker",
+          "require_valid_at_decision": true
         },
         {
           "gate_id": "capex-evidence",
@@ -1420,7 +1476,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-epc-cost-boundary-v1",
+          "expected_issuer_role": "epc_contractor",
+          "require_valid_at_decision": true
         }
       ]
     },
@@ -1853,7 +1913,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-poc-001",
+          "expected_boundary_id": "grid-poc-synthetic-poc-001",
+          "expected_issuer_role": "system_operator",
+          "require_valid_at_decision": true
         },
         {
           "gate_id": "physical-model-scope",
@@ -1863,7 +1927,11 @@
           "required_evidence_classes": [
             "validated_model_output"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-ac-boundary-v1",
+          "expected_issuer_role": "model_registry",
+          "require_valid_at_decision": false
         },
         {
           "gate_id": "yield-evidence",
@@ -1873,7 +1941,11 @@
           "required_evidence_classes": [
             "independently_reconciled_measurement"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-metering-boundary-v1",
+          "expected_issuer_role": "independent_verifier",
+          "require_valid_at_decision": false
         },
         {
           "gate_id": "tariff-evidence",
@@ -1883,7 +1955,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-offtake-boundary-v1",
+          "expected_issuer_role": "offtaker",
+          "require_valid_at_decision": true
         },
         {
           "gate_id": "capex-evidence",
@@ -1893,7 +1969,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-epc-cost-boundary-v1",
+          "expected_issuer_role": "epc_contractor",
+          "require_valid_at_decision": true
         },
         {
           "gate_id": "fx-evidence",
@@ -1903,7 +1983,11 @@
           "required_evidence_classes": [
             "official_source_publication"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "fx-observation-boundary-v1",
+          "expected_issuer_role": "central_bank",
+          "require_valid_at_decision": true
         }
       ]
     },
@@ -2337,7 +2421,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-poc-001",
+          "expected_boundary_id": "grid-poc-synthetic-poc-001",
+          "expected_issuer_role": "system_operator",
+          "require_valid_at_decision": true
         },
         {
           "gate_id": "physical-model-scope",
@@ -2347,7 +2435,11 @@
           "required_evidence_classes": [
             "validated_model_output"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-ac-boundary-v1",
+          "expected_issuer_role": "model_registry",
+          "require_valid_at_decision": false
         },
         {
           "gate_id": "yield-evidence",
@@ -2357,7 +2449,11 @@
           "required_evidence_classes": [
             "independently_reconciled_measurement"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-metering-boundary-v1",
+          "expected_issuer_role": "independent_verifier",
+          "require_valid_at_decision": false
         },
         {
           "gate_id": "tariff-evidence",
@@ -2367,7 +2463,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-offtake-boundary-v1",
+          "expected_issuer_role": "offtaker",
+          "require_valid_at_decision": true
         },
         {
           "gate_id": "capex-evidence",
@@ -2377,7 +2477,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-epc-cost-boundary-v1",
+          "expected_issuer_role": "epc_contractor",
+          "require_valid_at_decision": true
         }
       ]
     },
@@ -2810,7 +2914,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-poc-001",
+          "expected_boundary_id": "grid-poc-synthetic-poc-001",
+          "expected_issuer_role": "system_operator",
+          "require_valid_at_decision": true
         },
         {
           "gate_id": "physical-model-scope",
@@ -2820,7 +2928,11 @@
           "required_evidence_classes": [
             "validated_model_output"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-ac-boundary-v1",
+          "expected_issuer_role": "model_registry",
+          "require_valid_at_decision": false
         },
         {
           "gate_id": "yield-evidence",
@@ -2830,7 +2942,11 @@
           "required_evidence_classes": [
             "independently_reconciled_measurement"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-metering-boundary-v1",
+          "expected_issuer_role": "independent_verifier",
+          "require_valid_at_decision": false
         },
         {
           "gate_id": "tariff-evidence",
@@ -2840,7 +2956,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-offtake-boundary-v1",
+          "expected_issuer_role": "offtaker",
+          "require_valid_at_decision": true
         },
         {
           "gate_id": "capex-evidence",
@@ -2850,7 +2970,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-epc-cost-boundary-v1",
+          "expected_issuer_role": "epc_contractor",
+          "require_valid_at_decision": true
         }
       ]
     },
@@ -3306,7 +3430,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-poc-001",
+          "expected_boundary_id": "grid-poc-synthetic-poc-001",
+          "expected_issuer_role": "system_operator",
+          "require_valid_at_decision": true
         },
         {
           "gate_id": "physical-model-scope",
@@ -3316,7 +3444,11 @@
           "required_evidence_classes": [
             "validated_model_output"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-ac-boundary-v1",
+          "expected_issuer_role": "model_registry",
+          "require_valid_at_decision": false
         },
         {
           "gate_id": "yield-evidence",
@@ -3326,7 +3458,11 @@
           "required_evidence_classes": [
             "independently_reconciled_measurement"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "plant-metering-boundary-v1",
+          "expected_issuer_role": "independent_verifier",
+          "require_valid_at_decision": false
         },
         {
           "gate_id": "tariff-evidence",
@@ -3336,7 +3472,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-offtake-boundary-v1",
+          "expected_issuer_role": "offtaker",
+          "require_valid_at_decision": true
         },
         {
           "gate_id": "capex-evidence",
@@ -3346,7 +3486,11 @@
           "required_evidence_classes": [
             "issuer_signed"
           ],
-          "fail_closed": true
+          "fail_closed": true,
+          "expected_subject_id": "synthetic-site-nc-001",
+          "expected_boundary_id": "project-epc-cost-boundary-v1",
+          "expected_issuer_role": "epc_contractor",
+          "require_valid_at_decision": true
         }
       ]
     }
