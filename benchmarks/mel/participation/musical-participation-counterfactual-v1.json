@@ -1,0 +1,166 @@
+{
+  "schema_version": "mel-musical-participation-set-v1",
+  "families": [
+    {
+      "family_id": "MPART-INTENT-001",
+      "changed_factor": "collaborator_intent",
+      "preserved_factors": [
+        "local_cue_signature",
+        "preceding_context_signature",
+        "performer_role",
+        "stream_available",
+        "collaborator_veto"
+      ],
+      "members": [
+        {
+          "variant_id": "pause-invites",
+          "local_cue_signature": "two-second-pause-after-cadence",
+          "preceding_context_signature": "resolved-dominant-to-tonic",
+          "collaborator_intent": "invites_response",
+          "performer_role": "lead_saxophone",
+          "stream_available": true,
+          "collaborator_veto": false,
+          "requirement": "act",
+          "valid_decisions": [
+            "RESPOND"
+          ]
+        },
+        {
+          "variant_id": "pause-retains-floor",
+          "local_cue_signature": "two-second-pause-after-cadence",
+          "preceding_context_signature": "resolved-dominant-to-tonic",
+          "collaborator_intent": "retains_floor",
+          "performer_role": "lead_saxophone",
+          "stream_available": true,
+          "collaborator_veto": false,
+          "requirement": "withhold",
+          "valid_decisions": [
+            "WAIT"
+          ]
+        }
+      ]
+    },
+    {
+      "family_id": "MPART-ROLE-001",
+      "changed_factor": "performer_role",
+      "preserved_factors": [
+        "local_cue_signature",
+        "preceding_context_signature",
+        "collaborator_intent",
+        "stream_available",
+        "collaborator_veto"
+      ],
+      "members": [
+        {
+          "variant_id": "lead-role-entry",
+          "local_cue_signature": "one-bar-rest-after-ensemble-cadence",
+          "preceding_context_signature": "tonic-resolution",
+          "collaborator_intent": "shared-turn-taking",
+          "performer_role": "lead_instrument",
+          "stream_available": true,
+          "collaborator_veto": false,
+          "requirement": "act",
+          "valid_decisions": [
+            "CONTINUE",
+            "RESPOND"
+          ]
+        },
+        {
+          "variant_id": "support-role-yields",
+          "local_cue_signature": "one-bar-rest-after-ensemble-cadence",
+          "preceding_context_signature": "tonic-resolution",
+          "collaborator_intent": "shared-turn-taking",
+          "performer_role": "accompaniment",
+          "stream_available": true,
+          "collaborator_veto": false,
+          "requirement": "withhold",
+          "valid_decisions": [
+            "WAIT",
+            "ASK"
+          ]
+        }
+      ]
+    },
+    {
+      "family_id": "MPART-STREAM-001",
+      "changed_factor": "stream_integrity",
+      "preserved_factors": [
+        "local_cue_signature",
+        "preceding_context_signature",
+        "collaborator_intent",
+        "performer_role",
+        "collaborator_veto"
+      ],
+      "members": [
+        {
+          "variant_id": "valid-stream-invitation",
+          "local_cue_signature": "same-pickup-and-response-window",
+          "preceding_context_signature": "open-dominant",
+          "collaborator_intent": "invites_response",
+          "performer_role": "lead_piano",
+          "stream_available": true,
+          "collaborator_veto": false,
+          "requirement": "act",
+          "valid_decisions": [
+            "RESPOND"
+          ]
+        },
+        {
+          "variant_id": "dropout-no-observation",
+          "local_cue_signature": "same-pickup-and-response-window",
+          "preceding_context_signature": "open-dominant",
+          "collaborator_intent": "invites_response",
+          "performer_role": "lead_piano",
+          "stream_available": false,
+          "collaborator_veto": false,
+          "requirement": "withhold",
+          "valid_decisions": [
+            "ABSTAIN",
+            "WAIT"
+          ]
+        }
+      ]
+    },
+    {
+      "family_id": "MPART-VETO-001",
+      "changed_factor": "collaborator_veto",
+      "preserved_factors": [
+        "local_cue_signature",
+        "preceding_context_signature",
+        "collaborator_intent",
+        "performer_role",
+        "stream_available"
+      ],
+      "members": [
+        {
+          "variant_id": "authorized-entry",
+          "local_cue_signature": "same-two-beat-invitation",
+          "preceding_context_signature": "cadential-handoff",
+          "collaborator_intent": "invites_response",
+          "performer_role": "lead_guitar",
+          "stream_available": true,
+          "collaborator_veto": false,
+          "requirement": "act",
+          "valid_decisions": [
+            "RESPOND",
+            "YIELD"
+          ]
+        },
+        {
+          "variant_id": "explicit-veto",
+          "local_cue_signature": "same-two-beat-invitation",
+          "preceding_context_signature": "cadential-handoff",
+          "collaborator_intent": "invites_response",
+          "performer_role": "lead_guitar",
+          "stream_available": true,
+          "collaborator_veto": true,
+          "requirement": "withhold",
+          "valid_decisions": [
+            "WAIT",
+            "ABSTAIN"
+          ]
+        }
+      ]
+    }
+  ]
+}
