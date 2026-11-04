@@ -90,9 +90,11 @@ pub struct JepaOperationCounts {
     pub target_encoder_macs: u128,
     pub predictor_layer_1_macs: u128,
     pub predictor_layer_2_macs: u128,
-    pub activation_evaluations: u128,
-    /// Compatibility count matching the historical estimator's convention:
-    /// one unit per MAC plus one per activation evaluation.
+    pub encoder_activation_evaluations: u128,
+    pub predictor_activation_evaluations: u128,
+    pub total_activation_evaluations: u128,
+    /// Compatibility count matching the historical estimator. It counts one
+    /// unit per MAC and one per encoder activation, but omits predictor SiLU.
     pub legacy_operation_proxy_count: u128,
 }
 
@@ -100,10 +102,10 @@ pub struct JepaOperationCounts {
 impl JepaConfig {
     /// Return checked operation counts for the configured forward architecture.
     ///
-    /// The historical architecture count assumes two encoder passes (context
-    /// and target), two predictor matrix layers, and one activation evaluation
-    /// per output coordinate in each encoder. These are abstract operation
-    /// counts, not physical bit erasures.
+    /// The architecture count includes two encoder passes (context and
+    /// target), two predictor matrix layers, two encoder SiLU activations,
+    /// and one predictor SiLU activation. These are abstract operation counts,
+    /// not physical bit erasures.
     pub fn checked_operation_counts(
         &self,
     ) -> Result<JepaOperationCounts, JepaOperationCountError> {
@@ -121,16 +123,22 @@ impl JepaConfig {
         let predictor_layer_2_macs = latent
             .checked_mul(latent)
             .ok_or(JepaOperationCountError::Overflow)?;
-        let activation_evaluations = latent
+        let encoder_activation_evaluations = latent
             .checked_mul(2)
+            .ok_or(JepaOperationCountError::Overflow)?;
+        let predictor_activation_evaluations = latent;
+        let total_activation_evaluations = encoder_activation_evaluations
+            .checked_add(predictor_activation_evaluations)
             .ok_or(JepaOperationCountError::Overflow)?;
         let total_macs = encoder_macs
             .checked_mul(2)
             .and_then(|count| count.checked_add(predictor_layer_1_macs))
             .and_then(|count| count.checked_add(predictor_layer_2_macs))
             .ok_or(JepaOperationCountError::Overflow)?;
+        // Preserve the historical proxy exactly, including its omission of
+        // the predictor's SiLU evaluation.
         let legacy_operation_proxy_count = total_macs
-            .checked_add(activation_evaluations)
+            .checked_add(encoder_activation_evaluations)
             .ok_or(JepaOperationCountError::Overflow)?;
 
         Ok(JepaOperationCounts {
@@ -138,7 +146,9 @@ impl JepaConfig {
             target_encoder_macs: encoder_macs,
             predictor_layer_1_macs,
             predictor_layer_2_macs,
-            activation_evaluations,
+            encoder_activation_evaluations,
+            predictor_activation_evaluations,
+            total_activation_evaluations,
             legacy_operation_proxy_count,
         })
     }
@@ -208,7 +218,9 @@ mod operation_count_tests {
         assert_eq!(counts.target_encoder_macs, 2_097_152);
         assert_eq!(counts.predictor_layer_1_macs, 17_408);
         assert_eq!(counts.predictor_layer_2_macs, 16_384);
-        assert_eq!(counts.activation_evaluations, 256);
+        assert_eq!(counts.encoder_activation_evaluations, 256);
+        assert_eq!(counts.predictor_activation_evaluations, 128);
+        assert_eq!(counts.total_activation_evaluations, 384);
         assert_eq!(counts.legacy_operation_proxy_count, 4_228_352);
     }
 
