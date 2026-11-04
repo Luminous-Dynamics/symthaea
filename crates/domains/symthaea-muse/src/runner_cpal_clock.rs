@@ -1365,6 +1365,181 @@ mod tests {
     }
 
     #[test]
+    fn callback_to_predicted_playback_fit_uses_exact_output_anchor_set() {
+        use crate::output_clock::{
+            OutputClockAnchorSchemaV1, OutputClockAnchorSourceV1,
+        };
+
+        let descriptor = OutputClockStreamDescriptorV1::from_cpal_device_id(
+            7,
+            "callback-playback-fit-device",
+            48_000,
+            2,
+        )
+        .unwrap();
+        let anchors = vec![
+            OutputClockAnchorV1 {
+                schema_version: OutputClockAnchorSchemaV1::V1,
+                source: OutputClockAnchorSourceV1::SyntheticFixtureV1,
+                stream_instance_id: 7,
+                anchor_index: 0,
+                first_output_frame_index: 0,
+                frame_count: 480,
+                sample_rate_hz: 48_000,
+                channel_count: 2,
+                callback_stream_time_ns: 0,
+                playback_stream_time_ns: 5_000_000,
+                callback_to_playback_ns: 5_000_000,
+                timestamp_uncertainty_ns: None,
+            },
+            OutputClockAnchorV1 {
+                schema_version: OutputClockAnchorSchemaV1::V1,
+                source: OutputClockAnchorSourceV1::SyntheticFixtureV1,
+                stream_instance_id: 7,
+                anchor_index: 1,
+                first_output_frame_index: 480,
+                frame_count: 480,
+                sample_rate_hz: 48_000,
+                channel_count: 2,
+                callback_stream_time_ns: 10_000_000,
+                playback_stream_time_ns: 15_000_000,
+                callback_to_playback_ns: 5_000_000,
+                timestamp_uncertainty_ns: None,
+            },
+            OutputClockAnchorV1 {
+                schema_version: OutputClockAnchorSchemaV1::V1,
+                source: OutputClockAnchorSourceV1::SyntheticFixtureV1,
+                stream_instance_id: 7,
+                anchor_index: 2,
+                first_output_frame_index: 960,
+                frame_count: 480,
+                sample_rate_hz: 48_000,
+                channel_count: 2,
+                callback_stream_time_ns: 20_000_000,
+                playback_stream_time_ns: 25_000_000,
+                callback_to_playback_ns: 5_000_000,
+                timestamp_uncertainty_ns: None,
+            },
+            OutputClockAnchorV1 {
+                schema_version: OutputClockAnchorSchemaV1::V1,
+                source: OutputClockAnchorSourceV1::SyntheticFixtureV1,
+                stream_instance_id: 7,
+                anchor_index: 3,
+                first_output_frame_index: 1440,
+                frame_count: 480,
+                sample_rate_hz: 48_000,
+                channel_count: 2,
+                callback_stream_time_ns: 30_000_000,
+                playback_stream_time_ns: 35_000_000,
+                callback_to_playback_ns: 5_000_000,
+                timestamp_uncertainty_ns: None,
+            },
+        ];
+
+        let fit = fit_cpal_callback_playback_v1(
+            &descriptor,
+            &anchors,
+            CpalCallbackPlaybackFitPolicyV1::default(),
+        )
+        .unwrap();
+        let estimate = fit.playback_time_at_callback_time(20_000_000).unwrap();
+        let exact_anchor_bytes = serde_json::to_vec(&anchors).unwrap();
+
+        assert!((estimate.playback_stream_time_ns - 25_000_000.0).abs() < 1e-6);
+        assert!((fit.estimated_drift_ppm).abs() < 1e-6);
+        assert_eq!(
+            fit.anchor_set_sha256,
+            format!("{:x}", Sha256::digest(&exact_anchor_bytes))
+        );
+        assert_eq!(
+            estimate.accuracy_status,
+            CpalCallbackPlaybackAccuracyStatusV1::PointEstimateOnly
+        );
+        assert!(estimate.reported_uncertainty_ns.is_none());
+    }
+
+    #[test]
+    fn callback_to_predicted_playback_fit_rejects_schedule_outlier() {
+        use crate::output_clock::{
+            OutputClockAnchorSchemaV1, OutputClockAnchorSourceV1,
+        };
+
+        let descriptor = OutputClockStreamDescriptorV1::from_cpal_device_id(
+            7,
+            "callback-playback-outlier-device",
+            48_000,
+            2,
+        )
+        .unwrap();
+        let anchors = vec![
+            OutputClockAnchorV1 {
+                schema_version: OutputClockAnchorSchemaV1::V1,
+                source: OutputClockAnchorSourceV1::SyntheticFixtureV1,
+                stream_instance_id: 7,
+                anchor_index: 0,
+                first_output_frame_index: 0,
+                frame_count: 480,
+                sample_rate_hz: 48_000,
+                channel_count: 2,
+                callback_stream_time_ns: 0,
+                playback_stream_time_ns: 5_000_000,
+                callback_to_playback_ns: 5_000_000,
+                timestamp_uncertainty_ns: None,
+            },
+            OutputClockAnchorV1 {
+                schema_version: OutputClockAnchorSchemaV1::V1,
+                source: OutputClockAnchorSourceV1::SyntheticFixtureV1,
+                stream_instance_id: 7,
+                anchor_index: 1,
+                first_output_frame_index: 480,
+                frame_count: 480,
+                sample_rate_hz: 48_000,
+                channel_count: 2,
+                callback_stream_time_ns: 10_000_000,
+                playback_stream_time_ns: 15_000_000,
+                callback_to_playback_ns: 5_000_000,
+                timestamp_uncertainty_ns: None,
+            },
+            OutputClockAnchorV1 {
+                schema_version: OutputClockAnchorSchemaV1::V1,
+                source: OutputClockAnchorSourceV1::SyntheticFixtureV1,
+                stream_instance_id: 7,
+                anchor_index: 2,
+                first_output_frame_index: 960,
+                frame_count: 480,
+                sample_rate_hz: 48_000,
+                channel_count: 2,
+                callback_stream_time_ns: 20_000_000,
+                playback_stream_time_ns: 25_010_000,
+                callback_to_playback_ns: 5_010_000,
+                timestamp_uncertainty_ns: None,
+            },
+            OutputClockAnchorV1 {
+                schema_version: OutputClockAnchorSchemaV1::V1,
+                source: OutputClockAnchorSourceV1::SyntheticFixtureV1,
+                stream_instance_id: 7,
+                anchor_index: 3,
+                first_output_frame_index: 1440,
+                frame_count: 480,
+                sample_rate_hz: 48_000,
+                channel_count: 2,
+                callback_stream_time_ns: 30_000_000,
+                playback_stream_time_ns: 35_000_000,
+                callback_to_playback_ns: 5_000_000,
+                timestamp_uncertainty_ns: None,
+            },
+        ];
+        let policy = CpalCallbackPlaybackFitPolicyV1 {
+            maximum_abs_residual_ns: 100.0,
+            ..CpalCallbackPlaybackFitPolicyV1::default()
+        };
+        assert!(matches!(
+            fit_cpal_callback_playback_v1(&descriptor, &anchors, policy),
+            Err(CpalCallbackPlaybackFitErrorV1::ResidualOutsidePolicy { .. })
+        ));
+    }
+
+    #[test]
     fn runner_to_playback_to_output_frame_composes_for_exact_matching_stream() {
         use crate::output_clock::{
             fit_output_clock_bundle_v1, OutputClockAnchorSchemaV1,
@@ -1454,6 +1629,26 @@ mod tests {
             OutputClockAccuracyStatusV1::PointEstimateOnly
         );
         assert!(estimate.output_frame_estimate.reported_uncertainty_frames.is_none());
+
+        // Same musical timing but a changed anchor record must not compose
+        // with the callback/playback fit derived from the original anchors.
+        let mut substituted_anchors = output_anchors.clone();
+        substituted_anchors[0].timestamp_uncertainty_ns = Some(1_000);
+        let substituted_output_bundle = fit_output_clock_bundle_v1(
+            &output_descriptor,
+            &substituted_anchors,
+            OutputClockFitPolicyV1::default(),
+        )
+        .unwrap();
+        assert!(matches!(
+            estimate_output_frame_at_runner_time_v1(
+                &runner_fit,
+                &callback_playback_fit,
+                &substituted_output_bundle,
+                120_000_000,
+            ),
+            Err(RunnerOutputFrameCompositionErrorV1::AnchorSetDigestMismatch)
+        ));
     }
 
     #[test]
