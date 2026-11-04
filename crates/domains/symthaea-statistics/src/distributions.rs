@@ -120,9 +120,172 @@ pub fn chi_square_cdf(x: f64, df: f64) -> f64 {
     gammp(df / 2.0, x / 2.0)
 }
 
+
+/// Natural logarithm of the standard-normal cumulative distribution Φ(z).
+///
+/// Unlike ln(normal_cdf(z)), this remains useful in the far lower tail. The
+/// lower tail uses a continued-fraction Mills ratio; the central region uses
+/// an integrated power series. The upper tail is evaluated by symmetry with
+/// ln1p to avoid subtracting a rounded CDF from one.
+pub fn normal_log_cdf(z: f64) -> f64 {
+    if z.is_nan() {
+        return f64::NAN;
+    }
+    if z == f64::INFINITY {
+        return 0.0;
+    }
+    if z == f64::NEG_INFINITY {
+        return f64::NEG_INFINITY;
+    }
+    if z < -2.0 {
+        let a = -z;
+        let mut tail = 0.0;
+        // Laplace's continued fraction for the Mills ratio:
+        // Phi(-a) / phi(a) = 1 / (a + 1 / (a + 2 / (a + ...))).
+        for k in (1..=128).rev() {
+            tail = k as f64 / (a + tail);
+        }
+        let mills_ratio = 1.0 / (a + tail);
+        return -0.5 * a * a - 0.5 * (2.0 * std::f64::consts::PI).ln()
+            + mills_ratio.ln();
+    }
+    if z < 0.0 {
+        // Integrate exp(-t²/2) from zero to z. This converges rapidly on
+        // [-2, 0], where the alternating terms remain well scaled.
+        let mut term = z;
+        let mut integral = z;
+        for n in 1..=80 {
+            let nf = n as f64;
+            term *= -(z * z / 2.0) * (2.0 * nf - 1.0) / (nf * (2.0 * nf + 1.0));
+            integral += term;
+            if term.abs() <= 2.0e-16 * integral.abs().max(1.0e-300) {
+                break;
+            }
+        }
+        let cdf = 0.5 + integral / (2.0 * std::f64::consts::PI).sqrt();
+        return cdf.ln();
+    }
+    if z == 0.0 {
+        return -std::f64::consts::LN_2;
+    }
+    (-normal_log_cdf(-z).exp()).ln_1p()
+}
+
+/// Natural logarithm of the standard-normal survival function 1 - Φ(z).
+///
+/// This is evaluated as log Φ(-z), never as ln(1 - normal_cdf(z)).
+pub fn normal_log_survival(z: f64) -> f64 {
+    normal_log_cdf(-z)
+}
+
+/// Natural logarithm of the standard-normal probability in (lower, upper].
+///
+/// Infinite endpoints are supported. Invalid or unordered endpoints return
+/// NaN. Tail intervals use the smaller tail, avoiding catastrophic
+/// cancellation when both boundaries lie on the same side of zero. Very
+/// narrow finite intervals use a local density expansion.
+pub fn normal_log_interval(lower: f64, upper: f64) -> f64 {
+    if lower.is_nan() || upper.is_nan() || lower >= upper {
+        return f64::NAN;
+    }
+    if lower == f64::NEG_INFINITY {
+        return normal_log_cdf(upper);
+    }
+    if upper == f64::INFINITY {
+        return normal_log_survival(lower);
+    }
+
+    let width = upper - lower;
+    let midpoint = lower + width * 0.5;
+    if width.is_finite() && width > 0.0
+        && width <= 1.0e-5 / (1.0 + midpoint.abs())
+        && midpoint.abs() < 1.0e150
+    {
+        let correction = ((midpoint * width).powi(2) - width * width) / 24.0;
+        if correction > -1.0 {
+            return -0.5 * midpoint * midpoint
+                - 0.5 * (2.0 * std::f64::consts::PI).ln()
+                + width.ln()
+                + correction.ln_1p();
+        }
+    }
+
+    if upper <= 0.0 {
+        return log_difference_exp(normal_log_cdf(upper), normal_log_cdf(lower));
+    }
+    if lower >= 0.0 {
+        return log_difference_exp(normal_log_survival(lower), normal_log_survival(upper));
+    }
+
+    // The interval straddles zero. Both excluded tails are at most one half.
+    let left_tail = normal_log_cdf(lower).exp();
+    let right_tail = normal_log_survival(upper).exp();
+    let mass = 1.0 - left_tail - right_tail;
+    if mass > 0.0 { mass.ln() } else { f64::NEG_INFINITY }
+}
+
+fn log_difference_exp(log_a: f64, log_b: f64) -> f64 {
+    if log_b == f64::NEG_INFINITY {
+        return log_a;
+    }
+    if log_b > log_a {
+        return f64::NAN;
+    }
+    if log_a == log_b {
+        return f64::NEG_INFINITY;
+    }
+    log_a + (-(log_b - log_a).exp()).ln_1p()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+
+    #[test]
+    fn normal_log_cdf_matches_central_and_extreme_tail_landmarks() {
+        let points = [
+            (-10.0, -53.231_285_150_512_47),
+            (-8.0, -35.013_437_159_914_56),
+            (-3.0, -6.607_726_221_510_35),
+            (-1.0, -1.841_021_645_009_263_4),
+            (0.0, -0.693_147_180_559_945_3),
+            (1.0, -0.172_753_779_023_449_9),
+            (3.0, -0.001_350_809_964_748_193),
+            (8.0, -6.220_960_574_271_74e-16),
+        ];
+        for (z, expected) in points {
+            let actual = normal_log_cdf(z);
+            assert!((actual - expected).abs() < 2.0e-10, "z={z}: {actual} != {expected}");
+        }
+        assert!(normal_log_cdf(-40.0).is_finite());
+        assert_eq!(normal_log_cdf(f64::INFINITY), 0.0);
+        assert_eq!(normal_log_cdf(f64::NEG_INFINITY), f64::NEG_INFINITY);
+    }
+
+    #[test]
+    fn normal_log_interval_is_stable_in_both_tails() {
+        let left = normal_log_interval(f64::NEG_INFINITY, -8.0);
+        let right = normal_log_interval(8.0, f64::INFINITY);
+        assert!(left.is_finite() && right.is_finite());
+        assert!((left - right).abs() < 1.0e-12);
+        assert!((normal_log_interval(f64::NEG_INFINITY, 0.0).exp() - 0.5).abs() < 1.0e-14);
+        assert!((normal_log_interval(0.0, f64::INFINITY).exp() - 0.5).abs() < 1.0e-14);
+        let narrow = normal_log_interval(-1.0e-9, 1.0e-9).exp();
+        assert!((narrow / (2.0e-9 / (2.0 * std::f64::consts::PI).sqrt()) - 1.0).abs() < 1.0e-12);
+        assert!(normal_log_interval(1.0, 1.0).is_nan());
+    }
+
+
+    #[test]
+    fn normal_log_interval_matches_high_tail_reference() {
+        // Reference value for P(8 < Z <= 8.0001), evaluated independently
+        // with a high-accuracy log-normal-CDF implementation.
+        let actual = normal_log_interval(8.0, 8.0001);
+        assert!((actual - (-42.129_678_880_187_534)).abs() < 2.0e-9);
+        let reflected = normal_log_interval(-8.0001, -8.0);
+        assert!((actual - reflected).abs() < 2.0e-10);
+    }
 
     #[test]
     fn normal_cdf_landmarks() {

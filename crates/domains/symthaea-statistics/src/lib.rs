@@ -47,8 +47,8 @@ pub mod roc;
 pub use bayes::{Confusion, posterior, posterior_positive};
 pub use descriptive::{correlation, covariance, mean, median, quantile, std_dev, variance};
 pub use distributions::{
-    binomial_pmf, chi_square_cdf, normal_cdf, normal_pdf, normal_quantile, poisson_pmf,
-    students_t_cdf,
+    binomial_pmf, chi_square_cdf, normal_cdf, normal_log_cdf, normal_log_interval,
+    normal_log_survival, normal_pdf, normal_quantile, poisson_pmf, students_t_cdf,
 };
 pub use inference::{
     ChiSquare, Interval, TTest, chi_square_gof, one_sample_t_test, welch_t_test,
