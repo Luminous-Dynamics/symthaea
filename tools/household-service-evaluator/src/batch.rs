@@ -415,10 +415,11 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
                 "synthetic_inlet_volume_l_under_constant_flow",
                 flow * duration * 60.0,
             )?;
-            metrics.insert(
-                "gross_tank_sensor_inventory_l".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "gross_tank_sensor_inventory_l",
                 required_number(input, "tank_level_sensor_l")?,
-            );
+            )?;
             notes.push(
                 "The 576 L inlet figure assumes the fixture's 0.8 L/min flow remains constant for all 12 hours."
                     .to_owned(),
@@ -468,10 +469,11 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
             BatchDisposition::HumanReviewRequired
         }
         "WCONT-006" => {
-            metrics.insert(
-                "gross_tank_sensor_inventory_l".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "gross_tank_sensor_inventory_l",
                 required_number(input, "tank_level_sensor_l")?,
-            );
+            )?;
             let grid = required_bool(input, "grid_available")?;
             let pump = required_bool(input, "pump_available")?;
             let backup = required_bool(input, "backup_power_available")?;
@@ -493,10 +495,11 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
                 "stored_water_age_h",
                 required_number(input, "stored_water_age_h")?,
             )?;
-            metrics.insert(
-                "gross_tank_sensor_inventory_l".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "gross_tank_sensor_inventory_l",
                 required_number(input, "tank_level_sensor_l")?,
-            );
+            )?;
             notes.push(format!(
                 "Water-quality evidence state: {}.",
                 required_str(input, "water_quality_evidence", "WCONT-007.input")?
@@ -670,18 +673,21 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
             BatchDisposition::RepairNotExecuted
         }
         "REPAIR-002" => {
-            metrics.insert(
-                "access_fasteners".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "access_fasteners",
                 required_number(baseline, "access_fasteners")?,
-            );
-            metrics.insert(
-                "disassembly_steps".to_owned(),
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "disassembly_steps",
                 required_number(baseline, "disassembly_steps")?,
-            );
-            metrics.insert(
-                "synthetic_part_lead_time_days".to_owned(),
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "synthetic_part_lead_time_days",
                 required_number(baseline, "part_lead_time_days")?,
-            );
+            )?;
             notes.push(
                 "This is a trained-technician pump-module task; fixture counts describe access complexity, not measured repair time."
                     .to_owned(),
@@ -693,14 +699,16 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
             BatchDisposition::RepairHeld
         }
         "REPAIR-003" => {
-            metrics.insert(
-                "access_fasteners".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "access_fasteners",
                 required_number(baseline, "access_fasteners")?,
-            );
-            metrics.insert(
-                "disassembly_steps".to_owned(),
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "disassembly_steps",
                 required_number(baseline, "disassembly_steps")?,
-            );
+            )?;
             insert_boolean(
                 &mut metrics,
                 "adhesive_or_destructive_disassembly",
