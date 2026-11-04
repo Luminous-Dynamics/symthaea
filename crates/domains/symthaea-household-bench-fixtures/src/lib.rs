@@ -406,11 +406,11 @@ fn expected_disposition(
     id: &str,
     table: &[(&str, &str)],
     path: &str,
-) -> Result<&'static str, ValidationError> {
+) -> Result<String, ValidationError> {
     table
         .iter()
         .find(|(known_id, _)| *known_id == id)
-        .map(|(_, disposition)| *disposition)
+        .map(|(_, disposition)| (*disposition).to_owned())
         .ok_or_else(|| {
             ValidationError::new(
                 format!("{path}.id"),
