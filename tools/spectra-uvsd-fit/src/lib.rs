@@ -10,6 +10,12 @@ use std::fmt;
 
 use symthaea_statistics::{normal_log_interval, normal_quantile};
 
+mod bootstrap;
+pub use bootstrap::{
+    BootstrapFailureCounts, BootstrapIntervals, BootstrapOptions, BootstrapResult,
+    BootstrapStatus, bootstrap_intervals,
+};
+
 const MU_BOUND: f64 = 12.0;
 const LOG_SIGMA_BOUND: f64 = 4.0;
 const FIRST_THRESHOLD_BOUND: f64 = 12.0;
