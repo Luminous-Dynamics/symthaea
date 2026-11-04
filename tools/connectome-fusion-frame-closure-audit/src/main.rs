@@ -66,6 +66,8 @@ struct SourceExport {
 struct Event {
     event_id: String,
     sequence: u64,
+    event_at: String,
+    ingested_at: String,
     canonical_use_key: String,
     operation_id: String,
     claim_id: String,
@@ -139,6 +141,7 @@ struct SourceCheck {
     extraction_digest_valid: bool,
     scope_match: bool,
     coverage_qualified: bool,
+    custodian_unique: bool,
     shared_controls_empty: bool,
 }
 
@@ -208,8 +211,7 @@ fn domain_hash_string(domain: &str, value: &str) -> String {
 }
 
 fn sorted_unique(values: &[String]) -> bool {
-    let unique: BTreeSet<&str> = values.iter().map(String::as_str).collect();
-    unique.len() == values.len()
+    values.windows(2).all(|pair| pair[0] < pair[1])
 }
 
 fn use_key(input: &Input, event: &Event) -> Result<String, String> {
@@ -331,6 +333,8 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
 
     let mut source_checks = Vec::new();
     let mut source_ids = BTreeSet::new();
+    let mut custodian_refs = BTreeSet::new();
+    let mut shared_custodian_detected = false;
     let mut role_counts: BTreeMap<String, usize> = BTreeMap::new();
     let mut exports_by_role: BTreeMap<String, &SourceExport> = BTreeMap::new();
 
@@ -363,6 +367,10 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
         let event_digest_valid = computed_events.as_ref().is_ok_and(|digest| digest == &source.ordered_events_sha256);
         let extraction_digest_valid = computed_extraction == source.extraction_sha256;
         let scope_match = source.scope_sha256 == input.scope_sha256;
+        let custodian_unique = custodian_refs.insert(source.custodian_ref.as_str());
+        if !custodian_unique {
+            shared_custodian_detected = true;
+        }
 
         if source.source_id.trim().is_empty() || source.custodian_ref.trim().is_empty() {
             errors.push(format!("SOURCE_ID_OR_CUSTODIAN_MISSING:{}", source.source_id));
@@ -395,12 +403,22 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
                 || event.query_id.trim().is_empty()
                 || event.certificate_id.trim().is_empty()
                 || event.evidence_ids.len() < 2
+                || event.source_release_ids.is_empty()
+                || !event.event_at.ends_with("Z")
+                || !event.ingested_at.ends_with("Z")
+                || event.ingested_at < event.event_at
                 || !sorted_unique(&event.source_release_ids)
                 || !sorted_unique(&event.evidence_ids)
             {
                 errors.push(format!("INVALID_EVENT_IDENTITY_OR_EVIDENCE_SET:{}:{}", source.source_id, event.event_id));
             }
-            if !input.scope.query_ids.contains(&event.query_id)
+            let scoped_time = if input.scope.event_time_basis == "EVENT_TIME" {
+                &event.event_at
+            } else {
+                &event.ingested_at
+            };
+            if scoped_time < &input.scope.start_at || scoped_time >= &input.scope.end_at
+                || !input.scope.query_ids.contains(&event.query_id)
                 || event.source_release_ids.iter().any(|r| !input.scope.release_ids.contains(r))
             {
                 errors.push(format!("EVENT_OUTSIDE_DECLARED_SCOPE:{}:{}", source.source_id, event.event_id));
@@ -425,6 +443,7 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
             extraction_digest_valid,
             scope_match,
             coverage_qualified: source.coverage_disposition == "QUALIFIED_COMPLETE_WITHIN_DECLARED_SCOPE",
+            custodian_unique,
             shared_controls_empty: source.shared_controls.is_empty(),
         });
     }
@@ -484,7 +503,7 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
     }
 
     let mut coverage_unknown = false;
-    let mut shared_control = false;
+    let mut shared_control = shared_custodian_detected;
     for source in &input.source_exports {
         if source.coverage_disposition != "QUALIFIED_COMPLETE_WITHIN_DECLARED_SCOPE" {
             coverage_unknown = true;
