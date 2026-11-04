@@ -252,7 +252,7 @@ jobs:
               return len(world_ids), len(facts)
 
           world_count, conditional_fact_count = validate_repository_worlds(worlds, graph)
-          if world_count != 8 or conditional_fact_count != 7:
+          if world_count != 10 or conditional_fact_count != 7:
               raise SystemExit("repository target/feature world matrix changed without an explicit benchmark revision")
 
           def expect_world_reject(worlds_value, graph_value, label):
