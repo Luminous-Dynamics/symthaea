@@ -109,6 +109,35 @@ impl SimulationResult {
     }
 }
 
+/// Default upper bound on the number of time steps retained by checked simulation.
+pub const DEFAULT_MAX_SIMULATION_STEPS: usize = 1_000_000;
+
+/// Failure reasons returned by the checked simulation entry point.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SimulationError {
+    InvalidTimeBounds,
+    NonFiniteTimeSpan,
+    InvalidTimeStep,
+    InitialStateDimensionMismatch { expected: usize, actual: usize },
+    NonFiniteInitialState { index: usize },
+    StepCountOverflow,
+    StepLimitExceeded { requested_steps: usize, max_steps: usize },
+    AllocationFailed,
+    TimeGridDidNotAdvance { step: usize },
+    StateDimensionMismatch { step: usize, expected: usize, actual: usize },
+    NonFiniteState { step: usize, index: usize },
+}
+
+/// Clone a state vector while reporting allocation failure rather than panicking.
+fn try_clone_state(state: &[f64]) -> Result<Vec<f64>, SimulationError> {
+    let mut cloned = Vec::new();
+    cloned
+        .try_reserve_exact(state.len())
+        .map_err(|_| SimulationError::AllocationFailed)?;
+    cloned.extend_from_slice(state);
+    Ok(cloned)
+}
+
 // =============================================================================
 // SIMULATE FUNCTION
 // =============================================================================
@@ -116,18 +145,13 @@ impl SimulationResult {
 /// Run a full simulation of a dynamical system.
 ///
 /// Integrates from `t_start` to `t_end` using the given integrator and step
-/// size. Records the state at every step.
-///
-/// # Arguments
-/// * `system` - The dynamical system to simulate
-/// * `integrator` - The ODE integrator to use
-/// * `initial_state` - Initial conditions (length must equal `system.state_dim()`)
-/// * `t_start` - Start time
-/// * `t_end` - End time
-/// * `dt` - Time step size
+/// size. Records the state at every step. This compatibility entry point
+/// panics when the request is invalid; new callers should prefer
+/// `try_simulate` to receive a typed error.
 ///
 /// # Panics
-/// Panics if `initial_state.len() != system.state_dim()`.
+/// Panics when the time grid, initial state, step count, allocation, or
+/// integrator output is invalid.
 pub fn simulate(
     system: &dyn DynamicalSystem,
     integrator: &dyn Integrator,
@@ -136,47 +160,138 @@ pub fn simulate(
     t_end: f64,
     dt: f64,
 ) -> SimulationResult {
-    assert_eq!(
-        initial_state.len(),
-        system.state_dim(),
-        "Initial state dimension {} does not match system dimension {}",
-        initial_state.len(),
-        system.state_dim()
-    );
+    try_simulate(system, integrator, initial_state, t_start, t_end, dt)
+        .unwrap_or_else(|error| panic!("Invalid dynamical simulation request: {error:?}"))
+}
 
-    let n_steps = ((t_end - t_start) / dt).ceil() as usize;
-    let mut times = Vec::with_capacity(n_steps + 1);
-    let mut states = Vec::with_capacity(n_steps + 1);
+/// Checked simulation using the default resource limit.
+///
+/// Rejects invalid time bounds/steps, non-finite initial or returned states,
+/// dimension changes, excessive step counts, and allocation failures.
+pub fn try_simulate(
+    system: &dyn DynamicalSystem,
+    integrator: &dyn Integrator,
+    initial_state: &[f64],
+    t_start: f64,
+    t_end: f64,
+    dt: f64,
+) -> Result<SimulationResult, SimulationError> {
+    try_simulate_with_limit(
+        system,
+        integrator,
+        initial_state,
+        t_start,
+        t_end,
+        dt,
+        DEFAULT_MAX_SIMULATION_STEPS,
+    )
+}
 
-    let mut state = initial_state.to_vec();
+/// Checked simulation with an explicit maximum number of recorded steps.
+///
+/// The limit is applied before trajectory allocation. The final integration
+/// step is shortened so the returned final time is exactly `t_end`.
+pub fn try_simulate_with_limit(
+    system: &dyn DynamicalSystem,
+    integrator: &dyn Integrator,
+    initial_state: &[f64],
+    t_start: f64,
+    t_end: f64,
+    dt: f64,
+    max_steps: usize,
+) -> Result<SimulationResult, SimulationError> {
+    let expected_dim = system.state_dim();
+    if initial_state.len() != expected_dim {
+        return Err(SimulationError::InitialStateDimensionMismatch {
+            expected: expected_dim,
+            actual: initial_state.len(),
+        });
+    }
+    if !t_start.is_finite() || !t_end.is_finite() || t_end <= t_start {
+        return Err(SimulationError::InvalidTimeBounds);
+    }
+    if !dt.is_finite() || dt <= 0.0 {
+        return Err(SimulationError::InvalidTimeStep);
+    }
+    if let Some(index) = initial_state.iter().position(|value| !value.is_finite()) {
+        return Err(SimulationError::NonFiniteInitialState { index });
+    }
+
+    let time_span = t_end - t_start;
+    if !time_span.is_finite() || time_span <= 0.0 {
+        return Err(SimulationError::NonFiniteTimeSpan);
+    }
+    let requested_steps = (time_span / dt).ceil();
+    if !requested_steps.is_finite() || requested_steps > usize::MAX as f64 {
+        return Err(SimulationError::StepCountOverflow);
+    }
+    let n_steps = (requested_steps as usize).max(1);
+    if n_steps > max_steps {
+        return Err(SimulationError::StepLimitExceeded {
+            requested_steps: n_steps,
+            max_steps,
+        });
+    }
+    let capacity = n_steps
+        .checked_add(1)
+        .ok_or(SimulationError::StepCountOverflow)?;
+
+    let mut times = Vec::new();
+    times
+        .try_reserve_exact(capacity)
+        .map_err(|_| SimulationError::AllocationFailed)?;
+    let mut states = Vec::new();
+    states
+        .try_reserve_exact(capacity)
+        .map_err(|_| SimulationError::AllocationFailed)?;
+
+    let mut state = try_clone_state(initial_state)?;
     let mut t = t_start;
-
     times.push(t);
-    states.push(state.clone());
+    states.push(try_clone_state(&state)?);
 
-    for _ in 0..n_steps {
-        // Clamp the last step so we do not overshoot t_end
-        let step_dt = dt.min(t_end - t);
-        if step_dt <= 0.0 {
-            break;
+    for step in 0..n_steps {
+        let next_t = if step + 1 == n_steps {
+            t_end
+        } else {
+            (t_start + (step + 1) as f64 * dt).min(t_end)
+        };
+        if !next_t.is_finite() || next_t <= t {
+            return Err(SimulationError::TimeGridDidNotAdvance { step });
+        }
+        let step_dt = next_t - t;
+        if !step_dt.is_finite() || step_dt <= 0.0 {
+            return Err(SimulationError::TimeGridDidNotAdvance { step });
         }
 
-        state = integrator.step(system, &state, t, step_dt);
-        t += step_dt;
+        let next_state = integrator.step(system, &state, t, step_dt);
+        if next_state.len() != expected_dim {
+            return Err(SimulationError::StateDimensionMismatch {
+                step: step + 1,
+                expected: expected_dim,
+                actual: next_state.len(),
+            });
+        }
+        if let Some(index) = next_state.iter().position(|value| !value.is_finite()) {
+            return Err(SimulationError::NonFiniteState {
+                step: step + 1,
+                index,
+            });
+        }
 
+        state = next_state;
+        t = next_t;
         times.push(t);
-        states.push(state.clone());
+        states.push(try_clone_state(&state)?);
     }
 
-    let steps = times.len() - 1;
-
-    SimulationResult {
+    Ok(SimulationResult {
         times,
         states,
-        total_time: t_end - t_start,
-        steps,
+        total_time: time_span,
+        steps: n_steps,
         system_name: system.name().to_string(),
-    }
+    })
 }
 
 // =============================================================================
