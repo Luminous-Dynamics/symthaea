@@ -207,23 +207,31 @@ fn upstream_node_metadata(raw: &Value) -> Value {
 
 fn edge_relation(raw: &Value, source_kind: &str, target_kind: &str) -> Result<&'static str, String> {
     let upstream_type = required_string(raw, "type", "edge")?;
-    if upstream_type == "CONTAINS" {
-        if source_kind == "module" && target_kind == "formal_declaration" {
-            return Ok("daps_membership_candidate");
+    match upstream_type {
+        "CONTAINS" if source_kind == "module" && target_kind == "formal_declaration" => {
+            Ok("daps_membership_candidate")
         }
-        return Err(format!(
-            "DAPS CONTAINS edge has unsupported orientation/kinds: {source_kind} -> {target_kind}"
-        ));
+        "IMPORTS" if source_kind == "module" && target_kind == "module" => {
+            Ok("daps_import_candidate")
+        }
+        "USES_CLASS"
+        | "USES_CLASS_DERIVED"
+        | "USES_STRUCTURE"
+        | "USES_DEFINITION"
+        | "USES_INSTANCE"
+        | "DEPENDS_ON"
+            if source_kind == "formal_declaration" && target_kind == "formal_declaration" =>
+        {
+            Ok("daps_dependency_candidate")
+        }
+        "CONTAINS" | "IMPORTS" | "USES_CLASS" | "USES_CLASS_DERIVED"
+        | "USES_STRUCTURE" | "USES_DEFINITION" | "USES_INSTANCE" | "DEPENDS_ON" => {
+            Err(format!(
+                "DAPS edge type {upstream_type} has unsupported endpoint kinds {source_kind} -> {target_kind}"
+            ))
+        }
+        _ => Err(format!("unsupported DAPS edge type {upstream_type}; refusing to infer a relation")),
     }
-    if source_kind == "module" && target_kind == "module" {
-        return Ok("daps_import_candidate");
-    }
-    if source_kind == "formal_declaration" && target_kind == "formal_declaration" {
-        return Ok("daps_dependency_candidate");
-    }
-    Err(format!(
-        "DAPS edge type {upstream_type} joins unsupported node kinds {source_kind} -> {target_kind}; refusing to infer a semantic edge"
-    ))
 }
 
 fn convert(input: &Value, input_bytes: &[u8], args: &ProvenanceArgs) -> Result<Conversion, String> {
