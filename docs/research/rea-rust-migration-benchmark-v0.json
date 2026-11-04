@@ -1695,7 +1695,13 @@
         "receipt_does_not_infer_apk_ipa_signature_or_package_installability",
         "receipt_does_not_infer_whole_archive_completeness_from_one_member",
         "receipt_does_not_infer_masvs_control_pass_from_raw_observation",
-        "receipt_signature_authenticates_statement_not_underlying_semantic_truth"
+        "receipt_signature_authenticates_statement_not_underlying_semantic_truth",
+        "zip_rs_independent_replay_unique_name_stored_claim",
+        "zip_rs_zlib_rs_independent_replay_deflate_claim",
+        "zip_rs_independent_replay_wrong_archive_sha_rejection",
+        "zip_rs_independent_replay_raw_name_offset_flags_method_size_crc_parity",
+        "zip_rs_duplicate_name_occurrence_ambiguous_abstains",
+        "zip_rs_independent_replay_source_open_hash_parse_rehash_same_object"
       ],
       "metrics": [
         "schema_valid_receipt_rate_by_outcome",
@@ -1721,7 +1727,14 @@
         "do not add signer identity or authentication claims to REA Evidence ID or payload digest",
         "pin canonical serialization only after deterministic RFC 8785 behavior and independent conformance vectors are qualified",
         "for PR-triggered validation record both the pull-request head SHA and the GITHUB_SHA tested revision (which may be a synthetic merge commit); do not conflate them",
-        "the first exact receipt harness workflow run 41906164694 passed rustfmt, schema metadata, all 15 tests, and Clippy with warnings denied; its lockfile was uploaded with digest e0a22bf2e0a798aeb7134bf37d5f63ca3f0e23334274782495e09edd824b21e0 and remains to be committed or otherwise immutably bound for --locked reruns"
+        "the first exact receipt harness workflow run 41906164694 passed rustfmt, schema metadata, all 15 tests, and Clippy with warnings denied; its lockfile was uploaded with digest e0a22bf2e0a798aeb7134bf37d5f63ca3f0e23334274782495e09edd824b21e0 and remains to be committed or otherwise immutably bound for --locked reruns",
+        "the independent replay must hash, parse, stream and re-hash the same already-open archive object; do not hash one path open and parse a second path open",
+        "use zip 9.3.0 with deflate-flate2-zlib-rs to independently parse and decode unique-name Stored/Deflate member claims",
+        "return Unsupported for duplicate raw filenames when the oracle indexed map cannot preserve occurrence identity; do not map by filename or use a collapsed index",
+        "compare raw filename bytes, local-header/data offsets, flags, method, sizes and declared CRC before streaming",
+        "recompute payload SHA-256 and incremental bitwise CRC-32 over bounded chunks; require EOF and exact output length",
+        "re-hash the same source object after replay and reject source changes; source digest is separate from filesystem identity",
+        "report unsupported ZIP64, multi-disk, ambiguous EOCD and unsupported carrier layouts as explicit abstentions"
       ],
       "claim_boundaries": {
         "receipt_integrity": "A receipt is an auditable record of the verifier's claim and inputs. Its own digest or signature does not increase the strength of the underlying observation.",
@@ -1746,6 +1759,65 @@
         "schema_draft": "JSON Schema Draft 2020-12",
         "canonicalization": "RFC 8785 JCS via pinned serde_json_canonicalizer 0.4.1",
         "semantic_claim": "schema/semantic validator and canonicalizer harness only; no production receipt writer or replay CLI yet"
+      },
+      "independent_replay_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10507"
+    },
+    {
+      "id": "independent_member_receipt_replay",
+      "status": "draft_independent_replayer",
+      "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10507",
+      "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10507",
+      "oracle": {
+        "crate": "zip",
+        "version": "9.3.0",
+        "deflate_backend": "flate2 / zlib-rs 0.6.8",
+        "production_comparison": "zipcore 0.10.2 / miniz_oxide 0.9.1",
+        "commonality": "zip-rs and zipcore both depend on crc32fast for their own ZIP CRC paths; replay also requires its separately implemented incremental CRC-32"
+      },
+      "objective": "Independently replay a verified receipt's member-content claim from the original archive bytes using a different parser and Deflate implementation.",
+      "target": "100_percent replay agreement for the declared supported subset; zero false accepts for wrong archive digest, occurrence metadata, payload digest, CRC or output limits; 100_percent explicit abstention for duplicate-name indexed ambiguity and unsupported layouts.",
+      "cases": [
+        "independent_replay_stored_member_receipt",
+        "independent_replay_deflate_member_receipt_with_zlib_rs",
+        "independent_replay_rejects_wrong_archive_sha_before_member",
+        "independent_replay_rejects_raw_name_offset_flags_method_size_crc_mismatch",
+        "independent_replay_rejects_crc_and_payload_sha_mismatch",
+        "independent_replay_rejects_declared_or_actual_output_limit_exceedance",
+        "independent_replay_duplicate_raw_name_index_ambiguity_abstains",
+        "independent_replay_zip64_or_multidisk_layout_abstains",
+        "independent_replay_hash_parse_rehash_uses_same_open_file_object",
+        "independent_replay_raw_json_duplicate_property_rejected_before_canonicalization",
+        "independent_replay_preserves_claim_ceiling_and_attestation_separation"
+      ],
+      "metrics": [
+        "independent_replay_agreement_rate_by_fixture_family",
+        "false_replay_accept_rate",
+        "false_replay_rejection_rate",
+        "unsupported_abstention_rate_by_layout",
+        "duplicate_occurrence_abstention_rate",
+        "source_digest_mismatch_detection_rate",
+        "metadata_parity_mismatch_detection_rate",
+        "bytes_read_and_peak_rss",
+        "p50_p95_replay_latency",
+        "energy_per_replayed_mib"
+      ],
+      "protocol": [
+        "validate duplicate-key-free raw JSON against the pinned schema before attempting replay",
+        "bind replay to the whole-archive SHA-256 and exact occurrence metadata",
+        "perform archive hashing and zip-rs parsing through handles cloned from the same opened file object; re-hash after payload verification",
+        "never extract files; stream at most the receipt buffer size and enforce member output bounds with a one-byte overrun sentinel",
+        "retain a distinct outcome for replayed, rejected and unsupported; unsupported is not pass or failure",
+        "zip-rs duplicate-name view is unique-name-oriented; abstain when has_duplicate_names is true",
+        "compare raw filename bytes and absolute offsets; never use decoded names as occurrence identity",
+        "recompute independent CRC and SHA-256; require exact observed size and decoder EOF",
+        "report exact zip version, zlib-rs backend, Cargo.lock digest, source commit and runtime platform"
+      ],
+      "boundaries": {
+        "supported_subset": "Unique raw filenames, unencrypted regular files, Stored and Deflate, single-disk conventional ZIP layouts accepted by zip-rs.",
+        "duplicate_names": "Unsupported because zip-rs's indexed view collapses duplicate raw names; do not claim occurrence replay.",
+        "zip64_and_prefix": "May be Unsupported in this first independent replay slice; do not relax source-offset bounds or heuristically remap.",
+        "authenticity": "Replay verifies observed bytes against a receipt, not the producer's identity or truthfulness.",
+        "checksum_commonality": "zipcore/zip use crc32fast in ZIP parsing; the replay custom CRC path is required as a second calculation."
       }
     }
   ],
