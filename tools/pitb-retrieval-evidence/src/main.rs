@@ -497,11 +497,12 @@ fn synthetic_receipt(graph: &Value, graph_bytes: &[u8]) -> Receipt {
     let mut ids: Vec<String> = nodes.iter().map(|x| x["node_id"].as_str().unwrap().to_owned()).collect();
     ids.sort();
     let candidate_ids: BTreeSet<String> = [ids[0].clone(), ids[1].clone()].into_iter().collect();
+    let mut candidate_iter = candidate_ids.iter();
+    let candidate_one = candidate_iter.next().unwrap().clone();
+    let candidate_two = candidate_iter.next().unwrap().clone();
     let environment = graph["snapshot"]["environment_sha256"].as_str().unwrap().to_owned();
     let repository_commit = graph["snapshot"]["repository_commit"].as_str().unwrap().to_owned();
     let snapshot_id = graph["snapshot"]["snapshot_id"].as_str().unwrap().to_owned();
-    let candidate_one = graph["nodes"][0]["node_id"].as_str().unwrap().to_owned();
-    let candidate_two = graph["nodes"][1]["node_id"].as_str().unwrap().to_owned();
     Receipt {
         schema_version: RUN_SCHEMA.into(),
         evidence_class: "external_candidate_run".into(),
