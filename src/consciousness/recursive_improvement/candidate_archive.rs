@@ -547,8 +547,19 @@ mod tests {
         archive
             .insert(candidate("root", &[], '2', 'b', &[("coding", 0.5)]))
             .unwrap();
+        assert_eq!(
+            archive.insert(candidate(
+                "incomplete-hybrid",
+                &["root", "missing"],
+                '3',
+                'c',
+                &[("coding", 0.6)],
+            )),
+            Err(CandidateArchiveError::MissingParent("missing".into()))
+        );
+        assert_eq!(archive.len(), 1);
         archive
-            .insert(candidate("child", &["root"], '3', 'c', &[("coding", 0.6)]))
+            .insert(candidate("child", &["root"], '4', 'd', &[("coding", 0.6)]))
             .unwrap();
         assert_eq!(archive.len(), 2);
     }
