@@ -14,7 +14,7 @@ const MAPPING_SCHEMA: &str = "pitb.retrieval-declaration-mapping.v0";
 const REPORT_SCHEMA: &str = "pitb.retrieval-support-route-coverage.v0";
 const COVERAGE_K: [usize; 6] = [1, 5, 10, 32, 64, 100];
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize), Serialize)]
 #[serde(deny_unknown_fields)]
 struct Receipt {
     schema_version: String,
@@ -29,7 +29,7 @@ struct Receipt {
     budget: Budget,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize), Serialize)]
 #[serde(deny_unknown_fields)]
 struct Retriever {
     kind: String,
@@ -42,7 +42,7 @@ struct Retriever {
     query_formulator_sha256: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize), Serialize)]
 #[serde(deny_unknown_fields)]
 struct Benchmark {
     benchmark_id: String,
@@ -54,7 +54,7 @@ struct Benchmark {
     labels_sequestered: bool,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize), Serialize)]
 #[serde(deny_unknown_fields)]
 struct Query {
     query_id: String,
@@ -63,7 +63,7 @@ struct Query {
     target_environment_sha256: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize), Serialize)]
 #[serde(deny_unknown_fields)]
 struct GraphBinding {
     snapshot_id: String,
@@ -72,7 +72,7 @@ struct GraphBinding {
     graph_manifest_sha256: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize), Serialize)]
 #[serde(deny_unknown_fields)]
 struct CandidatePool {
     candidate_count: usize,
@@ -82,7 +82,7 @@ struct CandidatePool {
     candidate_policy_sha256: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize), Serialize)]
 #[serde(deny_unknown_fields)]
 struct Ranking {
     score_metric: String,
@@ -91,7 +91,7 @@ struct Ranking {
     candidates: Vec<RankedCandidate>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize), Serialize)]
 #[serde(deny_unknown_fields)]
 struct RankedCandidate {
     rank: usize,
@@ -102,7 +102,7 @@ struct RankedCandidate {
     evidence_artifact_sha256: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize), Serialize)]
 #[serde(deny_unknown_fields)]
 struct Budget {
     query_wall_ms: u64,
@@ -112,7 +112,7 @@ struct Budget {
     cost_microusd: u64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize), Serialize)]
 #[serde(deny_unknown_fields)]
 struct Mapping {
     schema_version: String,
