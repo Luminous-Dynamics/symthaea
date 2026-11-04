@@ -1,0 +1,261 @@
+{
+  "schema": "sam-episode-counterfactual-v0.1",
+  "status": "synthetic-analytic-causal-fixtures",
+  "claim_ceiling": "Structural causal logic and controlled synthetic counterfactual fixtures only.",
+  "estimands": [
+    {
+      "id": "R1",
+      "name": "observational_prediction",
+      "requires": [
+        "shared_history"
+      ],
+      "does_not_imply": [
+        "intervention_effect",
+        "episode_counterfactual"
+      ]
+    },
+    {
+      "id": "R2",
+      "name": "interventional_effect",
+      "requires": [
+        "declared_intervention",
+        "target_population",
+        "sampling_assumptions"
+      ]
+    },
+    {
+      "id": "R3",
+      "name": "episode_specific_counterfactual",
+      "requires": [
+        "factual_continuation",
+        "abduction_evidence",
+        "frozen_structural_mechanism",
+        "alternative_intervention"
+      ]
+    }
+  ],
+  "variables": {
+    "exogenous": [
+      "episode_trigger_time",
+      "actor_policy_noise"
+    ],
+    "intervention": [
+      "ego_action"
+    ],
+    "descendants": [
+      "ego_pose",
+      "ego_visible_cue",
+      "actor_policy_response",
+      "counterfactual_camera_view"
+    ],
+    "non_descendants": [
+      "external_signal_schedule"
+    ],
+    "shared_cause": [
+      "weather_visibility_state"
+    ],
+    "unidentified": [
+      "unobserved_actor_intent_when_no_trace"
+    ]
+  },
+  "cases": [
+    {
+      "id": "episode-event-nondescendant-persists",
+      "factual": {
+        "action": "continue",
+        "trigger_time_s": 2,
+        "event": "side_vehicle_emerges",
+        "revealed_after_shared_history": true
+      },
+      "alternative": {
+        "action": "yield",
+        "trigger_time_s": 2
+      },
+      "direct_baseline": {
+        "uses_factual_continuation": false,
+        "omits_event": true
+      },
+      "abduction_action_prediction": {
+        "uses_factual_continuation": true,
+        "preserves_episode_trigger": true
+      },
+      "expected": {
+        "classification": "R3_identified_in_simulator",
+        "event_preserved": true,
+        "trigger_time_s": 2
+      }
+    },
+    {
+      "id": "interactive-actor-descendant-recomputed",
+      "factual": {
+        "action": "brake",
+        "actor_intent": "crossing",
+        "ego_visible_ttc_after_action_s": 5,
+        "observation_delivered_tick": 14,
+        "actor_policy_transition": "enter_crossing"
+      },
+      "alternative": {
+        "action": "continue",
+        "actor_intent": "same_episode_intent",
+        "ego_visible_ttc_after_action_s": 1,
+        "observation_delivered_tick": 14,
+        "actor_policy_transition": "wait_or_pause"
+      },
+      "expected": {
+        "classification": "R3_identified_under_declared_policy",
+        "exogenous_intent_preserved": true,
+        "post_treatment_actor_response_recomputed": true,
+        "no_response_before_tick": 14
+      }
+    },
+    {
+      "id": "non-descendant-invariance",
+      "factual": {
+        "action": "brake",
+        "external_signal_schedule": "green_until_tick_50"
+      },
+      "alternative": {
+        "action": "continue",
+        "external_signal_schedule": "green_until_tick_50"
+      },
+      "expected": {
+        "non_descendant_unchanged": true
+      }
+    },
+    {
+      "id": "shared-confounder-preserved",
+      "factual": {
+        "weather_visibility_state": "foggy",
+        "actor_speed_observation": "slow"
+      },
+      "alternative": {
+        "weather_visibility_state": "foggy",
+        "actor_speed_observation": "recomputed_from_same_weather_and_policy"
+      },
+      "expected": {
+        "weather_is_shared_cause": true,
+        "weather_not_relabelled_as_action_effect": true
+      }
+    },
+    {
+      "id": "event-free-null",
+      "factual": {
+        "event_present": false,
+        "abduction_evidence": "no event observed over complete factual window"
+      },
+      "alternative": {
+        "event_present": false
+      },
+      "expected": {
+        "event_fabrication": false
+      }
+    },
+    {
+      "id": "over-copy-post-treatment-actor-state",
+      "factual": {
+        "action": "brake",
+        "actor_state_after_cue": "paused"
+      },
+      "alternative": {
+        "action": "continue",
+        "counterfactual_visible_ttc_s": 5,
+        "expected_actor_state_after_cue": "continue_crossing"
+      },
+      "attempted_output": {
+        "actor_state_after_cue": "paused",
+        "copied_without_policy_reexecution": true
+      },
+      "expected": {
+        "classification": "RejectOverCopiedPostTreatmentState",
+        "reason": "copied state conflicts with the policy transition under the alternative delivered cue"
+      }
+    },
+    {
+      "id": "missing-factual-continuation",
+      "factual": {
+        "shared_history_present": true,
+        "factual_continuation_present": false
+      },
+      "alternative": {
+        "action": "yield"
+      },
+      "expected": {
+        "classification": "R3_unavailable_or_NotIdentified",
+        "may_report_R1": true,
+        "may_report_R2_with_separate_design": true
+      }
+    },
+    {
+      "id": "ambiguous-abduction",
+      "factual": {
+        "observed_trace": "actor appears at tick 20",
+        "compatible_exogenous_states": [
+          "scheduled_entry_tick_18",
+          "hidden_signal_entry_tick_19"
+        ]
+      },
+      "alternative": {
+        "action": "continue"
+      },
+      "counterfactual_outcomes": [
+        {
+          "u": "scheduled_entry",
+          "outcome": "actor_crosses"
+        },
+        {
+          "u": "hidden_signal",
+          "outcome": "actor_yields"
+        }
+      ],
+      "expected": {
+        "classification": "NotIdentified",
+        "must_preserve_outcome_set": true,
+        "point_truth_claim": false
+      }
+    },
+    {
+      "id": "changed-mechanism-invalidates-abduction",
+      "factual": {
+        "mechanism_digest": "scm-A",
+        "abduction_digest": "posterior-A"
+      },
+      "attempted_counterfactual": {
+        "mechanism_digest": "scm-B",
+        "reuse_abduction_digest": "posterior-A"
+      },
+      "expected": {
+        "classification": "RejectIdentityMismatch"
+      }
+    },
+    {
+      "id": "future-leakage-and-clock-order",
+      "decision_tick": 10,
+      "model_inputs": [
+        {
+          "field": "future_ego_command",
+          "available_tick": 12
+        },
+        {
+          "field": "counterfactual_reference_outcome",
+          "available_tick": 20
+        }
+      ],
+      "expected": {
+        "classification": "RejectFutureInformation",
+        "inputs_allowed": false
+      }
+    }
+  ],
+  "invariants": [
+    "R1, R2 and R3 estimands are never silently substituted for one another.",
+    "Episode exogenous state is abducted from the factual episode, not inferred from a seed ID alone.",
+    "Non-descendants preserve factual episode values only when the declared causal graph justifies it.",
+    "Descendants are recomputed through the same frozen structural mechanisms.",
+    "Interactive actor responses are recomputed after the declared cue delivery and reaction delay.",
+    "Post-treatment factual observations are not blindly copied across alternative action branches.",
+    "Ambiguous abduction yields an outcome set/bound or NotIdentified, never a fabricated point truth.",
+    "Missing factual continuation makes R3 unavailable.",
+    "Future actions and evaluator-only references never leak into model/actor inputs.",
+    "A plausible output does not pass episode-specific fidelity unless it preserves the required factual evidence."
+  ]
+}
