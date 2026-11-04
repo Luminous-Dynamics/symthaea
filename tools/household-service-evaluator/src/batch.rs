@@ -1196,18 +1196,42 @@ mod tests {
             report.water_corpus_id,
             "HOME-UTILITY-COORD-001-WATER-CONTINUITY-SYNTHETIC-001"
         );
+        assert_eq!(report.report_schema_version, "0.2");
         assert_eq!(
+            report.evidence_class,
+            "synthetic_software_conformance_only"
+        );
+        assert_eq!(
+            report.adapter_version,
+            "household-service-v0.1-water-repair-adapter.1"
+        );
+        assert_eq!(report.source_artifacts.len(), 2);
+        assert!(report.source_artifacts.iter().all(|item| {
+            item.digest_algorithm == "sha-256"
+                && item.sha256.len() == 64
+                && item.byte_length > 0
+                && item.digest_scope == "normalized_serde_json_value_bytes"
+        }));
+        assert!(matches!(
             report.receipts[7].derived_metrics["mass_balance_residual_l"],
-            -200.0
-        );
-        assert_eq!(
+            MetricValue::Quantity { value: -200.0, ref unit, .. } if unit == "L"
+        ));
+        assert!(matches!(
             report.receipts[7].derived_metrics["mass_balance_residual_lower_l"],
-            -220.0
-        );
-        assert_eq!(
+            MetricValue::Quantity { value: -220.0, ref unit, .. } if unit == "L"
+        ));
+        assert!(matches!(
             report.receipts[7].derived_metrics["mass_balance_residual_upper_l"],
-            -180.0
-        );
+            MetricValue::Quantity { value: -180.0, ref unit, .. } if unit == "L"
+        ));
+        assert!(matches!(
+            report.receipts[5].derived_metrics["grid_available"],
+            MetricValue::Boolean { value: false, .. }
+        ));
+        assert!(matches!(
+            report.receipts[8].derived_metrics["commanded_refill"],
+            MetricValue::Boolean { value: true, .. }
+        ));
         assert_eq!(
             report.receipts[7].disposition,
             BatchDisposition::MassBalanceContradictionUnqualified
@@ -1225,6 +1249,76 @@ mod tests {
         let second = serde_json::to_vec(&evaluate_batch(&water, &repair).unwrap()).unwrap();
         assert_eq!(first, second, "batch report must be byte-deterministic");
         assert_eq!(report.disposition_counts.values().sum::<usize>(), 20);
+    }
+
+    #[test]
+    fn exact_source_byte_changes_change_the_recorded_sha256() {
+        let (water, repair) = fixtures();
+        let water_bytes = serde_json::to_vec(&water).unwrap();
+        let repair_bytes = serde_json::to_vec(&repair).unwrap();
+
+        let original = evaluate_batch_with_source_bytes(
+            &water,
+            &repair,
+            &water_bytes,
+            &repair_bytes,
+            "raw_file_bytes",
+        )
+        .unwrap();
+
+        // Leading JSON whitespace changes the source bytes but not the parsed
+        // corpus semantics; the detached receipt must still bind the new bytes.
+        let mut modified_water_bytes = vec![b' '];
+        modified_water_bytes.extend_from_slice(&water_bytes);
+        let modified = evaluate_batch_with_source_bytes(
+            &water,
+            &repair,
+            &modified_water_bytes,
+            &repair_bytes,
+            "raw_file_bytes",
+        )
+        .unwrap();
+
+        assert_ne!(
+            original.source_artifacts[0].sha256,
+            modified.source_artifacts[0].sha256
+        );
+        assert_eq!(
+            modified.source_artifacts[0].byte_length,
+            original.source_artifacts[0].byte_length + 1
+        );
+        assert_eq!(original.receipts, modified.receipts);
+    }
+
+    #[test]
+    fn sha256_uses_the_known_rustcrypto_test_vector() {
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn metric_wire_types_keep_boolean_and_quantity_values_distinct() {
+        let boolean = serde_json::to_value(MetricValue::Boolean {
+            value: false,
+            interpretation: "test boolean".to_owned(),
+        })
+        .unwrap();
+        assert_eq!(boolean["kind"], "boolean");
+        assert_eq!(boolean["value"], false);
+        assert!(boolean["value"].is_boolean());
+
+        let quantity = serde_json::to_value(MetricValue::Quantity {
+            value: 6.0,
+            unit: "L".to_owned(),
+            derivation: "test quantity".to_owned(),
+        })
+        .unwrap();
+        assert_eq!(quantity["kind"], "quantity");
+        assert_eq!(quantity["value"], 6.0);
+        assert_eq!(quantity["unit"], "L");
+        assert!(quantity["value"].is_number());
     }
 
     #[test]
