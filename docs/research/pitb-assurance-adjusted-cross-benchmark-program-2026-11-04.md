@@ -8,7 +8,7 @@ PITB should not become one more leaderboard of proof attempts. It should become 
 
 The score should mean: *the agent repaired the intended obligation in the exact original project context, with independently auditable evidence, within a declared resource budget*. A kernel-accepted term is necessary; it is not, by itself, proof that the intended task was solved faithfully.
 
-The current SorryDB receipt contract therefore requires more than compilation: the target must be a `Prop`, the exact source span must be replaced once, the original target `sorry` must disappear, the declaration-signature digest must remain identical across replacement, the kernel and independent semantic/source-binding/vacuity gates must pass, and axiom/`sorry` deltas must remain zero. This blocks a class of false wins where an agent changes or weakens the theorem instead of proving it.
+The current SorryDB receipt contract therefore requires more than compilation: the target must be a `Prop`, the exact source span must be replaced once, the original target `sorry` and its `sorryAx` dependency must disappear, the declaration-signature digest must remain identical across replacement, the kernel and independent semantic/source-binding/vacuity gates must pass, and axiom/`sorry` deltas must remain zero. This blocks a class of false wins where an agent changes or weakens the theorem instead of proving it.
 
 ## What the current frontier measures
 
