@@ -1822,7 +1822,7 @@
     },
     {
       "id": "platform_package_signature_evidence",
-      "status": "research_issue_opened",
+      "status": "schema_drafted",
       "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10508",
       "objective": "Produce independently qualified, platform-version-scoped signature and authorization evidence for APK and iOS packages without conflating content integrity, signature validity, signer identity, trust policy, distribution authorization or runtime safety.",
       "cases": [
@@ -1844,7 +1844,12 @@
         "ios_provisioning_profile_cms_der_profile_app_id_team_id_expiry_device_policy",
         "ios_der_entitlements_required_by_named_platform_version",
         "ios_valid_signature_unexpected_team_id_policy_denial",
-        "offline_structural_parser_vs_platform_native_api_disagreement"
+        "offline_structural_parser_vs_platform_native_api_disagreement",
+        "schema_rejects_generic_trusted_boolean_or_unsigned_signer_identity",
+        "valid_signature_from_unexpected_signer_preserved_as_crypto_valid_policy_denied",
+        "signature_scheme_results_are_separate_from_installability_and_runtime",
+        "Apple_profile_claimed_entitlements_vs_signature_entitlements_subset",
+        "Android_v4_idsig_companion_package_digest_and_merkle_binding"
       ],
       "metrics": [
         "scheme_presence_and_verification_accuracy_by_platform_version",
@@ -1858,7 +1863,10 @@
         "unsupported_and_abstention_rate_by_scheme",
         "platform_oracle_agreement_rate",
         "verification_p50_p95_latency_and_peak_rss",
-        "trust_context_completeness"
+        "trust_context_completeness",
+        "schema_rejects_claim_conflation",
+        "valid_unexpected_signer_policy_denial_accuracy",
+        "signature_trust_authorization_layer_separation_rate"
       ],
       "target": "Zero false accepts in seeded cryptographic-corruption controls; 100_percent correct distinction between cryptographic validity and named-policy acceptance; 100_percent explicit Unsupported/Unknown for untested platform/scheme combinations; no single aggregate trust scalar.",
       "protocol": [
@@ -1872,7 +1880,10 @@
         "valid cryptographic signature from an unexpected signer must remain cryptographically valid but policy denied",
         "preserve nested code identities, CodeResources, DER entitlements, bundle identifiers, Team ID and key rotation lineage as separate claims",
         "report Unsupported and abstained cases separately from invalid signatures; do not coerce unknown to false or true",
-        "keep content integrity, signature validity, signer identity, trust, authorization, installability, runtime behavior and MASVS control outcome as independent fields"
+        "keep content integrity, signature validity, signer identity, trust, authorization, installability, runtime behavior and MASVS control outcome as independent fields",
+        "validate package signature evaluation JSON against docs/research/rea-package-signature-evaluation-v0.schema.json",
+        "do not create or accept a single trusted boolean; report each scheme, signer, trust-policy, authorization, nested-code and runtime result independently",
+        "preserve a cryptographically valid but policy-denied signer as two separate positive/negative results"
       ],
       "claim_boundaries": {
         "content_integrity": "ZIP SHA-256/CRC and member receipts do not establish package signature validity.",
@@ -1890,7 +1901,8 @@
         "https://developer.apple.com/documentation/technotes/tn3125-inside-code-signing-provisioning-profiles",
         "https://developer.apple.com/documentation/technotes/tn3126-inside-code-signing-hashes",
         "https://support.apple.com/guide/security/app-code-signing-process-in-ios-ipados-tvos-visionos-and-watchos-sec7c917bf14/web"
-      ]
+      ],
+      "schema": "docs/research/rea-package-signature-evaluation-v0.schema.json"
     }
   ],
   "promotion_policy": {
