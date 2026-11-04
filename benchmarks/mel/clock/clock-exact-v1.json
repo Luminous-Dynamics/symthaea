@@ -1,0 +1,60 @@
+{
+  "schema_version": "mel-output-clock-anchor-set-v1",
+  "fixture_id": "MEL-CLOCK-EXACT-001",
+  "description": "Nominal 48 kHz output clock with 480-frame blocks, 10 ms apart and a 5 ms callback-to-playback prediction interval.",
+  "expected_disposition": "fit",
+  "anchors": [
+    {
+      "schema_version": "mel-output-clock-anchor-v1",
+      "source": "synthetic_fixture_v1",
+      "stream_instance_id": 7,
+      "anchor_index": 0,
+      "first_output_frame_index": 0,
+      "frame_count": 480,
+      "sample_rate_hz": 48000,
+      "callback_stream_time_ns": 0,
+      "playback_stream_time_ns": 5000000,
+      "callback_to_playback_ns": 5000000,
+      "timestamp_uncertainty_ns": null
+    },
+    {
+      "schema_version": "mel-output-clock-anchor-v1",
+      "source": "synthetic_fixture_v1",
+      "stream_instance_id": 7,
+      "anchor_index": 1,
+      "first_output_frame_index": 480,
+      "frame_count": 480,
+      "sample_rate_hz": 48000,
+      "callback_stream_time_ns": 10000000,
+      "playback_stream_time_ns": 15000000,
+      "callback_to_playback_ns": 5000000,
+      "timestamp_uncertainty_ns": null
+    },
+    {
+      "schema_version": "mel-output-clock-anchor-v1",
+      "source": "synthetic_fixture_v1",
+      "stream_instance_id": 7,
+      "anchor_index": 2,
+      "first_output_frame_index": 960,
+      "frame_count": 480,
+      "sample_rate_hz": 48000,
+      "callback_stream_time_ns": 20000000,
+      "playback_stream_time_ns": 25000000,
+      "callback_to_playback_ns": 5000000,
+      "timestamp_uncertainty_ns": null
+    },
+    {
+      "schema_version": "mel-output-clock-anchor-v1",
+      "source": "synthetic_fixture_v1",
+      "stream_instance_id": 7,
+      "anchor_index": 3,
+      "first_output_frame_index": 1440,
+      "frame_count": 480,
+      "sample_rate_hz": 48000,
+      "callback_stream_time_ns": 30000000,
+      "playback_stream_time_ns": 35000000,
+      "callback_to_playback_ns": 5000000,
+      "timestamp_uncertainty_ns": null
+    }
+  ]
+}
