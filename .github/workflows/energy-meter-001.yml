@@ -1,0 +1,40 @@
+name: Energy Meter Verification 001
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-core/src/physics/energy_meter.rs"
+      - "crates/core/symthaea-core/src/physics/mod.rs"
+      - "research/energy-meter-001/**"
+      - ".github/workflows/energy-meter-001.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: energy-meter-001-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-counter-verification:
+    name: Exact-source energy meter tests and strict Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust quality tools
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Format isolated harness and included production module
+        run: cargo fmt --manifest-path research/energy-meter-001/Cargo.toml -- --check
+
+      - name: Run energy meter unit tests
+        run: cargo test --locked --manifest-path research/energy-meter-001/Cargo.toml
+
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path research/energy-meter-001/Cargo.toml --all-targets -- -D warnings
