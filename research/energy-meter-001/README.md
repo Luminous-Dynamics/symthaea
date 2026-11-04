@@ -41,7 +41,10 @@ Energy remains in the receipt even when the quality gate fails. A failed quality
 gate disqualifies the observation from matched-quality efficiency claims; it
 does not delete an unfavourable data point.
 
-The receipt records total observed energy for the selected sensor scope. Idle
+The receipt records total observed energy for the selected sensor scope and
+exposes a BLAKE3 content fingerprint over its schema version, provenance,
+quality gate, raw counter readings and derived interval. The digest is a content
+identity, not a digital signature or proof that metadata is truthful. Idle
 subtraction is a separately derived view and requires its own idle baseline
 receipt, matching sensor, scope, device, power state and measurement protocol.
 Do not subtract a GPU idle counter from a CPU package total.
