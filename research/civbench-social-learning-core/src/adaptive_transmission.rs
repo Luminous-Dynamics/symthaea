@@ -1804,7 +1804,7 @@ mod tests {
         assert!(coarse.recipient_state_disclosure_units
             <= config.steps
                 * config.population_size
-                * COARSE_NEED_SIGNAL_BUDGET_PER_RECIPIENT
+                * DEFAULT_COARSE_NEED_SIGNAL_BUDGET_PER_RECIPIENT
                 * 3);
         assert!(central.recipient_state_disclosure_units
             > coarse.recipient_state_disclosure_units);
