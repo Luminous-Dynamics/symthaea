@@ -36,6 +36,19 @@ jobs:
       - name: Check formatting
         run: cargo fmt --manifest-path tools/household-service-evaluator/Cargo.toml -- --check
 
+      - name: Resolve canonical lockfile for receipt dependency (temporary bootstrap)
+        run: |
+          cargo generate-lockfile --manifest-path tools/household-service-evaluator/Cargo.toml
+          mkdir -p target
+          cp tools/household-service-evaluator/Cargo.lock target/household-service-evaluator-Cargo.lock
+
+      - name: Upload canonical lockfile for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: household-service-evaluator-lock-\${{ github.sha }}
+          path: target/household-service-evaluator-Cargo.lock
+          if-no-files-found: error
+
       - name: Run deterministic evaluator tests
         run: cargo test --locked --manifest-path tools/household-service-evaluator/Cargo.toml
 
