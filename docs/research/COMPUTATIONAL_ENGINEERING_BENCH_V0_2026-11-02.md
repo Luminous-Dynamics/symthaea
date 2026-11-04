@@ -107,7 +107,7 @@ Measure Symthaea's contribution separately from the foundation model. Do not att
 
 ## 7. V0 task catalog
 
-The eight initial records in `catalog.v0.json` cover:
+The ten initial records in `catalog.v0.json` cover:
 
 | ID | Lane | Task theme | Key evidence |
 |---|---|---|---|
@@ -257,12 +257,12 @@ CEB-REPO-001 should compare against adjacent production-grade code-intelligence 
 - **CodeQL** is a separate security/data-flow baseline. GitHub documents Rust support; CodeQL 2.27.2 (2026-10-09) added Rust extractor and data-flow improvements. Use its alert/data-flow results for security-relevant relations, but do not mistake CodeQL's security graph for a complete semantic repository twin.
 - **Cargo metadata** is a manifest/dependency baseline; syntax-only parsers such as Tree-sitter provide a syntax extraction baseline.
 
-Cargo is the configuration authority for Cargo features and target-filtered dependency resolution. `cargo metadata` enables default features unless `--no-default-features` is supplied; explicit flags are selected with `--features`, and `--filter-platform <triple>` filters the resolved dependency graph. The matrix must therefore capture the exact Cargo invocation, target triple, lockfile and effective feature set. For this fixture, the eight rows map to: default (defaults enabled, no explicit features), no-default + explicit `audit`, no-default + explicit `windows-native`, and no-default + both explicit features, each on Linux and Windows.
+Cargo is the configuration authority for Cargo features and target-filtered dependency resolution. `cargo metadata` enables default features unless `--no-default-features` is supplied; explicit flags are selected with `--features`, and `--filter-platform <triple>` filters the resolved dependency graph. The matrix must therefore capture the exact Cargo invocation, target triple, lockfile and effective feature set. For this fixture, the ten rows map to: default (defaults enabled, no explicit features), no-default + explicit `audit`, no-default + explicit `windows-native`, and no-default + both explicit features, each on Linux and Windows.
 
 rust-analyzer does not own Cargo feature expansion: its `CrateGraph` models dependencies and cfg flags, while Cargo features are lowered into `--cfg feature=` flags by the project-loading layer. Keep the evidence chain explicit: **Cargo metadata / feature selection → lowered per-crate cfg + crate graph → rust-analyzer resolved symbols/types → SCIP index**. Record both the source evidence and the adapter's lowering receipt. Do not infer a feature's absence just because the semantic index has no node; it may have been omitted by an incorrect project configuration.
 
 The feature-world acceptance metrics should be:
-- **100% effective-feature-set accuracy** across the eight supported worlds.
+- **100% effective-feature-set accuracy** across the ten supported worlds.
 - **100% target-triple and target-dependency activation accuracy** for the pinned matrix.
 - **Zero false-active conditional facts** and **zero false-inactive conditional facts** on the synthetic gold set.
 - **100% world coverage** with no silent fallback when a requested target/feature combination is unsupported.
