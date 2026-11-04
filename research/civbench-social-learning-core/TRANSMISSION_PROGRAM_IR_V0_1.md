@@ -22,7 +22,7 @@ A TransmissionProgram contains:
 
 The score is an integer expression with stable tie-breaking over sender, receiver and recipe IDs. This makes the same input state and program produce the same schedule without floating point ranking drift.
 
-The built-in frontier-v1 program is parameterized to reproduce the existing StateAwareFrontier heuristic's ranking. The unit test compares graph, final agent states and the entire metric history for the same seed/configuration. That is a conformance test between two implementations of the same heuristic, not proof that the heuristic is optimal.
+The built-in frontier-v1 program is parameterized to reproduce the existing StateAwareFrontier heuristic's ranking. The unit test compares graph, final agent states and the entire metric history for the same seed/configuration. That is a conformance test between two implementations of the same heuristic, not proof that the heuristic is optimal. The simulator derives independent deterministic streams for graph generation, individual discovery, policy scheduling and message acquisition. Same-seed policies therefore reuse the graph and subsystem seed schedule; scheduler RNG consumption cannot shift acquisition outcomes. This improves paired comparison quality, but it is not exact per-action common-random-number pairing when policy-dependent candidate inventories or message lists differ.
 
 ## 3. Allowed observations and forbidden authority
 
