@@ -1,0 +1,58 @@
+name: Connectome query-flipping witness audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/connectomics-intake-audit/src/bin/connectome_query_flipping_witness_audit.rs"
+      - "tools/connectomics-intake-audit/reference/verify_query_flipping_witness_oracle.py"
+      - "docs/neuroscience/CONNECTOME_QUERY_FLIPPING_WITNESS.schema.json"
+      - "docs/neuroscience/CONNECTOME_QUERY_FLIPPING_WITNESS_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_FLIPPING_WITNESS.example.json"
+      - ".github/workflows/connectome-query-flipping-witness.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "tools/connectomics-intake-audit/src/bin/connectome_query_flipping_witness_audit.rs"
+      - "tools/connectomics-intake-audit/reference/verify_query_flipping_witness_oracle.py"
+      - "docs/neuroscience/CONNECTOME_QUERY_FLIPPING_WITNESS.schema.json"
+      - "docs/neuroscience/CONNECTOME_QUERY_FLIPPING_WITNESS_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_FLIPPING_WITNESS.example.json"
+      - ".github/workflows/connectome-query-flipping-witness.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-witness-search:
+    name: Exact query-flip enumeration and independent subset oracle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/connectomics-intake-audit/Cargo.toml --all -- --check
+
+      - name: Run Rust witness-audit unit tests
+        run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_query_flipping_witness_audit
+
+      - name: Evaluate the checked-in synergistic counterexample fixture
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
+            --bin connectome_query_flipping_witness_audit -- \
+            --input docs/neuroscience/examples/CONNECTOME_QUERY_FLIPPING_WITNESS.example.json \
+            --output "$RUNNER_TEMP/query-flipping-witness-report.json"
+
+      - name: Independently enumerate and verify every edit subset
+        run: |
+          python3 tools/connectomics-intake-audit/reference/verify_query_flipping_witness_oracle.py \
+            --input docs/neuroscience/examples/CONNECTOME_QUERY_FLIPPING_WITNESS.example.json \
+            --report "$RUNNER_TEMP/query-flipping-witness-report.json"
+
+      - name: Verify oracle source syntax
+        run: python3 -m py_compile tools/connectomics-intake-audit/reference/verify_query_flipping_witness_oracle.py
