@@ -641,9 +641,21 @@ fn instrument_sorry_span(
     if end <= start || source.get(start..end) != Some("sorry") {
         return Err("pinned source coordinates do not select exactly the sorry token".into());
     }
+    let line_start = source[..start]
+        .rfind('\n')
+        .map(|index| index + 1)
+        .unwrap_or(0);
+    let leading_indent: String = source[line_start..start]
+        .chars()
+        .take_while(|character| matches!(character, ' ' | '\t'))
+        .collect();
+    let next_tactic_indent = format!("{leading_indent}  ");
+
     let mut instrumented = String::with_capacity(source.len() + 32);
     instrumented.push_str(&source[..start]);
-    instrumented.push_str("trace_state\n  sorry");
+    instrumented.push_str("trace_state\n");
+    instrumented.push_str(&next_tactic_indent);
+    instrumented.push_str("sorry");
     instrumented.push_str(&source[end..]);
     Ok(instrumented)
 }
@@ -1680,6 +1692,20 @@ mod tests {
         assert!(instrumented.contains("by trace_state\n  sorry"));
         assert_eq!(source.matches("sorry").count(), 1);
         assert_eq!(instrumented.matches("sorry").count(), 1);
+    }
+
+    #[test]
+    fn instrumentation_preserves_nested_tactic_indentation() {
+        let source = "theorem nested : True := by\n  sorry\n";
+        let instrumented = instrument_sorry_span(source, 2, 2, 2, 7).unwrap();
+        assert!(instrumented.contains("by\n  trace_state\n    sorry\n"));
+    }
+
+    #[test]
+    fn instrumentation_rejects_a_source_range_that_is_not_sorry() {
+        let source = "theorem sample : True := by trivial\n";
+        let start = source.find("trivial").unwrap() as u64;
+        assert!(instrument_sorry_span(source, 1, start, 1, start + 7).is_err());
     }
 
     #[test]
