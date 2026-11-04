@@ -77,5 +77,22 @@
       "semantics_match": true
     }
   ],
-  "conclusion": "All layouts agree on clause-intersection results and short-circuit probe counts. CPython-specific storage/time only; no CakeML extrapolation."
+  "conclusion": "All layouts agree on clause-intersection results and short-circuit probe counts. CPython-specific storage/time only; no CakeML extrapolation.",
+  "uploaded_script_execution": "passed",
+  "script_git_blob_sha1": "c18d1a9397d4d47e528a6941dded432cc7213df1",
+  "script_sha256": "sha256:711869eee2f6b99f5bf0f2268534b2d0bb92b01d2d911b75164a8c63ee72a315",
+  "execution_environment": {
+    "python": "3.13.5",
+    "platform": "linux",
+    "execution_date": "2026-11-04",
+    "method": "exact uploaded script reconstructed locally; Git blob SHA-1 verified before execution"
+  },
+  "execution_summary": {
+    "layouts": 4,
+    "queries_clauses": 86016,
+    "candidate_literal_count": 769440,
+    "actual_literal_probes": 599519,
+    "clause_hits": 43008,
+    "semantic_agreement": true
+  }
 }
