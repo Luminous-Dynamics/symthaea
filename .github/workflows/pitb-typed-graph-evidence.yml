@@ -320,6 +320,8 @@ jobs:
               "mapping_method": "exact_formal_name",
               "mapping_evidence_sha256": hashlib.sha256(b"mapping evidence").hexdigest(),
               "reviewer_attestation_sha256": None,
+              "source_locator": None,
+              "statement_sha256": None,
           }
           if list(Draft202012Validator(mapping_schema).iter_errors(mapping)):
               raise SystemExit("synthetic exact mapping failed its schema")
