@@ -431,13 +431,14 @@
         "record that zip-rs/zipcore share crc32fast for ZIP-level CRC validation; independent Deflate decoding does not imply independent ZIP CRC corroboration",
         "for every streamed member compute independent Symthaea bitwise CRC-32 on each bounded chunk and require equality with declared CRC as well as secondary decoder EOF/CRC/size success",
         "report observed CRC-32 in the per-member receipt; test update chunking invariance against the standard CRC-32/ISO-HDLC 123456789 known-answer vector",
-        "do not count zipcore and zip's shared crc32fast dependency as independent ZIP CRC libraries; the custom incremental CRC is the separate algorithmic path"
+        "do not count zipcore and zip's shared crc32fast dependency as independent ZIP CRC libraries; the custom incremental CRC is the separate algorithmic path",
+        "pin the fuzz compiler nightly date, cargo-fuzz version, libfuzzer-sys, seed corpus and resolved Cargo.lock digest in every run receipt"
       ],
       "fuzz_qualification": {
         "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10451",
         "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10451",
         "target": "zip_inventory_and_content",
-        "runner": "cargo-fuzz 0.13.2; libfuzzer-sys 0.4.13; Linux x86-64 nightly",
+        "runner": "cargo-fuzz 0.13.2; libfuzzer-sys 0.4.13; Rust nightly-2026-11-03; Linux x86-64",
         "starter_seed_sha256": "dd8a2bd8c16d808363a1d1e7560a4cc86494393c1a202a478db00f00ae53d099",
         "limits": {
           "input_bytes": 1048576,
@@ -451,7 +452,9 @@
           "rss_mib": 512
         },
         "current_status": "draft_target_authored; workflow queued; no fuzz executions claimed",
-        "claim_ceiling": "A bounded 180-second smoke run is only evidence for the exact head, toolchain, seed corpus, runtime and environment. It is not security certification or proof of bug absence."
+        "claim_ceiling": "A bounded 180-second smoke run is only evidence for the exact head, toolchain, seed corpus, runtime and environment. It is not security certification or proof of bug absence.",
+        "toolchain": "nightly-2026-11-03",
+        "status": "draft_target_authored; workflow queued; no fuzz executions claimed"
       }
     },
     {
