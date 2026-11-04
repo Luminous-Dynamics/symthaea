@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "tools/pitb-graph-evidence/**"
+      - "tools/pitb-daps-graph-import/**"
       - ".github/workflows/pitb-typed-graph-evidence.yml"
   workflow_dispatch:
 
@@ -140,5 +141,129 @@ jobs:
         with:
           name: pitb-typed-graph-evidence-summary
           path: ${{ runner.temp }}/pitb-graph-evidence-summary.json
+          if-no-files-found: warn
+          retention-days: 30
+
+
+  daps-graph-import-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify vendored DAPS Git blob identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git hash-object tools/pitb-daps-graph-import/fixtures/daps-example-graph.json)"
+          test "$actual" = "ff3e07e7a4867c969f4ed739497f78b6a77209f"
+          echo "DAPS_SOURCE_GRAPH_GIT_BLOB_PASS $actual"
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Install JSON Schema validator
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pitb-daps-venv"
+          "$RUNNER_TEMP/pitb-daps-venv/bin/pip" install "jsonschema==4.25.1"
+
+      - name: Stage importer and evidence verifier outside production workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          importer="$RUNNER_TEMP/pitb-daps-importer"
+          verifier="$RUNNER_TEMP/pitb-graph-evidence-daps"
+          mkdir -p "$importer/src" "$verifier/src"
+          cp tools/pitb-daps-graph-import/Cargo.toml "$importer/Cargo.toml"
+          cp tools/pitb-daps-graph-import/Cargo.lock "$importer/Cargo.lock"
+          cp tools/pitb-daps-graph-import/src/main.rs "$importer/src/main.rs"
+          cp tools/pitb-graph-evidence/Cargo.toml "$verifier/Cargo.toml"
+          cp tools/pitb-graph-evidence/Cargo.lock "$verifier/Cargo.lock"
+          cp tools/pitb-graph-evidence/src/main.rs "$verifier/src/main.rs"
+          echo "PITB_DAPS_IMPORTER_MANIFEST=$importer/Cargo.toml" >> "$GITHUB_ENV"
+          echo "PITB_DAPS_IMPORTER_DIR=$importer" >> "$GITHUB_ENV"
+          echo "PITB_DAPS_GRAPH_VERIFIER_MANIFEST=$verifier/Cargo.toml" >> "$GITHUB_ENV"
+
+      - name: Format and test DAPS importer
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2021 "$PITB_DAPS_IMPORTER_DIR/src/main.rs"
+          cargo fmt --check --manifest-path "$PITB_DAPS_IMPORTER_MANIFEST"
+          cargo test --locked --manifest-path "$PITB_DAPS_IMPORTER_MANIFEST"
+          cargo run --locked --manifest-path "$PITB_DAPS_IMPORTER_MANIFEST" -- --self-test
+
+      - name: Run exact pinned DAPS graph sample through importer
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path "$PITB_DAPS_IMPORTER_MANIFEST" -- \
+            --convert \
+            tools/pitb-daps-graph-import/fixtures/daps-example-graph.json \
+            "$RUNNER_TEMP/pitb-daps-import-output" \
+            978ca6bebb4c56e03795b4f5e34fcbdc6cb2d153 \
+            ff3e07e7a4867c969f4ed739497f78b6a77209f \
+            66eb2045724da71e32b765223c6c4fdcc903f466 \
+            778cba54c3e6117ad357e192d421d196b7d1eb6c \
+            79e94a093aff4a60fb1b1f92d9681e407124c2ca \
+            leanprover/lean4:v4.22.0
+
+      - name: Validate DAPS import output contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-daps-venv/bin/python" - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("tools/pitb-graph-evidence/schema")
+          schema = json.loads((root / "proof-graph-evidence-v0.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          out = Path(__import__("os").environ["RUNNER_TEMP"]) / "pitb-daps-import-output"
+          graph = json.loads((out / "graph.json").read_text())
+          summary = json.loads((out / "summary.json").read_text())
+          errors = list(Draft202012Validator(schema).iter_errors(graph))
+          if errors:
+              raise SystemExit("imported graph schema errors: " + "; ".join(e.message for e in errors))
+          if len(graph["nodes"]) != 30 or len(graph["edges"]) != 165:
+              raise SystemExit("pinned DAPS sample node/edge denominators changed")
+          if graph["evidence_class"] != "external_candidate_snapshot":
+              raise SystemExit("DAPS import cannot claim measured Lean extraction")
+          if summary["scheduler_admission"] is not False:
+              raise SystemExit("external candidate graph must remain scheduler-ineligible")
+          if any(e["status"] != "candidate" or e["evidence_class"] != "daps_graph_export" or e["confidence"] is not None for e in graph["edges"]):
+              raise SystemExit("DAPS edge was promoted or given invented confidence")
+          expected = {"daps_dependency_candidate": 157, "daps_membership_candidate": 8}
+          if summary["relation_counts"] != expected:
+              raise SystemExit(f"unexpected DAPS edge-kind counts: {summary['relation_counts']}")
+          if not graph.get("upstream_provenance", {}).get("source_graph_input_sha256"):
+              raise SystemExit("exact input SHA-256 missing from provenance")
+          print("PITB_DAPS_IMPORT_SCHEMA_AND_PROVENANCE_PASS")
+          print(json.dumps(summary, sort_keys=True))
+          PY
+
+      - name: Verify every imported statement and edge evidence byte
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked --manifest-path "$PITB_DAPS_GRAPH_VERIFIER_MANIFEST"
+          cargo run --locked --manifest-path "$PITB_DAPS_GRAPH_VERIFIER_MANIFEST" -- \
+            --verify \
+            "$RUNNER_TEMP/pitb-daps-import-output/graph.json" \
+            "$RUNNER_TEMP/pitb-daps-import-output/evidence"
+
+      - name: Retain imported DAPS candidate graph and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-daps-candidate-graph
+          path: ${{ runner.temp }}/pitb-daps-import-output
           if-no-files-found: warn
           retention-days: 30
