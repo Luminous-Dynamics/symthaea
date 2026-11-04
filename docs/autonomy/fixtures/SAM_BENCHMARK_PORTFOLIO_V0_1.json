@@ -118,17 +118,41 @@
       "source_status": "upstream_reported",
       "rights_status": "academic_only_unless_authorized",
       "snapshot": {
-        "KnowVal": {
-          "DS": 46.6,
-          "RC": 73.8,
-          "LS": 69.3,
-          "ES": 97.4
+        "TCP": {
+          "DS": 18.4,
+          "RC": 23.7,
+          "LS": 27.8,
+          "ES": 89.3
         },
-        "SimLingo": {
-          "DS": 42.3,
-          "RC": 70.5,
-          "LS": 63.3,
-          "ES": 94.8
+        "UniAD-Base": {
+          "DS": 21.9,
+          "RC": 26.6,
+          "LS": 32.1,
+          "ES": 91.6
+        },
+        "VAD": {
+          "DS": 20.1,
+          "RC": 24.3,
+          "LS": 30.7,
+          "ES": 89.3
+        },
+        "ThinkTwice": {
+          "DS": 28.3,
+          "RC": 35.6,
+          "LS": 38.9,
+          "ES": 92.4
+        },
+        "DriveAdapter": {
+          "DS": 29.5,
+          "RC": 40,
+          "LS": 40.3,
+          "ES": 92.4
+        },
+        "DriveTransformer": {
+          "DS": 31,
+          "RC": 40.3,
+          "LS": 43.1,
+          "ES": 91.9
         },
         "ORION": {
           "DS": 37.4,
@@ -141,13 +165,26 @@
           "RC": 58.3,
           "LS": 49.1,
           "ES": 91.4
+        },
+        "SimLingo": {
+          "DS": 42.3,
+          "RC": 70.5,
+          "LS": 63.3,
+          "ES": 94.8
+        },
+        "KnowVal": {
+          "DS": 46.6,
+          "RC": 73.8,
+          "LS": 69.3,
+          "ES": 97.4
         }
       },
       "caveats": [
         "Report RC/LS/ES separately; DS is a product.",
         "Repository says academic research only unless commercial permission is obtained.",
         "EthicsScore is benchmark-defined, not universal ethical truth.",
-        "Do not multiply the published aggregate RC, LS and ES columns to reconstruct aggregate DS; DS is averaged after per-route multiplication and ES has a subset denominator."
+        "Do not multiply the published aggregate RC, LS and ES columns to reconstruct aggregate DS; DS is averaged after per-route multiplication and ES has a subset denominator.",
+        "The paper's table includes nine baselines: TCP, UniAD-Base, VAD, ThinkTwice, DriveAdapter, DriveTransformer, ORION, DiffusionDrive, SimLingo and KnowVal."
       ],
       "sources": [
         "https://arxiv.org/abs/2605.09972",
