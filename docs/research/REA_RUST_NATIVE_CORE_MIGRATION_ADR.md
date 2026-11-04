@@ -979,3 +979,13 @@ The fuzz workflow now pins `nightly-2026-11-03` rather than following the moving
 
 The bounded fuzz workflow now enforces the starter ZIP's decoded SHA-256 with `sha256sum --check` rather than merely printing it. Each run writes a context receipt containing the triggering commit, pinned Rust nightly, cargo-fuzz version, Cargo version, runner OS/kernel, fuzz Cargo.lock digest, base64 seed digest and decoded seed digest. The artifact is uploaded with corpus and any minimized crash artifacts. These are provenance requirements for the fuzz result, not evidence that a run has passed.
 
+## 21. 2026-11-04 — archive-scoped verification performance without weakening member limits
+
+The current content-verification API opens a new secondary decoder archive for every member. This deliberately allows `ReadOptions.max_entry_size` to be set to the minimum of the caller budget and that member's admitted declared size. It is a strong correctness baseline, but it may reparse the central directory once per member.
+
+A shared archive/session could reduce repeated parser initialization, particularly for mobile packages with hundreds or thousands of assets. The decoder's current `ReadOptions.max_entry_size` is configured when an `Archive` is opened, and `by_index` does not expose a per-member options override. A single archive-wide limit therefore must not be treated as equivalent to the current per-member limit.
+
+The new [#10455 — amortize ZIP decoder admission without weakening per-member limits](https://github.com/Luminous-Dynamics/symthaea/issues/10455) owns this optimization. It compares the per-member-open reference with archive-scoped session and possible upstream per-index options designs across 1/10/100/1,000/10,000 entries. The protocol separately measures first-member latency, subsequent-member latency, total archive verification, parser initialization count, peak RSS, bytes read, energy per verified MiB and output-limit overshoot.
+
+No performance optimization may proceed by weakening per-member decompression limits. A one-byte-overrun sentinel could be evaluated only with explicit proof that the decoder cannot allocate or emit beyond the bounded caller-controlled read buffer and that every understated-size entry is rejected. Otherwise keep the current per-member-open reference. All session designs must retain independent decoder cursors and per-attempt source revalidation.
+
