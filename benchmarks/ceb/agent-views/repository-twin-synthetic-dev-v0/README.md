@@ -19,6 +19,6 @@ The payload does not contain the gold graph, mutation scenarios, feature/target 
 
 The evaluator/design artifacts remain public elsewhere in this repository. This is **not** a sealed agent/evaluator split, must not be scored as a blind holdout, and must not be represented as confidential. Use it only for public development, allowlist review, packaging-layout review and deterministic-inventory design.
 
-The manifest's SHA-256 and CEB-TREE-V1 digest are content commitments, not signatures, rights grants, isolation evidence or proof of hidden-answer custody. The expected manifest digest and tree digest must be pinned by an out-of-band task registry; a package cannot authenticate itself.
+The manifest's SHA-256 and CEB-TREE-V1 digest are content commitments, not signatures, rights grants, isolation evidence or proof of hidden-answer custody. The digest values printed above are published for reproducibility only: **no separate trusted task registry or external pin service has been provisioned yet**. A production caller must obtain both expected values through an independently controlled channel; a package README or manifest cannot authenticate itself.
 
 No source, build script, procedural macro, test, or binary was executed to produce this package. Execution remains blocked by #10064.
