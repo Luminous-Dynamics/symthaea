@@ -977,3 +977,5 @@ This does not authenticate the declared CRC or prove the archive producer is hon
 
 The fuzz workflow now pins `nightly-2026-11-03` rather than following the moving `nightly` channel. The run receipt must bind that exact toolchain together with cargo-fuzz 0.13.2, libfuzzer-sys 0.4.13, seed digest, generated Cargo.lock and bounded runtime/resource configuration.
 
+The bounded fuzz workflow now enforces the starter ZIP's decoded SHA-256 with `sha256sum --check` rather than merely printing it. Each run writes a context receipt containing the triggering commit, pinned Rust nightly, cargo-fuzz version, Cargo version, runner OS/kernel, fuzz Cargo.lock digest, base64 seed digest and decoded seed digest. The artifact is uploaded with corpus and any minimized crash artifacts. These are provenance requirements for the fuzz result, not evidence that a run has passed.
+
