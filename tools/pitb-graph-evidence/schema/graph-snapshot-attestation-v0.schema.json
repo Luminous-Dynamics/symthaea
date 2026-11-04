@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/graph-snapshot-attestation-v0.schema.json",
+  "title": "PITB signed graph snapshot attestation v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "canonicalization",
+    "signer_id",
+    "key_id",
+    "graph_manifest_sha256",
+    "snapshot_id",
+    "repository_commit",
+    "environment_sha256",
+    "extractor_id",
+    "extractor_version",
+    "extractor_config_sha256",
+    "signature_ed25519_hex"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.graph-snapshot-attestation.v0"
+    },
+    "canonicalization": {
+      "const": "serde-json-map-sorted-compact-v0"
+    },
+    "signer_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "key_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "graph_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repository_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "environment_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "extractor_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "extractor_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "extractor_config_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "signature_ed25519_hex": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{128}$"
+    }
+  }
+}

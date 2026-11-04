@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/graph-signer-registry-v0.schema.json",
+  "title": "PITB graph signer key registry v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "registry_id",
+    "keys"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.graph-signer-registry.v0"
+    },
+    "registry_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "keys": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key_id",
+          "signer_id",
+          "public_key_ed25519_hex",
+          "status"
+        ],
+        "properties": {
+          "key_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "signer_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "public_key_ed25519_hex": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "revoked"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
