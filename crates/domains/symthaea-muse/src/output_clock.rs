@@ -196,12 +196,15 @@ pub struct OutputClockFitV1 {
     pub valid_from_playback_stream_time_ns: u64,
     pub valid_until_playback_stream_time_ns: u64,
     pub maximum_extrapolation_ns: u64,
+    pub minimum_required_anchor_count: usize,
+    pub fit_policy_sha256: String,
     pub anchor_count: usize,
     /// Anchor indices absent before the first retained observation or
     /// between retained observations. Trailing drops are tracked by the live
     /// stream's callback-drop counter and cannot be inferred from this slice.
     pub missing_anchor_records_before_or_between_observations: u64,
     pub maximum_abs_drift_ppm: f64,
+    pub maximum_allowed_abs_residual_frames: f64,
     pub estimated_drift_ppm: f64,
     pub median_abs_residual_frames: f64,
     pub p95_abs_residual_frames: f64,
@@ -224,6 +227,8 @@ pub enum OutputClockFitErrorV1 {
     NonMonotonicCallbackTime { index: usize },
     InvalidStreamDescriptor,
     StreamDescriptorMismatch { index: usize },
+    AnchorSourceMismatch { index: usize },
+    SerializationFailure { reason: String },
     StreamIdentityMismatch { index: usize },
     SampleRateMismatch { index: usize },
     ChannelCountMismatch { index: usize },
@@ -303,6 +308,10 @@ pub fn fit_output_clock_v1(
     policy: OutputClockFitPolicyV1,
 ) -> Result<OutputClockFitV1, OutputClockFitErrorV1> {
     let required_anchors = policy.minimum_anchor_count.max(2);
+    let effective_policy = OutputClockFitPolicyV1 {
+        minimum_anchor_count: required_anchors,
+        ..policy
+    };
     if anchors.len() < required_anchors {
         return Err(OutputClockFitErrorV1::TooFewAnchors {
             actual: anchors.len(),
@@ -344,6 +353,9 @@ pub fn fit_output_clock_v1(
             if anchor.sample_rate_hz != previous.sample_rate_hz {
                 return Err(OutputClockFitErrorV1::SampleRateMismatch { index });
             }
+            if anchor.source != previous.source {
+                return Err(OutputClockFitErrorV1::AnchorSourceMismatch { index });
+            }
             if anchor.channel_count != previous.channel_count {
                 return Err(OutputClockFitErrorV1::ChannelCountMismatch { index });
             }
@@ -374,13 +386,18 @@ pub fn fit_output_clock_v1(
                 return Err(OutputClockFitErrorV1::NonContiguousFrameIndex { index });
             }
             if missing_anchor_records > 0
-                && anchor.first_output_frame_index == expected_frame
+                && anchor.first_output_frame_index - expected_frame < missing_anchor_records
             {
-                // A skipped anchor index must correspond to at least one
-                // omitted non-empty callback block.
+                // Each omitted callback represents at least one output frame.
                 return Err(OutputClockFitErrorV1::NonContiguousFrameIndex { index });
             }
         }
+    }
+
+    // The first retained record can follow dropped callback anchors. Every
+    // missing callback must have emitted at least one output frame.
+    if anchors[0].first_output_frame_index < anchors[0].anchor_index {
+        return Err(OutputClockFitErrorV1::NonContiguousFrameIndex { index: 0 });
     }
 
     let sample_rate_hz = anchors[0].sample_rate_hz;
@@ -463,6 +480,12 @@ pub fn fit_output_clock_v1(
         });
     }
 
+    let fit_policy_sha256 = serde_json::to_vec(&effective_policy)
+        .map(|bytes| format!("{:x}", Sha256::digest(bytes)))
+        .map_err(|error| OutputClockFitErrorV1::SerializationFailure {
+            reason: error.to_string(),
+        })?;
+
     let mut missing_anchor_records_before_or_between_observations =
         anchors[0].anchor_index;
     for pair in anchors.windows(2) {
@@ -489,10 +512,13 @@ pub fn fit_output_clock_v1(
             .last()
             .map(|anchor| anchor.playback_stream_time_ns)
             .unwrap_or(t0),
-        maximum_extrapolation_ns: policy.maximum_extrapolation_ns,
+        maximum_extrapolation_ns: effective_policy.maximum_extrapolation_ns,
+        minimum_required_anchor_count: effective_policy.minimum_anchor_count,
+        fit_policy_sha256,
         anchor_count: anchors.len(),
         missing_anchor_records_before_or_between_observations,
-        maximum_abs_drift_ppm: policy.maximum_abs_drift_ppm,
+        maximum_abs_drift_ppm: effective_policy.maximum_abs_drift_ppm,
+        maximum_allowed_abs_residual_frames: effective_policy.maximum_abs_residual_frames,
         estimated_drift_ppm,
         median_abs_residual_frames,
         p95_abs_residual_frames,
@@ -511,6 +537,8 @@ pub fn fit_output_clock_v1(
 pub struct OutputClockFitBundleV1 {
     pub schema_version: String,
     pub stream_descriptor: OutputClockStreamDescriptorV1,
+    /// SHA-256 of the exact serialized anchor vector used by the fit.
+    pub anchor_set_sha256: String,
     pub fit: OutputClockFitV1,
 }
 
@@ -531,10 +559,16 @@ pub fn fit_output_clock_bundle_v1(
             return Err(OutputClockFitErrorV1::StreamDescriptorMismatch { index });
         }
     }
+    let anchor_set_sha256 = serde_json::to_vec(anchors)
+        .map(|bytes| format!("{:x}", Sha256::digest(bytes)))
+        .map_err(|error| OutputClockFitErrorV1::SerializationFailure {
+            reason: error.to_string(),
+        })?;
     let fit = fit_output_clock_v1(anchors, policy)?;
     Ok(OutputClockFitBundleV1 {
         schema_version: OUTPUT_CLOCK_FIT_BUNDLE_SCHEMA_V1.to_owned(),
         stream_descriptor: descriptor.clone(),
+        anchor_set_sha256,
         fit,
     })
 }
@@ -850,6 +884,83 @@ mod tests {
     }
 
 
+
+
+    #[test]
+    fn fit_receipt_binds_exact_anchor_bytes_and_policy() {
+        let anchors = vec![
+            anchor(0, 0, 5_000_000),
+            anchor(1, 480, 15_000_000),
+            anchor(2, 960, 25_000_000),
+            anchor(3, 1440, 35_000_000),
+        ];
+        let descriptor = OutputClockStreamDescriptorV1::from_cpal_device_id(
+            7,
+            "synthetic-device-7",
+            48_000,
+            2,
+        )
+        .unwrap();
+        let bundle = fit_output_clock_bundle_v1(&descriptor, &anchors, policy()).unwrap();
+        let serialized = serde_json::to_vec(&anchors).unwrap();
+        assert_eq!(
+            bundle.anchor_set_sha256,
+            format!("{:x}", Sha256::digest(&serialized))
+        );
+        assert_eq!(bundle.anchor_set_sha256.len(), 64);
+        assert_eq!(bundle.fit.fit_policy_sha256.len(), 64);
+        assert_eq!(bundle.fit.minimum_required_anchor_count, 4);
+        assert_eq!(bundle.fit.maximum_allowed_abs_residual_frames, 0.25);
+    }
+
+    #[test]
+    fn effective_fit_policy_is_bound_and_changes_when_tolerance_changes() {
+        let anchors = vec![
+            anchor(0, 0, 5_000_000),
+            anchor(1, 480, 15_000_000),
+            anchor(2, 960, 25_000_000),
+            anchor(3, 1440, 35_000_000),
+        ];
+        let standard = fit_output_clock_v1(&anchors, policy()).unwrap();
+        let relaxed = fit_output_clock_v1(
+            &anchors,
+            OutputClockFitPolicyV1 {
+                maximum_abs_residual_frames: 0.5,
+                ..policy()
+            },
+        )
+        .unwrap();
+        assert_ne!(standard.fit_policy_sha256, relaxed.fit_policy_sha256);
+    }
+
+    #[test]
+    fn missing_anchor_records_require_minimum_frame_coverage() {
+        let anchors = vec![
+            anchor(2, 1, 25_000_000),
+            anchor(3, 481, 35_000_000),
+            anchor(4, 961, 45_000_000),
+            anchor(5, 1441, 55_000_000),
+        ];
+        assert!(matches!(
+            fit_output_clock_v1(&anchors, policy()),
+            Err(OutputClockFitErrorV1::NonContiguousFrameIndex { index: 0 })
+        ));
+    }
+
+    #[test]
+    fn mixed_anchor_sources_are_rejected() {
+        let mut anchors = vec![
+            anchor(0, 0, 5_000_000),
+            anchor(1, 480, 15_000_000),
+            anchor(2, 960, 25_000_000),
+            anchor(3, 1440, 35_000_000),
+        ];
+        anchors[2].source = OutputClockAnchorSourceV1::CpalOutputStreamTimestampV1;
+        assert!(matches!(
+            fit_output_clock_v1(&anchors, policy()),
+            Err(OutputClockFitErrorV1::AnchorSourceMismatch { index: 2 })
+        ));
+    }
 
     #[test]
     fn callback_clock_regression_is_rejected_even_when_playback_time_increases() {
