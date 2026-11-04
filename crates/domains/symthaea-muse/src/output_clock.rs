@@ -34,8 +34,9 @@ pub enum OutputClockSampleFormatV1 {
 /// Stream-level metadata shared by all callback anchors in one CPAL stream.
 ///
 /// The raw CPAL device ID is deliberately not persisted. Its SHA-256
-/// fingerprint supports device-stratified analysis without publishing a
-/// potentially identifying host/device string. The configuration digest
+/// fingerprint supports device-stratified analysis without storing the raw
+/// host/device string. It remains linkable and must not be treated as
+/// anonymization. The configuration digest
 /// binds that fingerprint to the negotiated output format.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -72,8 +73,9 @@ impl OutputClockStreamDescriptorV1 {
                 == self.expected_configuration_digest_sha256()
     }
 
-    /// Build a stable, privacy-preserving stream descriptor from CPAL's
-    /// stable device ID and the negotiated output configuration.
+    /// Build a stable, pseudonymous stream descriptor from CPAL's stable
+    /// device ID and the negotiated output configuration. The SHA-256
+    /// fingerprint is linkable across runs and is not anonymization.
     pub fn from_cpal_device_id(
         stream_instance_id: u64,
         device_id: &str,
@@ -826,8 +828,8 @@ mod tests {
             anchor(2, 960, 25_000_000),
             anchor(3, 1440, 35_000_000),
         ];
-        anchors[2].callback_stream_time_ns = 19_000_000;
-        anchors[2].callback_to_playback_ns = 6_000_000;
+        anchors[2].callback_stream_time_ns = 9_000_000;
+        anchors[2].callback_to_playback_ns = 16_000_000;
 
         assert!(matches!(
             fit_output_clock_v1(&anchors, policy()),
