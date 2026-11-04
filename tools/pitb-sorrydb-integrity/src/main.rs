@@ -620,11 +620,32 @@ fn run_self_tests() -> Result<(), String> {
     Ok(())
 }
 
+fn write_synthetic_report(report_path: &Path, task_path: &Path) -> Result<(), String> {
+    let database = synthetic_database();
+    let bytes = serde_json::to_vec(&database).map_err(|e| format!("serialize synthetic database: {e}"))?;
+    let blob = git_blob_sha1(&bytes);
+    let report = validate_database(&bytes, "synthetic.json", &blob)?;
+    let report_bytes = serde_json::to_vec_pretty(&report)
+        .map_err(|e| format!("serialize synthetic report: {e}"))?;
+    fs::write(report_path, report_bytes).map_err(|e| format!("write synthetic report: {e}"))?;
+    let task = report.task_records.first().ok_or("synthetic task manifest is empty")?;
+    let task_bytes = serde_json::to_vec_pretty(task)
+        .map_err(|e| format!("serialize synthetic task identity: {e}"))?;
+    fs::write(task_path, task_bytes).map_err(|e| format!("write synthetic task identity: {e}"))?;
+    Ok(())
+}
+
 fn execute() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
     if args.len() == 2 && args[1] == "--self-test" {
         run_self_tests()?;
         println!("PITB_SORRYDB_INTEGRITY_SELF_TEST_PASS");
+        return Ok(());
+    }
+    if args.len() == 4 && args[1] == "--self-test-report" {
+        run_self_tests()?;
+        write_synthetic_report(Path::new(&args[2]), Path::new(&args[3]))?;
+        println!("PITB_SORRYDB_INTEGRITY_SYNTHETIC_REPORT_OK");
         return Ok(());
     }
     if args.len() == 5 && args[1] == "--validate" {
@@ -645,7 +666,7 @@ fn execute() -> Result<(), String> {
         return Ok(());
     }
     Err(format!(
-        "usage: {} --self-test | --validate <sorrydb.json> <upstream-blob-sha1> <report.json> | --verify-checkout <task.json> <repo-root>",
+        "usage: {} --self-test | --self-test-report <report.json> <task.json> | --validate <sorrydb.json> <upstream-blob-sha1> <report.json> | --verify-checkout <task.json> <repo-root>",
         args.first().map(String::as_str).unwrap_or("pitb-sorrydb-integrity")
     ))
 }
@@ -657,5 +678,35 @@ fn main() -> ExitCode {
             eprintln!("INVALID: {message}");
             ExitCode::FAILURE
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sorrydb_integrity_controls_pass() {
+        run_self_tests().expect("all SorryDB integrity controls must pass");
+    }
+
+    #[test]
+    fn canonical_task_identity_changes_when_repository_commit_changes() {
+        let task = build_task(&synthetic_database()["sorries"][0], 0).unwrap();
+        let mut changed = synthetic_database();
+        changed["sorries"][0]["repo"]["commit"] = Value::String("2".repeat(40));
+        let changed_task = build_task(&changed["sorries"][0], 0).unwrap();
+        assert_ne!(task.task_id, changed_task.task_id);
+    }
+
+    #[test]
+    fn debug_goal_is_not_treated_as_authoritative_source_goal() {
+        let task = build_task(&synthetic_database()["sorries"][0], 0).unwrap();
+        assert_eq!(task.source_goal_trust, "debug_hint_not_reproduced");
+        assert_eq!(
+            task.prop_parent_type_trust,
+            "database_inclusion_claim_not_independently_rechecked"
+        );
     }
 }
