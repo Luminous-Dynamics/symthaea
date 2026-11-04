@@ -614,6 +614,8 @@ pub fn validate_grounded_decision_v1(
                 issues.push(GroundedParticipationIssueV1::MissingEvidenceForAbstainOrAsk);
             } else if cited_claims.iter().all(|claim| {
                 claim.status == GroundedClaimStatusV1::Grounded
+                    && claim.kind != GroundedMusicalClaimKindV1::StreamUnavailable
+                    && claim.kind != GroundedMusicalClaimKindV1::AmbiguousContext
             }) {
                 issues.push(GroundedParticipationIssueV1::AbstainRequiresNonGroundedEvidence);
             }
@@ -738,6 +740,8 @@ mod tests {
             artifact: artifact(),
             temporal_grounding_evaluator_version: "mel-temporal-grounding-evaluator-v1".to_owned(),
             annotation_policy_version: "musician-pilot-v1".to_owned(),
+            runner_clock_domain_id: "runner-monotonic-v1".to_owned(),
+            runner_origin_id: "runner-origin-001".to_owned(),
             permitted_prefix_end_frame: 12_000,
             committed_at_ns: 110,
             claims,
@@ -765,6 +769,8 @@ mod tests {
             decision_id: "decision-001".to_owned(),
             sequence: 1,
             artifact: evidence.artifact.clone(),
+            runner_clock_domain_id: evidence.runner_clock_domain_id.clone(),
+            runner_origin_id: evidence.runner_origin_id.clone(),
             evidence_claim_set_sha256: evidence.claim_set_sha256.clone(),
             evidence_bundle_sha256: evidence.evidence_bundle_sha256.clone(),
             observed_through_frame: evidence.permitted_prefix_end_frame,
@@ -779,10 +785,8 @@ mod tests {
 
     fn effect() -> Option<GroundedParticipationEffectWindowV1> {
         Some(GroundedParticipationEffectWindowV1 {
-            interval: GroundedFrameIntervalV1 {
-                start_frame: 12_100,
-                end_frame: 14_500,
-            },
+            not_before_runner_time_ns: 10_000_120,
+            expires_at_runner_time_ns: 10_100_120,
             authorization_id: "auth-001".to_owned(),
         })
     }
