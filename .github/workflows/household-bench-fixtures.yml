@@ -1,0 +1,42 @@
+name: Household Benchmark Fixture Contract
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "tools/household-bench-fixtures/**"
+      - "docs/research/household-services/fixtures/**"
+      - ".github/workflows/household-bench-fixtures.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: household-bench-fixtures-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  fixture-contract:
+    name: Household Fixture Contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify focused formatting
+        run: cargo fmt --manifest-path tools/household-bench-fixtures/Cargo.toml -- --check
+
+      - name: Test synthetic household fixture contract
+        run: cargo test --locked --manifest-path tools/household-bench-fixtures/Cargo.toml
+
+      - name: Run focused clippy
+        run: cargo clippy --locked --manifest-path tools/household-bench-fixtures/Cargo.toml --all-targets -- -D warnings

@@ -177,12 +177,14 @@
       "input": {
         "duration_h": 24,
         "municipal_inlet_volume_l": 480,
-        "tank_change_volume_l": 120,
         "outlet_meter_volume_l": 520,
         "purge_and_overflow_meter_volume_l": 40,
         "meter_uncertainty_l": 5,
         "grid_available": true,
-        "pump_available": true
+        "pump_available": true,
+        "tank_storage_delta_l": 120,
+        "storage_delta_sign_convention": "positive_when_tank_volume_increases",
+        "mass_balance_formula": "inlet_volume - positive_tank_storage_delta - outlet_volume - purge_overflow_volume"
       },
       "expected_disposition": "mass_balance_failure_unresolved",
       "invariants": [
