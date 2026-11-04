@@ -466,6 +466,10 @@ pub struct Ledger {
 pub enum ValidationError {
     /// Two records of one kind reuse an identifier.
     DuplicateId(&'static str),
+    /// A stable task, record, evidence-origin or evaluator identity is blank.
+    EmptyIdentity(&'static str),
+    /// One evidence item is simultaneously declared as support and contradiction.
+    EvidenceRoleConflict,
     /// Two records reuse a ledger sequence.
     DuplicateSequence,
     /// A record does not bind to the ledger's exact task snapshot.
@@ -530,6 +534,9 @@ fn ensure_unique<'a>(
 ) -> Result<(), ValidationError> {
     let mut seen = HashSet::new();
     for id in ids {
+        if id.trim().is_empty() {
+            return Err(ValidationError::EmptyIdentity(kind));
+        }
         if !seen.insert(id) {
             return Err(ValidationError::DuplicateId(kind));
         }
@@ -580,6 +587,9 @@ impl Ledger {
     /// This function does not hash content, verify signatures, establish runner
     /// isolation, authenticate graders, or prove observation truth.
     pub fn validate(&self) -> Result<(), ValidationError> {
+        if self.binding.task_id.trim().is_empty() || self.binding.task_revision.trim().is_empty() {
+            return Err(ValidationError::EmptyIdentity("task binding"));
+        }
         ensure_unique("evidence", self.evidence.iter().map(|record| record.id.as_str()))?;
         ensure_unique(
             "hypothesis",
@@ -716,6 +726,9 @@ impl Ledger {
             }
         }
         for record in &self.grades {
+            if record.evaluator_revision.trim().is_empty() {
+                return Err(ValidationError::EmptyIdentity("evaluator revision"));
+            }
             if record.binding != self.binding {
                 return Err(ValidationError::TaskBindingMismatch);
             }
@@ -758,6 +771,9 @@ impl Ledger {
             .collect();
 
         for record in &self.evidence {
+            if record.origin_id.trim().is_empty() {
+                return Err(ValidationError::EmptyIdentity("evidence origin"));
+            }
             ensure_unique("evidence parent", record.parent_ids.iter().map(String::as_str))?;
             for parent_id in &record.parent_ids {
                 let parent = evidence_by_id
@@ -770,6 +786,31 @@ impl Ledger {
         }
 
         for hypothesis in &self.hypotheses {
+            if hypothesis.claim.trim().is_empty() || hypothesis.applicability_domain.trim().is_empty() {
+                return Err(ValidationError::EmptyIdentity("hypothesis claim/domain"));
+            }
+            ensure_unique(
+                "hypothesis support reference",
+                hypothesis.supporting_evidence_ids.iter().map(String::as_str),
+            )?;
+            ensure_unique(
+                "hypothesis contradiction reference",
+                hypothesis.contradicting_evidence_ids.iter().map(String::as_str),
+            )?;
+            ensure_unique(
+                "competing hypothesis reference",
+                hypothesis.competing_hypothesis_ids.iter().map(String::as_str),
+            )?;
+            if hypothesis.supporting_evidence_ids.iter().any(|support| {
+                hypothesis.contradicting_evidence_ids.iter().any(|contradiction| contradiction == support)
+            }) {
+                return Err(ValidationError::EvidenceRoleConflict);
+            }
+            if hypothesis.status == HypothesisStatus::IdentifiedUnderAssumptions
+                && hypothesis.identification_assumptions.iter().any(|item| item.trim().is_empty())
+            {
+                return Err(ValidationError::IdentificationAssumptionsOrEvidenceMissing);
+            }
             let mut origins = HashSet::new();
             let mut has_intervention_support = false;
             let mut has_runtime_observation_support = false;
@@ -842,9 +883,6 @@ impl Ledger {
                 {
                     return Err(ValidationError::MissingReference);
                 }
-            }
-            if hypothesis.applicability_domain.trim().is_empty() {
-                return Err(ValidationError::MissingReference);
             }
             if hypothesis.status == HypothesisStatus::Correlational
                 && !has_runtime_observation_support
@@ -988,6 +1026,14 @@ impl Ledger {
         }
 
         for decision in &self.decisions {
+            ensure_unique(
+                "decision hypothesis reference",
+                decision.hypothesis_record_ids.iter().map(String::as_str),
+            )?;
+            ensure_unique(
+                "decision evidence reference",
+                decision.required_evidence_ids.iter().map(String::as_str),
+            )?;
             if decision.reason.trim().is_empty() {
                 return Err(ValidationError::InvalidDecisionRecord);
             }
@@ -1009,7 +1055,8 @@ impl Ledger {
                 return Err(ValidationError::InvalidDecisionRecord);
             }
             if matches!(decision.kind, DecisionKind::Abstain | DecisionKind::Escalate)
-                && decision.missing_requirements.iter().all(|item| item.trim().is_empty())
+                && (decision.missing_requirements.is_empty()
+                    || decision.missing_requirements.iter().any(|item| item.trim().is_empty()))
             {
                 return Err(ValidationError::InvalidDecisionRecord);
             }
@@ -1073,6 +1120,14 @@ impl Ledger {
                     return Err(ValidationError::RepairReferenceMismatch);
                 }
             }
+            ensure_unique(
+                "repair hypothesis reference",
+                repair.hypothesis_record_ids.iter().map(String::as_str),
+            )?;
+            ensure_unique(
+                "repair outcome reference",
+                repair.outcome_ids.iter().map(String::as_str),
+            )?;
             for outcome_id in &repair.outcome_ids {
                 let outcome = outcomes_by_id
                     .get(outcome_id.as_str())
@@ -1805,6 +1860,84 @@ mod tests {
             ablation_record("ablation-sham", AblationArm::Sham, 11),
         ];
         assert_eq!(ledger.validate(), Err(ValidationError::InvalidAblationGroup));
+    }
+
+
+    #[test]
+    fn blank_task_identity_is_rejected() {
+        let mut ledger = base_ledger();
+        ledger.binding.task_id.clear();
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::EmptyIdentity("task binding"))
+        );
+    }
+
+    #[test]
+    fn blank_evidence_origin_is_rejected() {
+        let mut ledger = base_ledger();
+        ledger.evidence[0].origin_id = "  ".into();
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::EmptyIdentity("evidence origin"))
+        );
+    }
+
+    #[test]
+    fn identified_hypothesis_rejects_blank_assumption() {
+        let mut ledger = base_ledger();
+        ledger.hypotheses[0].status = HypothesisStatus::IdentifiedUnderAssumptions;
+        ledger.hypotheses[0].identification_assumptions = vec![" ".into()];
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::IdentificationAssumptionsOrEvidenceMissing)
+        );
+    }
+
+    #[test]
+    fn abstention_rejects_mixed_blank_and_nonblank_requirements() {
+        let mut ledger = base_ledger();
+        ledger.decisions[0].kind = DecisionKind::Abstain;
+        ledger.decisions[0].missing_requirements = vec![
+            "A discriminating observation is unavailable.".into(),
+            "   ".into(),
+        ];
+        ledger.repairs.clear();
+        ledger.grades.clear();
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::InvalidDecisionRecord)
+        );
+    }
+
+    #[test]
+    fn evidence_cannot_be_both_support_and_contradiction() {
+        let mut ledger = base_ledger();
+        ledger.hypotheses[0].contradicting_evidence_ids = vec!["e-intervention".into()];
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::EvidenceRoleConflict)
+        );
+    }
+
+    #[test]
+    fn blank_record_id_is_rejected() {
+        let mut ledger = base_ledger();
+        ledger.evidence[0].id.clear();
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::EmptyIdentity("evidence"))
+        );
+    }
+
+    #[test]
+    fn blank_evaluator_revision_is_rejected() {
+        let mut ledger = base_ledger();
+        ledger.grades[0].evaluator_revision.clear();
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::EmptyIdentity("evaluator revision"))
+        );
     }
 
 }
