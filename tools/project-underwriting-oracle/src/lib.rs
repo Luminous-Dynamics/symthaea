@@ -207,6 +207,11 @@ fn evidence_references_resolve(case: &Value) -> bool {
                 references.push(reference);
             }
         }
+        if let Some(yield_assessment) = model.get("yield_assessment") {
+            for component in array(yield_assessment, "uncertainty_components") {
+                extend_references(&mut references, component, "evidence_refs");
+            }
+        }
     }
     if let Some(finance) = case.get("financial_case") {
         extend_references(&mut references, finance, "fx_evidence_refs");
@@ -283,6 +288,43 @@ fn model_has_independent_calibration(case: &Value, decision_time: &str) -> bool 
             )
         })
     })
+}
+
+fn yield_uncertainty_contract_valid(case: &Value) -> bool {
+    let assessment = match case
+        .get("physical_model")
+        .and_then(|model| model.get("yield_assessment"))
+    {
+        Some(value) => value,
+        None => return false,
+    };
+    let p50 = string(assessment, "p50_net_energy_mwh")
+        .and_then(|value| value.parse::<f64>().ok());
+    let p90 = string(assessment, "p90_net_energy_mwh")
+        .and_then(|value| value.parse::<f64>().ok());
+    let p95 = string(assessment, "p95_net_energy_mwh")
+        .and_then(|value| value.parse::<f64>().ok());
+    let horizon = assessment
+        .get("horizon_years")
+        .and_then(Value::as_u64);
+    let (Some(p50), Some(p90), Some(p95), Some(horizon)) = (p50, p90, p95, horizon) else {
+        return false;
+    };
+    p50.is_finite()
+        && p90.is_finite()
+        && p95.is_finite()
+        && p50 > 0.0
+        && p90 > 0.0
+        && p95 > 0.0
+        && p50 >= p90
+        && p90 >= p95
+        && horizon > 0
+        && string(assessment, "quantile_convention") == Some("exceedance_probability")
+        && !matches!(string(assessment, "method"), None | Some("not_established"))
+        && !array(assessment, "uncertainty_components").is_empty()
+        && array(assessment, "uncertainty_components")
+            .iter()
+            .all(|component| !array(component, "evidence_refs").is_empty())
 }
 
 fn valid_cash_flow_schedule(case: &Value) -> bool {
@@ -428,6 +470,10 @@ pub fn evaluate_case(case: &Value) -> Disposition {
         || !model_has_independent_calibration(case, decision_time)
     {
         blockers.push("PHYSICAL_MODEL_OUTSIDE_QUALIFIED_DOMAIN".to_owned());
+    }
+
+    if !yield_uncertainty_contract_valid(case) {
+        blockers.push("YIELD_UNCERTAINTY_CONTRACT_INVALID".to_owned());
     }
 
     if !claim_has_evidence(
@@ -648,6 +694,20 @@ mod tests {
             .unwrap();
         let result = evaluate_case(case);
         assert!(result.blockers.iter().any(|value| value == "PHYSICAL_MODEL_OUTSIDE_QUALIFIED_DOMAIN"));
+    }
+
+    #[test]
+    fn p90_must_not_exceed_p50_under_exceedance_convention() {
+        let mut corpus = public_corpus();
+        let case = corpus["cases"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|item| item["case_id"] == "solar-storage-base-001")
+            .unwrap();
+        case["physical_model"]["yield_assessment"]["p90_net_energy_mwh"] = json!("230000");
+        let result = evaluate_case(case);
+        assert!(result.blockers.iter().any(|value| value == "YIELD_UNCERTAINTY_CONTRACT_INVALID"));
     }
 
     #[test]
