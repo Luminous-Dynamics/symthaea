@@ -1,0 +1,79 @@
+name: Typed Connectome Claim Bundle Schema
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main, research/connectome-typed-claim-queries-v0-1-20261104]
+    paths:
+      - "research/connectomics/connectome-typed-claim-bundle-v0.1.schema.json"
+      - "research/connectomics/CONNECTOME_TYPED_CLAIM_QUERY_PROTOCOL_V0.1.md"
+      - "research/connectomics/fixtures/connectome-typed-claim-bundle-known-answer-v0.1.json"
+      - "tools/connectome-typed-claim-verifier/**"
+      - ".github/workflows/connectome-typed-claim-bundle-v1.yml"
+      - ".github/workflows/connectome-typed-claim-verifier-v1.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: connectome-typed-claim-bundle-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  schema:
+    name: Typed claim schema and known-answer fixture
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Draft 2020-12 schema and fixture
+        run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("research/connectomics/connectome-typed-claim-bundle-v0.1.schema.json").read_text())
+          bundle = json.loads(Path("research/connectomics/fixtures/connectome-typed-claim-bundle-known-answer-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(bundle)
+
+          claims = {claim["claim_id"]: claim for claim in bundle["claims"]}
+          assert len(claims) == len(bundle["claims"]), "duplicate claim_id"
+          queries = {query["query_id"]: query for query in bundle["queries"]}
+          assert len(queries) == len(bundle["queries"]), "duplicate query_id"
+          expected = {
+              "ANATOMICAL_SYNAPSE_EDGE": "ANATOMICAL_SYNAPSE_EVIDENCE",
+              "RECONSTRUCTION_CORRESPONDENCE": "RECONSTRUCTION_CORRESPONDENCE_EVIDENCE",
+              "STATISTICAL_DEPENDENCE_EDGE": "STATISTICAL_DEPENDENCE_EVIDENCE",
+              "FUNCTIONAL_ASSOCIATION_EDGE": "FUNCTIONAL_ASSOCIATION_EVIDENCE",
+              "CAUSAL_EFFECT_CLAIM": "CAUSAL_EFFECT_EVIDENCE",
+          }
+          for claim in claims.values():
+              assert all(evidence["evidence_type"] == expected[claim["relation_type"]] for evidence in claim["evidence"]), claim["claim_id"]
+          assert bundle["summary"]["claim_count"] == len(bundle["claims"])
+          assert bundle["summary"]["query_count"] == len(bundle["queries"])
+          # Preserve an intentional negative control: producer attempts to
+          # assert causality from anatomical plus statistical evidence.
+          invalid = queries["invalid-anatomy-to-causality-attempt"]["path_results"][0]
+          used = [claims[item]["relation_type"] for item in invalid["ordered_claim_ids"]]
+          assert used == ["ANATOMICAL_SYNAPSE_EDGE", "STATISTICAL_DEPENDENCE_EDGE"]
+          assert invalid["asserted_claim_type"] == "CAUSAL_EFFECT"
+          PY
+
+  verifier:
+    name: Typed claim semantic verifier
+    if: github.event.pull_request.base.ref == 'research/connectome-typed-claim-queries-v0-1-20261104'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Formatting
+        run: cargo fmt --manifest-path tools/connectome-typed-claim-verifier/Cargo.toml -- --check
+      - name: Tests
+        run: cargo test --manifest-path tools/connectome-typed-claim-verifier/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path tools/connectome-typed-claim-verifier/Cargo.toml --locked --all-targets -- -D warnings
