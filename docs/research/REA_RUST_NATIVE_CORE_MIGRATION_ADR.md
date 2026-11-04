@@ -827,3 +827,30 @@ The current upstream package metadata still reports `rea-agents@6.8.0`. The six 
 - If any contract file changes, create a new schema/compatibility review and corpus version; do not silently regenerate old fixtures from new upstream code.
 
 This removes an avoidable source of uncertainty: as of this audit, the six Evidence semantic-contract files do not require a new pin merely because upstream `main` advanced.
+
+
+## Exact-head implementation status refresh (2026-11-04)
+
+The following dedicated REA workflows were inspected by exact commit SHA. All PRs listed remain open drafts; a passing dedicated workflow is not a merge, review approval or qualification outside its declared scope.
+
+| Work item | Exact tested head | Dedicated workflow | Result | Scope actually tested |
+|---|---|---|---|---|
+| Rust Evidence core [#10347](https://github.com/Luminous-Dynamics/symthaea/pull/10347) | `8ff5b6cb87f1e4a4a9e5be19053d8fdefcf972d8` | [41784306259](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41784306259) | success | Pinned upstream-generated Evidence corpus and Rust core tests |
+| EvidenceBundle verifier [#10353](https://github.com/Luminous-Dynamics/symthaea/pull/10353) | `a4b61fbe43c80cd4b85c2371e9dbede181a17bf3` | [41805927317](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41805927317) | success | Bundle/residual-unknown graph verifier and upstream-generated bundle comparisons |
+| Offline CLI [#10348](https://github.com/Luminous-Dynamics/symthaea/pull/10348) | `59f9445fd1d714749f4d6edf5a37d7ce323bddd6` | [41785107146](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41785107146) | success | Isolated offline Evidence verifier CLI |
+| Read-only MCP stdio adapter [#10395](https://github.com/Luminous-Dynamics/symthaea/pull/10395) | `7f6ec97a0cee92186e9a7deb5715875a5037dc85` | [41839127100](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41839127100) | success | Pinned upstream fixture generation, formatting, unit/protocol tests and standalone stdio binary build |
+| Benchmark receipt validator [#10314](https://github.com/Luminous-Dynamics/symthaea/pull/10314) | `58dd14377870746b3b0fbe1e982391dd2cc918fa` | [41808798130](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41808798130) | success | Dedicated benchmark receipt validation workflow |
+
+### Failure/claim accounting
+
+The #10347 commit also had failures in two other repository workflows (Proof Insight Transfer Indexer V0 and Beverage Benchmark Contract); its dedicated REA Rust Evidence Core workflow passed. These unrelated failures are not hidden or re-labelled as successes, and the table above intentionally reports the dedicated REA lane rather than the aggregate repository status.
+
+The MCP adapter required several exact-head fixes: enabling/declaring the `schemars` feature/dependency; importing EvidenceBundle functions from the public `bundle` module; aligning calls with rmcp 3.8.0's direct `CallToolResult` return type; disabling unintended harness auto-bin discovery; and applying rustfmt. The final exact-head workflow passed all substantive steps.
+
+### Current status boundary
+
+- The Evidence verifier, bundle verifier, CLI and read-only MCP adapter have successful dedicated exact-head workflow evidence on their respective draft branches.
+- They are not yet merged together into one release or proven interoperable at every root feature/build combination.
+- The MCP result verifies only two content-supplied, read-only tools. It does not qualify the general REA tool catalog, external provider dispatch, producer authenticity, observation truth or mobile-device behavior.
+- The provider-dispatch gateway remains separately tracked in [#10398](https://github.com/Luminous-Dynamics/symthaea/issues/10398), with crash/reconciliation requirements composed from #4493, #7068, #7080 and #8769.
+- The newly opened [#10410](https://github.com/Luminous-Dynamics/symthaea/issues/10410) adds reverse-engineering-specific provider lineage/common-mode provenance as a consumer of #6283, not a second evidence ledger or trust score.
