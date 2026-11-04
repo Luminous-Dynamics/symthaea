@@ -951,7 +951,7 @@ mod tests {
 
     #[test]
     fn wait_evidence_requirement_flag_changes_the_policy_as_declared() {
-        let mut evidence = bundle();
+        let evidence = bundle();
         let receipt = decision(
             &evidence,
             GroundedMusicalActionV1::Wait,
