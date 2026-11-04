@@ -605,6 +605,204 @@ pub mod linux_powercap {
     }
 }
 
+/// NVIDIA NVML cumulative GPU energy backend.
+///
+/// This adapter is opt-in through the `nvml` Cargo feature and dynamically
+/// loads the NVIDIA management library at runtime. A successful library load
+/// does not imply that the selected GPU supports cumulative energy readings;
+/// each device is probed and `NOT_SUPPORTED` remains an explicit capability
+/// state. The counter is reported in millijoules since driver reload.
+///
+/// NVIDIA documents this counter for Volta-or-newer fully supported devices.
+/// Even on those architectures, the backend must handle a device/driver that
+/// returns NotSupported or loses the GPU. The adapter stores the immutable GPU
+/// UUID and does not rely on an enumeration index after opening the device.
+#[cfg(feature = "nvml")]
+pub mod nvml_backend {
+    use super::*;
+    use nvml_wrapper::{Nvml, error::NvmlError};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::Instant;
+
+    static NEXT_NVML_EPOCH: AtomicU64 = AtomicU64::new(1);
+
+    /// NVML-backed cumulative energy meter for one GPU UUID.
+    pub struct NvmlEnergyMeter {
+        nvml: Arc<Nvml>,
+        descriptor: EnergyMeterDescriptor,
+        driver_version: String,
+        nvml_version: Option<String>,
+        model: Option<String>,
+        counter_epoch: u64,
+        last_raw_counter: u64,
+        started_at: Instant,
+    }
+
+    impl NvmlEnergyMeter {
+        /// Initialize NVML and open a meter for the GPU currently at index.
+        ///
+        /// The index is used only to discover the immutable UUID. For a
+        /// multi-GPU process, prefer `from_shared` and pass one shared
+        /// `Arc<Nvml>` to all meters rather than initializing NVML repeatedly.
+        pub fn open_by_index(index: u32) -> Result<Self, EnergyMeterError> {
+            let nvml = Arc::new(Nvml::init().map_err(map_nvml_error)?);
+            Self::from_shared(nvml, index)
+        }
+
+        /// Open a meter using a shared NVML instance and the current device
+        /// index. The resolved UUID is retained for every subsequent read.
+        pub fn from_shared(
+            nvml: Arc<Nvml>,
+            index: u32,
+        ) -> Result<Self, EnergyMeterError> {
+            let device = nvml.device_by_index(index).map_err(map_nvml_error)?;
+            let uuid = device.uuid().map_err(map_nvml_error)?;
+            let initial_energy = device.total_energy_consumption().map_err(map_nvml_error)?;
+            let driver_version = nvml.sys_driver_version().map_err(map_nvml_error)?;
+            let nvml_version = nvml.sys_nvml_version().ok();
+            let model = device.name().ok();
+
+            Ok(Self {
+                nvml,
+                descriptor: EnergyMeterDescriptor {
+                    backend: EnergyMeterBackend::Nvml,
+                    sensor_id: format!("nvml:{uuid}:total-energy"),
+                    device_id: uuid,
+                    scope: EnergyScope::GpuDevice,
+                    unit: EnergyCounterUnit::Millijoules,
+                    // NVML exposes a cumulative counter but does not document
+                    // a rollover modulus for this API. Never infer one.
+                    wrap_modulus: None,
+                },
+                driver_version,
+                nvml_version,
+                model,
+                counter_epoch: NEXT_NVML_EPOCH.fetch_add(1, Ordering::Relaxed),
+                last_raw_counter: initial_energy,
+                started_at: Instant::now(),
+            })
+        }
+
+        /// NVIDIA driver version captured when this meter was opened.
+        pub fn driver_version(&self) -> &str {
+            &self.driver_version
+        }
+
+        /// NVML library version when the driver exposes it.
+        pub fn nvml_version(&self) -> Option<&str> {
+            self.nvml_version.as_deref()
+        }
+
+        /// GPU model name when the device exposes it.
+        pub fn model(&self) -> Option<&str> {
+            self.model.as_deref()
+        }
+
+        fn read_energy(&self) -> Result<u64, EnergyMeterError> {
+            self.nvml
+                .device_by_uuid(&self.descriptor.device_id)
+                .map_err(map_nvml_error)?
+                .total_energy_consumption()
+                .map_err(map_nvml_error)
+        }
+    }
+
+    impl EnergyMeter for NvmlEnergyMeter {
+        fn descriptor(&self) -> &EnergyMeterDescriptor {
+            &self.descriptor
+        }
+
+        fn availability(&self) -> EnergyMeterAvailability {
+            match self.read_energy() {
+                Ok(_) => EnergyMeterAvailability::Available,
+                Err(EnergyMeterError::Unsupported { reason }) => {
+                    EnergyMeterAvailability::Unsupported { reason }
+                }
+                Err(EnergyMeterError::PermissionDenied { reason }) => {
+                    EnergyMeterAvailability::PermissionDenied { reason }
+                }
+                Err(EnergyMeterError::Unavailable { reason }) => {
+                    EnergyMeterAvailability::Unavailable { reason }
+                }
+                Err(EnergyMeterError::BackendFailure { reason }) => {
+                    EnergyMeterAvailability::Unavailable { reason }
+                }
+                Err(EnergyMeterError::ClockUnavailable) => EnergyMeterAvailability::Unavailable {
+                    reason: "monotonic clock unavailable".into(),
+                },
+            }
+        }
+
+        fn read_counter(&mut self) -> Result<EnergyCounterReading, EnergyMeterError> {
+            let raw_counter = self.read_energy()?;
+            // NVML's total-energy API has no documented rollover modulus and
+            // resets on driver reload. A decrease starts a new epoch; callers
+            // cannot compute an interval across that boundary.
+            if raw_counter < self.last_raw_counter {
+                self.counter_epoch = self.counter_epoch.checked_add(1).ok_or_else(|| {
+                    EnergyMeterError::BackendFailure {
+                        reason: "NVML counter epoch overflow".into(),
+                    }
+                })?;
+            }
+            self.last_raw_counter = raw_counter;
+
+            Ok(EnergyCounterReading {
+                descriptor: self.descriptor.clone(),
+                counter_epoch: self.counter_epoch,
+                raw_counter,
+                monotonic_timestamp_ns: self.started_at.elapsed().as_nanos(),
+            })
+        }
+    }
+
+    fn map_nvml_error(error: NvmlError) -> EnergyMeterError {
+        match error {
+            NvmlError::NotSupported => EnergyMeterError::Unsupported {
+                reason: "NVML cumulative energy counter is not supported by this GPU/driver".into(),
+            },
+            NvmlError::NoPermission => EnergyMeterError::PermissionDenied {
+                reason: "NVML denied access to this GPU energy counter".into(),
+            },
+            NvmlError::DriverNotLoaded
+            | NvmlError::GpuLost
+            | NvmlError::LibraryNotFound
+            | NvmlError::LibRmVersionMismatch => EnergyMeterError::Unavailable {
+                reason: error.to_string(),
+            },
+            other => EnergyMeterError::BackendFailure {
+                reason: other.to_string(),
+            },
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn not_supported_is_not_reported_as_zero_energy() {
+            assert!(matches!(
+                map_nvml_error(NvmlError::NotSupported),
+                EnergyMeterError::Unsupported { .. }
+            ));
+        }
+
+        #[test]
+        fn permission_and_gpu_loss_remain_distinct_capabilities() {
+            assert!(matches!(
+                map_nvml_error(NvmlError::NoPermission),
+                EnergyMeterError::PermissionDenied { .. }
+            ));
+            assert!(matches!(
+                map_nvml_error(NvmlError::GpuLost),
+                EnergyMeterError::Unavailable { .. }
+            ));
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
