@@ -723,6 +723,61 @@ fn run_self_tests() -> Result<(), String> {
     Ok(())
 }
 
+fn synthetic_report() -> Result<Report, String> {
+    let alternative = build_synthetic_rows("self", "alternative", "component-a", &["d", "h", "hEq"], |set| {
+        set.contains("h") || set.contains("hEq")
+    });
+    let conjunctive = build_synthetic_rows("self", "conjunctive", "component-b", &["h1", "h2", "irrelevant"], |set| {
+        set.contains("h1") && set.contains("h2")
+    });
+    let mut outcomes = alternative;
+    outcomes.extend(conjunctive);
+    let reports = {
+        let mut grouped = BTreeMap::<String, Vec<Outcome>>::new();
+        for row in &outcomes {
+            grouped.entry(group_id(&identity(row))?).or_default().push(row.clone());
+        }
+        let mut reports = Vec::new();
+        for (gid, rows) in grouped {
+            reports.push(analyze_group(&gid, &rows, 12)?);
+        }
+        reports
+    };
+    let predictions = vec![
+        Prediction {
+            schema_version: PREDICTION_SCHEMA.into(),
+            group_id: reports[0].group_id.clone(),
+            model_id: "synthetic-model".into(),
+            model_version: "self-test".into(),
+            abstained: false,
+            claimed_necessary_declarations: vec![],
+            proposed_sufficient_route: Some(vec!["h".into()]),
+            route_sufficiency_probability: Some(0.8),
+            run_receipt_sha256: fake_digest("synthetic-prediction-alternative"),
+        },
+        Prediction {
+            schema_version: PREDICTION_SCHEMA.into(),
+            group_id: reports[1].group_id.clone(),
+            model_id: "synthetic-model".into(),
+            model_version: "self-test".into(),
+            abstained: false,
+            claimed_necessary_declarations: vec!["h1".into(), "h2".into()],
+            proposed_sufficient_route: Some(vec!["h1".into(), "h2".into()]),
+            route_sufficiency_probability: Some(0.8),
+            run_receipt_sha256: fake_digest("synthetic-prediction-conjunctive"),
+        },
+    ];
+    let outcome_bytes = serde_json::to_vec(&outcomes).map_err(|e| format!("serialize synthetic outcomes: {e}"))?;
+    let prediction_bytes = serde_json::to_vec(&predictions).map_err(|e| format!("serialize synthetic predictions: {e}"))?;
+    analyze(
+        &outcomes,
+        sha256(&outcome_bytes),
+        Some(&predictions),
+        Some(sha256(&prediction_bytes)),
+        12,
+    )
+}
+
 fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, Option<PathBuf>, usize), String> {
     let mut outcomes = None;
     let mut predictions = None;
@@ -764,6 +819,14 @@ fn execute() -> Result<(), String> {
     if args.len() == 2 && args[1] == "--self-test" {
         run_self_tests()?;
         println!("PITB_SUPPORT_ANTICHAIN_SELF_TEST_PASS");
+        return Ok(());
+    }
+    if args.len() == 3 && args[1] == "--self-test-report" {
+        run_self_tests()?;
+        let report = synthetic_report()?;
+        let bytes = serde_json::to_vec_pretty(&report).map_err(|e| format!("serialize synthetic report: {e}"))?;
+        fs::write(&args[2], bytes).map_err(|e| format!("write synthetic report: {e}"))?;
+        println!("PITB_SUPPORT_ANTICHAIN_SYNTHETIC_REPORT_OK");
         return Ok(());
     }
     let (outcome_path, report_path, prediction_path, max_variables) = parse_args(&args)?;
