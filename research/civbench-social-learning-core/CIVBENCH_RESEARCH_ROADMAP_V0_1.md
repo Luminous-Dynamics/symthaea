@@ -224,7 +224,7 @@ This is not a new evidence ledger and does not require a central collector to in
 
 The adaptive-transmission engine now records an explicit `RecipientStateDisclosure` on each run:
 - `CentralFullInventory` is the centralized research upper bound.
-- `CoarseRecipeReadiness` receives a minimized per-recipe request/readiness signal (recipe ID plus prerequisite-match fraction) rather than the full recipient inventory.
+- `CoarseRecipeReadiness` releases at most two prioritized unheld-recipe request/readiness signals per recipient per step (recipe ID plus prerequisite-match fraction) rather than the full recipient inventory. Publishing every unheld recipe would reveal the complement of the held-recipe inventory; the cap blocks that direct reconstruction but does not eliminate inference from repeated signals.
 
 The coarse mode rejects collective-novelty policy features that require global inventory knowledge. A multi-seed runner compares centralized, coarse and no-social conditions across Layered, Branching and Convergent DAG families (256 fixed seeds per family) under identical population, message and attention budgets. CI executes the sweep and stores a CSV artifact after the compile/test job.
 
