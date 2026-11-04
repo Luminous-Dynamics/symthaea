@@ -4,11 +4,7 @@
 //! engine. It checks that declared support and assumption evidence leads to the
 //! conservative disposition preregistered by each analytic fixture.
 
-use std::collections::{BTreeMap, BTreeSet};
-
 const EPSILON: f64 = 1.0e-12;
-const IDENTIFICATION_FIXTURES: &str = include_str!("../fixtures/identification-cases-v0.1.tsv");
-const CROSS_WORLD_FIXTURES: &str = include_str!("../fixtures/cross-world-couplings-v0.1.tsv");
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Disposition {
@@ -269,6 +265,12 @@ pub fn assess(case: &Case) -> Assessment {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::{BTreeMap, BTreeSet};
+
+    const IDENTIFICATION_FIXTURES: &str =
+        include_str!("../fixtures/identification-cases-v0.1.tsv");
+    const CROSS_WORLD_FIXTURES: &str =
+        include_str!("../fixtures/cross-world-couplings-v0.1.tsv");
 
     #[test]
     fn all_golden_cases_match_their_preregistered_dispositions() {
