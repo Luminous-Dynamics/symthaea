@@ -330,6 +330,36 @@ pub struct AblationRecord {
     pub sequence: u64,
 }
 
+/// Final investigation decision before any repair or side effect.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DecisionKind {
+    /// Evidence is sufficient to propose a repair.
+    ProceedToRepair,
+    /// Withhold action because the evidence or authority is insufficient.
+    Abstain,
+    /// Request information or authority from an external decision-maker.
+    Escalate,
+}
+
+/// Explicit proceed/abstain/escalate decision with its epistemic basis.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DecisionRecord {
+    /// Stable decision identifier.
+    pub id: String,
+    /// Exact task/source/configuration identity.
+    pub binding: TaskBinding,
+    /// Decision disposition.
+    pub kind: DecisionKind,
+    /// Human-readable reason, required for all decision types.
+    pub reason: String,
+    /// Exact hypothesis revision records considered.
+    pub hypothesis_record_ids: Vec<String>,
+    /// Evidence required to justify the decision.
+    pub required_evidence_ids: Vec<String>,
+    /// Append order.
+    pub sequence: u64,
+}
+
 /// Proposed repair tied to hypotheses and prior investigation records.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RepairRecord {
@@ -339,6 +369,8 @@ pub struct RepairRecord {
     pub binding: TaskBinding,
     /// Candidate patch digest.
     pub patch_digest: Digest,
+    /// Proceed decision authorizing this repair proposal.
+    pub decision_id: String,
     /// Exact hypothesis revision records considered by the repair.
     pub hypothesis_record_ids: Vec<String>,
     /// Outcomes used to justify the repair.
@@ -407,6 +439,8 @@ pub struct Ledger {
     pub outcomes: Vec<OutcomeRecord>,
     /// Matched scheduler/causal ablations.
     pub ablations: Vec<AblationRecord>,
+    /// Explicit proceed/abstain/escalate outcomes.
+    pub decisions: Vec<DecisionRecord>,
     /// Repair proposals.
     pub repairs: Vec<RepairRecord>,
     /// Primary and pristine-regrade records.
@@ -454,6 +488,10 @@ pub enum ValidationError {
     RepairReferenceMismatch,
     /// A grade is not bound to the exact repair patch.
     GradePatchMismatch,
+    /// A repair is not bound to an earlier proceed decision.
+    RepairWithoutProceedDecision,
+    /// A decision has an empty reason or invalid evidence/hypothesis references.
+    InvalidDecisionRecord,
     /// An execution identity is reused across grade records.
     DuplicateExecutionIdentity,
 }
@@ -511,6 +549,7 @@ impl Ledger {
         ensure_unique("action", self.actions.iter().map(|record| record.id.as_str()))?;
         ensure_unique("outcome", self.outcomes.iter().map(|record| record.id.as_str()))?;
         ensure_unique("ablation", self.ablations.iter().map(|record| record.id.as_str()))?;
+        ensure_unique("decision", self.decisions.iter().map(|record| record.id.as_str()))?;
         ensure_unique("repair", self.repairs.iter().map(|record| record.id.as_str()))?;
         ensure_unique("grade", self.grades.iter().map(|record| record.id.as_str()))?;
         ensure_unique(
@@ -527,6 +566,7 @@ impl Ledger {
             .chain(self.actions.iter().map(|record| record.sequence))
             .chain(self.outcomes.iter().map(|record| record.sequence))
             .chain(self.ablations.iter().map(|record| record.sequence))
+            .chain(self.decisions.iter().map(|record| record.sequence))
             .chain(self.repairs.iter().map(|record| record.sequence))
             .chain(self.grades.iter().map(|record| record.sequence));
         let mut seen_sequences = HashSet::new();
@@ -594,6 +634,11 @@ impl Ledger {
                 return Err(ValidationError::TaskBindingMismatch);
             }
         }
+        for record in &self.decisions {
+            if record.binding != self.binding {
+                return Err(ValidationError::TaskBindingMismatch);
+            }
+        }
         for record in &self.repairs {
             if record.binding != self.binding {
                 return Err(ValidationError::TaskBindingMismatch);
@@ -627,6 +672,11 @@ impl Ledger {
             .collect();
         let outcomes_by_id: HashMap<&str, &OutcomeRecord> = self
             .outcomes
+            .iter()
+            .map(|record| (record.id.as_str(), record))
+            .collect();
+        let decisions_by_id: HashMap<&str, &DecisionRecord> = self
+            .decisions
             .iter()
             .map(|record| (record.id.as_str(), record))
             .collect();
@@ -804,6 +854,14 @@ impl Ledger {
         }
 
         for evidence in &self.evidence {
+            if let Some(action_id) = evidence.source_action_id.as_deref() {
+                let action = actions_by_id
+                    .get(action_id)
+                    .ok_or(ValidationError::MissingReference)?;
+                if action.sequence >= evidence.sequence {
+                    return Err(ValidationError::EvidenceParentOutOfOrder);
+                }
+            }
             if evidence.authority == EvidenceAuthority::InterventionObserved {
                 let action_id = evidence
                     .source_action_id
@@ -827,7 +885,42 @@ impl Ledger {
             }
         }
 
+        for decision in &self.decisions {
+            if decision.reason.trim().is_empty() {
+                return Err(ValidationError::InvalidDecisionRecord);
+            }
+            if decision.kind == DecisionKind::ProceedToRepair
+                && decision.hypothesis_record_ids.is_empty()
+            {
+                return Err(ValidationError::InvalidDecisionRecord);
+            }
+            for hypothesis_id in &decision.hypothesis_record_ids {
+                let hypothesis = hypotheses_by_id
+                    .get(hypothesis_id.as_str())
+                    .ok_or(ValidationError::InvalidDecisionRecord)?;
+                if hypothesis.sequence >= decision.sequence {
+                    return Err(ValidationError::InvalidDecisionRecord);
+                }
+            }
+            for evidence_id in &decision.required_evidence_ids {
+                let evidence = evidence_by_id
+                    .get(evidence_id.as_str())
+                    .ok_or(ValidationError::InvalidDecisionRecord)?;
+                if evidence.sequence >= decision.sequence {
+                    return Err(ValidationError::InvalidDecisionRecord);
+                }
+            }
+        }
+
         for repair in &self.repairs {
+            let decision = decisions_by_id
+                .get(repair.decision_id.as_str())
+                .ok_or(ValidationError::RepairWithoutProceedDecision)?;
+            if decision.kind != DecisionKind::ProceedToRepair
+                || decision.sequence >= repair.sequence
+            {
+                return Err(ValidationError::RepairWithoutProceedDecision);
+            }
             for hypothesis_record_id in &repair.hypothesis_record_ids {
                 let hypothesis = hypotheses_by_id
                     .get(hypothesis_record_id.as_str())
@@ -944,13 +1037,23 @@ mod tests {
                 sequence: 5,
             }],
             ablations: vec![],
+            decisions: vec![DecisionRecord {
+                id: "d1".into(),
+                binding: binding.clone(),
+                kind: DecisionKind::ProceedToRepair,
+                reason: "The controlled configuration perturbation discriminated the leading hypothesis.".into(),
+                hypothesis_record_ids: vec!["h1-r1".into()],
+                required_evidence_ids: vec!["e-intervention".into()],
+                sequence: 7,
+            }],
             repairs: vec![RepairRecord {
                 id: "r1".into(),
                 binding: binding.clone(),
                 patch_digest: Digest([4; 32]),
+                decision_id: "d1".into(),
                 hypothesis_record_ids: vec!["h1-r1".into()],
                 outcome_ids: vec!["o1".into()],
-                sequence: 7,
+                sequence: 8,
             }],
             grades: vec![GradeRecord {
                 id: "g1".into(),
@@ -961,7 +1064,7 @@ mod tests {
                 execution_id: "run-primary".into(),
                 evaluator_revision: "grader-v0".into(),
                 verdict: GradeVerdict::Accepted,
-                sequence: 8,
+                sequence: 9,
             }],
         }
     }
@@ -1010,6 +1113,8 @@ mod tests {
         revision.status = HypothesisStatus::Unresolved;
         revision.sequence = 7;
         ledger.hypotheses.push(revision);
+        ledger.decisions[0].sequence = 7;
+        ledger.decisions[0].sequence = 7;
         ledger.repairs[0].sequence = 8;
         ledger.grades[0].sequence = 9;
         assert_eq!(ledger.validate(), Ok(()));
@@ -1088,12 +1193,52 @@ mod tests {
         revision_three.id = "h1-r3".into();
         revision_three.sequence = 8;
         ledger.hypotheses.extend([revision_two, revision_three]);
+        ledger.decisions[0].sequence = 7;
         ledger.repairs[0].sequence = 9;
         ledger.grades[0].sequence = 10;
         assert_eq!(
             ledger.validate(),
             Err(ValidationError::HypothesisRevisionChain)
         );
+    }
+
+    #[test]
+    fn abstention_is_a_first_class_valid_decision_without_a_repair() {
+        let mut ledger = base_ledger();
+        ledger.decisions[0].kind = DecisionKind::Abstain;
+        ledger.decisions[0].reason = "The observation is non-identifying under the permitted budget.".into();
+        ledger.repairs.clear();
+        ledger.grades.clear();
+        assert_eq!(ledger.validate(), Ok(()));
+    }
+
+    #[test]
+    fn repair_requires_an_explicit_proceed_decision() {
+        let mut ledger = base_ledger();
+        ledger.decisions[0].kind = DecisionKind::Abstain;
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::RepairWithoutProceedDecision)
+        );
+    }
+
+    #[test]
+    fn decision_requires_prior_evidence_and_hypothesis_records() {
+        let mut ledger = base_ledger();
+        ledger.decisions[0].required_evidence_ids = vec!["missing-evidence".into()];
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::InvalidDecisionRecord)
+        );
+    }
+
+    #[test]
+    fn runtime_evidence_must_reference_a_prior_action() {
+        let mut ledger = base_ledger();
+        ledger.evidence[0].authority = EvidenceAuthority::RuntimeObserved;
+        ledger.evidence[0].source_action_id = Some("missing-action".into());
+        ledger.hypotheses[0].status = HypothesisStatus::Correlational;
+        assert_eq!(ledger.validate(), Err(ValidationError::MissingReference));
     }
 
     #[test]
