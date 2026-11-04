@@ -687,6 +687,7 @@ struct Rng {
 
 const STREAM_GRAPH: u64 = 0xA6D3_5B79_1C42_E80F;
 const STREAM_DISCOVERY: u64 = 0xC58A_7E13_42B9_D601;
+const STREAM_DISCOVERY_ORDER: u64 = 0x4A2D_93F6_B10C_75E8;
 const STREAM_SCHEDULE: u64 = 0x91F0_2C6B_D835_A47E;
 const STREAM_ACQUISITION: u64 = 0xE43B_19D7_6A20_F58C;
 
@@ -701,6 +702,79 @@ fn stream_seed(master_seed: u64, domain: u64, step: usize) -> u64 {
         ^ (step as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
     let mut mixer = Rng::new(mixed);
     mixer.next_u64()
+}
+
+/// Derive a deterministic substream from the identity of an experimental
+/// unit. This makes candidate ordering irrelevant to the random draw assigned
+/// to a particular agent/recipe or sender/receiver message slot.
+fn keyed_stream_seed(
+    master_seed: u64,
+    domain: u64,
+    step: usize,
+    key_a: u64,
+    key_b: u64,
+    key_c: u64,
+) -> u64 {
+    let mixed = master_seed
+        ^ domain
+        ^ (step as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        ^ key_a.wrapping_mul(0xD6E8_FEB8_6659_FD93)
+        ^ key_b.wrapping_mul(0xA5A3_58B5_9E37_79B9)
+        ^ key_c.wrapping_mul(0x94D0_49BB_1331_11EB);
+    Rng::new(mixed).next_u64()
+}
+
+fn discovery_priority(
+    master_seed: u64,
+    step: usize,
+    agent_id: usize,
+    recipe_id: u16,
+) -> u64 {
+    keyed_stream_seed(
+        master_seed,
+        STREAM_DISCOVERY_ORDER,
+        step,
+        agent_id as u64,
+        recipe_id as u64,
+        0,
+    )
+}
+
+fn discovery_succeeds(
+    master_seed: u64,
+    step: usize,
+    agent_id: usize,
+    recipe_id: u16,
+    probability: f64,
+) -> bool {
+    let seed = keyed_stream_seed(
+        master_seed,
+        STREAM_DISCOVERY,
+        step,
+        agent_id as u64,
+        recipe_id as u64,
+        0,
+    );
+    Rng::new(seed).bernoulli(probability)
+}
+
+fn acquisition_succeeds(
+    master_seed: u64,
+    step: usize,
+    sender: usize,
+    receiver: usize,
+    route_slot: usize,
+    probability: f64,
+) -> bool {
+    let seed = keyed_stream_seed(
+        master_seed,
+        STREAM_ACQUISITION,
+        step,
+        sender as u64,
+        receiver as u64,
+        route_slot as u64,
+    );
+    Rng::new(seed).bernoulli(probability)
 }
 
 impl Rng {
@@ -797,18 +871,32 @@ fn individual_learning(
     agents: &mut [AgentKnowledge],
     attempts_per_agent: usize,
     discovery_probability: f64,
-    rng: &mut Rng,
+    master_seed: u64,
+    step: usize,
 ) -> usize {
     let mut discoveries = 0usize;
-    for agent in agents {
-        let mut candidates: Vec<u16> = task.recipes().iter()
+    for (agent_id, agent) in agents.iter_mut().enumerate() {
+        let mut candidates: Vec<(u64, u16)> = task.recipes().iter()
             .filter(|recipe| !agent.known_recipes.contains(&recipe.recipe_id))
             .filter(|recipe| recipe.ingredients.iter().all(|ingredient| agent.known_elements.contains(ingredient)))
-            .map(|recipe| recipe.recipe_id)
+            .map(|recipe| {
+                (
+                    discovery_priority(master_seed, step, agent_id, recipe.recipe_id),
+                    recipe.recipe_id,
+                )
+            })
             .collect();
-        rng.shuffle(&mut candidates);
-        for recipe_id in candidates.into_iter().take(attempts_per_agent) {
-            if rng.bernoulli(discovery_probability) {
+        // Sort by a per-agent/per-recipe keyed priority. Adding/removing a
+        // different candidate does not change the priority of shared recipes.
+        candidates.sort_unstable();
+        for (_, recipe_id) in candidates.into_iter().take(attempts_per_agent) {
+            if discovery_succeeds(
+                master_seed,
+                step,
+                agent_id,
+                recipe_id,
+                discovery_probability,
+            ) {
                 agent.known_recipes.insert(recipe_id);
                 agent.individual_discoveries += 1;
                 discoveries += 1;
@@ -1114,19 +1202,32 @@ fn apply_actions(
     agents: &mut [AgentKnowledge],
     actions: &[TransmissionAction],
     acquisition_probability: f64,
-    rng: &mut Rng,
+    master_seed: u64,
+    step: usize,
 ) -> (usize, usize, usize, usize) {
     let mut redundant = 0usize;
     let mut acquisitions = 0usize;
     let mut new_group_results = 0usize;
     let mut attention_used = 0usize;
     let before_group = group_known_elements(agents);
+    let mut route_slots: BTreeMap<(usize, usize), usize> = BTreeMap::new();
     for action in actions {
         attention_used += 1;
-        // Consume the draw for every scheduled message before checking
-        // recipient redundancy. This keeps subsequent message slots aligned
-        // between matched-schedule/content-shuffle ablations.
-        let acquisition_draw = rng.bernoulli(acquisition_probability);
+        // Draw is keyed by sender/receiver/route-slot, not payload identity.
+        // Thus a content-shuffle ablation preserves acquisition luck for the
+        // same scheduled route while changing only the transmitted recipe.
+        let route = (action.sender, action.receiver);
+        let route_slot = route_slots.entry(route).or_insert(0);
+        let slot = *route_slot;
+        *route_slot += 1;
+        let acquisition_draw = acquisition_succeeds(
+            master_seed,
+            step,
+            action.sender,
+            action.receiver,
+            slot,
+            acquisition_probability,
+        );
         if agents[action.receiver].known_recipes.contains(&action.recipe_id) {
             redundant += 1;
             continue;
@@ -1209,16 +1310,15 @@ fn simulate_internal(
     history.push(collective_metrics(0, task, &agents, 0, 0, 0, 0, 0, 0));
 
     for step in 1..=config.steps {
-        let mut discovery_rng = Rng::new(stream_seed(seed, STREAM_DISCOVERY, step));
         let mut schedule_rng = Rng::new(stream_seed(seed, STREAM_SCHEDULE, step));
-        let mut acquisition_rng = Rng::new(stream_seed(seed, STREAM_ACQUISITION, step));
 
         let individual_discoveries = individual_learning(
             task,
             &mut agents,
             config.individual_attempts_per_agent_step,
             config.individual_discovery_probability,
-            &mut discovery_rng,
+            seed,
+            step,
         );
         let actions = match program {
             Some(program) => program_schedule(task, &graph, &agents, config, program),
@@ -1229,7 +1329,8 @@ fn simulate_internal(
             &mut agents,
             &actions,
             config.acquisition_probability,
-            &mut acquisition_rng,
+            seed,
+            step,
         );
         history.push(collective_metrics(
             step,
@@ -1582,6 +1683,45 @@ mod tests {
                 random_content.history[1].individual_recipe_discoveries
             );
         }
+    }
+
+    #[test]
+    fn individual_discovery_draws_are_bound_to_agent_and_recipe_identity() {
+        let master_seed = 91;
+        let step = 4;
+        let agent_id = 3;
+        let recipe_ids = [2_u16, 7, 11, 15];
+        let forward: BTreeMap<_, _> = recipe_ids.iter().map(|&recipe_id| {
+            (
+                recipe_id,
+                discovery_succeeds(master_seed, step, agent_id, recipe_id, 0.37),
+            )
+        }).collect();
+        let reverse: BTreeMap<_, _> = recipe_ids.iter().rev().map(|&recipe_id| {
+            (
+                recipe_id,
+                discovery_succeeds(master_seed, step, agent_id, recipe_id, 0.37),
+            )
+        }).collect();
+        assert_eq!(forward, reverse);
+        assert_ne!(
+            discovery_priority(master_seed, step, agent_id, 2),
+            discovery_priority(master_seed, step, agent_id + 1, 2)
+        );
+    }
+
+    #[test]
+    fn acquisition_draw_is_paired_by_route_slot_not_transmitted_recipe() {
+        let first_payload = 6_u16;
+        let shuffled_payload = 12_u16;
+        assert_ne!(first_payload, shuffled_payload);
+        let original_draw = acquisition_succeeds(2026, 5, 1, 4, 0, 0.5);
+        let shuffled_draw = acquisition_succeeds(2026, 5, 1, 4, 0, 0.5);
+        assert_eq!(original_draw, shuffled_draw);
+        assert_ne!(
+            acquisition_succeeds(2026, 5, 1, 4, 0, 0.5),
+            acquisition_succeeds(2026, 5, 1, 4, 1, 0.5)
+        );
     }
 
     #[test]
