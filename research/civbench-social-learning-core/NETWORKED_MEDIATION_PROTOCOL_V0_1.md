@@ -99,6 +99,14 @@ Proposed targets for the future exact reproduction and extension (not achieved r
 - stress test 0/5/20% transmission corruption, top-k size, recommender noise, and network rewiring;
 - require performance gains not to hide destructive loss of knowledge diversity or false confidence.
 
+## 6A. Disclosure boundary is a separate benchmark track
+
+The ring-plus-shortcuts recommender model above still uses a global previous-generation candidate pool; its `mediation_fraction` controls peer versus recommender access, not the privacy of recipient state. Do not describe that mechanism as federated or privacy-preserving.
+
+A separate executable disclosure comparison now exists in `adaptive_transmission.rs` and `privacy_disclosure_sweep.rs`: centralized full inventory versus a recipient-local coarse recipe-readiness signal versus no social transmission. It is documented in `PRIVACY_PRESERVING_TRANSMISSION_PROTOCOL_V0_1.md`. The two models should remain separate:
+- `networked_mediation.rs`: peer/global mediator ratio, network density and lineage diversity;
+- `adaptive_transmission.rs`: what recipient-state evidence the scheduler is allowed to observe.
+
 ## 7. Security and governance extension
 
 A recommender must not become a hidden authority. The next version should separately model authenticated source identity, evidence-calibrated quality, provenance-preserving forks, revocation of invalid traits and a diversity/novelty term. Any resulting capsule remains contestable and locally rejectable; popularity is not qualification.
