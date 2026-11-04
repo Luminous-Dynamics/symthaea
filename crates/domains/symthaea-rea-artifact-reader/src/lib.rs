@@ -12,6 +12,10 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
+use sha2::{Digest, Sha256};
+use zipcore::error::Kind as ZipErrorKind;
+use zipcore::{Archive as DecoderArchive, ReadOptions as DecoderReadOptions};
+
 const EOCD_SIGNATURE: u32 = 0x0605_4b50;
 const ZIP64_LOCATOR_SIGNATURE: u32 = 0x0706_4b50;
 const ZIP64_EOCD_SIGNATURE: u32 = 0x0606_4b50;
@@ -33,6 +37,7 @@ const ENCRYPTED_FLAG: u16 = 1;
 const UNIX_FILE_TYPE_MASK: u32 = 0o170000;
 const UNIX_DIRECTORY: u32 = 0o040000;
 const UNIX_SYMLINK: u32 = 0o120000;
+const MAX_CONTENT_READ_BUFFER_BYTES: usize = 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReaderErrorKind {
@@ -70,6 +75,18 @@ impl std::fmt::Display for ReaderError {
 }
 
 impl std::error::Error for ReaderError {}
+
+fn map_zipcore_error(context: &str, error: zipcore::Error) -> ReaderError {
+    let kind = match error.kind() {
+        ZipErrorKind::LimitExceeded => ReaderErrorKind::LimitExceeded,
+        ZipErrorKind::IntegrityFailure | ZipErrorKind::Malformed => {
+            ReaderErrorKind::InvalidArchive
+        }
+        ZipErrorKind::Unsupported | ZipErrorKind::Password => ReaderErrorKind::Unsupported,
+        _ => ReaderErrorKind::Io,
+    };
+    ReaderError::new(kind, format!("{context}: {error}"))
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReaderLimits {
@@ -140,6 +157,37 @@ pub struct ArtifactEntry {
     pub data_descriptor_end: Option<u64>,
     pub data_descriptor_has_signature: Option<bool>,
     pub limitations: Vec<String>,
+}
+
+/// Limits for verifying one admitted member occurrence without extracting it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContentVerificationLimits {
+    /// Hard ceiling on decompressed bytes. Verification fails rather than returning a partial hash.
+    pub max_uncompressed_bytes: u64,
+    /// Fixed streaming buffer, constrained to 1..=1 MiB.
+    pub read_buffer_bytes: usize,
+}
+
+impl Default for ContentVerificationLimits {
+    fn default() -> Self {
+        Self {
+            max_uncompressed_bytes: 128 * 1024 * 1024,
+            read_buffer_bytes: 64 * 1024,
+        }
+    }
+}
+
+/// A per-occurrence result. declared_compressed_bytes is archive metadata, not a measured
+/// count of bytes read from the compressed stream.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedEntryContent {
+    pub occurrence_index: u64,
+    pub sha256: String,
+    pub declared_compressed_bytes: u64,
+    pub declared_uncompressed_bytes: u64,
+    pub observed_uncompressed_bytes: u64,
+    pub verified_crc32: bool,
+    pub compression_method: u16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -304,6 +352,203 @@ impl ZipArtifactReader {
 
     pub fn inventory(&self) -> &ZipInventory {
         &self.inventory
+    }
+
+    /// Stream and hash one central-directory occurrence without extracting or writing it.
+    ///
+    /// The custom inventory remains the policy authority. A separately implemented decoder is
+    /// used only for bounded streaming and CRC verification; its metadata must match our
+    /// occurrence by index and exact fields before any bytes are consumed.
+    pub fn verify_entry_content(
+        &self,
+        occurrence_index: u64,
+        limits: ContentVerificationLimits,
+    ) -> Result<VerifiedEntryContent, ReaderError> {
+        self.verify_source()?;
+
+        if limits.read_buffer_bytes == 0
+            || limits.read_buffer_bytes > MAX_CONTENT_READ_BUFFER_BYTES
+        {
+            return Err(ReaderError::new(
+                ReaderErrorKind::LimitExceeded,
+                format!(
+                    "content read buffer must be between 1 and {MAX_CONTENT_READ_BUFFER_BYTES} bytes"
+                ),
+            ));
+        }
+
+        let index = usize::try_from(occurrence_index).map_err(|_| {
+            ReaderError::new(
+                ReaderErrorKind::LimitExceeded,
+                "member occurrence index does not fit this platform",
+            )
+        })?;
+        let expected = self.inventory.entries.get(index).ok_or_else(|| {
+            ReaderError::new(
+                ReaderErrorKind::InvalidArchive,
+                format!("member occurrence {occurrence_index} is not present in this inventory"),
+            )
+        })?;
+        if expected.occurrence_index != occurrence_index {
+            return Err(ReaderError::new(
+                ReaderErrorKind::InvalidArchive,
+                "inventory occurrence index does not match its central-directory position",
+            ));
+        }
+        if expected.encrypted {
+            return Err(ReaderError::new(
+                ReaderErrorKind::Unsupported,
+                "encrypted members are not eligible for content verification",
+            ));
+        }
+        if expected.kind != EntryKind::File {
+            return Err(ReaderError::new(
+                ReaderErrorKind::Unsupported,
+                "directory and symbolic-link members are not eligible for content verification",
+            ));
+        }
+        if !matches!(expected.compression_method, 0 | 8) {
+            return Err(ReaderError::new(
+                ReaderErrorKind::Unsupported,
+                format!(
+                    "compression method {} is not enabled for content verification",
+                    expected.compression_method
+                ),
+            ));
+        }
+        if expected.declared_uncompressed_size > limits.max_uncompressed_bytes {
+            return Err(ReaderError::new(
+                ReaderErrorKind::LimitExceeded,
+                format!(
+                    "member declares {} uncompressed bytes; verification limit is {}",
+                    expected.declared_uncompressed_size, limits.max_uncompressed_bytes
+                ),
+            ));
+        }
+
+        // A cloned descriptor refers to the same admitted file object. Offset correction remains
+        // enabled for prefixed carriers; raw offsets are reconciled with our absolute offsets.
+        let decoder_file = self
+            .file
+            .try_clone()
+            .map_err(|error| ReaderError::io("cannot clone admitted archive descriptor", error))?;
+        let decoder_limit = limits
+            .max_uncompressed_bytes
+            .min(expected.declared_uncompressed_size);
+        let options = DecoderReadOptions {
+            verify_crc: true,
+            verify_size: true,
+            max_entry_size: Some(decoder_limit),
+            offset_correction: true,
+            password: None,
+        };
+        let mut archive = DecoderArchive::new_with_options(decoder_file, options)
+            .map_err(|error| map_zipcore_error("secondary ZIP parser rejected archive", error))?;
+
+        if archive.len() != self.inventory.entries.len()
+            || archive.central_directory_offset() != self.inventory.regions.central_directory_offset
+            || archive.is_zip64() != self.inventory.regions.zip64
+        {
+            return Err(ReaderError::new(
+                ReaderErrorKind::InvalidArchive,
+                "secondary ZIP parser archive-level metadata differs from the admitted inventory",
+            ));
+        }
+
+        let decoder_entry = archive.entries().get(index).ok_or_else(|| {
+            ReaderError::new(
+                ReaderErrorKind::InvalidArchive,
+                "secondary ZIP parser omitted the selected member occurrence",
+            )
+        })?;
+        let corrected_header_offset = decoder_entry
+            .header_offset()
+            .checked_add(self.inventory.regions.leading_bytes);
+        let decoder_kind_matches = match expected.kind {
+            EntryKind::File => !decoder_entry.is_dir() && !decoder_entry.is_symlink(),
+            EntryKind::Directory => decoder_entry.is_dir() && !decoder_entry.is_symlink(),
+            EntryKind::Symlink => decoder_entry.is_symlink(),
+        };
+        if decoder_entry.name_raw() != expected.raw_name
+            || corrected_header_offset != Some(expected.local_header_offset)
+            || decoder_entry.flags() != expected.general_purpose_flags
+            || decoder_entry.method() != expected.compression_method
+            || decoder_entry.compressed_size() != expected.declared_compressed_size
+            || decoder_entry.uncompressed_size() != expected.declared_uncompressed_size
+            || decoder_entry.crc32() != expected.declared_crc32
+            || decoder_entry.has_data_descriptor() != expected.uses_data_descriptor
+            || decoder_entry.is_encrypted() != expected.encrypted
+            || !decoder_kind_matches
+        {
+            return Err(ReaderError::new(
+                ReaderErrorKind::InvalidArchive,
+                "secondary ZIP parser metadata differs from the selected custom inventory occurrence",
+            ));
+        }
+
+        let stream_result = (|| {
+            let mut member = archive
+                .by_index(index)
+                .map_err(|error| map_zipcore_error("cannot open selected ZIP member stream", error))?;
+            let mut buffer = vec![0u8; limits.read_buffer_bytes];
+            let mut hasher = Sha256::new();
+            let mut observed_uncompressed_bytes = 0u64;
+
+            loop {
+                let read = match member.read(&mut buffer) {
+                    Ok(read) => read,
+                    Err(io_error) => {
+                        return Err(match member.take_terminal_error() {
+                            Some(error) => map_zipcore_error("ZIP member stream verification failed", error),
+                            None => ReaderError::io("cannot read ZIP member stream", io_error),
+                        });
+                    }
+                };
+                if read == 0 {
+                    break;
+                }
+                observed_uncompressed_bytes = observed_uncompressed_bytes
+                    .checked_add(read as u64)
+                    .ok_or_else(|| {
+                        ReaderError::new(
+                            ReaderErrorKind::LimitExceeded,
+                            "observed uncompressed byte count overflow",
+                        )
+                    })?;
+                if observed_uncompressed_bytes > expected.declared_uncompressed_size
+                    || observed_uncompressed_bytes > limits.max_uncompressed_bytes
+                {
+                    return Err(ReaderError::new(
+                        ReaderErrorKind::LimitExceeded,
+                        "member stream exceeded its declared size or caller byte budget",
+                    ));
+                }
+                hasher.update(&buffer[..read]);
+            }
+
+            member.verify_to_end().map_err(|error| {
+                map_zipcore_error("ZIP member did not reach a verified end state", error)
+            })?;
+            Ok((
+                format!("{:x}", hasher.finalize()),
+                observed_uncompressed_bytes,
+            ))
+        })();
+
+        // Source stability is checked even when decoding failed. A mutated source must not be
+        // misreported as an ordinary CRC/codec failure, and no would-be result escapes.
+        self.verify_source()?;
+        let (sha256, observed_uncompressed_bytes) = stream_result?;
+
+        Ok(VerifiedEntryContent {
+            occurrence_index,
+            sha256,
+            declared_compressed_bytes: expected.declared_compressed_size,
+            declared_uncompressed_bytes: expected.declared_uncompressed_size,
+            observed_uncompressed_bytes,
+            verified_crc32: true,
+            compression_method: expected.compression_method,
+        })
     }
 
     /// Revalidate both the held descriptor and the currently selected path.
