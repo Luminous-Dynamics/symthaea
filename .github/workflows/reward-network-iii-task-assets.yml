@@ -62,7 +62,9 @@ jobs:
       - name: Hydrate selected LFS task assets and audit
         shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # This optional token must be authorized for the external upstream
+          # repository. Do not pass this repository's GITHUB_TOKEN across owners.
+          CIVBENCH_REWARD_NETWORK_LFS_TOKEN: ${{ secrets.REWARD_NETWORK_III_LFS_READ_TOKEN }}
         run: |
           set -euo pipefail
           python research/civbench-social-learning-core/scripts/hydrate_reward_network_task_assets.py \
