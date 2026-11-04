@@ -132,7 +132,7 @@ pub fn parse_cases(input: &str) -> Result<Vec<Case>, String> {
         if !matches!(case.estimand.as_str(), "R1" | "R2" | "R3") {
             return Err(format!("line {}: estimand must be R1, R2 or R3", line_index + 1));
         }
-        if !matches!(case.support.as_str(), "SUPPORTED" | "UNSUPPORTED" | "UNKNOWN") {
+        if !matches!(case.support.as_str(), "SUPPORTED" | "UNSUPPORTED" | "GLOBAL_ONLY" | "UNKNOWN") {
             return Err(format!("line {}: invalid support disposition", line_index + 1));
         }
         if !matches!(case.abduction.as_str(), "IDENTIFIED" | "PARTIAL" | "MISSING" | "NA") {
@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn all_golden_cases_match_their_preregistered_dispositions() {
         let cases = parse_cases(IDENTIFICATION_FIXTURES).expect("valid fixture set");
-        assert_eq!(cases.len(), 11);
+        assert_eq!(cases.len(), 12);
 
         for case in &cases {
             let actual = assess(case);
