@@ -553,8 +553,15 @@ pub fn score_musical_participation_set_v1(
             } else {
                 withhold_required_count += 1;
                 if prediction.decision.is_contribution() {
-                    family_false_entries += 1;
-                    false_entry_count += 1;
+                    family_withhold_violations += 1;
+                    withhold_violation_count += 1;
+                    if prediction.decision.is_entry() {
+                        family_false_entries += 1;
+                        false_entry_count += 1;
+                    } else if prediction.decision == MusicalParticipationDecisionV1::Yield {
+                        family_unauthorized_yields += 1;
+                        unauthorized_yield_count += 1;
+                    }
                 }
             }
 
