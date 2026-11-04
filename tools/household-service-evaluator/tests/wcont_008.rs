@@ -1,7 +1,7 @@
 use serde_json::Value;
 use symthaea_household_service_evaluator::{
-    evaluate_water_balance, MeterMeasurement, TopologyAuditReference, WaterBalanceDisposition,
-    WaterBalanceInput,
+    MeterMeasurement, TopologyAuditReference, WaterBalanceDisposition, WaterBalanceInput,
+    evaluate_water_balance,
 };
 
 fn meter(value_l: f64, stream: &str, boundary: &str) -> MeterMeasurement {
