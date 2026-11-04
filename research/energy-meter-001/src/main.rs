@@ -79,6 +79,12 @@ fn status_for_error(error: &EnergyMeterError) -> &'static str {
     }
 }
 
+fn discovery_is_complete(results: &[ProbeResult]) -> bool {
+    !results
+        .iter()
+        .any(|result| result.status.starts_with("discovery_"))
+}
+
 #[cfg(target_os = "linux")]
 fn discover_powercap(
     directory: &Path,
@@ -320,9 +326,7 @@ fn main() {
 
     discover_nvml(&mut meters, &mut errors);
     let sensor_results = probe_meters(meters, interval_ms, errors);
-    let discovery_complete = !sensor_results
-        .iter()
-        .any(|result| result.status.starts_with("discovery_"));
+    let discovery_complete = discovery_is_complete(&sensor_results);
     let discovered_sensor_count = sensor_results
         .iter()
         .filter(|result| result.descriptor.is_some())
@@ -351,5 +355,42 @@ fn main() {
             eprintln!("failed to serialize sensor probe report: {error}");
             std::process::exit(1);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unsupported_sensor_serializes_without_a_numeric_energy_value() {
+        let result = failed_result(
+            "test-gpu",
+            "cumulative energy counter is unsupported",
+            "unsupported",
+        );
+        let value = serde_json::to_value(&result).unwrap();
+
+        assert_eq!(value["status"], "unsupported");
+        assert_eq!(value["energy_joules"], serde_json::Value::Null);
+        assert_eq!(value["energy_microjoules"], serde_json::Value::Null);
+        assert!(value["error"].as_str().unwrap().contains("unsupported"));
+    }
+
+    #[test]
+    fn discovery_errors_make_inventory_incomplete() {
+        let unavailable = failed_result(
+            "/sys/class/powercap/intel-rapl:1",
+            "permission denied",
+            "discovery_directory_error",
+        );
+        let unsupported = failed_result(
+            "nvml-device-1",
+            "counter not supported",
+            "unsupported",
+        );
+
+        assert!(!discovery_is_complete(&[unavailable, unsupported]));
+        assert!(discovery_is_complete(&[unsupported]));
     }
 }
