@@ -83,6 +83,44 @@ Standards are test-method and safety references; they are not proof that a produ
 
 For each product profile, identify the exact current appliance-specific test methods and applicable national adoption before freezing a formal protocol. Maintain a standards register with edition, corrigenda, scope, test conditions, clauses used, deviations and owner.
 
+### South African appliance efficiency / labelling horizon — VC9008 Notice 7859 of 2026
+
+South Africa gazetted an amendment to the compulsory specification for energy efficiency and labelling of electrical/electronic appliances (VC9008) on **28 August 2026**, Government Notice 7859, Gazette 55257. The notice sets:
+- **Phase 1:** effective 12 months after publication, calculated as **28 August 2027**.
+- **Phase 2:** effective 24 months after publication, calculated as **28 August 2028**.
+
+The amended Table 1 sets these minimum energy performance classes (Phase 1 / Phase 2) and associated test-method references:
+
+| Appliance | Phase 1 | Phase 2 | Referenced method |
+|---|---:|---:|---|
+| Dishwasher | E | E | SANS IEC 60436 |
+| Front-load washing machine | E | E | SANS IEC 60456 |
+| Top-load washing machine | G | F | SANS IEC 60456 |
+| Washer-dryer combination | F | F | SANS IEC 62512 |
+| Tumble dryer | E | E | SANS IEC 61121 |
+| Refrigerator/freezer | G | F | SANS IEC 62552-1/-2/-3 |
+| Fixed-speed air conditioner/heat pump | G | F | SANS/ISO methods stated in VC9008 |
+| Portable air conditioner/heat pump | G | G | SANS/ISO methods stated in VC9008 |
+| Electric oven | D | D | SANS IEC 60350-1 |
+
+The amended specification also states off-mode ≤0.5 W; reactivation-only standby ≤0.5 W; defined display/standby combinations ≤1.0 W; network standby ≤2.0 W for relevant networked appliances (with separate 8.0 W provisions for HiNA/complex set-top boxes); and requires appliances to conform to the latest DEE energy-efficiency label.
+
+Sources:
+- South African Government notice listing, GoN 7859, Gazette 55257, 28 Aug 2026: https://www.gov.za/documents/notices?page=2
+- Notice 7859 and phase dates: https://www.acts.co.za/national/n7859_notice_no__7859_of_2026
+- VC9008 scope: https://source.acts.co.za/national-regulator-for-compulsory-specifications-act-2008/n7859_1__scope.php
+- VC9008 standby and specific requirements: https://test.acts.co.za/national-regulator-for-compulsory-specifications-act-2008/n7859_4__specific_requirements.php
+- Table 1 image from the published schedule: https://test.acts.co.za/national-regulator-for-compulsory-specifications-act-2008/hmfile_hash_02d7fe0e.png
+- Department of Electricity and Energy appliance-labelling programme: https://www.dee.gov.za/appliance-labelling/
+
+These are **minimum market-access requirements**, not competitive targets or proof of product superiority. Confirm the current consolidated VC9008 text, exact product scope, applicable standard edition, label template, sampling/approval rules and transition treatment with NRCS/DEE before design freeze or sale. This is a South African requirement; EU rules do not replace it. Assess off-grid/battery/solar exemptions against the exact product architecture and statutory wording—do not assume a hybrid grid-connected appliance is exempt merely because it also accepts solar input.
+
+Portfolio impact:
+- InstantClean and FabricCare must design for the applicable dishwasher/laundry methods and label/MEPS classes.
+- FoodSteward refrigeration designs and HeatBank/air-conditioning heat-pump configurations need category-specific applicability review.
+- AirCare ventilation/air-cleaning products may fall outside the listed product categories unless they include a regulated air-conditioning/heat-pump function; classify the actual design rather than its marketing name.
+- Always report energy and service outcomes under the independent programme protocol in addition to formal MEPS label data.
+
 ## 6. Product portfolio and competitive claim discipline
 
 ### InstantClean — verified warewashing
