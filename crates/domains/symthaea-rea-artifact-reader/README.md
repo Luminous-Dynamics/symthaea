@@ -27,6 +27,7 @@ The custom Rust parser is the policy authority for:
 - Decompressed bytes are read through a fixed-size buffer, hashed incrementally, and bounded by both caller budget and declared uncompressed size.
 - A result is returned only after EOF and decoder CRC/size verification. A partial read is not a successful verification.
 - The held descriptor and selected path are revalidated after the attempt; source change discards the result.
+- Source-stability qualification is currently platform-gated: content verification is enabled only on Unix, where the admitted descriptor and selected path are checked using device, inode, size, mode, mtime and ctime. On non-Unix, metadata inventory remains available using a weaker best-effort identity, but content verification returns explicit `Unsupported` until handle-bound identity is qualified under [#10452](https://github.com/Luminous-Dynamics/symthaea/issues/10452).
 - Each verification call opens independent decoder and identity-witness descriptors instead of sharing the inventory descriptor's file cursor; concurrent calls do not race through a shared seek position.
 - A deterministic 256-sample, three-bit-flip mutation smoke test exercises admission and, when admitted, content verification under panic capture; this is not a substitute for coverage-guided fuzzing.
 - `declared_compressed_bytes` is metadata, not a measured compressed-byte count.
