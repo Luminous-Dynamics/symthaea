@@ -157,22 +157,36 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
-      - name: Verify vendored DAPS Git blob identity
+      - name: Verify vendored DAPS Git blob identity and source bytes
         shell: bash
         run: |
           set -euo pipefail
-          fixture="tools/pitb-daps-graph-import/fixtures/daps-example-graph.json"
-          tree_entry="$(git ls-tree HEAD -- "$fixture")"
-          echo "DAPS_FIXTURE_TREE_ENTRY=$tree_entry"
-          case "$tree_entry" in
-            *"blob ff3e07e7a4867c969f4ed739497f78b6a77209f"*) ;;
-            *) echo "expected upstream DAPS blob ID not present in HEAD tree" >&2; exit 1 ;;
-          esac
-          test -s "$fixture"
-          echo "DAPS_SOURCE_GRAPH_GIT_TREE_ID_PASS ff3e07e7a4867c969f4ed739497f78b6a77209f"
-          fixture_sha256="$(sha256sum "$fixture" | awk '{print $1}')"
-          echo "DAPS_SOURCE_GRAPH_RAW_SHA256=$fixture_sha256"
-          echo "DAPS_SOURCE_GRAPH_SHA256=$fixture_sha256" >> "$GITHUB_ENV"
+          python3 - <<'PY'
+          import hashlib
+          import os
+          import subprocess
+          from pathlib import Path
+
+          relative = "tools/pitb-daps-graph-import/fixtures/daps-example-graph.json"
+          entry = subprocess.check_output(
+              ["git", "ls-tree", "HEAD", "--", relative], text=True
+          ).strip()
+          fields = entry.split()
+          if len(fields) < 3 or fields[1] != "blob":
+              raise SystemExit(f"fixture is not a committed blob: {entry!r}")
+          expected_git_blob = "ff3e07e7a4867c969f4ed739497f78b6a77209f"
+          if fields[2] != expected_git_blob:
+              raise SystemExit(f"upstream DAPS blob mismatch: {fields[2]}")
+          fixture = Path(relative)
+          raw = fixture.read_bytes()
+          if not raw:
+              raise SystemExit("DAPS fixture is empty")
+          raw_sha256 = hashlib.sha256(raw).hexdigest()
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
+              env.write(f"DAPS_SOURCE_GRAPH_SHA256={raw_sha256}\\n")
+          print(f"DAPS_SOURCE_GRAPH_GIT_BLOB_PASS {fields[2]}")
+          print(f"DAPS_SOURCE_GRAPH_RAW_SHA256_PASS {raw_sha256}")
+          PY
 
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
