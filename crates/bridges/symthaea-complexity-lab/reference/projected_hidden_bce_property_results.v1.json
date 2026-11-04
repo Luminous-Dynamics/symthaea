@@ -1,0 +1,13 @@
+{
+ "format":"symthaea.projected-hidden-bce-property-results",
+ "version":1,
+ "claim_ceiling":"seeded_small_formula_exhaustive_property_tests_not_formal_proof_or_large_scale_solver",
+ "seed":946216,"positive_cases":2000,"positive_cases_passed":2000,
+ "all_positive_cases_preserved_projected_support":true,
+ "all_positive_cases_preserved_exact_visible_weighted_value":true,
+ "positive_cases_with_changed_full_model_count":1420,
+ "nonblocked_negative_control":{"classified_as_blocked":false,"source_full_models":1,"target_full_models":3,"source_projected_support":["1"],"target_projected_support":["0","1"],"support_change_detected":true},
+ "runtime":{"python":"3.13.5","platform":"linux"},
+ "script_sha256":"sha256:df08b43fa61d075452243991af9fae56b6fdf7c9d64328b1782c668d12f7046d",
+ "execution":"local_reference_script_passed"
+}
