@@ -123,6 +123,7 @@
         "descriptor_identity_sha256",
         "pair_index",
         "cpal_callback_stream_time_ns",
+        "cpal_playback_stream_time_ns",
         "runner_time_before_ns",
         "runner_time_after_ns"
       ],
@@ -157,6 +158,10 @@
           "minimum": 0
         },
         "runner_time_after_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cpal_playback_stream_time_ns": {
           "type": "integer",
           "minimum": 0
         }
