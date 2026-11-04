@@ -354,8 +354,10 @@ pub struct DecisionRecord {
     pub reason: String,
     /// Exact hypothesis revision records considered.
     pub hypothesis_record_ids: Vec<String>,
-    /// Evidence required to justify the decision.
+    /// Evidence already available and considered for the decision.
     pub required_evidence_ids: Vec<String>,
+    /// Missing evidence, information or authority that blocks progress.
+    pub missing_requirements: Vec<String>,
     /// Append order.
     pub sequence: u64,
 }
@@ -890,7 +892,13 @@ impl Ledger {
                 return Err(ValidationError::InvalidDecisionRecord);
             }
             if decision.kind == DecisionKind::ProceedToRepair
-                && decision.hypothesis_record_ids.is_empty()
+                && (decision.hypothesis_record_ids.is_empty()
+                    || !decision.missing_requirements.is_empty())
+            {
+                return Err(ValidationError::InvalidDecisionRecord);
+            }
+            if matches!(decision.kind, DecisionKind::Abstain | DecisionKind::Escalate)
+                && decision.missing_requirements.iter().all(|item| item.trim().is_empty())
             {
                 return Err(ValidationError::InvalidDecisionRecord);
             }
@@ -1044,6 +1052,7 @@ mod tests {
                 reason: "The controlled configuration perturbation discriminated the leading hypothesis.".into(),
                 hypothesis_record_ids: vec!["h1-r1".into()],
                 required_evidence_ids: vec!["e-intervention".into()],
+                missing_requirements: vec![],
                 sequence: 7,
             }],
             repairs: vec![RepairRecord {
@@ -1113,10 +1122,9 @@ mod tests {
         revision.status = HypothesisStatus::Unresolved;
         revision.sequence = 7;
         ledger.hypotheses.push(revision);
-        ledger.decisions[0].sequence = 7;
-        ledger.decisions[0].sequence = 7;
-        ledger.repairs[0].sequence = 8;
-        ledger.grades[0].sequence = 9;
+        ledger.decisions[0].sequence = 8;
+        ledger.repairs[0].sequence = 9;
+        ledger.grades[0].sequence = 10;
         assert_eq!(ledger.validate(), Ok(()));
     }
 
@@ -1207,9 +1215,22 @@ mod tests {
         let mut ledger = base_ledger();
         ledger.decisions[0].kind = DecisionKind::Abstain;
         ledger.decisions[0].reason = "The observation is non-identifying under the permitted budget.".into();
+        ledger.decisions[0].missing_requirements = vec!["A permitted discriminating intervention is unavailable.".into()];
         ledger.repairs.clear();
         ledger.grades.clear();
         assert_eq!(ledger.validate(), Ok(()));
+    }
+
+    #[test]
+    fn abstention_requires_an_explicit_missing_requirement() {
+        let mut ledger = base_ledger();
+        ledger.decisions[0].kind = DecisionKind::Abstain;
+        ledger.repairs.clear();
+        ledger.grades.clear();
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::InvalidDecisionRecord)
+        );
     }
 
     #[test]
@@ -1282,8 +1303,9 @@ mod tests {
         duplicate.source_action_id = Some("a1".into());
         ledger.outcomes[0].sequence = 6;
         ledger.hypotheses[0].sequence = 7;
-        ledger.repairs[0].sequence = 8;
-        ledger.grades[0].sequence = 9;
+        ledger.decisions[0].sequence = 8;
+        ledger.repairs[0].sequence = 9;
+        ledger.grades[0].sequence = 10;
         ledger.evidence.push(duplicate);
         ledger.hypotheses[0].supporting_evidence_ids.push("e-copy".into());
         assert_eq!(
