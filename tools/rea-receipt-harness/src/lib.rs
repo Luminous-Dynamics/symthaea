@@ -770,7 +770,47 @@ mod tests {
         assert!(validate_receipt(&schema, &rejected).is_err());
 
         rejected["observations"]["payload_sha256"] = Value::Null;
+        rejected["observations"]["failure_kind"] = json!("invalid_archive");
+        rejected["observations"]["failure_detail"] = json!("seeded malformed input");
         assert!(validate_receipt(&schema, &rejected).is_ok());
+
+        rejected["observations"]["failure_kind"] = json!("source_changed");
+        assert!(validate_receipt(&schema, &rejected).is_err());
+    }
+
+    #[test]
+    fn verified_receipt_rejects_noncanonical_base64_and_inconsistent_offsets() {
+        let schema = schema();
+        let mut bad_base64 = valid_verified_receipt();
+        bad_base64["occurrence"]["raw_filename_base64"] = json!("Y Q==");
+        assert!(validate_receipt(&schema, &bad_base64).is_err());
+
+        let mut bad_offsets = valid_verified_receipt();
+        bad_offsets["occurrence"]["data_offset_absolute"] = json!("0");
+        assert!(validate_receipt(&schema, &bad_offsets).is_err());
+    }
+
+    #[test]
+    fn verified_receipt_rejects_archive_and_occurrence_budget_exceedance() {
+        let schema = schema();
+        let mut oversized_archive = valid_verified_receipt();
+        oversized_archive["limits"]["max_archive_bytes"] = json!("100");
+        assert!(validate_receipt(&schema, &oversized_archive).is_err());
+
+        let mut missing_entry_budget = valid_verified_receipt();
+        missing_entry_budget["limits"]["max_entries"] = json!("0");
+        assert!(validate_receipt(&schema, &missing_entry_budget).is_err());
+    }
+
+    #[test]
+    fn raw_parse_and_validation_is_one_fail_closed_operation() {
+        let schema = schema();
+        let receipt = valid_verified_receipt();
+        let raw = serde_json::to_vec(&receipt).unwrap();
+        assert!(parse_and_validate_receipt(&schema, &raw).is_ok());
+
+        let duplicate = br#"{"outcome":"verified","outcome":"rejected"}"#;
+        assert!(parse_and_validate_receipt(&schema, duplicate).is_err());
     }
 
     #[test]
