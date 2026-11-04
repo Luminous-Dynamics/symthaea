@@ -87,6 +87,36 @@ struct SemanticAttestation {
     signature_hex: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+struct VerificationReport {
+    schema_version: String,
+    receipt_sha256: String,
+    registry_sha256: String,
+    trust_root_sha256: String,
+    registry_id: String,
+    registry_version: u64,
+    root_key_id: String,
+    authority_key_id: String,
+    reviewer_id: String,
+    reviewer_key_id: String,
+    signer_status: String,
+    signer_scopes: Vec<String>,
+    signed_at_unix: u64,
+    registry_payload_sha256: String,
+    attestation_payload_sha256: String,
+    registry_signature_sha256: String,
+    attestation_signature_sha256: String,
+    registry_signature_verified: bool,
+    reviewer_signature_verified: bool,
+    semantic_review_approved: bool,
+    openssl_version: String,
+    openssl_binary_sha256: String,
+    minimum_registry_version: u64,
+    authenticated: bool,
+    scoring_admission: bool,
+    trust_boundary: String,
+}
+
 fn sha256(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
@@ -405,6 +435,24 @@ fn validate_registry(
     Ok((payload_sha256, signature))
 }
 
+fn valid_github_remote(value: &str) -> bool {
+    let Some(rest) = value.strip_prefix("https://github.com/") else {
+        return false;
+    };
+    if rest.contains('?') || rest.contains('#') || rest.ends_with('/') {
+        return false;
+    }
+    let clean = rest.strip_suffix(".git").unwrap_or(rest);
+    let parts: Vec<&str> = clean.split('/').collect();
+    parts.len() == 2
+        && parts.iter().all(|part| {
+            !part.is_empty()
+                && *part != "."
+                && *part != ".."
+                && part.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+        })
+}
+
 fn validate_attestation(receipt: &SemanticAttestation) -> Result<(), String> {
     if receipt.schema_version != RECEIPT_SCHEMA {
         return Err("unsupported semantic attestation schema".into());
@@ -419,6 +467,23 @@ fn validate_attestation(receipt: &SemanticAttestation) -> Result<(), String> {
         ("reviewer_key_id", receipt.reviewer_key_id.as_str()),
     ] {
         non_empty(value, label)?;
+    }
+    if !valid_github_remote(&receipt.repository_remote) {
+        return Err("repository_remote must be a canonical GitHub HTTPS owner/repository URL".into());
+    }
+    let source = Path::new(&receipt.source_path);
+    if source.is_absolute()
+        || receipt.source_path.contains('\\')
+        || source.components().any(|part| matches!(part, std::path::Component::ParentDir | std::path::Component::CurDir))
+        || !receipt.source_path.ends_with(".lean")
+    {
+        return Err("source_path must be a normalized repository-relative Lean path".into());
+    }
+    if receipt.start_line == 0
+        || receipt.end_line < receipt.start_line
+        || (receipt.end_line == receipt.start_line && receipt.end_column <= receipt.start_column)
+    {
+        return Err("source coordinates are invalid".into());
     }
     if !valid_hex(&receipt.task_id, 64) || !valid_hex(&receipt.repository_commit, 40) {
         return Err("task_id or repository commit has invalid digest syntax".into());
@@ -543,6 +608,8 @@ fn verify_all(
         signed_at_unix: receipt.issued_at_unix,
         registry_payload_sha256,
         attestation_payload_sha256,
+        registry_signature_sha256: sha256(&decode_hex(&registry.signature_hex, "registry signature")?),
+        attestation_signature_sha256: sha256(&signature),
         registry_signature_verified: true,
         reviewer_signature_verified: true,
         semantic_review_approved: receipt.reviewer_decision == "pass"
@@ -851,11 +918,32 @@ mod tests {
     }
 
     #[test]
+    fn repository_identity_requires_canonical_github_owner_and_repo() {
+        assert!(valid_github_remote("https://github.com/owner/repository"));
+        assert!(valid_github_remote("https://github.com/owner/repo.git"));
+        assert!(!valid_github_remote("https://github.com/owner/repo/extra"));
+        assert!(!valid_github_remote("https://github.com/owner/../repo"));
+        assert!(!valid_github_remote("https://github.com/owner/repo?ref=main"));
+        assert!(!valid_github_remote("git@github.com:owner/repo.git"));
+    }
+
+    #[test]
     fn canonical_payload_is_stable_under_json_whitespace_and_member_order() {
         let payload = synthetic_receipt();
-        let a = attestation_payload(&payload).unwrap();
-        let mut reordered = payload.clone();
-        reordered.reviewer_id = payload.reviewer_id.clone();
-        assert_eq!(a, attestation_payload(&reordered).unwrap());
+        let expected = attestation_payload(&payload).unwrap();
+        let value = serde_json::to_value(&payload).unwrap();
+        let object = value.as_object().unwrap();
+        let mut fields: Vec<_> = object.iter().collect();
+        fields.reverse();
+        let reordered_fields = fields.iter().map(|(key, value)| {
+            format!(
+                "{}: {}",
+                serde_json::to_string(key).unwrap(),
+                serde_json::to_string(value).unwrap()
+            )
+        }).collect::<Vec<_>>().join(",\n  ");
+        let reordered_json = format!("{{\n  {reordered_fields}\n}}");
+        let decoded: SemanticAttestation = serde_json::from_str(&reordered_json).unwrap();
+        assert_eq!(expected, attestation_payload(&decoded).unwrap());
     }
 }
