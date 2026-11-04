@@ -160,3 +160,8 @@ Report a vector, not a scalar:
 ## 10. Claim ceiling
 
 This contract is a decision-policy and benchmark proposal. It does not authorize live control, create utility independence, establish water or food safety, approve electrical/plumbing work, qualify a treatment process, or prove household resilience. Any physical installation or integration requires the relevant local professional and authority review.
+
+
+## 11. Machine-readable synthetic challenge manifest
+
+The companion fixture `household-resource-arbitration-scenarios-v0.1.json` carries HRA-001…014 with structured stimuli, expected decision semantics, required assertions, prohibited behaviors and explicit acceptance gates. All entries are marked synthetic-only and proposed/not executed. This is a challenge manifest; it does not authorize equipment actuation or establish physical performance.
