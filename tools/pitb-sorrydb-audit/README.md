@@ -53,6 +53,21 @@ For a local checkout of the pinned upstream repository:
       /tmp/sorrydb-audit-report.json \
       --pinned-source SorryDB/SorryDB@74b3b63f8ba890d675f362924b21ac55db410383
 
+## Verify a task against committed source bytes
+
+The auditor can independently verify one SorryDB row against a local repository checkout. It checks the immutable `repo.commit`, the configured `origin`, the committed `HEAD:lean-toolchain`, and the committed `HEAD:<source-path>` object. It converts the database's zero-based character columns to UTF-8 byte offsets and requires the exact source span to contain `sorry`.
+
+```sh
+cargo run --locked --manifest-path tools/pitb-sorrydb-audit/Cargo.toml -- \
+  --verify-checkout /path/to/one-sorry-record.json \
+  /path/to/repository-checkout \
+  /tmp/source-checkout-receipt.json
+```
+
+This reads from Git objects, not working-tree files. A local uncommitted edit cannot change the bytes being verified. The resulting `pitb.sorrydb-source-checkout.v0` receipt includes the task ID, repository commit, Lean version, source coordinates and source-file SHA-256. It always sets `scoring_admission=false`: confirming the token is present does not reproduce the elaborated goal, build the project, or establish the informal specification.
+
+The exact-head workflow runs an integration control that commits a synthetic Lean file, dirties the working copy, and verifies that the source checker still reads the original committed `sorry` span. It also validates the generated receipt against `sorrydb-source-checkout-v0.schema.json`.
+
 ## From task record to admissible proof result
 
 A task is not independently reproduced merely because its JSON row contains a commit and a pretty-printed goal. For each scored task:
