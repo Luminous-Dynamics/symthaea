@@ -61,6 +61,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let receipt = json!({
         "receipt_version": "1.0",
+        "source_commit": env::var("GITHUB_SHA").ok(),
         "corpus_id": corpus.get("corpus_id"),
         "case_count": results.len(),
         "reference_case_count": expected.len(),
