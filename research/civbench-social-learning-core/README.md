@@ -272,6 +272,18 @@ Run:
 cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.toml --bin privacy-disclosure-sweep > privacy-disclosure-sweep.csv
 ```
 
+## Privacy-preserving recipient-state disclosure
+
+The adaptive-transmission engine now supports two explicit routing information boundaries:
+- `CentralFullInventory`: centralized full recipient-state visibility as a research upper bound;
+- `CoarseRecipeReadiness`: a recipient-side need signal with an unheld recipe ID and a prerequisite-readiness scalar, without giving the scheduler the recipient's full element/recipe inventory.
+
+The coarse mode rejects collective-novelty program features that require a global inventory. Every `Run` records its disclosure mode. The `privacy-disclosure-sweep` binary compares central, coarse and no-social conditions over three synthetic task families and 256 fixed seeds per family, with paired coverage differences and message/attention/acquisition metrics. CI now executes this sweep after the Rust test gate and uploads the CSV artifact.
+
+This is **data minimization, not a formal privacy guarantee**. The request/readiness signal can still reveal which recipe is needed and how close the recipient is to executing it. It does not implement differential privacy, secure aggregation, cryptographic confidentiality, consent enforcement or rights authorization.
+
+Protocol: [PRIVACY_PRESERVING_TRANSMISSION_PROTOCOL_V0_1.md](PRIVACY_PRESERVING_TRANSMISSION_PROTOCOL_V0_1.md). Leakage-attack and authorization tests are tracked in [issue #10413](https://github.com/Luminous-Dynamics/symthaea/issues/10413).
+
 ## Cross-project adaptive-transmission event contract
 
 The proposed event envelope and JSON Schema are:
