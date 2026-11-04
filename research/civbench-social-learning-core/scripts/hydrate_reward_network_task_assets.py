@@ -98,11 +98,12 @@ def post_json(url: str, payload: dict[str, Any]) -> dict[str, Any]:
         "User-Agent": "CivBench-TaskNetwork-Audit/0.1",
     }
 
-    # Git LFS uses HTTP Basic auth for its batch API. GitHub Actions supplies
-    # a short-lived, read-only GITHUB_TOKEN through the workflow environment.
-    # Never log or persist this credential; signed download URLs/headers returned
-    # by the batch response are used for the actual object requests.
-    token = os.environ.get("GITHUB_TOKEN")
+    # The workflow's GITHUB_TOKEN is scoped to this repository and must not
+    # be reused as an identity for the external research repository. Anonymous
+    # access is attempted by default; an explicitly configured upstream
+    # read-only credential may be supplied through the dedicated environment
+    # variable. Never log or persist credentials or signed download URLs.
+    token = os.environ.get("CIVBENCH_REWARD_NETWORK_LFS_TOKEN")
     if token:
         credential = base64.b64encode(
             f"x-access-token:{token}".encode("utf-8")
@@ -120,7 +121,23 @@ def post_json(url: str, payload: dict[str, Any]) -> dict[str, Any]:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         details = exc.read(4096).decode("utf-8", errors="replace")
-        raise RuntimeError(f"Git LFS batch endpoint returned HTTP {exc.code}: {details}") from exc
+        if exc.code == 401:
+            guidance = (
+                "Configure CIVBENCH_REWARD_NETWORK_LFS_TOKEN with a read-only "
+                "credential authorized for the upstream research repository."
+            )
+        elif exc.code == 404:
+            guidance = (
+                "The upstream LFS service reports that the repository is not "
+                "available to the supplied identity. Verify the upstream URL "
+                "and access rights; the current repository's GITHUB_TOKEN is "
+                "intentionally not used for this external repository."
+            )
+        else:
+            guidance = "Check the upstream LFS service response and retry policy."
+        raise RuntimeError(
+            f"Git LFS batch endpoint returned HTTP {exc.code}: {details}. {guidance}"
+        ) from exc
 
 
 def download_lfs_object(action: dict[str, Any], target: str) -> bytes:
