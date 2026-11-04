@@ -204,6 +204,15 @@ pub struct FitResult {
 
 impl FitResult {
     fn failure(status: FitStatus, optimizer: Optimizer, note: impl Into<String>) -> Self {
+        Self::failure_after_starts(status, optimizer, note, 0)
+    }
+
+    fn failure_after_starts(
+        status: FitStatus,
+        optimizer: Optimizer,
+        note: impl Into<String>,
+        starts_attempted: usize,
+    ) -> Self {
         Self {
             status,
             estimate: None,
@@ -212,7 +221,7 @@ impl FitResult {
                 negative_log_likelihood: None,
                 gradient_norm: None,
                 iterations: 0,
-                starts_attempted: 0,
+                starts_attempted,
                 solution_objective_spread: None,
                 solution_parameter_spread: None,
                 diagonal_curvature: None,
@@ -257,10 +266,11 @@ pub fn fit_with_optimizer(
     }
 
     if runs.is_empty() {
-        return FitResult::failure(
+        return FitResult::failure_after_starts(
             FitStatus::NotConverged,
             optimizer,
             "all optimizer starts produced non-finite likelihoods",
+            options.starts,
         );
     }
 
