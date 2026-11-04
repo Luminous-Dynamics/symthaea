@@ -19,10 +19,10 @@ SCPOG reverse-implication checking needs repeated membership checks over Skolem-
 
 | Representation | Storage | Lookup time | ns/query |
 |---|---:|---:|---:|
-| Python hash set | 40.105 MiB | 10.013 ms | 116.4 |
-| Sorted uint32 arrays | 2.742 MiB | 31.090 ms | 361.5 |
-| Dense bitsets | 7.056 MiB | 32.705 ms | 380.2 |
-| Hybrid sparse/dense | 1.787 MiB | 23.890 ms | 277.7 |
+| Python hash set | 40.105 MiB | 9.410 ms | 109.4 |
+| Sorted uint32 arrays | 2.742 MiB | 27.465 ms | 319.3 |
+| Dense bitsets | 7.056 MiB | 22.804 ms | 265.1 |
+| Hybrid sparse/dense | 1.787 MiB | 23.864 ms | 277.4 |
 
 The hybrid used about 22.4x less storage than Python hash sets, at about 2.38x the lookup time in CPython. It used less storage than the always-sorted or always-dense alternatives on this fixture.
 
@@ -39,3 +39,15 @@ The experiment used that threshold (2,048 for a 65,536-literal universe). A form
 ## Next
 
 Port the three representations to a CakeML/HOL4 microbenchmark using the actual SCPOG Skolem literal access pattern. Measure verified heap allocations and runtime on the published 172-input cohort. Select the representation by measured degree/density and include the data-structure invariant in the refinement proof.
+
+
+## Exact uploaded-artifact execution
+
+The uploaded script was fetched from the public branch and reconstructed byte-for-byte locally. The reconstructed file's Git blob SHA-1 matched the remote file before execution.
+
+- Git blob SHA-1: 4bf3dad70ac8a06e7f68fb4c05d6464b43084d12
+- Script SHA-256: a85fa5baae40159ba60cdcf1eae23d02a6080d003ee1545cb6ea87f3cc125a9a
+- Runtime: CPython 3.13.5, Linux
+- Exact run: 86,016 queries, 43,384 identical positive memberships across all four layouts.
+
+Lookup times are a single process run and remain indicative only; do not infer CakeML performance from them.
