@@ -287,5 +287,67 @@
       "url": "https://www.who.int/publications/i/item/9789240015241"
     }
   ],
-  "claim_ceiling": "No physical household performance, municipal compliance, drinking-water safety, product certification or local installation permission is established by this profile."
+  "claim_ceiling": "No physical household performance, municipal compliance, drinking-water safety, product certification or local installation permission is established by this profile.",
+  "drinking_water_quality_reference": {
+    "standard_name": "SANS 241 — Drinking water quality",
+    "current_revision_context": "SANS 241:2025 migration",
+    "legal_reference": "Government Gazette 52814 / GoN 6292 defines SANS 241 as the South African drinking-water standard as may be updated.",
+    "revision_guard": "Confirm the current controlled SANS publication and applicable clauses before conformity assessment; do not hardcode parameter limits from explanatory presentations.",
+    "monitoring_model": {
+      "type": "risk_based_and_system_specific",
+      "concepts": [
+        "ongoing water-quality risk assessment",
+        "mandatory process-risk parameters and routine monitoring",
+        "system-specific risk-defined parameters selected by risk assessment",
+        "source/final-water/distribution sampling-point representativeness",
+        "separate system classification for water supply, borehole, mobile tanker and static tank contexts where applicable",
+        "management of non-compliant results, corrective action and verification"
+      ],
+      "applicability_guard": "The exact monitoring obligations, parameters, sample locations and frequencies are determined by the current SANS text and the qualified programme for the actual source/system. No universal sample TTL is imposed here."
+    },
+    "quality_evidence_fields_required_for_a_claim": [
+      "water_source_id_and_source_class",
+      "supply_system_or_treatment_system_revision",
+      "intended_water_use_class",
+      "physical_sample_point_id_and_delivery_boundary",
+      "sample_collected_at_and_chain_of_custody",
+      "sampling_method_and_laboratory_or_qualified_method_identity",
+      "parameter_identity_method_detection_limit_and_unit",
+      "measured_result_with_uncertainty_or_qualifier",
+      "applicable_sans_241_edition_and_risk_assessment_revision",
+      "monitoring_programme_due_state_and_next_required_action",
+      "treatment_configuration_and_bypass_or_fault_state",
+      "storage_identity_residence_and_material_stagnation_events",
+      "noncompliance_incident_and_corrective_action_status"
+    ],
+    "qualification_states": [
+      "QualifiedForDeclaredUse",
+      "KnownNonCompliance",
+      "UnknownEvidenceInsufficient",
+      "ExpiredOrMonitoringOverdue",
+      "SourceOrSamplePointMismatch",
+      "CorrectiveActionPending"
+    ],
+    "source_to_use_guards": [
+      "A sample observation is bound to its exact source/system, sample point and collection time.",
+      "Evidence at one boundary does not qualify a different downstream boundary without an explicit validated transfer or downstream sample.",
+      "A source switch, unqualified blend, treatment bypass, material treatment fault or relevant storage event invalidates automatic reuse of prior evidence; the resulting state is Unknown until requalification.",
+      "Physical delivery remains observable even when quality is Unknown or KnownNonCompliance; it receives no drinking-water service credit without the applicable qualification.",
+      "Non-potable reuse qualification never implies drinking-water qualification."
+    ],
+    "sources": [
+      {
+        "id": "RAND_WATER_SANS241_2025_MIGRATION_BRIEFING_2026",
+        "publisher": "Rand Water",
+        "url": "https://www.randwater.co.za/media/forums/presentations/RW%20-%20Migrating%20from%20SANS%20241%202015%20to%20SANS%20241%202025.pdf",
+        "type": "technical_migration_briefing_not_the_standard"
+      },
+      {
+        "id": "SABS_SANS241_2025_UPDATE_REPORT_2026",
+        "publisher": "Plumbing Africa reporting on SABS update",
+        "url": "https://plumbingafrica.co.za/update-to-sans-241/",
+        "type": "secondary_reporting_not_the_standard"
+      }
+    ]
+  }
 }
