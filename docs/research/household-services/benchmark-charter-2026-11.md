@@ -167,7 +167,37 @@ Do not hide the Pareto trade-off. Publish the separate measures and the decision
 
 A superiority claim requires the same functional unit and outcome quality, a named incumbent, a frozen protocol, enough independent units/runs for the target precision, uncertainty-aware analysis and independent confirmation. If quality is not equivalent, the resource-per-service comparison is invalid.
 
-## 8. Adversarial controls common to all products
+## 8. Repairability, firmware support and requalification
+
+Repairability must be tested as restoration of useful function, not inferred from access to fasteners or a high-level score.
+
+The European Commission launched a public consultation on 3 November 2026 for possible horizontal ecodesign repairability requirements. Topics include spare-part access, repair/maintenance information, software/firmware, disassembly/reassembly and point-of-sale repairability information. The consultation is open until 9 February 2027 and informs a possible delegated act planned for 2027:
+https://environment.ec.europa.eu/news/commission-launches-public-consultation-making-products-easier-repair-2026-11-03_en
+
+Directive (EU) 2024/1799 has applied from 31 July 2026, but its repair obligations apply only to goods and to the extent covered by repairability requirements in applicable EU product legislation (Annex II). Do not imply that all products or non-EU jurisdictions are automatically covered:
+https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024L1799-20260731
+
+Cross-product repair qualification should cover:
+- replaceable critical modules, actual disassembly/reassembly time and tool requirements;
+- repair instructions, diagrams, diagnostic information and available parts;
+- spare part price, supply lead time, last-sale support horizon and qualified substitutes;
+- firmware support horizon, offline operation, signed updates, recovery/rollback and security maintenance;
+- post-repair functional verification, calibration and product-specific safety requalification;
+- effects of repair/replacement on hygiene, ingress protection, thermal integrity, hydraulic separation and other product-specific boundaries;
+- recurrence, repeat repairs, component consumption, user/service labor and lifetime cost.
+
+Do not make modularity an absolute goal: additional connectors, seals and interfaces can increase leak paths, failure modes, size, cost and embodied impacts. Compare modular, integrated and replaceable-subassembly architectures against the same service and safety requirements.
+
+Relevant cross-product work: [HOME-REPAIR-QUAL-001 #10358](https://github.com/Luminous-Dynamics/symthaea/issues/10358).
+
+## 9. South African water-continuity scenario freshness
+
+The 29 October 2026 Johannesburg Water statement remains a valid snapshot of the severe-constraint period, but it is not the newest status. On 3 November 2026 SAnews reported overall Johannesburg reservoir storage at 41%, up from 37% the previous day, while some households were still reporting dry taps for more than 10 days and several zones remained under active management:
+https://www.sanews.gov.za/node/85387
+
+Use this as a scenario-design signal only. Do not treat one snapshot as a forecast or household-demand estimate. The benchmark should separately model short pressure drops, multi-day outages, staggered restoration and post-restoration pressure/airlock events, with uncertainty and delivered service at actual fixtures.
+
+## 10. Adversarial controls common to all products
 
 - missing, stale, drifting or miscalibrated sensors;
 - duplicated/shared measurement boundaries and double-counted resources;
@@ -182,7 +212,7 @@ A superiority claim requires the same functional unit and outcome quality, a nam
 - safe fallback unavailable when network/cloud is lost;
 - user override, accessibility and local manual service untested.
 
-## 9. South African first-use design profile
+## 11. South African first-use design profile
 
 Use local conditions as explicit inputs, not universal assumptions:
 - pressure and duration of supply interruptions;
@@ -195,7 +225,7 @@ Use local conditions as explicit inputs, not universal assumptions:
 
 Do not assume one household archetype. Recruit representative use profiles before claiming broad local value. Any plumbing, electrical, ventilation, pressure, food-contact or building integration needs qualified local review and applicable compliance work.
 
-## 10. Decision gates and development order
+## 12. Decision gates and development order
 
 1. **Problem proof:** named user problem and baseline; evidence that a meaningful household pain exists.
 2. **Novelty/competitor proof:** exact incumbents and a measurable gap; no feature-list novelty.
@@ -210,7 +240,7 @@ Do not assume one household archetype. Recruit representative use profiles befor
 
 Priority: continue InstantClean in its existing PR dependency order; develop WaterLoop as distinct water-continuity and reuse profiles; advance FabricCare; evaluate FoodSteward and HomeRenew; keep HeatBank, AirCare and NutrientLoop as gated discovery lanes. The integrated household scenario composes CIV-PLACE and canonical utility owners; it does not create a centralized controller with authority over appliance safety.
 
-## 11. Claim vocabulary
+## 13. Claim vocabulary
 
 Use explicit evidence status:
 - **Proposed:** hypothesis or target.
@@ -224,7 +254,7 @@ Use explicit evidence status:
 
 Never use "passed", "validated", "qualified", "safe", "certified", "SOTA" or "better than industry" without naming the test, scope, revision and evidence.
 
-## 12. External references
+## 14. External references
 
 - IEC 60436:2025 corrected 2026-04: https://webstore.iec.ch/en/publication/80459
 - IEC 60436 COR1:2026: https://webstore.iec.ch/en/publication/112799
@@ -239,6 +269,9 @@ Never use "passed", "validated", "qualified", "safe", "certified", "SOTA" or "be
 - Dynamic shelf-life study (2025): https://pmc.ncbi.nlm.nih.gov/articles/PMC12269072/
 - Refrigerator use / food waste study (2025): https://www.sciencedirect.com/science/article/pii/S0921344925001533
 - WIRED home composters comparative review (2026): https://www.wired.com/story/home-composters-buying-guide/
+- EU Commission repairability consultation, 3 Nov 2026: https://environment.ec.europa.eu/news/commission-launches-public-consultation-making-products-easier-repair-2026-11-03_en
+- Directive (EU) 2024/1799 consolidated text 31 Jul 2026: https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024L1799-20260731
+- Johannesburg water supply status, SAnews, 3 Nov 2026: https://www.sanews.gov.za/node/85387
 
 ---
 
