@@ -235,7 +235,7 @@ impl CandidateRecord {
 
         if let Some(parent) = parent_id.as_deref() {
             validate_identifier(parent, "parent_id")?;
-            if parent == candidate_id {
+            if parent == candidate_id.as_str() {
                 return Err(CandidateArchiveError::SelfParent(candidate_id));
             }
         }
