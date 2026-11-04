@@ -7,7 +7,7 @@
 //! external evidence bytes, signer identity, statistical model assumptions,
 //! biological truth or causal identification.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
@@ -107,14 +107,19 @@ fn expected_path_claim_type(relation_type: &str) -> Result<&'static str, String>
 fn valid_claim_status(status: &str) -> bool {
     matches!(
         status,
-        "CLAIMED_SUPPORTED" | "CLAIMED_CONDITIONAL" | "CLAIMED_AMBIGUOUS"
-            | "CLAIMED_NOT_ESTIMABLE" | "CLAIMED_REJECTED"
+        "CLAIMED_SUPPORTED"
+            | "CLAIMED_CONDITIONAL"
+            | "CLAIMED_AMBIGUOUS"
+            | "CLAIMED_NOT_ESTIMABLE"
+            | "CLAIMED_REJECTED"
     )
 }
 
 fn parse_claims(bundle: &Value) -> Result<ClaimIndex, String> {
     let claim_rows = array(
-        bundle.get("claims").ok_or_else(|| "claims missing".to_owned())?,
+        bundle
+            .get("claims")
+            .ok_or_else(|| "claims missing".to_owned())?,
         "claims",
     )?;
     if claim_rows.is_empty() {
@@ -131,15 +136,21 @@ fn parse_claims(bundle: &Value) -> Result<ClaimIndex, String> {
         if !valid_claim_status(&claim_status) {
             return Err(format!("{context}.claim_status invalid"));
         }
-        let source = claim.get("source").ok_or_else(|| format!("{context}.source missing"))?;
-        let target = claim.get("target").ok_or_else(|| format!("{context}.target missing"))?;
+        let source = claim
+            .get("source")
+            .ok_or_else(|| format!("{context}.source missing"))?;
+        let target = claim
+            .get("target")
+            .ok_or_else(|| format!("{context}.target missing"))?;
         let source_kind = string_field(source, "object_kind", &format!("{context}.source"))?;
         let target_kind = string_field(target, "object_kind", &format!("{context}.target"))?;
         let source_world = string_field(source, "world_id", &format!("{context}.source"))?;
         let target_world = string_field(target, "world_id", &format!("{context}.target"))?;
         let expected = expected_evidence_type(&relation_type)?;
         let evidence = array(
-            claim.get("evidence").ok_or_else(|| format!("{context}.evidence missing"))?,
+            claim
+                .get("evidence")
+                .ok_or_else(|| format!("{context}.evidence missing"))?,
             &format!("{context}.evidence"),
         )?;
         if evidence.is_empty() {
@@ -159,10 +170,14 @@ fn parse_claims(bundle: &Value) -> Result<ClaimIndex, String> {
                     if !matches!(source_kind.as_str(), "NEURON" | "COMPARTMENT")
                         || !matches!(target_kind.as_str(), "NEURON" | "COMPARTMENT")
                     {
-                        return Err(format!("{context}: anatomical edge endpoints must be neuron/compartment objects"));
+                        return Err(format!(
+                            "{context}: anatomical edge endpoints must be neuron/compartment objects"
+                        ));
                     }
                     if source_world != target_world {
-                        return Err(format!("{context}: anatomical edge endpoints must be in the same world"));
+                        return Err(format!(
+                            "{context}: anatomical edge endpoints must be in the same world"
+                        ));
                     }
                     string_field(item, "synapse_candidate_id", &item_context)?;
                     digest_field(item, "artifact_sha256", &item_context)?;
@@ -177,30 +192,45 @@ fn parse_claims(bundle: &Value) -> Result<ClaimIndex, String> {
                         && pre_partner == "CLAIMED_MATCH"
                         && post_partner == "CLAIMED_MATCH";
                     if claim_status == "CLAIMED_SUPPORTED" && !all_supported {
-                        return Err(format!("{context}: supported anatomical edge lacks fully supported presence/polarity/partner claims"));
+                        return Err(format!(
+                            "{context}: supported anatomical edge lacks fully supported presence/polarity/partner claims"
+                        ));
                     }
                 }
                 "RECONSTRUCTION_CORRESPONDENCE" => {
                     if source_world == target_world {
-                        return Err(format!("{context}: reconstruction correspondence must cross distinct worlds/releases"));
+                        return Err(format!(
+                            "{context}: reconstruction correspondence must cross distinct worlds/releases"
+                        ));
                     }
                     let evidence_source = string_field(item, "source_world_id", &item_context)?;
                     let evidence_target = string_field(item, "target_world_id", &item_context)?;
                     if evidence_source != source_world || evidence_target != target_world {
-                        return Err(format!("{context}: correspondence evidence world IDs disagree with endpoints"));
+                        return Err(format!(
+                            "{context}: correspondence evidence world IDs disagree with endpoints"
+                        ));
                     }
                     digest_field(item, "mapping_receipt_sha256", &item_context)?;
                     string_field(item, "mapping_id", &item_context)?;
-                    let correspondence_relation = string_field(item, "correspondence_relation", &item_context)?;
+                    let correspondence_relation =
+                        string_field(item, "correspondence_relation", &item_context)?;
                     let valid_types = match correspondence_relation.as_str() {
-                        "ARTIFACT_IDENTITY" => source_kind == "DATASET_RELEASE" && target_kind == "DATASET_RELEASE",
+                        "ARTIFACT_IDENTITY" => {
+                            source_kind == "DATASET_RELEASE" && target_kind == "DATASET_RELEASE"
+                        }
                         "SEGMENT_LINEAGE" => source_kind == "SEGMENT" && target_kind == "SEGMENT",
-                        "NEURON_CORRESPONDENCE" => source_kind == "NEURON" && target_kind == "NEURON",
-                        "SYNAPSE_CORRESPONDENCE" => source_kind == "SYNAPSE" && target_kind == "SYNAPSE",
+                        "NEURON_CORRESPONDENCE" => {
+                            source_kind == "NEURON" && target_kind == "NEURON"
+                        }
+                        "SYNAPSE_CORRESPONDENCE" => {
+                            source_kind == "SYNAPSE" && target_kind == "SYNAPSE"
+                        }
                         _ => false,
                     };
                     if !valid_types {
-                        return Err(format!("{context}: correspondence relation does not match endpoint types"));
+                        return Err(format!(
+                            "{context}: correspondence relation does not match endpoint types"
+                        ));
                     }
                 }
                 "STATISTICAL_DEPENDENCE_EDGE" => {
@@ -215,8 +245,14 @@ fn parse_claims(bundle: &Value) -> Result<ClaimIndex, String> {
                     let q = number_field(item, "q_value", &item_context)?;
                     let se = number_field(item, "standard_error", &item_context)?;
                     let n = number_field(item, "effective_sample_size", &item_context)?;
-                    if !(0.0..=1.0).contains(&p) || !(0.0..=1.0).contains(&q) || se < 0.0 || n <= 0.0 {
-                        return Err(format!("{context}: statistical evidence values are outside admissible ranges"));
+                    if !(0.0..=1.0).contains(&p)
+                        || !(0.0..=1.0).contains(&q)
+                        || se < 0.0
+                        || n <= 0.0
+                    {
+                        return Err(format!(
+                            "{context}: statistical evidence values are outside admissible ranges"
+                        ));
                     }
                 }
                 "FUNCTIONAL_ASSOCIATION_EDGE" => {
@@ -227,7 +263,9 @@ fn parse_claims(bundle: &Value) -> Result<ClaimIndex, String> {
                     let start = number_field(item, "window_start_ms", &item_context)?;
                     let end = number_field(item, "window_end_ms", &item_context)?;
                     if end <= start {
-                        return Err(format!("{context}: functional time window must be increasing"));
+                        return Err(format!(
+                            "{context}: functional time window must be increasing"
+                        ));
                     }
                 }
                 "CAUSAL_EFFECT_CLAIM" => {
@@ -246,7 +284,9 @@ fn parse_claims(bundle: &Value) -> Result<ClaimIndex, String> {
                     if claim_status == "CLAIMED_SUPPORTED"
                         && (positivity != "CLAIMED_ADEQUATE" || selection != "CLAIMED_HANDLED")
                     {
-                        return Err(format!("{context}: supported causal claim has inadequate positivity or unresolved selection"));
+                        return Err(format!(
+                            "{context}: supported causal claim has inadequate positivity or unresolved selection"
+                        ));
                     }
                 }
                 _ => unreachable!(),
@@ -274,7 +314,9 @@ fn parse_claims(bundle: &Value) -> Result<ClaimIndex, String> {
 
 fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, String> {
     let query_rows = array(
-        bundle.get("queries").ok_or_else(|| "queries missing".to_owned())?,
+        bundle
+            .get("queries")
+            .ok_or_else(|| "queries missing".to_owned())?,
         "queries",
     )?;
     if query_rows.is_empty() {
@@ -292,26 +334,38 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
         digest_field(query, "query_definition_sha256", &context)?;
         digest_field(query, "analysis_code_sha256", &context)?;
         let query_mode = string_field(query, "query_mode", &context)?;
-        if !matches!(query_mode.as_str(), "SINGLE_RELATION_LAYER" | "DECLARED_MIXED_LAYERS") {
+        if !matches!(
+            query_mode.as_str(),
+            "SINGLE_RELATION_LAYER" | "DECLARED_MIXED_LAYERS"
+        ) {
             return Err(format!("{context}.query_mode invalid"));
         }
         let requested_type = string_field(query, "requested_claim_type", &context)?;
         if !matches!(
             requested_type.as_str(),
-            "ANATOMICAL_PATH" | "CORRESPONDENCE_PATH" | "STATISTICAL_PATH"
-                | "FUNCTIONAL_PATH" | "CAUSAL_EFFECT" | "MIXED_EVIDENCE_PATH"
+            "ANATOMICAL_PATH"
+                | "CORRESPONDENCE_PATH"
+                | "STATISTICAL_PATH"
+                | "FUNCTIONAL_PATH"
+                | "CAUSAL_EFFECT"
+                | "MIXED_EVIDENCE_PATH"
         ) {
             return Err(format!("{context}.requested_claim_type invalid"));
         }
         let result_status = string_field(query, "result_status", &context)?;
         if !matches!(
             result_status.as_str(),
-            "CLAIMED_SUPPORTED" | "CLAIMED_CONDITIONAL" | "CLAIMED_NOT_ESTIMABLE" | "CLAIMED_REJECTED"
+            "CLAIMED_SUPPORTED"
+                | "CLAIMED_CONDITIONAL"
+                | "CLAIMED_NOT_ESTIMABLE"
+                | "CLAIMED_REJECTED"
         ) {
             return Err(format!("{context}.result_status invalid"));
         }
         let allowed_rows = array(
-            query.get("allowed_relation_type_paths").ok_or_else(|| format!("{context}.allowed_relation_type_paths missing"))?,
+            query
+                .get("allowed_relation_type_paths")
+                .ok_or_else(|| format!("{context}.allowed_relation_type_paths missing"))?,
             &format!("{context}.allowed_relation_type_paths"),
         )?;
         let mut allowed = BTreeMap::<String, Vec<String>>::new();
@@ -319,12 +373,15 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
             let path_context = format!("{context}.allowed_relation_type_paths[{path_index}]");
             let path_id = string_field(path, "path_id", &path_context)?;
             let relation_types = array(
-                path.get("relation_types").ok_or_else(|| format!("{path_context}.relation_types missing"))?,
+                path.get("relation_types")
+                    .ok_or_else(|| format!("{path_context}.relation_types missing"))?,
                 &format!("{path_context}.relation_types"),
             )?;
             let mut types = Vec::new();
             for relation in relation_types {
-                let relation = relation.as_str().ok_or_else(|| format!("{path_context}: relation types must be strings"))?;
+                let relation = relation
+                    .as_str()
+                    .ok_or_else(|| format!("{path_context}: relation types must be strings"))?;
                 expected_evidence_type(relation)?;
                 types.push(relation.to_owned());
             }
@@ -337,7 +394,9 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
         }
 
         let path_results = array(
-            query.get("path_results").ok_or_else(|| format!("{context}.path_results missing"))?,
+            query
+                .get("path_results")
+                .ok_or_else(|| format!("{context}.path_results missing"))?,
             &format!("{context}.path_results"),
         )?;
         let mut seen_path_results = BTreeSet::new();
@@ -347,10 +406,13 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
             if !seen_path_results.insert(path_id.clone()) {
                 return Err(format!("{result_context}: duplicate path result {path_id}"));
             }
-            let allowed_sequence = allowed.get(&path_id)
-                .ok_or_else(|| format!("{result_context}: path_id is not declared by query grammar"))?;
+            let allowed_sequence = allowed.get(&path_id).ok_or_else(|| {
+                format!("{result_context}: path_id is not declared by query grammar")
+            })?;
             let claim_ids = array(
-                result.get("ordered_claim_ids").ok_or_else(|| format!("{result_context}.ordered_claim_ids missing"))?,
+                result
+                    .get("ordered_claim_ids")
+                    .ok_or_else(|| format!("{result_context}.ordered_claim_ids missing"))?,
                 &format!("{result_context}.ordered_claim_ids"),
             )?;
             let mut used = Vec::new();
@@ -359,33 +421,46 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
             let mut all_claims_supported = true;
             let mut contains_causal_claim = false;
             for claim_id_value in claim_ids {
-                let claim_id = claim_id_value.as_str().ok_or_else(|| format!("{result_context}: claim IDs must be strings"))?;
+                let claim_id = claim_id_value
+                    .as_str()
+                    .ok_or_else(|| format!("{result_context}: claim IDs must be strings"))?;
                 if !seen_claims.insert(claim_id.to_owned()) {
                     return Err(format!("{result_context}: duplicate claim ID {claim_id}"));
                 }
-                let claim = index.claims.get(claim_id)
+                let claim = index
+                    .claims
+                    .get(claim_id)
                     .ok_or_else(|| format!("{result_context}: unknown claim ID {claim_id}"))?;
                 used.push(claim.relation_type.clone());
                 relation_set.insert(claim.relation_type.clone());
                 if claim.claim_status != "CLAIMED_SUPPORTED" {
                     all_claims_supported = false;
                 }
-                if claim.relation_type == "CAUSAL_EFFECT_CLAIM" && claim.claim_status == "CLAIMED_SUPPORTED" {
+                if claim.relation_type == "CAUSAL_EFFECT_CLAIM"
+                    && claim.claim_status == "CLAIMED_SUPPORTED"
+                {
                     contains_causal_claim = true;
                 }
             }
             let asserted = string_field(result, "asserted_claim_type", &result_context)?;
             if !matches!(
                 asserted.as_str(),
-                "ANATOMICAL_PATH" | "CORRESPONDENCE_PATH" | "STATISTICAL_PATH"
-                    | "FUNCTIONAL_PATH" | "CAUSAL_EFFECT" | "MIXED_EVIDENCE_PATH"
+                "ANATOMICAL_PATH"
+                    | "CORRESPONDENCE_PATH"
+                    | "STATISTICAL_PATH"
+                    | "FUNCTIONAL_PATH"
+                    | "CAUSAL_EFFECT"
+                    | "MIXED_EVIDENCE_PATH"
             ) {
                 return Err(format!("{result_context}.asserted_claim_type invalid"));
             }
             let claimed_result_status = string_field(result, "result_status", &result_context)?;
             if !matches!(
                 claimed_result_status.as_str(),
-                "CLAIMED_SUPPORTED" | "CLAIMED_CONDITIONAL" | "CLAIMED_NOT_ESTIMABLE" | "CLAIMED_REJECTED"
+                "CLAIMED_SUPPORTED"
+                    | "CLAIMED_CONDITIONAL"
+                    | "CLAIMED_NOT_ESTIMABLE"
+                    | "CLAIMED_REJECTED"
             ) {
                 return Err(format!("{result_context}.result_status invalid"));
             }
@@ -394,7 +469,10 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
 
             if used != *allowed_sequence {
                 disposition = "REJECTED_PATH_GRAMMAR";
-                reasons.push("ordered claim relation types do not equal the frozen query path grammar".to_owned());
+                reasons.push(
+                    "ordered claim relation types do not equal the frozen query path grammar"
+                        .to_owned(),
+                );
             }
             if query_mode == "SINGLE_RELATION_LAYER" && relation_set.len() != 1 {
                 disposition = "REJECTED_PATH_GRAMMAR";
@@ -414,7 +492,8 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                     reasons.push("mixed relation types require MIXED_EVIDENCE_PATH or an explicit supported causal-effect claim".to_owned());
                 }
                 if asserted == "MIXED_EVIDENCE_PATH"
-                    && (query_mode != "DECLARED_MIXED_LAYERS" || requested_type != "MIXED_EVIDENCE_PATH")
+                    && (query_mode != "DECLARED_MIXED_LAYERS"
+                        || requested_type != "MIXED_EVIDENCE_PATH")
                 {
                     disposition = "REJECTED_TYPE_PROMOTION";
                     reasons.push("MIXED_EVIDENCE_PATH requires declared mixed-layer mode and mixed requested type".to_owned());
@@ -422,32 +501,54 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
             }
             if asserted == "CAUSAL_EFFECT" && !contains_causal_claim {
                 disposition = "REJECTED_TYPE_PROMOTION";
-                reasons.push("causal conclusion lacks a supported CAUSAL_EFFECT_CLAIM in its path".to_owned());
+                reasons.push(
+                    "causal conclusion lacks a supported CAUSAL_EFFECT_CLAIM in its path"
+                        .to_owned(),
+                );
             }
             if relation_set.len() == 1 {
                 let only_type = relation_set.iter().next().expect("one relation type");
                 let expected_claim_type = expected_path_claim_type(only_type)?;
                 if asserted != expected_claim_type {
                     disposition = "REJECTED_TYPE_PROMOTION";
-                    reasons.push(format!("{only_type} cannot support asserted claim type {asserted}"));
+                    reasons.push(format!(
+                        "{only_type} cannot support asserted claim type {asserted}"
+                    ));
                 }
             }
             if requested_type != asserted {
                 disposition = "REJECTED_TYPE_PROMOTION";
                 reasons.push(format!("asserted path type {asserted} differs from requested query type {requested_type}"));
             }
-            if disposition == "ACCEPTED_WITHIN_TYPED_SCOPE" && claimed_result_status == "CLAIMED_REJECTED" {
+            if disposition == "ACCEPTED_WITHIN_TYPED_SCOPE"
+                && claimed_result_status == "CLAIMED_REJECTED"
+            {
                 disposition = "REJECTED_EVIDENCE_CLAIM";
                 reasons.push("the producer marks the path result rejected".to_owned());
             }
             if disposition == "ACCEPTED_WITHIN_TYPED_SCOPE" {
-                if used.iter().any(|claim_id| index.claims.get(claim_id).is_some_and(|claim| claim.claim_status == "CLAIMED_REJECTED")) {
+                if used.iter().any(|claim_id| {
+                    index
+                        .claims
+                        .get(claim_id)
+                        .is_some_and(|claim| claim.claim_status == "CLAIMED_REJECTED")
+                }) {
                     disposition = "REJECTED_EVIDENCE_CLAIM";
                     reasons.push("path contains a producer-rejected claim".to_owned());
-                } else if used.iter().any(|claim_id| index.claims.get(claim_id).is_some_and(|claim| claim.claim_status == "CLAIMED_NOT_ESTIMABLE")) {
+                } else if used.iter().any(|claim_id| {
+                    index
+                        .claims
+                        .get(claim_id)
+                        .is_some_and(|claim| claim.claim_status == "CLAIMED_NOT_ESTIMABLE")
+                }) {
                     disposition = "NOT_ESTIMABLE";
                     reasons.push("path contains a NOT_ESTIMABLE claim".to_owned());
-                } else if used.iter().any(|claim_id| index.claims.get(claim_id).is_some_and(|claim| claim.claim_status == "CLAIMED_AMBIGUOUS")) {
+                } else if used.iter().any(|claim_id| {
+                    index
+                        .claims
+                        .get(claim_id)
+                        .is_some_and(|claim| claim.claim_status == "CLAIMED_AMBIGUOUS")
+                }) {
                     disposition = "AMBIGUOUS_NOT_PROMOTABLE";
                     reasons.push("path contains an ambiguous claim".to_owned());
                 } else if !all_claims_supported || claimed_result_status == "CLAIMED_CONDITIONAL" {
@@ -458,7 +559,9 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
             if claimed_result_status == "CLAIMED_NOT_ESTIMABLE" {
                 let digest = query.get("result_sha256");
                 if digest != Some(&Value::Null) {
-                    return Err(format!("{context}: NOT_ESTIMABLE result must not bind an output digest"));
+                    return Err(format!(
+                        "{context}: NOT_ESTIMABLE result must not bind an output digest"
+                    ));
                 }
                 if disposition == "ACCEPTED_WITHIN_TYPED_SCOPE" {
                     disposition = "NOT_ESTIMABLE";
@@ -487,7 +590,9 @@ fn verify_bundle(bytes: &[u8]) -> Result<Value, String> {
         return Err("unsupported claim bundle schema version".to_owned());
     }
     let bundle_id = string_field(&bundle, "bundle_id", "bundle")?;
-    let scope = bundle.get("scope").ok_or_else(|| "scope missing".to_owned())?;
+    let scope = bundle
+        .get("scope")
+        .ok_or_else(|| "scope missing".to_owned())?;
     let dataset_id = string_field(scope, "dataset_id", "scope")?;
     let source_volume_id = string_field(scope, "source_volume_id", "scope")?;
     let release_id = string_field(scope, "release_id", "scope")?;
@@ -496,19 +601,26 @@ fn verify_bundle(bytes: &[u8]) -> Result<Value, String> {
     let index = parse_claims(&bundle)?;
     let query_results = validate_queries(&bundle, &index)?;
 
-    let summary = bundle.get("summary").ok_or_else(|| "summary missing".to_owned())?;
+    let summary = bundle
+        .get("summary")
+        .ok_or_else(|| "summary missing".to_owned())?;
     let expected_claims = index.claims.len() as u64;
     let expected_queries = array(
-        bundle.get("queries").ok_or_else(|| "queries missing".to_owned())?,
+        bundle
+            .get("queries")
+            .ok_or_else(|| "queries missing".to_owned())?,
         "queries",
-    )?.len() as u64;
+    )?
+    .len() as u64;
     if summary.get("claim_count").and_then(Value::as_u64) != Some(expected_claims) {
         return Err("summary.claim_count does not match recomputed claim count".to_owned());
     }
     if summary.get("query_count").and_then(Value::as_u64) != Some(expected_queries) {
         return Err("summary.query_count does not match recomputed query count".to_owned());
     }
-    let type_counts = summary.get("claim_type_counts").ok_or_else(|| "summary.claim_type_counts missing".to_owned())?;
+    let type_counts = summary
+        .get("claim_type_counts")
+        .ok_or_else(|| "summary.claim_type_counts missing".to_owned())?;
     for (field, expected) in [
         ("ANATOMICAL_SYNAPSE_EDGE", index.counts.anatomical),
         ("RECONSTRUCTION_CORRESPONDENCE", index.counts.correspondence),
@@ -521,15 +633,24 @@ fn verify_bundle(bytes: &[u8]) -> Result<Value, String> {
         }
     }
 
-    let provenance = bundle.get("provenance").ok_or_else(|| "provenance missing".to_owned())?;
-    for field in ["claim_policy_sha256", "query_grammar_sha256", "producer_sha256"] {
+    let provenance = bundle
+        .get("provenance")
+        .ok_or_else(|| "provenance missing".to_owned())?;
+    for field in [
+        "claim_policy_sha256",
+        "query_grammar_sha256",
+        "producer_sha256",
+    ] {
         digest_field(provenance, field, "provenance")?;
     }
-    let rejected = query_results.iter().filter(|row| {
-        row["recomputed_disposition"] == "REJECTED_TYPE_PROMOTION"
-            || row["recomputed_disposition"] == "REJECTED_PATH_GRAMMAR"
-            || row["recomputed_disposition"] == "REJECTED_EVIDENCE_CLAIM"
-    }).count();
+    let rejected = query_results
+        .iter()
+        .filter(|row| {
+            row["recomputed_disposition"] == "REJECTED_TYPE_PROMOTION"
+                || row["recomputed_disposition"] == "REJECTED_PATH_GRAMMAR"
+                || row["recomputed_disposition"] == "REJECTED_EVIDENCE_CLAIM"
+        })
+        .count();
     Ok(json!({
         "schema_version": VERSION,
         "bundle_id": bundle_id,
@@ -569,7 +690,9 @@ fn main() {
     if args.len() != 2 {
         eprintln!(
             "usage: {} <typed-claim-bundle.json>",
-            args.first().map(String::as_str).unwrap_or("connectome-typed-claim-verifier")
+            args.first()
+                .map(String::as_str)
+                .unwrap_or("connectome-typed-claim-verifier")
         );
         process::exit(64);
     }
@@ -578,7 +701,10 @@ fn main() {
         process::exit(66);
     });
     match verify_bundle(&bytes) {
-        Ok(report) => println!("{}", serde_json::to_string_pretty(&report).expect("serialize report")),
+        Ok(report) => println!(
+            "{}",
+            serde_json::to_string_pretty(&report).expect("serialize report")
+        ),
         Err(error) => {
             eprintln!("REJECTED: {error}");
             process::exit(2);
@@ -642,14 +768,16 @@ mod tests {
     fn rejects_correspondence_with_same_source_and_target_world() {
         let mut bundle = parse_fixture();
         bundle["claims"][1]["target"]["world_id"] = Value::String("world-release-1".to_owned());
-        bundle["claims"][1]["evidence"][0]["target_world_id"] = Value::String("world-release-1".to_owned());
+        bundle["claims"][1]["evidence"][0]["target_world_id"] =
+            Value::String("world-release-1".to_owned());
         assert!(verify(&bundle).is_err());
     }
 
     #[test]
     fn rejects_correspondence_evidence_world_mismatch() {
         let mut bundle = parse_fixture();
-        bundle["claims"][1]["evidence"][0]["source_world_id"] = Value::String("wrong-world".to_owned());
+        bundle["claims"][1]["evidence"][0]["source_world_id"] =
+            Value::String("wrong-world".to_owned());
         assert!(verify(&bundle).is_err());
     }
 
@@ -683,14 +811,20 @@ mod tests {
             .iter()
             .find(|row| row["query_id"] == "invalid-anatomy-to-causality-attempt")
             .unwrap();
-        assert_eq!(attempted["recomputed_disposition"], "REJECTED_TYPE_PROMOTION");
+        assert_eq!(
+            attempted["recomputed_disposition"],
+            "REJECTED_TYPE_PROMOTION"
+        );
     }
 
     #[test]
     fn accepts_single_layer_anatomical_path_within_typed_scope() {
         let report = verify_bundle(FIXTURE.as_bytes()).expect("bundle");
         let path = &report["query_path_results"][0];
-        assert_eq!(path["recomputed_disposition"], "ACCEPTED_WITHIN_TYPED_SCOPE");
+        assert_eq!(
+            path["recomputed_disposition"],
+            "ACCEPTED_WITHIN_TYPED_SCOPE"
+        );
     }
 
     #[test]
@@ -705,10 +839,12 @@ mod tests {
         let mut bundle = parse_fixture();
         bundle["queries"][0]["allowed_relation_type_paths"][0]["relation_types"] =
             json!(["STATISTICAL_DEPENDENCE_EDGE"]);
-        assert!(verify(&bundle).is_err() || {
-            let report = verify(&bundle).unwrap();
-            report["query_path_results"][0]["recomputed_disposition"] == "REJECTED_PATH_GRAMMAR"
-        });
+        assert!(
+            verify(&bundle).is_err() || {
+                let report = verify(&bundle).unwrap();
+                report["query_path_results"][0]["recomputed_disposition"] == "REJECTED_PATH_GRAMMAR"
+            }
+        );
     }
 
     #[test]
@@ -718,7 +854,10 @@ mod tests {
             json!(["ANATOMICAL_SYNAPSE_EDGE", "STATISTICAL_DEPENDENCE_EDGE"]);
         bundle["queries"][0]["path_results"][0]["ordered_claim_ids"] =
             json!(["anat-syn-17", "stat-edge-activity"]);
-        assert!(verify(&bundle).unwrap()["query_path_results"][0]["recomputed_disposition"] == "REJECTED_PATH_GRAMMAR");
+        assert!(
+            verify(&bundle).unwrap()["query_path_results"][0]["recomputed_disposition"]
+                == "REJECTED_PATH_GRAMMAR"
+        );
     }
 
     #[test]
@@ -757,10 +896,16 @@ mod tests {
             Value::String("CLAIMED_ADEQUATE".to_owned());
         bundle["claims"][4]["evidence"][0]["selection_status"] =
             Value::String("CLAIMED_HANDLED".to_owned());
-        bundle["queries"][2]["allowed_relation_type_paths"][0]["relation_types"] =
-            json!(["ANATOMICAL_SYNAPSE_EDGE", "STATISTICAL_DEPENDENCE_EDGE", "CAUSAL_EFFECT_CLAIM"]);
-        bundle["queries"][2]["path_results"][0]["ordered_claim_ids"] =
-            json!(["anat-syn-17", "stat-edge-activity", "causal-edge-unresolved"]);
+        bundle["queries"][2]["allowed_relation_type_paths"][0]["relation_types"] = json!([
+            "ANATOMICAL_SYNAPSE_EDGE",
+            "STATISTICAL_DEPENDENCE_EDGE",
+            "CAUSAL_EFFECT_CLAIM"
+        ]);
+        bundle["queries"][2]["path_results"][0]["ordered_claim_ids"] = json!([
+            "anat-syn-17",
+            "stat-edge-activity",
+            "causal-edge-unresolved"
+        ]);
         let report = verify(&bundle).expect("explicit causal evidence in mixed path");
         assert_eq!(
             report["query_path_results"][2]["recomputed_disposition"],
@@ -771,8 +916,10 @@ mod tests {
     #[test]
     fn rejects_mixed_path_requested_in_single_layer_mode() {
         let mut bundle = parse_fixture();
-        bundle["queries"][0]["requested_claim_type"] = Value::String("MIXED_EVIDENCE_PATH".to_owned());
-        bundle["queries"][0]["path_results"][0]["asserted_claim_type"] = Value::String("MIXED_EVIDENCE_PATH".to_owned());
+        bundle["queries"][0]["requested_claim_type"] =
+            Value::String("MIXED_EVIDENCE_PATH".to_owned());
+        bundle["queries"][0]["path_results"][0]["asserted_claim_type"] =
+            Value::String("MIXED_EVIDENCE_PATH".to_owned());
         let report = verify(&bundle).expect("bundle structurally valid");
         assert_eq!(
             report["query_path_results"][0]["recomputed_disposition"],
