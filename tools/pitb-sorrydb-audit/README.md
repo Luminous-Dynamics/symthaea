@@ -68,6 +68,22 @@ This reads from Git objects, not working-tree files. A local uncommitted edit ca
 
 The exact-head workflow runs an integration control that commits a synthetic Lean file, dirties the working copy, and verifies that the source checker still reads the original committed `sorry` span. It also validates the generated receipt against `sorrydb-source-checkout-v0.schema.json`.
 
+## Replay the actual Lean goal, not just the source token
+
+The auditor also supports `--replay-goal`. It first verifies the repository remote, commit, committed `lean-toolchain`, source-file Git object and exact `sorry` span. It then creates a temporary sibling Lean module from the committed source with `trace_state` inserted immediately before the recorded `sorry`, runs that module with `lake env lean` under the pinned project, and compares the live tactic state to the recorded `debug_info.goal` after whitespace normalization.
+
+The replay receipt binds the task ID, repository and tree identity, source/goal/toolchain/Lake-manifest digests, exact replay command and output-log digest. It always sets `scoring_admission=false`: reproducing a goal is not a proof, independent kernel check or semantic specification review.
+
+```sh
+cargo run --locked --manifest-path tools/pitb-sorrydb-audit/Cargo.toml -- \
+  --replay-goal /path/to/one-sorry-record.json \
+  /path/to/exact-repository-checkout \
+  /tmp/goal-replay-receipt.json \
+  /tmp/goal-replay.log
+```
+
+The frozen integration task is SorryDB ID `7956fe8e4946a9ddf7098ee84c69669db5bc902715dad6e7cdf0db121aa5bfce`: `FKS.table_1_prop` in `PrimeNumberTheoremAnd/FioriKadiriSwidinsky.lean`, repository commit `ddcb6542f2b62883c8642d3db4ecc115afcce33e`, Lean `v4.26.0`. Its recorded coordinates are line 44, zero-based character columns 137–142. This is a nontrivial analytic-number-theory obligation, not a synthetic theorem. The workflow additionally pins the committed Lake manifest blob `c0405e3c9643b00b1ce6a8120516ca482e6fe4ec`, builds the upstream project with the pinned Lean toolchain, and requires the replayed goal to match.
+
 ## From task record to admissible proof result
 
 A task is not independently reproduced merely because its JSON row contains a commit and a pretty-printed goal. For each scored task:
