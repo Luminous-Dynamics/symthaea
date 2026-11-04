@@ -8,6 +8,7 @@ on:
       - "research/**/src/**"
       - ".github/workflows/civbench-research-crates.yml"
       - "research/civbench-social-learning-core/scripts/inspect_reward_network_archive.py"
+      - "research/civbench-social-learning-core/PRIVACY_PRESERVING_TRANSMISSION_PROTOCOL_V0_1.md"
   push:
     paths:
       - "research/**/Cargo.toml"
