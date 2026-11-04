@@ -62,6 +62,10 @@ pub struct MusicalContextVariantV1 {
     /// Stable symbolic signature of the local cue. Counterfactual families
     /// use equality here when local audio/score evidence is held constant.
     pub local_cue_signature: String,
+    /// Compact symbolic signature of preceding harmonic/phrase context. It is
+    /// deliberately separate from the local cue and explicit collaborator
+    /// instruction so counterfactuals can vary one contextual source at a time.
+    pub preceding_harmonic_context_signature: String,
     pub phrase_function: MusicalPhraseFunctionV1,
     pub collaborator_intent: CollaboratorIntentV1,
     pub performer_role: String,
@@ -104,12 +108,17 @@ pub enum MusicalContextValidationIssueV1 {
     DuplicateVariantId { family_index: usize },
     ContextCounterfactualChangedLocalCue { family_index: usize },
     ContextCounterfactualDidNotChangeIntent { family_index: usize },
+    ContextCounterfactualDidNotChangeHarmonicContext { family_index: usize },
+    ContextCounterfactualChangedHarmonicContextUnexpectedly { family_index: usize },
+    ContextCounterfactualIntentChangedUnexpectedly { family_index: usize },
+    UnsupportedChangedFactor { family_index: usize },
     ContextCounterfactualChangedPhraseFunction { family_index: usize },
     ContextCounterfactualChangedRole { family_index: usize },
     ContextCounterfactualChangedInstrument { family_index: usize },
     ContextCounterfactualActionSetsOverlap { family_index: usize },
     SurfaceCounterfactualChangedLocalCue { family_index: usize },
     SurfaceCounterfactualChangedIntent { family_index: usize },
+    SurfaceCounterfactualChangedHarmonicContext { family_index: usize },
     SurfaceCounterfactualChangedRole { family_index: usize },
     SurfaceCounterfactualDidNotChangeInstrument { family_index: usize },
     SurfaceCounterfactualActionSetsDiffer { family_index: usize },
@@ -185,6 +194,12 @@ pub fn validate_musical_context_family_v1(
                 member_index,
             });
         }
+        if member.preceding_harmonic_context_signature.trim().is_empty() {
+            issues.push(MusicalContextValidationIssueV1::EmptyLocalCueSignature {
+                family_index,
+                member_index,
+            });
+        }
         if member.performer_role.trim().is_empty()
             || member.surface_instrument.trim().is_empty()
         {
@@ -242,12 +257,46 @@ pub fn validate_musical_context_family_v1(
                     },
                 );
             }
-            if left.collaborator_intent == right.collaborator_intent {
-                issues.push(
-                    MusicalContextValidationIssueV1::ContextCounterfactualDidNotChangeIntent {
-                        family_index,
-                    },
-                );
+            match family.changed_factor.as_str() {
+                "collaborator_intent" => {
+                    if left.collaborator_intent == right.collaborator_intent {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualDidNotChangeIntent {
+                                family_index,
+                            },
+                        );
+                    }
+                    if left.preceding_harmonic_context_signature
+                        != right.preceding_harmonic_context_signature
+                    {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualChangedHarmonicContextUnexpectedly {
+                                family_index,
+                            },
+                        );
+                    }
+                }
+                "preceding_harmonic_context" => {
+                    if left.preceding_harmonic_context_signature
+                        == right.preceding_harmonic_context_signature
+                    {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualDidNotChangeHarmonicContext {
+                                family_index,
+                            },
+                        );
+                    }
+                    if left.collaborator_intent != right.collaborator_intent {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualIntentChangedUnexpectedly {
+                                family_index,
+                            },
+                        );
+                    }
+                }
+                _ => issues.push(MusicalContextValidationIssueV1::UnsupportedChangedFactor {
+                    family_index,
+                }),
             }
             if left.phrase_function != right.phrase_function {
                 issues.push(
@@ -293,6 +342,20 @@ pub fn validate_musical_context_family_v1(
             {
                 issues.push(
                     MusicalContextValidationIssueV1::SurfaceCounterfactualChangedIntent {
+                        family_index,
+                    },
+                );
+            }
+            if family.changed_factor != "surface_instrument" {
+                issues.push(MusicalContextValidationIssueV1::UnsupportedChangedFactor {
+                    family_index,
+                });
+            }
+            if left.preceding_harmonic_context_signature
+                != right.preceding_harmonic_context_signature
+            {
+                issues.push(
+                    MusicalContextValidationIssueV1::SurfaceCounterfactualChangedHarmonicContext {
                         family_index,
                     },
                 );
