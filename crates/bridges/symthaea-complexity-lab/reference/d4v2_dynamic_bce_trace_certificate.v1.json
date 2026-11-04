@@ -1,0 +1,187 @@
+{
+  "format": "symthaea.d4v2.dynamic-projected-bce-trace",
+  "version": 1,
+  "claim_ceiling": "independent_reference_model_of_pinned_D4_manager_state_subset_plus_exhaustive_projected_oracle_not_D4_binary_replay_or_formal_proof",
+  "upstream": {
+    "repository": "crillab/d4v2",
+    "branch": "main",
+    "source_blob_sha1": {
+      "src/formulaManager/cnf/CnfManagerDynBlockedCl.cpp": "303817529debd95735a32ca9200791c3a854d992",
+      "src/formulaManager/cnf/CnfManagerDynBlockedCl.hpp": "d92fe5e5d25b26f981ff657230ff0a9cb8ad04bf",
+      "src/formulaManager/cnf/CnfManagerDyn.cpp": "3f19bc0664ff90d167ee00b1b6321a0015fe1ff8",
+      "src/formulaManager/cnf/CnfManagerDyn.hpp": "8c014829c7ccae545b1afb98c10d21b425e1b4b7",
+      "src/formulaManager/cnf/ClauseInfo.hpp": "c8d0718fdad78aba0c87701e2e19b5fd2acd7f75",
+      "src/formulaManager/cnf/DataOccurrence.hpp": "0a74b2c9db6c8eb0863d4d43d1b13f9c0df5bc29",
+      "src/problem/ProblemManager.hpp": "f5c2bbfd3a0951685a7055d1a9b4153395563bc1"
+    }
+  },
+  "problem": {
+    "nvars": 4,
+    "selected_vars": [
+      2,
+      3,
+      4
+    ],
+    "hidden_vars": [
+      1
+    ],
+    "clauses": [
+      {
+        "id": "C1",
+        "lits": [
+          1,
+          2
+        ]
+      },
+      {
+        "id": "C2",
+        "lits": [
+          -1,
+          3
+        ]
+      },
+      {
+        "id": "C3",
+        "lits": [
+          -1,
+          -2,
+          4
+        ]
+      }
+    ],
+    "visible_weights": {
+      "2": {
+        "false": "1/3",
+        "true": "2/3"
+      },
+      "3": {
+        "false": "1/2",
+        "true": "1/2"
+      },
+      "4": {
+        "false": "2/5",
+        "true": "3/5"
+      }
+    }
+  },
+  "expected_initial": {
+    "active": {
+      "C1": true,
+      "C2": true,
+      "C3": false
+    },
+    "protected_records": [
+      {
+        "id": 0,
+        "blocker": 1,
+        "target": "C1",
+        "candidate_clauses": [
+          "C2"
+        ]
+      },
+      {
+        "id": 1,
+        "blocker": -1,
+        "target": "C2",
+        "candidate_clauses": [
+          "C1"
+        ]
+      }
+    ],
+    "watchlists": {
+      "C1": [
+        1
+      ],
+      "C2": [
+        0
+      ],
+      "C3": []
+    },
+    "events": [
+      [
+        "initial_blocked",
+        "C3"
+      ]
+    ]
+  },
+  "branches": [
+    {
+      "id": "b_true",
+      "label": "b=true",
+      "true_literals": [
+        3
+      ],
+      "expected": {
+        "active": {
+          "C1": false,
+          "C2": false,
+          "C3": false
+        },
+        "watchlists": {
+          "C1": [
+            1
+          ],
+          "C2": [
+            0
+          ],
+          "C3": []
+        },
+        "events": [
+          [
+            "clause_satisfied",
+            "C2",
+            3
+          ],
+          [
+            "blocked_by_exhausted_opposing_set",
+            "C1",
+            0,
+            "C2"
+          ]
+        ],
+        "source_full_models": 5,
+        "processed_full_models": 8,
+        "projected_support_size": 4,
+        "pwmc": "1/2"
+      }
+    },
+    {
+      "id": "b_false",
+      "label": "b=false",
+      "true_literals": [
+        -3
+      ],
+      "expected": {
+        "active": {
+          "C1": true,
+          "C2": true,
+          "C3": false
+        },
+        "watchlists": {
+          "C1": [
+            1
+          ],
+          "C2": [
+            0
+          ],
+          "C3": []
+        },
+        "events": [],
+        "source_full_models": 2,
+        "processed_full_models": 2,
+        "projected_support_size": 2,
+        "pwmc": "1/3"
+      }
+    }
+  ],
+  "expected_root": {
+    "source_full_models": 7,
+    "processed_full_models": 8,
+    "projected_support_size": 6,
+    "pwmc": "5/6"
+  },
+  "expected_branch_union": {
+    "projected_support_size": 6,
+    "pwmc": "5/6"
+  }
+}
