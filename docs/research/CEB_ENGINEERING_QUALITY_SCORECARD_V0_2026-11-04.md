@@ -1,7 +1,7 @@
 # CEB Engineering Quality Scorecard V0 — 2026-11-04
 
 **Status:** research addendum / design-only  
-**Related:** [CEB-CAUSE-001 #10366](https://github.com/Luminous-Dynamics/symthaea/issues/10366), [CEB-DEBUG-QUALITY-001 #10385](https://github.com/Luminous-Dynamics/symthaea/issues/10385), [protocol PR #10367](https://github.com/Luminous-Dynamics/symthaea/pull/10367)  
+**Related:** [CEB-CAUSE-001 #10366](https://github.com/Luminous-Dynamics/symthaea/issues/10366), [CEB-DEBUG-QUALITY-001 #10385](https://github.com/Luminous-Dynamics/symthaea/issues/10385), [CEB-CAUSE-INTEGRATION-001 #10387](https://github.com/Luminous-Dynamics/symthaea/issues/10387), [protocol PR #10367](https://github.com/Luminous-Dynamics/symthaea/pull/10367)  
 **Claim ceiling:** this is a benchmark portfolio and experimental design. It is not a CEB score, an implementation claim, or evidence that Symthaea outperforms any published system.
 
 ## 1. Strategic correction: do not optimize one coding score
