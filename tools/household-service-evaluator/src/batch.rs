@@ -226,6 +226,16 @@ fn validate_scenarios<'a>(
         ));
     }
 
+    let payload_field = match collection_name {
+        "scenarios" => "input",
+        "task_profiles" => "synthetic_baseline",
+        _ => {
+            return Err(EvaluationError::new(
+                collection_name,
+                "unsupported scenario collection",
+            ));
+        }
+    };
     let expected: BTreeSet<&str> = expected_ids.iter().copied().collect();
     let mut observed = BTreeSet::new();
     for scenario in scenarios {
@@ -247,7 +257,7 @@ fn validate_scenarios<'a>(
         if scenario["title"].as_str().is_none()
             || scenario["expected_disposition"].as_str().is_none()
             || scenario["invariants"].as_array().is_none()
-            || !scenario["input"].is_object()
+            || !scenario[payload_field].is_object()
         {
             return Err(EvaluationError::new(
                 collection_name,
