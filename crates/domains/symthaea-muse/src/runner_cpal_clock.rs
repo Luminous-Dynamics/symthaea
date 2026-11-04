@@ -97,7 +97,7 @@ impl RunnerCpalClockDescriptorV1 {
             return None;
         }
         let canonical = format!(
-            "{RUNNER_CLOCK_BRIDGE_DESCRIPTOR_SCHEMA_V1}\\n{}\\n{}\\n{}\\n{}\\n{}",
+            "{RUNNER_CLOCK_BRIDGE_DESCRIPTOR_SCHEMA_V1}\n{}\n{}\n{}\n{}\n{}",
             self.session_id,
             self.runner_clock_domain_id,
             self.runner_origin_id,
@@ -151,6 +151,31 @@ pub struct RunnerCpalClockPairV1 {
 }
 
 impl RunnerCpalClockPairV1 {
+    /// Construct the fixed-size callback record after the caller has sampled
+    /// the runner clock before/after reading CPAL's callback timestamp. The
+    /// descriptor digest is computed off the real-time thread and copied in.
+    pub fn from_observation(
+        stream_instance_id: u64,
+        descriptor_identity_sha256: [u8; 32],
+        pair_index: u64,
+        cpal_callback_stream_time_ns: u64,
+        runner_time_before_ns: u64,
+        runner_time_after_ns: u64,
+    ) -> Option<Self> {
+        if stream_instance_id == 0 || runner_time_after_ns < runner_time_before_ns {
+            return None;
+        }
+        Some(Self {
+            schema_version: RunnerCpalClockPairSchemaV1::V1,
+            stream_instance_id,
+            descriptor_identity_sha256,
+            pair_index,
+            cpal_callback_stream_time_ns,
+            runner_time_before_ns,
+            runner_time_after_ns,
+        })
+    }
+
     fn midpoint_runner_time_ns(&self) -> u64 {
         self.runner_time_before_ns
             + (self.runner_time_after_ns - self.runner_time_before_ns) / 2
@@ -586,6 +611,31 @@ mod tests {
             pair(2, 25_000_000, 125_000_000),
             pair(3, 35_000_000, 135_000_000),
         ]
+    }
+
+    #[test]
+    fn compact_pair_record_is_copyable_and_rejects_invalid_brackets() {
+        let d = descriptor();
+        let identity = d.identity_sha256().unwrap();
+        let record = RunnerCpalClockPairV1::from_observation(
+            d.stream_instance_id,
+            identity,
+            0,
+            1_000,
+            2_000,
+            2_100,
+        )
+        .unwrap();
+        let copied = record;
+        assert_eq!(record, copied);
+        assert!(RunnerCpalClockPairV1::from_observation(
+            d.stream_instance_id,
+            identity,
+            1,
+            2_000,
+            3_000,
+            2_999,
+        ).is_none());
     }
 
     #[test]
