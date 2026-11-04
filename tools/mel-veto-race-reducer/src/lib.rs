@@ -1244,6 +1244,29 @@ mod tests {
     }
 
     #[test]
+    fn premature_expiry_event_rejects_without_mutating_authorization_or_epoch() {
+        let mut ledger = authorized_ledger();
+        let premature = ledger.apply(expiration_event(2, 9_999_999_999));
+        assert_eq!(
+            premature,
+            Err(RaceError::ExpirationBeforeDeadline {
+                authorization_id: "auth-1".into(),
+                observed_at_ns: 9_999_999_999,
+                expires_at_ns: 10_000_000_000,
+            })
+        );
+        assert_eq!(ledger.current_epoch(), 0);
+        assert!(!ledger.authorization("auth-1").unwrap().revoked);
+
+        // The failed event did not consume its order or control sequence.
+        ledger
+            .apply(expiration_event(2, 10_000_000_000))
+            .unwrap();
+        assert_eq!(ledger.current_epoch(), 1);
+        assert!(ledger.authorization("auth-1").unwrap().revoked);
+    }
+
+    #[test]
     fn producer_cannot_start_before_authorization_or_at_expiry() {
         let mut ledger = authorized_ledger();
         let before_authorization = ledger.apply(event(
