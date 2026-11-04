@@ -638,6 +638,25 @@ pub fn compare_music_benchmark_runs_v1(
     if left_run.execution.decoding_config_sha256 != right_run.execution.decoding_config_sha256 {
         reasons.push("decoding configurations differ".to_owned());
     }
+    if left_run.execution.precision != right_run.execution.precision {
+        reasons.push("inference precision differs".to_owned());
+    }
+    if left_run.execution.runtime_environment_sha256
+        != right_run.execution.runtime_environment_sha256
+    {
+        reasons.push("runtime environments differ".to_owned());
+    }
+    if left_run.execution.runner_commit_sha != right_run.execution.runner_commit_sha {
+        reasons.push("runner commits differ".to_owned());
+    }
+    if left_run.execution.seed != right_run.execution.seed {
+        reasons.push("random seeds differ".to_owned());
+    }
+    if left_run.profile_sha256 != left_profile.expected_profile_sha256().unwrap_or_default()
+        || right_run.profile_sha256 != right_profile.expected_profile_sha256().unwrap_or_default()
+    {
+        reasons.push("run/profile digest binding is invalid".to_owned());
+    }
     if reasons.is_empty() {
         MusicBenchmarkComparisonV1 {
             comparability: MusicBenchmarkComparabilityV1::DirectlyComparable,
@@ -843,11 +862,59 @@ mod tests {
     }
 
     #[test]
-    fn run_digest_commits_raw_outputs_and_evaluator_receipt() {
+    fn run_digest_commits_raw_outputs_and_validator_rejects_stale_digest() {
         let profile = profile();
         let mut run = run(&profile);
-        let original = run.run_manifest_sha256.clone();
         run.raw_output_sha256 = "a".repeat(64);
-        assert_ne!(run.expected_run_manifest_sha256().unwrap(), original);
+        assert!(validate_music_benchmark_run_v1(&profile, &run)
+            .contains(&MusicBenchmarkRegistryIssueV1::RunCommitmentMismatch));
+    }
+
+    #[test]
+    fn metric_ids_must_be_declared_by_the_native_scorer() {
+        let profile = profile();
+        let mut run = run(&profile);
+        run.metrics[0].metric_id = "invented_composite_score".to_owned();
+        run.run_manifest_sha256 = run.expected_run_manifest_sha256().unwrap();
+        assert!(validate_music_benchmark_run_v1(&profile, &run)
+            .contains(&MusicBenchmarkRegistryIssueV1::UnknownNativeMetric {
+                metric_index: 0
+            }));
+    }
+
+    #[test]
+    fn model_precision_and_runtime_mismatch_make_results_descriptive_only() {
+        let profile = profile();
+        let left = run(&profile);
+        let mut right = left.clone();
+        right.execution.precision = "bf16".to_owned();
+        let comparison = compare_music_benchmark_runs_v1(&profile, &left, &profile, &right);
+        assert_eq!(
+            comparison.comparability,
+            MusicBenchmarkComparabilityV1::DescriptiveOnly
+        );
+        assert!(comparison.reasons.iter().any(|reason| reason.contains("precision")));
+    }
+
+    #[test]
+    fn different_benchmark_families_are_never_directly_comparable() {
+        let left_profile = profile();
+        let left_run = run(&left_profile);
+        let mut right_profile = left_profile.clone();
+        right_profile.benchmark_id = "tag-bench".to_owned();
+        right_profile.native_track_id = "all-intervals".to_owned();
+        right_profile.comparison_scope_id = "tag-bench-official-test-v1".to_owned();
+        let right_run = run(&right_profile);
+        let comparison = compare_music_benchmark_runs_v1(
+            &left_profile,
+            &left_run,
+            &right_profile,
+            &right_run,
+        );
+        assert_eq!(
+            comparison.comparability,
+            MusicBenchmarkComparabilityV1::DescriptiveOnly
+        );
+        assert!(comparison.reasons.iter().any(|reason| reason.contains("benchmark_id")));
     }
 }
