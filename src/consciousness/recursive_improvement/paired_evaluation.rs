@@ -123,7 +123,7 @@ impl CandidateEvaluationView {
     pub fn new(
         context: EvaluationContext,
         candidate_id: impl Into<String>,
-        parent_id: Option<String>,
+        parent_ids: Vec<String>,
         source_tree_digest: impl Into<String>,
         receipt_digest: impl Into<String>,
         cases: impl IntoIterator<Item = CaseScore>,
@@ -175,7 +175,7 @@ impl CandidateEvaluationView {
         let capabilities = CapabilityVector::new(aggregate)?;
         let candidate = CandidateRecord::new(
             candidate_id,
-            parent_id,
+            parent_ids,
             source_tree_digest,
             receipt_digest,
             capabilities,
@@ -276,7 +276,7 @@ impl PairedComparison {
         if parent_id == candidate_id {
             return Err(PairedEvaluationError::SameCandidate);
         }
-        if candidate.candidate.parent_id() != Some(parent_id) {
+        if !candidate.candidate.has_parent(parent_id) {
             return Err(PairedEvaluationError::ParentLineageMismatch);
         }
 
@@ -466,7 +466,7 @@ mod tests {
         CandidateEvaluationView::new(
             context,
             candidate_id,
-            parent_id.map(str::to_owned),
+            parent_id.map(str::to_owned).into_iter().collect(),
             digest(source_byte),
             digest(receipt_byte),
             cases,
@@ -675,6 +675,56 @@ mod tests {
         assert_eq!(
             PairedComparison::compare(&parent, &parent, f64::NAN),
             Err(PairedEvaluationError::InvalidTieEpsilon)
+        );
+    }
+
+    #[test]
+    fn compares_multi_parent_hybrid_against_each_declared_parent() {
+        let ctx = context(EvaluationPartition::Validation, "hybrid-split");
+        let parent_left = receipt(
+            ctx.clone(),
+            "parent-left",
+            None,
+            '1',
+            'a',
+            vec![score("case-1", 0.5, 0.8), score("case-2", 0.6, 0.8)],
+        );
+        let parent_right = receipt(
+            ctx.clone(),
+            "parent-right",
+            None,
+            '2',
+            'b',
+            vec![score("case-1", 0.7, 0.9), score("case-2", 0.7, 0.9)],
+        );
+        let hybrid = CandidateEvaluationView::new(
+            ctx,
+            "hybrid",
+            vec!["parent-left".into(), "parent-right".into()],
+            digest('3'),
+            digest('c'),
+            vec![score("case-1", 0.8, 0.9), score("case-2", 0.9, 0.9)],
+        )
+        .unwrap();
+
+        let left_comparison = PairedComparison::compare(&parent_left, &hybrid, 0.0).unwrap();
+        let right_comparison = PairedComparison::compare(&parent_right, &hybrid, 0.0).unwrap();
+        assert_eq!(left_comparison.parent_candidate_id(), "parent-left");
+        assert_eq!(right_comparison.parent_candidate_id(), "parent-right");
+        assert_eq!(left_comparison.metric("coding").unwrap().wins(), 2);
+        assert_eq!(right_comparison.metric("coding").unwrap().wins(), 2);
+
+        let unrelated = receipt(
+            hybrid.context().clone(),
+            "unrelated",
+            None,
+            '4',
+            'd',
+            vec![score("case-1", 0.8, 0.9), score("case-2", 0.9, 0.9)],
+        );
+        assert_eq!(
+            PairedComparison::compare(&unrelated, &hybrid, 0.0),
+            Err(PairedEvaluationError::ParentLineageMismatch)
         );
     }
 
