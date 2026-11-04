@@ -1213,23 +1213,23 @@ mod tests {
                 && item.digest_scope == "normalized_serde_json_value_bytes"
         }));
         assert!(matches!(
-            report.receipts[7].derived_metrics["mass_balance_residual_l"],
-            MetricValue::Quantity { value: -200.0, ref unit, .. } if unit == "L"
+            &report.receipts[7].derived_metrics["mass_balance_residual_l"],
+            MetricValue::Quantity { value, unit, .. } if *value == -200.0 && unit == "L"
         ));
         assert!(matches!(
-            report.receipts[7].derived_metrics["mass_balance_residual_lower_l"],
-            MetricValue::Quantity { value: -220.0, ref unit, .. } if unit == "L"
+            &report.receipts[7].derived_metrics["mass_balance_residual_lower_l"],
+            MetricValue::Quantity { value, unit, .. } if *value == -220.0 && unit == "L"
         ));
         assert!(matches!(
-            report.receipts[7].derived_metrics["mass_balance_residual_upper_l"],
-            MetricValue::Quantity { value: -180.0, ref unit, .. } if unit == "L"
+            &report.receipts[7].derived_metrics["mass_balance_residual_upper_l"],
+            MetricValue::Quantity { value, unit, .. } if *value == -180.0 && unit == "L"
         ));
         assert!(matches!(
-            report.receipts[5].derived_metrics["grid_available"],
+            &report.receipts[5].derived_metrics["grid_available"],
             MetricValue::Boolean { value: false, .. }
         ));
         assert!(matches!(
-            report.receipts[8].derived_metrics["commanded_refill"],
+            &report.receipts[8].derived_metrics["commanded_refill"],
             MetricValue::Boolean { value: true, .. }
         ));
         assert_eq!(
