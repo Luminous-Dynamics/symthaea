@@ -44,7 +44,7 @@ The companion Rust module supplies a deliberately small first vertical slice.
 - Every archive belongs to one immutable evaluation context.
 - The context binds benchmark identity/version, partition, split, evaluator digest, corpus digest, metric-schema digest, resource-budget digest, and seed-manifest digest.
 - Candidate IDs are unique.
-- A child can only reference a parent already present in the archive, so the stored lineage is acyclic by construction.
+- Every candidate can declare zero, one, or multiple parents; all parents must already exist in the archive, so the stored multi-parent lineage is an acyclic DAG by construction.
 - Candidate source-tree and result-receipt digests must be canonical 64-character lowercase hexadecimal strings.
 - Capability vectors are non-empty, finite, normalized to [0, 1], and use a consistent set of metric IDs.
 - Higher is better for every normalized capability dimension.
@@ -222,7 +222,8 @@ Preserve reversible snapshots, deterministic builds where possible, resource cap
 - [x] Add a validating Rust representation for candidate identities and capability vectors.
 - [x] Bind an archive to one exact evaluation context.
 - [x] Retain dominated candidates while exposing a non-dominated frontier.
-- [x] Reject inconsistent metric dimensions and broken parent lineage.
+- [x] Reject inconsistent metric dimensions, duplicate/self/missing parents, and out-of-order lineage.
+- [x] Represent multi-parent hybrid candidates with canonical parent ordering; compare a hybrid separately against each declared parent.
 - [ ] Run exact-head Rust formatting, compilation, tests, and Clippy; no runner result is inferred from source creation.
 
 ### Phase 1 — Receipt and paired-evaluation kernel
@@ -244,7 +245,7 @@ Preserve reversible snapshots, deterministic builds where possible, resource cap
 
 - Connect the archive to the coding agent through a candidate adapter.
 - Keep generated repairs and code edits in isolated worktrees/containers.
-- Compare the candidate with its direct parent and frozen baseline.
+- Compare mutation candidates with their parent; compare multi-parent hybrids separately with every declared parent and the frozen baseline.
 - Promote only after independent tests, retention gates, and held-out evaluation.
 - Keep a fixed-meta-agent and single-champion baseline.
 
