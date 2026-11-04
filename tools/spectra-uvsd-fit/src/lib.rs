@@ -16,6 +16,13 @@ pub use bootstrap::{
     BootstrapStatus, bootstrap_intervals,
 };
 
+mod parametric;
+pub use parametric::{
+    ParametricBootstrapFailureCounts, ParametricBootstrapIntervals, ParametricBootstrapOptions,
+    ParametricBootstrapResult, ParametricBootstrapStatus, ParametricSimulationError,
+    parametric_bootstrap_intervals, simulate_uvsd_category_table,
+};
+
 const MU_BOUND: f64 = 12.0;
 const LOG_SIGMA_BOUND: f64 = 4.0;
 const FIRST_THRESHOLD_BOUND: f64 = 12.0;
