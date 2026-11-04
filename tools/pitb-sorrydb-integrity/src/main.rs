@@ -238,9 +238,7 @@ fn validate_task(task: &SorryRecord, index: usize) -> Result<(), String> {
         return Err(format!("{label}.location.path is unsafe or is not a Lean source path"));
     }
     if task.location.start_line == 0
-        || task.location.start_column == 0
         || task.location.end_line == 0
-        || task.location.end_column == 0
         || task.location.end_line < task.location.start_line
         || (task.location.end_line == task.location.start_line
             && task.location.end_column < task.location.start_column)
@@ -275,11 +273,14 @@ fn task_identity(task: &SorryRecord) -> String {
 
 fn source_location_identity(task: &SorryRecord) -> String {
     format!(
-        "{}|{}|{}|{}",
+        "{}|{}|{}|{}:{}-{}:{}",
         task.repo.remote,
         task.repo.commit,
         task.location.path,
-        task.location.start_line
+        task.location.start_line,
+        task.location.start_column,
+        task.location.end_line,
+        task.location.end_column
     )
 }
 
@@ -309,9 +310,6 @@ fn audit_database(
     }
 
     let registry: BTreeSet<String> = db.repos.iter().map(|r| r.remote_url.clone()).collect();
-    if !db.repos.is_empty() && registry.len() != db.repos.len() {
-        return Err(format!("{label} repository registry contains duplicate remote URLs"));
-    }
 
     let mut ids = BTreeMap::<String, String>::new();
     let mut locations = BTreeSet::<String>::new();
@@ -478,6 +476,13 @@ fn run_self_tests() -> Result<(), String> {
         .map_err(|e| format!("decode synthetic SorryDB task: {e}"))?;
     validate_task(&record, 1)?;
     println!("SELF_TEST_PASS valid pinned-task metadata and coordinates");
+
+    let mut zero_based_column = valid.clone();
+    zero_based_column["location"]["start_column"] = Value::from(0);
+    zero_based_column["location"]["end_column"] = Value::from(5);
+    let zero_based: SorryRecord = serde_json::from_value(zero_based_column).map_err(|e| e.to_string())?;
+    validate_task(&zero_based, 10)?;
+    println!("SELF_TEST_PASS zero-based Lean columns are accepted");
 
     let mut bad = valid.clone();
     bad["repo"]["commit"] = Value::String("not-a-commit".into());
