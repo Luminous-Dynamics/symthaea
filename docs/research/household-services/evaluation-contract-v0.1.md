@@ -101,3 +101,23 @@ The batch report is generated without a timestamp and orders receipts by frozen 
 The report is a software-conformance artifact, not an installation result. Cases without measured pressure, calibrated outlet flow, usable delivery-boundary reserve, qualified end-use water, executed repair actions, post-repair checks or physical follow-up stay unresolved, blocked or held. The batch evaluator does not infer missing evidence from the expected fixture disposition.
 
 CI uploads the generated JSON for traceability. An uploaded artifact proves only that the declared deterministic software path produced a report from the declared synthetic fixture inputs.
+
+
+## 8. Content-bound software receipt contract v0.2
+
+The batch report schema is versioned independently from the source corpus schema. For the frozen water and repair corpus v0.1 adapters it includes:
+- an explicit adapter version;
+- a non-upgradable `synthetic_software_conformance_only` evidence class;
+- exact corpus IDs and a source artifact manifest;
+- raw source byte length and SHA-256 when the file-based CLI is used;
+- a digest-scope label distinguishing raw bytes from normalized in-memory JSON values;
+- a pinned serialization contract;
+- typed quantity and boolean metrics.
+
+A quantity carries a numeric value, an explicit unit and a derivation label. A boolean carries a JSON boolean and an interpretation. The adapter refuses unknown metric keys rather than silently assigning a unit or semantic. The expected disposition from the fixture remains source metadata and is not used to derive the evaluator disposition.
+
+The CLI computes SHA-256 over the exact serialized report bytes and emits a separate `.sha256` sidecar. The sidecar is a detached integrity reference. CI records the exact source commit separately and uploads both report and sidecar. The output does not hash itself; the sidecar binds the complete report bytes.
+
+The Value-based library API hashes the normalized compact Serde JSON representation, not the original caller's whitespace/formatting. The path-based CLI hashes raw file bytes. Consumers must inspect `digest_scope`; the two contracts are not interchangeable.
+
+A SHA-256 match establishes byte identity only. It does not prove authenticity, authorship, signer authority, calibration suitability, physical independence, water quality or product truth. No signature or trust authority is introduced. The evidence class remains synthetic-only regardless of a passing software run.
