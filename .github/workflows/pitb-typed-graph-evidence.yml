@@ -148,7 +148,7 @@ jobs:
 
   sorrydb-snapshot-integrity:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 50
     steps:
       - name: Check out exact pull request head
         uses: actions/checkout@v4
@@ -390,12 +390,15 @@ jobs:
           test "$actual_commit" = "ddcb6542f2b62883c8642d3db4ecc115afcce33e"
           toolchain_blob="$(git -C "$repo_dir" rev-parse HEAD:lean-toolchain)"
           source_blob="$(git -C "$repo_dir" rev-parse HEAD:PrimeNumberTheoremAnd/FioriKadiriSwidinsky.lean)"
+          manifest_blob="$(git -C "$repo_dir" rev-parse HEAD:lake-manifest.json)"
           test "$toolchain_blob" = "2654c20bb16bfd3a12f77a6cdeb73d48bf3b8359"
           test "$source_blob" = "6214f90ce5f8c61aca4a4d696ff5687d872dfc0e"
+          test "$manifest_blob" = "c0405e3c9643b00b1ce6a8120516ca482e6fe4ec"
           git -C "$repo_dir" show HEAD:lean-toolchain
           echo "PITB_SORRYDB_REAL_SOURCE_COMMIT_PASS $actual_commit"
           echo "PITB_SORRYDB_REAL_SOURCE_FILE_BLOB_PASS $source_blob"
           echo "PITB_SORRYDB_REAL_SOURCE_TOOLCHAIN_BLOB_PASS $toolchain_blob"
+          echo "PITB_SORRYDB_REAL_SOURCE_LAKE_MANIFEST_BLOB_PASS $manifest_blob"
           echo "PITB_SORRYDB_REAL_SOURCE_DIR=$repo_dir" >> "$GITHUB_ENV"
 
       - name: Verify real SorryDB task source coordinates from Git objects
@@ -435,6 +438,78 @@ jobs:
           print(json.dumps(receipt, sort_keys=True))
           PY
 
+      - name: Build pinned Lean project with its own toolchain
+        uses: leanprover/lean-action@8fc2853fe07aa43fa70b509ee91926147759ba2b
+        with:
+          lake-package-directory: ${{ runner.temp }}/sorrydb-real-source
+          auto-config: "false"
+          build: "true"
+          use-mathlib-cache: "true"
+          use-github-cache: "false"
+
+      - name: Replay the live SorryDB goal under the pinned Lean environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path "$PITB_SORRYDB_MANIFEST" -- \
+            --replay-goal \
+            "$RUNNER_TEMP/sorrydb-source-task.json" \
+            "$PITB_SORRYDB_REAL_SOURCE_DIR" \
+            "$RUNNER_TEMP/sorrydb-goal-replay.json" \
+            "$RUNNER_TEMP/sorrydb-goal-replay.log"
+
+      - name: Validate exact live goal replay receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-sorrydb-venv/bin/python" - \
+            "$RUNNER_TEMP/sorrydb-goal-replay.json" \
+            "$RUNNER_TEMP/sorrydb-source-task.json" \
+            "$PITB_SORRYDB_REAL_SOURCE_DIR" <<'PY'
+          import hashlib
+          import json
+          import subprocess
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          receipt_path, task_path, repo_path = map(Path, sys.argv[1:])
+          receipt = json.loads(receipt_path.read_text())
+          task = json.loads(task_path.read_text())
+          schema_path = Path("tools/pitb-sorrydb-audit/schema/sorrydb-goal-replay-v0.schema.json")
+          schema = json.loads(schema_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          errors = list(Draft202012Validator(schema).iter_errors(receipt))
+          if errors:
+              raise SystemExit("goal replay receipt schema errors: " + "; ".join(e.message for e in errors))
+
+          def git_blob(path):
+              return subprocess.check_output(["git", "-C", str(repo_path), "show", f"HEAD:{path}"])
+
+          source_path = task["location"]["path"]
+          source_bytes = git_blob(source_path)
+          manifest_bytes = git_blob("lake-manifest.json")
+          toolchain_bytes = git_blob("lean-toolchain")
+          tree = subprocess.check_output(["git", "-C", str(repo_path), "rev-parse", "HEAD^{tree}"], text=True).strip()
+          checks = {
+              "task identity": receipt["source_database_task_id"] == task["id"],
+              "repository commit": receipt["repository_commit"] == task["repo"]["commit"],
+              "Lean version": receipt["lean_version"] == task["repo"]["lean_version"],
+              "source path": receipt["source_path"] == source_path,
+              "goal digest": receipt["goal_sha256"] == hashlib.sha256(task["debug_info"]["goal"].encode()).hexdigest(),
+              "source bytes": receipt["source_file_sha256"] == hashlib.sha256(source_bytes).hexdigest(),
+              "Lake manifest": receipt["lake_manifest_sha256"] == hashlib.sha256(manifest_bytes).hexdigest(),
+              "toolchain file": receipt["toolchain_file_sha256"] == hashlib.sha256(toolchain_bytes).hexdigest(),
+              "repository tree": receipt["repository_tree_sha256"] == tree,
+              "actual live goal": receipt["goal_reproduced"] is True and receipt["replay_exit_code"] == 0,
+              "scoring boundary": receipt["scoring_admission"] is False,
+          }
+          failed = [name for name, passed in checks.items() if not passed]
+          if failed:
+              raise SystemExit("goal replay receipt checks failed: " + ", ".join(failed))
+          print("PITB_SORRYDB_LIVE_GOAL_REPLAY_PASS")
+          print(json.dumps(receipt, sort_keys=True))
+          PY
       - name: Retain SorryDB audit evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -446,6 +521,8 @@ jobs:
             ${{ runner.temp }}/sorrydb-audit.synthetic-runs.jsonl
             ${{ runner.temp }}/sorrydb-source-checkout.json
             ${{ runner.temp }}/sorrydb-real-source-checkout.json
+            ${{ runner.temp }}/sorrydb-goal-replay.json
+            ${{ runner.temp }}/sorrydb-goal-replay.log
             ${{ runner.temp }}/sorrydb-source-task.json
             ${{ runner.temp }}/sorrydb-real-source/
             ${{ runner.temp }}/sorrydb-input/
