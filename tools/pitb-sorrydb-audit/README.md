@@ -124,7 +124,7 @@ A run is counted as `verified_success` only if all of the following are true:
 - source binding passes against the pinned repository commit and exact range;
 - no new axioms and no new sorry placeholders were introduced.
 
-The auditor rejects success receipts missing any gate, receipts for tasks outside the pinned 1,000-task evaluation split, mismatched commits/toolchains/coordinates/goals, invalid digests, duplicate run IDs, and infrastructure failures without a failure type. It emits per-strategy attempt counts, assurance-adjusted success rate, mean successful wall time and total recorded cost. Repeated attempts are allowed and are counted as attempts, not distinct solved tasks.
+The auditor rejects success receipts missing any gate, receipts for tasks outside the pinned 1,000-task evaluation split, mismatched commits/toolchains/coordinates/goals, invalid digests, duplicate run IDs, and infrastructure failures without a failure type. It reports successful attempts separately from unique tasks solved, with per-strategy attempt rate, unique-task coverage, mean successful wall time, total recorded cost and cost per unique verified task. Ten successful retries of one task remain one unique solved task.
 
 The run verifier validates the receipt structure and identity bindings. It does not authenticate the referenced receipt bytes or independently rebuild the source repository. The separate checker/source-binding/semantic-gate evidence must be reopened and verified by the surrounding evaluator before using a receipt in a public score. In particular, a kernel pass alone is never enough for PITB's assurance-adjusted success label.
 
