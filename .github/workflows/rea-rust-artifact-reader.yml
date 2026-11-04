@@ -1,0 +1,47 @@
+name: REA Rust Artifact Reader
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "crates/domains/symthaea-rea-artifact-reader/**"
+      - "tools/rea-artifact-reader-harness/**"
+      - ".github/workflows/rea-rust-artifact-reader.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-rea-artifact-reader/**"
+      - "tools/rea-artifact-reader-harness/**"
+      - ".github/workflows/rea-rust-artifact-reader.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-rust-artifact-reader-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  artifact-reader:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Set up pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy
+      - name: Validate isolated harness metadata
+        run: cargo metadata --manifest-path tools/rea-artifact-reader-harness/Cargo.toml --locked --no-deps --format-version 1 > "$RUNNER_TEMP/rea-reader-metadata.json"
+      - name: Format check
+        run: cargo fmt --manifest-path tools/rea-artifact-reader-harness/Cargo.toml -- --check
+      - name: ZIP reader adversarial unit tests
+        run: cargo test --manifest-path tools/rea-artifact-reader-harness/Cargo.toml --locked
+      - name: Clippy with warnings denied
+        run: cargo clippy --manifest-path tools/rea-artifact-reader-harness/Cargo.toml --locked --all-targets -- -D warnings
