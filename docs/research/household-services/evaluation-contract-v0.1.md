@@ -101,3 +101,21 @@ The batch report is generated without a timestamp and orders receipts by frozen 
 The report is a software-conformance artifact, not an installation result. Cases without measured pressure, calibrated outlet flow, usable delivery-boundary reserve, qualified end-use water, executed repair actions, post-repair checks or physical follow-up stay unresolved, blocked or held. The batch evaluator does not infer missing evidence from the expected fixture disposition.
 
 CI uploads the generated JSON for traceability. An uploaded artifact proves only that the declared deterministic software path produced a report from the declared synthetic fixture inputs.
+
+
+## 8. Content-bound typed receipt envelope (report schema 0.2)
+
+The report records for each corpus:
+- Corpus ID, schema version, synthetic-only status and scenario-set revision.
+- Exact source byte length and lowercase SHA-256 digest when using the byte/path APIs.
+- Digest scope, distinguishing exact source bytes from canonicalized Serde JSON values.
+- Evaluator version, explicit adapter version, source repository and optional full source Git commit.
+- Explicit synthetic-only evidence class.
+
+The CLI path reads each fixture once and hashes the same byte buffers that it parses. Parsed-Value callers use the explicitly labelled canonicalized_json_value scope; they must not claim that digest represents original file formatting or bytes.
+
+Every derived numeric quantity is serialized with a numeric value, explicit unit and derivation description. Boolean observations remain JSON booleans with semantic descriptions. Missing, unknown, stale, unqualified, censored and contradicted states are not coerced to numeric zero.
+
+The CLI wraps the report in an envelope. report_sha256 is the digest of compact deterministic JSON serialization of the report body only; report_byte_length records that body's byte length. The serialization identifier declares Serde struct field order and BTreeMap key order. The envelope is excluded from its own hash.
+
+A source digest establishes byte identity only. It does not authenticate a publisher, source author, Git signature, calibration certificate, topology auditor, measurement boundary or physical truth. A successful software run retains the synthetic-only evidence class and cannot assign E1/E2/E3/E4.
