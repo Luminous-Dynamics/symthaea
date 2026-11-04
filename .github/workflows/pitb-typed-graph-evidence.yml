@@ -159,9 +159,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          actual="$(git hash-object tools/pitb-daps-graph-import/fixtures/daps-example-graph.json)"
-          test "$actual" = "ff3e07e7a4867c969f4ed739497f78b6a77209f"
-          echo "DAPS_SOURCE_GRAPH_GIT_BLOB_PASS $actual"
+          fixture="tools/pitb-daps-graph-import/fixtures/daps-example-graph.json"
+          committed_blob="$(git rev-parse "HEAD:$fixture")"
+          test "$committed_blob" = "ff3e07e7a4867c969f4ed739497f78b6a77209f"
+          git cat-file blob "$committed_blob" > "$RUNNER_TEMP/daps-graph-from-git-object.json"
+          cmp "$RUNNER_TEMP/daps-graph-from-git-object.json" "$fixture"
+          echo "DAPS_SOURCE_GRAPH_GIT_BLOB_PASS $committed_blob"
+          sha256sum "$fixture"
 
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
