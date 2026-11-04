@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-proof-run-v0.schema.json",
+  "title": "PITB SorryDB proof replacement run v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "task_fingerprint",
+    "task_id",
+    "repo_commit",
+    "lean_version",
+    "source_file_sha256",
+    "replacement_patch_sha256",
+    "proof_artifact_sha256",
+    "checker_receipt_sha256",
+    "semantic_gate_receipt_sha256",
+    "source_binding_receipt_sha256",
+    "strategy",
+    "outcome",
+    "proof_inserted",
+    "exact_sorry_replaced",
+    "sorry_absent_after_replacement",
+    "build_passed",
+    "kernel_passed",
+    "semantic_gate_passed",
+    "source_binding_passed",
+    "vacuity_gate_passed",
+    "axiom_delta_zero",
+    "new_sorry_delta_zero",
+    "wall_time_ms",
+    "input_tokens",
+    "output_tokens",
+    "cost_microusd",
+    "failure_type"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-proof-run.v0"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repo_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "lean_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_file_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "replacement_patch_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "proof_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "checker_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "semantic_gate_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_binding_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "strategy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "implementation_sha256",
+        "model_id",
+        "model_version"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "implementation_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "model_id": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ]
+        },
+        "model_version": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ]
+        }
+      }
+    },
+    "outcome": {
+      "enum": [
+        "verified_success",
+        "non_solve",
+        "infrastructure_failure",
+        "invalid_target"
+      ]
+    },
+    "proof_inserted": {
+      "type": "boolean"
+    },
+    "exact_sorry_replaced": {
+      "type": "boolean"
+    },
+    "sorry_absent_after_replacement": {
+      "type": "boolean"
+    },
+    "build_passed": {
+      "type": "boolean"
+    },
+    "kernel_passed": {
+      "type": "boolean"
+    },
+    "semantic_gate_passed": {
+      "type": "boolean"
+    },
+    "source_binding_passed": {
+      "type": "boolean"
+    },
+    "vacuity_gate_passed": {
+      "type": "boolean"
+    },
+    "axiom_delta_zero": {
+      "type": "boolean"
+    },
+    "new_sorry_delta_zero": {
+      "type": "boolean"
+    },
+    "wall_time_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "input_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "output_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cost_microusd": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "failure_type": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "minLength": 1
+        }
+      ]
+    }
+  }
+}
