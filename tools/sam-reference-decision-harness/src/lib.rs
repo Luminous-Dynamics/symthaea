@@ -217,12 +217,12 @@ pub enum EvaluationError {
     EmptyField(&'static str),
     DuplicateActionId,
     InvalidEquivalenceMargin,
-    DuplicateActionId,
     DuplicateReferenceId(String),
     InvalidDigest { field: &'static str },
     ContextMismatch { reference_id: String, action_id: String },
     NonFiniteDifference { reference_id: String },
     DuplicateReceiptId(String),
+    DuplicateActionPayload { reference_id: String },
     NonFiniteMetricValue {
         reference_id: String,
         action_id: String,
@@ -409,6 +409,11 @@ pub fn evaluate_pair(
             } else {
                 common_action_payloads.insert(action_id.to_owned(), action.action_payload_digest.clone());
             }
+        }
+        if action_a.action_payload_digest == action_b.action_payload_digest {
+            return Err(EvaluationError::DuplicateActionPayload {
+                reference_id: row.reference_id.clone(),
+            });
         }
         if action_a.execution_context_digest != action_b.execution_context_digest {
             return Err(EvaluationError::ContextMismatch {
@@ -1210,6 +1215,19 @@ mod tests {
             evaluate(&context(Direction::HigherIsBetter, 0.1), &[bad]),
             Err(EvaluationError::ContextMismatch { .. })
         ));
+    }
+
+    #[test]
+    fn identical_action_payloads_cannot_be_compared_as_two_actions() {
+        let mut duplicate = row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2));
+        duplicate.action_b.as_mut().unwrap().action_payload_digest =
+            duplicate.action_a.as_ref().unwrap().action_payload_digest.clone();
+        assert_eq!(
+            evaluate(&context(Direction::HigherIsBetter, 0.1), &[duplicate]),
+            Err(EvaluationError::DuplicateActionPayload {
+                reference_id: "r0".into()
+            })
+        );
     }
 
     #[test]
