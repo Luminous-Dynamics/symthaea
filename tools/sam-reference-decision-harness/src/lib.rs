@@ -121,6 +121,11 @@ pub struct ComparisonContext {
     pub expected_reference_ids: Vec<String>,
     pub action_a_id: String,
     pub action_b_id: String,
+    /// Digest of the shared scenario/initial-state/environment/action-history context.
+    pub execution_context_digest: String,
+    /// Frozen command payloads for the two compared actions.
+    pub action_a_payload_digest: String,
+    pub action_b_payload_digest: String,
     pub metric: MetricDefinition,
 }
 
@@ -314,7 +319,6 @@ pub fn evaluate_pair(
     let mut applicable_count = 0usize;
     let mut inapplicable_count = 0usize;
     let mut common_semantics: Option<IntervalSemantics> = None;
-    let mut common_action_payloads = std::collections::BTreeMap::new();
     let mut evidence_kind: Option<EvidenceKind> = None;
     let mut mixed_evidence = false;
     let mut incompatible_semantics = false;
@@ -393,34 +397,20 @@ pub fn evaluate_pair(
             ));
         };
 
-        validate_action_identity(context, row, &context.action_a_id, action_a)?;
-        validate_action_identity(context, row, &context.action_b_id, action_b)?;
-        for (action_id, action) in [
-            (context.action_a_id.as_str(), action_a),
-            (context.action_b_id.as_str(), action_b),
-        ] {
-            if let Some(existing) = common_action_payloads.get(action_id) {
-                if existing != &action.action_payload_digest {
-                    return Err(EvaluationError::ContextMismatch {
-                        reference_id: row.reference_id.clone(),
-                        action_id: action_id.to_owned(),
-                    });
-                }
-            } else {
-                common_action_payloads.insert(action_id.to_owned(), action.action_payload_digest.clone());
-            }
-        }
-        if action_a.action_payload_digest == action_b.action_payload_digest {
-            return Err(EvaluationError::DuplicateActionPayload {
-                reference_id: row.reference_id.clone(),
-            });
-        }
-        if action_a.execution_context_digest != action_b.execution_context_digest {
-            return Err(EvaluationError::ContextMismatch {
-                reference_id: row.reference_id.clone(),
-                action_id: "shared_execution_context".into(),
-            });
-        }
+        validate_action_identity(
+            context,
+            row,
+            &context.action_a_id,
+            &context.action_a_payload_digest,
+            action_a,
+        )?;
+        validate_action_identity(
+            context,
+            row,
+            &context.action_b_id,
+            &context.action_b_payload_digest,
+            action_b,
+        )?;
 
         for (action_id, action) in [
             (context.action_a_id.as_str(), action_a),
@@ -680,10 +670,18 @@ fn validate_context(context: &ComparisonContext) -> Result<(), EvaluationError> 
     validate_nonempty(&context.action_set_id, "action_set_id")?;
     validate_nonempty(&context.action_a_id, "action_a_id")?;
     validate_nonempty(&context.action_b_id, "action_b_id")?;
+    validate_digest(&context.execution_context_digest, "execution_context_digest")?;
+    validate_digest(&context.action_a_payload_digest, "action_a_payload_digest")?;
+    validate_digest(&context.action_b_payload_digest, "action_b_payload_digest")?;
     validate_nonempty(&context.metric.metric_id, "metric_id")?;
     validate_nonempty(&context.metric.unit, "metric_unit")?;
     if context.action_a_id == context.action_b_id {
         return Err(EvaluationError::DuplicateActionId);
+    }
+    if context.action_a_payload_digest == context.action_b_payload_digest {
+        return Err(EvaluationError::DuplicateActionPayload {
+            reference_id: "comparison-context".into(),
+        });
     }
     if context.expected_reference_ids.is_empty() {
         return Err(EvaluationError::EmptyField("expected_reference_ids"));
@@ -707,6 +705,7 @@ fn validate_action_identity(
     context: &ComparisonContext,
     row: &ReferenceRow,
     expected_action_id: &str,
+    expected_payload_digest: &str,
     action: &ActionResult,
 ) -> Result<(), EvaluationError> {
     let matches = action.scenario_id == context.scenario_id
@@ -714,7 +713,9 @@ fn validate_action_identity(
         && action.reference_id == row.reference_id
         && action.action_id == expected_action_id
         && action.metric_id == context.metric.metric_id
-        && action.unit == context.metric.unit;
+        && action.unit == context.metric.unit
+        && action.execution_context_digest == context.execution_context_digest
+        && action.action_payload_digest == expected_payload_digest;
     if !matches {
         return Err(EvaluationError::ContextMismatch {
             reference_id: row.reference_id.clone(),
@@ -896,6 +897,9 @@ mod tests {
             expected_reference_ids: Vec::new(),
             action_a_id: "continue".into(),
             action_b_id: "yield".into(),
+            execution_context_digest: "d".repeat(64),
+            action_a_payload_digest: "b".repeat(64),
+            action_b_payload_digest: "c".repeat(64),
             metric: MetricDefinition {
                 metric_id: "clearance-margin".into(),
                 unit: "m".into(),
@@ -1218,16 +1222,24 @@ mod tests {
     }
 
     #[test]
+    fn paired_actions_must_match_the_frozen_execution_context_digest() {
+        let mut bad = row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2));
+        bad.action_a.as_mut().unwrap().execution_context_digest = "9".repeat(64);
+        assert!(matches!(
+            evaluate(&context(Direction::HigherIsBetter, 0.1), &[bad]),
+            Err(EvaluationError::ContextMismatch { .. })
+        ));
+    }
+
+    #[test]
     fn identical_action_payloads_cannot_be_compared_as_two_actions() {
-        let mut duplicate = row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2));
-        duplicate.action_b.as_mut().unwrap().action_payload_digest =
-            duplicate.action_a.as_ref().unwrap().action_payload_digest.clone();
-        assert_eq!(
-            evaluate(&context(Direction::HigherIsBetter, 0.1), &[duplicate]),
-            Err(EvaluationError::DuplicateActionPayload {
-                reference_id: "r0".into()
-            })
-        );
+        let mut ctx = context(Direction::HigherIsBetter, 0.1);
+        ctx.action_b_payload_digest = ctx.action_a_payload_digest.clone();
+        let duplicate = row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2));
+        assert!(matches!(
+            evaluate(&ctx, &[duplicate]),
+            Err(EvaluationError::DuplicateActionPayload { .. })
+        ));
     }
 
     #[test]
