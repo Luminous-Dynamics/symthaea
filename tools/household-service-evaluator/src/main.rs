@@ -64,7 +64,7 @@ fn run() -> Result<(), String> {
         }
     });
     if let Some(path) = digest_path {
-        fs::write(&path, format!("{output_digest}\\n"))
+        fs::write(&path, format!("{output_digest}\n"))
             .map_err(|error| format!("could not write {}: {error}", path))?;
     } else {
         eprintln!("sha256:{output_digest}");
