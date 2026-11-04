@@ -10,10 +10,10 @@ Can a policy use collaborator intent and musical context to distinguish an invit
 
 1. Explicit-intent change must change action: keep the local cue, preceding harmonic context, phrase function, performer role and instrument fixed; change collaborator intent. Example: the same cadential rest invites a response in one condition but retains the floor in the other.
 2. Preceding-harmonic-context change must change action: keep the local cue, phrase function, explicit collaborator-intent label, performer role and instrument fixed; change only the preceding harmonic progression/context. Example: an otherwise identical cadential rest follows a resolved dominant-to-tonic cadence in one member and an open half-cadence in the other. The annotation must specify why the valid next action differs.
-4. Phrase-function change must change action: preserve the local cue, preceding harmonic context, collaborator intent, performer role and instrument; change only the annotated phrase function (for example, a phrase-internal breath versus a solo handoff).
-5. Performer-role change must change action: preserve the local cue, harmonic context, phrase function, collaborator intent and instrument; change only the declared ensemble role.
-6. Surface change must preserve action: keep cue, preceding harmonic context, phrase function, collaborator intent and performer role fixed; change only the surface instrument. The set includes both a musical continuation case and a technical-dropout case.
-7. Ambiguous valid-action set: preserve a set of musically defensible actions, rather than forcing one canonical response.
+3. Phrase-function change must change action: preserve the local cue, preceding harmonic context, collaborator intent, performer role and instrument; change only the annotated phrase function (for example, a phrase-internal breath versus a solo handoff).
+4. Performer-role change must change action: preserve the local cue, harmonic context, phrase function, collaborator intent and instrument; change only the declared ensemble role.
+5. Surface change must preserve action: keep cue, preceding harmonic context, phrase function, collaborator intent and performer role fixed; change only the surface instrument. The set includes both a musical continuation case and a technical-dropout case.
+6. Ambiguous valid-action set: preserve a set of musically defensible actions, rather than forcing one canonical response.
 
 ## Evaluator
 
