@@ -430,6 +430,8 @@ pub enum ValidationError {
     DuplicateEvidenceOrigin,
     /// A causal status is claimed without intervention evidence.
     CausalStatusWithoutIntervention,
+    /// A correlational status lacks runtime-observation support.
+    CorrelationalStatusWithoutRuntimeEvidence,
     /// A hypothesis revision does not link to the preceding revision correctly.
     HypothesisRevisionChain,
     /// A pristine regrade has no preceding primary grade for the same patch.
@@ -635,6 +637,7 @@ impl Ledger {
             .collect();
 
         for record in &self.evidence {
+            ensure_unique("evidence parent", record.parent_ids.iter().map(String::as_str))?;
             for parent_id in &record.parent_ids {
                 let parent = evidence_by_id
                     .get(parent_id.as_str())
@@ -648,6 +651,7 @@ impl Ledger {
         for hypothesis in &self.hypotheses {
             let mut origins = HashSet::new();
             let mut has_intervention_support = false;
+            let mut has_runtime_observation_support = false;
             for evidence_id in &hypothesis.supporting_evidence_ids {
                 let evidence = evidence_by_id
                     .get(evidence_id.as_str())
@@ -660,6 +664,10 @@ impl Ledger {
                 }
                 has_intervention_support |=
                     evidence.authority == EvidenceAuthority::InterventionObserved;
+                has_runtime_observation_support |= matches!(
+                    evidence.authority,
+                    EvidenceAuthority::RuntimeObserved | EvidenceAuthority::InterventionObserved
+                );
             }
             for evidence_id in &hypothesis.contradicting_evidence_ids {
                 let evidence = evidence_by_id
@@ -679,6 +687,14 @@ impl Ledger {
                         .ok_or(ValidationError::HypothesisRevisionChain)?;
                     if previous.hypothesis_id != hypothesis.hypothesis_id
                         || previous.sequence >= hypothesis.sequence
+                        || self.hypotheses.iter().any(|other| {
+                            other.hypothesis_id == hypothesis.hypothesis_id
+                                && other.sequence > previous.sequence
+                                && other.sequence < hypothesis.sequence
+                        })
+                        || self.hypotheses.iter().filter(|other| {
+                            other.previous_record_id.as_deref() == Some(previous_id)
+                        }).count() > 1
                     {
                         return Err(ValidationError::HypothesisRevisionChain);
                     }
@@ -701,6 +717,11 @@ impl Ledger {
             }
             if hypothesis.applicability_domain.trim().is_empty() {
                 return Err(ValidationError::MissingReference);
+            }
+            if hypothesis.status == HypothesisStatus::Correlational
+                && !has_runtime_observation_support
+            {
+                return Err(ValidationError::CorrelationalStatusWithoutRuntimeEvidence);
             }
             if matches!(
                 hypothesis.status,
