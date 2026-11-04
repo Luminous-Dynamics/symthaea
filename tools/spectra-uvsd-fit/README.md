@@ -24,7 +24,7 @@ If a category is absent from an adapter's emitted sparse count vector, insert it
 - Uses shared symthaea-statistics log-CDF, log-survival and log-interval primitives; lower-tail probabilities are evaluated by a Mills-ratio continued fraction.
 - Ordered thresholds are parameterized by a free first threshold and exponentiated positive gaps.
 - The primary likelihood has no continuity correction or arbitrary pseudo-count smoothing.
-- Multi-start BFGS with finite-difference gradients is available as the default fit.
+- Multi-start BFGS uses an analytic gradient in natural parameters, transformed to the ordered-cut parameterization. An independent central finite-difference test is included; finite differences remain a fallback for non-finite analytic-gradient evaluations.
 - Nelder-Mead is provided as a derivative-free cross-check, not as an assumed truth oracle.
 - Reports objective, gradient norm, iteration count, start count, optimizer and explicit Converged / Boundary / NotIdentifiable / NotConverged / NotEvaluable disposition.
 - Boundary and non-convergence are not converted into finite-point success.
@@ -34,13 +34,13 @@ The fit crate intentionally does not depend on symthaea-core or HDC-specific opt
 
 ## Interpretation and fail-closed boundaries
 
-- `NotIdentifiable` is currently a conservative category-support screen, not a formal proof from the Fisher information matrix or profile likelihood. A table passing the screen can still be practically weakly identified.
-- The numerical parameter bounds in the optimizer are computational guardrails, not scientifically justified limits. A fit at one is returned as `Boundary`, not as an interior estimate.
-- `Converged` means the selected optimizer met its numerical stopping rule. It does not certify a global optimum, model adequacy, correct Gaussian assumptions, or statistical identifiability.
-- `solution_parameter_spread` is the coordinate-wise max-minus-min across converged starts in the internal coordinates (mu, log-sigma, first cut, log-gaps). It is a multistart stability diagnostic, not a confidence interval.
+- The `NotIdentifiable` status is currently a conservative category-support screen, not a formal proof based on the Fisher-information matrix or profile likelihood. A table passing the screen can still be practically weakly identified.
+- Numerical parameter bounds are optimizer guardrails, not scientifically justified parameter limits. A fit touching one is returned as `Boundary`.
+- `Converged` means the selected optimizer met its numerical stopping rule. It does not certify a global optimum, model adequacy, the Gaussian assumption, or statistical identifiability.
+- `solution_parameter_spread` is a coordinate-wise max-minus-min across converged starts in internal coordinates (mu, log-sigma, first threshold, log-gaps). It is a multistart stability diagnostic, not a confidence interval.
 - `diagonal_curvature` is a coordinate-wise second derivative of the objective. It is not a full Hessian, covariance matrix, or uncertainty interval.
-- The best finite objective is selected even when that run did not converge; in that case the final status is `NotConverged`. A worse converged start cannot mask a lower-objective failed start.
-- The primary likelihood remains unsmoothed. A separate paper-compatibility smoothing mode is not yet implemented; do not compare exact numerical outputs until the reference preprocessing/correction convention is matched.
+- The lowest finite objective is selected even when its run did not converge; in that case the result is `NotConverged`. A higher-objective converged start cannot mask a lower-objective failed start.
+- The primary likelihood has no pseudo-counts. A separately named reference-compatibility smoothing mode is not implemented yet, so exact numerical comparisons must match the reference preprocessing and correction convention first.
 
 ## Reproduction and benchmark programme
 
