@@ -1,0 +1,258 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-integrity-report-v0.schema.json",
+  "title": "PITB SorryDB benchmark integrity report v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_repository_commit",
+    "full_snapshot_git_blob_sha1",
+    "evaluation_split_git_blob_sha1",
+    "license_git_blob_sha1",
+    "task_input_sha256",
+    "run_input_sha256",
+    "task_count",
+    "repository_snapshot_count",
+    "unique_repository_commit_count",
+    "duplicate_task_ids",
+    "source_file_digest_coverage",
+    "source_binding_ready_task_count",
+    "task_audits",
+    "run_count",
+    "verified_success_count",
+    "strategy_summaries",
+    "trust_boundary",
+    "interpretation_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-integrity-report.v0"
+    },
+    "source_repository_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "full_snapshot_git_blob_sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "evaluation_split_git_blob_sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "license_git_blob_sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "task_input_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "run_input_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "repository_snapshot_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "unique_repository_commit_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "duplicate_task_ids": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "source_file_digest_coverage": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "source_binding_ready_task_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "task_audits": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "task_fingerprint",
+          "repository",
+          "repository_commit",
+          "lean_version",
+          "source_path",
+          "line_range",
+          "goal_sha256",
+          "source_file_sha256_present",
+          "source_binding_ready"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "task_fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "repository": {
+            "type": "string",
+            "minLength": 1
+          },
+          "repository_commit": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "lean_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "line_range": {
+            "type": "string",
+            "minLength": 1
+          },
+          "goal_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "source_file_sha256_present": {
+            "type": "boolean"
+          },
+          "source_binding_ready": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "run_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "verified_success_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "strategy_summaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "strategy_name",
+          "strategy_version",
+          "model_id",
+          "model_version",
+          "attempts",
+          "verified_successes",
+          "non_solves",
+          "infrastructure_failures",
+          "invalid_targets",
+          "success_rate_per_attempt",
+          "mean_success_wall_time_ms",
+          "total_cost_usd"
+        ],
+        "properties": {
+          "strategy_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "strategy_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model_id": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "minLength": 1
+              }
+            ]
+          },
+          "model_version": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "minLength": 1
+              }
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "verified_successes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "non_solves": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "infrastructure_failures": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "invalid_targets": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "success_rate_per_attempt": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "mean_success_wall_time_ms": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "number",
+                "minimum": 0
+              }
+            ]
+          },
+          "total_cost_usd": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "trust_boundary": {
+      "type": "string",
+      "minLength": 30
+    },
+    "interpretation_boundary": {
+      "type": "string",
+      "minLength": 30
+    }
+  }
+}
