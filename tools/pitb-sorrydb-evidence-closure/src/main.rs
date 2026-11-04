@@ -653,6 +653,34 @@ fn make_synthetic_bundle(root: &Path) -> Result<(Vec<u8>, Vec<u8>), String> {
     let semantic_log = b"synthetic semantic review pass\n".to_vec();
     let reproduction_log = b"synthetic Lean goal reproduced\n".to_vec();
     let lake_manifest = b"{\"version\":1}\n".to_vec();
+    let repository_tree = json!({
+        "schema_version":"pitb.sorrydb.repository-tree-manifest.v0",
+        "repository_commit":"1".repeat(40),
+        "source_path":"Demo/Sample.lean",
+        "source_file_sha256":sha256(&source_before),
+        "lean_version":"v4.27.0",
+        "lake_manifest_sha256":sha256(&lake_manifest)
+    });
+    let repository_tree_bytes = serde_json::to_vec(&repository_tree).map_err(|e| e.to_string())?;
+    let repository_tree_sha256 = sha256(&repository_tree_bytes);
+    let lean_environment = json!({
+        "schema_version":"pitb.sorrydb.lean-environment-manifest.v0",
+        "repository_commit":"1".repeat(40),
+        "lean_version":"v4.27.0",
+        "lake_manifest_sha256":sha256(&lake_manifest),
+        "repository_tree_sha256":repository_tree_sha256
+    });
+    let lean_environment_bytes = serde_json::to_vec(&lean_environment).map_err(|e| e.to_string())?;
+    let environment_sha256 = sha256(&lean_environment_bytes);
+    let checker_command = json!({
+        "schema_version":"pitb.sorrydb.checker-command.v0",
+        "run_id":run_id,
+        "repo_commit":"1".repeat(40),
+        "lean_version":"v4.27.0",
+        "environment_sha256":environment_sha256
+    });
+    let checker_command_bytes = serde_json::to_vec(&checker_command).map_err(|e| e.to_string())?;
+    let checker_command_sha256 = sha256(&checker_command_bytes);
 
     let task = json!({
         "id": "a".repeat(64),
@@ -674,7 +702,8 @@ fn make_synthetic_bundle(root: &Path) -> Result<(Vec<u8>, Vec<u8>), String> {
         "source_file_sha256":source_file_sha,"goal_sha256":goal_sha,
         "source_span_sha256":sha256(b"sorry"),"source_span":"sorry",
         "source_span_verified_as_sorry":true,"target_goal_reproduced":true,
-        "lake_manifest_sha256":sha256(&lake_manifest),"repository_tree_sha256":sha256(b"repository-tree"),
+        "environment_sha256":environment_sha256,
+        "lake_manifest_sha256":sha256(&lake_manifest),"repository_tree_sha256":repository_tree_sha256,
         "reproduction_log_sha256":sha256(&reproduction_log)
     });
     let source_receipt_bytes = serde_json::to_vec(&source_receipt).map_err(|e| e.to_string())?;
@@ -685,8 +714,8 @@ fn make_synthetic_bundle(root: &Path) -> Result<(Vec<u8>, Vec<u8>), String> {
         "proof_artifact_sha256":proof_sha,"declaration_signature_before_sha256":sig,
         "declaration_signature_after_sha256":sig,"target_is_prop":true,"build_passed":true,
         "kernel_passed":true,"target_sorry_ax_absent":true,"axiom_delta_zero":true,"new_sorry_delta_zero":true,
-        "checker_binary_sha256":sha256(b"checker binary"),"checker_command_sha256":sha256(b"checker command"),
-        "environment_sha256":sha256(b"environment"),"checker_log_sha256":sha256(&checker_log)
+        "checker_binary_sha256":sha256(b"checker binary"),"checker_command_sha256":checker_command_sha256,
+        "environment_sha256":environment_sha256,"checker_log_sha256":sha256(&checker_log)
     });
     let checker_receipt_bytes = serde_json::to_vec(&checker_receipt).map_err(|e| e.to_string())?;
     let semantic_receipt = json!({
@@ -704,7 +733,9 @@ fn make_synthetic_bundle(root: &Path) -> Result<(Vec<u8>, Vec<u8>), String> {
         ("source-before.lean", &source_before),("source-after.lean", &source_after),
         ("proof.txt", &proof),("replacement.patch", &patch),("checker.log", &checker_log),
         ("semantic-audit.log", &semantic_log),("source-reproduction.log", &reproduction_log),
-        ("lake-manifest.json", &lake_manifest),("source-binding-receipt.json", &source_receipt_bytes),
+        ("lake-manifest.json", &lake_manifest),("repository-tree.json", &repository_tree_bytes),
+        ("lean-environment.json", &lean_environment_bytes),("checker-command.json", &checker_command_bytes),
+        ("source-binding-receipt.json", &source_receipt_bytes),
         ("checker-receipt.json", &checker_receipt_bytes),("semantic-gate-receipt.json", &semantic_receipt_bytes),
     ] {
         fs::write(dir.join(name), bytes).map_err(|e| format!("write synthetic {name}: {e}"))?;
