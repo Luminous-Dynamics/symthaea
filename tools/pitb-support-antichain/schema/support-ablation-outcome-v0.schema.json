@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/support-ablation-outcome-v0.schema.json",
+  "title": "PITB support ablation outcome v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "study_id",
+    "component_id",
+    "target_id",
+    "analysis_endpoint",
+    "target_statement_sha256",
+    "environment_sha256",
+    "toolchain_sha256",
+    "fixed_context_sha256",
+    "budget_sha256",
+    "solver_policy_sha256",
+    "mutable_declarations",
+    "available_declarations",
+    "local_context_sha256",
+    "outcome",
+    "terminal_reason",
+    "terminal_reason_evidence_sha256",
+    "attempt_finished",
+    "kernel_passed",
+    "semantic_gate_passed",
+    "state_receipt_sha256",
+    "run_receipt_sha256",
+    "checker_receipt_sha256",
+    "semantic_gate_receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.support-ablation-outcome.v0"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "component_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "analysis_endpoint": {
+      "const": "exact_target_replan"
+    },
+    "target_statement_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "environment_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "toolchain_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "fixed_context_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "budget_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "solver_policy_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "mutable_declarations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "available_declarations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "local_context_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "outcome": {
+      "enum": [
+        "verified_success",
+        "non_solve"
+      ]
+    },
+    "kernel_passed": {
+      "type": "boolean"
+    },
+    "semantic_gate_passed": {
+      "type": "boolean"
+    },
+    "state_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "run_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "checker_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "semantic_gate_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "terminal_reason": {
+      "enum": [
+        "verified_success",
+        "budget_exhausted",
+        "search_exhausted",
+        "interrupted",
+        "infrastructure_failure",
+        "invalid_target",
+        "checker_failure",
+        "semantic_rejection",
+        "unresolved"
+      ]
+    },
+    "terminal_reason_evidence_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "attempt_finished": {
+      "type": "boolean"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "verified_success"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "terminal_reason": {
+            "const": "verified_success"
+          },
+          "attempt_finished": {
+            "const": true
+          },
+          "kernel_passed": {
+            "const": true
+          },
+          "semantic_gate_passed": {
+            "const": true
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "non_solve"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "terminal_reason": {
+            "enum": [
+              "budget_exhausted",
+              "search_exhausted"
+            ]
+          },
+          "attempt_finished": {
+            "const": true
+          },
+          "kernel_passed": {
+            "const": false
+          },
+          "semantic_gate_passed": {
+            "const": false
+          }
+        }
+      }
+    }
+  ]
+}

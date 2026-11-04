@@ -1,0 +1,106 @@
+name: PITB Support Antichain (Rust)
+
+on:
+  pull_request:
+    paths:
+      - "tools/pitb-support-antichain/**"
+      - ".github/workflows/pitb-support-antichain.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  support-antichain-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Install JSON Schema validator
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pitb-antichain-venv"
+          "$RUNNER_TEMP/pitb-antichain-venv/bin/pip" install "jsonschema==4.25.1"
+
+      - name: Stage isolated analyzer outside production workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/pitb-support-antichain"
+          mkdir -p "$staged/src" "$staged/schema"
+          cp tools/pitb-support-antichain/Cargo.toml "$staged/Cargo.toml"
+          cp tools/pitb-support-antichain/Cargo.lock "$staged/Cargo.lock"
+          cp tools/pitb-support-antichain/src/main.rs "$staged/src/main.rs"
+          cp tools/pitb-support-antichain/schema/*.json "$staged/schema/"
+          echo "PITB_SUPPORT_ANTICHAIN_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+          echo "PITB_SUPPORT_ANTICHAIN_DIR=$staged" >> "$GITHUB_ENV"
+
+      - name: Format and test isolated Rust analyzer
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2021 "$PITB_SUPPORT_ANTICHAIN_DIR/src/main.rs"
+          cargo fmt --check --manifest-path "$PITB_SUPPORT_ANTICHAIN_MANIFEST"
+          cargo test --locked --manifest-path "$PITB_SUPPORT_ANTICHAIN_MANIFEST"
+
+      - name: Run self-tests and generate schema-checkable report
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path "$PITB_SUPPORT_ANTICHAIN_MANIFEST" -- --self-test-report "$RUNNER_TEMP/pitb-support-antichain-report.json"
+
+      - name: Validate schemas and synthetic report instance
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-antichain-venv/bin/python" - "$RUNNER_TEMP/pitb-support-antichain-report.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("tools/pitb-support-antichain/schema")
+          for name in (
+              "support-ablation-outcome-v0.schema.json",
+              "support-antichain-prediction-v0.schema.json",
+              "support-antichain-report-v0.schema.json",
+          ):
+              schema = json.loads((root / name).read_text())
+              Draft202012Validator.check_schema(schema)
+          report_schema = json.loads((root / "support-antichain-report-v0.schema.json").read_text())
+          report = json.loads(Path(sys.argv[1]).read_text())
+          errors = list(Draft202012Validator(report_schema).iter_errors(report))
+          if errors:
+              raise SystemExit("synthetic report schema errors: " + "; ".join(e.message for e in errors))
+          if report["group_count"] != 2 or report["total_ablation_rows"] != 16:
+              raise SystemExit("synthetic exhaustive support groups changed")
+          antichains = {g["target_id"]: g["minimal_sufficient_support_antichain"] for g in report["groups"]}
+          if antichains.get("alternative") != [["h"], ["hEq"]]:
+              raise SystemExit(f"alternative route antichain changed: {antichains}")
+          if antichains.get("conjunctive") != [["h1", "h2"]]:
+              raise SystemExit(f"conjunctive route antichain changed: {antichains}")
+          if report["prediction_analysis"]["route_sufficiency_rate"] != 1.0:
+              raise SystemExit("synthetic prediction scoring changed")
+          print("PITB_SUPPORT_ANTICHAIN_SCHEMA_AND_REPORT_PASS")
+          PY
+
+      - name: Retain synthetic report and source
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-support-antichain-report
+          path: |
+            ${{ runner.temp }}/pitb-support-antichain-report.json
+            ${{ runner.temp }}/pitb-support-antichain/src/main.rs
+            ${{ runner.temp }}/pitb-support-antichain/Cargo.lock
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,436 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/support-antichain-report-v0.schema.json",
+  "title": "PITB support antichain analysis report v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "outcomes_jsonl_sha256",
+    "predictions_jsonl_sha256",
+    "group_count",
+    "exhaustive_group_count",
+    "total_ablation_rows",
+    "max_mutable_declarations",
+    "groups",
+    "prediction_analysis",
+    "receipt_verification_boundary",
+    "overall_interpretation_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.support-antichain-report.v0"
+    },
+    "outcomes_jsonl_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "predictions_jsonl_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "group_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "exhaustive_group_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "total_ablation_rows": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "max_mutable_declarations": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 16
+    },
+    "groups": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/group"
+      }
+    },
+    "prediction_analysis": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/prediction_analysis"
+        }
+      ]
+    },
+    "receipt_verification_boundary": {
+      "type": "string",
+      "minLength": 20
+    },
+    "overall_interpretation_boundary": {
+      "type": "string",
+      "minLength": 20
+    }
+  },
+  "$defs": {
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group_id",
+        "study_id",
+        "component_id",
+        "target_id",
+        "analysis_endpoint",
+        "target_statement_sha256",
+        "environment_sha256",
+        "toolchain_sha256",
+        "fixed_context_sha256",
+        "budget_sha256",
+        "solver_policy_sha256",
+        "mutable_declaration_universe",
+        "subset_lattice_size",
+        "verified_success_subset_count",
+        "non_solve_subset_count",
+        "full_context_verified_success",
+        "minimal_sufficient_support_antichain",
+        "minimal_support_set_count",
+        "necessary_across_all_observed_minimal_routes",
+        "possible_across_observed_minimal_routes",
+        "declaration_roles",
+        "failed_supersets_of_verified_success_count",
+        "observed_success_monotonicity",
+        "interpretation_boundary"
+      ],
+      "properties": {
+        "group_id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "study_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "component_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "analysis_endpoint": {
+          "const": "exact_target_replan"
+        },
+        "target_statement_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "environment_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "toolchain_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "fixed_context_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "budget_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "solver_policy_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "mutable_declaration_universe": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "subset_lattice_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "verified_success_subset_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "non_solve_subset_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "full_context_verified_success": {
+          "const": true
+        },
+        "minimal_sufficient_support_antichain": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "minimal_support_set_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "necessary_across_all_observed_minimal_routes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "possible_across_observed_minimal_routes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "declaration_roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "declaration",
+              "in_all_minimal_support_sets",
+              "in_some_minimal_support_sets",
+              "minimal_support_set_frequency"
+            ],
+            "properties": {
+              "declaration": {
+                "type": "string",
+                "minLength": 1
+              },
+              "in_all_minimal_support_sets": {
+                "type": "boolean"
+              },
+              "in_some_minimal_support_sets": {
+                "type": "boolean"
+              },
+              "minimal_support_set_frequency": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "failed_supersets_of_verified_success_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observed_success_monotonicity": {
+          "enum": [
+            "violations_present",
+            "no_violations_on_exhaustive_lattice"
+          ]
+        },
+        "interpretation_boundary": {
+          "type": "string",
+          "minLength": 20
+        }
+      }
+    },
+    "prediction_analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_id",
+        "model_version",
+        "prediction_count",
+        "evaluated_prediction_count",
+        "prediction_coverage",
+        "necessary_declaration_confusion",
+        "necessary_declaration_precision",
+        "necessary_declaration_recall",
+        "necessary_declaration_f1",
+        "route_sufficiency_rate",
+        "exact_minimal_route_rate",
+        "route_sufficiency_brier_score",
+        "route_sufficiency_probability_scored_count",
+        "selective_route_risk",
+        "interpretation_boundary"
+      ],
+      "properties": {
+        "model_id": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ]
+        },
+        "model_version": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ]
+        },
+        "prediction_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "evaluated_prediction_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "prediction_coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "necessary_declaration_confusion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "true_positive",
+            "false_positive",
+            "false_negative",
+            "true_negative"
+          ],
+          "properties": {
+            "true_positive": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "false_positive": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "false_negative": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "true_negative": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "necessary_declaration_precision": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          ]
+        },
+        "necessary_declaration_recall": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          ]
+        },
+        "necessary_declaration_f1": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          ]
+        },
+        "route_sufficiency_rate": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          ]
+        },
+        "exact_minimal_route_rate": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          ]
+        },
+        "route_sufficiency_brier_score": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          ]
+        },
+        "route_sufficiency_probability_scored_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "selective_route_risk": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          ]
+        },
+        "interpretation_boundary": {
+          "type": "string",
+          "minLength": 20
+        }
+      }
+    }
+  }
+}
