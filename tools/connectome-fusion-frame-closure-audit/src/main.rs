@@ -282,32 +282,6 @@ fn frame_key(assertion: &Assertion) -> AssertionKey {
     }
 }
 
-fn invalid_report(audit_id: String, raw: &[u8], scope_sha256: String, projection_sha256: String, errors: Vec<String>) -> Report {
-    Report {
-        report_version: SCHEMA_VERSION,
-        audit_id,
-        disposition: "NOT_ESTIMABLE".to_string(),
-        promotion_authorized: false,
-        input_sha256: sha256_hex(raw),
-        scope_sha256,
-        projection_sha256,
-        source_checks: Vec::new(),
-        source_population_match: false,
-        required_assertion_count: 0,
-        frame_assertion_count: 0,
-        missing_assertions: Vec::new(),
-        orphan_assertions: Vec::new(),
-        execution_without_claim: Vec::new(),
-        claim_without_execution: Vec::new(),
-        errors,
-        limitations: vec![
-            "This verifier qualifies only the supplied finite event exports and declared scope.".to_string(),
-            "A passing result does not prove that every real-world evidence use was logged or that the sources have no hidden common control.".to_string(),
-            "A passing frame-closure result is not proof of biological independence or biological truth.".to_string(),
-        ],
-    }
-}
-
 fn verify(input: &Input, raw: &[u8]) -> Report {
     let mut errors = Vec::new();
     if input.schema_version != SCHEMA_VERSION {
