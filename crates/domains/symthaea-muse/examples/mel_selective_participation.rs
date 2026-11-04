@@ -40,7 +40,7 @@ struct BaselineV1 {
     expected: BaselineExpectedV1,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct BaselineExpectedV1 {
     valid_decision_support_count: usize,
