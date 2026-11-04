@@ -208,7 +208,7 @@ pub fn replay_member_claim(
         || member.compressed_size() != declared_compressed
         || member.size() != declared_size
         || member.crc32() != declared_crc
-        || u64::from(member.flags().bits())
+        || u64::from(member.flags().as_u16())
             != decimal_at(receipt, &["occurrence", "general_purpose_flags"])?
         || member.encrypted()
         || member.is_dir()
@@ -545,7 +545,7 @@ mod tests {
         let data_offset = member.data_start().unwrap();
         let compressed_size = member.compressed_size();
         let uncompressed_size = member.size();
-        let flags = member.flags().bits();
+        let flags = member.flags().as_u16();
         let crc = member.crc32();
         let method = match member.compression() {
             CompressionMethod::Stored => 0,
