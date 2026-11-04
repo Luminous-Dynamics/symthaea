@@ -987,6 +987,95 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
     })
 }
 
+
+fn insert_quantity(
+    metrics: &mut BTreeMap<String, MetricValue>,
+    key: &'static str,
+    value: f64,
+) -> Result<(), EvaluationError> {
+    if !value.is_finite() {
+        return Err(EvaluationError::new(
+            "derived_metrics",
+            format!("quantity metric {key} must be finite"),
+        ));
+    }
+    let unit = match key {
+        "synthetic_inlet_volume_l"
+        | "gross_tank_sensor_inventory_l"
+        | "tank_sensor_l"
+        | "independent_reference_l"
+        | "absolute_sensor_disagreement_l"
+        | "unexplained_flow_volume_l_under_constant_rate"
+        | "mass_balance_residual_l"
+        | "mass_balance_residual_lower_l"
+        | "mass_balance_residual_upper_l"
+        | "assumed_per_term_absolute_error_bound_l"
+        | "conservative_aggregate_absolute_error_bound_l" => "L",
+        "municipal_inlet_flow_l_min" | "measured_inlet_flow_l_min" => "L/min",
+        "synthetic_inlet_volume_l_under_constant_flow" => "L",
+        "stored_water_age_h" | "observation_duration_h" => "h",
+        "access_fasteners" | "disassembly_steps" => "count",
+        "synthetic_part_lead_time_days" | "follow_up_days_observed" => "day",
+        _ => {
+            return Err(EvaluationError::new(
+                "derived_metrics",
+                format!("no explicit unit contract for quantity metric {key}"),
+            ));
+        }
+    };
+    metrics.insert(
+        key.to_owned(),
+        MetricValue::Quantity {
+            value,
+            unit: unit.to_owned(),
+            derivation: "synthetic_fixture_input_or_deterministic_calculation".to_owned(),
+        },
+    );
+    Ok(())
+}
+
+fn insert_boolean(
+    metrics: &mut BTreeMap<String, MetricValue>,
+    key: &'static str,
+    value: bool,
+) -> Result<(), EvaluationError> {
+    let interpretation = match key {
+        "grid_available" => "grid supply declared available in the fixture",
+        "pump_available" => "pump declared available in the fixture",
+        "backup_power_available" => "backup power declared available in the fixture",
+        "commanded_refill" => "refill command declared active; not proof of physical inflow",
+        "adhesive_or_destructive_disassembly" => "destructive or adhesive disassembly declared",
+        "calibration_required" => "post-replacement calibration declared necessary",
+        "signed_image_available" => "signed firmware image declared available",
+        "previous_known_good_image_available" => "previous known-good firmware image declared available",
+        "catalog_part_exists" => "part appears in catalog; not proof of local stock",
+        "local_stock" => "exact spare declared in local stock",
+        "physical_fit" => "replacement declared to physically fit",
+        "electrical_interface_match" => "electrical interface declared to match",
+        "material_grade_known" => "replacement material grade declared known",
+        "recurrence_observed" => "fault recurrence declared observed during the stated follow-up",
+        "vendor_cloud_available" => "vendor cloud service declared available",
+        "offline_diagnostics_available" => "offline diagnostics declared available",
+        "manual_available" => "repair manual declared available",
+        "critical_interface_changed" => "repair declared to change a critical interface",
+        "post_repair_test_available" => "product-specific post-repair test declared available",
+        _ => {
+            return Err(EvaluationError::new(
+                "derived_metrics",
+                format!("no boolean interpretation contract for metric {key}"),
+            ));
+        }
+    };
+    metrics.insert(
+        key.to_owned(),
+        MetricValue::Boolean {
+            value,
+            interpretation: interpretation.to_owned(),
+        },
+    );
+    Ok(())
+}
+
 fn required_str<'a>(
     object: &'a Value,
     key: &'static str,
@@ -1020,10 +1109,6 @@ fn required_bool(object: &Value, key: &'static str) -> Result<bool, EvaluationEr
             format!("required boolean {key} is missing"),
         )
     })
-}
-
-fn bool_as_f64(value: bool) -> f64 {
-    if value { 1.0 } else { 0.0 }
 }
 
 fn disposition_name(disposition: BatchDisposition) -> &'static str {
