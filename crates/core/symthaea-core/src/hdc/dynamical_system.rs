@@ -1202,26 +1202,26 @@ mod tests {
         let integrator = EulerIntegrator;
         let initial = [1.0, 0.0];
 
-        assert_eq!(
+        assert!(matches!(
             try_simulate(&system, &integrator, &initial, 0.0, 1.0, 0.0),
             Err(SimulationError::InvalidTimeStep)
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             try_simulate(&system, &integrator, &initial, 0.0, 1.0, -0.1),
             Err(SimulationError::InvalidTimeStep)
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             try_simulate(&system, &integrator, &initial, 1.0, 1.0, 0.1),
             Err(SimulationError::InvalidTimeBounds)
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             try_simulate(&system, &integrator, &initial, f64::NAN, 1.0, 0.1),
             Err(SimulationError::InvalidTimeBounds)
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             try_simulate(&system, &integrator, &initial, -f64::MAX, f64::MAX, 0.1),
             Err(SimulationError::NonFiniteTimeSpan)
-        );
+        ));
     }
 
     #[test]
@@ -1229,14 +1229,14 @@ mod tests {
         let system = HarmonicOscillator::simple(1.0);
         let integrator = EulerIntegrator;
 
-        assert_eq!(
+        assert!(matches!(
             try_simulate(&system, &integrator, &[1.0], 0.0, 1.0, 0.1),
             Err(SimulationError::InitialStateDimensionMismatch {
                 expected: 2,
                 actual: 1,
             })
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             try_simulate(
                 &system,
                 &integrator,
@@ -1246,7 +1246,7 @@ mod tests {
                 0.1,
             ),
             Err(SimulationError::NonFiniteInitialState { index: 1 })
-        );
+        ));
     }
 
     #[test]
@@ -1254,7 +1254,7 @@ mod tests {
         let system = HarmonicOscillator::simple(1.0);
         let integrator = EulerIntegrator;
 
-        assert_eq!(
+        assert!(matches!(
             try_simulate_with_limit(
                 &system,
                 &integrator,
@@ -1268,14 +1268,14 @@ mod tests {
                 requested_steps: 10,
                 max_steps: 5,
             })
-        );
+        ));
     }
 
     #[test]
     fn checked_simulation_rejects_invalid_integrator_output() {
         let system = HarmonicOscillator::simple(1.0);
 
-        assert_eq!(
+        assert!(matches!(
             try_simulate(
                 &system,
                 &FixedOutputIntegrator(vec![1.0]),
@@ -1289,9 +1289,9 @@ mod tests {
                 expected: 2,
                 actual: 1,
             })
-        );
+        ));
 
-        assert_eq!(
+        assert!(matches!(
             try_simulate(
                 &system,
                 &FixedOutputIntegrator(vec![1.0, f64::NAN]),
@@ -1301,7 +1301,7 @@ mod tests {
                 0.1,
             ),
             Err(SimulationError::NonFiniteState { step: 1, index: 1 })
-        );
+        ));
     }
 
     #[test]
