@@ -229,9 +229,9 @@ Use explicit status labels: **PROPOSED**, **DESIGN_ONLY**, **SIMULATED**, **MEAS
 
 ## References and external comparators
 
-- PLE: https://www.mercor.com/blog/physical-engineerings-last-exam
+- PLE leaderboard: https://www.mercor.com/apex/partner-benchmarks/ple-bench-leaderboard/\n- PLE paper: https://arxiv.org/abs/2610.30537
 - EngiBench ACL Findings 2026: https://aclanthology.org/2026.findings-acl.1810/
-- EngDesign: https://github.com/engdesign-benchmark/engdesign
+- EngDesign: https://github.com/AGI4Engineering/EngDesign
 - CADGenBench: https://github.com/huggingface/cadgenbench/
 - CADGenBench metrics: https://github.com/huggingface/cadgenbench/blob/main/docs/metrics.md
 - CADBench: https://arxiv.org/abs/2605.10873
