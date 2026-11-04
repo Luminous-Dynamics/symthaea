@@ -125,9 +125,15 @@ pub fn replay_member_claim(
             "receipt entry index is out of range".into(),
         ));
     }
+    let raw_name_base64 = string_at(receipt, &["occurrence", "raw_filename_base64"])?;
     let raw_name = BASE64
-        .decode(string_at(receipt, &["occurrence", "raw_filename_base64"])?)
+        .decode(raw_name_base64)
         .map_err(|e| ReplayError::Rejected(format!("invalid raw filename base64: {e}")))?;
+    if BASE64.encode(&raw_name) != raw_name_base64 {
+        return Err(ReplayError::Rejected(
+            "raw filename base64 must use canonical standard encoding".into(),
+        ));
+    }
     if optional_decimal_at(receipt, &["occurrence", "duplicate_raw_name_count"])? != Some(1) {
         return Err(ReplayError::Unsupported(
             "receipt does not prove a unique raw filename".into(),
