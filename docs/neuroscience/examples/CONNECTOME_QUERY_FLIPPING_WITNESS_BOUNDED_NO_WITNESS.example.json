@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "analysis_id": "synthetic-bounded-universe-no-witness-v1",
+  "dataset_revision_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "edit_universe_scope": "bounded_candidate_subset",
+  "baseline_graph_sha256": "c24fb5455ca674c7aa8bf229bdb6904bc0000949a94efa8a2a5717c6e164f59",
+  "baseline_graph": [
+    { "source": 1, "target": 2, "weight": 0.6 },
+    { "source": 1, "target": 3, "weight": 0.6 },
+    { "source": 1, "target": 4, "weight": 0.6 }
+  ],
+  "query": {
+    "query_id": "node-1-out-degree-at-least-1-0",
+    "metric": { "kind": "out_degree", "node": 1 },
+    "decision": { "kind": "greater_or_equal", "threshold": 1.0 }
+  },
+  "effort_unit": "synthetic_effort_units",
+  "max_total_effort_units": 2,
+  "edits": [
+    {
+      "edit_id": "evidence-review-gate",
+      "kind": "evidence_gate",
+      "effort_units": 1,
+      "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "requires": [],
+      "conflicts_with": [],
+      "changes": []
+    },
+    {
+      "edit_id": "unrelated-decoy",
+      "kind": "graph_edit",
+      "effort_units": 1,
+      "evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "requires": [],
+      "conflicts_with": [],
+      "changes": [
+        { "source": 9, "target": 10, "expected_weight": 0.0, "replacement_weight": 0.5 }
+      ]
+    }
+  ]
+}
