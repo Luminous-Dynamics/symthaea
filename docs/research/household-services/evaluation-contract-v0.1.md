@@ -15,9 +15,12 @@ The signed equation is:
 
     R = V_in - ΔV_tank - V_delivered - V_purge_overflow
 
-ΔV_tank > 0 means tank storage increased during the observation window. The residual interval is R ± U_R, where U_R is a conservative aggregate absolute error bound for the complete residual.
+ΔV_tank > 0 means tank storage increased during the observation window. Each measurement carries its own conservative absolute error bound (u_in, u_tank, u_delivered, u_purge). The evaluator derives the residual bound rather than accepting a caller-supplied aggregate:
 
-The software does not infer U_R from a single meter uncertainty, assume measurement independence, or invent covariance. The measurement protocol must justify the declared bound. Zero inside the interval means only that the interval does not exclude zero. It is not proof of correct topology or physical closure.
+    U_R = u_in + u_tank + u_delivered + u_purge
+    residual interval = [R - U_R, R + U_R]
+
+This is worst-case interval propagation. It assumes neither measurement independence nor a covariance model and therefore cannot silently shrink because a caller omitted a term. The measurement protocol must justify each individual bound. Zero inside the interval means only that the interval does not exclude zero. It is not proof of correct topology or physical closure.
 
 All four terms must use the same observation window, distinct stream IDs and distinct declared boundary IDs. Calibration record and topology-audit digests are references only. Their bytes, signer authority and physical meaning must be independently checked.
 
