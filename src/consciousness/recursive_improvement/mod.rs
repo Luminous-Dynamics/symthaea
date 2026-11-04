@@ -74,7 +74,7 @@ pub use candidate_archive::{
 };
 
 pub use paired_evaluation::{
-    CandidateEvaluationReceipt, CaseScore, MetricPairedResult, PairedComparison,
+    CandidateEvaluationView, CaseScore, MetricPairedResult, PairedComparison,
     PairedEvaluationError,
 };
 
