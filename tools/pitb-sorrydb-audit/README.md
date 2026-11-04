@@ -128,6 +128,9 @@ The auditor rejects success receipts missing any gate, receipts for tasks outsid
 
 The run verifier validates the receipt structure and identity bindings. It does not authenticate the referenced receipt bytes or independently rebuild the source repository. The separate checker/source-binding/semantic-gate evidence must be reopened and verified by the surrounding evaluator before using a receipt in a public score. In particular, a kernel pass alone is never enough for PITB's assurance-adjusted success label.
 
+A synthetic run ledger is exercised by the exact-head workflow. Its JSONL bytes are SHA-256-bound by the report, and CI validates each row against `sorrydb-proof-run-v0.schema.json`. The same task may have multiple attempts, but run IDs must be unique. Per-strategy attempt counts and verified successes are reported separately; these are not deduplicated task-level leaderboard scores.
+
+
 Historic SorryDB task rows do not contain a source-file SHA-256. The task snapshot auditor therefore continues to establish dataset membership and reproducibility inputs, while each proof-run receipt supplies the source digest and carries an independent source-binding receipt. This is not a substitute for actually checking out and hashing the source file at the recorded commit.
 
 ## Trust boundary
