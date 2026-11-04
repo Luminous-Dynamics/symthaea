@@ -951,6 +951,19 @@ mod tests {
         assert_eq!(result.action.audit_stratum, 10);
         assert!((result.receipt.selection_probability - 0.5).abs() < 1.0e-12);
         assert!(result.receipt.candidate_random_u64.is_some());
+        let propensity_sum = result
+            .receipt
+            .action_propensities
+            .iter()
+            .map(|entry| entry.probability)
+            .sum::<f64>();
+        assert!((propensity_sum - 1.0).abs() < 1.0e-12);
+        assert!(result
+            .receipt
+            .action_propensities
+            .iter()
+            .filter(|entry| entry.action_id == 3 || entry.action_id == 4)
+            .all(|entry| entry.probability == 0.0));
     }
 
     #[test]
@@ -1051,6 +1064,26 @@ mod tests {
         let result =
             select_next_action(&action_set, &[candidate], &history, &make_config());
         assert_eq!(result, Err(SelectionError::NoQualifiedAction));
+    }
+
+    #[test]
+    fn due_audit_stratum_without_a_qualified_action_fails_closed() {
+        let action_set = OperationalActionSet::new(
+            vec![action(1, 10, 0.0), action(2, 20, 1.0)],
+            "sha256:action-set",
+        )
+        .unwrap();
+        let history = make_history(&action_set, &[]);
+        let mut candidate_one = assessment(1, 10.0, 0.9);
+        candidate_one.operational_mapping_qualified = false;
+        let assessments = vec![candidate_one, assessment(2, 1.0, 0.9)];
+        let mut config = make_config();
+        config.audit_floor_by_stratum = [(10, 1)].into_iter().collect();
+        let result = select_next_action(&action_set, &assessments, &history, &config);
+        assert_eq!(
+            result,
+            Err(SelectionError::AuditStratumHasNoQualifiedAction)
+        );
     }
 
     #[test]
