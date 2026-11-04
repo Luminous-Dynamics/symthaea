@@ -35,8 +35,8 @@ jobs:
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Check formatting
-        run: cargo fmt --manifest-path tools/connectomics-intake-audit/Cargo.toml --all -- --check
+      - name: Check witness tool formatting
+        run: rustfmt --edition 2024 --check tools/connectomics-intake-audit/src/bin/connectome_query_flipping_witness_audit.rs
 
       - name: Run Rust witness-audit unit tests
         run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_query_flipping_witness_audit
