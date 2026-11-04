@@ -808,6 +808,7 @@ mod tests {
             include_str!("../../../../benchmarks/mel/clock/clock-drift-minus-25ppm-v1.json"),
             include_str!("../../../../benchmarks/mel/clock/clock-outlier-v1.json"),
             include_str!("../../../../benchmarks/mel/clock/clock-discontinuity-v1.json"),
+            include_str!("../../../../benchmarks/mel/clock/clock-missing-anchor-v1.json"),
         ];
 
         for fixture_json in fixtures {
@@ -867,6 +868,12 @@ mod tests {
                         bundle.fit.channel_count,
                         fixture.stream_descriptor.channel_count
                     );
+                    if fixture.fixture_id == "MEL-CLOCK-MISSING-ANCHOR-001" {
+                        assert_eq!(
+                            bundle.fit.missing_anchor_records_before_or_between_observations,
+                            1
+                        );
+                    }
                 }
                 "reject_residual" => assert!(
                     matches!(result, Err(OutputClockFitErrorV1::ResidualOutsidePolicy { .. })),
