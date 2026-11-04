@@ -495,17 +495,15 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
     }
 
     let artifact_digests = validate_artifacts(&manifest, root, &mut errors);
-    if let Some(receipt_sha) = freeze_receipt_digest {
-        if artifact_digests
+    if let Some(receipt_sha) = freeze_receipt_digest
+        && artifact_digests
             .get("prequery_freeze_receipt")
             .map(String::as_str)
             != Some(receipt_sha)
-        {
-            errors.push(
-                "freeze.prequery_freeze_receipt_sha256: does not match verified artifact"
-                    .to_owned(),
-            );
-        }
+    {
+        errors.push(
+            "freeze.prequery_freeze_receipt_sha256: does not match verified artifact".to_owned(),
+        );
     }
     for (context_field, artifact_id) in [
         ("base_graph_snapshot_sha256", "base_graph_snapshot"),
@@ -515,12 +513,12 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
         ),
         ("candidate_patch_sha256", "candidate_patch"),
     ] {
-        if let Some(value) = context.get(context_field).and_then(Value::as_str) {
-            if artifact_digests.get(artifact_id).map(String::as_str) != Some(value) {
-                errors.push(format!(
-                    "context.{context_field}: does not match verified artifact"
-                ));
-            }
+        if let Some(value) = context.get(context_field).and_then(Value::as_str)
+            && artifact_digests.get(artifact_id).map(String::as_str) != Some(value)
+        {
+            errors.push(format!(
+                "context.{context_field}: does not match verified artifact"
+            ));
         }
     }
 
@@ -529,7 +527,7 @@ fn verify_manifest(manifest_path: &Path, verifier_sha256: &str) -> Result<Value,
         for alternative in &axis.alternatives {
             match artifact_digests.get(&alternative.evidence_artifact_id) {
                 Some(actual) if actual == &alternative.evidence_sha256 => {}
-                Some(actual) => errors.push(format!(
+                Some(_) => errors.push(format!(
                     "axis {}/{}: evidence digest mismatch for artifact {}",
                     axis.id, alternative.id, alternative.evidence_artifact_id
                 )),
@@ -813,11 +811,11 @@ fn main() {
     match verify_manifest(Path::new(&arguments[1]), &verifier_sha) {
         Ok(receipt) => {
             let encoded = serde_json::to_string_pretty(&receipt).expect("receipt is serializable");
-            if arguments.len() == 3 {
-                if let Err(error) = fs::write(&arguments[2], &encoded) {
-                    eprintln!("cannot write receipt: {error}");
-                    std::process::exit(74);
-                }
+            if arguments.len() == 3
+                && let Err(error) = fs::write(&arguments[2], &encoded)
+            {
+                eprintln!("cannot write receipt: {error}");
+                std::process::exit(74);
             }
             println!("{encoded}");
         }
