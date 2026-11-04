@@ -230,3 +230,210 @@ fn value_at<'a>(value: &'a Value, path: &[&str]) -> Result<&'a Value, ReplayErro
     Ok(current)
 }
 fn io_error(error: std::io::Error) -> ReplayError { ReplayError::Io(error.to_string()) }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use std::io::{Cursor, Write};
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use zip::write::SimpleFileOptions;
+
+    static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
+
+    struct TempArchive(std::path::PathBuf);
+    impl Drop for TempArchive {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.0);
+        }
+    }
+
+    fn make_archive(
+        method: CompressionMethod,
+        entries: &[(&str, &[u8])],
+    ) -> (TempArchive, Vec<u8>) {
+        let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        for (name, payload) in entries {
+            let options = SimpleFileOptions::default().compression_method(method);
+            writer.start_file(*name, options).unwrap();
+            writer.write_all(payload).unwrap();
+        }
+        let bytes = writer.finish().unwrap().into_inner();
+        let path = std::env::temp_dir().join(format!(
+            "rea-replay-{}-{}.zip",
+            std::process::id(),
+            NEXT_TEMP.fetch_add(1, Ordering::Relaxed)
+        ));
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .unwrap();
+        file.write_all(&bytes).unwrap();
+        drop(file);
+        (TempArchive(path), bytes)
+    }
+
+    fn make_receipt(bytes: &[u8], index: usize, payload: &[u8]) -> Value {
+        let mut oracle = zip::ZipArchive::new(Cursor::new(bytes.to_vec())).unwrap();
+        let mut member = oracle.by_index(index).unwrap();
+        let raw_name = member.name_raw().to_vec();
+        let decoded_name = member.name().to_owned();
+        let local_header_offset = member.header_start();
+        let data_offset = member.data_start().unwrap();
+        let compressed_size = member.compressed_size();
+        let uncompressed_size = member.size();
+        let flags = member.flags().bits();
+        let crc = member.crc32();
+        let method = match member.compression() {
+            CompressionMethod::Stored => 0,
+            CompressionMethod::Deflated => 8,
+            _ => panic!("test fixture uses an unsupported compression method"),
+        };
+        drop(member);
+        drop(oracle);
+
+        json!({
+            "schema_version": "0.1.0",
+            "outcome": "verified",
+            "source": {
+                "archive_size_bytes": bytes.len().to_string(),
+                "binding_strength": "qualified_identity",
+                "identity_scheme": "unix_dev_ino_mode_mtime_ctime",
+                "platform": {
+                    "os": std::env::consts::OS,
+                    "architecture": std::env::consts::ARCH,
+                    "kernel_or_filesystem": "test fixture"
+                },
+                "held_descriptor_matches": true,
+                "selected_path_matches": true,
+                "identity_revalidated_after_attempt": true,
+                "identity_commitment_sha256": null,
+                "archive_sha256": format!("{:x}", Sha256::digest(bytes))
+            },
+            "occurrence": {
+                "central_directory_index": index.to_string(),
+                "raw_filename_base64": BASE64.encode(&raw_name),
+                "decoded_filename": decoded_name,
+                "duplicate_raw_name_count": "1",
+                "local_header_offset_absolute": local_header_offset.to_string(),
+                "data_offset_absolute": data_offset.to_string(),
+                "entry_kind": "file",
+                "encrypted": false,
+                "general_purpose_flags": flags,
+                "compression_method": method,
+                "declared_compressed_bytes": compressed_size.to_string(),
+                "declared_uncompressed_bytes": uncompressed_size.to_string(),
+                "declared_crc32": format!("{crc:08x}")
+            },
+            "verifier": {
+                "implementation": "production-member-verifier",
+                "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "toolchain": "rustc 1.96.0",
+                "target": "x86_64-unknown-linux-gnu",
+                "cargo_lock_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "sha256_implementation": "sha2 0.10.9",
+                "independent_crc_implementation": "Symthaea bitwise CRC-32",
+                "secondary_decoder": "zipcore 0.10.2 / miniz_oxide",
+                "secondary_decoder_crc_implementation": "crc32fast 1.5.4",
+                "differential_oracles": []
+            },
+            "limits": {
+                "max_archive_bytes": (HARD_ARCHIVE_LIMIT).to_string(),
+                "max_central_directory_bytes": (64 * 1024 * 1024u64).to_string(),
+                "max_entries": HARD_ENTRY_LIMIT.to_string(),
+                "max_total_declared_uncompressed_bytes": (4 * 1024 * 1024 * 1024u64).to_string(),
+                "max_entry_declared_uncompressed_bytes": (2 * 1024 * 1024 * 1024u64).to_string(),
+                "max_member_output_bytes": (128 * 1024 * 1024u64).to_string(),
+                "read_buffer_bytes": 65536
+            },
+            "observations": {
+                "observed_uncompressed_bytes": payload.len().to_string(),
+                "observed_crc32": format!("{crc:08x}"),
+                "payload_sha256": format!("{:x}", Sha256::digest(payload)),
+                "decoder_reached_eof": true,
+                "decoder_crc32_valid": true,
+                "decoder_size_valid": true,
+                "independent_crc32_valid": true,
+                "metadata_parity_valid": true,
+                "source_revalidated": true,
+                "failure_kind": null,
+                "failure_detail": null
+            },
+            "claim_scope": {
+                "asserted_claim": "member_content_integrity_only",
+                "not_established": [
+                    "producer_authenticity", "producer_identity", "apk_signature_validity",
+                    "ipa_code_signature_validity", "whole_archive_completeness",
+                    "package_installability", "runtime_behavior", "masvs_control_pass",
+                    "semantic_truth", "absence_of_malicious_writer"
+                ]
+            },
+            "attestation": {
+                "status": "not_provided",
+                "envelope_reference": null
+            }
+        })
+    }
+
+    #[test]
+    fn independently_replays_stored_member_receipt() {
+        let payload = b"independent Stored replay payload";
+        let (temp, bytes) = make_archive(CompressionMethod::Stored, &[("asset.bin", payload)]);
+        let receipt = make_receipt(&bytes, 0, payload);
+        let report = replay_member_claim(&temp.0, &receipt).unwrap();
+        assert_eq!(report.payload_sha256, format!("{:x}", Sha256::digest(payload)));
+        assert_eq!(report.observed_bytes, payload.len() as u64);
+        assert_eq!(report.observed_crc32, crc32(payload));
+        assert_eq!(report.oracle, "zip 9.3.0");
+    }
+
+    #[test]
+    fn independently_replays_deflate_member_with_zlib_rs() {
+        let payload = b"independent Deflate replay payload ".repeat(1024);
+        let (temp, bytes) = make_archive(CompressionMethod::Deflated, &[("asset.bin", &payload)]);
+        let receipt = make_receipt(&bytes, 0, &payload);
+        let report = replay_member_claim(&temp.0, &receipt).unwrap();
+        assert_eq!(report.codec, "flate2 / zlib-rs");
+        assert_eq!(report.payload_sha256, format!("{:x}", Sha256::digest(&payload)));
+    }
+
+    #[test]
+    fn wrong_archive_digest_is_rejected_before_member_replay() {
+        let payload = b"archive digest negative control";
+        let (temp, bytes) = make_archive(CompressionMethod::Stored, &[("asset.bin", payload)]);
+        let mut receipt = make_receipt(&bytes, 0, payload);
+        receipt["source"]["archive_sha256"] = json!("0".repeat(64));
+        let error = replay_member_claim(&temp.0, &receipt).unwrap_err();
+        assert!(matches!(error, ReplayError::Rejected(_)));
+        assert!(error.to_string().contains("archive SHA-256"));
+    }
+
+    #[test]
+    fn duplicate_name_archive_abstains_instead_of_collapsing_occurrences() {
+        let (temp, bytes) = make_archive(
+            CompressionMethod::Stored,
+            &[("same.bin", b"first"), ("same.bin", b"second")],
+        );
+        let receipt = make_receipt(&bytes, 0, b"first");
+        let error = replay_member_claim(&temp.0, &receipt).unwrap_err();
+        assert!(matches!(error, ReplayError::Unsupported(_)));
+        assert!(error.to_string().contains("duplicate raw names"));
+    }
+
+    #[test]
+    fn metadata_mismatch_is_rejected() {
+        let payload = b"metadata negative control";
+        let (temp, bytes) = make_archive(CompressionMethod::Stored, &[("asset.bin", payload)]);
+        let mut receipt = make_receipt(&bytes, 0, payload);
+        receipt["occurrence"]["local_header_offset_absolute"] = json!("999");
+        let error = replay_member_claim(&temp.0, &receipt).unwrap_err();
+        assert!(matches!(error, ReplayError::Rejected(_)));
+    }
+
+    fn crc32(bytes: &[u8]) -> u32 {
+        let mut state = Crc32::new();
+        state.update(bytes);
+        state.finish()
+    }
+}
