@@ -412,7 +412,8 @@
             "qualification",
             "qualification_scope",
             "measurements",
-            "calibration_evidence_refs"
+            "calibration_evidence_refs",
+            "yield_assessment"
           ],
           "properties": {
             "model_id": {
@@ -473,6 +474,75 @@
             },
             "calibration_evidence_refs": {
               "$ref": "#/$defs/refArray"
+            },
+            "yield_assessment": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "horizon_years",
+                "quantile_convention",
+                "p50_net_energy_mwh",
+                "p90_net_energy_mwh",
+                "p95_net_energy_mwh",
+                "method",
+                "uncertainty_components"
+              ],
+              "properties": {
+                "horizon_years": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "quantile_convention": {
+                  "const": "exceedance_probability"
+                },
+                "p50_net_energy_mwh": {
+                  "$ref": "#/$defs/decimal"
+                },
+                "p90_net_energy_mwh": {
+                  "$ref": "#/$defs/decimal"
+                },
+                "p95_net_energy_mwh": {
+                  "$ref": "#/$defs/decimal"
+                },
+                "method": {
+                  "enum": [
+                    "empirical_bootstrap",
+                    "joint_monte_carlo",
+                    "parametric",
+                    "not_established"
+                  ]
+                },
+                "uncertainty_components": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "component_id",
+                      "uncertainty_type",
+                      "evidence_refs"
+                    ],
+                    "properties": {
+                      "component_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uncertainty_type": {
+                        "enum": [
+                          "aleatory",
+                          "epistemic",
+                          "systematic",
+                          "mixed"
+                        ]
+                      },
+                      "evidence_refs": {
+                        "$ref": "#/$defs/refArray"
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         },
