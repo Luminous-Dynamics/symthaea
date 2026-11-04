@@ -785,6 +785,35 @@ mod tests {
     }
 
     #[test]
+    fn greedy_comparator_reports_partial_coverage_when_no_action_can_finish() {
+        let mut input = fixture();
+        for action in &mut input.actions {
+            let alpha = action
+                .outcomes
+                .iter()
+                .find(|outcome| outcome.scenario_id == "world-alpha")
+                .unwrap()
+                .outcome_id
+                .clone();
+            let beta = action
+                .outcomes
+                .iter_mut()
+                .find(|outcome| outcome.scenario_id == "world-beta")
+                .unwrap();
+            beta.outcome_id = alpha;
+        }
+        let bytes = serde_json::to_vec(&input).unwrap();
+        let report = evaluate(&input, &bytes).unwrap();
+        assert!(!report.greedy_comparator.complete);
+        assert_eq!(
+            report.greedy_comparator.separated_decision_conflict_pair_count,
+            2
+        );
+        assert_eq!(report.greedy_comparator.remaining_pairs.len(), 2);
+        assert_eq!(report.greedy_comparator.regret_to_exact_minimum_effort_units, None);
+    }
+
+    #[test]
     fn no_query_decision_disagreement_requires_no_disambiguation_plan() {
         let mut input = fixture();
         for scenario in &mut input.scenarios {
