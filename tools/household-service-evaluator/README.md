@@ -3,7 +3,8 @@
 A small, offline Rust evaluation core with Serde-serializable evidence inputs and result receipts for three bounded household-service questions:
 
 1. Is a metered water balance compatible with its declared residual error bound, calibration evidence and topology-audit reference?
-2. Does a repair attempt meet its declared prerequisites, post-repair qualification and follow-up gate?\n3. What interval of requested service remains unmet when physical delivery and end-use qualification have explicit uncertainty states?
+2. Does a repair attempt meet its declared prerequisites, post-repair qualification and follow-up gate?
+3. What interval of requested service remains unmet when physical delivery and end-use qualification have explicit uncertainty states?
 
 It is intentionally separate from the fixture-integrity validator in tools/household-bench-fixtures.
 
