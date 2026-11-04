@@ -1178,6 +1178,145 @@ pub fn trajectory_to_hvs(result: &SimulationResult) -> Vec<ContinuousHV> {
 mod tests {
     use super::*;
 
+    struct FixedOutputIntegrator(Vec<f64>);
+
+    impl Integrator for FixedOutputIntegrator {
+        fn step(
+            &self,
+            _system: &dyn DynamicalSystem,
+            _state: &[f64],
+            _t: f64,
+            _dt: f64,
+        ) -> Vec<f64> {
+            self.0.clone()
+        }
+
+        fn name(&self) -> &str {
+            "FixedOutput"
+        }
+    }
+
+    #[test]
+    fn checked_simulation_rejects_invalid_time_grid() {
+        let system = HarmonicOscillator::simple(1.0);
+        let integrator = EulerIntegrator;
+        let initial = [1.0, 0.0];
+
+        assert_eq!(
+            try_simulate(&system, &integrator, &initial, 0.0, 1.0, 0.0),
+            Err(SimulationError::InvalidTimeStep)
+        );
+        assert_eq!(
+            try_simulate(&system, &integrator, &initial, 0.0, 1.0, -0.1),
+            Err(SimulationError::InvalidTimeStep)
+        );
+        assert_eq!(
+            try_simulate(&system, &integrator, &initial, 1.0, 1.0, 0.1),
+            Err(SimulationError::InvalidTimeBounds)
+        );
+        assert_eq!(
+            try_simulate(&system, &integrator, &initial, f64::NAN, 1.0, 0.1),
+            Err(SimulationError::InvalidTimeBounds)
+        );
+        assert_eq!(
+            try_simulate(&system, &integrator, &initial, -f64::MAX, f64::MAX, 0.1),
+            Err(SimulationError::NonFiniteTimeSpan)
+        );
+    }
+
+    #[test]
+    fn checked_simulation_rejects_invalid_initial_state() {
+        let system = HarmonicOscillator::simple(1.0);
+        let integrator = EulerIntegrator;
+
+        assert_eq!(
+            try_simulate(&system, &integrator, &[1.0], 0.0, 1.0, 0.1),
+            Err(SimulationError::InitialStateDimensionMismatch {
+                expected: 2,
+                actual: 1,
+            })
+        );
+        assert_eq!(
+            try_simulate(
+                &system,
+                &integrator,
+                &[1.0, f64::INFINITY],
+                0.0,
+                1.0,
+                0.1,
+            ),
+            Err(SimulationError::NonFiniteInitialState { index: 1 })
+        );
+    }
+
+    #[test]
+    fn checked_simulation_enforces_step_limit_before_allocation() {
+        let system = HarmonicOscillator::simple(1.0);
+        let integrator = EulerIntegrator;
+
+        assert_eq!(
+            try_simulate_with_limit(
+                &system,
+                &integrator,
+                &[1.0, 0.0],
+                0.0,
+                1.0,
+                0.1,
+                5,
+            ),
+            Err(SimulationError::StepLimitExceeded {
+                requested_steps: 10,
+                max_steps: 5,
+            })
+        );
+    }
+
+    #[test]
+    fn checked_simulation_rejects_invalid_integrator_output() {
+        let system = HarmonicOscillator::simple(1.0);
+
+        assert_eq!(
+            try_simulate(
+                &system,
+                &FixedOutputIntegrator(vec![1.0]),
+                &[1.0, 0.0],
+                0.0,
+                1.0,
+                0.1,
+            ),
+            Err(SimulationError::StateDimensionMismatch {
+                step: 1,
+                expected: 2,
+                actual: 1,
+            })
+        );
+
+        assert_eq!(
+            try_simulate(
+                &system,
+                &FixedOutputIntegrator(vec![1.0, f64::NAN]),
+                &[1.0, 0.0],
+                0.0,
+                1.0,
+                0.1,
+            ),
+            Err(SimulationError::NonFiniteState { step: 1, index: 1 })
+        );
+    }
+
+    #[test]
+    fn checked_simulation_reaches_exact_terminal_time() {
+        let system = HarmonicOscillator::simple(1.0);
+        let result =
+            try_simulate(&system, &EulerIntegrator, &[1.0, 0.0], 0.1, 1.0, 0.3)
+                .expect("valid simulation");
+
+        assert_eq!(result.times.last().copied(), Some(1.0));
+        assert_eq!(result.steps, 3);
+        assert_eq!(result.times.len(), result.states.len());
+        assert_eq!(result.total_time, 0.9);
+    }
+
     // -------------------------------------------------------------------------
     // Harmonic oscillator: energy conservation
     // -------------------------------------------------------------------------
