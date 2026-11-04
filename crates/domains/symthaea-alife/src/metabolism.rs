@@ -79,8 +79,9 @@ pub fn perceptual_resolution_bits(grain: f64) -> f64 {
 
 /// Quantize a `[0,1]` observation to the nearest multiple of `grain` -- the coarse-graining a
 /// perceptual strategy actually applies to what it observes, before belief update ever sees it.
-/// Companion to [`perceptual_resolution_bits`]: the same `grain` drives both how distorted the
-/// observation is and how much it cost to have resolved that much of it.
+/// Companion to [`perceptual_resolution_bits`]: the same `grain` drives both the
+/// observation distortion and the dimensionless model cost assigned to its
+/// resolution; it is not a measurement of physical erasure energy.
 pub fn quantize_to_grain(value: f64, grain: f64) -> f64 {
     let grain = grain.max(1e-6);
     ((value / grain).round() * grain).clamp(0.0, 1.0)
@@ -104,8 +105,8 @@ mod tests {
 
     #[test]
     fn landauer_minimum_never_negative_for_negative_bits_input() {
-        // Negative "bits" isn't physically meaningful (can't un-erase information) -- clamp,
-        // don't let it produce a negative "cost" that could offset real charges elsewhere.
+        // Negative modeled information counts are invalid for this policy; clamp
+        // them to zero so they cannot create a negative model cost.
         assert_eq!(landauer_minimum(-5.0, 1.0), 0.0);
     }
 
