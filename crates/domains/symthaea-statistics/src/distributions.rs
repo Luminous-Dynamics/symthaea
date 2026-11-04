@@ -198,7 +198,7 @@ pub fn normal_log_interval(lower: f64, upper: f64) -> f64 {
     let width = upper - lower;
     let midpoint = lower + width * 0.5;
     if width.is_finite() && width > 0.0
-        && width <= 1.0e-5 * (1.0 + midpoint.abs())
+        && width <= 1.0e-5 / (1.0 + midpoint.abs())
         && midpoint.abs() < 1.0e150
     {
         let correction = ((midpoint * width).powi(2) - width * width) / 24.0;
@@ -274,6 +274,17 @@ mod tests {
         let narrow = normal_log_interval(-1.0e-9, 1.0e-9).exp();
         assert!((narrow / (2.0e-9 / (2.0 * std::f64::consts::PI).sqrt()) - 1.0).abs() < 1.0e-12);
         assert!(normal_log_interval(1.0, 1.0).is_nan());
+    }
+
+
+    #[test]
+    fn normal_log_interval_matches_high_tail_reference() {
+        // Reference value for P(8 < Z <= 8.0001), evaluated independently
+        // with a high-accuracy log-normal-CDF implementation.
+        let actual = normal_log_interval(8.0, 8.0001);
+        assert!((actual - (-42.129_678_880_187_534)).abs() < 2.0e-9);
+        let reflected = normal_log_interval(-8.0001, -8.0);
+        assert!((actual - reflected).abs() < 2.0e-10);
     }
 
     #[test]
