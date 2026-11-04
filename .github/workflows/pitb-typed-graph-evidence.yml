@@ -175,7 +175,7 @@ jobs:
           match = re.search(r"\bblob ([0-9a-f]{40})\t", tree)
           if not match:
               raise SystemExit(f"unable to parse fixture tree entry: {tree!r}")
-          expected = "ff3e07e7a4867c969f4ed739497f78b6a77209f"
+          expected = "ff3e07e7a4867c969f4fed739497f78b6a77209f"
           actual = match.group(1)
           if actual != expected:
               raise SystemExit(f"wrong upstream DAPS blob: expected {expected}, got {actual}")
