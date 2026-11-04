@@ -68,7 +68,7 @@ fn simulate_table(mu: f64, sigma: f64, seed: u64) -> CategoryTable {
 
 fn main() {
     println!(
-        "seed,mu_true,sigma_true,status,mu_hat,sigma_hat,d_a_hat,nll,gradient_norm,iterations"
+        "seed,mu_true,sigma_true,status,mu_hat,sigma_hat,d_a_hat,nll,gradient_norm,iterations,objective_spread,parameter_spread,diagonal_curvature"
     );
 
     for &mu in &MU_GRID {
@@ -99,8 +99,27 @@ fn main() {
                     .gradient_norm
                     .map(|value| value.to_string())
                     .unwrap_or_default();
+                let objective_spread = result
+                    .diagnostics
+                    .solution_objective_spread
+                    .map(|value| value.to_string())
+                    .unwrap_or_default();
+                let parameter_spread = result
+                    .diagnostics
+                    .solution_parameter_spread
+                    .as_ref()
+                    .map(|values| values.iter().map(f64::to_string).collect::<Vec<_>>().join(";"))
+                    .map(|value| format!("\\"{value}\\""))
+                    .unwrap_or_default();
+                let curvature = result
+                    .diagnostics
+                    .diagonal_curvature
+                    .as_ref()
+                    .map(|values| values.iter().map(f64::to_string).collect::<Vec<_>>().join(";"))
+                    .map(|value| format!("\\"{value}\\""))
+                    .unwrap_or_default();
                 println!(
-                    "{campaign_seed},{mu},{sigma},{:?},{mu_hat},{sigma_hat},{d_a_hat},{nll},{gradient},{}",
+                    "{campaign_seed},{mu},{sigma},{:?},{mu_hat},{sigma_hat},{d_a_hat},{nll},{gradient},{},{objective_spread},{parameter_spread},{curvature}",
                     result.status,
                     result.diagnostics.iterations
                 );
