@@ -1424,6 +1424,12 @@ mod tests {
                 timestamp_uncertainty_ns: None,
             })
             .collect::<Vec<_>>();
+        let callback_playback_fit = fit_cpal_callback_playback_v1(
+            &output_descriptor,
+            &output_anchors,
+            CpalCallbackPlaybackFitPolicyV1::default(),
+        )
+        .unwrap();
         let output_bundle = fit_output_clock_bundle_v1(
             &output_descriptor,
             &output_anchors,
@@ -1433,6 +1439,7 @@ mod tests {
 
         let estimate = estimate_output_frame_at_runner_time_v1(
             &runner_fit,
+            &callback_playback_fit,
             &output_bundle,
             120_000_000,
         )
@@ -1536,6 +1543,12 @@ mod tests {
                 timestamp_uncertainty_ns: None,
             },
         ];
+        let callback_playback_fit = fit_cpal_callback_playback_v1(
+            &output_descriptor,
+            &anchors,
+            CpalCallbackPlaybackFitPolicyV1::default(),
+        )
+        .unwrap();
         let output_bundle = fit_output_clock_bundle_v1(
             &output_descriptor,
             &anchors,
@@ -1544,7 +1557,12 @@ mod tests {
         .unwrap();
 
         assert!(matches!(
-            estimate_output_frame_at_runner_time_v1(&runner_fit, &output_bundle, 120_000_000),
+            estimate_output_frame_at_runner_time_v1(
+                &runner_fit,
+                &callback_playback_fit,
+                &output_bundle,
+                120_000_000
+            ),
             Err(RunnerOutputFrameCompositionErrorV1::StreamInstanceMismatch)
                 | Err(RunnerOutputFrameCompositionErrorV1::StreamDescriptorDigestMismatch)
         ));
