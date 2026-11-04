@@ -349,5 +349,141 @@
         "type": "secondary_reporting_not_the_standard"
       }
     ]
-  }
+  },
+  "benchmark_cases": [
+    {
+      "id": "HSC-SA-001",
+      "title": "Basic formal-settlement service profile",
+      "synthetic_only": true,
+      "observation_window": "full calendar year plus each calendar month",
+      "boundary": "public_user_connection",
+      "checks": [
+        "quantity_6kL_per_household_calendar_month",
+        "minimum_flow_10L_per_min",
+        "annual_availability_358_days",
+        "maximum_consecutive_interruption_48_hours",
+        "SANS241_current_edition_quality"
+      ],
+      "expected_semantics": "Evaluate each requirement independently. A single hard-gate failure is reported even when other measures pass; Unknown quality is not a potable pass.",
+      "adversarial_variants": [
+        {
+          "id": "HSC-SA-001-A",
+          "condition": "Monthly quantity meets 6 kL but one interruption lasts 49 consecutive hours.",
+          "expected": "Quantity may pass; continuity gate fails independently."
+        },
+        {
+          "id": "HSC-SA-001-B",
+          "condition": "Annual availability is 357 days while monthly quantity and flow pass.",
+          "expected": "Annual availability gate fails independently."
+        }
+      ]
+    },
+    {
+      "id": "HSC-SA-002",
+      "title": "Alternative drinking water after interruption exceeds 48 hours",
+      "synthetic_only": true,
+      "trigger": "continuous interruption >48 hours",
+      "boundary": "designated_emergency_delivery_point",
+      "checks": [
+        "15L_per_person_per_day_drinking_water",
+        "delivery_point_relatively_convenient_and_safe",
+        "SANS241_quality",
+        "actual_offered_and_received_quantity"
+      ],
+      "expected_semantics": "Evaluate alternative supply at designated delivery points. Do not infer delivery at household fixtures. Preserve access burden and actual receipt separately.",
+      "adversarial_variants": [
+        {
+          "id": "HSC-SA-002-A",
+          "condition": "49-hour outage; 15 L/person/day is offered at the designated point and quality evidence is current.",
+          "expected": "Alternative-supply profile can qualify at that point only."
+        },
+        {
+          "id": "HSC-SA-002-B",
+          "condition": "Same quantity is logged in a tanker depot but no designated-point delivery is evidenced.",
+          "expected": "No delivery-point service credit; state Unknown."
+        }
+      ]
+    },
+    {
+      "id": "HSC-SA-003",
+      "title": "Interim informal-settlement delivery-point access",
+      "synthetic_only": true,
+      "boundary": "communal_delivery_point",
+      "checks": [
+        "maximum_walking_distance_200m",
+        "quantity_6kL_per_household_calendar_month",
+        "minimum_flow_10L_per_min",
+        "annual_availability_358_days",
+        "maximum_interruption_48_hours",
+        "SANS241_quality",
+        "tanker_interim_duration_12_consecutive_months"
+      ],
+      "expected_semantics": "Keep each delivery/access condition independent. A private household buffer is not a substitute for the interim public-service profile.",
+      "adversarial_variants": [
+        {
+          "id": "HSC-SA-003-A",
+          "condition": "Delivery point is 199 m from the furthest household.",
+          "expected": "Distance gate may pass if measurement method and origin are valid."
+        },
+        {
+          "id": "HSC-SA-003-B",
+          "condition": "Delivery point is 201 m from the furthest household.",
+          "expected": "Distance gate fails independently."
+        }
+      ]
+    },
+    {
+      "id": "HSC-SA-004",
+      "title": "Public-to-private boundary attribution",
+      "synthetic_only": true,
+      "boundary_pairs": [
+        "public_user_connection",
+        "private_household_fixture"
+      ],
+      "checks": [
+        "measurement_boundary_identity",
+        "separate_utility_and_property_responsibility",
+        "no_cross_boundary_inference"
+      ],
+      "expected_semantics": "A restriction at the user connection and a restriction inside household plumbing are distinct observations. Attribute only to the evidenced boundary.",
+      "adversarial_variants": [
+        {
+          "id": "HSC-SA-004-A",
+          "condition": "Pressure is low at user connection and fixture.",
+          "expected": "Evidence supports an upstream/user-connection constraint; do not infer the exclusive cause without further evidence."
+        },
+        {
+          "id": "HSC-SA-004-B",
+          "condition": "User connection pressure passes but fixture pressure fails.",
+          "expected": "Do not attribute the fixture shortfall to the utility from these measurements alone."
+        }
+      ]
+    },
+    {
+      "id": "HSC-SA-005",
+      "title": "Drinking-water quality evidence absent or stale",
+      "synthetic_only": true,
+      "boundary": "declared_drinking_water_delivery_point",
+      "checks": [
+        "source_and_batch_identity",
+        "sample_point_identity",
+        "current_SANS241_edition",
+        "monitoring_programme_currentness",
+        "quality_result_and_method"
+      ],
+      "expected_semantics": "Retain delivered physical litres but assign no confirmed potable-service credit when quality evidence is missing, stale or mis-scoped. State Unknown, not confirmed contamination.",
+      "adversarial_variants": [
+        {
+          "id": "HSC-SA-005-A",
+          "condition": "A historic sample exists but the monitoring programme is overdue.",
+          "expected": "ExpiredOrMonitoringOverdue / no potable credit."
+        },
+        {
+          "id": "HSC-SA-005-B",
+          "condition": "A current sample exists for a different storage tank or outlet.",
+          "expected": "SourceOrSamplePointMismatch / no potable credit."
+        }
+      ]
+    }
+  ]
 }

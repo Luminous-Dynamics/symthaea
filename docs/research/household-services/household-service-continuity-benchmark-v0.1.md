@@ -460,3 +460,6 @@ This is a technical interpretation from a Rand Water water-quality specialist's 
 The machine-readable profile captures the standard revision and evidence-boundary requirements but intentionally contains no SANS numerical parameter limits. Its role is to prevent a false "quality pass" from stale, wrong-source, wrong-boundary or out-of-context evidence; it is not a substitute for water-quality testing.
 
 **Technical reference:** Rand Water, *Migrating from SANS 241:2015 to SANS 241:2025 — Practical implications*, presentation by a Rand Water Water Quality Specialist (2026): https://www.randwater.co.za/media/forums/presentations/RW%20-%20Migrating%20from%20SANS%20241%202015%20to%20SANS%20241%202025.pdf. Supporting SABS-referenced update: https://plumbingafrica.co.za/update-to-sans-241/ (2026-05-12). Treat the current SANS publication as controlling; these explanatory sources are not the standard itself.
+
+
+The machine-readable profile now also carries synthetic benchmark templates HSC-SA-001 through HSC-SA-005, each with independent gates and adversarial variants for volume/continuity trade-offs, emergency delivery-point accounting, 200 m access, public/private boundary attribution and stale/mis-scoped quality evidence. These are test designs, not observations of municipal compliance.
