@@ -109,14 +109,14 @@ fn main() {
                     .solution_parameter_spread
                     .as_ref()
                     .map(|values| values.iter().map(f64::to_string).collect::<Vec<_>>().join(";"))
-                    .map(|value| format!("\\"{value}\\""))
+                    .map(|value| format!(r#""{value}""#))
                     .unwrap_or_default();
                 let curvature = result
                     .diagnostics
                     .diagonal_curvature
                     .as_ref()
                     .map(|values| values.iter().map(f64::to_string).collect::<Vec<_>>().join(";"))
-                    .map(|value| format!("\\"{value}\\""))
+                    .map(|value| format!(r#""{value}""#))
                     .unwrap_or_default();
                 println!(
                     "{campaign_seed},{mu},{sigma},{:?},{mu_hat},{sigma_hat},{d_a_hat},{nll},{gradient},{},{objective_spread},{parameter_spread},{curvature}",
