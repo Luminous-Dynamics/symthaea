@@ -308,6 +308,10 @@ pub fn evaluate_case(case: &Value) -> Disposition {
 
     if has_material_source_conflict(case, decision_time) {
         blockers.push("MATERIAL_SOURCE_CONFLICT".to_owned());
+        warnings.push(
+            "Conflicting current evidence remains visible; do not majority-vote source count."
+                .to_owned(),
+        );
     }
 
     let grid = case.get("grid_connection");
@@ -381,6 +385,17 @@ pub fn evaluate_case(case: &Value) -> Disposition {
         true,
     ) {
         blockers.push("NO_DECISION_TIME_VALID_TARIFF_EVIDENCE".to_owned());
+        let future_known_tariff = array(case, "evidence").iter().any(|evidence| {
+            string(evidence, "claim_id") == Some("revenue_tariff")
+                && string(evidence, "known_at")
+                    .is_some_and(|known_at| known_at.ends_with('Z') && decision_time < known_at)
+        });
+        if future_known_tariff {
+            warnings.push(
+                "Evidence with known_at after decision_time must be excluded even when valid_time overlaps."
+                    .to_owned(),
+            );
+        }
     }
 
     if !claim_has_evidence(
@@ -427,7 +442,7 @@ pub fn evaluate_case(case: &Value) -> Disposition {
         }
         _ => {
             warnings.push(
-                "Scenario dependence is unknown; do not report calibrated joint tail probabilities or CVaR."
+                "Do not report joint tail-risk probabilities as calibrated when dependence is unknown."
                     .to_owned(),
             );
             "indeterminate"
@@ -494,6 +509,7 @@ mod tests {
             assert_eq!(result.to_value()["risk_disposition"], expected_case["risk_disposition"]);
             assert_eq!(result.to_value()["decision_authority"], expected_case["decision_authority"]);
             assert_eq!(result.to_value()["blockers"], expected_case["blockers"]);
+            assert_eq!(result.to_value()["warnings"], expected_case["warnings"]);
         }
     }
 
