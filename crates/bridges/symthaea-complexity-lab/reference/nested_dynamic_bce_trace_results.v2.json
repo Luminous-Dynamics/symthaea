@@ -1,6 +1,86 @@
 {
-  "format":"symthaea.nested-dynamic-projected-bce-trace-results",
-  "version":2,
-  "claim_ceiling":"nested_branch_reference_checker_plus_exhaustive_oracle_not_formal_proof_or_D4_trace_replay",
-  "uploaded_checker_execution":"not_run"
+  "format": "symthaea.nested-dynamic-projected-bce-trace-results",
+  "version": 2,
+  "claim_ceiling": "nested_branch_reference_checker_plus_exhaustive_oracle_not_formal_proof_or_D4_trace_replay",
+  "certificate_sha256": "sha256:2b57e824b30df5452f7d3824a268f98715544adc7c586c93e669cd347c49a5e4",
+  "certificate_git_blob_sha1": "edeaa6bd2b27b48cd89c070a8755dee1fa9833f8",
+  "local_reference_checker_sha256": "sha256:55beb7db67de6e91f4822b203e95ba7b00ee95cc4ab7d0ad1c7951f93880ce97",
+  "local_reference_checker_git_blob_sha1": "cb4443853ca5bded57c6917f4e2e505386ca9f45",
+  "uploaded_checker_git_blob_sha1": "61c7acc4dd54f10904e0a287b6c0ee97e182806f",
+  "local_reference_variant_execution": "passed",
+  "uploaded_checker_execution": "not_run",
+  "execution_environment": {
+    "python": "3.13.5",
+    "platform": "linux",
+    "execution_date": "2026-11-04",
+    "method": "local reference implementation executed against certificate whose Git blob SHA-1 matches the public certificate"
+  },
+  "summary": {
+    "root_full_models": 14,
+    "leaf_source_full_models": 14,
+    "leaf_processed_full_models": 15,
+    "root_pmc": 8,
+    "processed_pmc": 8,
+    "root_pwmc": "1/1",
+    "processed_pwmc": "1/1",
+    "root_support": [
+      "000",
+      "001",
+      "010",
+      "011",
+      "100",
+      "101",
+      "110",
+      "111"
+    ],
+    "processed_support": [
+      "000",
+      "001",
+      "010",
+      "011",
+      "100",
+      "101",
+      "110",
+      "111"
+    ],
+    "leaves": [
+      {
+        "leaf": "x0y0",
+        "source_models": 2,
+        "processed_models": 3,
+        "source_support_size": 2,
+        "processed_support_size": 2
+      },
+      {
+        "leaf": "x0y1",
+        "source_models": 4,
+        "processed_models": 4,
+        "source_support_size": 2,
+        "processed_support_size": 2
+      },
+      {
+        "leaf": "x1",
+        "source_models": 8,
+        "processed_models": 8,
+        "source_support_size": 4,
+        "processed_support_size": 4
+      }
+    ]
+  },
+  "negative_controls": 11,
+  "negative_controls_rejected": 11,
+  "negative_control_labels": [
+    "missing nested y=1 sibling",
+    "duplicate nested assignment",
+    "wrong nested parent",
+    "cross-branch context reuse",
+    "conditioned formula tampering",
+    "blocker made visible",
+    "missing opposing clause check",
+    "backtrack restores child",
+    "sibling inherits BCE target",
+    "stale root digest",
+    "stale nested context"
+  ],
+  "execution_note": "The local reference checker variant passed all 11 negative controls and the exhaustive root/leaf oracle. The current uploaded compact checker is a different source blob and is explicitly marked not_run; run it before promoting its execution status."
 }
