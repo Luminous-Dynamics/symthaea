@@ -973,7 +973,11 @@ fn synthetic_report() -> Result<Value, String> {
     let proof_runs = synthetic_proof_runs();
     let (verified_success_count, strategy_summaries) =
         summarize_proof_runs(&proof_runs, &evaluation)?;
-    let run_bytes = serde_json::to_vec(&proof_runs).map_err(|e| e.to_string())?;
+    let mut run_bytes = Vec::new();
+    for run in &proof_runs {
+        run_bytes.extend_from_slice(&serde_json::to_vec(run).map_err(|e| e.to_string())?);
+        run_bytes.push(b'\n');
+    }
     let run_input_sha256 = sha256(&run_bytes);
     let mut report = json!({
         "schema_version": REPORT_SCHEMA,
