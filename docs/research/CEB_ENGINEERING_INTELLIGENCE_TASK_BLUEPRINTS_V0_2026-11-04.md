@@ -1,6 +1,6 @@
 # CEB engineering-intelligence task blueprints V0 — 2026-11-04
 
-**Status:** eight non-executable authoring blueprints. Not task records, executable fixtures, qualified oracles, or benchmark results.  
+**Status:** ten non-executable authoring blueprints. Not task records, executable fixtures, qualified oracles, or benchmark results.  
 **Parent:** [CEB-INTELLIGENCE-001 #10419](https://github.com/Luminous-Dynamics/symthaea/issues/10419)  
 **Related:** #10173 repository twin; #10400 specification discovery; #8311 oracle quality; #10385 repair precision / optimization / abstention; #10369 trust; #10064 execution isolation; #10370 evidence convergence.  
 **Claim ceiling:** the blueprint set defines task intent, evidence requirements, adversarial controls and metrics. It does not assert that Symthaea or any other system has achieved the targets.
