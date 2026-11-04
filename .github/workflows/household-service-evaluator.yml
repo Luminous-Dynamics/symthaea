@@ -48,6 +48,7 @@ jobs:
           cargo run --locked --manifest-path tools/household-service-evaluator/Cargo.toml -- \
             --water docs/research/household-services/fixtures/water-continuity-scenarios-v0.1.json \
             --repair docs/research/household-services/fixtures/repairability-scenarios-v0.1.json \
+            --source-commit "${GITHUB_SHA}" \\
             --output target/household-service-batch-report.json
 
       - name: Upload synthetic batch report
