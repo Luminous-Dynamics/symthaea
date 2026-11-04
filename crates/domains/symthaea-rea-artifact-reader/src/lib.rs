@@ -2158,6 +2158,100 @@ mod tests {
     }
 
     #[test]
+    fn verifies_empty_stored_member() {
+        let path = write_temp(&single_entry(b"empty.bin", b""));
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let verified = reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap();
+        assert_eq!(
+            verified.sha256,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_eq!(verified.observed_uncompressed_bytes, 0);
+        assert!(verified.verified_crc32);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn refuses_directory_and_symlink_content_verification() {
+        let path = write_temp(&build_zip(
+            &[
+                TestEntry {
+                    name: b"folder/",
+                    data: b"",
+                    flags: 0,
+                    method: 0,
+                    external_attributes: (UNIX_DIRECTORY | 0o755) << 16,
+                },
+                TestEntry {
+                    name: b"link",
+                    data: b"target",
+                    flags: 0,
+                    method: 0,
+                    external_attributes: (UNIX_SYMLINK | 0o777) << 16,
+                },
+            ],
+            &[],
+        ));
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let directory = reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap_err();
+        let symlink = reader
+            .verify_entry_content(1, ContentVerificationLimits::default())
+            .unwrap_err();
+        assert_eq!(directory.kind, ReaderErrorKind::Unsupported);
+        assert_eq!(symlink.kind, ReaderErrorKind::Unsupported);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn rejects_deflate_output_that_exceeds_declared_uncompressed_size() {
+        let payload = vec![0u8; 4096];
+        let mut writer = zipcore::ZipWriter::new(std::io::Cursor::new(Vec::new())).unwrap();
+        writer
+            .add_file(
+                "bomb.bin",
+                &payload,
+                &zipcore::FileOptions::deflate(6),
+            )
+            .unwrap();
+        let mut bytes = writer.finish().unwrap().into_inner();
+
+        let local_size = 10u32.to_le_bytes();
+        bytes[22..26].copy_from_slice(&local_size);
+        let central_start = bytes
+            .windows(4)
+            .position(|window| window == CENTRAL_HEADER_SIGNATURE.to_le_bytes())
+            .unwrap();
+        bytes[central_start + 24..central_start + 28].copy_from_slice(&local_size);
+
+        let path = write_temp(&bytes);
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let error = reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap_err();
+        assert_eq!(error.kind, ReaderErrorKind::LimitExceeded);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn content_verification_refuses_a_source_changed_after_inventory() {
+        let path = write_temp(&single_entry(b"asset.bin", b"payload"));
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let mut changed = OpenOptions::new().append(true).open(&path).unwrap();
+        changed.write_all(b"mutated").unwrap();
+        changed.sync_all().unwrap();
+
+        let error = reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap_err();
+        assert_eq!(error.kind, ReaderErrorKind::SourceChanged);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn parses_zip64_with_a_prepended_stub() {
         let archive = build_zip64(
             &[TestEntry {
