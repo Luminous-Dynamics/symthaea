@@ -339,13 +339,325 @@ impl RunnerCpalClockFitV1 {
 }
 
 
-/// Result of composing runner time -> CPAL predicted playback time ->
-/// cumulative output frame. Both component fits remain point-estimate-only
+/// Frozen acceptance policy for the measured callback -> predicted-playback
+/// scheduling relation carried by one CPAL stream's exact output anchors.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CpalCallbackPlaybackFitPolicyV1 {
+    pub minimum_anchor_count: usize,
+    pub maximum_abs_drift_ppm: f64,
+    pub maximum_abs_residual_ns: f64,
+    pub maximum_extrapolation_ns: u64,
+}
+
+impl Default for CpalCallbackPlaybackFitPolicyV1 {
+    fn default() -> Self {
+        Self {
+            minimum_anchor_count: 4,
+            maximum_abs_drift_ppm: 500.0,
+            maximum_abs_residual_ns: 500_000.0,
+            maximum_extrapolation_ns: 100_000_000,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CpalCallbackPlaybackAccuracyStatusV1 {
+    PointEstimateOnly,
+}
+
+/// Replayable affine relation between CPAL callback invocation time and the
+/// predicted playback time for the data supplied by that callback.
+///
+/// This is a scheduling relation, not a shared-origin clock synchronization.
+/// It must be derived from the same exact anchors used by MEL-CLOCK-001's
+/// playback-time -> output-frame fit.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CpalCallbackPlaybackFitV1 {
+    pub schema_version: String,
+    pub stream_instance_id: u64,
+    pub cpal_stream_configuration_digest_sha256: String,
+    pub sample_rate_hz: u32,
+    pub channel_count: u16,
+    pub playback_ns_per_callback_ns: f64,
+    pub reference_callback_stream_time_ns: u64,
+    pub reference_playback_stream_time_ns: f64,
+    pub valid_from_callback_stream_time_ns: u64,
+    pub valid_until_callback_stream_time_ns: u64,
+    pub maximum_extrapolation_ns: u64,
+    pub minimum_required_anchor_count: usize,
+    pub anchor_set_sha256: String,
+    pub fit_policy_sha256: String,
+    pub anchor_count: usize,
+    pub maximum_abs_drift_ppm: f64,
+    pub maximum_allowed_abs_residual_ns: f64,
+    pub estimated_drift_ppm: f64,
+    pub median_abs_residual_ns: f64,
+    pub p95_abs_residual_ns: f64,
+    pub maximum_abs_residual_ns: f64,
+    pub accuracy_status: CpalCallbackPlaybackAccuracyStatusV1,
+    pub reported_uncertainty_ns: Option<f64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CpalPlaybackTimeEstimateV1 {
+    pub playback_stream_time_ns: f64,
+    /// Regression residual only; not backend timestamp accuracy.
+    pub fit_residual_bound_ns: f64,
+    pub accuracy_status: CpalCallbackPlaybackAccuracyStatusV1,
+    pub reported_uncertainty_ns: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CpalCallbackPlaybackFitErrorV1 {
+    InvalidStreamDescriptor,
+    TooFewAnchors { actual: usize, required: usize },
+    StreamDescriptorMismatch { index: usize },
+    AnchorSourceMismatch { index: usize },
+    InvalidFrameCount { index: usize },
+    CallbackPlaybackDeltaMismatch { index: usize },
+    NonMonotonicAnchorIndex { index: usize },
+    NonMonotonicCallbackTime { index: usize },
+    NonMonotonicPlaybackTime { index: usize },
+    ZeroTimeVariance,
+    NonFiniteFit,
+    DriftOutsidePolicy { drift_ppm: f64, maximum_abs_ppm: f64 },
+    ResidualOutsidePolicy { residual_ns: f64, maximum_abs_ns: f64 },
+    QueryOutsideValidity { callback_time_ns: u64 },
+    SerializationFailure { reason: String },
+}
+
+impl std::fmt::Display for CpalCallbackPlaybackFitErrorV1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl std::error::Error for CpalCallbackPlaybackFitErrorV1 {}
+
+impl CpalCallbackPlaybackFitV1 {
+    /// Map a CPAL callback-stream timestamp to the predicted playback-stream
+    /// timestamp for the callback's supplied output block.
+    pub fn playback_time_at_callback_time(
+        &self,
+        callback_stream_time_ns: u64,
+    ) -> Result<CpalPlaybackTimeEstimateV1, CpalCallbackPlaybackFitErrorV1> {
+        let lower = self
+            .valid_from_callback_stream_time_ns
+            .saturating_sub(self.maximum_extrapolation_ns);
+        let upper = self
+            .valid_until_callback_stream_time_ns
+            .saturating_add(self.maximum_extrapolation_ns);
+        if callback_stream_time_ns < lower || callback_stream_time_ns > upper {
+            return Err(CpalCallbackPlaybackFitErrorV1::QueryOutsideValidity {
+                callback_time_ns: callback_stream_time_ns,
+            });
+        }
+
+        let delta_ns = callback_stream_time_ns as i128
+            - self.reference_callback_stream_time_ns as i128;
+        let playback_stream_time_ns = self.reference_playback_stream_time_ns
+            + self.playback_ns_per_callback_ns * delta_ns as f64;
+        if !playback_stream_time_ns.is_finite() || playback_stream_time_ns < 0.0 {
+            return Err(CpalCallbackPlaybackFitErrorV1::NonFiniteFit);
+        }
+
+        Ok(CpalPlaybackTimeEstimateV1 {
+            playback_stream_time_ns,
+            fit_residual_bound_ns: self.maximum_abs_residual_ns,
+            accuracy_status: self.accuracy_status,
+            reported_uncertainty_ns: self.reported_uncertainty_ns,
+        })
+    }
+}
+
+/// Fit the callback -> predicted-playback scheduling relation from the exact
+/// CPAL anchor vector. The resulting anchor digest must equal the anchor-set
+/// digest inside MEL-CLOCK-001's output-frame fit bundle before composition.
+pub fn fit_cpal_callback_playback_v1(
+    descriptor: &OutputClockStreamDescriptorV1,
+    anchors: &[OutputClockAnchorV1],
+    policy: CpalCallbackPlaybackFitPolicyV1,
+) -> Result<CpalCallbackPlaybackFitV1, CpalCallbackPlaybackFitErrorV1> {
+    if !descriptor.is_valid() {
+        return Err(CpalCallbackPlaybackFitErrorV1::InvalidStreamDescriptor);
+    }
+    let required = policy.minimum_anchor_count.max(2);
+    let effective_policy = CpalCallbackPlaybackFitPolicyV1 {
+        minimum_anchor_count: required,
+        ..policy
+    };
+    if anchors.len() < required {
+        return Err(CpalCallbackPlaybackFitErrorV1::TooFewAnchors {
+            actual: anchors.len(),
+            required,
+        });
+    }
+    if !policy.maximum_abs_drift_ppm.is_finite()
+        || policy.maximum_abs_drift_ppm < 0.0
+        || !policy.maximum_abs_residual_ns.is_finite()
+        || policy.maximum_abs_residual_ns < 0.0
+    {
+        return Err(CpalCallbackPlaybackFitErrorV1::NonFiniteFit);
+    }
+
+    for (index, anchor) in anchors.iter().enumerate() {
+        if anchor.stream_instance_id != descriptor.stream_instance_id
+            || anchor.sample_rate_hz != descriptor.sample_rate_hz
+            || anchor.channel_count != descriptor.channel_count
+        {
+            return Err(CpalCallbackPlaybackFitErrorV1::StreamDescriptorMismatch { index });
+        }
+        if anchor.frame_count == 0 {
+            return Err(CpalCallbackPlaybackFitErrorV1::InvalidFrameCount { index });
+        }
+        if anchor
+            .playback_stream_time_ns
+            .checked_sub(anchor.callback_stream_time_ns)
+            != Some(anchor.callback_to_playback_ns)
+        {
+            return Err(CpalCallbackPlaybackFitErrorV1::CallbackPlaybackDeltaMismatch { index });
+        }
+        if index > 0 {
+            let previous = &anchors[index - 1];
+            if anchor.source != previous.source {
+                return Err(CpalCallbackPlaybackFitErrorV1::AnchorSourceMismatch { index });
+            }
+            if anchor.anchor_index <= previous.anchor_index {
+                return Err(CpalCallbackPlaybackFitErrorV1::NonMonotonicAnchorIndex { index });
+            }
+            if anchor.callback_stream_time_ns <= previous.callback_stream_time_ns {
+                return Err(CpalCallbackPlaybackFitErrorV1::NonMonotonicCallbackTime { index });
+            }
+            if anchor.playback_stream_time_ns <= previous.playback_stream_time_ns {
+                return Err(CpalCallbackPlaybackFitErrorV1::NonMonotonicPlaybackTime { index });
+            }
+        }
+    }
+
+    let x0 = anchors[0].callback_stream_time_ns;
+    let y0 = anchors[0].playback_stream_time_ns;
+    let xs = anchors
+        .iter()
+        .map(|anchor| (anchor.callback_stream_time_ns - x0) as f64)
+        .collect::<Vec<_>>();
+    let ys = anchors
+        .iter()
+        .map(|anchor| (anchor.playback_stream_time_ns as i128 - y0 as i128) as f64)
+        .collect::<Vec<_>>();
+    let mean_x = xs.iter().sum::<f64>() / xs.len() as f64;
+    let mean_y = ys.iter().sum::<f64>() / ys.len() as f64;
+    let covariance = xs
+        .iter()
+        .zip(&ys)
+        .map(|(x, y)| (x - mean_x) * (y - mean_y))
+        .sum::<f64>();
+    let variance = xs.iter().map(|x| (x - mean_x).powi(2)).sum::<f64>();
+    if variance <= 0.0 || !variance.is_finite() {
+        return Err(CpalCallbackPlaybackFitErrorV1::ZeroTimeVariance);
+    }
+
+    let slope = covariance / variance;
+    let reference_callback_delta = mean_x;
+    let reference_callback_stream_time_ns =
+        x0.saturating_add(reference_callback_delta.max(0.0).round() as u64);
+    let rounded_reference_delta =
+        reference_callback_stream_time_ns.saturating_sub(x0) as f64;
+    let reference_playback_stream_time_ns =
+        y0 as f64 + mean_y + slope * (rounded_reference_delta - reference_callback_delta);
+    if !slope.is_finite() || slope <= 0.0 || !reference_playback_stream_time_ns.is_finite() {
+        return Err(CpalCallbackPlaybackFitErrorV1::NonFiniteFit);
+    }
+
+    let estimated_drift_ppm = (slope - 1.0) * 1_000_000.0;
+    if !estimated_drift_ppm.is_finite() {
+        return Err(CpalCallbackPlaybackFitErrorV1::NonFiniteFit);
+    }
+    if estimated_drift_ppm.abs() > policy.maximum_abs_drift_ppm {
+        return Err(CpalCallbackPlaybackFitErrorV1::DriftOutsidePolicy {
+            drift_ppm: estimated_drift_ppm,
+            maximum_abs_ppm: policy.maximum_abs_drift_ppm,
+        });
+    }
+
+    let mut residuals = anchors
+        .iter()
+        .zip(&xs)
+        .map(|(anchor, x)| {
+            let predicted = y0 as f64 + mean_y + slope * (x - mean_x);
+            (predicted - anchor.playback_stream_time_ns as f64).abs()
+        })
+        .collect::<Vec<_>>();
+    if residuals.iter().any(|value| !value.is_finite()) {
+        return Err(CpalCallbackPlaybackFitErrorV1::NonFiniteFit);
+    }
+    residuals.sort_by(f64::total_cmp);
+    let maximum_abs_residual_ns = *residuals.last().unwrap_or(&0.0);
+    if maximum_abs_residual_ns > policy.maximum_abs_residual_ns {
+        return Err(CpalCallbackPlaybackFitErrorV1::ResidualOutsidePolicy {
+            residual_ns: maximum_abs_residual_ns,
+            maximum_abs_ns: policy.maximum_abs_residual_ns,
+        });
+    }
+    let middle = residuals.len() / 2;
+    let median_abs_residual_ns = if residuals.len() % 2 == 0 {
+        (residuals[middle - 1] + residuals[middle]) * 0.5
+    } else {
+        residuals[middle]
+    };
+    let p95_index = ((residuals.len() as f64 * 0.95).ceil() as usize)
+        .saturating_sub(1)
+        .min(residuals.len() - 1);
+    let p95_abs_residual_ns = residuals[p95_index];
+
+    let anchor_set_sha256 = serde_json::to_vec(anchors)
+        .map(|bytes| format!("{:x}", Sha256::digest(bytes)))
+        .map_err(|error| CpalCallbackPlaybackFitErrorV1::SerializationFailure {
+            reason: error.to_string(),
+        })?;
+    let fit_policy_sha256 = serde_json::to_vec(&effective_policy)
+        .map(|bytes| format!("{:x}", Sha256::digest(bytes)))
+        .map_err(|error| CpalCallbackPlaybackFitErrorV1::SerializationFailure {
+            reason: error.to_string(),
+        })?;
+
+    Ok(CpalCallbackPlaybackFitV1 {
+        schema_version: "mel-cpal-callback-playback-fit-v1".to_owned(),
+        stream_instance_id: descriptor.stream_instance_id,
+        cpal_stream_configuration_digest_sha256: descriptor.configuration_digest_sha256.clone(),
+        sample_rate_hz: descriptor.sample_rate_hz,
+        channel_count: descriptor.channel_count,
+        playback_ns_per_callback_ns: slope,
+        reference_callback_stream_time_ns,
+        reference_playback_stream_time_ns,
+        valid_from_callback_stream_time_ns: x0,
+        valid_until_callback_stream_time_ns: anchors[anchors.len() - 1].callback_stream_time_ns,
+        maximum_extrapolation_ns: effective_policy.maximum_extrapolation_ns,
+        minimum_required_anchor_count: effective_policy.minimum_anchor_count,
+        anchor_set_sha256,
+        fit_policy_sha256,
+        anchor_count: anchors.len(),
+        maximum_abs_drift_ppm: effective_policy.maximum_abs_drift_ppm,
+        maximum_allowed_abs_residual_ns: effective_policy.maximum_abs_residual_ns,
+        estimated_drift_ppm,
+        median_abs_residual_ns,
+        p95_abs_residual_ns,
+        maximum_abs_residual_ns,
+        accuracy_status: CpalCallbackPlaybackAccuracyStatusV1::PointEstimateOnly,
+        reported_uncertainty_ns: None,
+    })
+}
+
+/// Result of composing runner time -> CPAL callback time -> predicted playback
+/// time -> cumulative output frame. All three mappings are point-estimate-only
 /// until their uncertainty terms are qualified and propagated.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RunnerOutputFrameEstimateV1 {
     pub runner_time_ns: u64,
     pub estimated_cpal_callback_stream_time_ns: f64,
+    pub estimated_cpal_playback_stream_time_ns: f64,
     pub rounded_cpal_playback_stream_time_ns: u64,
     /// Signed quantization introduced when converting the sub-nanosecond
     /// floating point playback estimate to the integer API used by the
@@ -360,8 +672,10 @@ pub enum RunnerOutputFrameCompositionErrorV1 {
     InvalidOutputClockBundle,
     StreamInstanceMismatch,
     StreamDescriptorDigestMismatch,
+    AnchorSetDigestMismatch,
     PlaybackTimeOutOfRange,
     RunnerClock(RunnerCpalClockFitErrorV1),
+    CallbackPlayback(CpalCallbackPlaybackFitErrorV1),
     OutputClock(OutputClockFitErrorV1),
 }
 
@@ -373,19 +687,17 @@ impl std::fmt::Display for RunnerOutputFrameCompositionErrorV1 {
 
 impl std::error::Error for RunnerOutputFrameCompositionErrorV1 {}
 
-/// Compose runner time -> CPAL predicted playback time -> output frame.
+/// Compose the three independently fitted relations:
+/// runner monotonic -> CPAL callback clock (simultaneous observation),
+/// CPAL callback clock -> predicted playback time (measured scheduling),
+/// predicted playback time -> output frame (#10345).
 ///
-/// The runner fit is explicitly against CPAL's predicted playback timestamp,
-/// not its callback-invocation timestamp. This matches the clock consumed by
-/// MEL-CLOCK-001's output-frame fit and avoids an undocumented callback-to-
-/// playback conversion.
-///
-/// Both receipts must bind the same stream instance and the runner descriptor's
-/// CPAL configuration digest must equal the output bundle descriptor's
-/// configuration digest. The returned mapping is still point-estimate-only;
-/// it is not DAC/acoustic observation or a qualified latency measurement.
+/// The callback/playback scheduling fit must be built from the same exact
+/// output-anchor vector committed by the output-frame fit bundle. No nominal
+/// buffer duration or shared-origin assumption substitutes for those anchors.
 pub fn estimate_output_frame_at_runner_time_v1(
     runner_fit: &RunnerCpalClockFitV1,
+    callback_playback_fit: &CpalCallbackPlaybackFitV1,
     output_bundle: &OutputClockFitBundleV1,
     runner_time_ns: u64,
 ) -> Result<RunnerOutputFrameEstimateV1, RunnerOutputFrameCompositionErrorV1> {
@@ -396,22 +708,33 @@ pub fn estimate_output_frame_at_runner_time_v1(
         return Err(RunnerOutputFrameCompositionErrorV1::InvalidOutputClockBundle);
     }
     if runner_fit.stream_instance_id != output_bundle.stream_descriptor.stream_instance_id
+        || callback_playback_fit.stream_instance_id != output_bundle.stream_descriptor.stream_instance_id
         || output_bundle.fit.stream_instance_id != output_bundle.stream_descriptor.stream_instance_id
     {
         return Err(RunnerOutputFrameCompositionErrorV1::StreamInstanceMismatch);
     }
     if runner_fit.cpal_stream_descriptor_sha256
         != output_bundle.stream_descriptor.configuration_digest_sha256
+        || callback_playback_fit.cpal_stream_configuration_digest_sha256
+            != output_bundle.stream_descriptor.configuration_digest_sha256
         || output_bundle.fit.sample_rate_hz != output_bundle.stream_descriptor.sample_rate_hz
         || output_bundle.fit.channel_count != output_bundle.stream_descriptor.channel_count
     {
         return Err(RunnerOutputFrameCompositionErrorV1::StreamDescriptorDigestMismatch);
     }
+    if callback_playback_fit.anchor_set_sha256 != output_bundle.anchor_set_sha256 {
+        return Err(RunnerOutputFrameCompositionErrorV1::AnchorSetDigestMismatch);
+    }
 
-    let playback_estimate = runner_fit
+    let callback_estimate = runner_fit
         .callback_time_at_runner_time(runner_time_ns)
         .map_err(RunnerOutputFrameCompositionErrorV1::RunnerClock)?;
-    let rounded_playback_time = playback_estimate.cpal_callback_stream_time_ns.round();
+    let playback_estimate = callback_playback_fit
+        .playback_time_at_callback_time(
+            callback_estimate.cpal_callback_stream_time_ns.round() as u64,
+        )
+        .map_err(RunnerOutputFrameCompositionErrorV1::CallbackPlayback)?;
+    let rounded_playback_time = playback_estimate.playback_stream_time_ns.round();
     if !rounded_playback_time.is_finite()
         || rounded_playback_time < 0.0
         || rounded_playback_time >= u64::MAX as f64
@@ -426,11 +749,11 @@ pub fn estimate_output_frame_at_runner_time_v1(
 
     Ok(RunnerOutputFrameEstimateV1 {
         runner_time_ns,
-        estimated_cpal_playback_stream_time_ns: playback_estimate
-            .cpal_playback_stream_time_ns,
+        estimated_cpal_callback_stream_time_ns: callback_estimate.cpal_callback_stream_time_ns,
+        estimated_cpal_playback_stream_time_ns: playback_estimate.playback_stream_time_ns,
         rounded_cpal_playback_stream_time_ns: rounded_playback_time_ns,
         playback_time_quantization_error_ns: rounded_playback_time
-            - playback_estimate.cpal_callback_stream_time_ns,
+            - playback_estimate.playback_stream_time_ns,
         output_frame_estimate,
         accuracy_status: RunnerCpalClockAccuracyStatusV1::PointEstimateOnly,
     })
