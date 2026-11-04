@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/rea-zip-content-verification-receipt-v0.schema.json",
   "title": "REA ZIP member content-verification receipt",
-  "description": "A versioned record of one member-occurrence verification attempt. This is not a producer attestation, authenticity claim, whole-archive verification, or security-control verdict.",
+  "description": "A versioned record of one member-occurrence verification attempt. This is not a producer attestation, authenticity claim, whole-archive verification, or security-control verdict. All potentially 64-bit counts, lengths, offsets and budgets are encoded as canonical unsigned decimal strings to preserve exact values through RFC 8785 / ECMAScript-number-compatible canonicalization.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -45,8 +45,8 @@
       ],
       "properties": {
         "archive_size_bytes": {
-          "type": "integer",
-          "minimum": 0
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
         },
         "binding_strength": {
           "enum": [
@@ -134,8 +134,8 @@
       ],
       "properties": {
         "central_directory_index": {
-          "type": "integer",
-          "minimum": 0
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
         },
         "raw_filename_base64": {
           "type": "string",
@@ -149,18 +149,18 @@
         },
         "duplicate_raw_name_count": {
           "type": [
-            "integer",
+            "string",
             "null"
           ],
-          "minimum": 1
+          "pattern": "^(0|[1-9][0-9]*)$"
         },
         "local_header_offset_absolute": {
-          "type": "integer",
-          "minimum": 0
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
         },
         "data_offset_absolute": {
-          "type": "integer",
-          "minimum": 0
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
         },
         "entry_kind": {
           "enum": [
@@ -184,12 +184,12 @@
           "maximum": 65535
         },
         "declared_compressed_bytes": {
-          "type": "integer",
-          "minimum": 0
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
         },
         "declared_uncompressed_bytes": {
-          "type": "integer",
-          "minimum": 0
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
         },
         "declared_crc32": {
           "type": "string",
@@ -300,28 +300,28 @@
       ],
       "properties": {
         "max_archive_bytes": {
-          "type": "integer",
-          "minimum": 0
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
         },
         "max_central_directory_bytes": {
-          "type": "integer",
-          "minimum": 0
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
         },
         "max_entries": {
-          "type": "integer",
-          "minimum": 0
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
         },
         "max_total_declared_uncompressed_bytes": {
-          "type": "integer",
-          "minimum": 0
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
         },
         "max_entry_declared_uncompressed_bytes": {
-          "type": "integer",
-          "minimum": 0
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
         },
         "max_member_output_bytes": {
-          "type": "integer",
-          "minimum": 0
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
         },
         "read_buffer_bytes": {
           "type": "integer",
@@ -347,10 +347,10 @@
       "properties": {
         "observed_uncompressed_bytes": {
           "type": [
-            "integer",
+            "string",
             "null"
           ],
-          "minimum": 0
+          "pattern": "^(0|[1-9][0-9]*)$"
         },
         "observed_crc32": {
           "type": [
@@ -488,6 +488,10 @@
               },
               "identity_revalidated_after_attempt": {
                 "const": true
+              },
+              "archive_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
               }
             }
           },
@@ -521,8 +525,46 @@
                 "const": true
               }
             }
+          },
+          "occurrence": {
+            "properties": {
+              "entry_kind": {
+                "const": "file"
+              },
+              "encrypted": {
+                "const": false
+              },
+              "compression_method": {
+                "enum": [
+                  0,
+                  8
+                ]
+              }
+            }
+          },
+          "limits": {
+            "properties": {
+              "max_member_output_bytes": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "read_buffer_bytes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1048576
+              }
+            }
           }
-        }
+        },
+        "required": [
+          "source",
+          "occurrence",
+          "verifier",
+          "limits",
+          "observations",
+          "claim_scope",
+          "attestation"
+        ]
       }
     }
   ]
