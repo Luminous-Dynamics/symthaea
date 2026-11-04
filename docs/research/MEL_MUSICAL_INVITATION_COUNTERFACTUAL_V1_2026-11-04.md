@@ -68,4 +68,4 @@ Run the frozen policy controls and emit machine-readable aggregate JSON:
 
     cargo run -p symthaea-muse --example mel_context_counterfactual
 
-The runner validates the counterfactual corpus, computes the three policy reports, and fails closed if any metric differs from the values frozen in `mctx-baselines-v1.json`. It emits member action accuracy, intent-change sensitivity, irrelevant-surface invariance, ambiguous valid-action coverage and per-family scores. No composite score is generated.
+The runner validates the counterfactual corpus, computes the three policy reports, and fails closed if any metric differs from the values frozen in `mctx-baselines-v1.json`. It emits member valid-action support rate, intent-change sensitivity, irrelevant-surface invariance, ambiguous valid-action coverage and per-family scores. No composite score is generated.
