@@ -296,6 +296,7 @@ fn convert(input: &Value, input_bytes: &[u8], args: &ProvenanceArgs) -> Result<C
     }
 
     let mut relation_counts = BTreeMap::<String, usize>::new();
+    let mut edges = Vec::<Edge>::with_capacity(upstream_edges.len());
     for (index, raw) in upstream_edges.iter().enumerate() {
         let source_name = required_string(raw, "source_name", &format!("edges[{index}]"))?;
         let target_name = required_string(raw, "target_name", &format!("edges[{index}]"))?;
@@ -309,7 +310,7 @@ fn convert(input: &Value, input_bytes: &[u8], args: &ProvenanceArgs) -> Result<C
         let raw_bytes = json_bytes(raw)?;
         let id = edge_id(index, &raw_bytes);
         let evidence_path = format!("edges/{id}.json");
-        let evidence_id = format!("daps-evidence-{}", &sha256(&raw_bytes)[..24]);
+        let evidence_id = format!("daps-evidence-{index:06}-{}", &sha256(&raw_bytes)[..20]);
         let evidence_record = json!({
             "upstream": "DAPS-ETH/DAPS",
             "upstream_edge_index": index,
@@ -327,7 +328,6 @@ fn convert(input: &Value, input_bytes: &[u8], args: &ProvenanceArgs) -> Result<C
         });
 
         *relation_counts.entry(relation.to_owned()).or_default() += 1;
-        nodes_edge_placeholder();
         // Every DAPS edge remains a candidate. Its exported relation labels
         // are coarse target-category labels, not a claim about Lean Expr roles.
         // DAPS does not export calibrated edge confidence, so null is retained.
@@ -345,7 +345,7 @@ fn convert(input: &Value, input_bytes: &[u8], args: &ProvenanceArgs) -> Result<C
             reviewer_key_id: Value::Null,
         };
         // Store in the local vector after all per-edge provenance is complete.
-        EDGES.push(edge);
+        edges.push(edge);
     }
 
     let upstream_provenance = json!({
@@ -374,7 +374,7 @@ fn convert(input: &Value, input_bytes: &[u8], args: &ProvenanceArgs) -> Result<C
         evidence_class: "external_candidate_snapshot".into(),
         snapshot,
         nodes,
-        edges: EDGES.into_inner(),
+        edges,
         artifacts,
         upstream_provenance,
     };
@@ -392,29 +392,6 @@ fn convert(input: &Value, input_bytes: &[u8], args: &ProvenanceArgs) -> Result<C
         "environment_sha256": graph.snapshot.environment_sha256
     });
     Ok(Conversion { graph, evidence_files, summary })
-}
-
-// A local thread-local staging vector keeps the conversion function simple
-// without exposing a mutable output buffer in the public CLI.
-thread_local! {
-    static EDGES: std::cell::RefCell<Vec<Edge>> = const { std::cell::RefCell::new(Vec::new()) };
-}
-
-struct EdgeGuard;
-impl EdgeGuard {
-    fn clear() {
-        EDGES.with(|edges| edges.borrow_mut().clear());
-    }
-    fn push(edge: Edge) {
-        EDGES.with(|edges| edges.borrow_mut().push(edge));
-    }
-    fn take() -> Vec<Edge> {
-        EDGES.with(|edges| std::mem::take(&mut *edges.borrow_mut()))
-    }
-}
-
-fn nodes_edge_placeholder() {
-    // Intentionally empty; retained in v0 to mark the node/edge construction boundary.
 }
 
 fn write_conversion(conversion: &Conversion, output_dir: &Path) -> Result<(), String> {
@@ -462,7 +439,6 @@ fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, ProvenanceArgs), Str
 }
 
 fn run_self_test() -> Result<(), String> {
-    EdgeGuard::clear();
     let raw = json!({
         "nodes": [
             {"name":"A","category":"theorem","statement":"theorem A : True","signature":"True","module":"Demo","line":1,"source_path":"Demo.lean"},
@@ -510,11 +486,9 @@ fn run_self_test() -> Result<(), String> {
 fn execute() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
     if args.len() == 2 && args[1] == "--self-test" {
-        EdgeGuard::clear();
         run_self_test()?;
         return Ok(());
     }
-    EdgeGuard::clear();
     let (input_path, output_dir, provenance) = parse_args(&args)?;
     let input_bytes = fs::read(&input_path).map_err(|e| format!("read DAPS graph: {e}"))?;
     let input: Value = serde_json::from_slice(&input_bytes).map_err(|e| format!("parse DAPS graph JSON: {e}"))?;
