@@ -40,6 +40,9 @@ jobs:
       - name: Check disambiguation tool formatting
         run: rustfmt --edition 2024 --check tools/connectomics-intake-audit/src/bin/connectome_query_disambiguation_audit.rs
 
+      - name: Run strict Clippy for disambiguation tool
+        run: cargo clippy --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_query_disambiguation_audit -- -D warnings
+
       - name: Run Rust disambiguation unit tests
         run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_query_disambiguation_audit
 
