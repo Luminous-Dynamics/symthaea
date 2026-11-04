@@ -93,7 +93,7 @@ pub fn replay_member_claim(path: impl AsRef<Path>, receipt: &Value) -> Result<Re
     if declared_size > member_limit {
         return Err(ReplayError::Rejected("declared size exceeds member output limit".into()));
     }
-    let buffer_len = usize::try_from(decimal_at(receipt, &["limits", "read_buffer_bytes"])?)
+    let buffer_len = usize::try_from(integer_at(receipt, &["limits", "read_buffer_bytes"])?)
         .map_err(|_| ReplayError::Rejected("read buffer does not fit platform".into()))?;
     if buffer_len == 0 || buffer_len > HARD_BUFFER_LIMIT {
         return Err(ReplayError::Rejected("read buffer exceeds replay bound".into()));
@@ -169,8 +169,8 @@ pub fn replay_member_claim(path: impl AsRef<Path>, receipt: &Value) -> Result<Re
 }
 
 fn hash_open_file(file: &mut File, limit: u64) -> Result<(String, u64), ReplayError> {
-    let length = file.metadata().map_err(io_error)?.len();
-    if length > limit {
+    let initial_length = file.metadata().map_err(io_error)?.len();
+    if initial_length > limit {
         return Err(ReplayError::Rejected("archive exceeds byte limit".into()));
     }
     file.seek(std::io::SeekFrom::Start(0)).map_err(io_error)?;
@@ -187,10 +187,17 @@ fn hash_open_file(file: &mut File, limit: u64) -> Result<(String, u64), ReplayEr
         }
         sha.update(&buf[..n]);
     }
-    if total != file.metadata().map_err(io_error)?.len() {
+    let final_length = file.metadata().map_err(io_error)?.len();
+    if total != initial_length || total != final_length {
         return Err(ReplayError::Rejected("archive changed while hashing".into()));
     }
     Ok((format!("{:x}", sha.finalize()), total))
+}
+
+fn integer_at(value: &Value, path: &[&str]) -> Result<u64, ReplayError> {
+    value_at(value, path)?.as_u64().ok_or_else(|| {
+        ReplayError::Rejected(format!("{} must be a non-negative integer", path.join(".")))
+    })
 }
 
 struct Crc32(u32);
