@@ -133,8 +133,10 @@ This isolates whether progress comes from recursive modification, a stronger fix
 ### External reference points
 
 - **Darwin Gödel Machine:** archive-based self-modification and empirical selection; reported 20% to 50% on SWE-bench and 14.2% to 30.7% on Polyglot.
-- **AIDE²:** a self-modifying research agent with seven reported successive improvements in an eight-day autonomous run and gains on four held-out task families.
-- **AI4AI-Bench:** isolates training-algorithm redesign; the paper reports a best normalized score of 0.250 across ten algorithm-design tasks.
+- **HyperAgents / DGM-H (Meta, March 2026):** combines task-agent and meta-agent in one editable program, so the improvement procedure itself can evolve. It reports gains across coding, paper review, robotics reward design and Olympiad-math grading. This is the closest direct comparator for the proposed R4 meta-improvement target.
+- **Mendel Gödel Machine (August 2026 preprint):** adds reaction-norm mutation from multi-task trajectories and cross-lineage hybridization from another lineage's results on the same task. This motivates controlled comparisons of single-trajectory mutation, multi-task mutation and cross-lineage transfer; reported results remain a preprint and should be independently reproduced.
+- **AIDE² (September 2026):** a self-modifying research agent with seven reported successive improvements in an eight-day autonomous run and gains on four held-out task families.
+- **AI4AI-Bench:** isolates training-algorithm redesign; the paper reports a best normalized score of 0.250 across ten algorithm-design tasks. Keep this distinct from task-agent and meta-policy improvement.
 - **RSIBench-Data:** shows that continued search can regress after a prior best; checkpoint retention and best-so-far selection are essential.
 - **SWE-bench Verified:** useful only as a secondary coding reference. Results depend on model/scaffold configuration and the benchmark has known contamination and test-quality limitations.
 
@@ -225,10 +227,18 @@ Preserve reversible snapshots, deterministic builds where possible, resource cap
 
 ### Phase 1 — Receipt and paired-evaluation kernel
 
-- Add versioned per-case receipts and exact matched parent/candidate comparison.
-- Bind independent evaluator, case-set, seed, budget, metric-schema, and source identities.
-- Add deterministic paired statistics and confidence intervals.
-- Reject missing cases, duplicate cases, stale lineage, unsupported metric transformations, and evaluator mismatch.
+- [x] Add an in-memory paired-analysis adapter over the shared benchmark-run receipt contract (`paired_evaluation.rs`); do not introduce a competing persisted receipt schema.
+- [x] Require exact evaluation context, candidate/parent identity, source-tree digest, shared receipt digest, case IDs, and normalized metric dimensions in the in-memory view.
+- [x] Derive archive capability summaries from sorted per-case evidence rather than caller-supplied aggregate scores.
+- [x] Report per-metric paired wins/losses/ties, mean paired delta, and exact one-sided sign-test p-values.
+- [x] Reject empty/duplicate/mismatched cases, metric-schema drift, context mismatch, incorrect parent lineage, and invalid tie tolerances.
+- [ ] Add authenticated evaluator receipts and retained raw outcomes; digests alone do not authenticate a measurement.
+- [ ] Add confidence intervals, multiplicity correction, practical-effect thresholds, and non-inferiority gates.
+- [ ] Add an independently operated sealed-holdout evaluator/access boundary. The partition enum is descriptive metadata, not access control.
+
+**Evidence integration:** the adapter must consume validated task-level rows from the shared benchmark-run receipt contract (#10314) and the applicable DSSE/regrade verification pipeline (#10167/#10370). It is not an evidence format or authenticator of its own.
+
+**Statistical limitation:** the exact sign test measures directional consistency among non-tied paired cases under an independent-pair-sign assumption. It does not measure effect magnitude (the mean delta is reported separately), establish practical significance, correct for repeated adaptive selection or multiple metrics, prove equivalence when non-significant, or authorize promotion. Cases clustered by repository, task family, project, or run require independent-group or cluster-aware confirmation; counting correlated cases as independent can overstate evidence.
 
 ### Phase 2 — Controlled coding-agent evolution
 
@@ -240,8 +250,10 @@ Preserve reversible snapshots, deterministic builds where possible, resource cap
 
 ### Phase 3 — Meta-improvement
 
+- [ ] Execute the dedicated matched-budget programme in [SYM-RSI-META-001 #10497](https://github.com/Luminous-Dynamics/symthaea/issues/10497).
 - Let Symthaea improve experiment selection, hypothesis generation, causal review, and memory/context management.
-- Measure discovery yield and quality per fixed budget.
+- Compare clonal/single-trajectory mutation, reaction-norm mutation over multiple task histories, cross-lineage hybridization, archive-based fixed-meta search, and meta-evolving archive search.
+- Measure independently confirmed discoveries per fixed total budget, transfer of the meta-level change, capability retention, and best-so-far versus final-candidate quality.
 - Retain all candidates on a Pareto frontier rather than selecting by one blended score.
 
 ### Phase 4 — Algorithmic RSI
