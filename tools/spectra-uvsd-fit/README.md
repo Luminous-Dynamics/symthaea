@@ -99,7 +99,7 @@ let intervals = parametric_bootstrap_intervals(
 );
 ```
 
-A qualified result is still conditional on the Gaussian UVSD model and the supplied fit. It is not evidence of model adequacy or calibrated interval coverage. The Rust implementation and tests in this draft have not been compiled or executed.
+Passing the replicate-success gate is still conditional on the Gaussian UVSD model and the supplied fit. It is not evidence of model adequacy or calibrated interval coverage. The Rust implementation and tests in this draft have not been compiled or executed.
 
 ## Run
 
