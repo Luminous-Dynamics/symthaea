@@ -923,6 +923,8 @@ fn sign_synthetic_attestation(
 }
 
 fn make_synthetic_bundle(root: &Path) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>, String), String> {
+    let (reviewer_registry_bytes, reviewer_registry_sha256, reviewer_private_key_path) =
+        create_synthetic_reviewer_identity(root)?;
     let run_id = "synthetic-run";
     let dir = root.join(run_id);
     fs::create_dir_all(&dir).map_err(|e| format!("create synthetic bundle: {e}"))?;
@@ -1007,13 +1009,41 @@ fn make_synthetic_bundle(root: &Path) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>, Stri
         "environment_sha256":environment_sha256,"checker_log_sha256":sha256(&checker_log)
     });
     let checker_receipt_bytes = serde_json::to_vec(&checker_receipt).map_err(|e| e.to_string())?;
+    let mut reviewer_attestation = json!({
+        "schema_version":"pitb.sorrydb-reviewer-attestation.v1",
+        "canonicalization":"serde-json-map-sorted-compact-v0",
+        "key_id":"synthetic-reviewer-key-v1",
+        "reviewer_id":"synthetic-reviewer",
+        "run_id":run_id,
+        "task_id":"a".repeat(64),
+        "goal_sha256":goal_sha,
+        "declaration_signature_sha256":sig,
+        "source_binding_receipt_sha256":sha256(&source_receipt_bytes),
+        "source_correspondence_status":"pass",
+        "hypothesis_audit_status":"pass",
+        "vacuity_audit_status":"pass",
+        "reviewer_decision":"pass",
+        "semantic_log_sha256":sha256(&semantic_log),
+        "signature_ed25519_hex":""
+    });
+    let signature = sign_synthetic_attestation(
+        &reviewer_attestation,
+        &reviewer_private_key_path,
+        &root.join("synthetic-reviewer-signing-temp"),
+    )?;
+    reviewer_attestation["signature_ed25519_hex"] = Value::String(signature);
+    let reviewer_attestation_bytes = serde_json::to_vec(&reviewer_attestation)
+        .map_err(|e| format!("serialize synthetic reviewer attestation: {e}"))?;
+    let reviewer_attestation_sha256 = sha256(&reviewer_attestation_bytes);
+
     let semantic_receipt = json!({
         "schema_version":"pitb.sorrydb-semantic-gate-receipt.v1","run_id":run_id,"task_id":"a".repeat(64),
         "goal_sha256":goal_sha,"declaration_signature_sha256":sig,
         "source_binding_receipt_sha256":sha256(&source_receipt_bytes),
         "source_correspondence_status":"pass","hypothesis_audit_status":"pass",
         "vacuity_audit_status":"pass","reviewer_decision":"pass","reviewer_id":"synthetic-reviewer",
-        "reviewer_attestation_sha256":sha256(b"reviewer evidence"),"semantic_log_sha256":sha256(&semantic_log),
+        "reviewer_key_id":"synthetic-reviewer-key-v1",
+        "reviewer_attestation_sha256":reviewer_attestation_sha256,"semantic_log_sha256":sha256(&semantic_log),
         "semantic_gate_passed":true,"vacuity_gate_passed":true
     });
     let semantic_receipt_bytes = serde_json::to_vec(&semantic_receipt).map_err(|e| e.to_string())?;
@@ -1026,6 +1056,7 @@ fn make_synthetic_bundle(root: &Path) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>, Stri
         ("lean-environment.json", &lean_environment_bytes),("checker-command.json", &checker_command_bytes),
         ("source-binding-receipt.json", &source_receipt_bytes),
         ("checker-receipt.json", &checker_receipt_bytes),("semantic-gate-receipt.json", &semantic_receipt_bytes),
+        ("reviewer-attestation.json", &reviewer_attestation_bytes),
     ] {
         fs::write(dir.join(name), bytes).map_err(|e| format!("write synthetic {name}: {e}"))?;
     }
@@ -1048,7 +1079,9 @@ fn make_synthetic_bundle(root: &Path) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>, Stri
     let run_bytes = [serde_json::to_vec(&run).map_err(|e| e.to_string())?, b"\n".to_vec()].concat();
     let evaluation = json!({"sorries":[task]});
     let evaluation_bytes = serde_json::to_vec(&evaluation).map_err(|e| e.to_string())?;
-    Ok((evaluation_bytes, run_bytes))
+    let _ = fs::remove_dir_all(root.join("synthetic-reviewer-keygen"));
+    let _ = fs::remove_dir_all(root.join("synthetic-reviewer-signing-temp"));
+    Ok((evaluation_bytes, run_bytes, reviewer_registry_bytes, reviewer_registry_sha256))
 }
 
 fn run_self_tests() -> Result<(), String> {
