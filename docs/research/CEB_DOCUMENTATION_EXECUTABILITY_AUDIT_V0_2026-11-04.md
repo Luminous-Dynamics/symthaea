@@ -24,7 +24,7 @@ The checker is deliberately offline and static. It does not invoke Cargo, build 
 
 ## First exact-head result
 
-The first repository-wide CEB validation plus documentation audit passed on commit 36f7061f554a6593a1434a8b2e3c3b64e66bcfe3, workflow run 198:
+The first repository-wide CEB validation plus documentation audit passed on commit dc5847ca1f6362d04788f28657828d1140749958, workflow run 207:
 
 - CEB contract: 10 tasks, 4 schemas, 39 negative controls, 10 repository configuration worlds and 7 conditional facts.
 - Documentation parser self-test: passed.
