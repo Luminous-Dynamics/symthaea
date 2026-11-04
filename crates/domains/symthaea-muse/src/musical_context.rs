@@ -124,6 +124,14 @@ pub enum MusicalContextScoreErrorV1 {
     FamilyPredictionCountMismatch { expected: usize, actual: usize },
 }
 
+impl std::fmt::Display for MusicalContextScoreErrorV1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl std::error::Error for MusicalContextScoreErrorV1 {}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MusicalContextCounterfactualScoreV1 {
     pub family_id: String,
