@@ -138,3 +138,31 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Run coarse-need signal quota sweep
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked \
+            --manifest-path research/civbench-social-learning-core/Cargo.toml \
+            --bin privacy-disclosure-quota-sweep \
+            > /tmp/civbench-privacy/privacy-disclosure-quota-sweep.csv
+          {
+            echo "## Privacy disclosure quota sweep"
+            echo ""
+            echo "Synthetic 1/2/4/8 recipient-need-signal quota sweep. Realized messages, attention and disclosure field counts are reported separately; no formal privacy claim is made."
+            echo ""
+            echo "`$(wc -l < /tmp/civbench-privacy/privacy-disclosure-quota-sweep.csv)` CSV lines (including header)."
+            echo ""
+            echo "```csv"
+            cat /tmp/civbench-privacy/privacy-disclosure-quota-sweep.csv
+            echo "```"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload disclosure quota sweep results
+        uses: actions/upload-artifact@v4
+        with:
+          name: civbench-privacy-disclosure-quota-sweep
+          path: /tmp/civbench-privacy/privacy-disclosure-quota-sweep.csv
+          if-no-files-found: error
+          retention-days: 30
+
