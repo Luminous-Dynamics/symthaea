@@ -149,6 +149,198 @@
           ]
         }
       ]
+    },
+    {
+      "family_id": "MCTX-PICKUP-INTENT-001",
+      "kind": "context_change_must_change_action",
+      "changed_factor": "collaborator_intent",
+      "preserved_factor": "local_cue_signature,preceding_harmonic_context_signature,phrase_function,performer_role,surface_instrument",
+      "members": [
+        {
+          "variant_id": "pickup-invites",
+          "local_cue_signature": "two-eighth-note-pickup-after-one-beat-rest",
+          "preceding_harmonic_context_signature": "dominant-pickup-into-tonic",
+          "phrase_function": "pickup",
+          "collaborator_intent": "invites_response",
+          "performer_role": "lead_trumpet",
+          "surface_instrument": "trumpet",
+          "valid_action_set": [
+            "RESPOND"
+          ]
+        },
+        {
+          "variant_id": "pickup-retains",
+          "local_cue_signature": "two-eighth-note-pickup-after-one-beat-rest",
+          "preceding_harmonic_context_signature": "dominant-pickup-into-tonic",
+          "phrase_function": "pickup",
+          "collaborator_intent": "continue_phrase",
+          "performer_role": "lead_trumpet",
+          "surface_instrument": "trumpet",
+          "valid_action_set": [
+            "CONTINUE"
+          ]
+        }
+      ]
+    },
+    {
+      "family_id": "MCTX-MOTIF-COMPLETION-INTENT-001",
+      "kind": "context_change_must_change_action",
+      "changed_factor": "collaborator_intent",
+      "preserved_factor": "local_cue_signature,preceding_harmonic_context_signature,phrase_function,performer_role,surface_instrument",
+      "members": [
+        {
+          "variant_id": "motif-invites",
+          "local_cue_signature": "motif-end-held-note-with-two-beat-space",
+          "preceding_harmonic_context_signature": "ascending-sequence-unresolved-dominant",
+          "phrase_function": "motif_completion",
+          "collaborator_intent": "invites_response",
+          "performer_role": "lead_piano",
+          "surface_instrument": "piano",
+          "valid_action_set": [
+            "RESPOND"
+          ]
+        },
+        {
+          "variant_id": "motif-continues",
+          "local_cue_signature": "motif-end-held-note-with-two-beat-space",
+          "preceding_harmonic_context_signature": "ascending-sequence-unresolved-dominant",
+          "phrase_function": "motif_completion",
+          "collaborator_intent": "continue_phrase",
+          "performer_role": "lead_piano",
+          "surface_instrument": "piano",
+          "valid_action_set": [
+            "CONTINUE"
+          ]
+        }
+      ]
+    },
+    {
+      "family_id": "MCTX-DRAMATIC-SILENCE-INTENT-001",
+      "kind": "context_change_must_change_action",
+      "changed_factor": "collaborator_intent",
+      "preserved_factor": "local_cue_signature,preceding_harmonic_context_signature,phrase_function,performer_role,surface_instrument",
+      "members": [
+        {
+          "variant_id": "dramatic-silence-invites",
+          "local_cue_signature": "two-second-zero-energy-dramatic-pause",
+          "preceding_harmonic_context_signature": "suspended-dominant-over-pedal",
+          "phrase_function": "dramatic_silence",
+          "collaborator_intent": "invites_response",
+          "performer_role": "lead_guitar",
+          "surface_instrument": "guitar",
+          "valid_action_set": [
+            "RESPOND"
+          ]
+        },
+        {
+          "variant_id": "dramatic-silence-retains",
+          "local_cue_signature": "two-second-zero-energy-dramatic-pause",
+          "preceding_harmonic_context_signature": "suspended-dominant-over-pedal",
+          "phrase_function": "dramatic_silence",
+          "collaborator_intent": "retains_floor",
+          "performer_role": "lead_guitar",
+          "surface_instrument": "guitar",
+          "valid_action_set": [
+            "WAIT"
+          ]
+        }
+      ]
+    },
+    {
+      "family_id": "MCTX-PHRASE-FUNCTION-001",
+      "kind": "context_change_must_change_action",
+      "changed_factor": "phrase_function",
+      "preserved_factor": "local_cue_signature,preceding_harmonic_context_signature,collaborator_intent,performer_role,surface_instrument",
+      "members": [
+        {
+          "variant_id": "breath-function",
+          "local_cue_signature": "one-beat-rest-after-shared-tonic-statement",
+          "preceding_harmonic_context_signature": "tonic-over-pedal-with-open-meter",
+          "phrase_function": "phrase_internal_breath",
+          "collaborator_intent": "ambiguous",
+          "performer_role": "lead_saxophone",
+          "surface_instrument": "saxophone",
+          "valid_action_set": [
+            "CONTINUE"
+          ]
+        },
+        {
+          "variant_id": "handoff-function",
+          "local_cue_signature": "one-beat-rest-after-shared-tonic-statement",
+          "preceding_harmonic_context_signature": "tonic-over-pedal-with-open-meter",
+          "phrase_function": "solo_handoff",
+          "collaborator_intent": "ambiguous",
+          "performer_role": "lead_saxophone",
+          "surface_instrument": "saxophone",
+          "valid_action_set": [
+            "RESPOND"
+          ]
+        }
+      ]
+    },
+    {
+      "family_id": "MCTX-PERFORMER-ROLE-001",
+      "kind": "context_change_must_change_action",
+      "changed_factor": "performer_role",
+      "preserved_factor": "local_cue_signature,preceding_harmonic_context_signature,phrase_function,collaborator_intent,surface_instrument",
+      "members": [
+        {
+          "variant_id": "lead-role",
+          "local_cue_signature": "same-two-beat-rest-after-ensemble-cadence",
+          "preceding_harmonic_context_signature": "ii-v-i-resolution",
+          "phrase_function": "cadence",
+          "collaborator_intent": "invites_response",
+          "performer_role": "lead_saxophone",
+          "surface_instrument": "saxophone",
+          "valid_action_set": [
+            "RESPOND"
+          ]
+        },
+        {
+          "variant_id": "accompaniment-role",
+          "local_cue_signature": "same-two-beat-rest-after-ensemble-cadence",
+          "preceding_harmonic_context_signature": "ii-v-i-resolution",
+          "phrase_function": "cadence",
+          "collaborator_intent": "invites_response",
+          "performer_role": "accompanist_saxophone",
+          "surface_instrument": "saxophone",
+          "valid_action_set": [
+            "WAIT"
+          ]
+        }
+      ]
+    },
+    {
+      "family_id": "MCTX-DROPOUT-SURFACE-INVARIANCE-001",
+      "kind": "surface_change_must_preserve_action",
+      "changed_factor": "surface_instrument",
+      "preserved_factor": "local_cue_signature,preceding_harmonic_context_signature,phrase_function,collaborator_intent,performer_role",
+      "members": [
+        {
+          "variant_id": "dropout-saxophone",
+          "local_cue_signature": "missing-input-window-two-seconds",
+          "preceding_harmonic_context_signature": "context-unobservable-during-dropout",
+          "phrase_function": "technical_dropout",
+          "collaborator_intent": "stream_unavailable",
+          "performer_role": "ensemble_receiver",
+          "surface_instrument": "saxophone",
+          "valid_action_set": [
+            "WAIT"
+          ]
+        },
+        {
+          "variant_id": "dropout-clarinet",
+          "local_cue_signature": "missing-input-window-two-seconds",
+          "preceding_harmonic_context_signature": "context-unobservable-during-dropout",
+          "phrase_function": "technical_dropout",
+          "collaborator_intent": "stream_unavailable",
+          "performer_role": "ensemble_receiver",
+          "surface_instrument": "clarinet",
+          "valid_action_set": [
+            "WAIT"
+          ]
+        }
+      ]
     }
   ]
 }
