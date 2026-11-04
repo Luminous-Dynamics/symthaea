@@ -6,7 +6,7 @@
 **Date:** 2026-11-04  
 **Revision:** 0.1
 
-> This is an educational design brief, not a construction drawing, engineering approval, physical test instruction or safety certification. The first activity is paper/digital modelling. Any physical prototype or loading exercise requires a separately approved educator-led risk assessment, guarded fixture and calibrated measurement plan.
+> This is an educational design brief, not a construction drawing, engineering approval, physical test instruction or safety certification. The first activity is paper/hand-calculation and diagram work. Digital analysis is deferred until the Symtropy owner confirms a reviewed, supported solver interface. Any physical prototype or loading exercise requires a separately approved educator-led risk assessment, guarded fixture and calibrated measurement plan.
 
 ## 1. The challenge
 
@@ -104,7 +104,7 @@ Do not apply a formula outside its declared assumptions.
 
 ### D. Analyse, then question the result
 
-The digital analysis should be carried out using the existing Symtropy PHYS-TRUSS implementation and its supported contract, after its owner confirms the exact branch/API and fixture profile.
+The intended digital integration target is Symtropy PHYS-TRUSS core solver PR [#2363](https://github.com/Luminous-Dynamics/symtropy/pull/2363) and its follow-on work. At the time of this draft, #2363 is open/unmerged; the cited receipt, sweep, energy, asymmetric, conditioning and bounded-interval follow-ons are open/draft, not a merged mainline API. Until the Symtropy owner confirms an exact reviewed head, supported request interface and qualification status, this activity remains paper/hand-calculation-only: do not call the unmerged branch and do not claim the digital integration is implemented.
 
 The current model family is intentionally narrow: static, small-displacement, linear-elastic, 2D pin-jointed axial bars. It does not model member bending, buckling, geometric nonlinearity, contact, fracture, material plasticity, dynamics, connection failure, fabrication defects or real-world structural safety.
 
