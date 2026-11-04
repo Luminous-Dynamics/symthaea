@@ -375,7 +375,11 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
         "WCONT-001" => {
             let flow = required_number(input, "municipal_inlet_flow_l_min")?;
             let duration = required_number(input, "duration_h")?;
-            insert_quantity(&mut metrics, "synthetic_inlet_volume_l", flow * duration * 60.0)?;
+            insert_quantity(
+                &mut metrics,
+                "synthetic_inlet_volume_l",
+                flow * duration * 60.0,
+            )?;
             notes.push(
                 "Inlet volume is integrated from the fixture's constant synthetic flow assumption."
                     .to_owned(),
@@ -1018,7 +1022,6 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
     })
 }
 
-
 fn insert_quantity(
     metrics: &mut BTreeMap<String, MetricValue>,
     key: &'static str,
@@ -1078,7 +1081,9 @@ fn insert_boolean(
         "adhesive_or_destructive_disassembly" => "destructive or adhesive disassembly declared",
         "calibration_required" => "post-replacement calibration declared necessary",
         "signed_image_available" => "signed firmware image declared available",
-        "previous_known_good_image_available" => "previous known-good firmware image declared available",
+        "previous_known_good_image_available" => {
+            "previous known-good firmware image declared available"
+        }
         "catalog_part_exists" => "part appears in catalog; not proof of local stock",
         "local_stock" => "exact spare declared in local stock",
         "physical_fit" => "replacement declared to physically fit",
@@ -1197,10 +1202,7 @@ mod tests {
             "HOME-UTILITY-COORD-001-WATER-CONTINUITY-SYNTHETIC-001"
         );
         assert_eq!(report.report_schema_version, "0.2");
-        assert_eq!(
-            report.evidence_class,
-            "synthetic_software_conformance_only"
-        );
+        assert_eq!(report.evidence_class, "synthetic_software_conformance_only");
         assert_eq!(
             report.adapter_version,
             "household-service-v0.1-water-repair-adapter.1"
