@@ -389,6 +389,9 @@ pub mod linux_powercap {
             match self.read_energy() {
                 Ok(_) => match self.max_range_path.as_ref() {
                     Some(path) => match read_counter_file(path) {
+                        Ok(0) => EnergyMeterAvailability::Unsupported {
+                            reason: "powercap counter reports a zero rollover range".into(),
+                        },
                         Ok(_) => EnergyMeterAvailability::Available,
                         Err(EnergyMeterError::PermissionDenied { reason }) => {
                             EnergyMeterAvailability::PermissionDenied { reason }
