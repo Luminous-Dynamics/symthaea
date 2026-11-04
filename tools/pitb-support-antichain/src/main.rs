@@ -316,12 +316,13 @@ fn analyze_group(gid: &str, rows: &[Outcome], max_variables: usize) -> Result<Gr
             return Err(format!("group {gid} reuses local-context digest across distinct subsets"));
         }
     }
-    let missing: Vec<_> = expected.difference(&seen.keys().cloned().collect()).take(8).cloned().collect();
+    let seen_subsets: BTreeSet<Vec<String>> = seen.keys().cloned().collect();
+    let missing: Vec<_> = expected.difference(&seen_subsets).take(8).cloned().collect();
     if !missing.is_empty() || seen.len() != expected.len() {
         return Err(format!("group {gid} is not exhaustive; missing subsets {missing:?}"));
     }
     let full = universe.clone();
-    if seen.get(&full).is_none_or(|row| row.outcome != "verified_success") {
+    if seen.get(&full).map_or(true, |row| row.outcome != "verified_success") {
         return Err(format!("group {gid} full-context baseline is not a verified exact-target success"));
     }
 
@@ -714,7 +715,7 @@ fn run_self_tests() -> Result<(), String> {
     if score.prediction_coverage != 1.0
         || score.route_sufficiency_rate != Some(1.0)
         || score.exact_minimal_route_rate != Some(1.0)
-        || score.route_sufficiency_brier_score.is_none_or(|value| (value - 0.04).abs() > 1e-12)
+        || score.route_sufficiency_brier_score.map_or(true, |value| (value - 0.04).abs() > 1e-12)
     {
         return Err("prediction scoring control failed".into());
     }
