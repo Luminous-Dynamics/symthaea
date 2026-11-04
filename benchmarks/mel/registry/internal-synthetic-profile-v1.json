@@ -1,0 +1,28 @@
+{
+  "schema_version": "mel-music-benchmark-profile-v1",
+  "benchmark_id": "mel-registry-contract-synthetic",
+  "benchmark_title": "Melothaea benchmark registry contract synthetic fixture",
+  "benchmark_family": "other",
+  "benchmark_version": "synthetic-contract-v1",
+  "protocol_reference": "internal://mel/benchmark-registry/contract-sanity-v1",
+  "native_track_id": "schema-conformance",
+  "source_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "split_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "task_protocol_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "scorer_id": "mel-registry-contract-validator",
+  "scorer_version": "1.0.0",
+  "scorer_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "native_metric_ids": [
+    "fixture_acceptance_rate"
+  ],
+  "comparison_scope_id": "mel-registry-contract-synthetic-v1",
+  "intended_use": "evaluation_only",
+  "rights": {
+    "status": "cleared",
+    "rights_reference": "generated synthetic metadata only; no external recording or dataset",
+    "rights_evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "permitted_uses": [
+      "evaluation_only"
+    ]
+  }
+}
