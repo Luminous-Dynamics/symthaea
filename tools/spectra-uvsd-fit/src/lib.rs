@@ -285,6 +285,48 @@ impl FitResult {
     }
 }
 
+/// Evaluate expected Fisher information for a proposed category design before
+/// collecting observations. `thresholds` are strictly ordered evidence cut-points;
+/// the model uses noise N(0,1) and signal N(mu,sigma^2). The returned local
+/// Wald standard errors are design expectations, not empirical intervals.
+pub fn expected_fisher_information_for_design(
+    mu: f64,
+    sigma: f64,
+    thresholds: &[f64],
+    signal_trials: u64,
+    noise_trials: u64,
+) -> Option<FisherInformationDiagnostics> {
+    if !mu.is_finite()
+        || !sigma.is_finite()
+        || sigma <= 0.0
+        || thresholds.len() < 2
+        || thresholds.iter().any(|value| !value.is_finite())
+        || thresholds.windows(2).any(|pair| pair[0] >= pair[1])
+        || signal_trials == 0
+        || noise_trials == 0
+    {
+        return None;
+    }
+    let category_count = thresholds.len() + 1;
+    let mut categories = Vec::with_capacity(category_count);
+    for index in 0..category_count {
+        categories.push(CategoryCount {
+            order: index as i16,
+            signal: if index == 0 { signal_trials } else { 0 },
+            noise: if index == 0 { noise_trials } else { 0 },
+        });
+    }
+    let table = CategoryTable::new(categories).ok()?;
+    let mut parameters = Vec::with_capacity(category_count + 1);
+    parameters.push(mu);
+    parameters.push(sigma.ln());
+    parameters.push(thresholds[0]);
+    for pair in thresholds.windows(2) {
+        parameters.push((pair[1] - pair[0]).ln());
+    }
+    expected_fisher_information(&table, &parameters, true)
+}
+
 /// Fit with multi-start BFGS.
 pub fn fit(table: &CategoryTable, options: FitOptions) -> FitResult {
     fit_with_optimizer(table, options, Optimizer::Bfgs)
@@ -1546,6 +1588,28 @@ mod tests {
             ).unwrap()
         ) / (2.0 * epsilon);
         assert!((gradient.mu - finite_difference).abs() < 1.0e-3 * (1.0 + finite_difference.abs()));
+    }
+
+    #[test]
+    fn design_information_matches_fit_model_parameter_dimension() {
+        let information = expected_fisher_information_for_design(
+            1.2,
+            1.3,
+            &[-0.8, 0.1, 1.2],
+            10_000,
+            10_000,
+        )
+        .unwrap();
+        assert_eq!(information.parameter_dimension, 5);
+        assert_eq!(information.effective_rank, 5);
+        assert!(!information.weakly_identified);
+        assert!(information.d_a_standard_error.unwrap().is_finite());
+        assert!(expected_fisher_information_for_design(
+            1.2, 1.3, &[-0.8], 10_000, 10_000
+        ).is_none());
+        assert!(expected_fisher_information_for_design(
+            1.2, 1.3, &[-0.8, 0.1, 1.2], 0, 10_000
+        ).is_none());
     }
 
     #[test]
