@@ -127,9 +127,31 @@ Permanent known-answer and negative controls should include:
 11. **Held-out edit:** add a scientifically admissible edit outside the declared universe; use it to demonstrate why a no-witness result is universe-bounded.
 12. **Baseline revision:** change the baseline edge state; stale edit preconditions must reject the old universe.
 
-V1 has unit tests for pair synergy, tied minima, preconditions, dependency cycles, symmetric conflicts, same-edge alternatives, no-witness under a smaller budget, digest mismatch, input-order canonicalization and the 20-edit bound. The next extension should add explicit three-way synergy and a generated family of held-out edits.
+V1 has unit tests for pair synergy, a separate three-edit case where no singleton or pair flips, tied minima, preconditions, dependency cycles, symmetric conflicts, same-edge alternatives, no-witness under a smaller budget, digest mismatch, input-order canonicalization and the 20-edit bound. The next extension should add generated families of held-out edits and dependent hyperedge/motif query semantics.
 
-## 8. Benchmark targets (proposed, not results)
+## 8. Position against graph-counterfactual minimization SOTA
+
+A directly relevant comparator appeared in *Machine Learning* on 18 September 2026: García et al., “On the Minimization of Graph Counterfactual Explanations: Theory and a Local Bounded Search Algorithm” ([paper](https://doi.org/10.1007/s10994-026-07157-0)). It formalizes graph-counterfactual minimization as NP-hard and proposes Local Bounded Search (LBS), a model-agnostic generate-and-minimize heuristic. Across nine synthetic and real-world molecular, biomedical and social datasets, the paper reports structural edit-distance reductions of up to 98% from initial counterfactuals.
+
+This changes our benchmark strategy. The current exact enumerator should be positioned as a **small-instance optimality oracle**, not as a scalable winner. The scientific assurance problem differs from generic graph explainability in several important ways:
+
+- The target is a frozen scientific query and declared decision rule, not necessarily a black-box GNN prediction.
+- Edits carry evidence digests, exact baseline preconditions, prerequisite gates and explicit conflicts.
+- The objective is declared expert effort, not merely unweighted graph edit distance.
+- A witness is bounded by an explicit biological edit universe and cannot be interpreted as an observed correction.
+- The witness may reveal which observation or adjudication would falsify a scientific claim; generic graph-CF minimization does not itself establish evidential admissibility.
+
+The fair comparator ladder should be:
+1. Exact subset enumeration (ground-truth optimum on small cases).
+2. García et al. LBS, adapted to the same admissible edit atoms and effort cost.
+3. Greedy marginal query-sensitivity ranking.
+4. Beam search / bounded best-first search.
+5. ILP/SMT or branch-and-bound when a sound encoding and independently checkable optimality bound are available.
+6. Random compatible subsets as a negative baseline.
+
+Report validity, minimum-cost regret against the exact oracle, runtime, memory, witness diversity, dependency/conflict violations, human-adjudicated biological plausibility and reviewer time. Do not compare raw edit-count reductions when one method is allowed different edit atoms or a different cost model.
+
+## 9. Benchmark targets (proposed, not results)
 
 | Metric | Target |
 |---|---:|
