@@ -906,7 +906,13 @@ impl Ledger {
                 let hypothesis = hypotheses_by_id
                     .get(hypothesis_id.as_str())
                     .ok_or(ValidationError::InvalidDecisionRecord)?;
-                if hypothesis.sequence >= decision.sequence {
+                if hypothesis.sequence >= decision.sequence
+                    || self.hypotheses.iter().any(|revision| {
+                        revision.hypothesis_id == hypothesis.hypothesis_id
+                            && revision.sequence > hypothesis.sequence
+                            && revision.sequence < decision.sequence
+                    })
+                {
                     return Err(ValidationError::InvalidDecisionRecord);
                 }
             }
@@ -926,6 +932,9 @@ impl Ledger {
                 .ok_or(ValidationError::RepairWithoutProceedDecision)?;
             if decision.kind != DecisionKind::ProceedToRepair
                 || decision.sequence >= repair.sequence
+                || repair.hypothesis_record_ids.iter().any(|id| {
+                    !decision.hypothesis_record_ids.iter().any(|decision_id| decision_id == id)
+                })
             {
                 return Err(ValidationError::RepairWithoutProceedDecision);
             }
@@ -1122,10 +1131,30 @@ mod tests {
         revision.status = HypothesisStatus::Unresolved;
         revision.sequence = 7;
         ledger.hypotheses.push(revision);
+        ledger.decisions[0].hypothesis_record_ids = vec!["h1-r2".into()];
+        ledger.repairs[0].hypothesis_record_ids = vec!["h1-r2".into()];
         ledger.decisions[0].sequence = 8;
         ledger.repairs[0].sequence = 9;
         ledger.grades[0].sequence = 10;
         assert_eq!(ledger.validate(), Ok(()));
+    }
+
+    #[test]
+    fn decision_cannot_use_a_stale_hypothesis_revision() {
+        let mut ledger = base_ledger();
+        let mut revision = ledger.hypotheses[0].clone();
+        revision.id = "h1-r2".into();
+        revision.previous_record_id = Some("h1-r1".into());
+        revision.status = HypothesisStatus::Unresolved;
+        revision.sequence = 7;
+        ledger.hypotheses.push(revision);
+        ledger.decisions[0].sequence = 8;
+        ledger.repairs[0].sequence = 9;
+        ledger.grades[0].sequence = 10;
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::InvalidDecisionRecord)
+        );
     }
 
     #[test]
