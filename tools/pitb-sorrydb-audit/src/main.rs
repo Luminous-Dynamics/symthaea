@@ -1055,7 +1055,7 @@ fn synthetic_report() -> Result<Value, String> {
         },
         "source_reconstruction_requirement": "synthetic source reconstruction policy",
         "benchmark_integrity_warnings": ["synthetic documentation drift control"],
-        "admission_boundary": "synthetic benchmark admission boundary"
+        "admission_boundary": "Synthetic fixture only: source repositories and referenced checker/semantic receipt bytes have not been independently reconstructed or authenticated."
     });
     if !report.is_object() {
         return Err("synthetic report construction failed".into());
