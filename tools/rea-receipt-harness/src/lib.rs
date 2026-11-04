@@ -189,22 +189,49 @@ pub fn validate_receipt(schema: &Value, receipt: &Value) -> Result<(), ReceiptEr
     validate_semantics(receipt)
 }
 
-/// Produce RFC 8785 canonical JSON bytes after enforcing the receipt's I-JSON number subset.
+/// Produce RFC 8785 canonical JSON bytes only after schema and semantic validation.
 ///
 /// Potentially 64-bit values are decimal strings in the receipt schema. The only JSON numbers
-/// permitted by the current receipt schema are small flags, compression-method codes, and the
-/// bounded read-buffer length. Floating-point values and integers above 2^53-1 are rejected.
-pub fn canonicalize_receipt(receipt: &Value) -> Result<Vec<u8>, ReceiptError> {
-    validate_jcs_number_subset(receipt)?;
-    serde_json_canonicalizer::to_vec(receipt)
-        .map_err(|error| ReceiptError::Canonicalization(error.to_string()))
+/// permitted by the current receipt schema are small bounded integers: ZIP flags, compression
+/// method codes, and the bounded read-buffer length. Floating-point values and larger integers
+/// are rejected before canonicalization.
+pub fn canonicalize_receipt(
+    schema: &Value,
+    receipt: &Value,
+) -> Result<Vec<u8>, ReceiptError> {
+    validate_receipt(schema, receipt)?;
+    canonicalize_jcs_value(receipt)
 }
 
-/// SHA-256 over the RFC 8785 canonical receipt bytes. This hashes the receipt statement; it does
-/// not authenticate the producer or make the underlying observations true.
-pub fn receipt_sha256(receipt: &Value) -> Result<String, ReceiptError> {
-    let canonical = canonicalize_receipt(receipt)?;
+/// Parse raw JSON with duplicate-key rejection, validate it, then return the receipt and its
+/// canonical JCS bytes. This is the preferred ingress path for untrusted receipt documents.
+pub fn canonicalize_raw_receipt(
+    schema: &Value,
+    input: &[u8],
+) -> Result<(Value, Vec<u8>), ReceiptError> {
+    let receipt = parse_and_validate_receipt(schema, input)?;
+    let canonical = canonicalize_receipt(schema, &receipt)?;
+    Ok((receipt, canonical))
+}
+
+/// SHA-256 over a schema- and semantics-validated RFC 8785 canonical receipt.
+/// The digest identifies the receipt statement; it does not authenticate the producer or make
+/// the underlying observations true.
+pub fn receipt_sha256(schema: &Value, receipt: &Value) -> Result<String, ReceiptError> {
+    let canonical = canonicalize_receipt(schema, receipt)?;
     Ok(format!("{:x}", Sha256::digest(canonical)))
+}
+
+/// Preferred raw-input path for receipt digests: duplicate-key parsing, validation, JCS and hash.
+pub fn receipt_sha256_from_raw(schema: &Value, input: &[u8]) -> Result<String, ReceiptError> {
+    let (_, canonical) = canonicalize_raw_receipt(schema, input)?;
+    Ok(format!("{:x}", Sha256::digest(canonical)))
+}
+
+fn canonicalize_jcs_value(value: &Value) -> Result<Vec<u8>, ReceiptError> {
+    validate_jcs_number_subset(value)?;
+    serde_json_canonicalizer::to_vec(value)
+        .map_err(|error| ReceiptError::Canonicalization(error.to_string()))
 }
 
 fn validate_semantics(receipt: &Value) -> Result<(), ReceiptError> {
@@ -712,12 +739,16 @@ mod tests {
 
     #[test]
     fn canonical_receipt_preserves_u64_values_exactly_as_decimal_strings() {
+        let schema = schema();
         let receipt = valid_verified_receipt();
-        let canonical = canonicalize_receipt(&receipt).unwrap();
+        let canonical = canonicalize_receipt(&schema, &receipt).unwrap();
         let text = std::str::from_utf8(&canonical).unwrap();
         assert!(text.contains(r#""archive_size_bytes":"18446744073709551615""#));
         assert!(!text.contains("18446744073709551615.0"));
-        assert_eq!(receipt_sha256(&receipt).unwrap().len(), 64);
+        assert_eq!(receipt_sha256(&schema, &receipt).unwrap().len(), 64);
+
+        let raw = serde_json::to_vec(&receipt).unwrap();
+        assert_eq!(receipt_sha256_from_raw(&schema, &raw).unwrap().len(), 64);
     }
 
     #[test]
@@ -815,7 +846,15 @@ mod tests {
 
     #[test]
     fn canonicalization_rejects_floats_and_unsafe_json_integers() {
-        assert!(canonicalize_receipt(&json!({"value": 1.25})).is_err());
-        assert!(canonicalize_receipt(&json!({"value": 9007199254740992u64})).is_err());
+        assert!(canonicalize_jcs_value(&json!({"value": 1.25})).is_err());
+        assert!(canonicalize_jcs_value(&json!({"value": 9007199254740992u64})).is_err());
+    }
+
+    #[test]
+    fn raw_canonicalization_rejects_duplicate_keys_before_digesting() {
+        let schema = schema();
+        let duplicate = br#"{"outcome":"verified","outcome":"rejected"}"#;
+        assert!(canonicalize_raw_receipt(&schema, duplicate).is_err());
+        assert!(receipt_sha256_from_raw(&schema, duplicate).is_err());
     }
 }
