@@ -2,7 +2,7 @@
   "schema_version": "mel-output-clock-anchor-set-v1",
   "fixture_id": "MEL-CLOCK-OUTLIER-001",
   "description": "One callback timestamp is displaced by 2 ms. A strict fit policy must reject the window instead of silently filtering the anchor.",
-  "expected_disposition": "fit",
+  "expected_disposition": "reject_residual",
   "anchors": [
     {
       "schema_version": "mel-output-clock-anchor-v1",
