@@ -561,6 +561,28 @@ mod tests {
     }
 
     #[test]
+    fn jcs_matches_rfc_8785_number_and_string_vector() {
+        let input = r#"{"numbers":[333333333.33333329,1E30,4.50,2e-3,0.000000000000000000000000001],"string":"\\u20ac$\\u000F\\u000aA'\\u0042\\u0022\\u005c\\\\\\\"\\/","literals":[null,true,false]}"#;
+        let value = parse_unique_json(input.as_bytes()).unwrap();
+        let canonical = serde_json_canonicalizer::to_string(&value).unwrap();
+        assert_eq!(
+            canonical,
+            r#"{"literals":[null,true,false],"numbers":[333333333.3333333,1e+30,4.5,0.002,1e-27],"string":"€$\\u000f\\nA'B\\\"\\\\\\\"/"}"#
+        );
+    }
+
+    #[test]
+    fn jcs_matches_rfc_8785_utf16_property_sorting_vector() {
+        let input = r#"{"\\u20ac":"Euro Sign","\\r":"Carriage Return","\\ufb33":"Hebrew Letter Dalet With Dagesh","1":"One","\\ud83d\\ude00":"Emoji: Grinning Face","\\u0080":"Control","\\u00f6":"Latin Small Letter O With Diaeresis"}"#;
+        let value = parse_unique_json(input.as_bytes()).unwrap();
+        let canonical = serde_json_canonicalizer::to_string(&value).unwrap();
+        assert_eq!(
+            canonical,
+            "{\"\\r\":\"Carriage Return\",\"1\":\"One\",\"\\u0080\":\"Control\",\"ö\":\"Latin Small Letter O With Diaeresis\",\"€\":\"Euro Sign\",\"😀\":\"Emoji: Grinning Face\",\"דּ\":\"Hebrew Letter Dalet With Dagesh\"}"
+        );
+    }
+
+    #[test]
     fn raw_receipt_parser_rejects_duplicate_properties_at_any_depth() {
         let duplicate_root = br#"{"outcome":"verified","outcome":"rejected"}"#;
         assert!(parse_unique_json(duplicate_root).is_err());
