@@ -83,3 +83,24 @@ The committed unit fixture is a source-derived reference vector; its semantic di
 ## Claim ceiling
 
 A matching Evidence ID proves that the supplied object is internally consistent with this implementation's semantic projection and canonicalization. It does not prove producer authorship, provenance authenticity, observation truth, hardware identity, runtime behavior, or security compliance. Use HARDSEC and independently trusted signed/anchored receipts for those claims.
+
+
+## EvidenceBundle and residual-unknown graph verification
+
+The optional `bundle` module verifies REA EvidenceBundle records and the residual-unknown revision graph. When the root Symthaea feature `rea-compat` is enabled, its in-process adapter is available from `symthaea::rea_bundle_compat`.
+
+The API separates:
+- `verify_evidence_bundle_value(&Value)`: verify an already-parsed bundle;
+- `verify_evidence_bundle_json(&[u8])`: verify bounded raw JSON with duplicate-key rejection and a separate raw-file SHA-256;
+- `canonical_evidence_bundle_bytes(&Value)`: obtain JCS bytes only after bundle verification;
+- `audit_evidence_link_closure(&Value)`: a stricter optional audit that reports links to records outside the bundle.
+
+The compatibility verifier checks all embedded Evidence IDs/profile commitments, rejects duplicate record IDs, rebuilds the deterministic artifact/provider/environment/scenario/capture manifests, validates residual-unknown revision digests and contiguous histories, checks previous-revision bindings, support/contradiction/mutation/resolution references, validates dependency relationships and rejects dependency cycles. A `verified` resolution requires qualifying supporting Evidence with the required authority/confidence and no unresolved contradiction.
+
+The separate link-closure audit is intentionally not part of the upstream parser's accept/reject contract: REA can accept a bundle whose record points to an Evidence ID outside the included `records` array. The audit reports that condition without silently changing upstream compatibility disposition.
+
+Raw-file SHA-256 and canonical bundle SHA-256 are distinct. Bundle consistency does not authenticate the bundle producer, observation authorship, trusted time, hardware identity or observation truth. A bundle with internally consistent IDs can still be fabricated by anyone who can construct a matching record.
+
+The dedicated integration workflow executes the pinned upstream REA functions to create, parse and serialize an EvidenceBundle. It verifies a six-record example with five residual-unknown revisions across three stable unknown IDs, a dependency edge and a verified resolution. It also exercises upstream-rejected duplicate-record, noncanonical-order, missing-reference, history-gap and dependency-cycle controls. Those fixtures are separate from the single-record Evidence corpus.
+
+The standalone Cargo harness also compiles `src/rea_bundle_compat.rs` through a dedicated adapter test. This catches a missing root-module declaration even when the monorepo root workspace cannot be resolved due to unrelated manifest-less glob entries.
