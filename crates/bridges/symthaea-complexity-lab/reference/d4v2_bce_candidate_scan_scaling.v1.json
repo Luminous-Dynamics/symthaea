@@ -1,0 +1,7 @@
+{
+  "format": "symthaea.d4v2.dynamic-bce-candidate-scan-scaling",
+  "version": 1,
+  "claim_ceiling": "instrumented_independent_source_derived_reference_model_not_D4_binary_benchmark_or_formal_proof",
+  "uploaded_script_execution": "not_run",
+  "local_in_memory_execution": "passed"
+}
