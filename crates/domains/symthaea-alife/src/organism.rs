@@ -99,16 +99,12 @@ pub struct OrganismConfig {
     /// `symthaea-fep`'s own default (1.0) via `..Default::default()`; exposed here so Phase 4
     /// can treat it as a heritable, mutable trait (see `genome`).
     pub action_temperature: f64,
-    /// `None` (the default) reproduces this crate's exact pre-existing behavior: the resource
-    /// observation is passed to perception raw/unquantized, and no perceptual-resolution energy
-    /// cost is charged. `Some(grain)` activates the Hoffman Fitness-Beats-Truth experiment
-    /// (`tests/hoffman_fitness_beats_truth.rs`, `HOFFMAN_INTERFACE_THEORY_PLAN_2026-07-22.md`
     /// `None` (the default) preserves unquantized observations and charges
     /// no perceptual-resolution model cost. `Some(grain)` activates the
     /// Hoffman Fitness-Beats-Truth experiment: observations are coarsened to
     /// bucket width `grain` before perception, and the ALife dimensionless
     /// information-cost policy charges for the modeled resolution. This is
-    /// not a measured physical bit-erasure cost. See `genome`'s module docs.
+    /// not a measured physical bit-erasure cost.
     pub perceptual_grain: Option<f64>,
     /// `None` (the default) reproduces this crate's exact pre-existing behavior: foraging gain
     /// scales linearly with the true `resource_level` (more is always better). `Some(sigma)`
