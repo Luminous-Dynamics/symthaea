@@ -226,7 +226,8 @@ impl IrrOptions {
 /// Classification of an IRR search.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IrrStatus {
-    /// Every cash flow is zero, so every rate is a root.
+    /// A unique rate cannot be identified because every rate is a root or
+    /// the dated schedule has no elapsed time and a zero net amount.
     Indeterminate,
     /// No root was found in the configured search domain.
     NoRoot,
@@ -353,6 +354,24 @@ pub fn irr_analysis(cash_flows: &[f64], options: IrrOptions) -> Result<IrrAnalys
     }
 
     let normalized: Vec<f64> = cash_flows.iter().map(|value| value / scale).collect();
+    if normalized
+        .iter()
+        .all(|flow| flow.timestamp_seconds == normalized[0].timestamp_seconds)
+    {
+        let (value, _) = xnpv_and_derivative(0.0, &normalized)?;
+        return Ok(IrrAnalysis {
+            roots: Vec::new(),
+            cash_flow_sign_changes: sign_changes,
+            status: if value.abs() <= options.tolerance {
+                IrrStatus::Indeterminate
+            } else {
+                IrrStatus::NoRoot
+            },
+            search_complete: true,
+            searched_rate_range: (options.min_rate, options.max_rate),
+        });
+    }
+
     let min_log = options.min_rate.ln_1p();
     let max_log = options.max_rate.ln_1p();
     let mut roots = Vec::new();
@@ -917,6 +936,32 @@ mod tests {
         assert!(matches!(
             xirr(&flows),
             Err(EconomicsError::AmbiguousSolution { .. })
+        ));
+    }
+
+    #[test]
+    fn xirr_analysis_marks_zero_duration_net_zero_schedule_indeterminate() {
+        let flows = [dated_flow(0, -100.0), dated_flow(0, 100.0)];
+        let analysis = xirr_analysis(&flows, IrrOptions::default()).unwrap();
+        assert_eq!(analysis.status, IrrStatus::Indeterminate);
+        assert!(analysis.search_complete);
+        assert!(analysis.roots.is_empty());
+        assert!(matches!(
+            xirr(&flows),
+            Err(EconomicsError::AmbiguousSolution { .. })
+        ));
+    }
+
+    #[test]
+    fn xirr_analysis_rejects_zero_duration_nonzero_schedule() {
+        let flows = [dated_flow(0, -100.0), dated_flow(0, 150.0)];
+        let analysis = xirr_analysis(&flows, IrrOptions::default()).unwrap();
+        assert_eq!(analysis.status, IrrStatus::NoRoot);
+        assert!(analysis.search_complete);
+        assert!(analysis.roots.is_empty());
+        assert!(matches!(
+            xirr(&flows),
+            Err(EconomicsError::NoSolution { .. })
         ));
     }
 
