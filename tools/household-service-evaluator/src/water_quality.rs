@@ -144,6 +144,8 @@ pub struct WaterParameterResult {
 #[serde(deny_unknown_fields)]
 pub struct WaterSampleObservation {
     pub sample_id: String,
+    pub source_id: String,
+    pub stream_id: String,
     pub sample_point_id: String,
     pub collected_at: String,
     pub collector_id: Option<String>,
@@ -382,6 +384,8 @@ pub fn validate_water_use_qualification(
     let mut sample_times: BTreeMap<&str, UtcInstant> = BTreeMap::new();
     for sample in &input.sample_observations {
         nonempty("sample_observations.sample_id", &sample.sample_id)?;
+        nonempty("sample_observations.source_id", &sample.source_id)?;
+        nonempty("sample_observations.stream_id", &sample.stream_id)?;
         nonempty("sample_observations.sample_point_id", &sample.sample_point_id)?;
         nonempty("sample_observations.method_id", &sample.method_id)?;
         let time = parse_utc_instant(&sample.collected_at, "sample_observations.collected_at")?;
@@ -436,6 +440,9 @@ pub fn validate_water_use_qualification(
         }
         let sample = sample_by_id.get(sample_id.as_str()).ok_or_else(||
             invalid("decision.supporting_sample_ids", "references a missing sample observation"))?;
+        if sample.source_id != input.source.source_id || sample.stream_id != input.stream.stream_id {
+            return Err(invalid("decision.supporting_sample_ids", "supporting sample source/stream identity does not match qualification record"));
+        }
         let sample_time = *sample_times.get(sample_id.as_str()).expect("sample time inserted with sample");
         if sample_time > decision_time {
             return Err(invalid("decision.supporting_sample_ids", "supporting sample occurs after decision time"));
@@ -619,8 +626,9 @@ mod tests {
                 next_required_review_at: Some("2026-11-05T08:00:00Z".into()),
             },
             sample_observations: vec![WaterSampleObservation {
-                sample_id: "sample-001".into(), sample_point_id: "kitchen-tap".into(),
-                collected_at: "2026-11-04T09:00:00Z".into(), collector_id: Some("collector-01".into()),
+                sample_id: "sample-001".into(), source_id: "municipal-main".into(), stream_id: "stream-01".into(),
+                sample_point_id: "kitchen-tap".into(), collected_at: "2026-11-04T09:00:00Z".into(),
+                collector_id: Some("collector-01".into()),
                 laboratory_or_provider_id: Some("lab-01".into()), method_id: "method-ecoli-01".into(),
                 method_revision: Some("2".into()), chain_of_custody_digest_sha256: Some("a".repeat(64)),
                 parameter_results: vec![WaterParameterResult {
@@ -714,6 +722,20 @@ mod tests {
     fn rejects_required_parameter_not_covered_by_supporting_samples() {
         let mut record = valid_record();
         record.quality_profile.required_parameter_ids.push("turbidity".into());
+        assert!(validate_water_use_qualification(&record).is_err());
+    }
+
+    #[test]
+    fn rejects_sample_from_different_stream_at_same_sampling_point() {
+        let mut record = valid_record();
+        record.sample_observations[0].stream_id = "previous-batch".into();
+        assert!(validate_water_use_qualification(&record).is_err());
+    }
+
+    #[test]
+    fn rejects_sample_from_different_source_at_same_sampling_point() {
+        let mut record = valid_record();
+        record.sample_observations[0].source_id = "private-borehole".into();
         assert!(validate_water_use_qualification(&record).is_err());
     }
 
