@@ -7,6 +7,7 @@ name = "symthaea-rea-mcp"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
+autobins = false
 
 [lib]
 path = "../../crates/domains/symthaea-rea-mcp/src/lib.rs"
