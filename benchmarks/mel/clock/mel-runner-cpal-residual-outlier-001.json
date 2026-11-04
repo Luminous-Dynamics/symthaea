@@ -141,8 +141,8 @@
       ],
       "pair_index": 2,
       "cpal_callback_stream_time_ns": 20000000,
-      "runner_time_before_ns": 120499950,
-      "runner_time_after_ns": 120500050
+      "runner_time_before_ns": 120000950,
+      "runner_time_after_ns": 120001050
     },
     {
       "schema_version": "mel-runner-cpal-clock-pair-v1",
