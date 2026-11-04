@@ -596,7 +596,7 @@ mod tests {
     }
 
     #[test]
-    fn identical_outcomes_for_a_conflicting_pair_fail_closed() {
+    fn one_observation_cannot_claim_to_separate_identical_outcomes() {
         let mut input = fixture();
         let action = input.actions.iter_mut()
             .find(|action| action.action_id == "inspect-synapse")
@@ -608,9 +608,12 @@ mod tests {
             .find(|outcome| outcome.scenario_id == "world-beta")
             .unwrap();
         beta_outcome.outcome_id = alpha_outcome;
-        // This action can still be redundant, but the other actions must cover the pair.
         let bytes = serde_json::to_vec(&input).unwrap();
         let report = evaluate(&input, &bytes).unwrap();
+        let coverage = report.action_pair_coverage.iter()
+            .find(|row| row.action_id == "inspect-synapse")
+            .unwrap();
+        assert_eq!(coverage.separated_decision_conflict_pair_count, 2);
         assert!(report.search_complete);
     }
 
