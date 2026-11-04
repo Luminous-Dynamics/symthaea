@@ -1,0 +1,44 @@
+{
+  "bundle_version": "0.1.0",
+  "bundle_id": "synthetic-dependence-bundle-v0.1",
+  "evidence": [
+    {
+      "evidence_id": "model-a",
+      "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "role": "SPECIALIST_MODEL_OUTPUT",
+      "producer_id": "specialist-run-0041",
+      "declared_lineage_ref": "manifest-a"
+    },
+    {
+      "evidence_id": "model-b",
+      "artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "role": "VLM_OUTPUT",
+      "producer_id": "vlm-run-0182",
+      "declared_lineage_ref": "manifest-b"
+    }
+  ],
+  "claimed_independence_pairs": [
+    {
+      "left_evidence_id": "model-a",
+      "right_evidence_id": "model-b",
+      "protocol_id": "protocol-independence-01",
+      "scope": "independent source measurements"
+    }
+  ],
+  "manifests": [
+    {
+      "manifest_id": "manifest-a",
+      "declared_sources": [
+        "source-set-a"
+      ],
+      "completeness": "DECLARED_COMPLETE"
+    },
+    {
+      "manifest_id": "manifest-b",
+      "declared_sources": [
+        "source-set-b"
+      ],
+      "completeness": "DECLARED_COMPLETE"
+    }
+  ]
+}
