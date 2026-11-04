@@ -160,10 +160,18 @@ jobs:
         run: |
           set -euo pipefail
           fixture="tools/pitb-daps-graph-import/fixtures/daps-example-graph.json"
-          committed_blob="$(git rev-parse "HEAD:$fixture")"
+          tree_entry="$(git ls-tree HEAD -- "$fixture")"
+          echo "DAPS_FIXTURE_TREE_ENTRY=$tree_entry"
+          committed_blob="$(printf '%s\n' "$tree_entry" | awk '{print $3}')"
+          echo "DAPS_FIXTURE_BLOB=$committed_blob"
           test "$committed_blob" = "ff3e07e7a4867c969f4ed739497f78b6a77209f"
+          git cat-file -s "$committed_blob"
           git cat-file blob "$committed_blob" > "$RUNNER_TEMP/daps-graph-from-git-object.json"
-          cmp "$RUNNER_TEMP/daps-graph-from-git-object.json" "$fixture"
+          cmp -s "$RUNNER_TEMP/daps-graph-from-git-object.json" "$fixture" || {
+            echo "DAPS fixture working-tree bytes differ from committed blob"
+            wc -c "$RUNNER_TEMP/daps-graph-from-git-object.json" "$fixture"
+            exit 1
+          }
           echo "DAPS_SOURCE_GRAPH_GIT_BLOB_PASS $committed_blob"
           sha256sum "$fixture"
 
