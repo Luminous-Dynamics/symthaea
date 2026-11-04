@@ -120,6 +120,22 @@ pub struct GroundedMusicalEvidenceBundleV1 {
     pub claims: Vec<GroundedMusicalClaimV1>,
     /// SHA-256 of the exact serialized claims vector.
     pub claim_set_sha256: String,
+    /// SHA-256 of the complete evidence-bundle payload, excluding this field.
+    pub evidence_bundle_sha256: String,
+}
+
+#[derive(Serialize)]
+struct GroundedEvidenceBundleCommitmentPayloadV1<'a> {
+    schema_version: &'a str,
+    session_id: &'a str,
+    turn_id: &'a str,
+    artifact: &'a GroundedAudioArtifactV1,
+    temporal_grounding_evaluator_version: &'a str,
+    annotation_policy_version: &'a str,
+    permitted_prefix_end_frame: u64,
+    committed_at_ns: u64,
+    claims: &'a [GroundedMusicalClaimV1],
+    claim_set_sha256: &'a str,
 }
 
 impl GroundedMusicalEvidenceBundleV1 {
@@ -127,9 +143,26 @@ impl GroundedMusicalEvidenceBundleV1 {
         sha256_json(&self.claims)
     }
 
-    pub fn is_claim_set_commitment_valid(&self) -> bool {
+    pub fn expected_evidence_bundle_sha256(&self) -> Result<String, String> {
+        sha256_json(&GroundedEvidenceBundleCommitmentPayloadV1 {
+            schema_version: &self.schema_version,
+            session_id: &self.session_id,
+            turn_id: &self.turn_id,
+            artifact: &self.artifact,
+            temporal_grounding_evaluator_version: &self.temporal_grounding_evaluator_version,
+            annotation_policy_version: &self.annotation_policy_version,
+            permitted_prefix_end_frame: self.permitted_prefix_end_frame,
+            committed_at_ns: self.committed_at_ns,
+            claims: &self.claims,
+            claim_set_sha256: &self.claim_set_sha256,
+        })
+    }
+
+    pub fn is_commitment_valid(&self) -> bool {
         self.expected_claim_set_sha256()
             .is_ok_and(|expected| expected == self.claim_set_sha256)
+            && self.expected_evidence_bundle_sha256()
+                .is_ok_and(|expected| expected == self.evidence_bundle_sha256)
     }
 }
 
@@ -176,6 +209,8 @@ pub struct GroundedMusicalDecisionReceiptV1 {
     pub artifact: GroundedAudioArtifactV1,
     /// Exact claim-set digest from the evidence bundle used by the decision.
     pub evidence_claim_set_sha256: String,
+    /// Exact commitment to the full evidence metadata and claim set.
+    pub evidence_bundle_sha256: String,
     /// Last input frame available when the decision was made.
     pub observed_through_frame: u64,
     /// Runner monotonic time when the decision was committed.
@@ -255,6 +290,10 @@ pub enum GroundedParticipationIssueV1 {
     PolicyVersionMismatch,
     DecisionBeforeEvidenceBundle,
     MissingEvidenceForAbstainOrAsk,
+    AskRequiresAmbiguousGrounding,
+    AbstainRequiresNonGroundedEvidence,
+    StreamUnavailableRequiresAbstain,
+    EffectWindowBeyondArtifact,
 }
 
 impl std::fmt::Display for GroundedParticipationIssueV1 {
@@ -318,7 +357,8 @@ pub fn validate_grounded_evidence_bundle_v1(
         issues.push(GroundedParticipationIssueV1::EmptyClaimSet);
     }
     if !is_lower_hex_digest(&bundle.claim_set_sha256)
-        || !bundle.is_claim_set_commitment_valid()
+        || !is_lower_hex_digest(&bundle.evidence_bundle_sha256)
+        || !bundle.is_commitment_valid()
     {
         issues.push(GroundedParticipationIssueV1::InvalidClaimSetDigest);
     }
@@ -409,7 +449,9 @@ pub fn validate_grounded_decision_v1(
             field: "audio_artifact_clock".to_owned(),
         });
     }
-    if decision.evidence_claim_set_sha256 != bundle.claim_set_sha256 {
+    if decision.evidence_claim_set_sha256 != bundle.claim_set_sha256
+        || decision.evidence_bundle_sha256 != bundle.evidence_bundle_sha256
+    {
         issues.push(GroundedParticipationIssueV1::EvidenceCommitmentMismatch);
     }
     if decision.policy_version != policy.policy_version {
@@ -441,7 +483,9 @@ pub fn validate_grounded_decision_v1(
                 claim_id: claim_id.clone(),
             }),
             Some(claim) => {
-                if claim.status != GroundedClaimStatusV1::Grounded {
+                let requires_grounded_claim = decision.action.is_active_intervention()
+                    || decision.action == GroundedMusicalActionV1::Wait;
+                if requires_grounded_claim && claim.status != GroundedClaimStatusV1::Grounded {
                     issues.push(GroundedParticipationIssueV1::DecisionClaimNotGrounded {
                         claim_id: claim_id.clone(),
                         status: claim.status,
@@ -476,7 +520,21 @@ pub fn validate_grounded_decision_v1(
         GroundedMusicalActionV1::Continue => Some(GroundedMusicalClaimKindV1::ActivePhrase),
         GroundedMusicalActionV1::Yield => Some(GroundedMusicalClaimKindV1::HandoffOrStop),
         GroundedMusicalActionV1::Wait if policy.require_grounded_claims_for_wait => {
-            Some(GroundedMusicalClaimKindV1::RetainedFloor)
+            let has_wait_authority = cited_claims.iter().any(|claim| {
+                claim.status == GroundedClaimStatusV1::Grounded
+                    && matches!(
+                        claim.kind,
+                        GroundedMusicalClaimKindV1::RetainedFloor
+                            | GroundedMusicalClaimKindV1::IntentionalSpace
+                            | GroundedMusicalClaimKindV1::CollaboratorVeto
+                    )
+            });
+            if !has_wait_authority {
+                issues.push(GroundedParticipationIssueV1::RequiredEvidenceKindMissing {
+                    action: decision.action,
+                });
+            }
+            None
         }
         _ => None,
     };
@@ -503,12 +561,38 @@ pub fn validate_grounded_decision_v1(
         });
     }
 
-    if matches!(
-        decision.action,
-        GroundedMusicalActionV1::Ask | GroundedMusicalActionV1::Abstain
-    ) && cited_claims.is_empty()
+    match decision.action {
+        GroundedMusicalActionV1::Ask => {
+            if cited_claims.is_empty() {
+                issues.push(GroundedParticipationIssueV1::MissingEvidenceForAbstainOrAsk);
+            } else if !cited_claims.iter().any(|claim| {
+                claim.status == GroundedClaimStatusV1::Ambiguous
+                    || claim.kind == GroundedMusicalClaimKindV1::AmbiguousContext
+            }) {
+                issues.push(GroundedParticipationIssueV1::AskRequiresAmbiguousGrounding);
+            }
+        }
+        GroundedMusicalActionV1::Abstain => {
+            if cited_claims.is_empty() {
+                issues.push(GroundedParticipationIssueV1::MissingEvidenceForAbstainOrAsk);
+            } else if cited_claims.iter().all(|claim| {
+                claim.status == GroundedClaimStatusV1::Grounded
+            }) {
+                issues.push(GroundedParticipationIssueV1::AbstainRequiresNonGroundedEvidence);
+            }
+        }
+        _ => {}
+    }
+
+    let stream_unavailable = bundle.claims.iter().any(|claim| {
+        claim.kind == GroundedMusicalClaimKindV1::StreamUnavailable
+            && claim.status == GroundedClaimStatusV1::Grounded
+    });
+    if stream_unavailable
+        && decision.action != GroundedMusicalActionV1::Abstain
+        && decision.action != GroundedMusicalActionV1::Ask
     {
-        issues.push(GroundedParticipationIssueV1::MissingEvidenceForAbstainOrAsk);
+        issues.push(GroundedParticipationIssueV1::StreamUnavailableRequiresAbstain);
     }
 
     match decision.action.allows_effect_window() {
@@ -526,6 +610,9 @@ pub fn validate_grounded_decision_v1(
                 < decision.observed_through_frame.saturating_add(policy.minimum_effect_lead_frames)
             {
                 issues.push(GroundedParticipationIssueV1::EffectWindowBeforeObservedPrefix);
+            }
+            if effect.interval.end_frame > decision.artifact.total_frames {
+                issues.push(GroundedParticipationIssueV1::EffectWindowBeyondArtifact);
             }
             if effect.authorization_id.trim().is_empty() {
                 issues.push(GroundedParticipationIssueV1::EffectAuthorizationIdEmpty);
