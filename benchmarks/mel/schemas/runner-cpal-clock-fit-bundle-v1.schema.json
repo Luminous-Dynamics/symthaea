@@ -68,7 +68,7 @@
         "runner_origin_id",
         "stream_instance_id",
         "cpal_stream_descriptor_sha256",
-        "runner_ns_per_cpal_ns",
+        "runner_ns_per_cpal_playback_ns",
         "reference_runner_time_ns",
         "reference_cpal_playback_stream_time_ns",
         "valid_from_cpal_playback_stream_time_ns",
@@ -115,10 +115,6 @@
         "cpal_stream_descriptor_sha256": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
-        },
-        "runner_ns_per_cpal_ns": {
-          "type": "number",
-          "exclusiveMinimum": 0
         },
         "reference_runner_time_ns": {
           "type": "number"
@@ -205,6 +201,10 @@
         "valid_until_cpal_playback_stream_time_ns": {
           "type": "integer",
           "minimum": 0
+        },
+        "runner_ns_per_cpal_playback_ns": {
+          "type": "number",
+          "exclusiveMinimum": 0
         }
       }
     }
