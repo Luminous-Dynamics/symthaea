@@ -36,6 +36,10 @@ struct ProbeResult {
 struct ProbeReport {
     schema_version: u32,
     interval_ms: u64,
+    powercap_scan_enabled: bool,
+    nvml_probe_enabled: bool,
+    discovery_complete: bool,
+    discovered_sensor_count: usize,
     sensor_results: Vec<ProbeResult>,
     notes: Vec<String>,
 }
@@ -89,18 +93,27 @@ fn discover_powercap(
     let entries = match std::fs::read_dir(directory) {
         Ok(entries) => entries,
         Err(error) => {
-            if depth == 0 {
-                errors.push(failed_result(
-                    directory.display().to_string(),
-                    error.to_string(),
-                    "discovery_unavailable",
-                ));
-            }
+            errors.push(failed_result(
+                directory.display().to_string(),
+                error.to_string(),
+                "discovery_directory_error",
+            ));
             return;
         }
     };
 
-    for entry in entries.flatten() {
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(error) => {
+                errors.push(failed_result(
+                    directory.display().to_string(),
+                    error.to_string(),
+                    "discovery_entry_error",
+                ));
+                continue;
+            }
+        };
         let path = entry.path();
         if !path.is_dir() {
             continue;
@@ -307,16 +320,28 @@ fn main() {
 
     discover_nvml(&mut meters, &mut errors);
     let sensor_results = probe_meters(meters, interval_ms, errors);
+    let discovery_complete = !sensor_results
+        .iter()
+        .any(|result| result.status.starts_with("discovery_"));
+    let discovered_sensor_count = sensor_results
+        .iter()
+        .filter(|result| result.descriptor.is_some())
+        .count();
 
     let report = ProbeReport {
         schema_version: 1,
         interval_ms,
+        powercap_scan_enabled: cfg!(target_os = "linux"),
+        nvml_probe_enabled: cfg!(feature = "nvml"),
+        discovery_complete,
+        discovered_sensor_count,
         sensor_results,
         notes: vec![
             "NVML energy is whole-GPU device energy, not per-process energy.".into(),
             "Linux powercap scope is the named kernel zone supplied by sysfs.".into(),
             "Missing or unsupported sensors never become numeric zero.".into(),
             "A sampled cumulative-counter interval is not a whole-system energy claim unless sensor coverage is complete.".into(),
+            "discovery_complete means the configured discovery paths were traversed without filesystem errors; it does not prove every physical power domain is exposed.".into(),
         ],
     };
 
