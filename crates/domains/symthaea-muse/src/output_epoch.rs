@@ -98,6 +98,50 @@ impl EpochTaggedStereoFrame {
     }
 }
 
+
+/// Maximum stale frames removed in one audio callback. This bounds queue
+/// scanning during an urgent invalidation; excess stale frames remain queued
+/// and are rejected by subsequent callbacks.
+pub const MAX_STALE_FRAMES_PER_CALLBACK: usize = 512;
+
+/// Result of searching the application output queue for a current frame.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum OutputQueueRead {
+    Current(EpochTaggedStereoFrame),
+    Empty,
+    StaleBudgetExhausted,
+}
+
+/// Pop until a current frame is found, the queue empties, or the per-callback
+/// stale-frame budget is exhausted.
+///
+/// The callback supplies its SPSC consumer through `pop_next`. No allocation,
+/// locking, sleeping or logging occurs here. At most the remaining stale
+/// budget plus one current frame is removed.
+pub fn pop_current_epoch_frame(
+    clock: &OutputEpochClock,
+    stale_budget_remaining: &mut usize,
+    stale_frames_dropped: &mut u64,
+    mut pop_next: impl FnMut() -> Option<EpochTaggedStereoFrame>,
+) -> OutputQueueRead {
+    loop {
+        if *stale_budget_remaining == 0 {
+            return OutputQueueRead::StaleBudgetExhausted;
+        }
+
+        let Some(frame) = pop_next() else {
+            return OutputQueueRead::Empty;
+        };
+
+        if clock.accepts(frame.epoch) {
+            return OutputQueueRead::Current(frame);
+        }
+
+        *stale_budget_remaining -= 1;
+        *stale_frames_dropped = stale_frames_dropped.saturating_add(1);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -156,6 +200,88 @@ mod tests {
 
         assert!(!clock.accepts(stale.epoch));
         assert!(clock.accepts(current.epoch));
+    }
+
+
+    #[test]
+    fn queue_reader_skips_stale_frames_then_returns_current_frame() {
+        let clock = OutputEpochClock::new();
+        assert_eq!(clock.invalidate(), Ok(1));
+        let mut queue = vec![
+            EpochTaggedStereoFrame::new(0, [1.0, 1.0]),
+            EpochTaggedStereoFrame::new(0, [0.5, 0.5]),
+            EpochTaggedStereoFrame::new(1, [0.25, -0.25]),
+        ]
+        .into_iter();
+        let mut budget = 8;
+        let mut dropped = 0;
+
+        let read = pop_current_epoch_frame(&clock, &mut budget, &mut dropped, || queue.next());
+
+        assert_eq!(
+            read,
+            OutputQueueRead::Current(EpochTaggedStereoFrame::new(1, [0.25, -0.25]))
+        );
+        assert_eq!(dropped, 2);
+        assert_eq!(budget, 6);
+    }
+
+    #[test]
+    fn queue_reader_never_exceeds_callback_stale_budget() {
+        let clock = OutputEpochClock::new();
+        assert_eq!(clock.invalidate(), Ok(1));
+        let stale = EpochTaggedStereoFrame::new(0, [1.0, 1.0]);
+        let mut queue = std::iter::repeat_n(stale, MAX_STALE_FRAMES_PER_CALLBACK + 3);
+        let mut budget = MAX_STALE_FRAMES_PER_CALLBACK;
+        let mut dropped = 0;
+
+        let read = pop_current_epoch_frame(&clock, &mut budget, &mut dropped, || queue.next());
+
+        assert_eq!(read, OutputQueueRead::StaleBudgetExhausted);
+        assert_eq!(dropped, MAX_STALE_FRAMES_PER_CALLBACK as u64);
+        assert_eq!(budget, 0);
+        assert_eq!(queue.count(), 3);
+    }
+
+    #[test]
+    fn next_callback_can_finish_stale_drain_and_reach_current_frame() {
+        let clock = OutputEpochClock::new();
+        assert_eq!(clock.invalidate(), Ok(1));
+        let mut queue = vec![
+            EpochTaggedStereoFrame::new(0, [1.0, 1.0]),
+            EpochTaggedStereoFrame::new(0, [1.0, 1.0]),
+            EpochTaggedStereoFrame::new(1, [0.0, 0.0]),
+        ]
+        .into_iter();
+
+        let mut first_budget = 1;
+        let mut first_dropped = 0;
+        assert_eq!(
+            pop_current_epoch_frame(&clock, &mut first_budget, &mut first_dropped, || queue.next()),
+            OutputQueueRead::StaleBudgetExhausted
+        );
+        assert_eq!(first_dropped, 1);
+
+        let mut next_budget = 1;
+        let mut next_dropped = 0;
+        assert_eq!(
+            pop_current_epoch_frame(&clock, &mut next_budget, &mut next_dropped, || queue.next()),
+            OutputQueueRead::Current(EpochTaggedStereoFrame::new(1, [0.0, 0.0]))
+        );
+        assert_eq!(next_dropped, 1);
+    }
+
+    #[test]
+    fn empty_queue_is_distinct_from_stale_budget_exhaustion() {
+        let clock = OutputEpochClock::new();
+        let mut budget = 4;
+        let mut dropped = 0;
+        assert_eq!(
+            pop_current_epoch_frame(&clock, &mut budget, &mut dropped, || None),
+            OutputQueueRead::Empty
+        );
+        assert_eq!(dropped, 0);
+        assert_eq!(budget, 4);
     }
 
     #[test]
