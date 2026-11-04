@@ -19,6 +19,7 @@ The custom Rust parser is the policy authority for:
 `ZipArtifactReader::verify_entry_content(occurrence_index, limits)` verifies one exact central-directory occurrence without extracting or writing it.
 
 - The secondary decoder is pinned to `zipcore = 0.10.2` with default optional codecs disabled. SHA-256 uses `sha2 = 0.10.9`.
+- The mature `zip = 9.3.0` parser is a test-harness-only differential oracle; it is not a production dependency. The initial differential fixture covers central-directory order, duplicate raw names, raw local-header offsets, sizes, CRCs, header consistency, overlap detection and Stored payload bytes. Do not infer codec independence from parser diversity; record dependency ancestry by method.
 - The custom inventory remains authoritative. Decoder entry count, central-directory position, ZIP64 status, occurrence index, raw name, offset, flags, method, sizes, CRC, data-descriptor bit, encryption bit and file kind are compared before streaming.
 - The first tranche supports Stored (method 0) and Deflate (method 8) only.
 - Encrypted, directory and symlink entries are explicitly unsupported. No password or decryption path is exposed.
