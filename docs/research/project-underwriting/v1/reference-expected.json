@@ -17,7 +17,8 @@
       "risk_disposition": "not_evaluated",
       "decision_authority": "none",
       "blockers": [
-        "GRID_EVIDENCE_BELOW_REQUIRED_CLASS"
+        "GRID_EVIDENCE_BELOW_REQUIRED_CLASS",
+        "REQUIRED_EVIDENCE_GATE_FAILED"
       ],
       "warnings": []
     },
@@ -27,7 +28,8 @@
       "risk_disposition": "not_evaluated",
       "decision_authority": "none",
       "blockers": [
-        "PHYSICAL_MODEL_OUTSIDE_QUALIFIED_DOMAIN"
+        "PHYSICAL_MODEL_OUTSIDE_QUALIFIED_DOMAIN",
+        "REQUIRED_EVIDENCE_GATE_FAILED"
       ],
       "warnings": []
     },
@@ -37,7 +39,8 @@
       "risk_disposition": "not_evaluated",
       "decision_authority": "none",
       "blockers": [
-        "REPORTING_CURRENCY_CONVERSION_MISSING"
+        "REPORTING_CURRENCY_CONVERSION_MISSING",
+        "REQUIRED_EVIDENCE_GATE_FAILED"
       ],
       "warnings": []
     },
@@ -47,7 +50,8 @@
       "risk_disposition": "not_evaluated",
       "decision_authority": "none",
       "blockers": [
-        "NO_DECISION_TIME_VALID_TARIFF_EVIDENCE"
+        "NO_DECISION_TIME_VALID_TARIFF_EVIDENCE",
+        "REQUIRED_EVIDENCE_GATE_FAILED"
       ],
       "warnings": [
         "Evidence with known_at after decision_time must be excluded even when valid_time overlaps."
@@ -70,7 +74,8 @@
       "decision_authority": "none",
       "blockers": [
         "GRID_EVIDENCE_BELOW_REQUIRED_CLASS",
-        "MATERIAL_SOURCE_CONFLICT"
+        "MATERIAL_SOURCE_CONFLICT",
+        "REQUIRED_EVIDENCE_GATE_FAILED"
       ],
       "warnings": [
         "Conflicting current evidence remains visible; do not majority-vote source count."
