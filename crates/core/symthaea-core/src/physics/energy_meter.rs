@@ -110,8 +110,9 @@ pub enum EnergyMeterAvailability {
 /// One raw cumulative counter reading.
 ///
 /// monotonic_timestamp_ns must use a monotonic clock, not wall time.
-/// counter_epoch must change whenever the counter may have reset, for example
-/// after a driver reload or device reinitialization.
+/// counter_epoch must change whenever the backend detects a reset or
+/// reinitialization. Some hardware counters do not expose enough information
+/// to distinguish every silent reset from a documented rollover.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnergyCounterReading {
     /// Descriptor of the exact sensor that supplied this reading.
