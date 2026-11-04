@@ -148,13 +148,16 @@ struct StrategySummary {
     model_id: Option<String>,
     model_version: Option<String>,
     attempts: usize,
-    verified_successes: usize,
+    verified_success_attempts: usize,
+    unique_tasks_solved: usize,
+    unique_task_success_rate: f64,
     non_solves: usize,
     infrastructure_failures: usize,
     invalid_targets: usize,
     success_rate_per_attempt: f64,
     mean_success_wall_time_ms: Option<f64>,
     total_cost_usd: f64,
+    cost_per_unique_verified_task_usd: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -557,6 +560,11 @@ fn summarize_proof_runs(
     for ((name, version, model_id, model_version), group) in groups {
         let attempts = group.len();
         let verified = group.iter().filter(|run| run.outcome == "verified_success").count();
+        let unique_solved = group.iter()
+            .filter(|run| run.outcome == "verified_success")
+            .map(|run| run.task_id.as_str())
+            .collect::<BTreeSet<_>>()
+            .len();
         let non_solves = group.iter().filter(|run| run.outcome == "non_solve").count();
         let infra = group.iter().filter(|run| run.outcome == "infrastructure_failure").count();
         let invalid = group.iter().filter(|run| run.outcome == "invalid_target").count();
@@ -571,7 +579,9 @@ fn summarize_proof_runs(
             model_id,
             model_version,
             attempts,
-            verified_successes: verified,
+            verified_success_attempts: verified,
+            unique_tasks_solved: unique_solved,
+            unique_task_success_rate: unique_solved as f64 / evaluation.sorries.len() as f64,
             non_solves,
             infrastructure_failures: infra,
             invalid_targets: invalid,
@@ -582,6 +592,11 @@ fn summarize_proof_runs(
                 Some(successful_times.iter().sum::<u64>() as f64 / successful_times.len() as f64)
             },
             total_cost_usd: total_cost as f64 / 1_000_000.0,
+            cost_per_unique_verified_task_usd: if unique_solved == 0 {
+                None
+            } else {
+                Some(total_cost as f64 / 1_000_000.0 / unique_solved as f64)
+            },
         });
     }
     Ok((verified_success_count, successful_task_ids.len(), summaries))
@@ -716,7 +731,7 @@ fn audit(
         cluster_summary_evaluation: cluster_summary(&evaluation.sorries),
         source_reconstruction_requirement: "For each scored task, checkout repo.remote at repo.commit, install the exact repo.lean_version, build the unmodified project, reproduce the sorry at location.path and the stored range, and compare the observed Lean goal to debug_info.goal before attempting a proof. Record repository tree digest, Lake manifest digest, toolchain digest and checker/kernel receipt.".into(),
         benchmark_integrity_warnings: warnings,
-        admission_boundary: "This audit validates pinned dataset bytes, record structure, task identity uniqueness and evaluation-split membership. It does not clone or build source repositories, authenticate the original extraction process, prove the informal-to-formal statement mapping, or certify non-vacuity. A task is not benchmark-admissible until source reconstruction and independent semantic checks pass.".into(),
+        admission_boundary: "This audit validates pinned dataset bytes, record structure, task identity uniqueness and evaluation-split membership. When proof-run JSONL is supplied, it also checks each attempt's task, commit, Lean version, source range, goal digest, evidence-digest syntax and declared proof/semantic gate results. It does not reopen or authenticate referenced checker, source-binding or semantic-gate receipt bytes, clone/build task repositories, or prove the informal-to-formal statement mapping. A public assurance-adjusted score requires those receipts to be independently reopened and verified.".into(),
     })
 }
 
@@ -958,7 +973,9 @@ fn run_self_tests() -> Result<(), String> {
     let (success_runs, unique_successes, summaries) = summarize_proof_runs(&runs, &evaluation)?;
     if success_runs != 1 || unique_successes != 1 || summaries.len() != 1
         || summaries[0].attempts != 2
-        || summaries[0].verified_successes != 1
+        || summaries[0].verified_success_attempts != 1
+        || summaries[0].unique_tasks_solved != 1
+        || summaries[0].unique_task_success_rate != 0.5
         || summaries[0].non_solves != 1
     {
         return Err("proof-run denominator and strategy summary controls failed".into());
