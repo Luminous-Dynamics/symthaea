@@ -86,8 +86,9 @@ def main():
  "source_projected_support":ss,"target_projected_support":ts,"pwmc_visible_weighted_value":val(ss),
  "negative_controls":len(xs),"negative_controls_rejected":len(xs),
  "source_digest":c["source"]["digest"],"target_digest":c["target"]["digest"],
- "certificate_sha256":"sha256:623eb9beed7063c5aa273019de6f93492589b4a5617cb40e18003bae49bdac6a",
- "checker_sha256":"sha256:df75fdee730c25a295ac00d1359bdd982f09cd1217e3990f6d927d726b495f2e"}
+ "certificate_sha256":"sha256:"+hashlib.sha256(CERT.read_bytes()).hexdigest(),
+ "checker_sha256":"sha256:"+hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest(),
+ "checker_execution":"passed"}
  OUT.write_text(json.dumps(result,indent=2,sort_keys=True)+"\n")
  print("PASS",len(xs),"negative controls; reference checker only")
 if __name__=="__main__":main()
