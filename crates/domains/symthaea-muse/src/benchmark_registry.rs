@@ -420,14 +420,7 @@ pub fn validate_music_benchmark_profile_v1(
             break;
         }
     }
-    if profile.rights.status == MusicBenchmarkRightsStatusV1::Unresolved
-        && matches!(
-            profile.intended_use,
-            MusicBenchmarkUseV1::Training
-                | MusicBenchmarkUseV1::Redistribution
-                | MusicBenchmarkUseV1::PublicRelease
-        )
-    {
+    if profile.rights.status == MusicBenchmarkRightsStatusV1::Unresolved {
         issues.push(MusicBenchmarkRegistryIssueV1::UnresolvedRightsForIntendedUse);
     }
     if !profile.rights.permitted_uses.contains(&profile.intended_use) {
@@ -632,6 +625,11 @@ pub fn compare_music_benchmark_runs_v1(
     }
     if left_profile.scorer_sha256 != right_profile.scorer_sha256 {
         reasons.push("scorer_sha256 differs".to_owned());
+    }
+    if left_profile.scorer_id != right_profile.scorer_id
+        || left_profile.scorer_version != right_profile.scorer_version
+    {
+        reasons.push("native scorer identity differs".to_owned());
     }
     if left_profile.comparison_scope_id != right_profile.comparison_scope_id {
         reasons.push("comparison_scope_id differs".to_owned());
@@ -840,6 +838,14 @@ mod tests {
         profile.intended_use = MusicBenchmarkUseV1::Training;
         profile.rights.status = MusicBenchmarkRightsStatusV1::Unresolved;
         profile.rights.permitted_uses = vec![MusicBenchmarkUseV1::Training];
+        assert!(validate_music_benchmark_profile_v1(&profile)
+            .contains(&MusicBenchmarkRegistryIssueV1::UnresolvedRightsForIntendedUse));
+    }
+
+    #[test]
+    fn unresolved_rights_cannot_authorize_even_evaluation_use() {
+        let mut profile = profile();
+        profile.rights.status = MusicBenchmarkRightsStatusV1::Unresolved;
         assert!(validate_music_benchmark_profile_v1(&profile)
             .contains(&MusicBenchmarkRegistryIssueV1::UnresolvedRightsForIntendedUse));
     }
