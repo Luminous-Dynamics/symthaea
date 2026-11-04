@@ -3,6 +3,8 @@
 //! This evaluator qualifies input readiness and risk-calculation readiness only.
 //! It does not issue investment recommendations or establish real-project bankability.
 
+use std::collections::HashSet;
+
 use serde_json::{Value, json};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -165,6 +167,61 @@ fn has_material_source_conflict(case: &Value, decision_time: &str) -> bool {
     })
 }
 
+fn evidence_references_resolve(case: &Value) -> bool {
+    let evidence = array(case, "evidence");
+    let evidence_ids: HashSet<&str> = evidence
+        .iter()
+        .filter_map(|item| string(item, "evidence_id"))
+        .collect();
+    if evidence_ids.len() != evidence.len() {
+        return false;
+    }
+
+    let claim_ids: HashSet<&str> = array(case, "claims")
+        .iter()
+        .filter_map(|item| string(item, "claim_id"))
+        .collect();
+    if array(case, "claims").len() != claim_ids.len()
+        || evidence.iter().any(|item| {
+            !claim_ids.contains(string(item, "claim_id").unwrap_or_default())
+        })
+    {
+        return false;
+    }
+
+    let mut references = Vec::new();
+    let mut collect = |value: &Value, key: &str| {
+        references.extend(array(value, key).iter().filter_map(Value::as_str));
+    };
+    for claim in array(case, "claims") {
+        collect(claim, "evidence_refs");
+    }
+    for evidence_item in array(case, "grid_connection") {
+        let _ = evidence_item;
+    }
+    if let Some(grid) = case.get("grid_connection") {
+        collect(grid, "evidence_refs");
+    }
+    if let Some(model) = case.get("physical_model") {
+        collect(model, "calibration_evidence_refs");
+        for measurement in array(model, "measurements") {
+            if let Some(reference) = string(measurement, "evidence_ref") {
+                references.push(reference);
+            }
+        }
+    }
+    if let Some(finance) = case.get("financial_case") {
+        collect(finance, "fx_evidence_refs");
+        for flow in array(finance, "cash_flows") {
+            collect(flow, "evidence_refs");
+        }
+    }
+    for scenario in array(case, "scenarios") {
+        collect(scenario, "evidence_refs");
+    }
+    references.into_iter().all(|reference| evidence_ids.contains(reference))
+}
+
 fn model_domain_qualified(case: &Value, decision_time: &str) -> bool {
     let project = match case.get("project") {
         Some(value) => value,
@@ -312,6 +369,9 @@ pub fn evaluate_case(case: &Value) -> Disposition {
             "Conflicting current evidence remains visible; do not majority-vote source count."
                 .to_owned(),
         );
+    }
+    if !evidence_references_resolve(case) {
+        blockers.push("EVIDENCE_REFERENCE_INTEGRITY_FAILURE".to_owned());
     }
 
     let grid = case.get("grid_connection");
@@ -578,6 +638,23 @@ mod tests {
             .unwrap();
         let result = evaluate_case(case);
         assert!(result.blockers.iter().any(|value| value == "PHYSICAL_MODEL_OUTSIDE_QUALIFIED_DOMAIN"));
+    }
+
+    #[test]
+    fn dangling_evidence_reference_fails_closed() {
+        let mut corpus = public_corpus();
+        let case = corpus["cases"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|item| item["case_id"] == "solar-storage-base-001")
+            .unwrap();
+        case["evidence"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|item| item["evidence_id"] != "ev_grid_agreement");
+        let result = evaluate_case(case);
+        assert!(result.blockers.iter().any(|value| value == "EVIDENCE_REFERENCE_INTEGRITY_FAILURE"));
     }
 
     #[test]
