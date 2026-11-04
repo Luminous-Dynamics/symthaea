@@ -37,6 +37,43 @@ The activity can be adapted by the educator for different ages and prior knowled
 
 The educator or benchmark author must provide a versioned task card containing the actual numerical values for the chosen digital case. The following are intentionally parameters, not hidden assumptions:
 
+
+### Paper exercise A — complete numerical input
+
+Use this fully specified idealized case for the first paper/hand-calculation exercise. It is a mathematical learning fixture, not a physical prototype specification.
+
+| Item | Value |
+|---|---|
+| Left support node A | `(0, 0) m` |
+| Right support node B | `(4, 0) m` |
+| Apex node C | `(2, 3) m` |
+| Members | A–C and B–C |
+| Support conditions | Both translations restrained at A and B: (u_x=u_y=0) |
+| Joint idealization | Ideal pins; axial member response only |
+| Young's modulus, each member | (E=200\,\mathrm{GPa}) |
+| Cross-sectional area, each member | (A=10\,\mathrm{mm}^2=1.0\times10^{-5}\,\mathrm{m}^2) |
+| Applied load at C | (F_C=(0,-100)\,\mathrm{N}) |
+| Self-weight | Excluded |
+| Coordinate convention | +x right, +y up |
+| Units | SI for all calculations |
+
+**Your work**
+
+1. Draw a free-body diagram for joint C and for the complete structure.
+2. Calculate both member lengths and their direction cosines.
+3. Predict whether each member is in tension or compression before calculating.
+4. Solve for the horizontal and vertical displacement of C using the idealized linear-elastic truss model.
+5. Calculate each member's axial force, stress, strain and axial extension/shortening.
+6. Calculate the support reactions at A and B.
+7. Check global force balance, moment balance and strain-energy / external-work consistency.
+8. Explain which assumptions make this model solvable and name at least three physical effects it omits.
+9. Explain how your prediction changes if the load doubles, the member area doubles, or Young's modulus doubles.
+
+Do not fabricate values for an unspecified material or joint. The stated elastic modulus and area belong only to this mathematical fixture. Do not apply these calculations to an actual bridge, building, person-supporting structure or physical load test.
+
+The separate [instructor answer key](INVENTOR_LOOP_001_BRIDGE_TRUSS_INSTRUCTOR_KEY_V0_1.md) is public teaching material, **not a hidden benchmark oracle**.
+
+
 | Requirement | Task-card value | Unit / status |
 |---|---|---|
 | Clear span | To be assigned | length |
