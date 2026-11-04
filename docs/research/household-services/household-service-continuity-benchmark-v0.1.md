@@ -150,17 +150,94 @@ Report per service, per scenario and per comparator arm:
 14. pump starts/cycles, maintenance, consumables and operator intervention;
 15. installed footprint and lifecycle cost per qualified essential-service hour.
 
-### Cumulative service deficit
+### Cumulative service deficit — interval-valued and quality-qualified
 
-For a declared service demand rate d_s(t) and qualified delivered service rate q_s(t), one possible deficit measure is:
+Use this integral only for rate-based services whose requested and delivered rates have the same declared unit and timebase.
 
-D_s = integral over the scenario window of max(0, d_s(t) - q_s(t)) dt.
+Let:
+- d_s(t) be requested demand rate, with uncertainty interval [d_s^-(t), d_s^+(t)];
+- q_phys_s(t) be physically measured delivery rate at the service boundary;
+- q_qual_s(t) be the rate that is both physically delivered and qualified against every mandatory service-envelope gate, with interval [q_s^-(t), q_s^+(t)].
 
-The units depend on the service: litre-hours, energy, or another declared service quantity over time. This measure is supplementary; it must not replace outage duration, peak deficit, critical-floor violations or denied-demand reporting.
+Never substitute q_phys for q_qual when quality, pressure, end-use or other mandatory qualification is missing or failed. Preserve physical delivery separately even when it cannot be credited as qualified service.
 
-If service is deferred under an authorized policy, retain both the time-shifted demand and its actual eventual delivery. Do not erase the original deadline or count a late delivery as on-time service.
+The instantaneous deficit interval is:
+
+Ddot_s^-(t) = max(0, d_s^-(t) - q_s^+(t))
+Ddot_s^+(t) = max(0, d_s^+(t) - q_s^-(t))
+
+and the cumulative bound over [0,T] is:
+
+D_s in [ integral_0^T Ddot_s^-(t) dt,
+         integral_0^T Ddot_s^+(t) dt ].
+
+This yields the declared service-quantity unit, not a unit multiplied by time: for example, L/hour integrated over hours yields L; kW integrated over hours yields kWh. The previous "litre-hours" wording would be dimensionally incorrect.
+
+Qualification semantics:
+- all mandatory evidence current and passing: q_qual is bounded by the measured physical delivery and its uncertainty;
+- a mandatory gate is known to fail: q_qual = [0,0] for the affected use class, while q_phys remains reported;
+- a mandatory gate is unknown, stale or contradictory: retain the state as Unknown and use a conservative lower qualified-delivery bound of zero; do not rewrite Unknown as a physical failure or a pass;
+- quality/pressure/temperature failures should also be reported as distinct hard-constraint violations, not hidden inside the integral.
+
+For discrete services (such as an accepted dishwasher request), do not force a continuous-rate integral. Report request count, acceptance, deadline, latency, failure/deferral and rework directly.
+
+This measure is supplementary; it must not replace outage duration, peak deficit, critical-floor violations, denied-demand reporting, unknown-state duration or recovery stability.
+
+If service is deferred under an authorized policy, retain both the original request/deadline and its later completion. Do not erase the original deadline or count late delivery as on-time service.
 
 Do not create a weighted total household-resilience score. A dishwasher task cannot compensate for an essential water-service failure.
+
+## 8. Affordability, accessibility and public-service complementarity
+
+The household capability floor must not assume every household can buy, install and maintain a private tank, pump, battery or treatment system. Nor should a household product normalize permanent inferior service or transfer public-service accountability to residents.
+
+The South African Human Rights Commission's Gauteng inquiry report (released 2 November 2026) identifies failures across the water-service value chain, including ageing infrastructure, losses, maintenance, storage/pumping capacity, electricity interruptions, technical skills and financial constraints. It emphasizes that responsibility must remain attributable to the relevant public/utility institutions and cautions against normalising recurring road-based water distribution as a permanent inferior service:
+https://sahrc.org.za/index.php/sahrc-media/news-2/item/4567-media-statement-the-south-african-human-rights-commission-releases-an-inquiry-report-highlighting-neglected-water-and-sanitation-infrastructure-and-heavy-reliance-on-road-based-water-distribution-water-tankers-in-gauteng
+
+SAnews reported on 3 November 2026 that Johannesburg's overall reservoir storage had improved to 41% from 37% the previous day, while some households had experienced dry taps for more than 10 days and recovery remained uneven:
+https://www.sanews.gov.za/node/85387
+
+These are problem and scenario-design signals, not product demand estimates or permission to substitute private equipment for municipal infrastructure.
+
+### Required affordability and access reporting
+
+For each matched configuration, report separately:
+- purchase and installation cost;
+- financing/lease cost where applicable;
+- plumbing/electrical modification and reinstatement cost;
+- energy, water, consumables, filters and replacement parts;
+- maintenance labour, service travel, downtime and disposal;
+- total annualized and lifecycle cost under declared usage/outage profiles;
+- cost per qualified service-hour and cost per delivered qualified litre/useful kWh where those functional units apply;
+- voluntary, privacy-preserving affordability bands (e.g. share of disposable household resources), not exact income or identity data;
+- sensitivity to tariffs, interest rates, parts availability and outage frequency.
+
+Do not collapse affordability into one average. Report outcome/cost distributions by voluntarily supplied, anonymized affordability bands and installation constraints. Do not infer or proxy protected traits.
+
+### Installability and reversibility
+
+Test representative constraints separately:
+- owner-occupied dwelling with suitable utility space;
+- rental dwelling where equipment must be removable and installation reversible;
+- small or space-constrained dwelling;
+- dwelling with limited electrical capacity;
+- shared or multi-unit property with a common utility boundary.
+
+Record area/volume footprint, access, required professional modifications, landlord/body-corporate/utility permissions where applicable, reinstatement burden and safe maintenance access. Do not assume permission or code compliance.
+
+### Public-service complementarity
+
+WaterLoop is a temporary, bounded resilience buffer and observability/maintenance aid. It is not a replacement for reliable municipal supply, a permanent tanker service, an alternative public utility, or a reason to reduce public investment and accountability.
+
+Benchmark:
+- continuity during a declared interruption;
+- return to normal piped service after utility restoration;
+- dependence on upstream public/utility service;
+- affordability and availability for households unable to purchase private equipment;
+- compatibility with shared/community resilience options, where locally reviewed and feasible.
+
+Keep public-system restoration metrics and household-appliance metrics separate. A household buffer may reduce a bounded service interruption; it cannot claim that the municipal service has been restored.
+
 
 ## 8. Policy and architecture experiments
 
