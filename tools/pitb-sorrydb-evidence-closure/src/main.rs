@@ -102,6 +102,7 @@ struct SourceBindingReceipt {
     source_span: String,
     source_span_verified_as_sorry: bool,
     target_goal_reproduced: bool,
+    environment_sha256: String,
     lake_manifest_sha256: String,
     repository_tree_sha256: String,
     reproduction_log_sha256: String,
@@ -370,6 +371,9 @@ fn verify_bundle(run: &ProofRun, task: &SorryRecord, evidence_root: &Path) -> Re
     let semantic_log = read_required(evidence_root, &run.run_id, "semantic-audit.log")?;
     let reproduction_log = read_required(evidence_root, &run.run_id, "source-reproduction.log")?;
     let lake_manifest = read_required(evidence_root, &run.run_id, "lake-manifest.json")?;
+    let repository_tree = read_required(evidence_root, &run.run_id, "repository-tree.json")?;
+    let lean_environment = read_required(evidence_root, &run.run_id, "lean-environment.json")?;
+    let checker_command = read_required(evidence_root, &run.run_id, "checker-command.json")?;
 
     if proof.is_empty() {
         return Err(format!("run {} has an empty proof artifact", run.run_id));
@@ -439,6 +443,7 @@ fn verify_bundle(run: &ProofRun, task: &SorryRecord, evidence_root: &Path) -> Re
         return Err(format!("run {} source-binding receipt does not close over exact task/source/goal identity", run.run_id));
     }
     for (label, value) in [
+        ("environment_sha256", &source_receipt.environment_sha256),
         ("lake_manifest_sha256", &source_receipt.lake_manifest_sha256),
         ("repository_tree_sha256", &source_receipt.repository_tree_sha256),
         ("reproduction_log_sha256", &source_receipt.reproduction_log_sha256),
@@ -447,8 +452,31 @@ fn verify_bundle(run: &ProofRun, task: &SorryRecord, evidence_root: &Path) -> Re
     }
     if sha256(&lake_manifest) != source_receipt.lake_manifest_sha256
         || sha256(&reproduction_log) != source_receipt.reproduction_log_sha256
+        || sha256(&repository_tree) != source_receipt.repository_tree_sha256
+        || sha256(&lean_environment) != source_receipt.environment_sha256
     {
-        return Err(format!("run {} source environment/reproduction artifacts do not match source-binding receipt", run.run_id));
+        return Err(format!("run {} source environment/repository/reproduction artifacts do not match source-binding receipt", run.run_id));
+    }
+    let tree_manifest: Value = serde_json::from_slice(&repository_tree)
+        .map_err(|e| format!("run {} repository-tree.json is invalid: {e}", run.run_id))?;
+    if tree_manifest["schema_version"] != "pitb.sorrydb.repository-tree-manifest.v0"
+        || tree_manifest["repository_commit"] != run.repo_commit
+        || tree_manifest["source_path"] != run.source_path
+        || tree_manifest["source_file_sha256"] != run.source_file_sha256
+        || tree_manifest["lean_version"] != run.lean_version
+        || tree_manifest["lake_manifest_sha256"] != source_receipt.lake_manifest_sha256
+    {
+        return Err(format!("run {} repository-tree manifest does not bind exact source and environment", run.run_id));
+    }
+    let environment_manifest: Value = serde_json::from_slice(&lean_environment)
+        .map_err(|e| format!("run {} lean-environment.json is invalid: {e}", run.run_id))?;
+    if environment_manifest["schema_version"] != "pitb.sorrydb.lean-environment-manifest.v0"
+        || environment_manifest["repository_commit"] != run.repo_commit
+        || environment_manifest["lean_version"] != run.lean_version
+        || environment_manifest["lake_manifest_sha256"] != source_receipt.lake_manifest_sha256
+        || environment_manifest["repository_tree_sha256"] != source_receipt.repository_tree_sha256
+    {
+        return Err(format!("run {} Lean environment manifest does not bind exact repository/toolchain", run.run_id));
     }
 
     if checker.schema_version != "pitb.sorrydb-checker-receipt.v1"
@@ -468,6 +496,7 @@ fn verify_bundle(run: &ProofRun, task: &SorryRecord, evidence_root: &Path) -> Re
         || checker.axiom_delta_zero != run.axiom_delta_zero
         || checker.new_sorry_delta_zero != run.new_sorry_delta_zero
         || checker.modified_source_sha256 != sha256(&source_after)
+        || checker.environment_sha256 != source_receipt.environment_sha256
     {
         return Err(format!("run {} checker receipt contradicts its proof-run record or source artifacts", run.run_id));
     }
@@ -479,8 +508,20 @@ fn verify_bundle(run: &ProofRun, task: &SorryRecord, evidence_root: &Path) -> Re
     ] {
         digest(value, &format!("run {} checker {label}", run.run_id))?;
     }
-    if sha256(&checker_log) != checker.checker_log_sha256 {
-        return Err(format!("run {} checker log digest mismatch", run.run_id));
+    if sha256(&checker_log) != checker.checker_log_sha256
+        || sha256(&checker_command) != checker.checker_command_sha256
+    {
+        return Err(format!("run {} checker log/command bytes do not match checker receipt", run.run_id));
+    }
+    let command_manifest: Value = serde_json::from_slice(&checker_command)
+        .map_err(|e| format!("run {} checker-command.json is invalid: {e}", run.run_id))?;
+    if command_manifest["schema_version"] != "pitb.sorrydb.checker-command.v0"
+        || command_manifest["run_id"] != run.run_id
+        || command_manifest["repo_commit"] != run.repo_commit
+        || command_manifest["lean_version"] != run.lean_version
+        || command_manifest["environment_sha256"] != source_receipt.environment_sha256
+    {
+        return Err(format!("run {} checker command manifest does not bind exact run/environment", run.run_id));
     }
 
     if semantic.schema_version != "pitb.sorrydb-semantic-gate-receipt.v1"
