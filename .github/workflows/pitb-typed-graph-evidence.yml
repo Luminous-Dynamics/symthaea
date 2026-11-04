@@ -168,24 +168,33 @@ jobs:
           from pathlib import Path
 
           relative = "tools/pitb-daps-graph-import/fixtures/daps-example-graph.json"
-          entry = subprocess.check_output(
+          expected = "ff3e07e7a4867c969f4ed739497f78b6a77209f"
+          tree = subprocess.check_output(
               ["git", "ls-tree", "HEAD", "--", relative], text=True
           ).strip()
-          fields = entry.split()
+          fields = tree.split()
           if len(fields) < 3 or fields[1] != "blob":
-              raise SystemExit(f"fixture is not a committed blob: {entry!r}")
-          expected_git_blob = "ff3e07e7a4867c969f4ed739497f78b6a77209f"
-          if fields[2] != expected_git_blob:
-              raise SystemExit(f"upstream DAPS blob mismatch: {fields[2]}")
-          fixture = Path(relative)
-          raw = fixture.read_bytes()
+              raise SystemExit(f"fixture is not a committed Git blob: {tree!r}")
+          raw = Path(relative).read_bytes()
           if not raw:
               raise SystemExit("DAPS fixture is empty")
+          header = f"blob {len(raw)}\0".encode("ascii")
+          actual = hashlib.sha1(header + raw).hexdigest()
+          print(f"DAPS_GIT_TREE_ENTRY={tree!r}")
+          print(f"DAPS_EXPECTED_GIT_BLOB={expected!r}")
+          print(f"DAPS_TREE_GIT_BLOB={fields[2]!r}")
+          print(f"DAPS_COMPUTED_GIT_BLOB={actual!r}")
+          print(f"DAPS_RAW_SHA256={hashlib.sha256(raw).hexdigest()}")
+          if fields[2] != expected:
+              raise SystemExit("committed tree entry does not pin the expected DAPS blob")
+          if actual != fields[2]:
+              raise SystemExit("working-tree bytes do not match the committed Git blob")
+          if actual != expected:
+              raise SystemExit("working-tree bytes do not match the upstream DAPS Git blob")
           raw_sha256 = hashlib.sha256(raw).hexdigest()
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
-              env.write(f"DAPS_SOURCE_GRAPH_SHA256={raw_sha256}\\n")
-          print(f"DAPS_SOURCE_GRAPH_GIT_BLOB_PASS {fields[2]}")
-          print(f"DAPS_SOURCE_GRAPH_RAW_SHA256_PASS {raw_sha256}")
+              env.write(f"DAPS_SOURCE_GRAPH_SHA256={raw_sha256}\n")
+          print("DAPS_SOURCE_GRAPH_GIT_BLOB_AND_BYTES_PASS")
           PY
 
       - name: Install stable Rust
