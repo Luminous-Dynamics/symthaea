@@ -1,0 +1,57 @@
+name: Robust connectome query-disambiguation under set-valued outcomes
+
+on:
+  pull_request:
+    paths:
+      - "tools/connectomics-intake-audit/src/bin/connectome_robust_query_disambiguation_audit.rs"
+      - "tools/connectomics-intake-audit/reference/verify_robust_query_disambiguation_oracle.py"
+      - "docs/neuroscience/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION.schema.json"
+      - "docs/neuroscience/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION_NO_PLAN.example.json"
+      - ".github/workflows/connectome-robust-query-disambiguation.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "tools/connectomics-intake-audit/src/bin/connectome_robust_query_disambiguation_audit.rs"
+      - "tools/connectomics-intake-audit/reference/verify_robust_query_disambiguation_oracle.py"
+      - "docs/neuroscience/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION.schema.json"
+      - "docs/neuroscience/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION_NO_PLAN.example.json"
+      - ".github/workflows/connectome-robust-query-disambiguation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-robust-observation-plan:
+    name: Exact set-valued robust observation plan and independent oracle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Check robust disambiguation tool formatting
+        run: rustfmt --edition 2024 --check tools/connectomics-intake-audit/src/bin/connectome_robust_query_disambiguation_audit.rs
+      - name: Run strict Clippy for robust disambiguation
+        run: cargo clippy --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_robust_query_disambiguation_audit -- -D warnings
+      - name: Run Rust robust-disambiguation unit tests
+        run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_robust_query_disambiguation_audit
+      - name: Evaluate the robust set-valued observation fixture
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_robust_query_disambiguation_audit -- --input docs/neuroscience/examples/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION.example.json --output "$RUNNER_TEMP/robust-query-disambiguation-report.json"
+      - name: Independently verify robust set-valued separation
+        run: |
+          python3 tools/connectomics-intake-audit/reference/verify_robust_query_disambiguation_oracle.py --input docs/neuroscience/examples/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION.example.json --report "$RUNNER_TEMP/robust-query-disambiguation-report.json"
+      - name: Evaluate overlapping-outcome negative control
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_robust_query_disambiguation_audit -- --input docs/neuroscience/examples/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION_NO_PLAN.example.json --output "$RUNNER_TEMP/robust-query-disambiguation-no-plan-report.json"
+      - name: Independently verify robust no-plan disposition
+        run: |
+          python3 tools/connectomics-intake-audit/reference/verify_robust_query_disambiguation_oracle.py --input docs/neuroscience/examples/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION_NO_PLAN.example.json --report "$RUNNER_TEMP/robust-query-disambiguation-no-plan-report.json"
+      - name: Verify oracle source syntax
+        run: python3 -m py_compile tools/connectomics-intake-audit/reference/verify_robust_query_disambiguation_oracle.py
