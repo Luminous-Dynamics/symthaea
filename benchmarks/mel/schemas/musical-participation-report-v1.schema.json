@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/musical-participation-report-v1.schema.json",
+  "title": "Melothaea selective musical participation report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "family_count",
+    "member_count",
+    "act_required_count",
+    "withhold_required_count",
+    "valid_decision_support_count",
+    "valid_decision_support_rate",
+    "paired_correct_count",
+    "paired_act_withhold_accuracy",
+    "false_entry_count",
+    "false_entry_rate",
+    "unauthorized_yield_count",
+    "withhold_violation_count",
+    "withhold_violation_rate",
+    "missed_invitation_count",
+    "missed_invitation_rate",
+    "intentional_wait_count",
+    "epistemic_abstain_count",
+    "clarification_ask_count",
+    "mean_brier_score",
+    "risk_coverage",
+    "per_family"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-musical-participation-report-v1"
+    },
+    "family_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "member_count": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "act_required_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "withhold_required_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "valid_decision_support_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "valid_decision_support_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "paired_correct_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "paired_act_withhold_accuracy": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "false_entry_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "false_entry_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "missed_invitation_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "missed_invitation_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "intentional_wait_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "epistemic_abstain_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "clarification_ask_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "mean_brier_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "risk_coverage": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "confidence_threshold",
+          "covered_member_count",
+          "coverage",
+          "selective_risk"
+        ],
+        "properties": {
+          "confidence_threshold": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "covered_member_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "coverage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "selective_risk": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "per_family": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "family_id",
+          "member_count",
+          "valid_decision_support_count",
+          "valid_decision_support_rate",
+          "paired_correct",
+          "false_entry_count",
+          "unauthorized_yield_count",
+          "withhold_violation_count",
+          "missed_invitation_count",
+          "intentional_wait_count",
+          "epistemic_abstain_count",
+          "clarification_ask_count",
+          "brier_score"
+        ],
+        "properties": {
+          "family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "member_count": {
+            "type": "integer",
+            "const": 2
+          },
+          "valid_decision_support_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "valid_decision_support_rate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "paired_correct": {
+            "type": "boolean"
+          },
+          "false_entry_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "missed_invitation_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "intentional_wait_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "epistemic_abstain_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "clarification_ask_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "brier_score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "unauthorized_yield_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "withhold_violation_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "unauthorized_yield_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "withhold_violation_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "withhold_violation_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  }
+}

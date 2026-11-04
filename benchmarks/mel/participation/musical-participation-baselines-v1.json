@@ -1,0 +1,203 @@
+{
+  "schema_version": "mel-musical-participation-baselines-v1",
+  "baselines": [
+    {
+      "baseline_id": "ALWAYS-WAIT-001",
+      "description": "Negative control: intentional WAIT for every paired member.",
+      "predictions_by_family": [
+        [
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.95,
+            "act_probability": 0.05
+          },
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.95,
+            "act_probability": 0.05
+          }
+        ],
+        [
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.95,
+            "act_probability": 0.05
+          },
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.95,
+            "act_probability": 0.05
+          }
+        ],
+        [
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.95,
+            "act_probability": 0.05
+          },
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.95,
+            "act_probability": 0.05
+          }
+        ],
+        [
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.95,
+            "act_probability": 0.05
+          },
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.95,
+            "act_probability": 0.05
+          }
+        ]
+      ],
+      "expected": {
+        "valid_decision_support_count": 4,
+        "paired_correct_count": 0,
+        "false_entry_count": 0,
+        "missed_invitation_count": 4,
+        "intentional_wait_count": 8,
+        "epistemic_abstain_count": 0,
+        "clarification_ask_count": 0,
+        "mean_brier_score": 0.4525,
+        "unauthorized_yield_count": 0,
+        "withhold_violation_count": 0
+      }
+    },
+    {
+      "baseline_id": "ALWAYS-RESPOND-001",
+      "description": "Negative control: RESPOND for every paired member.",
+      "predictions_by_family": [
+        [
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.95,
+            "act_probability": 0.95
+          },
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.95,
+            "act_probability": 0.95
+          }
+        ],
+        [
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.95,
+            "act_probability": 0.95
+          },
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.95,
+            "act_probability": 0.95
+          }
+        ],
+        [
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.95,
+            "act_probability": 0.95
+          },
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.95,
+            "act_probability": 0.95
+          }
+        ],
+        [
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.95,
+            "act_probability": 0.95
+          },
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.95,
+            "act_probability": 0.95
+          }
+        ]
+      ],
+      "expected": {
+        "valid_decision_support_count": 4,
+        "paired_correct_count": 0,
+        "false_entry_count": 4,
+        "missed_invitation_count": 0,
+        "intentional_wait_count": 0,
+        "epistemic_abstain_count": 0,
+        "clarification_ask_count": 0,
+        "mean_brier_score": 0.4525,
+        "unauthorized_yield_count": 0,
+        "withhold_violation_count": 4
+      }
+    },
+    {
+      "baseline_id": "CONTEXT-RULE-FIXTURE-SANITY-001",
+      "description": "Hand-written fixture sanity policy; not a learned-model result.",
+      "predictions_by_family": [
+        [
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.9,
+            "act_probability": 0.9
+          },
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.9,
+            "act_probability": 0.1
+          }
+        ],
+        [
+          {
+            "decision": "CONTINUE",
+            "decision_confidence": 0.85,
+            "act_probability": 0.9
+          },
+          {
+            "decision": "ASK",
+            "decision_confidence": 0.7,
+            "act_probability": 0.1
+          }
+        ],
+        [
+          {
+            "decision": "RESPOND",
+            "decision_confidence": 0.9,
+            "act_probability": 0.9
+          },
+          {
+            "decision": "ABSTAIN",
+            "decision_confidence": 0.8,
+            "act_probability": 0.1
+          }
+        ],
+        [
+          {
+            "decision": "YIELD",
+            "decision_confidence": 0.9,
+            "act_probability": 0.9
+          },
+          {
+            "decision": "WAIT",
+            "decision_confidence": 0.9,
+            "act_probability": 0.1
+          }
+        ]
+      ],
+      "expected": {
+        "valid_decision_support_count": 8,
+        "paired_correct_count": 4,
+        "false_entry_count": 0,
+        "missed_invitation_count": 0,
+        "intentional_wait_count": 2,
+        "epistemic_abstain_count": 1,
+        "clarification_ask_count": 1,
+        "mean_brier_score": 0.01,
+        "unauthorized_yield_count": 0,
+        "withhold_violation_count": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/musical-participation-counterfactual-set-v1.schema.json",
+  "title": "Melothaea selective musical participation counterfactual set v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "families"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-musical-participation-set-v1"
+    },
+    "families": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/family"
+      }
+    }
+  },
+  "$defs": {
+    "family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family_id",
+        "changed_factor",
+        "preserved_factors",
+        "members"
+      ],
+      "properties": {
+        "family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "changed_factor": {
+          "enum": [
+            "collaborator_intent",
+            "preceding_context",
+            "performer_role",
+            "stream_integrity",
+            "collaborator_veto"
+          ]
+        },
+        "preserved_factors": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "members": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/member"
+          }
+        }
+      }
+    },
+    "member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "variant_id",
+        "local_cue_signature",
+        "preceding_context_signature",
+        "collaborator_intent",
+        "performer_role",
+        "stream_available",
+        "collaborator_veto",
+        "requirement",
+        "valid_decisions"
+      ],
+      "properties": {
+        "variant_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "local_cue_signature": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preceding_context_signature": {
+          "type": "string",
+          "minLength": 1
+        },
+        "collaborator_intent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "performer_role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stream_available": {
+          "type": "boolean"
+        },
+        "collaborator_veto": {
+          "type": "boolean"
+        },
+        "requirement": {
+          "enum": [
+            "act",
+            "withhold"
+          ]
+        },
+        "valid_decisions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "WAIT",
+              "RESPOND",
+              "CONTINUE",
+              "YIELD",
+              "ABSTAIN",
+              "ASK"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
