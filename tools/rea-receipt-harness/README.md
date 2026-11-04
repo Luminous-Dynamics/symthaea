@@ -42,3 +42,26 @@ cargo clippy --manifest-path tools/rea-receipt-harness/Cargo.toml --locked --all
 The test suite includes schema meta-validation, verified/rejected receipt outcomes, CRC/size/source/offset/archive-budget/claim-ceiling negative controls, canonical-base64 checks, duplicate raw-property rejection at root and nested levels, decimal-string precision through `u64::MAX`, and RFC 8785 Section 3.2.2 number/string plus UTF-16 property-order vectors.
 
 A green harness run is evidence only for this receipt schema, implementation revision, dependency lock and fixtures. An independent replay tool against original content-addressed archive bytes remains a separate gate.
+
+## Independent replay executable
+
+The branch also adds `rea-receipt-replay`, a read-only command-line verifier:
+
+```bash
+cargo run --locked --manifest-path tools/rea-receipt-harness/Cargo.toml --bin rea-receipt-replay -- artifact.zip member-receipt.json
+```
+
+The CLI embeds the pinned receipt schema, rejects duplicate JSON properties, validates schema and semantic claim ceilings, canonicalizes the receipt through RFC 8785, then replays the member through `zip 9.3.0` using `flate2 / zlib-rs`. The production member verifier uses `zipcore / miniz_oxide`, so this is a separate parser/Deflate path.
+
+It hashes the same opened archive object before and after replay, checks source size and SHA-256, compares the raw filename bytes, occurrence index, local-header/data offsets, flags, method, declared sizes and CRC, and streams output through the receipt's bounded buffer while recomputing SHA-256 and bitwise CRC-32. It performs no extraction or file writes.
+
+The current independent replay subset is deliberately narrower:
+- Stored and Deflate regular-file entries only.
+- Unique raw filename only. If zip-rs reports duplicate names, the replayer returns `unsupported`; its indexed map is not occurrence-preserving.
+- ZIP64 / unsupported carrier layouts may be rejected by the independent parser and must return `unsupported`, not a guessed offset correction.
+- Archive, output, count and buffer limits are checked; the whole-archive re-hash must match after parsing.
+
+Exit codes: `0` replayed, `1` rejected, `2` unsupported, `3` input/schema/I/O error. A successful replay supports only the member-content integrity claim. It does not establish producer authenticity, package signature validity, archive completeness, installability, runtime behaviour or MASVS control pass.
+
+The replay test suite uses generated Stored and Deflate packages, wrong-source-digest and metadata controls, and a duplicate-name abstention case. The second implementation is a valuable independent oracle, but it shares zip-rs's stated dependency graph and must still be version/lockfile-bound in every run receipt.
+
