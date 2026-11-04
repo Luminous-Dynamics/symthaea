@@ -4,10 +4,10 @@
 //! Replayable mapping between a runner monotonic clock and one CPAL stream clock.
 //!
 //! This module is dependency-light and contains no CPAL types. The live callback
-//! adapter records a bounded pair around the CPAL callback and predicted-playback timestamps read:
-//! runner time immediately before and after observing the CPAL stream timestamp.
-//! The pair is a software observation bracket, not a guarantee about backend
-//! callback-start accuracy.
+//! adapter records both CPAL callback time (diagnostic) and CPAL predicted playback
+//! time (the composition target) while bracketing their observation with runner
+//! monotonic timestamps. The pair is a software observation bracket, not a
+//! guarantee about backend callback-start or DAC accuracy.
 //!
 //! A low regression residual establishes consistency of the supplied pairs.
 //! It does not establish absolute clock accuracy. V1 therefore reports only a
@@ -119,11 +119,12 @@ impl RunnerCpalClockDescriptorV1 {
 
 /// Paired observation acquired during one CPAL output callback.
 ///
-/// `runner_time_before_ns` and `runner_time_after_ns` bracket the read of
-/// CPAL's callback timestamp using the exact monotonic origin named by the
-/// descriptor. The midpoint is used as the OLS observation; the full bracket
-/// is retained and checked. It is not a certified uncertainty interval for
-/// the backend timestamp.
+/// `runner_time_before_ns` and `runner_time_after_ns` bracket the read and
+/// normalization of both CPAL timestamps using the exact monotonic origin
+/// named by the descriptor. The midpoint is paired with CPAL's predicted
+/// playback timestamp for OLS; callback time remains a separate diagnostic.
+/// The full bracket is retained and checked. It is not a certified uncertainty
+/// interval for either backend timestamp.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RunnerCpalClockPairSchemaV1 {
     #[serde(rename = "mel-runner-cpal-clock-pair-v1")]
@@ -144,7 +145,7 @@ pub struct RunnerCpalClockPairV1 {
     pub cpal_callback_stream_time_ns: u64,
     /// CPAL OutputStreamTimestamp.playback normalized to this stream's
     /// callback-time origin. This is the clock domain consumed by the
-    /// MEL-CLOCK-001 output-frame fit.
+    /// MEL-CLOCK-001 output-frame fit; the regression below uses this field.
     pub cpal_playback_stream_time_ns: u64,
     /// Runner monotonic time sampled immediately before reading/normalizing
     /// the CPAL callback and predicted-playback timestamps.
@@ -156,7 +157,7 @@ pub struct RunnerCpalClockPairV1 {
 
 impl RunnerCpalClockPairV1 {
     /// Construct the fixed-size callback record after the caller has sampled
-    /// the runner clock before/after reading CPAL's callback timestamp. The
+    /// the runner clock before/after reading both CPAL timestamps. The
     /// descriptor digest is computed off the real-time thread and copied in.
     pub fn from_observation(
         stream_instance_id: u64,
@@ -231,7 +232,7 @@ pub struct RunnerCpalClockFitV1 {
     pub runner_origin_id: String,
     pub stream_instance_id: u64,
     pub cpal_stream_descriptor_sha256: String,
-    /// Runner nanoseconds per CPAL callback-stream nanosecond.
+    /// Runner nanoseconds per CPAL predicted-playback-stream nanosecond.
     pub runner_ns_per_cpal_ns: f64,
     /// Runner time at the reference CPAL timestamp. Retained as f64 because
     /// the OLS centroid need not fall on an integer nanosecond.
@@ -301,9 +302,10 @@ impl std::fmt::Display for RunnerCpalClockFitErrorV1 {
 impl std::error::Error for RunnerCpalClockFitErrorV1 {}
 
 impl RunnerCpalClockFitV1 {
-    /// Invert the fitted mapping and estimate the CPAL stream-clock instant
-    /// corresponding to a runner monotonic timestamp. A caller may then query
-    /// the CPAL playback-time -> frame fit with this same stream-clock value.
+    /// Invert the fitted mapping and estimate the CPAL predicted-playback
+    /// stream-clock instant corresponding to a runner monotonic timestamp.
+    /// A caller may query MEL-CLOCK-001's playback-time -> output-frame fit
+    /// directly with this value; no callback-to-playback fit is required.
     pub fn playback_time_at_runner_time(
         &self,
         runner_time_ns: u64,
