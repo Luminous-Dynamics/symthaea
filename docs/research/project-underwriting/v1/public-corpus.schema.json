@@ -94,6 +94,7 @@
           "enum": [
             "self_asserted",
             "issuer_signed",
+            "official_source_publication",
             "authenticated_meter",
             "independently_reconciled_measurement",
             "validated_model_output",
@@ -789,7 +790,8 @@
                     "issuer_signed",
                     "authenticated_meter",
                     "independently_reconciled_measurement",
-                    "validated_model_output"
+                    "validated_model_output",
+                    "official_source_publication"
                   ]
                 }
               },
