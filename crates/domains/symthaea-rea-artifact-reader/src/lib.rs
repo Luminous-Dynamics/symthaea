@@ -483,14 +483,16 @@ impl ZipArtifactReader {
                     "central-directory offset precedes the admitted ZIP structure",
                 )
             })?;
-        let archive_length = self.inventory.source_bytes.checked_sub(archive_start).ok_or_else(
-            || {
+        let archive_length = self
+            .inventory
+            .source_bytes
+            .checked_sub(archive_start)
+            .ok_or_else(|| {
                 ReaderError::new(
                     ReaderErrorKind::InvalidArchive,
                     "admitted ZIP structure begins beyond the selected source length",
                 )
-            },
-        )?;
+            })?;
         let options = DecoderReadOptions {
             verify_crc: true,
             verify_size: true,
@@ -505,7 +507,9 @@ impl ZipArtifactReader {
         // selected path are revalidated even when the secondary parser rejects metadata.
         let stream_result = (move || {
             let virtual_archive = ArchiveSlice::new(decoder_file, archive_start, archive_length)
-                .map_err(|error| ReaderError::io("cannot create bounded ZIP-relative view", error))?;
+                .map_err(|error| {
+                    ReaderError::io("cannot create bounded ZIP-relative view", error)
+                })?;
             let mut archive =
                 DecoderArchive::new_with_options(virtual_archive, options).map_err(|error| {
                     map_zipcore_error("secondary ZIP parser rejected archive", error)
@@ -751,12 +755,13 @@ impl<R: Read + Seek> Read for ArchiveSlice<R> {
             .checked_add(self.position)
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "archive read overflow"))?;
         self.inner.seek(SeekFrom::Start(physical_position))?;
-        let allowed = buffer.len().min(usize::try_from(remaining).unwrap_or(usize::MAX));
+        let allowed = buffer
+            .len()
+            .min(usize::try_from(remaining).unwrap_or(usize::MAX));
         let read = self.inner.read(&mut buffer[..allowed])?;
-        self.position = self
-            .position
-            .checked_add(read as u64)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "archive position overflow"))?;
+        self.position = self.position.checked_add(read as u64).ok_or_else(|| {
+            io::Error::new(io::ErrorKind::InvalidData, "archive position overflow")
+        })?;
         Ok(read)
     }
 }
@@ -2339,7 +2344,10 @@ mod tests {
         let verified = reader
             .verify_entry_content(0, ContentVerificationLimits::default())
             .unwrap();
-        assert_eq!(verified.sha256, format!("{:x}", Sha256::digest(b"zip64 payload")));
+        assert_eq!(
+            verified.sha256,
+            format!("{:x}", Sha256::digest(b"zip64 payload"))
+        );
         assert_eq!(verified.observed_uncompressed_bytes, 13);
         assert_eq!(verified.observed_crc32, crc32(b"zip64 payload"));
         assert!(verified.verified_crc32);
