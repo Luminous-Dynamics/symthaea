@@ -974,6 +974,23 @@ fn run_self_tests() -> Result<(), String> {
     Ok(())
 }
 
+fn synthetic_report() -> Result<Report, String> {
+    let support = synthetic_support_report();
+    let support_bytes = serde_json::to_vec_pretty(&support).map_err(|e| e.to_string())?;
+    let receipt = synthetic_receipt();
+    let receipts_bytes = [serde_json::to_vec(&receipt).map_err(|e| e.to_string())?, b"\n".to_vec()].concat();
+    let mappings = vec![
+        synthetic_mapping("node-h1","h1"),
+        synthetic_mapping("node-h2","h2")
+    ];
+    let mut mapping_bytes = Vec::new();
+    for mapping in &mappings {
+        mapping_bytes.extend(serde_json::to_vec(mapping).map_err(|e| e.to_string())?);
+        mapping_bytes.push(b'\n');
+    }
+    analyze(&support_bytes, &receipts_bytes, &mapping_bytes)
+}
+
 fn execute() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
     if args.len() == 2 && args[1] == "--self-test" {
@@ -981,9 +998,17 @@ fn execute() -> Result<(), String> {
         println!("PITB_ROUTE_COVERAGE_SELF_TEST_PASS");
         return Ok(());
     }
+    if args.len() == 3 && args[1] == "--self-test-report" {
+        run_self_tests()?;
+        let report = synthetic_report()?;
+        let bytes = serde_json::to_vec_pretty(&report).map_err(|e| format!("serialize synthetic route report: {e}"))?;
+        fs::write(&args[2], bytes).map_err(|e| format!("write synthetic route report: {e}"))?;
+        println!("PITB_ROUTE_COVERAGE_SYNTHETIC_REPORT_OK");
+        return Ok(());
+    }
     if args.len() != 6 || args[1] != "--analyze" {
         return Err(format!(
-            "usage: {} --analyze <support-antichain-report.json> <retrieval-runs.jsonl> <declaration-mappings.jsonl> <report.json> | --self-test",
+            "usage: {} --analyze <support-antichain-report.json> <retrieval-runs.jsonl> <declaration-mappings.jsonl> <report.json> | --self-test | --self-test-report <report.json>",
             args.first().map(String::as_str).unwrap_or("pitb-route-coverage")
         ));
     }
