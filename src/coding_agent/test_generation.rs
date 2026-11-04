@@ -291,12 +291,12 @@ impl TestGenerator {
             Type::Reference(reference) if reference.mutability.is_none() => {
                 match reference.elem.as_ref() {
                     Type::Path(path) if path.path.is_ident("str") => Some("\"\"".into()),
-                    Type::Path(path) if path.path.segments.last().is_some_and(|segment| segment.ident.to_string() == "String") => Some("&String::new()".into()),
+                    Type::Path(path) if path.path.is_ident("String") => Some("&String::new()".into()),
                     Type::Slice(_) => Some("&[]".into()),
                     _ => None,
                 }
             }
-            Type::Path(path) if path.qself.is_none() => {
+            Type::Path(path) if path.qself.is_none() && path.path.segments.len() == 1 => {
                 let ident = path.path.segments.last()?.ident.to_string();
                 match ident.as_str() {
                     "u8" | "u16" | "u32" | "u64" | "u128" | "usize"
@@ -321,7 +321,7 @@ impl TestGenerator {
             Type::Reference(reference) if reference.mutability.is_none() => {
                 match reference.elem.as_ref() {
                     Type::Path(path) if path.path.is_ident("str") => vec![("empty", "\"\"".into())],
-                    Type::Path(path) if path.path.segments.last().is_some_and(|segment| segment.ident.to_string() == "String") => vec![("empty", "&String::new()".into())],
+                    Type::Path(path) if path.path.is_ident("String") => vec![("empty", "&String::new()".into())],
                     Type::Slice(_) => vec![("empty", "&[]".into())],
                     _ => return None,
                 }
@@ -367,10 +367,12 @@ impl TestGenerator {
         let Expr::Path(path) = call.func.as_ref() else {
             return false;
         };
-        path.path
-            .segments
-            .last()
-            .is_some_and(|segment| segment.ident.unraw().to_string() == fn_name.trim_start_matches("r#"))
+        path.path.segments.len() == 1
+            && path
+                .path
+                .segments
+                .first()
+                .is_some_and(|segment| segment.ident.unraw().to_string() == fn_name.trim_start_matches("r#"))
     }
 
     /// Render tests into a Rust `#[cfg(test)] mod tests` block.
@@ -471,6 +473,7 @@ mod tests {
             .with_signature("fn double(value: i32) -> i32")
             .with_example("1 + 2", "3")
             .with_example("other(2)", "4")
+            .with_example("other::double(2)", "4")
             .with_example("double(2)", "4");
         let suite = TestGenerator::generate(&request);
 
@@ -481,7 +484,7 @@ mod tests {
         assert!(suite.source.contains("assert_eq!(double(2), 4)"));
         assert!(!suite.source.contains("assert_eq!(1 + 2, 3)"));
         assert!(!suite.source.contains("assert_eq!(other(2), 4)"));
-        assert_eq!(suite.unsupported_reasons.len(), 2);
+        assert_eq!(suite.unsupported_reasons.len(), 3);
     }
 
     #[test]
@@ -629,6 +632,19 @@ mod tests {
         assert!(!suite.source.contains("Default::default()"));
         assert!(!suite.source.contains("check("));
         assert!(suite.unsupported_reasons.iter().any(|reason| reason.contains("no safe constructor")));
+    }
+
+    #[test]
+    fn test_qualified_custom_types_do_not_use_standard_constructors() {
+        let request = SynthesisRequest::new("rust", "inspect", "Inspect a custom value")
+            .with_signature("fn inspect(value: i32, context: custom::String) -> bool");
+        let suite = TestGenerator::generate(&request);
+
+        assert!(suite.tests.is_empty());
+        assert!(!suite.source.contains("inspect("));
+        assert!(suite.unsupported_reasons.iter().any(|reason| {
+            reason.contains("No safe boundary constructor")
+        }));
     }
 
     #[test]
