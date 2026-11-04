@@ -21,6 +21,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::time::Instant;
 
 pub const RUNNER_CLOCK_BRIDGE_DESCRIPTOR_SCHEMA_V1: &str =
     "mel-runner-cpal-clock-descriptor-v1";
@@ -34,6 +35,39 @@ fn is_lower_hex_digest(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+/// Copyable process-local origin for runner monotonic timestamps.
+///
+/// Construct this once for a session and share the same value with the
+/// turn-taking/effect logger and the CPAL callback. It is intentionally not
+/// serializable: only relative integer nanoseconds are persisted. The
+/// descriptor's `runner_origin_id` identifies this exact origin in receipts.
+#[derive(Debug, Clone, Copy)]
+pub struct RunnerMonotonicClockOriginV1 {
+    origin: Instant,
+}
+
+impl RunnerMonotonicClockOriginV1 {
+    pub fn new() -> Self {
+        Self { origin: Instant::now() }
+    }
+
+    pub fn now_ns(&self) -> Option<u64> {
+        self.elapsed_ns_at(Instant::now())
+    }
+
+    pub fn elapsed_ns_at(&self, instant: Instant) -> Option<u64> {
+        instant
+            .checked_duration_since(self.origin)
+            .and_then(|elapsed| u64::try_from(elapsed.as_nanos()).ok())
+    }
+}
+
+impl Default for RunnerMonotonicClockOriginV1 {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Identity of the two clock domains being bridged for one live session.
@@ -73,13 +107,16 @@ impl RunnerCpalClockDescriptorV1 {
 /// descriptor. The midpoint is used as the OLS observation; the full bracket
 /// is retained and checked. It is not a certified uncertainty interval for
 /// the backend timestamp.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RunnerCpalClockPairSchemaV1 {
+    #[serde(rename = "mel-runner-cpal-clock-pair-v1")]
+    V1,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RunnerCpalClockPairV1 {
-    pub schema_version: String,
-    pub session_id: String,
-    pub runner_clock_domain_id: String,
-    pub runner_origin_id: String,
+    pub schema_version: RunnerCpalClockPairSchemaV1,
     pub stream_instance_id: u64,
     pub pair_index: u64,
     /// CPAL OutputStreamTimestamp.callback normalized to this stream's
@@ -275,14 +312,10 @@ pub fn fit_runner_cpal_clock_v1(
     }
 
     for (index, pair) in pairs.iter().enumerate() {
-        if pair.schema_version != RUNNER_CPAL_CLOCK_PAIR_SCHEMA_V1 {
+        if pair.schema_version != RunnerCpalClockPairSchemaV1::V1 {
             return Err(RunnerCpalClockFitErrorV1::InvalidPairSchema { index });
         }
-        if pair.session_id != descriptor.session_id
-            || pair.runner_clock_domain_id != descriptor.runner_clock_domain_id
-            || pair.runner_origin_id != descriptor.runner_origin_id
-            || pair.stream_instance_id != descriptor.stream_instance_id
-        {
+        if pair.stream_instance_id != descriptor.stream_instance_id {
             return Err(RunnerCpalClockFitErrorV1::DescriptorMismatch { index });
         }
         if pair.runner_time_after_ns < pair.runner_time_before_ns {
@@ -504,10 +537,7 @@ mod tests {
 
     fn pair(index: u64, cpal_ns: u64, runner_midpoint_ns: u64) -> RunnerCpalClockPairV1 {
         RunnerCpalClockPairV1 {
-            schema_version: RUNNER_CPAL_CLOCK_PAIR_SCHEMA_V1.to_owned(),
-            session_id: "session-001".to_owned(),
-            runner_clock_domain_id: "runner-monotonic-v1".to_owned(),
-            runner_origin_id: "origin-001".to_owned(),
+            schema_version: RunnerCpalClockPairSchemaV1::V1,
             stream_instance_id: 7,
             pair_index: index,
             cpal_callback_stream_time_ns: cpal_ns,
@@ -580,13 +610,20 @@ mod tests {
     }
 
     #[test]
-    fn mismatched_session_or_clock_origin_is_rejected() {
-        let mut pairs = exact_pairs();
-        pairs[2].runner_origin_id = "another-origin".to_owned();
-        assert!(matches!(
-            fit_runner_cpal_clock_v1(&descriptor(), &pairs, policy()),
-            Err(RunnerCpalClockFitErrorV1::DescriptorMismatch { index: 2 })
-        ));
+    fn descriptor_identity_binds_runner_session_clock_domain_and_origin() {
+        for mutate in 0..3 {
+            let mut d = descriptor();
+            match mutate {
+                0 => d.session_id = "another-session".to_owned(),
+                1 => d.runner_clock_domain_id = "another-domain".to_owned(),
+                _ => d.runner_origin_id = "another-origin".to_owned(),
+            }
+            assert!(d.is_valid());
+            // Identity is external to each compact Copy pair and therefore
+            // changes the fit receipt descriptor, not the real-time record.
+            let bundle = fit_runner_cpal_clock_bundle_v1(&d, &exact_pairs(), policy()).unwrap();
+            assert_eq!(bundle.descriptor, d);
+        }
     }
 
     #[test]
@@ -621,6 +658,7 @@ mod tests {
     fn runner_and_cpal_fit_remains_point_estimate_without_error_propagation() {
         let mut pairs = exact_pairs();
         pairs[0].runner_time_before_ns -= 10;
+        pairs[0].runner_time_after_ns += 10;
         let fit = fit_runner_cpal_clock_v1(&descriptor(), &pairs, policy()).unwrap();
         assert_eq!(fit.accuracy_status, RunnerCpalClockAccuracyStatusV1::PointEstimateOnly);
         assert!(fit.reported_uncertainty_ns.is_none());
