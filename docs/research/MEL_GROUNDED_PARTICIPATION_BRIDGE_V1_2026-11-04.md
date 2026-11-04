@@ -1,6 +1,6 @@
 # MEL-EVIDENCE-001 — Grounded evidence to selective participation v1
 
-**Status:** independent evidence-bundle receipt contract, action authorization validator, three strict schemas, four conformance fixtures, CLI example and 18 authored Rust tests are committed. Rust compilation, test execution, integration with the #10265 temporal-grounding producer, runner prefix isolation and real-audio evaluation remain outstanding.
+**Status:** independent evidence-bundle receipt contract, action authorization validator, four strict schemas, four conformance fixtures, CLI example and 20 authored Rust tests are committed. Rust compilation, test execution, integration with the #10265 temporal-grounding producer, runner prefix isolation and real-audio evaluation remain outstanding.
 
 ## Objective
 
@@ -22,6 +22,7 @@ The bundle records:
 - session, turn and exact audio SHA-256 / sample rate / channel count / frame count;
 - temporal-grounding evaluator and annotation-policy versions;
 - the permitted input-prefix end frame;
+- runner monotonic clock-domain ID and exact origin ID for decision/effect timestamps;
 - claims with stable IDs, event/context kind, grounding status, source frame interval, observed-through frame, commit time, source grounding-receipt digest and reason when not grounded;
 - SHA-256 of the exact serialized claim vector;
 - SHA-256 of the entire evidence-bundle payload (excluding its own digest).
@@ -41,7 +42,7 @@ V1 uses the Rust `serde_json` serialization of the typed structs for the commitm
 
 All cited claims for active interventions and WAIT must be grounded and committed before the decision. ASK/ABSTAIN may cite non-grounded claims, but non-grounded claims require a reason. A grounded stream-unavailable claim requires ASK or ABSTAIN; it cannot be silently re-labelled as intentional WAIT. A valid collaborator veto blocks RESPOND, CONTINUE and YIELD even if an invitation is otherwise grounded.
 
-Active interventions require an effect window strictly after the observed input prefix by the policy's minimum lead frames, inside the exact audio artifact, and with a non-empty authorization ID. WAIT/ASK/ABSTAIN must not claim an output effect window.
+Active interventions require an effect window in the explicitly identified runner-monotonic clock domain and origin. Its not-before timestamp must be at least the policy's minimum lead after the decision time, its expiry must follow its start, and its duration must not exceed policy. This is deliberately separate from the source-audio sample-frame clock used by evidence intervals. WAIT/ASK/ABSTAIN must not claim an output effect window.
 
 ## Temporal and artifact checks
 
@@ -57,19 +58,19 @@ The validator rejects:
 - missing action-specific grounded claim;
 - ambiguous evidence used to justify an active contribution;
 - veto or stream-unavailable contradiction;
-- missing, premature or out-of-artifact effect windows.
+- runner-clock-origin mismatch, missing or premature effect windows, invalid/overlong effect windows.
 
 A decision must carry the exact full evidence-bundle and claim-set commitments. The bridge checks these relations and action predicates; it does not independently re-read the WAV bytes or prove the live runner exposed only the declared prefix. Runtime input isolation is a separate assurance obligation.
 
 ## Conformance fixtures
 
 The checked-in fixture set contains four cases:
-1. **Grounded invitation → RESPOND:** accepted with a bounded future effect window.
+1. **Grounded invitation → RESPOND:** accepted with a bounded future effect window in the shared runner clock domain.
 2. **Ambiguous invitation evidence → ASK:** accepted without an audio effect.
 3. **Unavailable input evidence → ABSTAIN:** accepted as an explicit epistemic withhold.
 4. **Grounded invitation + collaborator veto → RESPOND:** rejected due to veto authority.
 
-The test suite also challenges mismatched artifact digests, ambiguous evidence used for RESPOND, prefix leakage, expired claims, premature effects, tampered full-bundle metadata, unavailable-stream masquerading as WAIT and an effect interval beyond the source artifact.
+The test suite also challenges mismatched artifact digests, ambiguous evidence used for RESPOND, prefix leakage, expired claims, premature or overlong effects, runner-clock-origin mismatch, tampered full-bundle metadata and unavailable-stream masquerading as WAIT.
 
 These are controlled conformance cases, not a real audio-localization result or model score.
 
