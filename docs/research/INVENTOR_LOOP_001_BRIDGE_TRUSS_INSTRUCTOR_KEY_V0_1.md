@@ -20,42 +20,42 @@ Members: A–C and B–C.
 
 Properties:
 
-- Both members use E = 200 GPa = 2.0 × 10¹¹ Pa.
-- Both members use A = 10 mm² = 1.0 × 10⁻⁵ m².
-- EA = 2.0 × 10⁶ N.
-- Both support nodes have ux = uy = 0.
-- Apex load is FC = (0, −100) N.
+- Both members use \(E=200\,\mathrm{GPa}=2.0\times10^{11}\,\mathrm{Pa}\).
+- Both members use \(A=10\,\mathrm{mm}^2=1.0\times10^{-5}\,\mathrm{m}^2\).
+- \(EA=2.0\times10^6\,\mathrm{N}\).
+- Both support nodes have \(u_x=u_y=0\).
+- Apex load is \(F_C=(0,-100)\,\mathrm{N}\).
 - No self-weight; ideal pins; axial bar response only; static, small-displacement, linear-elastic 2D model.
 
 Each member length is:
 
-[
-L=sqrt{2^2+3^2}=sqrt{13}=3.605551275ldots;\mathrm{m}
-]
+\[
+L=\sqrt{2^2+3^2}=\sqrt{13}=3.605551275\ldots\,\mathrm{m}
+\]
 
 Direction cosines from the base node toward C:
 
-[
+\[
 n_A=\left(\frac{2}{\sqrt{13}},\frac{3}{\sqrt{13}}\right),
 \qquad
 n_B=\left(-\frac{2}{\sqrt{13}},\frac{3}{\sqrt{13}}\right)
-]
+\]
 
 ## 2. Apex stiffness and displacement
 
 For an axial bar, the contribution to the free-node stiffness is:
 
-[
+\[
 K_e=\frac{EA}{L}
 \begin{bmatrix}
 c^2 & cs\\
 cs & s^2
 \end{bmatrix}
-]
+\]
 
 The two mirrored members cancel the off-diagonal terms. The reduced apex stiffness is:
 
-[
+\[
 K_C=\frac{EA}{L}
 \begin{bmatrix}
 8/13 & 0\\
@@ -66,84 +66,84 @@ K_C=\frac{EA}{L}
 8EA/(13L) & 0\\
 0 & 18EA/(13L)
 \end{bmatrix}
-]
+\]
 
 Numerically:
 
-[
+\[
 K_C\approx
 \begin{bmatrix}
 341353.9669 & 0\\
 0 & 768046.4255
 \end{bmatrix}
-\;\mathrm{N/m}
-]
+\,\mathrm{N/m}
+\]
 
-With FC = (0, −100) N:
+With \(F_C=(0,-P)\) and \(P=100\,\mathrm{N}\):
 
-[
+\[
 u_C=K_C^{-1}F_C
 =
 \left(
 0,
 -\frac{13LP}{18EA}
 \right)
-]
+\]
 
 Therefore:
 
-[
+\[
 u_{Cx}=0
 \]
 
-[
+\[
 u_{Cy}=-\frac{13\sqrt{13}\cdot100}{18\cdot2.0\times10^6}
-=-0.0001302004627\ldots\;\mathrm{m}
-]
+=-0.0001302004627\ldots\,\mathrm{m}
+\]
 
-or −0.13020046 mm vertically. The negative sign means downward displacement.
+or \(-0.13020046\,\mathrm{mm}\) vertically. The negative sign means downward displacement.
 
 ## 3. Member force, stress, strain and shortening
 
-For either member, signed axial force is:
+For either member, the signed axial force is:
 
-[
+\[
 N=\frac{EA}{L}(n\cdot u_C)
 =-\frac{13P}{6\sqrt{13}}
-=-60.09252126\ldots\;\mathrm{N}
-]
+=-60.09252126\ldots\,\mathrm{N}
+\]
 
 Negative force denotes compression under the declared sign convention.
 
 Stress:
 
-[
+\[
 \sigma=\frac{N}{A}
-=-6.00925213\ldots\;\mathrm{MPa}
-]
+=-6.00925213\ldots\,\mathrm{MPa}
+\]
 
 Strain:
 
-[
+\[
 \epsilon=\frac{N}{EA}
 =-3.00462606\ldots\times10^{-5}
-]
+\]
 
 Axial change in length:
 
-[
+\[
 \delta=\frac{NL}{EA}
 =-\frac{13P}{6EA}
-=-0.0001083333333\ldots\;\mathrm{m}
-]
+=-0.0001083333333\ldots\,\mathrm{m}
+\]
 
-Each member shortens by approximately 0.10833333 mm. Both members have the same force, stress, strain and shortening because the geometry and properties are symmetric.
+Each member shortens by approximately \(0.10833333\,\mathrm{mm}\). Both members have the same force, stress, strain and shortening because the geometry and properties are symmetric.
 
 ## 4. Support reactions
 
-At A, the member force acting on the joint is (N n_A). The support reaction balances it:
+At A, the member force acting on the joint is \(Nn_A\). The support reaction balances it:
 
-[
+\[
 R_A=-Nn_A
 =
 \left(
@@ -151,12 +151,12 @@ R_A=-Nn_A
 \frac{P}{2}
 \right)
 =
-(33.3333333,50)\;\mathrm{N}
-]
+(33.3333333,50)\,\mathrm{N}
+\]
 
 At B:
 
-[
+\[
 R_B=-Nn_B
 =
 \left(
@@ -164,8 +164,8 @@ R_B=-Nn_B
 \frac{P}{2}
 \right)
 =
-(-33.3333333,50)\;\mathrm{N}
-]
+(-33.3333333,50)\,\mathrm{N}
+\]
 
 Signs use +x right and +y up.
 
@@ -173,21 +173,21 @@ Signs use +x right and +y up.
 
 Global horizontal force:
 
-[
+\[
 \sum F_x=33.3333333-33.3333333=0
-]
+\]
 
 Global vertical force:
 
-[
+\[
 \sum F_y=50+50-100=0
-]
+\]
 
 Moment about A:
 
-[
+\[
 \sum M_A=50\cdot4-100\cdot2=0
-]
+\]
 
 The two support reactions and the applied apex load satisfy global force and moment equilibrium.
 
@@ -195,20 +195,20 @@ The two support reactions and the applied apex load satisfy global force and mom
 
 The external work for a linear load ramp is:
 
-[
-W_{ext}=\frac12 P|u_{Cy}|
-=0.006510023136\ldots\;\mathrm{J}
-]
+\[
+W_{\mathrm{ext}}=\frac12P|u_{Cy}|
+=0.006510023136\ldots\,\mathrm{J}
+\]
 
 The total member strain energy is:
 
-[
+\[
 U=\sum_e\frac12N_e\delta_e
 =2\cdot\frac12N\delta
-=0.006510023136\ldots\;\mathrm{J}
-]
+=0.006510023136\ldots\,\mathrm{J}
+\]
 
-Thus (U=W_{ext}) for this idealized linear static model.
+Thus \(U=W_{\mathrm{ext}}\) for this idealized linear static model.
 
 ## 7. Summary values
 
