@@ -807,10 +807,26 @@ mod tests {
     #[test]
     fn three_edit_synergy_is_found_when_no_singleton_or_pair_flips() {
         let baseline_graph = vec![
-            Edge { source: 1, target: 2, weight: 0.5 },
-            Edge { source: 1, target: 3, weight: 0.5 },
-            Edge { source: 1, target: 4, weight: 0.5 },
-            Edge { source: 1, target: 5, weight: 0.5 },
+            Edge {
+                source: 1,
+                target: 2,
+                weight: 0.5,
+            },
+            Edge {
+                source: 1,
+                target: 3,
+                weight: 0.5,
+            },
+            Edge {
+                source: 1,
+                target: 4,
+                weight: 0.5,
+            },
+            Edge {
+                source: 1,
+                target: 5,
+                weight: 0.5,
+            },
         ];
         let graph = graph_from_edges(&baseline_graph).unwrap();
         let targets = [2_u64, 3, 4, 5];
@@ -863,9 +879,12 @@ mod tests {
         assert_eq!(report.minimal_witness_effort_units, Some(3));
         assert_eq!(report.minimal_witness_count, 4);
         assert_eq!(report.decision_flipping_subset_count_within_budget, 5);
-        assert!(report.witnesses.iter().all(|witness| {
-            witness.edit_ids.len() == 3 && !witness.resulting_decision_met
-        }));
+        assert!(
+            report
+                .witnesses
+                .iter()
+                .all(|witness| { witness.edit_ids.len() == 3 && !witness.resulting_decision_met })
+        );
     }
 
     #[test]
