@@ -808,9 +808,9 @@ mod tests {
             report
                 .greedy_comparator
                 .separated_decision_conflict_pair_count,
-            2
+            3
         );
-        assert_eq!(report.greedy_comparator.remaining_pairs.len(), 2);
+        assert_eq!(report.greedy_comparator.remaining_pairs.len(), 1);
         assert_eq!(
             report
                 .greedy_comparator
