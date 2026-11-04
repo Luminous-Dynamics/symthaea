@@ -1,0 +1,177 @@
+{
+  "schema_version": "0.1.0",
+  "audit_id": "synthetic-provenance-audit-small-finite-population-v0.1",
+  "dependence_bundle_sha256": "f9f4c7cf8f02f15d8f8e5f81f126cb03be0f9b5e35b2adad2e7c945a8a2b98a5",
+  "frame": {
+    "frame_sha256": "ab9e86b36aa2a9bf2beb9960ae9ff736cfb049b017f9ed557fdf4f6127392a6d",
+    "frozen_at": "2026-11-04T14:40:00Z",
+    "frame_builder_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "assertion_count": 8,
+    "assertions": [
+      {
+        "assertion_id": "a-01",
+        "stratum_id": "high_materiality",
+        "left_evidence_id": "model-a",
+        "right_evidence_id": "model-b",
+        "claim_id": "query-pathway-1",
+        "declared_scope": "independent source measurements"
+      },
+      {
+        "assertion_id": "a-02",
+        "stratum_id": "high_materiality",
+        "left_evidence_id": "model-b",
+        "right_evidence_id": "vlm-c",
+        "claim_id": "query-pathway-1",
+        "declared_scope": "independent source measurements"
+      },
+      {
+        "assertion_id": "a-03",
+        "stratum_id": "high_materiality",
+        "left_evidence_id": "model-d",
+        "right_evidence_id": "reviewer-e",
+        "claim_id": "query-pathway-2",
+        "declared_scope": "independent source measurements"
+      },
+      {
+        "assertion_id": "a-04",
+        "stratum_id": "high_materiality",
+        "left_evidence_id": "synapse-f",
+        "right_evidence_id": "morphology-g",
+        "claim_id": "query-pathway-2",
+        "declared_scope": "independent source measurements"
+      },
+      {
+        "assertion_id": "b-01",
+        "stratum_id": "routine",
+        "left_evidence_id": "pipeline-h",
+        "right_evidence_id": "pipeline-i",
+        "claim_id": "query-morphology-1",
+        "declared_scope": "independent preprocessing"
+      },
+      {
+        "assertion_id": "b-02",
+        "stratum_id": "routine",
+        "left_evidence_id": "model-j",
+        "right_evidence_id": "model-k",
+        "claim_id": "query-morphology-1",
+        "declared_scope": "independent training lineage"
+      },
+      {
+        "assertion_id": "b-03",
+        "stratum_id": "routine",
+        "left_evidence_id": "reviewer-l",
+        "right_evidence_id": "reviewer-m",
+        "claim_id": "query-morphology-2",
+        "declared_scope": "blinded review"
+      },
+      {
+        "assertion_id": "b-04",
+        "stratum_id": "routine",
+        "left_evidence_id": "modality-n",
+        "right_evidence_id": "modality-o",
+        "claim_id": "query-morphology-2",
+        "declared_scope": "independent acquisition"
+      }
+    ],
+    "strata": [
+      {
+        "stratum_id": "high_materiality",
+        "population_size": 4,
+        "sample_size": 3,
+        "risk_class": "CRITICAL",
+        "alpha_allocation": 0.025
+      },
+      {
+        "stratum_id": "routine",
+        "population_size": 4,
+        "sample_size": 2,
+        "risk_class": "ROUTINE",
+        "alpha_allocation": 0.025
+      }
+    ]
+  },
+  "sampling": {
+    "design": "STRATIFIED_SRSWOR_V1",
+    "algorithm": "SHA256_RANK_V1",
+    "seed_source": "synthetic public fixture seed; not an authenticated randomness beacon",
+    "seed_hex": "4b92af016515b8e6ef8c7b6c76d602c9d0970de6c90d03b80192a153129775b8",
+    "selection_commitment": "f0ea800cef08adb46bee5b10962b9497817d9bf051108d3cb3e90a33f86e9648"
+  },
+  "risk_policy": {
+    "familywise_alpha": 0.05,
+    "query_risk_budget": 0.01,
+    "minimum_sample_per_critical_stratum": 3,
+    "critical_strata": [
+      "high_materiality"
+    ]
+  },
+  "outcomes": [
+    {
+      "assertion_id": "a-04",
+      "disposition": "UNRESOLVED_SOURCE_ACCESS",
+      "finding_codes": [],
+      "sources_examined": [
+        {
+          "source_ref": "synthetic://custodian/training-manifest/a-04",
+          "source_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+          "access_status": "INACCESSIBLE"
+        },
+        {
+          "source_ref": "synthetic://custodian/preprocessing/a-04",
+          "source_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "access_status": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "assertion_id": "a-01",
+      "disposition": "CONTRADICTED_DEPENDENCE",
+      "finding_codes": [
+        "SHARED_SEGMENTATION"
+      ],
+      "sources_examined": [
+        {
+          "source_ref": "synthetic://custodian/segmentation-revisions/model-a-model-b",
+          "source_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "access_status": "AVAILABLE"
+        }
+      ]
+    },
+    {
+      "assertion_id": "a-03",
+      "disposition": "NO_SHARED_ANCESTOR_FOUND_WITHIN_AUDITED_SCOPE",
+      "finding_codes": [],
+      "sources_examined": [
+        {
+          "source_ref": "synthetic://custodian/source-measurements/model-d-reviewer-e",
+          "source_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "access_status": "AVAILABLE"
+        }
+      ]
+    },
+    {
+      "assertion_id": "b-02",
+      "disposition": "NO_SHARED_ANCESTOR_FOUND_WITHIN_AUDITED_SCOPE",
+      "finding_codes": [],
+      "sources_examined": [
+        {
+          "source_ref": "synthetic://custodian/training-manifests/model-j-model-k",
+          "source_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "access_status": "AVAILABLE"
+        }
+      ]
+    },
+    {
+      "assertion_id": "b-04",
+      "disposition": "NO_SHARED_ANCESTOR_FOUND_WITHIN_AUDITED_SCOPE",
+      "finding_codes": [],
+      "sources_examined": [
+        {
+          "source_ref": "synthetic://custodian/acquisition-records/modality-n-modality-o",
+          "source_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+          "access_status": "AVAILABLE"
+        }
+      ]
+    }
+  ]
+}
