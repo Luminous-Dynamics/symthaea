@@ -1,0 +1,61 @@
+name: Connectome Target-Fate Verifier
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+    paths:
+      - "tools/connectome-target-fate-verifier/**"
+      - "research/connectomics/connectome-target-fate-inventory-v0.1.schema.json"
+      - "research/connectomics/fixtures/connectome-target-fate-**"
+      - ".github/workflows/connectome-target-fate-verifier-v1.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: connectome-target-fate-verifier-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier:
+    name: Target-fate inventory closure and semantic verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Formatting
+        run: cargo fmt --manifest-path tools/connectome-target-fate-verifier/Cargo.toml -- --check
+      - name: Validate Draft 2020-12 schema and known-answer fixture
+        run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("research/connectomics/connectome-target-fate-inventory-v0.1.schema.json").read_text())
+          receipt = json.loads(Path("research/connectomics/fixtures/connectome-target-fate-inventory-known-answer-v0.1.json").read_text())
+          target = json.loads(Path("research/connectomics/fixtures/connectome-target-fate-target-world-v0.1.json").read_text())
+          correspondence = json.loads(Path("research/connectomics/fixtures/connectome-target-fate-correspondence-v0.1.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(receipt)
+
+          target_ids = {item["object_id"]: item["object_type"] for item in target["world"]["objects"]}
+          fate_ids = [item["target_object_id"] for item in receipt["fates"]]
+          assert len(fate_ids) == len(set(fate_ids)), "duplicate target fate"
+          assert set(fate_ids) == set(target_ids), "target inventory closure mismatch"
+          assert all(target_ids[item["target_object_id"]] == item["object_type"] for item in receipt["fates"])
+          assert sum(item["status"] == "MAPPED" for item in receipt["fates"]) == 1
+          assert sum(item["status"] == "ALTERNATIVE_CANDIDATE" for item in receipt["fates"]) == 2
+          assert sum(item["status"] == "TARGET_ONLY_UNRESOLVED" for item in receipt["fates"]) == 1
+          assert sum(item["status"] == "OUT_OF_SCOPE" for item in receipt["fates"]) == 1
+          assert len(correspondence["mappings"]) == 3
+          PY
+      - name: Tests
+        run: cargo test --manifest-path tools/connectome-target-fate-verifier/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path tools/connectome-target-fate-verifier/Cargo.toml --locked --all-targets -- -D warnings
