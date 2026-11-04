@@ -28,11 +28,21 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up pinned Rust toolchain
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
         with:
+          toolchain: 1.96.0
           components: clippy
       - name: Resolve isolated receipt harness lock
         run: cargo generate-lockfile --manifest-path tools/rea-receipt-harness/Cargo.toml
+      - name: Record schema and dependency provenance
+        run: |
+          {
+            echo "source_commit=$GITHUB_SHA"
+            rustc --version --verbose
+            cargo --version
+            sha256sum docs/research/rea-zip-content-verification-receipt-v0.schema.json
+            sha256sum tools/rea-receipt-harness/Cargo.lock
+          } | tee tools/rea-receipt-harness/run-context.txt
       - name: Validate JSON Schema and dependency metadata
         run: |
           cargo tree --manifest-path tools/rea-receipt-harness/Cargo.toml --locked -e normal,dev
@@ -46,7 +56,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: rea-member-receipt-cargo-lock
-          path: tools/rea-receipt-harness/Cargo.lock
+          path: |
+            tools/rea-receipt-harness/Cargo.lock
+            tools/rea-receipt-harness/run-context.txt
           if-no-files-found: error
           retention-days: 14
       - name: Clippy with warnings denied
