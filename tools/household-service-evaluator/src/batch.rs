@@ -592,7 +592,7 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
             );
             metrics.insert(
                 "adhesive_or_destructive_disassembly".to_owned(),
-                f64::from(required_bool(
+                bool_as_f64(required_bool(
                     baseline,
                     "adhesive_or_destructive_disassembly",
                 )?),
