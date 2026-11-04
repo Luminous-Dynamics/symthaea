@@ -717,9 +717,10 @@ fn run_self_tests() -> Result<(), String> {
     semantic["source_correspondence_status"] = Value::String("unresolved".into());
     let semantic_mutated_bytes = serde_json::to_vec(&semantic).map_err(|e| e.to_string())?;
     fs::write(&semantic_path, &semantic_mutated_bytes).map_err(|e| e.to_string())?;
-    let mut run_rows = parse_runs(&runs_bytes)?;
-    run_rows[0].semantic_gate_receipt_sha256 = sha256(&semantic_mutated_bytes);
-    let rebound_runs = [serde_json::to_vec(&run_rows[0]).map_err(|e| e.to_string())?, b"\\n".to_vec()].concat();
+    let run_line = runs_bytes.strip_suffix(b"\\n").unwrap_or(&runs_bytes);
+    let mut run_value: Value = serde_json::from_slice(run_line).map_err(|e| e.to_string())?;
+    run_value["semantic_gate_receipt_sha256"] = Value::String(sha256(&semantic_mutated_bytes));
+    let rebound_runs = [serde_json::to_vec(&run_value).map_err(|e| e.to_string())?, b"\\n".to_vec()].concat();
     if verify_all(&evaluation_bytes, &rebound_runs, &root, false).is_ok() {
         return Err("unresolved semantic review was accepted after valid digest rebinding".into());
     }
