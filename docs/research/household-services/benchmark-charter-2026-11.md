@@ -198,6 +198,39 @@ Do not make modularity an absolute goal: additional connectors, seals and interf
 
 Relevant cross-product work: [HOME-REPAIR-QUAL-001 #10358](https://github.com/Luminous-Dynamics/symthaea/issues/10358).
 
+### Connected-appliance cybersecurity and firmware lifecycle
+
+Connected appliances must be supportable as secure digital products over their operational life. Do not invent a second device-security framework: compose the existing Symthaea HARDSEC owners:
+- [HARDSEC-027 #9736](https://github.com/Luminous-Dynamics/symthaea/issues/9736): device hardware security, attestation and runtime metrology;
+- [HARDSEC-029 #9771](https://github.com/Luminous-Dynamics/symthaea/issues/9771): declarative security policy and explicit enforcement/verification obligations;
+- [HARDSEC-030 #9802](https://github.com/Luminous-Dynamics/symthaea/issues/9802): authenticated verifier receipts bound to device profile, policy, evidence, verifier, freshness and trust anchor.
+
+The EU Cyber Resilience Act has a staged application timeline:
+- Article 14 vulnerability/severe-incident reporting obligations have applied since **11 September 2026**. The Commission specifies an early warning within 24 hours, fuller notification within 72 hours, and final-report deadlines dependent on actively exploited vulnerability vs. severe incident.
+- Most product requirements apply from **11 December 2027**.
+- Article 24(3) open-source software steward reporting applies from **11 December 2027** where the statutory scope is met.
+- This is an EU market requirement and a design signal, not South African law.
+
+Official references:
+- https://digital-strategy.ec.europa.eu/en/policies/cra-reporting
+- https://digital-strategy.ec.europa.eu/en/factpages/cyber-resilience-act-implementation
+- https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=celex:32024R2847
+
+For every connected appliance, benchmark:
+- signed firmware identity and independent signature verification;
+- hardware/product compatibility and secure-boot/boot-measurement evidence where available;
+- anti-rollback and recovery state;
+- power/network loss injected at each update phase;
+- offline diagnostics, authorized recovery and safe local operation;
+- firmware-support horizon, vulnerability intake, triage, mitigation, release and field-adoption latency;
+- software bill of materials and dependency vulnerability status;
+- key rotation/revocation and trust-anchor recovery;
+- user-visible disclosure of support end date and update status.
+
+Proposed hostile controls: malformed or wrongly signed image, downgrade, wrong-product image, interrupted download, power loss during install, failed boot, stale trust anchor, compromised distribution endpoint, offline recovery, duplicate update and attempted safety-control disablement. Proposed target: zero unauthorized firmware/rollback accepts in the frozen negative corpus, and every interrupted update ends in a verified recoverable or declared safe state. These are hypotheses, not results or legal certification.
+
+A hash, SBOM, secure-boot report, signed update or authenticated verifier receipt proves only its specifically verified scope; none proves the entire appliance is secure. Keep update distribution, signature authority, independent verification and product safety interlocks separate.
+
 ## 9. South African water-continuity scenario freshness
 
 The 29 October 2026 Johannesburg Water statement remains a valid snapshot of the severe-constraint period, but it is not the newest status. On 3 November 2026 SAnews reported overall Johannesburg reservoir storage at 41%, up from 37% the previous day, while some households were still reporting dry taps for more than 10 days and several zones remained under active management:
