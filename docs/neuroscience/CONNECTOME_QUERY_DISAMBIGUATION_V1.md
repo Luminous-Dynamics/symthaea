@@ -102,7 +102,20 @@ The Python standard-library oracle:
 
 The oracle is test-only. It is not imported into production Rust code or used to produce the plan.
 
-## 8. Benchmarks and promotion criteria (proposed, not results)
+## 8. Exact optimality oracle versus greedy set cover
+
+The report includes a deterministic greedy baseline that repeatedly selects the remaining action with the highest marginal number of newly separated decision-conflict pairs per effort unit. Ties prefer greater marginal coverage, then stable lexical action ID. This is a comparator only; the exact subset search remains authoritative.
+
+The primary fixture deliberately demonstrates approximation regret:
+- a three-unit broad scan separates three of four conflict pairs;
+- a two-unit morphology review separates the remaining pair;
+- greedy total effort is 5;
+- the exact optimum uses two complementary two-unit actions, total effort 4;
+- greedy regret is therefore 1 effort unit, while both plans are complete.
+
+The oracle independently recomputes this greedy trace and regret. Future benchmarks should also compare greedy set cover, cost-aware greedy variants, beam search, branch-and-bound and ILP/SMT against the exact solver over generated worlds/action matrices. Report plan completion, pair coverage, cost regret, action count, execution time and memory. Do not promote greedy as optimal or interpret its partial plan as complete.
+
+## 9. Benchmarks and promotion criteria (proposed, not results)
 
 | Measure | Proposed target |
 |---|---:|
@@ -119,7 +132,7 @@ For larger action sets, compare branch-and-bound, ILP/SMT, beam search and greed
 
 For biological promotion, additionally measure whether the declared outcome mapping predicts actual independent review or acquisition results, whether action provenance is complete, whether shared ancestry changes reliability, and whether a blinded expert confirms that the chosen observation can genuinely discriminate the competing reconstructions.
 
-## 9. Integration boundaries
+## 10. Integration boundaries
 
 - #9987: this tool supplies deterministic minimum-cost discrimination plans without requiring probability assumptions.
 - #9344: worlds and query disagreement must come from a frozen reconstruction set and query result.
@@ -128,6 +141,6 @@ For biological promotion, additionally measure whether the declared outcome mapp
 - #10406, #10435 and #10453: evidence dependence, frame closure and execution-route observability remain separate conjunctive gates.
 - Probability-based VOI remains a separate extension. It needs calibrated outcome likelihoods and a declared scientific decision-loss function. Do not multiply a finite unweighted world list into a probability distribution.
 
-## 10. Non-claims
+## 11. Non-claims
 
 The tool does not prove that an observation will be acquired, that an outcome mapping is scientifically correct, that a candidate action is independent of other evidence, that submitted worlds exhaust biological possibilities, or that any action has positive expected utility. It ranks only deterministic separation coverage under supplied mappings and effort costs. No biological observation or correction is executed.
