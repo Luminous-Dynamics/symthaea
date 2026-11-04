@@ -16,8 +16,9 @@
 //!
 //! This is the deeper reason neither Phase 1 (monotonic) nor Phase 2 (non-monotonic) payoff
 //! shapes could ever reward finer resolution: if the decision doesn't use the resolved
-//! information regardless of shape, any real cost charged for resolving it -- `perceptual_grain`'s
-//! Landauer tax -- is pure waste no matter how the true payoff is shaped. Investigating *why*
+//! information regardless of shape, any configured model cost charged for resolving it --
+//! `perceptual_grain`'s Landauer-inspired cost policy -- is pure waste in this
+//! regime no matter how the true payoff is shaped. Investigating *why*
 //! `select_action` is resource-insensitive here would mean touching `symthaea-fep`'s
 //! `ActiveInferenceAgent` internals, a different crate and a materially larger scope than this
 //! plan's Phase 1/2 -- explicitly not attempted, left as an open question for a separately-scoped
