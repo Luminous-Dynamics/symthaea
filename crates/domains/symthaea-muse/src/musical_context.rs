@@ -102,6 +102,7 @@ pub enum MusicalContextValidationIssueV1 {
     WrongMemberCount { family_index: usize, expected: usize, actual: usize },
     EmptyVariantId { family_index: usize, member_index: usize },
     EmptyLocalCueSignature { family_index: usize, member_index: usize },
+    EmptyHarmonicContextSignature { family_index: usize, member_index: usize },
     EmptyRoleOrInstrument { family_index: usize, member_index: usize },
     EmptyValidActionSet { family_index: usize, member_index: usize },
     DuplicateValidAction { family_index: usize, member_index: usize },
@@ -195,7 +196,7 @@ pub fn validate_musical_context_family_v1(
             });
         }
         if member.preceding_harmonic_context_signature.trim().is_empty() {
-            issues.push(MusicalContextValidationIssueV1::EmptyLocalCueSignature {
+            issues.push(MusicalContextValidationIssueV1::EmptyHarmonicContextSignature {
                 family_index,
                 member_index,
             });
@@ -601,7 +602,7 @@ mod tests {
     fn checked_in_counterfactual_corpus_is_structurally_valid() {
         let set = fixture_set();
         assert!(validate_musical_context_counterfactual_set_v1(&set).is_empty());
-        assert_eq!(set.families.len(), 3);
+        assert_eq!(set.families.len(), 5);
     }
 
     #[test]
@@ -630,7 +631,7 @@ mod tests {
     #[test]
     fn irrelevant_surface_change_requires_action_invariance() {
         let set = fixture_set();
-        let family = &set.families[1];
+        let family = &set.families[2];
         let correct = score_musical_context_counterfactual_v1(
             family,
             &[MusicalActionV1::Respond, MusicalActionV1::Respond],
@@ -647,10 +648,61 @@ mod tests {
         assert_eq!(spurious_change.pair_relation_correct, Some(false));
     }
 
+
+    #[test]
+    fn preceding_harmonic_context_can_change_action_with_same_local_cue_and_intent() {
+        let set = fixture_set();
+        let family = &set.families[1];
+
+        let context_sensitive = score_musical_context_counterfactual_v1(
+            family,
+            &[MusicalActionV1::Respond, MusicalActionV1::Continue],
+        )
+        .unwrap();
+        assert!(context_sensitive.passed);
+        assert_eq!(context_sensitive.pair_relation_correct, Some(true));
+
+        let local_cue_only = score_musical_context_counterfactual_v1(
+            family,
+            &[MusicalActionV1::Respond, MusicalActionV1::Respond],
+        )
+        .unwrap();
+        assert!(!local_cue_only.passed);
+        assert_eq!(local_cue_only.member_action_accuracy, 0.5);
+        assert_eq!(local_cue_only.pair_relation_correct, Some(false));
+    }
+
+    #[test]
+    fn preceding_harmonic_context_counterfactual_requires_stated_intent_to_remain_fixed() {
+        let set = fixture_set();
+        let mut family = set.families[1].clone();
+        family.members[1].collaborator_intent = CollaboratorIntentV1::InvitesResponse;
+
+        let issues = validate_musical_context_family_v1(&family, 1);
+        assert!(issues.contains(
+            &MusicalContextValidationIssueV1::ContextCounterfactualIntentChangedUnexpectedly {
+                family_index: 1
+            }
+        ));
+    }
+
+    #[test]
+    fn second_surface_only_family_preserves_action_across_instruments() {
+        let set = fixture_set();
+        let family = &set.families[3];
+        let score = score_musical_context_counterfactual_v1(
+            family,
+            &[MusicalActionV1::Wait, MusicalActionV1::Wait],
+        )
+        .unwrap();
+        assert!(score.passed);
+        assert_eq!(score.pair_relation_correct, Some(true));
+    }
+
     #[test]
     fn ambiguous_context_accepts_any_declared_valid_action_without_forcing_one() {
         let set = fixture_set();
-        let family = &set.families[2];
+        let family = &set.families[4];
 
         let wait = score_musical_context_counterfactual_v1(
             family,
@@ -754,20 +806,22 @@ mod tests {
             &set,
             &[
                 vec![MusicalActionV1::Respond, MusicalActionV1::Wait],
+                vec![MusicalActionV1::Respond, MusicalActionV1::Continue],
                 vec![MusicalActionV1::Respond, MusicalActionV1::Respond],
+                vec![MusicalActionV1::Wait, MusicalActionV1::Wait],
                 vec![MusicalActionV1::Wait],
             ],
         )
         .unwrap();
 
-        assert_eq!(report.family_count, 3);
-        assert_eq!(report.member_count, 5);
+        assert_eq!(report.family_count, 5);
+        assert_eq!(report.member_count, 9);
         assert_eq!(report.supported_prediction_count, 5);
         assert_eq!(report.member_action_accuracy, 1.0);
         assert_eq!(report.context_sensitivity_rate, Some(1.0));
         assert_eq!(report.surface_invariance_rate, Some(1.0));
         assert_eq!(report.ambiguous_valid_action_rate, Some(1.0));
-        assert_eq!(report.per_family.len(), 3);
+        assert_eq!(report.per_family.len(), 5);
     }
 
     #[test]
