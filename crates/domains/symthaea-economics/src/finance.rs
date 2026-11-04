@@ -739,9 +739,10 @@ fn bisect_xirr_stationary_point(
 ///
 /// The search uses the same explicit bounds and tolerances as IrrOptions.
 /// It scans uniformly in ln(1 + rate), refines sign-changing roots by
-/// bisection, and checks stationary points for repeated roots. The result
-/// records whether every scan point was evaluable; an incomplete scan must
-/// not be reported as proof that no other root exists.
+/// bisection, and checks stationary points for repeated roots. The
+/// search_complete field means every scan-grid evaluation was computable; it
+/// is not a formal interval proof that every multiple or tangent root was
+/// found. The strict xirr helper accepts only a single-sign-change schedule.
 pub fn xirr_analysis(
     cash_flows: &[DatedCashFlow],
     options: IrrOptions,
