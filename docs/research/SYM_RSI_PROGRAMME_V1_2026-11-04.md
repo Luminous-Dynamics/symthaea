@@ -133,8 +133,10 @@ This isolates whether progress comes from recursive modification, a stronger fix
 ### External reference points
 
 - **Darwin Gödel Machine:** archive-based self-modification and empirical selection; reported 20% to 50% on SWE-bench and 14.2% to 30.7% on Polyglot.
-- **AIDE²:** a self-modifying research agent with seven reported successive improvements in an eight-day autonomous run and gains on four held-out task families.
-- **AI4AI-Bench:** isolates training-algorithm redesign; the paper reports a best normalized score of 0.250 across ten algorithm-design tasks.
+- **HyperAgents / DGM-H (Meta, March 2026):** combines task-agent and meta-agent in one editable program, so the improvement procedure itself can evolve. It reports gains across coding, paper review, robotics reward design and Olympiad-math grading. This is the closest direct comparator for the proposed R4 meta-improvement target.
+- **Mendel Gödel Machine (August 2026 preprint):** adds reaction-norm mutation from multi-task trajectories and cross-lineage hybridization from another lineage's results on the same task. This motivates controlled comparisons of single-trajectory mutation, multi-task mutation and cross-lineage transfer; reported results remain a preprint and should be independently reproduced.
+- **AIDE² (September 2026):** a self-modifying research agent with seven reported successive improvements in an eight-day autonomous run and gains on four held-out task families.
+- **AI4AI-Bench:** isolates training-algorithm redesign; the paper reports a best normalized score of 0.250 across ten algorithm-design tasks. Keep this distinct from task-agent and meta-policy improvement.
 - **RSIBench-Data:** shows that continued search can regress after a prior best; checkpoint retention and best-so-far selection are essential.
 - **SWE-bench Verified:** useful only as a secondary coding reference. Results depend on model/scaffold configuration and the benchmark has known contamination and test-quality limitations.
 
@@ -248,8 +250,10 @@ Preserve reversible snapshots, deterministic builds where possible, resource cap
 
 ### Phase 3 — Meta-improvement
 
+- [ ] Execute the dedicated matched-budget programme in [SYM-RSI-META-001 #10497](https://github.com/Luminous-Dynamics/symthaea/issues/10497).
 - Let Symthaea improve experiment selection, hypothesis generation, causal review, and memory/context management.
-- Measure discovery yield and quality per fixed budget.
+- Compare clonal/single-trajectory mutation, reaction-norm mutation over multiple task histories, cross-lineage hybridization, archive-based fixed-meta search, and meta-evolving archive search.
+- Measure independently confirmed discoveries per fixed total budget, transfer of the meta-level change, capability retention, and best-so-far versus final-candidate quality.
 - Retain all candidates on a Pareto frontier rather than selecting by one blended score.
 
 ### Phase 4 — Algorithmic RSI
