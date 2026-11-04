@@ -5,6 +5,8 @@
 //! Trace order is the modeled linearization order of control updates and
 //! callback epoch observations.
 
+#![forbid(unsafe_code)]
+
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -134,7 +136,7 @@ pub struct LedgerEvent {
     pub kind: EventKind,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct RaceSummary {
     pub current_epoch: u64,
     pub authorization_count: usize,
