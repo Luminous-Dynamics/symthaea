@@ -2,7 +2,9 @@ use std::env;
 use std::fs;
 use std::process;
 
-use symthaea_household_service_evaluator::batch::evaluate_batch_from_paths;
+use symthaea_household_service_evaluator::batch::{
+    BatchOutputEnvelope, evaluate_batch_from_paths,
+};
 
 fn main() {
     if let Err(error) = run() {
@@ -41,8 +43,9 @@ fn run() -> Result<(), String> {
 
     let report =
         evaluate_batch_from_paths(&water_path, &repair_path).map_err(|error| error.to_string())?;
-    let rendered = serde_json::to_string_pretty(&report)
-        .map_err(|error| format!("could not serialize batch report: {error}"))?;
+    let envelope = BatchOutputEnvelope::from_report(report).map_err(|error| error.to_string())?;
+    let rendered = serde_json::to_string_pretty(&envelope)
+        .map_err(|error| format!("could not serialize batch output envelope: {error}"))?;
 
     if output_path == "-" {
         println!("{rendered}");
