@@ -9,7 +9,8 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use zip::CompressionMethod;
 
-const RECEIPT_SCHEMA: &str = include_str!("../../../docs/research/rea-zip-content-verification-receipt-v0.schema.json");
+const RECEIPT_SCHEMA: &str =
+    include_str!("../../../docs/research/rea-zip-content-verification-receipt-v0.schema.json");
 
 const HARD_ARCHIVE_LIMIT: u64 = 512 * 1024 * 1024;
 const HARD_ENTRY_LIMIT: u64 = 100_000;
@@ -51,8 +52,9 @@ pub fn replay_member_claim(
     path: impl AsRef<Path>,
     receipt: &Value,
 ) -> Result<ReplayReport, ReplayError> {
-    let schema: Value = serde_json::from_str(RECEIPT_SCHEMA)
-        .map_err(|error| ReplayError::Rejected(format!("embedded receipt schema is invalid: {error}")))?;
+    let schema: Value = serde_json::from_str(RECEIPT_SCHEMA).map_err(|error| {
+        ReplayError::Rejected(format!("embedded receipt schema is invalid: {error}"))
+    })?;
     crate::validate_receipt(&schema, receipt)
         .map_err(|error| ReplayError::Rejected(format!("receipt validation failed: {error}")))?;
     if string_at(receipt, &["outcome"])? != "verified" {
@@ -115,8 +117,10 @@ pub fn replay_member_claim(
         ));
     }
 
-    let aggregate_limit =
-        decimal_at(receipt, &["limits", "max_total_declared_uncompressed_bytes"])?;
+    let aggregate_limit = decimal_at(
+        receipt,
+        &["limits", "max_total_declared_uncompressed_bytes"],
+    )?;
     let mut aggregate_declared = 0u64;
     for entry_index in 0..archive.len() {
         let metadata = archive.by_index_data(entry_index).map_err(|error| {
