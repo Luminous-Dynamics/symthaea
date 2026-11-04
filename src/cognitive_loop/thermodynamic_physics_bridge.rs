@@ -141,9 +141,10 @@ pub struct ThermodynamicPhysicsBridge {
     pub epistemic_free_energy: f64,
 
     /// Heuristic ratio using a scalar prediction-error proxy in place of W2.
-    /// Values above 1 are diagnostic thresholds, not proof of a physical
-    /// thermodynamic speed-limit violation.
-    /// Science: T * sigma >= W_2(q_0, q_1)^2 (arXiv 2601.17607).
+    /// Values above 1 are internal diagnostic thresholds, not proof of a
+    /// physical thermodynamic speed-limit violation. The cited learning theory
+    /// motivates a future distribution-based test but is not validated by this
+    /// scalar implementation.
     #[cfg(feature = "epistemic")]
     pub epistemic_speed_limit_violation: f64,
 
@@ -404,16 +405,18 @@ impl ThermodynamicPhysicsBridge {
         let t_eff = effective_temperature.max(0.01);
         let sigma = entropy_production.max(0.001);
 
-        // F = E[loss] - T * H[beliefs]
-        // We use |belief_delta| as proxy for expected loss and sigma as proxy for
-        // belief entropy (higher entropy production ≈ higher belief entropy).
+        // Heuristic score: scalar prediction-error displacement minus a
+        // configured temperature-scaled entropy-production proxy. This is not
+        // a distributional free-energy calculation.
         self.epistemic_free_energy = belief_delta.abs() - t_eff * sigma;
 
-        // W_2 proxy: absolute belief displacement
+        // Legacy scalar displacement proxy; no probability distributions or
+        // transport plan are computed, so this value is not Wasserstein-2.
         self.belief_wasserstein_distance = belief_delta.abs();
 
-        // ESL violation = W_2^2 / (T * sigma)
-        // >1.0 means beliefs moved faster than the thermodynamic bound allows
+        // Heuristic ratio: scalar displacement proxy squared divided by the
+        // configured temperature/entropy-production scale. Crossing 1.0 only
+        // crosses an internal diagnostic threshold, not a physical bound.
         self.epistemic_speed_limit_violation =
             self.belief_wasserstein_distance.powi(2) / (t_eff * sigma);
     }
@@ -434,11 +437,11 @@ impl ThermodynamicPhysicsBridge {
         let available =
             (self.total_energy_budget - self.memory_landauer_cost - self.attention_erasure_cost)
                 .max(0.0);
-        // Cost per claim = k_B_eff * T_eff * ln(2)
+        // Configured model cost per claim proxy = k_eff * T_eff * ln(2).
         let k_eff = thresholds::K_CONSCIOUSNESS_BOLTZMANN;
-        // Use Carnot T_cold as floor to avoid division issues when actual_efficiency is 0
+        // Use the reference effective-temperature scale as a floor.
         let t_eff = if self.carnot_efficiency > 0.01 {
-            // Recover T_hot from Carnot: η = 1 - T_cold/T_hot → T_hot = T_cold / (1 - η)
+            // Recover the configured effective scale from the normalization.
             thresholds::THERMO_CARNOT_T_COLD / (1.0 - self.carnot_efficiency)
         } else {
             thresholds::THERMO_CARNOT_T_COLD
@@ -546,12 +549,12 @@ mod tests {
             0.5,   // hfe_total
             &default_regime(),
         );
-        // Demon gathers bits = sensitivity × info
+        // Attention-information proxy = sensitivity × modeled information.
         assert!((b.attention_demon_bits - 80.0).abs() < 0.01);
         // Configured erasure-cost proxy >= heuristic work proxy by policy.
         assert!(b.attention_erasure_cost >= b.attention_work);
-        // Work = bits × k × T × ln2 × efficiency (THERMO_ATTENTION_DEMON_EFFICIENCY)
-        // Erasure = bits × k × T × ln2
+        // This ratio checks the configured model policy; neither field is a
+        // measurement of physical work or measured bit-erasure heat.
         let ratio = b.attention_work / b.attention_erasure_cost;
         let expected = thresholds::THERMO_ATTENTION_DEMON_EFFICIENCY;
         assert!(
@@ -583,7 +586,7 @@ mod tests {
     #[test]
     fn test_effective_temperature_normalization_bounded() {
         let mut b = make_bridge();
-        // Higher configured effective temperature raises the normalization.
+        // Larger configured effective-temperature scale raises the normalization.
         b.compute(
             0.5,
             50.0,
@@ -609,7 +612,7 @@ mod tests {
         );
 
         // Low temperature → low efficiency
-        // Lower effective temperature approaches a zero normalization.
+        // Smaller configured effective-temperature scale approaches zero normalization.
         b.compute(
             0.5,
             50.0,
@@ -626,7 +629,7 @@ mod tests {
         // With effective T below the reference scale, the normalization is zero.
         assert!(
             b.carnot_efficiency < 0.01,
-            "expected ~0 with T_hot < T_cold, got {}",
+            "expected ~0 below the effective reference scale, got {}",
             b.carnot_efficiency,
         );
     }
@@ -634,9 +637,9 @@ mod tests {
     #[test]
     fn test_insight_detection() {
         let mut b = make_bridge();
-        // Moderate order increase (0.3 → 0.45) = entropy-decreasing event
-        // order_delta = 0.15 > 0.1 threshold, t_eff = 0.5
-        // P(insight) = exp(-0.15 / 0.5) = exp(-0.3) ≈ 0.741 > THRESHOLD (0.7)
+        // A moderate order-proxy increase crosses the heuristic event threshold.
+        // The returned score is deterministic model arithmetic, not a sampled
+        // fluctuation-theorem probability.
         b.compute(
             0.5,
             50.0,
@@ -721,7 +724,7 @@ mod tests {
         // ESL = 0.3^2 / (2.0 * 1.0) = 0.09 / 2.0 = 0.045
         assert!(
             esl_hot < 1.0,
-            "hot system should allow fast belief change, got ESL={esl_hot}"
+            "larger model scales should lower the heuristic ratio, got {esl_hot}"
         );
 
         // Smaller model scales raise this heuristic ratio.
@@ -730,9 +733,9 @@ mod tests {
         // ESL = 0.09 / (0.05 * 0.01) = 0.09 / 0.0005 = 180.0
         assert!(
             esl_cold > 1.0,
-            "cold system should flag fast belief change, got ESL={esl_cold}"
+            "smaller model scales should raise the heuristic ratio, got {esl_cold}"
         );
-        assert!(esl_cold > esl_hot, "cold ESL should exceed hot ESL");
+        assert!(esl_cold > esl_hot, "the small-scale heuristic ratio should exceed the large-scale ratio");
 
         // Zero belief delta → ESL = 0
         b.compute_epistemic_thermodynamics(0.5, 0.1, 0.0);
@@ -793,7 +796,7 @@ mod tests {
     #[test]
     fn test_epistemic_energy_budget() {
         let mut b = make_bridge();
-        // After compute, memory_landauer_cost and attention_erasure_cost are populated
+        // After compute, the information-cost proxy fields are populated.
         b.compute(
             0.5,
             50.0,
