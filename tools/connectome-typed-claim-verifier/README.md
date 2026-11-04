@@ -29,4 +29,4 @@ The report is `STRUCTURE_RECOMPUTED` with `trusted_promotion=false`. It does not
 
 Twenty Rust tests are authored for known-answer, relation/evidence mismatch, same-world anatomical and correspondence errors, ambiguous polarity, statistical range, functional window, causal positivity, invalid causal promotion, query grammar, duplicate IDs and counter corruption.
 
-Tests have not yet been compiled or executed in this authoring environment because Cargo and Rust binaries are unavailable. Exact-head CI is the execution gate.
+Tests are authored for exact-head execution by the isolated pinned Rust 1.96.0 workflow. They have not been executed locally in this authoring environment.
