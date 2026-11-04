@@ -15,7 +15,7 @@
 | Repository comprehension | SWE Atlas Codebase QnA, 124 tasks / 11 repositories / 4 languages | Opus 5 + Claude Code: 63.17 ± 5.01 | Runtime analysis, multi-file tracing and technical repository questions |
 | Test writing | SWE Atlas Test Writing | Fable 5.1 + Claude Code: 67.04 ± 5.33 | Meaningful test additions, mutation checks and rubric compliance |
 | Architectural refactoring | SWE Atlas Refactoring, 70 tasks / 10 repositories / 6 languages | GPT-6 Astra + Codex: 59.05 ± 6.43 | Multi-file restructure, behaviour preservation, maintainability and cleanup |
-| Precision-aware debugging | Precise Debugging Benchmark (PDB) | Reported frontier edit precision below 45%, despite unit-test pass above 76% | Bug-level recall and edit-level precision as separate outcomes |
+| Precision-aware debugging | PDB-Single Hard, 5,751 tasks; PDB-Wild, 484 mixed tasks | PDB-Single: Opus 4.7 P 83.3 ± 0.8 / R 89.3 ± 0.6; PDB-Wild: Opus 4.7 P 77.8 ± 3.1 / R 83.4 ± 2.8 | Newer per-task result table; sets differ and use epsilon-relaxed edit matching |
 | Expert-relative optimization | SWE-fficiency, 498 tasks / 9 repositories | Top evaluated agents average below 0.23× expert speedup | Performance improvements against expert reference workloads while preserving correctness |
 | Selective escalation | HiL-Bench, 300 tasks / 1,131 blockers | Historical paper/page takeaway: 24% combined Pass@3 and 44% highest ASK-F1 | Question precision/recall and task completion after help; metrics differ |
 | Paired act/abstain | AgentAbstain, 263 pairs / 42 environments / 8 scenarios | Gemini 3.1 Pro + Google ADK: 59.5% paired accuracy | Correct on both should-act and should-abstain members of a pair |
@@ -59,7 +59,7 @@ Sources:
 
 ### Precise Debugging Benchmark
 
-The April 2026 PDB paper generates controlled atomic and multi-bug programs and scores necessary edits versus resolved bugs. It reports unit-test pass rates above 76% with edit precision below 45% for evaluated frontier systems, and finds that iterative/agentic debugging did not substantially improve edit precision or bug recall in its experiments.
+The April 2026 PDB paper introduces edit-level precision and bug-level recall to expose over-editing that unit-test pass rates hide. A later public PDB-Results release now publishes per-task scores and confidence intervals: on PDB-Single Hard (5,751 single-line tasks), Claude Opus 4.7 reports 83.3 ± 0.8 precision and 89.3 ± 0.6 recall; Gemini 3.1 Pro reports 82.5 ± 0.8 and 89.4 ± 0.7. On PDB-Wild (484 mixed tasks including repository-level SWE-smith bugs), Opus 4.7 reports 77.8 ± 3.1 and 83.4 ± 2.8; Gemini 3.1 Pro reports 77.8 ± 3.0 and 85.6 ± 2.8. The earlier paper's below-45% precision finding describes its initial evaluated systems and should not be presented as today's best result. PDB edit matching is epsilon-relaxed (ε=2 for single-line sets, ε=1 for PDB-Wild).
 
 Source: https://arxiv.org/abs/2604.17338
 
@@ -233,7 +233,7 @@ The immediate route is runner-independent authoring, static source/manifest chec
 
 - SWE-Bench Pro V2: Scale Labs leaderboard and methodology.
 - SWE Atlas: Scale Labs Codebase QnA, Test Writing and Refactoring.
-- Precise Debugging Benchmark: Zhu et al., April 2026.
+- Precise Debugging Benchmark: Zhu et al., April 2026, [paper](https://arxiv.org/abs/2604.17338), [versioned model outputs and result tables](https://huggingface.co/datasets/Precise-Debugging-Benchmarking/PDB-Results).
 - SWE-fficiency: Ma et al., ICML 2026.
 - HiL-Bench: Scale Labs benchmark page and paper.
 - AgentAbstain: Liu et al., 2026; official code and leaderboard.
