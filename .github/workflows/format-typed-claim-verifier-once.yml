@@ -1,42 +1,45 @@
-name: One-time typed-claim verifier formatting and lockfile generation
+name: Format typed-claim verifier once
 
 on:
-  push:
-    branches: [research/connectome-typed-claim-verifier-v0-1-20261104]
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [research/connectome-typed-claim-queries-v0-1-20261104]
+    paths:
+      - "tools/connectome-typed-claim-verifier/src/main.rs"
+      - ".github/workflows/format-typed-claim-verifier-once.yml"
 
 permissions:
   contents: write
+  pull-requests: read
 
 concurrency:
-  group: typed-claim-verifier-bootstrap
+  group: typed-claim-format-once
   cancel-in-progress: true
 
 jobs:
   format:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: research/connectome-typed-claim-verifier-v0-1-20261104
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install pinned Rust 1.96.0
         uses: dtolnay/rust-toolchain@1.96.0
         with:
-          components: rustfmt, clippy
-      - name: Format and reconcile Cargo lockfile
-        run: |
-          cargo fmt --manifest-path tools/connectome-typed-claim-verifier/Cargo.toml
-          cargo generate-lockfile --manifest-path tools/connectome-typed-claim-verifier/Cargo.toml
-          cargo metadata --manifest-path tools/connectome-typed-claim-verifier/Cargo.toml --locked --format-version 1 > /tmp/typed-claim-metadata.json
-      - name: Commit Cargo-generated outputs only
+          components: rustfmt
+      - name: Apply exact pinned rustfmt
+        run: cargo fmt --manifest-path tools/connectome-typed-claim-verifier/Cargo.toml
+      - name: Commit formatting if required
         run: |
           git diff --check
-          git diff -- tools/connectome-typed-claim-verifier/src/main.rs tools/connectome-typed-claim-verifier/Cargo.lock
-          if ! git diff --quiet -- tools/connectome-typed-claim-verifier/src/main.rs tools/connectome-typed-claim-verifier/Cargo.lock; then
+          if ! git diff --quiet -- tools/connectome-typed-claim-verifier/src/main.rs; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add tools/connectome-typed-claim-verifier/src/main.rs tools/connectome-typed-claim-verifier/Cargo.lock
+            git add tools/connectome-typed-claim-verifier/src/main.rs
             git commit -m "style(connectomics): format typed-claim verifier with Rust 1.96"
-            git push origin HEAD:research/connectome-typed-claim-verifier-v0-1-20261104
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
           else
-            echo "No rustfmt or Cargo lockfile changes required."
+            echo "Typed-claim verifier is already rustfmt-clean."
           fi
