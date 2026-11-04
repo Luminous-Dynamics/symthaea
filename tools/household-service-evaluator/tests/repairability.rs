@@ -1,6 +1,6 @@
 use serde_json::Value;
 use symthaea_household_service_evaluator::{
-    evaluate_repair_attempt, RepairAttempt, RepairDisposition,
+    RepairAttempt, RepairDisposition, evaluate_repair_attempt,
 };
 
 fn repair_task<'a>(corpus: &'a Value, id: &str) -> &'a Value {
@@ -115,12 +115,8 @@ fn critical_interface_without_a_post_repair_test_remains_held() {
     .expect("committed repairability fixture must remain valid JSON");
     let task = repair_task(&corpus, "REPAIR-010");
     let baseline = &task["synthetic_baseline"];
-    let critical_interface_changed = baseline["critical_interface_changed"]
-        .as_bool()
-        .unwrap();
-    let post_repair_test_available = baseline["post_repair_test_available"]
-        .as_bool()
-        .unwrap();
+    let critical_interface_changed = baseline["critical_interface_changed"].as_bool().unwrap();
+    let post_repair_test_available = baseline["post_repair_test_available"].as_bool().unwrap();
 
     let mut attempt = qualified_repair_attempt();
     attempt.affected_calibration_requalified = !critical_interface_changed;
