@@ -32,6 +32,16 @@ If a category is absent from an adapter's emitted sparse count vector, insert it
 
 The fit crate intentionally does not depend on symthaea-core or HDC-specific optimization types. A statistical likelihood should have a transparent numerical contract independent of consciousness/HDC state or optimizer telemetry.
 
+## Interpretation and fail-closed boundaries
+
+- `NotIdentifiable` is currently a conservative category-support screen, not a formal proof from the Fisher information matrix or profile likelihood. A table passing the screen can still be practically weakly identified.
+- The numerical parameter bounds in the optimizer are computational guardrails, not scientifically justified limits. A fit at one is returned as `Boundary`, not as an interior estimate.
+- `Converged` means the selected optimizer met its numerical stopping rule. It does not certify a global optimum, model adequacy, correct Gaussian assumptions, or statistical identifiability.
+- `solution_parameter_spread` is the coordinate-wise max-minus-min across converged starts in the internal coordinates (mu, log-sigma, first cut, log-gaps). It is a multistart stability diagnostic, not a confidence interval.
+- `diagonal_curvature` is a coordinate-wise second derivative of the objective. It is not a full Hessian, covariance matrix, or uncertainty interval.
+- The best finite objective is selected even when that run did not converge; in that case the final status is `NotConverged`. A worse converged start cannot mask a lower-objective failed start.
+- The primary likelihood remains unsmoothed. A separate paper-compatibility smoothing mode is not yet implemented; do not compare exact numerical outputs until the reference preprocessing/correction convention is matched.
+
 ## Reproduction and benchmark programme
 
 1. Known-answer parameter recovery over mu, sigma, criteria, category count, trial budget, class imbalance and sparse cells.
