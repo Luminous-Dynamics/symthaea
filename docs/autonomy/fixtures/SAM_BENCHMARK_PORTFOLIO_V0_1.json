@@ -114,7 +114,7 @@
         "LegalScore",
         "EthicsScore"
       ],
-      "score_definition": "DS = RC * LS * ES",
+      "score_definition": "Per route: DS_i = RC_i * LS_i * ES_i. Split-level DS is mean_i(DS_i); split-level RC and LS are means over all valid routes; split-level ES is averaged only over the ethics-applicable route subset.",
       "source_status": "upstream_reported",
       "rights_status": "academic_only_unless_authorized",
       "snapshot": {
@@ -146,11 +146,28 @@
       "caveats": [
         "Report RC/LS/ES separately; DS is a product.",
         "Repository says academic research only unless commercial permission is obtained.",
-        "EthicsScore is benchmark-defined, not universal ethical truth."
+        "EthicsScore is benchmark-defined, not universal ethical truth.",
+        "Do not multiply the published aggregate RC, LS and ES columns to reconstruct aggregate DS; DS is averaged after per-route multiplication and ES has a subset denominator."
       ],
       "sources": [
         "https://arxiv.org/abs/2605.09972",
         "https://github.com/VDIGPKU/HiDrive"
+      ],
+      "aggregation": {
+        "per_route_formula": "DS_i = RC_i * LS_i * ES_i",
+        "split_level": {
+          "DS": "mean(DS_i) over all valid routes",
+          "RC": "mean(RC_i) over all valid routes",
+          "LS": "mean(LS_i) over all valid routes",
+          "ES": "mean(ES_i) over ethics-applicable routes only"
+        },
+        "implication": "Aggregate DS is not generally equal to aggregate RC * aggregate LS * aggregate ES because the product is taken per route before averaging, and ES can use a different denominator."
+      },
+      "metric_semantics": [
+        "RC is usually passed-waypoints / total-waypoints, but selected dilemma scenarios may set RC=1 after their safety-critical primary objective is completed.",
+        "LS is affected by legal events, collisions and route-lane events; it is not a pure traffic-law-only score.",
+        "Brake-aware relief changes selected collision penalty coefficients when braking occurred within the declared two-frame window.",
+        "ES includes social/normative events and its split-level mean is computed only over ethics-applicable routes."
       ]
     },
     {
