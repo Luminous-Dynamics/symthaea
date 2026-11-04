@@ -689,6 +689,45 @@ mod tests {
     }
 
     #[test]
+    fn runner_clock_regression_is_rejected_even_when_cpal_time_increases() {
+        let mut pairs = exact_pairs();
+        pairs[2].runner_time_before_ns = pairs[1].runner_time_before_ns - 1;
+        pairs[2].runner_time_after_ns = pairs[1].runner_time_after_ns + 1;
+        assert!(matches!(
+            fit_runner_cpal_clock_v1(&descriptor(), &pairs, policy()),
+            Err(RunnerCpalClockFitErrorV1::NonMonotonicRunnerBefore { index: 2 })
+        ));
+    }
+
+    #[test]
+    fn out_of_policy_drift_is_rejected() {
+        let pairs = vec![
+            pair(0, 0, 100_000_000),
+            pair(1, 10_000_000, 110_020_000),
+            pair(2, 20_000_000, 120_040_000),
+            pair(3, 30_000_000, 130_060_000),
+        ];
+        assert!(matches!(
+            fit_runner_cpal_clock_v1(&descriptor(), &pairs, policy()),
+            Err(RunnerCpalClockFitErrorV1::DriftOutsidePolicy { .. })
+        ));
+    }
+
+    #[test]
+    fn residual_outlier_is_rejected_not_silently_removed() {
+        let pairs = vec![
+            pair(0, 0, 100_000_000),
+            pair(1, 10_000_000, 110_000_000),
+            pair(2, 20_000_000, 120_500_000),
+            pair(3, 30_000_000, 130_000_000),
+        ];
+        assert!(matches!(
+            fit_runner_cpal_clock_v1(&descriptor(), &pairs, policy()),
+            Err(RunnerCpalClockFitErrorV1::ResidualOutsidePolicy { .. })
+        ));
+    }
+
+    #[test]
     fn descriptor_identity_binds_runner_session_clock_domain_and_origin() {
         let pairs = exact_pairs();
         for mutate in 0..3 {
