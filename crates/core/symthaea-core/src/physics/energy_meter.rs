@@ -698,7 +698,7 @@ pub mod nvml_backend {
 
         fn read_energy(&self) -> Result<u64, EnergyMeterError> {
             self.nvml
-                .device_by_uuid(&self.descriptor.device_id)
+                .device_by_uuid(self.descriptor.device_id.as_str())
                 .map_err(map_nvml_error)?
                 .total_energy_consumption()
                 .map_err(map_nvml_error)
