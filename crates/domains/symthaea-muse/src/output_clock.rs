@@ -76,11 +76,9 @@ impl Default for OutputClockFitPolicyV1 {
 #[serde(rename_all = "snake_case")]
 pub enum OutputClockAccuracyStatusV1 {
     /// Residuals describe fit consistency only. Timestamp measurement error
-    /// is not bounded by the anchor source contract.
+    /// and regression-parameter uncertainty have not been propagated into a
+    /// certified absolute frame-position interval.
     PointEstimateOnly,
-    /// Every input anchor supplied an independently justified timestamp
-    /// uncertainty bound; the reported frame bound includes it.
-    BoundedByDeclaredAnchorUncertainty,
 }
 
 /// Qualified only as a mathematical fit under the supplied policy.
@@ -106,6 +104,9 @@ pub struct OutputClockFitV1 {
     pub p95_abs_residual_frames: f64,
     pub maximum_abs_residual_frames: f64,
     pub accuracy_status: OutputClockAccuracyStatusV1,
+    /// Always None in v1. Raw per-anchor uncertainty is retained, but a
+    /// conservative regression-parameter uncertainty propagation is not yet
+    /// qualified.
     pub reported_uncertainty_frames: Option<f64>,
 }
 
@@ -326,22 +327,11 @@ pub fn fit_output_clock_v1(
         .min(residuals.len() - 1);
     let p95_abs_residual_frames = residuals[p95_index];
 
-    let max_anchor_uncertainty_ns = anchors
-        .iter()
-        .map(|anchor| anchor.timestamp_uncertainty_ns)
-        .collect::<Option<Vec<_>>>()
-        .map(|values| values.into_iter().max().unwrap_or(0));
-
-    let (accuracy_status, reported_uncertainty_frames) =
-        match max_anchor_uncertainty_ns {
-            Some(max_ns) => (
-                OutputClockAccuracyStatusV1::BoundedByDeclaredAnchorUncertainty,
-                Some(maximum_abs_residual_frames
-                    + frames_per_ns * max_ns as f64
-                    + 0.5),
-            ),
-            None => (OutputClockAccuracyStatusV1::PointEstimateOnly, None),
-        };
+    // Retain each raw timestamp uncertainty on its anchor, but do not
+    // promote it to a frame-position bound until regression uncertainty is
+    // propagated with a separately qualified method.
+    let accuracy_status = OutputClockAccuracyStatusV1::PointEstimateOnly;
+    let reported_uncertainty_frames = None;
 
     Ok(OutputClockFitV1 {
         schema_version: OUTPUT_CLOCK_FIT_SCHEMA_V1.to_owned(),
@@ -471,7 +461,7 @@ mod tests {
     }
 
     #[test]
-    fn bounded_anchor_uncertainty_is_propagated_and_never_invented() {
+    fn declared_anchor_uncertainty_is_not_promoted_without_a_propagation_model() {
         let mut anchors = vec![
             anchor(0, 0, 5_000_000),
             anchor(1, 480, 15_000_000),
@@ -485,9 +475,9 @@ mod tests {
 
         assert_eq!(
             fit.accuracy_status,
-            OutputClockAccuracyStatusV1::BoundedByDeclaredAnchorUncertainty
+            OutputClockAccuracyStatusV1::PointEstimateOnly
         );
-        assert!(fit.reported_uncertainty_frames.unwrap() >= 0.5);
+        assert!(fit.reported_uncertainty_frames.is_none());
     }
 
 
