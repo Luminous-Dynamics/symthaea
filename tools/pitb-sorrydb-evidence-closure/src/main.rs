@@ -680,7 +680,9 @@ fn make_synthetic_bundle(root: &Path) -> Result<(Vec<u8>, Vec<u8>), String> {
         "proof_inserted":true,"exact_sorry_replaced":true,"sorry_absent_after_replacement":true,
         "target_sorry_ax_absent":true,"target_is_prop":true,"build_passed":true,"kernel_passed":true,
         "semantic_gate_passed":true,"source_binding_passed":true,"vacuity_gate_passed":true,
-        "axiom_delta_zero":true,"new_sorry_delta_zero":true
+        "axiom_delta_zero":true,"new_sorry_delta_zero":true,
+        "strategy":{"name":"synthetic-strategy","version":"v0","implementation_sha256":sha256(b"synthetic-strategy"),"model_id":null,"model_version":null},
+        "wall_time_ms":1,"input_tokens":1,"output_tokens":1,"cost_microusd":1,"failure_type":null
     });
     let run_bytes = [serde_json::to_vec(&run).map_err(|e| e.to_string())?, b"\n".to_vec()].concat();
     let evaluation = json!({"sorries":[task]});
@@ -713,13 +715,16 @@ fn run_self_tests() -> Result<(), String> {
     let semantic_bytes = fs::read(&semantic_path).map_err(|e| e.to_string())?;
     let mut semantic: Value = serde_json::from_slice(&semantic_bytes).map_err(|e| e.to_string())?;
     semantic["source_correspondence_status"] = Value::String("unresolved".into());
-    fs::write(&semantic_path, serde_json::to_vec(&semantic).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())?;
-    if verify_all(&evaluation_bytes, &runs_bytes, &root, false).is_ok() {
-        return Err("unresolved semantic review was accepted".into());
+    let semantic_mutated_bytes = serde_json::to_vec(&semantic).map_err(|e| e.to_string())?;
+    fs::write(&semantic_path, &semantic_mutated_bytes).map_err(|e| e.to_string())?;
+    let mut run_rows = parse_runs(&runs_bytes)?;
+    run_rows[0].semantic_gate_receipt_sha256 = sha256(&semantic_mutated_bytes);
+    let rebound_runs = [serde_json::to_vec(&run_rows[0]).map_err(|e| e.to_string())?, b"\\n".to_vec()].concat();
+    if verify_all(&evaluation_bytes, &rebound_runs, &root, false).is_ok() {
+        return Err("unresolved semantic review was accepted after valid digest rebinding".into());
     }
-    println!("SELF_TEST_PASS unresolved source/specification review cannot count as success");
-    fs::write(&semantic_path, semantic_bytes).map_err(|e| e.to_string())?;
+    println!("SELF_TEST_PASS unresolved semantic status is rejected after digest rebinding");
+    fs::write(&semantic_path, &semantic_bytes).map_err(|e| e.to_string())?;
 
     let checker_log_path = run_dir.join("checker.log");
     let checker_log = fs::read(&checker_log_path).map_err(|e| e.to_string())?;
@@ -749,22 +754,24 @@ fn execute() -> Result<(), String> {
         println!("PITB_SORRYDB_EVIDENCE_CLOSURE_SELF_TEST_PASS");
         return Ok(());
     }
-    if args.len() == 3 && args[1] == "--self-test-report" {
+    if args.len() == 4 && args[1] == "--self-test-report" {
         run_self_tests()?;
-        let root = env::temp_dir().join(format!("pitb-sorrydb-evidence-report-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&root);
-        fs::create_dir_all(&root).map_err(|e| e.to_string())?;
+        let root = PathBuf::from(&args[3]);
+        fs::create_dir_all(&root).map_err(|e| format!("create evidence bundle root: {e}"))?;
         let (evaluation, runs) = make_synthetic_bundle(&root)?;
         let report = verify_all(&evaluation, &runs, &root, false)?;
+        fs::write(root.join("evaluation-split.json"), &evaluation)
+            .map_err(|e| format!("write synthetic evaluation split: {e}"))?;
+        fs::write(root.join("proof-runs.jsonl"), &runs)
+            .map_err(|e| format!("write synthetic proof-run JSONL: {e}"))?;
         fs::write(&args[2], serde_json::to_vec_pretty(&report).map_err(|e| e.to_string())?)
             .map_err(|e| format!("write evidence closure report: {e}"))?;
-        let _ = fs::remove_dir_all(root);
         println!("PITB_SORRYDB_EVIDENCE_CLOSURE_SYNTHETIC_REPORT_OK");
         return Ok(());
     }
     if args.len() != 6 || args[1] != "--verify" {
         return Err(format!(
-            "usage: {} --verify <evaluation-split.json> <proof-runs.jsonl> <evidence-root> <report.json> OR --self-test OR --self-test-report <report.json>",
+            "usage: {} --verify <evaluation-split.json> <proof-runs.jsonl> <evidence-root> <report.json> OR --self-test OR --self-test-report <report.json> <evidence-bundle-dir>",
             args.first().map(String::as_str).unwrap_or("pitb-sorrydb-evidence-closure")
         ));
     }
