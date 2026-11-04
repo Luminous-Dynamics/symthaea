@@ -1578,6 +1578,60 @@
         "no_change_to_pinned_REA_Evidence_identity_projection"
       ],
       "claim_ceiling": "This evaluates whether declared/observed provider dependency lineage is preserved and used correctly on the named corpus. It does not prove absence of undisclosed dependencies, statistical independence, producer authenticity or conclusion truth."
+    },
+    {
+      "id": "artifact_member_receipt_reproducibility",
+      "status": "schema_drafted",
+      "schema": "docs/research/rea-zip-content-verification-receipt-v0.schema.json",
+      "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10477",
+      "implementation_pr": null,
+      "objective": "Bind a member-integrity statement to the exact archive source/occurrence, verifier and codec lineage, observed bytes, limits and explicit claim ceiling in a versioned receipt that an independent replay tool can check.",
+      "cases": [
+        "verified_member_receipt_replays_against_frozen_archive_bytes",
+        "raw_filename_bytes_and_central_directory_occurrence_are_bound",
+        "duplicate_filename_occurrences_do_not_collapse",
+        "receipt_rejects_missing_decoder_eof_or_crc_or_size_evidence",
+        "receipt_rejects_missing_independent_crc_match",
+        "receipt_rejects_best_effort_non_unix_identity_as_verified",
+        "receipt_locks_verifier_commit_and_cargo_lock_digest",
+        "receipt_preserves_configured_vs_observed_limits",
+        "receipt_does_not_infer_producer_authenticity_from_payload_hash",
+        "receipt_does_not_infer_apk_ipa_signature_or_package_installability",
+        "receipt_does_not_infer_whole_archive_completeness_from_one_member",
+        "receipt_does_not_infer_masvs_control_pass_from_raw_observation",
+        "receipt_signature_authenticates_statement_not_underlying_semantic_truth"
+      ],
+      "metrics": [
+        "schema_valid_receipt_rate_by_outcome",
+        "independent_replay_success_rate",
+        "false_verified_claim_rate_by_fault_family",
+        "provenance_field_completeness",
+        "source_occurrence_binding_precision",
+        "false_authenticity_inference_rate",
+        "claim_ceiling_violation_rate",
+        "receipt_serialization_and_validation_overhead",
+        "receipt_size_bytes"
+      ],
+      "target": "100_percent schema-valid receipts for all explicitly reported outcomes; zero verified receipts with missing source/occurrence/verifier/limits/EOF/size/decoder-CRC/independent-CRC evidence; zero false authenticity, signature, archive-completeness or control-pass inferences; 100_percent replay agreement on frozen supported-subset fixtures.",
+      "protocol": [
+        "validate receipts against the pinned JSON Schema version and include the schema digest in run provenance",
+        "replay each verified receipt from original content-addressed archive bytes using an independent verifier process",
+        "record source identity strength separately from whole-archive content digest; never imply file identity is content immutability",
+        "bind exact raw member-name bytes and central-directory occurrence index; decoded filename is presentation metadata only",
+        "bind exact source commit, toolchain, target, Cargo.lock digest, decoder/codec and CRC implementation lineage",
+        "store configured limits separately from observed bytes and actual runtime resource measurements",
+        "keep unsupported/rejected/source-changed/limit-exceeded/abstained cases in denominators",
+        "treat producer attestation as a separate in-toto/DSSE reference and separate trust policy",
+        "do not add signer identity or authentication claims to REA Evidence ID or payload digest",
+        "pin canonical serialization only after deterministic RFC 8785 behavior and independent conformance vectors are qualified"
+      ],
+      "claim_boundaries": {
+        "receipt_integrity": "A receipt is an auditable record of the verifier's claim and inputs. Its own digest or signature does not increase the strength of the underlying observation.",
+        "authenticity": "Not established by SHA-256, CRC, parser agreement or receipt signature alone; requires separate producer/build attestation and trust-root evaluation.",
+        "completeness": "A verified member does not establish that all archive content, APK Signing Block records or package semantics were inspected.",
+        "semantics": "A byte digest does not establish installability, runtime behavior, maliciousness/benignness or MASVS control pass.",
+        "identity": "A source file identity tuple is distinct from a whole-archive digest and distinct from an immutable content snapshot."
+      }
     }
   ],
   "promotion_policy": {
