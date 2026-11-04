@@ -63,13 +63,14 @@ Retrieval should return provenance-bound candidates, but planning should operate
 - minimal route: no proper subset succeeds under the same experimental policy;
 - antichain: all inclusion-minimal sufficient routes.
 
-The support-antichain analyzer already makes the distinction between one proof term's imports and declarations common to every observed minimal route. The next join is to measure whether retrieved candidate bundles intersect or cover those routes.
+The support-antichain analyzer distinguishes one proof term's imports from declarations common to every observed minimal route. The new retrieval-route coverage join now measures whether a returned candidate bundle covers an entire minimal sufficient route, while requiring an explicit graph-node-to-declaration crosswalk. Its paired comparison reports same-query discordances, exact McNemar tests and component-clustered bootstrap intervals; a one-cluster sample deliberately receives no interval.
 
 Primary retrieval-to-proof measures:
 - Recall@K and nDCG@K (diagnostic only);
 - complete-route coverage@K;
-- useful-novel-premise rate;
+- useful-route-premise rate (route-membership precision, not baseline novelty);
 - minimal-route recovery;
+- baseline-relative novel premise rate only when an exact matched candidate-set difference is available;
 - verified target completion after a fixed downstream proof budget;
 - cost per unique assurance-adjusted task solved.
 
@@ -92,7 +93,24 @@ Research questions:
 - What is the cheapest checker sequence that still satisfies the assurance contract?
 - Which failure modes justify another attempt, and which indicate a stale/invalid task?
 
-### 5. From one-shot correctness to proof maintenance
+### 5. From proof-only scoring to proof-or-refutation on implementation-derived tasks
+
+For software properties, a useful prover must distinguish at least four terminal states: `proved`, `refuted`, `unresolved`, and `invalid_translation_or_task`. A correct counterexample is not a failed attempt; it is a validated result that the proposed property is false of the frozen implementation.
+
+The EasyProver/Aegis pipeline provides a concrete design pattern: freeze the Rust implementation and generated Lean statement before the proof agent sees it; translate through Aeneas; differentially validate Rust/Lean behavior; and label the statement or its negation with a kernel-checked proof. The Aegis paper reports 2,045 validated Rust–Lean pairs and 11,533 candidate specifications, with 1,054/2,000 sampled statements proved within 30 minutes by EasyProver.
+
+PITB should make this a separate software-verification track:
+- immutable Rust source and compiler/toolchain identity;
+- exact translated Lean program and translation digest;
+- differential tests or executable counterexamples binding Rust and Lean behavior;
+- a frozen property statement with declaration signature fixed before proving;
+- proof-or-refutation receipt, including the exact proposition and its polarity;
+- independent kernel replay, axiom policy, target-hole/axiom absence;
+- semantic classification of missing hypotheses, vacuity and translation mismatch.
+
+A proof of the Lean translation is not automatically a proof of the source program unless the translation correspondence is separately established. Conversely, a counterexample in the translated model is useful only when its input and observable behavior reproduce against the pinned source implementation.
+
+### 6. From one-shot correctness to proof maintenance
 
 A real engineering proof is not only correct once. It must survive upstream dependency changes and project evolution.
 
@@ -105,6 +123,8 @@ Measure:
 - regression rate after merge.
 
 This becomes the “SWE-bench for proof obligations” dimension of PITB, with exact source patches and independently checked builds.
+
+The proof-search runtime should also be treated as a controlled portfolio, not one serial agent loop. EasyProver's current design combines recursive isolated contexts, asynchronous returns, parallel tactic probing, independent final acceptance and an elastic elaboration service; its paper describes per-process concurrency limits of 64 active agents and 16 expensive Lean queries. PITB should reproduce the architectural idea under a **fixed total CPU/GPU/token/wall-time budget**, with early-accepted proof cancellation and retained branch receipts. Comparing raw agent counts or reflection turns would be misleading when parallelism and elaboration resources differ.
 
 ## Experimental protocol
 
