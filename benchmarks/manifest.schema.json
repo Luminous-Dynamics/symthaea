@@ -165,8 +165,8 @@
             "dataset_revision",
             "execution_authorized",
             "official_hidden_test_repeat_count",
-            "local_development_repeat_count",
-            "repeat_policy"
+            "repeat_policy",
+            "official_development_baseline_repeat_count"
           ],
           "properties": {
             "official_runner": {
@@ -198,13 +198,13 @@
               "type": "integer",
               "minimum": 1
             },
-            "local_development_repeat_count": {
-              "type": "integer",
-              "minimum": 1
-            },
             "repeat_policy": {
               "type": "string",
               "minLength": 20
+            },
+            "official_development_baseline_repeat_count": {
+              "type": "integer",
+              "minimum": 1
             }
           }
         },
