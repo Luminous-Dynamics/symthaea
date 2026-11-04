@@ -112,7 +112,8 @@
       ],
       "additionalProperties": false,
       "required": [
-        "interval",
+        "not_before_runner_time_ns",
+        "expires_at_runner_time_ns",
         "authorization_id"
       ],
       "properties": {
