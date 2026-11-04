@@ -18,22 +18,25 @@ pub enum RateUnit {
     LitresPerMinute,
     /// Litres delivered per hour; integrates to litres.
     LitresPerHour,
-    /// Useful power in kilowatts; integrates to kilowatt-hours.
-    Kilowatts,
+    /// Electrical power input in kW; integrates to kWh-electric.
+    ElectricalKilowatts,
+    /// Useful thermal power delivered in kW; integrates to kWh-thermal.
+    UsefulThermalKilowatts,
 }
 
 impl RateUnit {
     const fn seconds_per_unit(self) -> f64 {
         match self {
             Self::LitresPerMinute => 60.0,
-            Self::LitresPerHour | Self::Kilowatts => 3_600.0,
+            Self::LitresPerHour | Self::ElectricalKilowatts | Self::UsefulThermalKilowatts => 3_600.0,
         }
     }
 
     const fn quantity_unit(self) -> QuantityUnit {
         match self {
             Self::LitresPerMinute | Self::LitresPerHour => QuantityUnit::Litres,
-            Self::Kilowatts => QuantityUnit::KilowattHours,
+            Self::ElectricalKilowatts => QuantityUnit::ElectricalKilowattHours,
+            Self::UsefulThermalKilowatts => QuantityUnit::UsefulThermalKilowattHours,
         }
     }
 }
@@ -42,7 +45,8 @@ impl RateUnit {
 #[serde(rename_all = "snake_case")]
 pub enum QuantityUnit {
     Litres,
-    KilowattHours,
+    ElectricalKilowattHours,
+    UsefulThermalKilowattHours,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -111,7 +115,8 @@ pub struct ServiceDeficitResult {
 ///   guaranteed-service credit while preserving a possible upper bound.
 ///
 /// The rate unit must match exactly; this function does not silently convert
-/// units. Integrating L/min or L/hour yields litres. Integrating kW yields kWh.
+/// units. Integrating L/min or L/hour yields litres. Electrical kW yields kWh-electric;
+/// useful thermal kW yields kWh-thermal. These energy carriers are not interchangeable.
 pub fn evaluate_service_deficit(
     input: ServiceDeficitInput,
 ) -> Result<ServiceDeficitResult, EvaluationError> {
@@ -405,16 +410,47 @@ mod tests {
     }
 
     #[test]
-    fn power_rate_integrates_to_kilowatt_hours() {
+    fn electrical_power_rate_integrates_to_electrical_kwh() {
         let result = evaluate_service_deficit(ServiceDeficitInput {
-            demand_rate: rate(1.0, 1.0, RateUnit::Kilowatts),
-            physical_delivery_rate: rate(0.75, 0.75, RateUnit::Kilowatts),
+            demand_rate: rate(1.0, 1.0, RateUnit::ElectricalKilowatts),
+            physical_delivery_rate: rate(0.75, 0.75, RateUnit::ElectricalKilowatts),
             qualification: ServiceQualification::Qualified,
             duration_seconds: 2 * 60 * 60,
         })
         .expect("valid");
 
         assert_encloses(result.deficit, 0.5, 0.5);
+    }
+
+    #[test]
+    fn useful_thermal_power_integrates_to_thermal_kwh() {
+        let result = evaluate_service_deficit(ServiceDeficitInput {
+            demand_rate: rate(2.0, 2.0, RateUnit::UsefulThermalKilowatts),
+            physical_delivery_rate: rate(1.5, 1.5, RateUnit::UsefulThermalKilowatts),
+            qualification: ServiceQualification::Qualified,
+            duration_seconds: 2 * 60 * 60,
+        })
+        .expect("valid");
+
+        assert_eq!(
+            result.deficit.unit,
+            QuantityUnit::UsefulThermalKilowattHours
+        );
+        assert_encloses(result.deficit, 1.0, 1.0);
+    }
+
+    #[test]
+    fn electrical_and_thermal_energy_carriers_cannot_be_mixed() {
+        let input = ServiceDeficitInput {
+            demand_rate: rate(2.0, 2.0, RateUnit::ElectricalKilowatts),
+            physical_delivery_rate: rate(1.0, 1.0, RateUnit::UsefulThermalKilowatts),
+            qualification: ServiceQualification::Qualified,
+            duration_seconds: 3600,
+        };
+
+        let error =
+            evaluate_service_deficit(input).expect_err("energy carriers must not be mixed");
+        assert_eq!(error.path, "service_deficit.rate_unit");
     }
 
     #[test]
@@ -433,7 +469,7 @@ mod tests {
     #[test]
     fn mismatched_rate_units_fail_closed() {
         let mut input = water_input(ServiceQualification::Qualified);
-        input.physical_delivery_rate.unit = RateUnit::Kilowatts;
+        input.physical_delivery_rate.unit = RateUnit::ElectricalKilowatts;
 
         let error = evaluate_service_deficit(input).expect_err("unit mismatch must fail");
         assert_eq!(error.path, "service_deficit.rate_unit");
@@ -486,8 +522,8 @@ mod tests {
     fn positive_subnormal_delivery_does_not_underflow_to_exact_zero() {
         let smallest_positive = f64::from_bits(1);
         let result = evaluate_service_deficit(ServiceDeficitInput {
-            demand_rate: rate(0.0, smallest_positive, RateUnit::Kilowatts),
-            physical_delivery_rate: rate(0.0, smallest_positive, RateUnit::Kilowatts),
+            demand_rate: rate(0.0, smallest_positive, RateUnit::ElectricalKilowatts),
+            physical_delivery_rate: rate(0.0, smallest_positive, RateUnit::ElectricalKilowatts),
             qualification: ServiceQualification::Unknown,
             duration_seconds: 1,
         })
