@@ -4,10 +4,10 @@ use std::fs::File;
 use std::io::{self, Read};
 use std::process::ExitCode;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use symthaea_rea_compat::{
-    verify_evidence_json, EvidenceError, EvidenceErrorKind, VerifiedEvidence,
-    MAX_EVIDENCE_JSON_BYTES,
+    EvidenceError, EvidenceErrorKind, MAX_EVIDENCE_JSON_BYTES, VerifiedEvidence,
+    verify_evidence_json,
 };
 
 const EXIT_USAGE: u8 = 2;
@@ -52,9 +52,7 @@ where
             format = OutputFormat::Text;
             saw_format = true;
         } else if argument == "--help" || argument == "-h" {
-            return Err(
-                "usage: rea-evidence-verify [--json|--text] <evidence.json>".to_owned(),
-            );
+            return Err("usage: rea-evidence-verify [--json|--text] <evidence.json>".to_owned());
         } else if argument.to_string_lossy().starts_with('-') {
             return Err("unknown option".to_owned());
         } else if input.replace(argument).is_some() {
@@ -62,9 +60,8 @@ where
         }
     }
 
-    let input = input.ok_or_else(|| {
-        "usage: rea-evidence-verify [--json|--text] <evidence.json>".to_owned()
-    })?;
+    let input = input
+        .ok_or_else(|| "usage: rea-evidence-verify [--json|--text] <evidence.json>".to_owned())?;
 
     Ok(Arguments { format, input })
 }
@@ -198,7 +195,9 @@ fn text_report(report: &Value) -> String {
         report["evidence_id"].as_str().unwrap_or(""),
         report["semantic_sha256"].as_str().unwrap_or(""),
         report["raw_file_sha256"].as_str().unwrap_or(""),
-        report["analysis_profile_digest"].as_str().unwrap_or("not-present"),
+        report["analysis_profile_digest"]
+            .as_str()
+            .unwrap_or("not-present"),
         provider,
         format,
         architecture,
@@ -217,9 +216,12 @@ fn print_error(format: OutputFormat, code: &str, message: &str) {
                     "message": message
                 }
             });
-            eprintln!("{}", serde_json::to_string(&output).unwrap_or_else(|_| {
-                "{\"result\":\"rejected\",\"error\":{\"code\":\"internal_error\"}}".to_owned()
-            }));
+            eprintln!(
+                "{}",
+                serde_json::to_string(&output).unwrap_or_else(|_| {
+                    "{\"result\":\"rejected\",\"error\":{\"code\":\"internal_error\"}}".to_owned()
+                })
+            );
         }
         OutputFormat::Text => {
             eprintln!("{code}: {message}");
@@ -286,7 +288,9 @@ fn safe_error_message(error: &EvidenceError) -> &str {
         EvidenceErrorKind::InvalidJson => "Evidence JSON is malformed or contains duplicate keys",
         EvidenceErrorKind::SchemaViolation => "Evidence does not satisfy the supported schema",
         EvidenceErrorKind::Canonicalization => "Evidence cannot be canonicalized",
-        EvidenceErrorKind::IdentityMismatch => "Evidence semantic identity does not match its content",
+        EvidenceErrorKind::IdentityMismatch => {
+            "Evidence semantic identity does not match its content"
+        }
         EvidenceErrorKind::InputTooLarge => "Evidence file exceeds the 64 MiB input limit",
     }
 }
@@ -318,27 +322,26 @@ mod tests {
 
     #[test]
     fn parser_accepts_one_format_and_one_path() {
-        let args = parse_arguments([
-            OsString::from("--json"),
-            OsString::from("evidence.json"),
-        ])
-        .unwrap();
+        let args =
+            parse_arguments([OsString::from("--json"), OsString::from("evidence.json")]).unwrap();
         assert_eq!(args.format, OutputFormat::Json);
         assert_eq!(args.input, OsString::from("evidence.json"));
     }
 
     #[test]
     fn parser_rejects_duplicate_format_and_multiple_paths() {
-        assert!(parse_arguments([
-            OsString::from("--json"),
-            OsString::from("--text"),
-            OsString::from("evidence.json"),
-        ]).is_err());
+        assert!(
+            parse_arguments([
+                OsString::from("--json"),
+                OsString::from("--text"),
+                OsString::from("evidence.json"),
+            ])
+            .is_err()
+        );
 
-        assert!(parse_arguments([
-            OsString::from("one.json"),
-            OsString::from("two.json"),
-        ]).is_err());
+        assert!(
+            parse_arguments([OsString::from("one.json"), OsString::from("two.json"),]).is_err()
+        );
     }
 
     #[test]
@@ -373,9 +376,21 @@ mod tests {
     #[test]
     fn error_codes_are_stable_and_distinct() {
         assert_eq!(error_code(EvidenceErrorKind::InvalidJson), "invalid_json");
-        assert_eq!(error_code(EvidenceErrorKind::SchemaViolation), "schema_violation");
-        assert_eq!(error_code(EvidenceErrorKind::IdentityMismatch), "identity_mismatch");
-        assert_eq!(error_code(EvidenceErrorKind::InputTooLarge), "input_too_large");
-        assert_eq!(exit_code(EvidenceErrorKind::IdentityMismatch), EXIT_IDENTITY);
+        assert_eq!(
+            error_code(EvidenceErrorKind::SchemaViolation),
+            "schema_violation"
+        );
+        assert_eq!(
+            error_code(EvidenceErrorKind::IdentityMismatch),
+            "identity_mismatch"
+        );
+        assert_eq!(
+            error_code(EvidenceErrorKind::InputTooLarge),
+            "input_too_large"
+        );
+        assert_eq!(
+            exit_code(EvidenceErrorKind::IdentityMismatch),
+            EXIT_IDENTITY
+        );
     }
 }
