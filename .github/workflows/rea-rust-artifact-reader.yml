@@ -37,8 +37,8 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: clippy
-      - name: Validate committed isolated dependency lock
-        run: test -f tools/rea-artifact-reader-harness/Cargo.lock
+      - name: Resolve updated test-only decoder oracle features
+        run: cargo generate-lockfile --manifest-path tools/rea-artifact-reader-harness/Cargo.toml
       - name: Show resolved direct dependency graph
         run: cargo tree --manifest-path tools/rea-artifact-reader-harness/Cargo.toml --locked -e normal,dev
       - name: Validate isolated harness metadata
