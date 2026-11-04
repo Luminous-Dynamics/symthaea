@@ -107,6 +107,12 @@ pub struct HypothesisRecord {
     pub binding: TaskBinding,
     /// Exact causal or fault claim.
     pub claim: String,
+    /// Declared domain in which this claim is intended to apply.
+    pub applicability_domain: String,
+    /// Explicit competing hypothesis identifiers, including null where relevant.
+    pub competing_hypothesis_ids: Vec<String>,
+    /// Assumptions required for an identification claim.
+    pub identification_assumptions: Vec<String>,
     /// Evidence references supporting this hypothesis.
     pub supporting_evidence_ids: Vec<String>,
     /// Evidence references contradicting this hypothesis.
@@ -644,11 +650,26 @@ impl Ledger {
                     return Err(ValidationError::EvidenceParentOutOfOrder);
                 }
             }
+            for competing_id in &hypothesis.competing_hypothesis_ids {
+                if competing_id == &hypothesis.id
+                    || !hypotheses_by_id.contains_key(competing_id.as_str())
+                {
+                    return Err(ValidationError::MissingReference);
+                }
+            }
+            if hypothesis.applicability_domain.trim().is_empty() {
+                return Err(ValidationError::MissingReference);
+            }
             if matches!(
                 hypothesis.status,
                 HypothesisStatus::InterventionSupported
                     | HypothesisStatus::IdentifiedUnderAssumptions
             ) && !has_intervention_support
+            {
+                return Err(ValidationError::CausalStatusWithoutIntervention);
+            }
+            if hypothesis.status == HypothesisStatus::IdentifiedUnderAssumptions
+                && hypothesis.identification_assumptions.is_empty()
             {
                 return Err(ValidationError::CausalStatusWithoutIntervention);
             }
@@ -805,6 +826,9 @@ mod tests {
                 id: "h1".into(),
                 binding: binding.clone(),
                 claim: "feature gate causes the observed regression".into(),
+                applicability_domain: "pinned Rust workspace / declared feature matrix".into(),
+                competing_hypothesis_ids: vec![],
+                identification_assumptions: vec![],
                 supporting_evidence_ids: vec!["e-intervention".into()],
                 contradicting_evidence_ids: vec![],
                 status: HypothesisStatus::InterventionSupported,
@@ -872,9 +896,18 @@ mod tests {
     }
 
     #[test]
+    fn accepted_repair_does_not_promote_an_unresolved_diagnosis() {
+        let mut ledger = base_ledger();
+        ledger.hypotheses[0].status = HypothesisStatus::Unresolved;
+        assert_eq!(ledger.validate(), Ok(()));
+        assert_eq!(ledger.grades[0].verdict, GradeVerdict::Accepted);
+    }
+
+    #[test]
     fn post_hoc_forecast_is_rejected() {
         let mut ledger = base_ledger();
-        ledger.forecasts[0].sequence = 4;
+        ledger.actions[0].sequence = 2;
+        ledger.forecasts[0].sequence = 3;
         assert_eq!(
             ledger.validate(),
             Err(ValidationError::ForecastActionOutcomeOrder)
@@ -909,12 +942,15 @@ mod tests {
         duplicate.origin_id = ledger.evidence[0].origin_id.clone();
         duplicate.sequence = 5;
         duplicate.source_action_id = Some("a1".into());
-        // A copied evidence record cannot precede the already-recorded outcome.
+        ledger.outcomes[0].sequence = 6;
+        ledger.hypotheses[0].sequence = 7;
+        ledger.repairs[0].sequence = 8;
+        ledger.grades[0].sequence = 9;
         ledger.evidence.push(duplicate);
         ledger.hypotheses[0].supporting_evidence_ids.push("e-copy".into());
         assert_eq!(
             ledger.validate(),
-            Err(ValidationError::DuplicateSequence)
+            Err(ValidationError::DuplicateEvidenceOrigin)
         );
     }
 
@@ -922,6 +958,7 @@ mod tests {
     fn missing_counterfactual_is_distinct_from_zero() {
         assert_ne!(MetricValue::NotObserved, MetricValue::Value(0.0));
         let mut ledger = base_ledger();
+        ledger.evidence[0].authority = EvidenceAuthority::RuntimeObserved;
         ledger.outcomes[0].status = OutcomeStatus::NotMeasurable;
         ledger.outcomes[0].observation_evidence_id = None;
         ledger.outcomes[0].realized_utility = MetricValue::NotMeasurable;
