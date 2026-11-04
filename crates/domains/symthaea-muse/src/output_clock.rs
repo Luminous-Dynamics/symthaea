@@ -287,16 +287,6 @@ pub fn fit_output_clock_v1(
     let nominal_frames_per_ns = sample_rate_hz as f64 / 1_000_000_000.0;
     let estimated_drift_ppm =
         (frames_per_ns / nominal_frames_per_ns - 1.0) * 1_000_000.0;
-    if !estimated_drift_ppm.is_finite() {
-        return Err(OutputClockFitErrorV1::NonFiniteFit);
-    }
-    if estimated_drift_ppm.abs() > policy.maximum_abs_drift_ppm {
-        return Err(OutputClockFitErrorV1::DriftOutsidePolicy {
-            drift_ppm: estimated_drift_ppm,
-            maximum_abs_ppm: policy.maximum_abs_drift_ppm,
-        });
-    }
-
     let mut residuals = anchors
         .iter()
         .zip(&xs)
@@ -326,6 +316,16 @@ pub fn fit_output_clock_v1(
         .saturating_sub(1)
         .min(residuals.len() - 1);
     let p95_abs_residual_frames = residuals[p95_index];
+
+    if !estimated_drift_ppm.is_finite() {
+        return Err(OutputClockFitErrorV1::NonFiniteFit);
+    }
+    if estimated_drift_ppm.abs() > policy.maximum_abs_drift_ppm {
+        return Err(OutputClockFitErrorV1::DriftOutsidePolicy {
+            drift_ppm: estimated_drift_ppm,
+            maximum_abs_ppm: policy.maximum_abs_drift_ppm,
+        });
+    }
 
     // Retain each raw timestamp uncertainty on its anchor, but do not
     // promote it to a frame-position bound until regression uncertainty is
