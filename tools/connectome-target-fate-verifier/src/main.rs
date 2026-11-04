@@ -506,7 +506,8 @@ fn verify(
                 }
                 let mapping_id =
                     mapping_id.ok_or_else(|| format!("{context}: MAPPED requires mapping_id"))?;
-                let mapping = correspondence_mappings.mappings
+                let mapping = correspondence_mappings
+                    .mappings
                     .get(&mapping_id)
                     .ok_or_else(|| format!("{context}: unknown mapping_id {mapping_id}"))?;
                 if mapping.support_status == "AMBIGUOUS" || mapping.support_status == "REJECTED" {
@@ -538,7 +539,8 @@ fn verify(
                 let group_id = alternative_set_id.ok_or_else(|| {
                     format!("{context}: ALTERNATIVE_CANDIDATE requires alternative_set_id")
                 })?;
-                let mapping = correspondence_mappings.mappings
+                let mapping = correspondence_mappings
+                    .mappings
                     .get(&mapping_id)
                     .ok_or_else(|| format!("{context}: unknown mapping_id {mapping_id}"))?;
                 if mapping.support_status != "AMBIGUOUS"
@@ -570,7 +572,8 @@ fn verify(
                         "{context}: TARGET_ONLY_UNRESOLVED requires only a reason and no mapping/scope fields"
                     ));
                 }
-                if correspondence_mappings.mappings
+                if correspondence_mappings
+                    .mappings
                     .values()
                     .any(|mapping| mapping.target_ids.contains(&object_id))
                 {
@@ -592,7 +595,8 @@ fn verify(
                 if !valid_sha256(&digest) {
                     return Err(format!("{context}: invalid scope policy digest"));
                 }
-                if correspondence_mappings.mappings
+                if correspondence_mappings
+                    .mappings
                     .values()
                     .any(|mapping| mapping.target_ids.contains(&object_id))
                 {
@@ -610,7 +614,8 @@ fn verify(
                 }
                 let mapping_id =
                     mapping_id.ok_or_else(|| format!("{context}: REJECTED requires mapping_id"))?;
-                let mapping = correspondence_mappings.mappings
+                let mapping = correspondence_mappings
+                    .mappings
                     .get(&mapping_id)
                     .ok_or_else(|| format!("{context}: unknown mapping_id {mapping_id}"))?;
                 if mapping.support_status != "REJECTED" || !mapping.target_ids.contains(&object_id)
