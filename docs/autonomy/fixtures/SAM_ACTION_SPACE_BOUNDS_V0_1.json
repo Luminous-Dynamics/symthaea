@@ -24,7 +24,7 @@
         "function": "1 - ((x - 3.7) / 10)^2",
         "exact_maximum": 1,
         "maximizer": 3.7,
-        "max_abs_derivative": 0.074
+        "max_abs_derivative": 0.126
       },
       "evaluated_actions": [
         {
