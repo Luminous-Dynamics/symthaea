@@ -1300,8 +1300,7 @@ mod tests {
             &[first.clone(), second.clone()],
         )
         .unwrap();
-        let right =
-            evaluate(&context(Direction::HigherIsBetter, 0.1), &[second, first]).unwrap();
+        let right = evaluate(&context(Direction::HigherIsBetter, 0.1), &[second, first]).unwrap();
         assert_eq!(left, right);
         assert_eq!(left.comparisons[0].reference_id, "r0");
     }
@@ -1392,8 +1391,7 @@ mod tests {
     fn no_applicable_qualified_reference_is_out_of_scope() {
         let mut unqualified = row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2));
         unqualified.qualification = Qualification::NotQualified;
-        let envelope =
-            evaluate(&context(Direction::HigherIsBetter, 0.1), &[unqualified]).unwrap();
+        let envelope = evaluate(&context(Direction::HigherIsBetter, 0.1), &[unqualified]).unwrap();
         assert_eq!(envelope.classification, DecisionClass::OutOfScope);
     }
 
