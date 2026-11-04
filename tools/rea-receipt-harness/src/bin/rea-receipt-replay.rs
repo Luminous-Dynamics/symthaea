@@ -30,16 +30,22 @@ fn run() -> Result<(), (u8, String)> {
     let mut args = std::env::args_os();
     let program = args.next().unwrap_or_default();
     let archive = args.next().ok_or_else(|| {
-        (3, format!(
-            "usage: {} <archive.zip> <receipt.json>",
-            program.to_string_lossy()
-        ))
+        (
+            3,
+            format!(
+                "usage: {} <archive.zip> <receipt.json>",
+                program.to_string_lossy()
+            ),
+        )
     })?;
     let receipt_path = args.next().ok_or_else(|| {
-        (3, format!(
-            "usage: {} <archive.zip> <receipt.json>",
-            program.to_string_lossy()
-        ))
+        (
+            3,
+            format!(
+                "usage: {} <archive.zip> <receipt.json>",
+                program.to_string_lossy()
+            ),
+        )
     })?;
     if args.next().is_some() {
         return Err((3, "unexpected extra command-line arguments".into()));
