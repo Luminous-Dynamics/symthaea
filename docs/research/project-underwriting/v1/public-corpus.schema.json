@@ -770,7 +770,11 @@
               "gate_id",
               "claim_ids",
               "required_evidence_classes",
-              "fail_closed"
+              "fail_closed",
+              "expected_subject_id",
+              "expected_boundary_id",
+              "expected_issuer_role",
+              "require_valid_at_decision"
             ],
             "properties": {
               "gate_id": {
@@ -797,6 +801,29 @@
               },
               "fail_closed": {
                 "const": true
+              },
+              "expected_subject_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "expected_boundary_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "expected_issuer_role": {
+                "enum": [
+                  "developer",
+                  "system_operator",
+                  "offtaker",
+                  "independent_verifier",
+                  "model_registry",
+                  "epc_contractor",
+                  "central_bank",
+                  "other"
+                ]
+              },
+              "require_valid_at_decision": {
+                "type": "boolean"
               }
             }
           }
