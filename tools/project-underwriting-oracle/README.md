@@ -20,13 +20,14 @@ The command prints a JSON receipt containing the case dispositions, mismatches a
 
 - Evidence IDs are unique; claim IDs are unique; every evidence record belongs to a declared claim.
 - Evidence references resolve across claims, grid, physical model, yield uncertainty components, cash flows and scenarios.
-- Issuer-signed evidence has verified authenticity, exact issuer role, subject identity and boundary.
+- Issuer-signed and official-source-publication evidence has verified source authenticity, exact issuer role, subject identity and boundary (without confusing a public dataset with a signed contract).
 - Decision-time evidence is not known after the decision timestamp.
 - Grid connection status and allocated capacity meet the synthetic gate.
 - Physical model qualification is valid for the project's capacity and assessment date, and has independent calibration evidence.
 - P50/P90/P95 energy quantiles have the required exceedance ordering.
 - Cash-flow schedule currency, ordering and date convention are explicit.
 - FX evidence is required when reporting and cash-flow currencies differ.
+- Declarative required gates are enforced fail-closed against claim, evidence class, subject, boundary, issuer role, authenticity and valid-time requirements.
 - Unknown dependence remains indeterminate rather than becoming a joint tail-risk estimate.
 
 ## Deliberate limitations
