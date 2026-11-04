@@ -34,8 +34,9 @@
     "admission_boundary",
     "run_input_sha256",
     "run_count",
-    "verified_success_count",
-    "strategy_summaries"
+    "strategy_summaries",
+    "verified_success_run_count",
+    "unique_successful_task_count"
   ],
   "properties": {
     "schema_version": {
@@ -241,10 +242,6 @@
       "type": "integer",
       "minimum": 0
     },
-    "verified_success_count": {
-      "type": "integer",
-      "minimum": 0
-    },
     "strategy_summaries": {
       "type": "array",
       "items": {
@@ -337,6 +334,14 @@
           }
         }
       }
+    },
+    "verified_success_run_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unique_successful_task_count": {
+      "type": "integer",
+      "minimum": 0
     }
   }
 }
