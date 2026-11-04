@@ -46,6 +46,8 @@ struct BaselineExpectedV1 {
     valid_decision_support_count: usize,
     paired_correct_count: usize,
     false_entry_count: usize,
+    unauthorized_yield_count: usize,
+    withhold_violation_count: usize,
     missed_invitation_count: usize,
     intentional_wait_count: usize,
     epistemic_abstain_count: usize,
@@ -90,6 +92,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if metrics.valid_decision_support_count != expected.valid_decision_support_count
             || metrics.paired_correct_count != expected.paired_correct_count
             || metrics.false_entry_count != expected.false_entry_count
+            || metrics.unauthorized_yield_count != expected.unauthorized_yield_count
+            || metrics.withhold_violation_count != expected.withhold_violation_count
             || metrics.missed_invitation_count != expected.missed_invitation_count
             || metrics.intentional_wait_count != expected.intentional_wait_count
             || metrics.epistemic_abstain_count != expected.epistemic_abstain_count
