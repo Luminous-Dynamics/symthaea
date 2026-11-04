@@ -51,6 +51,8 @@ mod quantum_gravity;
 pub mod thermodynamics;
 /// Backend-neutral, unit-preserving hardware energy counter contract.
 pub mod energy_meter;
+/// Provenance-bound hardware energy run receipts.
+pub mod energy_receipt;
 // true_phi relocated to crate::consciousness_metrics
 
 // Phase 2: Additional physics domains (pub mod to avoid glob conflicts)
