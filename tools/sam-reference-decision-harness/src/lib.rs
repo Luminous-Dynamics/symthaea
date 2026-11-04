@@ -1065,7 +1065,7 @@ mod tests {
                 interval(0.20, 0.30),
             ),
         ];
-        let envelope = evaluate_pair(&context(Direction::HigherIsBetter, 0.02), &rows).unwrap();
+        let envelope = evaluate(&context(Direction::HigherIsBetter, 0.02), &rows).unwrap();
         assert_eq!(envelope.classification, DecisionClass::ReferenceSensitive);
     }
 
@@ -1075,7 +1075,7 @@ mod tests {
             row("r0", "family-a", interval(0.72, 0.82), interval(0.78, 0.88)),
             row("r1", "family-b", interval(0.70, 0.80), interval(0.76, 0.86)),
         ];
-        let envelope = evaluate_pair(&context(Direction::HigherIsBetter, 0.02), &rows).unwrap();
+        let envelope = evaluate(&context(Direction::HigherIsBetter, 0.02), &rows).unwrap();
         assert_eq!(envelope.classification, DecisionClass::Unresolved);
         assert_eq!(
             envelope.unresolved_reason,
@@ -1094,7 +1094,7 @@ mod tests {
                 interval(2.005, 2.01),
             ),
         ];
-        let envelope = evaluate_pair(&context(Direction::HigherIsBetter, 0.02), &rows).unwrap();
+        let envelope = evaluate(&context(Direction::HigherIsBetter, 0.02), &rows).unwrap();
         assert_eq!(envelope.classification, DecisionClass::PortfolioEquivalent);
     }
 
@@ -1104,7 +1104,7 @@ mod tests {
             row("r0", "analytic", interval(1.0, 1.2), interval(2.0, 2.2)),
             row("r1", "independent", interval(0.8, 1.1), interval(1.8, 2.0)),
         ];
-        let envelope = evaluate_pair(&context(Direction::LowerIsBetter, 0.01), &rows).unwrap();
+        let envelope = evaluate(&context(Direction::LowerIsBetter, 0.01), &rows).unwrap();
         assert_eq!(envelope.classification, DecisionClass::PortfolioDominatesA);
     }
 
@@ -1114,7 +1114,7 @@ mod tests {
             row("r0", "family-a", point(4.0), point(2.0)),
             row("r1", "family-b", point(3.0), point(1.0)),
         ];
-        let envelope = evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &rows).unwrap();
+        let envelope = evaluate(&context(Direction::HigherIsBetter, 0.1), &rows).unwrap();
         assert_eq!(envelope.classification, DecisionClass::PointwiseOnly);
         assert!(
             envelope
@@ -1136,7 +1136,7 @@ mod tests {
             row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2)),
             row("r1", "family-b", point(2.0), point(1.0)),
         ];
-        let envelope = evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &rows).unwrap();
+        let envelope = evaluate(&context(Direction::HigherIsBetter, 0.1), &rows).unwrap();
         assert_eq!(envelope.classification, DecisionClass::Unresolved);
         assert_eq!(
             envelope.unresolved_reason,
@@ -1161,7 +1161,7 @@ mod tests {
             row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2)),
             second,
         ];
-        let envelope = evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &rows).unwrap();
+        let envelope = evaluate(&context(Direction::HigherIsBetter, 0.1), &rows).unwrap();
         assert_eq!(envelope.classification, DecisionClass::Unresolved);
         assert_eq!(
             envelope.unresolved_reason,
@@ -1185,7 +1185,7 @@ mod tests {
             row("r0", "analytic", interval(2.0, 2.2), interval(1.0, 1.2)),
             actor_only,
         ];
-        let envelope = evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &rows).unwrap();
+        let envelope = evaluate(&context(Direction::HigherIsBetter, 0.1), &rows).unwrap();
         assert_eq!(envelope.classification, DecisionClass::PortfolioDominatesA);
         assert_eq!(envelope.applicable_reference_count, 1);
         assert_eq!(envelope.inapplicable_reference_count, 1);
@@ -1195,7 +1195,7 @@ mod tests {
     fn unknown_applicability_blocks_complete_portfolio_claim() {
         let mut row = row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2));
         row.applicability = Applicability::Unknown;
-        let envelope = evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &[row]).unwrap();
+        let envelope = evaluate(&context(Direction::HigherIsBetter, 0.1), &[row]).unwrap();
         assert_eq!(envelope.classification, DecisionClass::Incomplete);
         assert_eq!(
             envelope.incomplete_reason,
@@ -1213,7 +1213,7 @@ mod tests {
             MetricOutcome::TimedOut,
             interval(1.0, 1.2),
         )];
-        let envelope = evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &rows).unwrap();
+        let envelope = evaluate(&context(Direction::HigherIsBetter, 0.1), &rows).unwrap();
         assert_eq!(envelope.classification, DecisionClass::Incomplete);
         assert_eq!(
             envelope.incomplete_reason,
@@ -1228,7 +1228,7 @@ mod tests {
     fn infeasible_or_unknown_action_is_never_ranked_by_utility() {
         let mut bad = row("r0", "family-a", interval(9.0, 10.0), interval(1.0, 2.0));
         bad.action_a.as_mut().unwrap().feasibility = Feasibility::Infeasible;
-        let envelope = evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &[bad]).unwrap();
+        let envelope = evaluate(&context(Direction::HigherIsBetter, 0.1), &[bad]).unwrap();
         assert_eq!(envelope.classification, DecisionClass::Incomplete);
         assert!(matches!(
             envelope.incomplete_reason,
@@ -1243,7 +1243,7 @@ mod tests {
             row("r0", "family-b", interval(2.0, 2.2), interval(1.0, 1.2)),
         ];
         assert_eq!(
-            evaluate_pair(
+            evaluate(
                 &context(Direction::HigherIsBetter, 0.1),
                 &duplicate_reference
             ),
@@ -1253,7 +1253,7 @@ mod tests {
         let mut duplicate_receipt = row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2));
         duplicate_receipt.action_b.as_mut().unwrap().receipt_id = "r0-a".into();
         assert_eq!(
-            evaluate_pair(
+            evaluate(
                 &context(Direction::HigherIsBetter, 0.1),
                 &[duplicate_receipt]
             ),
@@ -1285,7 +1285,7 @@ mod tests {
             row("r0", "shared-root", interval(2.0, 2.2), interval(1.0, 1.2)),
             row("r1", "shared-root", interval(2.1, 2.3), interval(1.0, 1.2)),
         ];
-        let envelope = evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &rows).unwrap();
+        let envelope = evaluate(&context(Direction::HigherIsBetter, 0.1), &rows).unwrap();
         assert_eq!(envelope.classification, DecisionClass::PortfolioDominatesA);
         assert_eq!(envelope.applicable_reference_count, 2);
         assert_eq!(envelope.dependency_family_count, 1);
@@ -1295,13 +1295,13 @@ mod tests {
     fn input_reference_order_does_not_change_canonical_result() {
         let first = row("r1", "family-b", interval(2.0, 2.2), interval(1.0, 1.2));
         let second = row("r0", "family-a", interval(2.1, 2.3), interval(1.0, 1.2));
-        let left = evaluate_pair(
+        let left = evaluate(
             &context(Direction::HigherIsBetter, 0.1),
             &[first.clone(), second.clone()],
         )
         .unwrap();
         let right =
-            evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &[second, first]).unwrap();
+            evaluate(&context(Direction::HigherIsBetter, 0.1), &[second, first]).unwrap();
         assert_eq!(left, right);
         assert_eq!(left.comparisons[0].reference_id, "r0");
     }
@@ -1393,7 +1393,7 @@ mod tests {
         let mut unqualified = row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2));
         unqualified.qualification = Qualification::NotQualified;
         let envelope =
-            evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &[unqualified]).unwrap();
+            evaluate(&context(Direction::HigherIsBetter, 0.1), &[unqualified]).unwrap();
         assert_eq!(envelope.classification, DecisionClass::OutOfScope);
     }
 
@@ -1406,14 +1406,14 @@ mod tests {
         });
         let rows = vec![row("r0", "family-a", bad, interval(1.0, 1.2))];
         assert!(matches!(
-            evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &rows),
+            evaluate(&context(Direction::HigherIsBetter, 0.1), &rows),
             Err(EvaluationError::InvalidMetricInterval { .. })
         ));
 
         let nan = MetricOutcome::Observed(MetricEvidence::PointEstimateOnly { value: f64::NAN });
         let rows = vec![row("r0", "family-a", nan, point(1.0))];
         assert!(matches!(
-            evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &rows),
+            evaluate(&context(Direction::HigherIsBetter, 0.1), &rows),
             Err(EvaluationError::NonFiniteMetricValue { .. })
         ));
     }
