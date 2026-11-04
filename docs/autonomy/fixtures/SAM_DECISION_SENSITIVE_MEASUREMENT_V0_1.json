@@ -1,0 +1,351 @@
+{
+  "schema": "sam-decision-sensitive-measurement-v0.1",
+  "status": "synthetic-analytic-golden-fixtures",
+  "claim_ceiling": "Arithmetic and decision-contract fixtures only; not sensor validation or vehicle safety evidence.",
+  "protocol": {
+    "uncertainty_probability": "not_assumed",
+    "evsi_allowed": false,
+    "objective": "decision_consequence_not_entropy",
+    "deadline_ticks": 10,
+    "query_outcomes": [
+      "Observed",
+      "Stale",
+      "Missing",
+      "Occluded",
+      "TimedOut",
+      "Unsupported"
+    ]
+  },
+  "cases": [
+    {
+      "id": "high-uncertainty-decision-invariant",
+      "decision_context": {
+        "action_set_complete": true,
+        "deadline_tick": 10,
+        "budget_units": 2
+      },
+      "envelope": {
+        "uncertainty_width": 100,
+        "admissible_cells": [
+          {
+            "id": "cell-a",
+            "best_action": "yield",
+            "feasibility": {
+              "continue": "feasible",
+              "yield": "feasible"
+            }
+          },
+          {
+            "id": "cell-b",
+            "best_action": "yield",
+            "feasibility": {
+              "continue": "feasible",
+              "yield": "feasible"
+            }
+          },
+          {
+            "id": "cell-c",
+            "best_action": "yield",
+            "feasibility": {
+              "continue": "feasible",
+              "yield": "feasible"
+            }
+          }
+        ]
+      },
+      "query_candidates": [
+        {
+          "id": "high-entropy-camera",
+          "cost_units": 2,
+          "return_tick": 4,
+          "possible_decision_classes": [
+            "yield"
+          ],
+          "entropy_reduction_claim": "high"
+        }
+      ],
+      "expected": {
+        "decision": "DecisionInvariant",
+        "selection": "NoQueryDecisionInvariant",
+        "reason": "query does not change feasibility or action preference"
+      }
+    },
+    {
+      "id": "narrow-uncertainty-crosses-feasibility-boundary",
+      "decision_context": {
+        "action_set_complete": true,
+        "hard_constraint": "clearance_margin_m >= 0",
+        "deadline_tick": 10,
+        "budget_units": 2
+      },
+      "envelope": {
+        "uncertainty_width": 0.02,
+        "admissible_cells": [
+          {
+            "id": "cell-negative",
+            "clearance_margin_m": -0.01,
+            "best_action": "yield",
+            "feasibility": {
+              "continue": "infeasible",
+              "yield": "feasible"
+            }
+          },
+          {
+            "id": "cell-positive",
+            "clearance_margin_m": 0.01,
+            "best_action": "continue",
+            "feasibility": {
+              "continue": "feasible",
+              "yield": "feasible"
+            }
+          }
+        ]
+      },
+      "query_candidates": [
+        {
+          "id": "targeted-range-observation",
+          "cost_units": 1,
+          "return_tick": 5,
+          "outcomes": [
+            "observed-negative",
+            "observed-positive"
+          ],
+          "possible_decision_classes": [
+            "yield",
+            "continue"
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "FeasibilitySensitive",
+        "selection": "QuerySelected",
+        "reason": "small interval crosses declared hard constraint and timely query distinguishes branches"
+      }
+    },
+    {
+      "id": "stale-result-does-not-reduce-envelope",
+      "decision_context": {
+        "action_set_complete": true,
+        "deadline_tick": 10
+      },
+      "envelope": {
+        "admissible_action_preferences": [
+          "continue",
+          "yield"
+        ],
+        "classification": "PreferenceSensitive"
+      },
+      "query_candidates": [
+        {
+          "id": "stale-range-reading",
+          "cost_units": 1,
+          "return_tick": 5,
+          "outcome": "Stale",
+          "age_ticks": 8,
+          "max_age_ticks": 2
+        }
+      ],
+      "expected": {
+        "decision": "Incomplete",
+        "selection": "DoNotUpdateEnvelope",
+        "reason": "stale measurement is not new information"
+      }
+    },
+    {
+      "id": "late-query-misses-decision-deadline",
+      "decision_context": {
+        "action_set_complete": true,
+        "deadline_tick": 10
+      },
+      "envelope": {
+        "classification": "PreferenceSensitive"
+      },
+      "query_candidates": [
+        {
+          "id": "slow-independent-reference",
+          "cost_units": 1,
+          "return_tick": 12,
+          "outcome": "Observed"
+        }
+      ],
+      "expected": {
+        "decision": "PreferenceSensitive",
+        "selection": "DeadlineExceeded",
+        "reason": "result arrives after decision deadline"
+      }
+    },
+    {
+      "id": "entropy-only-query-has-zero-decision-value",
+      "decision_context": {
+        "action_set_complete": true,
+        "deadline_tick": 10
+      },
+      "envelope": {
+        "admissible_cells": [
+          {
+            "id": "cell-1",
+            "best_action": "yield"
+          },
+          {
+            "id": "cell-2",
+            "best_action": "yield"
+          }
+        ],
+        "entropy": "high"
+      },
+      "query_candidates": [
+        {
+          "id": "semantic-camera-query",
+          "cost_units": 2,
+          "return_tick": 4,
+          "entropy_reduction_claim": "high",
+          "possible_decision_classes": [
+            "yield"
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "DecisionInvariant",
+        "selection": "NoQueryDecisionInvariant",
+        "entropy_is_not_sufficient": true
+      }
+    },
+    {
+      "id": "query-resolves-action-ranking-reversal",
+      "decision_context": {
+        "action_set_complete": true,
+        "deadline_tick": 10,
+        "utility_protocol": "synthetic-higher-is-better-v1"
+      },
+      "envelope": {
+        "classification": "PreferenceSensitive",
+        "admissible_cells": [
+          {
+            "id": "ref-a",
+            "best_action": "yield"
+          },
+          {
+            "id": "ref-b",
+            "best_action": "continue"
+          }
+        ]
+      },
+      "query_candidates": [
+        {
+          "id": "qualified-independent-measurement",
+          "cost_units": 1,
+          "return_tick": 6,
+          "outcomes": [
+            "measurement-a",
+            "measurement-b"
+          ],
+          "possible_decision_classes": [
+            "yield",
+            "continue"
+          ]
+        }
+      ],
+      "expected": {
+        "decision": "PreferenceSensitive",
+        "selection": "QuerySelected",
+        "post_query_recompute_required": true
+      }
+    },
+    {
+      "id": "no-calibrated-outcome-probabilities",
+      "decision_context": {
+        "action_set_complete": true,
+        "deadline_tick": 10
+      },
+      "envelope": {
+        "classification": "Unresolved"
+      },
+      "query_candidates": [
+        {
+          "id": "analytic-oracle-query",
+          "cost_units": 1,
+          "return_tick": 2,
+          "outcome_probability_model": null
+        }
+      ],
+      "expected": {
+        "v0_robust_partition_allowed": true,
+        "v1_regret_allowed_only_with_scalar_utility": true,
+        "v2_evsi_allowed": false
+      }
+    },
+    {
+      "id": "shared-common-mode-is-not-independent-information",
+      "decision_context": {
+        "action_set_complete": true
+      },
+      "query_candidates": [
+        {
+          "id": "model-endpoint-b",
+          "method": "model-query",
+          "shared_roots": [
+            "code-root-x",
+            "calibration-root-y"
+          ]
+        }
+      ],
+      "expected": {
+        "independent_reference_increment": 0,
+        "reason": "shared dependency roots are retained"
+      }
+    },
+    {
+      "id": "duplicate-observation-rejected",
+      "decision_context": {
+        "action_set_complete": true
+      },
+      "observations": [
+        {
+          "observation_id": "obs-1",
+          "source_id": "sensor-1",
+          "tick": 5,
+          "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "observation_id": "obs-1",
+          "source_id": "sensor-1",
+          "tick": 5,
+          "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "expected": {
+        "result": "RejectDuplicateEvidence",
+        "decision_envelope_unchanged": true
+      }
+    },
+    {
+      "id": "future-observation-leakage-rejected",
+      "decision_context": {
+        "decision_tick": 4,
+        "action_set_complete": true
+      },
+      "observations": [
+        {
+          "observation_id": "future-1",
+          "source_id": "sensor-1",
+          "observed_tick": 5,
+          "delivered_tick": 5
+        }
+      ],
+      "expected": {
+        "result": "RejectFutureObservation",
+        "policy_must_not_consume": true
+      }
+    }
+  ],
+  "invariants": [
+    "Entropy reduction alone never establishes decision value.",
+    "DecisionInvariant is conditional on the complete admitted envelope and is not a safety certificate.",
+    "Missing, stale, late, censored, occluded, failed and unsupported observations do not reduce uncertainty.",
+    "No EVSI without calibrated, context-valid query outcome probabilities and qualified selection assumptions.",
+    "Model endpoints sharing common-mode roots are not independent references.",
+    "Query selection is frozen before query outcomes are revealed.",
+    "Every query and observation has causal delivery, freshness, cost and deadline semantics.",
+    "The evaluator grants no vehicle actuation or control authority."
+  ]
+}
