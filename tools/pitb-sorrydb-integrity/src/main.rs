@@ -139,7 +139,7 @@ fn python_json_string(value: &str) -> String {
             '\r' => output.push_str("\\r"),
             '\t' => output.push_str("\\t"),
             ch if (ch as u32) < 0x20 => output.push_str(&format!("\\u{:04x}", ch as u32)),
-            ch if (ch as u32) > 0x7f && (ch as u32) <= 0xffff => output.push_str(&format!("\\u{:04x}", ch as u32)),
+            ch if (ch as u32) >= 0x7f && (ch as u32) <= 0xffff => output.push_str(&format!("\\u{:04x}", ch as u32)),
             ch if (ch as u32) > 0xffff => {
                 let scalar = ch as u32 - 0x1_0000;
                 let high = 0xd800 + ((scalar >> 10) & 0x3ff);
@@ -208,7 +208,7 @@ fn valid_iso8601(value: &str) -> bool {
     let bytes = value.as_bytes();
     if bytes.len() < 20 || !bytes.get(0..4).is_some_and(|s| s.iter().all(u8::is_ascii_digit))
         || bytes.get(4) != Some(&b'-') || bytes.get(7) != Some(&b'-')
-        || !matches!(bytes.get(10), Some(b'T') | Some(b't') | Some(b' '))
+        || !matches!(bytes.get(10), Some(&b'T') | Some(&b't') | Some(&b' '))
         || bytes.get(13) != Some(&b':') || bytes.get(16) != Some(&b':') { return false; }
     for (start, end) in [(5,7),(8,10),(11,13),(14,16),(17,19)] {
         if !bytes.get(start..end).is_some_and(|p| p.iter().all(u8::is_ascii_digit)) { return false; }
