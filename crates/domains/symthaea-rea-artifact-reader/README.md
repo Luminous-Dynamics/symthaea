@@ -1,39 +1,51 @@
 # symthaea-rea-artifact-reader
 
-A standard-library-only, bounded, read-only ZIP metadata inventory prototype for REA-compatible artifact work.
+A bounded, read-only ZIP inventory and per-occurrence content-verification prototype for REA-compatible artifact work.
 
-## Scope of this slice
+## Metadata inventory
 
-- Preflight the EOCD / ZIP64 end records before allocating entry metadata.
-- Bound archive bytes, central-directory bytes, entry count, names, extra fields, and declared uncompressed sizes.
-- Preserve each central-directory occurrence independently, including duplicate raw names.
-- Preserve raw filename bytes and decoded path separately.
-- Decode UTF-8 names and CP437 fallback names; honor a CRC-valid Unicode Path extra field.
-- Validate every listed local header against its central-directory record.
-- Parse and compare data-descriptor CRC and compressed/uncompressed sizes (with or without the optional signature; 32-bit and ZIP64 widths).
-- Reject overlapping local-header/compressed-data/data-descriptor extents.
-- Capture file identity for both the open descriptor and selected path, and revalidate it.
-- Report leading stubs, central-directory extent, trailing comment and opaque pre-central-directory bytes.
+The custom Rust parser is the policy authority for:
 
-## Non-goals and claim ceiling
+- Preflight of EOCD / ZIP64 end records and archive-size limits.
+- Central-directory byte, entry-count, name, extra-field, and declared-size budgets.
+- Per-occurrence identity in central-directory order, including duplicate raw names.
+- Raw filename-byte preservation plus UTF-8, CP437 and CRC-valid Unicode Path decoding.
+- Local/central header consistency and data-descriptor metadata checks.
+- Checked member extents, overlap rejection, and held-descriptor plus selected-path source identity.
+- Opaque-region accounting, including prepended stubs and bytes not mapped to listed entries.
 
-This is metadata inventory, not a full REA ArtifactReader replacement. It does not extract, decrypt, decompress, hash member bytes, or verify payload CRCs against decompressed bytes. It does parse data-descriptor metadata and checks its declared CRC/sizes against the central directory; that does not verify the member payload. It does not scan for unlisted local headers, validate Android APK Signing Blocks, inspect package signatures, or interpret native executable formats. It does not execute archive contents. It records encrypted members but never decrypts them.
+## Per-member content verification
 
-Traversal is reported as partial until the omitted checks above are implemented or explicitly excluded by a reviewed policy. A central-directory CRC or size is a producer declaration, not an observation over payload bytes.
+`ZipArtifactReader::verify_entry_content(occurrence_index, limits)` verifies one exact central-directory occurrence without extracting or writing it.
 
-The parser rejects multi-disk archives and ambiguous EOCD candidates. It also rejects malformed local/central header pairs, ZIP64 arithmetic overflow, out-of-bounds extents and overlapping listed member extents.
+- The secondary decoder is pinned to `zipcore = 0.10.2` with default optional codecs disabled. SHA-256 uses `sha2 = 0.10.9`.
+- The custom inventory remains authoritative. Decoder entry count, central-directory position, ZIP64 status, occurrence index, raw name, offset, flags, method, sizes, CRC, data-descriptor bit, encryption bit and file kind are compared before streaming.
+- The first tranche supports Stored (method 0) and Deflate (method 8) only.
+- Encrypted, directory and symlink entries are explicitly unsupported. No password or decryption path is exposed.
+- Decompressed bytes are read through a fixed-size buffer, hashed incrementally, and bounded by both caller budget and declared uncompressed size.
+- A result is returned only after EOF and decoder CRC/size verification. A partial read is not a successful verification.
+- The held descriptor and selected path are revalidated after the attempt; source change discards the result.
+- `declared_compressed_bytes` is metadata, not a measured compressed-byte count.
+- Per-entry verification does not make archive traversal complete. Unlisted local-header scanning, APK Signing Block interpretation, package-signature checks and full REA ArtifactReader parity remain separate work.
+
+The selected decoder is a second implementation, not proof of correctness or a substitute for an independent differential oracle. Its own tests and security claims are not independent qualification. Keep a separately pinned mature parser and the upstream REA implementation as distinct oracles; preserve disagreements.
+
+## Claim ceiling
+
+A successful result supports only this statement: this named member occurrence was streamed to EOF from the revalidated admitted source, its observed decompressed byte count matched the declared size, the selected decoder's CRC check passed, and the observed decompressed bytes have the returned SHA-256.
+
+It does not establish APK signing validity, IPA code-signing validity, package installability, runtime behavior, producer authenticity, target truth, whole-archive completeness or security compliance.
 
 ## Build and test
 
-The isolated harness compiles this exact source file without relying on unrelated root-workspace metadata:
+The isolated harness compiles the exact source file without relying on unrelated root-workspace metadata:
 
 ```bash
 cargo fmt --manifest-path tools/rea-artifact-reader-harness/Cargo.toml -- --check
 cargo test --manifest-path tools/rea-artifact-reader-harness/Cargo.toml --locked
+cargo clippy --manifest-path tools/rea-artifact-reader-harness/Cargo.toml --locked --all-targets -- -D warnings
 ```
 
 ## Upstream contract
 
 Pinned reference: [REA ArtifactReader](https://github.com/morluto/rea/blob/8250bf2320ea57aab4e664db4b4d44b8abd2004e/src/artifacts/ArtifactReader.ts), [REA ZipArtifactReader](https://github.com/morluto/rea/blob/8250bf2320ea57aab4e664db4b4d44b8abd2004e/src/artifacts/ZipArtifactReader.ts).
-
-The next qualification stage must differential-test this prototype against upstream and a pinned mature ZIP parser. The mature parser is a second implementation/oracle, not the policy authority. Its documented duplicate-name limitation must not be used to collapse archive occurrences.
