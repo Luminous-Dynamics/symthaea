@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-snapshot-audit-report-v0.schema.json",
+  "title": "PITB SorryDB snapshot audit report v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "snapshot_id",
+    "upstream_repository",
+    "upstream_repository_commit",
+    "full_snapshot",
+    "evaluation_split",
+    "evaluation_split_is_subset_of_full_snapshot",
+    "missing_evaluation_task_ids",
+    "count_pins_match",
+    "repository_count_pin_matches",
+    "source_git_blob_pins_match",
+    "source_identity_boundary",
+    "semantic_audit_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-snapshot-audit-report.v0"
+    },
+    "snapshot_id": {
+      "const": "SorryDB_2601"
+    },
+    "upstream_repository": {
+      "const": "SorryDB/SorryDB"
+    },
+    "upstream_repository_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "full_snapshot": {
+      "$ref": "#/$defs/snapshot"
+    },
+    "evaluation_split": {
+      "$ref": "#/$defs/snapshot"
+    },
+    "evaluation_split_is_subset_of_full_snapshot": {
+      "const": true
+    },
+    "missing_evaluation_task_ids": {
+      "type": "array",
+      "maxItems": 0,
+      "items": {
+        "type": "string"
+      }
+    },
+    "count_pins_match": {
+      "const": true
+    },
+    "repository_count_pin_matches": {
+      "const": true
+    },
+    "source_git_blob_pins_match": {
+      "const": true
+    },
+    "source_identity_boundary": {
+      "type": "string",
+      "minLength": 40
+    },
+    "semantic_audit_boundary": {
+      "type": "string",
+      "minLength": 40
+    }
+  },
+  "$defs": {
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_raw_sha256",
+        "input_git_blob_sha1",
+        "task_count",
+        "unique_task_id_count",
+        "unique_source_location_count",
+        "unique_repository_count",
+        "task_count_by_lean_version",
+        "repositories_by_task_count",
+        "repeated_goal_group_count",
+        "repeated_goal_task_count",
+        "repository_registry_count",
+        "repository_registry_complete"
+      ],
+      "properties": {
+        "input_raw_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "input_git_blob_sha1": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "task_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "unique_task_id_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "unique_source_location_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "unique_repository_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "task_count_by_lean_version": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "task_count",
+              "repository_count"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "task_count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "repository_count": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "repositories_by_task_count": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "integer",
+                "minimum": 1
+              }
+            ],
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "repeated_goal_group_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "repeated_goal_task_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "repository_registry_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "repository_registry_complete": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
