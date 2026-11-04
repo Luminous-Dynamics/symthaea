@@ -41,6 +41,7 @@ const [
   },
   {
     createEvidenceBundle,
+    evidenceBundleForTarget,
     parseEvidenceBundle,
     serializeEvidenceBundle,
   },
@@ -627,6 +628,44 @@ const bundleManifest = {
   unknown_ids: [...new Set(parsedUpstreamBundle.unknowns.map((item) => item.unknown_id))].sort(),
 };
 
+const targetBundle = evidenceBundleForTarget(parsedUpstreamBundle, scopeDigest);
+const targetBundleBytes = Buffer.from(JSON.stringify(targetBundle, null, 2) + "\\n");
+const targetBundleCanonicalBytes = Buffer.from(serializeEvidenceBundle(targetBundle));
+const targetBundleFile = "evidence-bundle-target-v1.json";
+await writeFile(resolve(outputDirectory, targetBundleFile), targetBundleBytes, {
+  flag: "wx",
+  mode: 0o600,
+});
+const targetBundleManifest = {
+  file: targetBundleFile,
+  target_sha256: scopeDigest,
+  bytes: targetBundleBytes.length,
+  raw_file_sha256: digest(targetBundleBytes),
+  canonical_sha256: digest(targetBundleCanonicalBytes),
+  record_count: targetBundle.records.length,
+  unknown_revision_count: targetBundle.unknowns.length,
+  unknown_ids: [...new Set(targetBundle.unknowns.map((item) => item.unknown_id))].sort(),
+};
+
+const otherTargetSha = "b".repeat(64);
+const otherTargetBundle = evidenceBundleForTarget(parsedUpstreamBundle, otherTargetSha);
+const otherTargetBundleBytes = Buffer.from(
+  JSON.stringify(otherTargetBundle, null, 2) + "\\n",
+);
+const otherTargetBundleFile = "evidence-bundle-other-target-v1.json";
+await writeFile(resolve(outputDirectory, otherTargetBundleFile), otherTargetBundleBytes, {
+  flag: "wx",
+  mode: 0o600,
+});
+const otherTargetBundleManifest = {
+  file: otherTargetBundleFile,
+  target_sha256: otherTargetSha,
+  bytes: otherTargetBundleBytes.length,
+  raw_file_sha256: digest(otherTargetBundleBytes),
+  record_count: otherTargetBundle.records.length,
+  unknown_revision_count: otherTargetBundle.unknowns.length,
+};
+
 const bundleNegativeInputs = [];
 const expectBundleReject = (name, candidate, expectedError) => {
   let caught;
@@ -808,6 +847,8 @@ const manifest = {
   key_order_mutations: keyOrderMutations,
   negative_controls: invalidCases,
   evidence_bundle: bundleManifest,
+  evidence_bundle_target: targetBundleManifest,
+  evidence_bundle_other_target: otherTargetBundleManifest,
   bundle_negative_controls: bundleNegativeControls,
   stricter_importer_cases: [
     {
@@ -839,6 +880,9 @@ await writeFile(
       stricter_importer_count: 1,
       evidence_bundle_raw_sha256: bundleManifest.raw_file_sha256,
       evidence_bundle_canonical_sha256: bundleManifest.canonical_sha256,
+      evidence_bundle_target_raw_sha256: targetBundleManifest.raw_file_sha256,
+      evidence_bundle_target_canonical_sha256: targetBundleManifest.canonical_sha256,
+      evidence_bundle_other_target_raw_sha256: otherTargetBundleManifest.raw_file_sha256,
       bundle_negative_control_count: bundleNegativeControls.length,
       producer: manifest.producer,
       generator: manifest.generator,
