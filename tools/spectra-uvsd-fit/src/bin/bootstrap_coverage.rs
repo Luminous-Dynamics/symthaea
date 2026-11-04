@@ -93,7 +93,11 @@ struct CellSummary {
     fit_not_converged: usize,
     fit_not_evaluable: usize,
     intervals_returned: usize,
-    covered: usize,
+    mu_covered: usize,
+    sigma_covered: usize,
+    da_covered: usize,
+    mu_width_sum: f64,
+    sigma_width_sum: f64,
     da_width_sum: f64,
     bootstrap_success_rate_sum: f64,
     bootstrap_failed_replicates: usize,
@@ -122,7 +126,7 @@ fn main() {
     };
 
     println!(
-        "mu_true,sigma_true,d_a_true,outer_attempted,fit_converged,fit_boundary,fit_weakly_identified,fit_not_identifiable,fit_not_converged,fit_not_evaluable,intervals_returned,d_a_covered,coverage_given_interval,mean_d_a_interval_width,mean_bootstrap_success_rate,mean_bootstrap_failed_replicates"
+        "mu_true,sigma_true,d_a_true,outer_attempted,fit_converged,fit_boundary,fit_weakly_identified,fit_not_identifiable,fit_not_converged,fit_not_evaluable,intervals_returned,mu_covered,sigma_covered,d_a_covered,mu_coverage,sigma_coverage,d_a_coverage,mean_mu_interval_width,mean_sigma_interval_width,mean_d_a_interval_width,mean_bootstrap_success_rate,mean_bootstrap_failed_replicates"
     );
 
     for (mu_index, &mu) in MU_GRID.iter().enumerate() {
@@ -162,24 +166,35 @@ fn main() {
                 if bootstrap.status == BootstrapStatus::Qualified {
                     if let Some(intervals) = bootstrap.intervals {
                         summary.intervals_returned += 1;
-                        if intervals.d_a_95[0] <= true_da && true_da <= intervals.d_a_95[1] {
-                            summary.covered += 1;
+                        if intervals.mu_95[0] <= mu && mu <= intervals.mu_95[1] {
+                            summary.mu_covered += 1;
                         }
+                        if intervals.sigma_95[0] <= sigma && sigma <= intervals.sigma_95[1] {
+                            summary.sigma_covered += 1;
+                        }
+                        if intervals.d_a_95[0] <= true_da && true_da <= intervals.d_a_95[1] {
+                            summary.da_covered += 1;
+                        }
+                        summary.mu_width_sum += intervals.mu_95[1] - intervals.mu_95[0];
+                        summary.sigma_width_sum += intervals.sigma_95[1] - intervals.sigma_95[0];
                         summary.da_width_sum += intervals.d_a_95[1] - intervals.d_a_95[0];
                     }
                 }
             }
 
-            let coverage = if summary.intervals_returned > 0 {
-                summary.covered as f64 / summary.intervals_returned as f64
-            } else {
-                f64::NAN
-            };
-            let width = if summary.intervals_returned > 0 {
-                summary.da_width_sum / summary.intervals_returned as f64
-            } else {
-                f64::NAN
-            };
+            let (mu_coverage, sigma_coverage, da_coverage, mu_width, sigma_width, da_width) =
+                if summary.intervals_returned > 0 {
+                    (
+                        summary.mu_covered as f64 / summary.intervals_returned as f64,
+                        summary.sigma_covered as f64 / summary.intervals_returned as f64,
+                        summary.da_covered as f64 / summary.intervals_returned as f64,
+                        summary.mu_width_sum / summary.intervals_returned as f64,
+                        summary.sigma_width_sum / summary.intervals_returned as f64,
+                        summary.da_width_sum / summary.intervals_returned as f64,
+                    )
+                } else {
+                    (f64::NAN, f64::NAN, f64::NAN, f64::NAN, f64::NAN, f64::NAN)
+                };
             let returned_bootstraps = summary.fit_converged;
             let mean_bootstrap_success = if returned_bootstraps > 0 {
                 summary.bootstrap_success_rate_sum / returned_bootstraps as f64
@@ -194,7 +209,7 @@ fn main() {
             };
 
             println!(
-                "{mu},{sigma},{true_da},{outer},{},{},{},{},{},{},{},{},{coverage},{width},{mean_bootstrap_success},{mean_bootstrap_failed}",
+                "{mu},{sigma},{true_da},{outer},{},{},{},{},{},{},{},{},{},{},{mu_coverage},{sigma_coverage},{da_coverage},{mu_width},{sigma_width},{da_width},{mean_bootstrap_success},{mean_bootstrap_failed}",
                 summary.fit_converged,
                 summary.fit_boundary,
                 summary.fit_weakly_identified,
@@ -202,7 +217,9 @@ fn main() {
                 summary.fit_not_converged,
                 summary.fit_not_evaluable,
                 summary.intervals_returned,
-                summary.covered
+                summary.mu_covered,
+                summary.sigma_covered,
+                summary.da_covered
             );
         }
     }
