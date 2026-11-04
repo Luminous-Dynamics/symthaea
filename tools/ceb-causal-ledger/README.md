@@ -34,7 +34,7 @@ From the repository root:
 cargo test --manifest-path tools/ceb-causal-ledger/Cargo.toml --locked
 ```
 
-The crate has its own `[workspace]` boundary and is intentionally not a member or dependency of the production workspace. Integrate it only after exact-head compilation, independent review, and reconciliation with the existing CEB/general receipt and DSSE work.
+The crate has its own `[workspace]` boundary and is intentionally not a member or dependency of the production workspace. Seventeen unit tests are authored. Integrate it only after exact-head compilation, independent review, and reconciliation with the existing CEB/general receipt and DSSE work.
 
 ## Status
 
