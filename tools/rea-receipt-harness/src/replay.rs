@@ -9,6 +9,8 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use zip::CompressionMethod;
 
+const RECEIPT_SCHEMA: &str = include_str!("../../../docs/research/rea-zip-content-verification-receipt-v0.schema.json");
+
 const HARD_ARCHIVE_LIMIT: u64 = 512 * 1024 * 1024;
 const HARD_ENTRY_LIMIT: u64 = 100_000;
 const HARD_BUFFER_LIMIT: usize = 1024 * 1024;
