@@ -3,7 +3,7 @@
   "analysis_id": "synthetic-bounded-universe-no-witness-v1",
   "dataset_revision_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "edit_universe_scope": "bounded_candidate_subset",
-  "baseline_graph_sha256": "c24fb5455ca674c7aa8bf229bdb6904bc0000949a94efa8a2a5717c6e164f59",
+  "baseline_graph_sha256": "c24fb5455ca674c7aa8bf229bdb6904bc0000949a94efa8a2a571c7c6e164f59",
   "baseline_graph": [
     { "source": 1, "target": 2, "weight": 0.6 },
     { "source": 1, "target": 3, "weight": 0.6 },
