@@ -902,7 +902,11 @@ fn sign_synthetic_attestation(
     fs::create_dir_all(temp_dir).map_err(|e| format!("create synthetic signing directory: {e}"))?;
     let payload_path = temp_dir.join("reviewer-attestation-payload.json");
     let signature_path = temp_dir.join("reviewer-attestation-signature.bin");
-    let payload = serde_json::to_vec(attestation_without_signature)
+    let mut payload_value = attestation_without_signature.clone();
+    payload_value.as_object_mut()
+        .ok_or("synthetic reviewer attestation must be a JSON object")?
+        .remove("signature_ed25519_hex");
+    let payload = serde_json::to_vec(&payload_value)
         .map_err(|e| format!("serialize synthetic signed reviewer payload: {e}"))?;
     fs::write(&payload_path, &payload).map_err(|e| format!("write synthetic reviewer payload: {e}"))?;
     let private_key = private_key_path.to_str().ok_or("synthetic private-key path is not UTF-8")?;
@@ -1128,7 +1132,7 @@ fn run_self_tests() -> Result<(), String> {
     let checker_log_path = run_dir.join("checker.log");
     let checker_log = fs::read(&checker_log_path).map_err(|e| e.to_string())?;
     fs::write(&checker_log_path, b"tampered checker log").map_err(|e| e.to_string())?;
-    if verify_all(&evaluation_bytes, &runs_bytes, &root, false).is_ok() {
+    if verify_all(&evaluation_bytes, &runs_bytes, &root, &reviewer_registry_bytes, &reviewer_registry_sha256, false).is_ok() {
         return Err("tampered checker log was accepted".into());
     }
     fs::write(&checker_log_path, checker_log).map_err(|e| e.to_string())?;
@@ -1137,7 +1141,7 @@ fn run_self_tests() -> Result<(), String> {
     let proof_path = run_dir.join("proof.txt");
     let proof = fs::read(&proof_path).map_err(|e| e.to_string())?;
     fs::remove_file(&proof_path).map_err(|e| e.to_string())?;
-    if verify_all(&evaluation_bytes, &runs_bytes, &root, false).is_ok() {
+    if verify_all(&evaluation_bytes, &runs_bytes, &root, &reviewer_registry_bytes, &reviewer_registry_sha256, false).is_ok() {
         return Err("missing proof artifact was accepted".into());
     }
     fs::write(&proof_path, proof).map_err(|e| e.to_string())?;
