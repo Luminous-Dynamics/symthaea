@@ -158,7 +158,7 @@ fn sha1_digest(input: &[u8]) -> [u8; 20] {
 }
 
 fn git_blob_sha1(raw: &[u8]) -> String {
-    let header = format!("blob {}\\0", raw.len());
+    let header = format!("blob {}\0", raw.len());
     let mut object = Vec::with_capacity(header.len() + raw.len());
     object.extend_from_slice(header.as_bytes());
     object.extend_from_slice(raw);
@@ -478,6 +478,49 @@ fn verify_checkout(task: &TaskIdentity, repo_root: &Path) -> Result<CheckoutVeri
     })
 }
 
+fn validate_task_identity(task: &TaskIdentity) -> Result<(), String> {
+    if task.schema_version != TASK_SCHEMA {
+        return Err("unsupported SorryDB task identity schema".into());
+    }
+    require_nonempty(&task.repository_remote, "repository_remote")?;
+    if !task.repository_remote.starts_with("https://github.com/")
+        && !task.repository_remote.starts_with("git@github.com:")
+    {
+        return Err("repository_remote must be a GitHub HTTPS or SSH remote".into());
+    }
+    require_nonempty(&task.repository_branch, "repository_branch")?;
+    require_sha1(&task.repository_commit, "repository_commit")?;
+    if normalize_lean_version(&task.lean_version)? != task.lean_version {
+        return Err("lean_version must be normalized".into());
+    }
+    safe_repo_path(&task.source_path)?;
+    if task.start_line == 0 || task.end_line == 0 || task.end_line < task.start_line {
+        return Err("task source line coordinates are invalid".into());
+    }
+    if task.end_line == task.start_line && task.end_column <= task.start_column {
+        return Err("task source span is empty or reversed".into());
+    }
+    if !valid_hex(&task.debug_goal_sha256, 64) {
+        return Err("debug_goal_sha256 must be lowercase SHA-256".into());
+    }
+    let identity_value = json!({
+        "repository_remote": task.repository_remote,
+        "repository_branch": task.repository_branch,
+        "repository_commit": task.repository_commit,
+        "lean_version": task.lean_version,
+        "source_path": task.source_path,
+        "start_line": task.start_line,
+        "start_column": task.start_column,
+        "end_line": task.end_line,
+        "end_column": task.end_column
+    });
+    let expected = canonical_task_id(&identity_value)?;
+    if task.task_id != expected {
+        return Err(format!("task_id does not match canonical identity: expected {expected}"));
+    }
+    Ok(())
+}
+
 fn parse_task_file(path: &Path) -> Result<TaskIdentity, String> {
     let raw = fs::read(path).map_err(|e| format!("read task identity JSON: {e}"))?;
     if let Ok(task) = serde_json::from_slice::<TaskIdentity>(&raw) {
@@ -595,6 +638,7 @@ fn execute() -> Result<(), String> {
     }
     if args.len() == 4 && args[1] == "--verify-checkout" {
         let task = parse_task_file(Path::new(&args[2]))?;
+        validate_task_identity(&task)?;
         let result = verify_checkout(&task, Path::new(&args[3]))?;
         println!("{}", serde_json::to_string_pretty(&result).map_err(|e| e.to_string())?);
         println!("PITB_SORRYDB_CHECKOUT_IDENTITY_OK");
