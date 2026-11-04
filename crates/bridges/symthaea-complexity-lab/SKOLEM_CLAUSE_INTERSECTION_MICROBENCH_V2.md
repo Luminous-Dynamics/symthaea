@@ -19,10 +19,10 @@ Representations: Python hash set, sorted packed uint32 IDs with binary search, d
 
 | Representation | Storage | ns/clause | Positive clauses |
 |---|---:|---:|---:|
-| Python hash set | 30.107 MiB | 726.6 | 43,008 |
-| Sorted uint32 | 2.056 MiB | 2,103.3 | 43,008 |
-| Dense 2-bit | 10.542 MiB | 1,873.1 | 43,008 |
-| Hybrid | 2.090 MiB | 2,277.8 | 43,008 |
+| Python hash set | 30.107 MiB | 722.1 | 43,008 |
+| Sorted uint32 | 2.056 MiB | 2,052.3 | 43,008 |
+| Dense 2-bit | 10.542 MiB | 2,014.4 | 43,008 |
+| Hybrid | 2.090 MiB | 2,096.5 | 43,008 |
 
 All layouts agreed on the 43,008 positive clause intersections and on the 599,519 literal probes after identical short-circuit behavior.
 
@@ -35,3 +35,16 @@ This is a negative/qualifying result: a simple density-threshold hybrid is not a
 The next investigation should profile real Skolem-node degree distributions and the exact SCPOG reverse-check membership pattern. Then compare a Skolem-specific sparse index against reuse of CakeML's established array/byte-array techniques, with the refinement proof carried into HOL4. Do not select an implementation from this Python benchmark alone.
 
 Source for CakeML prior art: Tan, Heule and Myreen, *Verified Propagation Redundancy and Compositional UNSAT Checking in CakeML*, 2023, Section 5.3.1–5.3.4.
+
+
+## Exact uploaded-script execution
+
+The uploaded V2 script was reconstructed byte-for-byte and its Git blob SHA-1 matched the fetched GitHub file before execution.
+
+- Git blob SHA-1: c18d1a9397d4d47e528a6941dded432cc7213df1
+- Script SHA-256: 711869eee2f6b99f5bf0f2268534b2d0bb92b01d2d911b75164a8c63ee72a315
+- Runtime: CPython 3.13.5, Linux
+- 86,016 clause queries; 769,440 candidate literal positions; 599,519 actual probes after short-circuit; 43,008 clause hits.
+- All four representations returned identical hit and probe counts.
+
+A single run is indicative only. No CakeML or SCPOG memory/time claim follows.
