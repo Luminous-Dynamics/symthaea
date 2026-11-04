@@ -23,7 +23,7 @@ The 2026 pathwise feature-selection paper is a comparator for statistical local-
 
 Every query freezes a formal definition, analysis digest, single-layer or declared-mixed mode, requested claim type, allowed relation-type path sequences, claim IDs used by each result path and producer-declared result digest/status.
 
-The semantic verifier must recompute relation-type sequences from referenced claim IDs and compare them with the allowed path grammar. A producer cannot label an anatomical-plus-statistical path as causal. Mixed evidence remains mixed evidence until a separate relation-specific claim and evidence adapter justifies any stronger interpretation.
+The semantic verifier must recompute relation-type sequences from referenced claim IDs and compare them with the allowed path grammar. For an ordered path, each claim's target object, object kind and world ID must equal the next claim's source object, object kind and world ID. A producer cannot label an anatomical-plus-statistical path as causal. Mixed evidence remains mixed evidence; a causal-effect query must instead use a standalone path containing a supported `CAUSAL_EFFECT_CLAIM`. The presence of a causal claim elsewhere in a mixed path does not upgrade that path to a causal conclusion.
 
 ## Non-laundering rules
 
@@ -32,6 +32,8 @@ The semantic verifier must recompute relation-type sequences from referenced cla
 3. Claim and query IDs are unique.
 4. Every path references existing claims and its relation-type order is recomputed.
 5. Path assertions must be allowed by the query's frozen grammar.
+6. Ordered path claims must be endpoint-contiguous by object ID, object kind and world ID. Disconnected claims cannot form a path.
+7. A causal-effect path must consist solely of a supported `CAUSAL_EFFECT_CLAIM`; anatomical, statistical or functional edges cannot be appended to or used to upgrade it.
 6. Anatomical edge construction requires presence, polarity and pre-/post-partner support. Unresolved components yield ambiguous or not-estimable status.
 7. Cross-release correspondence never becomes a within-release anatomical edge.
 8. Statistical q-values are bound to a declared complete hypothesis family and multiplicity procedure.
