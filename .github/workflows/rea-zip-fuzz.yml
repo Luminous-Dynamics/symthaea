@@ -1,0 +1,62 @@
+name: REA ZIP Fuzz Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "43 3 * * 1"
+  pull_request:
+    paths:
+      - "fuzz/**"
+      - "crates/domains/symthaea-rea-artifact-reader/**"
+      - ".github/workflows/rea-zip-fuzz.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-zip-fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zip-fuzz-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install nightly Rust
+        uses: dtolnay/rust-toolchain@nightly
+      - name: Install pinned cargo-fuzz
+        run: cargo install cargo-fuzz --version 0.13.2 --locked
+      - name: Resolve and audit fuzz dependency graph
+        run: |
+          cargo generate-lockfile --manifest-path fuzz/Cargo.toml
+          cargo tree --manifest-path fuzz/Cargo.toml --locked -e normal,dev
+      - name: Prepare content-addressable seed corpus
+        run: |
+          mkdir -p fuzz/corpus/zip_inventory_and_content fuzz/artifacts
+          base64 --decode fuzz/seeds/empty-stored.zip.b64 > fuzz/corpus/zip_inventory_and_content/empty-stored.zip
+          sha256sum fuzz/seeds/empty-stored.zip.b64 fuzz/corpus/zip_inventory_and_content/empty-stored.zip
+      - name: Run bounded coverage-guided fuzz smoke
+        run: |
+          cargo +nightly fuzz run zip_inventory_and_content -- \
+            -artifact_prefix=fuzz/artifacts/ \
+            -max_total_time=180 \
+            -max_len=1048576 \
+            -rss_limit_mb=512 \
+            -print_final_stats=1
+      - name: Upload fuzz lock and artifacts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: rea-zip-fuzz-run
+          path: |
+            fuzz/Cargo.lock
+            fuzz/artifacts/**
+            fuzz/corpus/zip_inventory_and_content/**
+          if-no-files-found: warn
+          retention-days: 14
