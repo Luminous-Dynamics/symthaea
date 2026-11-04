@@ -1,0 +1,41 @@
+# ETH-029 — Skolem membership layout microbench v1
+
+**Claim ceiling:** synthetic CPython representation experiment. This is not a SCPOG benchmark, not a CakeML measurement, and not a formal verification result.
+
+## Question
+
+SCPOG reverse-implication checking needs repeated membership checks over Skolem-node quantified-literal sets. Which storage representation offers a useful memory/lookup trade-off?
+
+## Experiment
+
+- Universe: 65,536 literal IDs.
+- 896 synthetic Skolem nodes: 128 each with degrees 1, 4, 16, 64, 256, 1,024 and 4,096.
+- 96 identical-pattern membership queries per node; 86,016 queries total.
+- Seed: 0xE7029.
+- Compared Python hash sets, sorted packed uint32 arrays, dense bitsets and a hybrid that uses a dense bitset at degree >=2,048 and a sorted array below it.
+- All representations returned the same 43,384 positive memberships.
+
+## Results
+
+| Representation | Storage | Lookup time | ns/query |
+|---|---:|---:|---:|
+| Python hash set | 40.105 MiB | 10.013 ms | 116.4 |
+| Sorted uint32 arrays | 2.742 MiB | 31.090 ms | 361.5 |
+| Dense bitsets | 7.056 MiB | 32.705 ms | 380.2 |
+| Hybrid sparse/dense | 1.787 MiB | 23.890 ms | 277.7 |
+
+The hybrid used about 22.4x less storage than Python hash sets, at about 2.38x the lookup time in CPython. It used less storage than the always-sorted or always-dense alternatives on this fixture.
+
+## Interpretation
+
+This supports testing an adaptive sparse/dense index in the CakeML implementation. It does not establish that the same threshold or time trade-off holds in CakeML: Python object layouts, array, bytearray access and set membership have very different costs from CakeML's verified data structures.
+
+The initial crossover estimate is the equality of packed 32-bit sparse storage and a dense bitset:
+
+4 * degree ~= universe / 8, hence degree ~= universe / 32.
+
+The experiment used that threshold (2,048 for a 65,536-literal universe). A formal implementation must include metadata overhead, integer range constraints, duplicate handling, and a proof that every membership answer is identical.
+
+## Next
+
+Port the three representations to a CakeML/HOL4 microbenchmark using the actual SCPOG Skolem literal access pattern. Measure verified heap allocations and runtime on the published 172-input cohort. Select the representation by measured degree/density and include the data-structure invariant in the refinement proof.
