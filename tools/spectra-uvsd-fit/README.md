@@ -100,3 +100,22 @@ The default 50 outer campaigns are a smoke pilot, not a coverage qualification. 
 The recovery runner emits one CSV row per frozen synthetic campaign across mu, sigma and independent seeds, including optimizer and Fisher-information diagnostics. It is a parameter-recovery smoke benchmark only; its Wald intervals are not yet coverage-calibrated and the runner does not estimate false UVSD declaration rates, power, or empirical performance.
 
 This code is an estimator prototype, not an empirical result. It has not been compiled or run in the current environment. Human-subject collection, physical actuation and causal/anomalous information claims are out of scope.
+
+
+## Sequential policy core (experimental)
+
+The crate exports an experimental `sequential` module for choosing among a frozen set of **experimenter-controlled** trial actions. It intentionally has no action field for participant confidence criteria, internal evidence thresholds or latent response bias.
+
+The selector currently provides:
+- typed action-space validation and canonical action ordering;
+- hard exclusion of actions without qualified action-to-observation mappings or qualified model adequacy;
+- minimum representativeness and model-discrimination floors;
+- forced, randomized audit-stratum coverage before ordinary exploration/exploitation;
+- deterministic SplitMix64 research randomization;
+- exploration plus exploitation of a caller-supplied worst-case target utility;
+- marginal propensity for every eligible action, including the combined exploration and exploitation probability mass;
+- replay receipts containing policy configuration, model-set version, action-set/history/assessment digests, complete candidate assessments, random draws, exclusions and selected action.
+
+The selector is intentionally a **policy primitive**, not a Bayesian adaptive inference engine. Its caller must supply and freeze the assessments, robust utility, model-adequacy decisions, digest commitments, estimand, ambiguity set and action-to-observation calibration. The module does not compute EIG, posterior updates, model-discrepancy diagnostics, confidence/RT validity, or sequential p-values. A qualified action set and complete receipt do not establish statistical calibration.
+
+SplitMix64-v1 is reproducible simulation randomness, not cryptographic randomness or a deployment-grade randomization service. Do not use this prototype for live human-subject adaptive presentation. See [SPECTRA robust sequential design contract](../../docs/research/SPECTRA_ROBUST_SEQUENTIAL_DESIGN_V0_1.md) and [issue #10490](https://github.com/Luminous-Dynamics/symthaea/issues/10490).
