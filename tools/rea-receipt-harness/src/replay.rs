@@ -72,13 +72,11 @@ pub fn replay_member_claim(
         ));
     }
 
-    let max_central_directory = decimal_at(
-        receipt,
-        &["limits", "max_central_directory_bytes"],
-    )?
-    .min(HARD_CENTRAL_DIRECTORY_LIMIT);
+    let max_central_directory =
+        decimal_at(receipt, &["limits", "max_central_directory_bytes"])?
+            .min(HARD_CENTRAL_DIRECTORY_LIMIT);
     let max_entries = decimal_at(receipt, &["limits", "max_entries"])?.min(HARD_ENTRY_LIMIT);
-    preflight_regular_zip(
+    let preflight_entries = preflight_regular_zip(
         &mut source,
         actual_size,
         max_central_directory,
@@ -91,6 +89,21 @@ pub fn replay_member_claim(
     if archive.has_duplicate_names() {
         return Err(ReplayError::Unsupported(
             "zip-rs indexed view collapses duplicate raw names; occurrence cannot be proven".into(),
+        ));
+    }
+    if archive.len() as u64 != preflight_entries {
+        return Err(ReplayError::Rejected(
+            "zip-rs unique-name count differs from EOCD entry count".into(),
+        ));
+    }
+    archive.validate_header_consistency().map_err(|error| {
+        ReplayError::Rejected(format!("zip-rs header consistency failure: {error}"))
+    })?;
+    if archive.has_overlapping_entries().map_err(|error| {
+        ReplayError::Rejected(format!("zip-rs overlap check failed: {error}"))
+    })? {
+        return Err(ReplayError::Rejected(
+            "zip-rs reports overlapping member extents".into(),
         ));
     }
     let entry_limit = decimal_at(receipt, &["limits", "max_entries"])?.min(HARD_ENTRY_LIMIT);
@@ -254,15 +267,17 @@ fn preflight_regular_zip(
     file_length: u64,
     max_central_directory_bytes: u64,
     max_entries: u64,
-) -> Result<(), ReplayError> {
+) -> Result<u64, ReplayError> {
     let tail_length = file_length.min((EOCD_FIXED_BYTES + EOCD_MAX_COMMENT_BYTES) as u64);
-    let tail_start = file_length.checked_sub(tail_length).ok_or_else(|| {
-        ReplayError::Rejected("EOCD window underflow".into())
-    })?;
+    let tail_start = file_length
+        .checked_sub(tail_length)
+        .ok_or_else(|| ReplayError::Rejected("EOCD window underflow".into()))?;
     file.seek(SeekFrom::Start(tail_start)).map_err(io_error)?;
-    let mut tail = vec![0u8; usize::try_from(tail_length).map_err(|_| {
-        ReplayError::Rejected("EOCD window does not fit address space".into())
-    })?];
+    let mut tail = vec![
+        0u8;
+        usize::try_from(tail_length)
+            .map_err(|_| ReplayError::Rejected("EOCD window does not fit address space".into()))?
+    ];
     file.read_exact(&mut tail).map_err(io_error)?;
 
     let mut candidates = Vec::new();
@@ -271,8 +286,7 @@ fn preflight_regular_zip(
             if read_u32(&tail, offset) != EOCD_SIGNATURE {
                 continue;
             }
-            let comment_len =
-                u16::from_le_bytes([tail[offset + 20], tail[offset + 21]]) as usize;
+            let comment_len = u16::from_le_bytes([tail[offset + 20], tail[offset + 21]]) as usize;
             if offset + EOCD_FIXED_BYTES + comment_len == tail.len() {
                 candidates.push(offset);
             }
@@ -297,7 +311,8 @@ fn preflight_regular_zip(
             "multi-disk or split ZIP archives are not in the independent replay subset".into(),
         ));
     }
-    if entries_total == u16::MAX || central_bytes == u64::from(u32::MAX)
+    if entries_total == u16::MAX
+        || central_bytes == u64::from(u32::MAX)
         || central_offset == u64::from(u32::MAX)
     {
         return Err(ReplayError::Unsupported(
@@ -318,9 +333,13 @@ fn preflight_regular_zip(
     let central_absolute = eocd_absolute.checked_sub(central_bytes).ok_or_else(|| {
         ReplayError::Rejected("central-directory range underflows source".into())
     })?;
-    let archive_start = central_absolute.checked_sub(central_offset).ok_or_else(|| {
-        ReplayError::Rejected("ZIP-relative central-directory offset underflows source".into())
-    })?;
+    let archive_start = central_absolute
+        .checked_sub(central_offset)
+        .ok_or_else(|| {
+            ReplayError::Rejected(
+                "ZIP-relative central-directory offset underflows source".into(),
+            )
+        })?;
     if archive_start != 0 {
         return Err(ReplayError::Unsupported(
             "prefixed/self-extracting carrier layouts are outside this replay subset".into(),
@@ -331,7 +350,7 @@ fn preflight_regular_zip(
             "interstitial records between central directory and EOCD are not in replay subset".into(),
         ));
     }
-    Ok(())
+    Ok(u64::from(entries_total))
 }
 
 fn read_u16(bytes: &[u8], offset: usize) -> u16 {
