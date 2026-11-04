@@ -298,13 +298,13 @@ impl RaceLedger {
             }
         }
 
-        self.apply_kind(&event.kind)?;
+        self.apply_kind(&event.kind, event.order)?;
         self.last_event_order = Some(event.order);
         self.seen_events.insert(event.event_id.clone(), event);
         Ok(())
     }
 
-    fn apply_kind(&mut self, kind: &EventKind) -> Result<(), RaceError> {
+    fn apply_kind(&mut self, kind: &EventKind, event_order: u64) -> Result<(), RaceError> {
         match kind {
             EventKind::Authorize {
                 authorization_id,
@@ -391,7 +391,7 @@ impl RaceLedger {
                         authorization_id: authorization_id.clone(),
                         plan_sha256: plan_sha256.clone(),
                         captured_epoch: *captured_epoch,
-                        started_order: self.last_event_order.unwrap_or(0) + 1,
+                        started_order: event_order,
                         completed: false,
                     },
                 );
@@ -425,7 +425,6 @@ impl RaceLedger {
                 let captured_epoch = producer.captured_epoch;
                 // Completion is allowed after veto only because this producer
                 // captured the active authorization/epoch before revocation.
-                producer.completed = true;
                 if let Some((existing_frame_id, _)) = self.frames.iter().find(|(_, existing)| {
                     existing.range.overlaps(*range)
                 }) {
@@ -434,6 +433,7 @@ impl RaceLedger {
                         incoming_frame_id: *frame_id,
                     });
                 }
+                producer.completed = true;
                 self.frames.insert(
                     *frame_id,
                     RenderedFrameRange {
