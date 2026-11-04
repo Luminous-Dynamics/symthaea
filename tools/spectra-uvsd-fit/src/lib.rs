@@ -330,6 +330,16 @@ pub fn negative_log_likelihood(
     table: &CategoryTable,
     estimate: &UvsdEstimate,
 ) -> Option<f64> {
+    if !estimate.mu.is_finite()
+        || !estimate.sigma.is_finite()
+        || estimate.sigma <= 0.0
+        || estimate.thresholds.len() + 1 != table.categories.len()
+        || estimate.thresholds.windows(2).any(|pair| pair[0] >= pair[1])
+        || estimate.thresholds.iter().any(|value| !value.is_finite())
+    {
+        return None;
+    }
+
     let mut nll = 0.0;
     for (index, row) in table.categories.iter().enumerate() {
         let lower = if index == 0 { f64::NEG_INFINITY } else { estimate.thresholds[index - 1] };
@@ -930,7 +940,7 @@ fn run_nelder_mead(table: &CategoryTable, initial: Vec<f64>, options: FitOptions
 
     simplex.sort_by(|left, right| left.value.total_cmp(&right.value));
     let best = &simplex[0];
-    let gradient_norm = vector_norm(&numeric_gradient(table, &best.point, &lower, &upper));
+    let gradient_norm = vector_norm(&parameter_gradient(table, &best.point));
     let at_boundary = decode_parameters(&best.point, table.categories.len())
         .map(|value| value.3)
         .unwrap_or(true);
@@ -1032,6 +1042,28 @@ mod tests {
                     < 1.0e-3 * (1.0 + finite_difference.abs()),
                 "cut {index}: analytic={} finite_difference={finite_difference}",
                 gradient.thresholds[index]
+            );
+        }
+    }
+
+    #[test]
+    fn transformed_analytic_gradient_matches_parameter_finite_differences() {
+        let table = synthetic_table(1.1, 1.4, 80_000);
+        let parameters = initial_parameters(table.categories.len(), 3);
+        let gradient = parameter_gradient(&table, &parameters);
+        let epsilon = 1.0e-5;
+        for index in 0..parameters.len() {
+            let mut plus = parameters.clone();
+            let mut minus = parameters.clone();
+            plus[index] += epsilon;
+            minus[index] -= epsilon;
+            let finite_difference =
+                (objective(&table, &plus) - objective(&table, &minus)) / (2.0 * epsilon);
+            assert!(
+                (gradient[index] - finite_difference).abs()
+                    < 1.0e-3 * (1.0 + finite_difference.abs()),
+                "parameter {index}: analytic={} finite_difference={finite_difference}",
+                gradient[index]
             );
         }
     }
