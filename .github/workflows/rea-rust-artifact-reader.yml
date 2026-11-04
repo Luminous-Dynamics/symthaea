@@ -37,8 +37,8 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: clippy
-      - name: Resolve updated test-only decoder oracle features
-        run: cargo generate-lockfile --manifest-path tools/rea-artifact-reader-harness/Cargo.toml
+      - name: Validate committed test-only decoder oracle lockfile
+        run: test -f tools/rea-artifact-reader-harness/Cargo.lock
       - name: Show resolved direct dependency graph
         run: cargo tree --manifest-path tools/rea-artifact-reader-harness/Cargo.toml --locked -e normal,dev
       - name: Validate isolated harness metadata
@@ -47,7 +47,7 @@ jobs:
         run: cargo fmt --manifest-path tools/rea-artifact-reader-harness/Cargo.toml -- --check
       - name: ZIP reader adversarial unit tests
         run: cargo test --manifest-path tools/rea-artifact-reader-harness/Cargo.toml --locked
-      - name: Archive resolved isolated harness lockfile
+      - name: Archive committed isolated harness lockfile
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
