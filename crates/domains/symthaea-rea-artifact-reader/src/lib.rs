@@ -2051,6 +2051,7 @@ mod tests {
         assert_eq!(verified.observed_uncompressed_bytes, 11);
         assert_eq!(verified.declared_uncompressed_bytes, 11);
         assert_eq!(verified.declared_compressed_bytes, 11);
+        assert_eq!(verified.observed_crc32, 0x0d4a_1185);
         assert!(verified.verified_crc32);
         assert_eq!(verified.compression_method, 0);
         assert_eq!(reader.inventory().coverage.status, TraversalStatus::Partial);
@@ -2234,6 +2235,7 @@ mod tests {
             .verify_entry_content(0, ContentVerificationLimits::default())
             .unwrap();
         assert_eq!(symthaea.observed_uncompressed_bytes, payload.len() as u64);
+        assert_eq!(symthaea.observed_crc32, crc32(&payload));
         assert!(symthaea.verified_crc32);
 
         // The harness enables zip 9.3.0's flate2/zlib-rs backend. This independently
@@ -2271,6 +2273,7 @@ mod tests {
             "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
         );
         assert_eq!(verified.observed_uncompressed_bytes, 11);
+        assert_eq!(verified.observed_crc32, 0x0d4a_1185);
         fs::remove_file(path).unwrap();
     }
 
@@ -2309,9 +2312,15 @@ mod tests {
     }
 
     #[test]
-    fn crc32_matches_standard_123456789_check_value() {
+    fn crc32_matches_standard_123456789_check_value_and_incremental_chunks() {
         assert_eq!(crc32(b"123456789"), 0xcbf4_3926);
         assert_eq!(crc32(b""), 0);
+
+        let mut incremental = Crc32State::new();
+        incremental.update(b"1234");
+        incremental.update(b"5");
+        incremental.update(b"6789");
+        assert_eq!(incremental.finish(), 0xcbf4_3926);
     }
 
     #[test]
@@ -2451,6 +2460,7 @@ mod tests {
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         );
         assert_eq!(verified.observed_uncompressed_bytes, 0);
+        assert_eq!(verified.observed_crc32, 0);
         assert!(verified.verified_crc32);
         fs::remove_file(path).unwrap();
     }
