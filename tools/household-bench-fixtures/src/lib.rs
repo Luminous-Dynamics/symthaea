@@ -736,11 +736,8 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
                 ("disassembly_steps", 12.0),
                 ("part_lead_time_days", 7.0),
             ] {
-                let observed = required_number(
-                    baseline,
-                    key,
-                    &format!("{path}.synthetic_baseline"),
-                )?;
+                let observed =
+                    required_number(baseline, key, &format!("{path}.synthetic_baseline"))?;
                 if observed != expected {
                     return Err(ValidationError::new(
                         format!("{path}.synthetic_baseline.{key}"),
