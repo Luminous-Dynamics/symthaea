@@ -10,7 +10,7 @@
 //! Values are device/sensor-scope readings, not process-energy attribution.
 
 use serde::Serialize;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::thread;
 use std::time::Duration;
 use symthaea_energy_meter_verification::physics::energy_meter::{
