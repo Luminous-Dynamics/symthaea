@@ -34,3 +34,20 @@ The score is intentionally not an audio classifier score. The supplied v1 fixtur
 Use these fixtures as unit tests only. Expand into multi-renderer symbolic renderings and musician-annotated real sessions. Use at least three independent musician annotations per real item, preserve disagreement, and split by performer, composition and ensemble. Keep synthetic and real cohorts separate.
 
 No claim about subjective musical understanding, consciousness or real-world ensemble superiority is authorized by this v1.
+
+
+## Aggregate metrics and frozen baseline controls
+
+The Rust evaluator exposes `score_musical_context_counterfactual_set_v1`, with separate output fields for:
+- member-level valid-action support;
+- counterfactual sensitivity on intent-changing pairs;
+- invariance on surface-only pairs;
+- valid-action coverage on ambiguous cases;
+- per-family scores and exact denominators.
+
+There is deliberately no composite score. The checked-in `mctx-baselines-v1.json` includes:
+1. `LOCAL-CUE-ONLY-001`: repeats the action for a matching local cue and therefore fails the intent-changing pair.
+2. `INSTRUMENT-SURFACE-ONLY-001`: changes action based on piano/guitar surface and therefore fails the irrelevant-surface invariance pair.
+3. `EXPLICIT-CONTEXT-RULE-SANITY-001`: a hand-written symbolic rule sanity check that satisfies the toy fixture. This is not a learned model, an audio system, or a competitive result.
+
+These controls demonstrate that the paired fixture design distinguishes the behaviours it claims to measure. They do not establish real-world model performance.
