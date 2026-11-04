@@ -14,25 +14,64 @@ pub enum RaceError {
     EmptyIdentity,
     InvalidDigest,
     InvalidFrameRange,
-    OutOfOrderEvent { previous: u64, received: u64 },
-    ConflictingDuplicateEvent { event_id: String },
-    DuplicateAuthorization { authorization_id: String },
-    UnknownAuthorization { authorization_id: String },
-    RevokedAuthorization { authorization_id: String },
-    ControlSequenceRegression { previous: u64, received: u64 },
-    AuthorizationEpochMismatch { expected: u64, received: u64 },
+    OutOfOrderEvent {
+        previous: u64,
+        received: u64,
+    },
+    ConflictingDuplicateEvent {
+        event_id: String,
+    },
+    DuplicateAuthorization {
+        authorization_id: String,
+    },
+    UnknownAuthorization {
+        authorization_id: String,
+    },
+    RevokedAuthorization {
+        authorization_id: String,
+    },
+    ControlSequenceRegression {
+        previous: u64,
+        received: u64,
+    },
+    AuthorizationEpochMismatch {
+        expected: u64,
+        received: u64,
+    },
     VetoAuthorityRejected,
     VetoTurnMismatch,
-    VetoEpochMismatch { expected: u64, prior: u64, next: u64 },
+    VetoEpochMismatch {
+        expected: u64,
+        prior: u64,
+        next: u64,
+    },
     EpochExhausted,
-    DuplicateFrame { frame_id: u64 },
-    UnknownFrame { frame_id: u64 },
-    FrameBindingMismatch { frame_id: u64 },
-    FrameAlreadyEnqueued { frame_id: u64 },
-    FrameNotEnqueued { frame_id: u64 },
-    FrameAlreadyTerminal { frame_id: u64 },
-    CallbackEpochRegression { expected_at_least: u64, observed: u64 },
-    CallbackObservedFutureEpoch { current: u64, observed: u64 },
+    DuplicateFrame {
+        frame_id: u64,
+    },
+    UnknownFrame {
+        frame_id: u64,
+    },
+    FrameBindingMismatch {
+        frame_id: u64,
+    },
+    FrameAlreadyEnqueued {
+        frame_id: u64,
+    },
+    FrameNotEnqueued {
+        frame_id: u64,
+    },
+    FrameAlreadyTerminal {
+        frame_id: u64,
+    },
+    CallbackEpochRegression {
+        expected_at_least: u64,
+        observed: u64,
+    },
+    CallbackObservedFutureEpoch {
+        current: u64,
+        observed: u64,
+    },
 }
 
 impl std::fmt::Display for RaceError {
@@ -56,6 +95,10 @@ impl FrameRange {
 
     pub fn len(self) -> u64 {
         self.end - self.start
+    }
+
+    pub fn is_empty(self) -> bool {
+        self.start >= self.end
     }
 }
 
@@ -278,14 +321,15 @@ impl RaceLedger {
                     return Err(RaceError::InvalidFrameRange);
                 }
                 if self.frames.contains_key(frame_id) {
-                    return Err(RaceError::DuplicateFrame { frame_id: *frame_id });
+                    return Err(RaceError::DuplicateFrame {
+                        frame_id: *frame_id,
+                    });
                 }
-                let auth = self
-                    .authorizations
-                    .get(authorization_id)
-                    .ok_or_else(|| RaceError::UnknownAuthorization {
+                let auth = self.authorizations.get(authorization_id).ok_or_else(|| {
+                    RaceError::UnknownAuthorization {
                         authorization_id: authorization_id.clone(),
-                    })?;
+                    }
+                })?;
                 if auth.plan_sha256 != *plan_sha256 || auth.epoch != *captured_epoch {
                     return Err(RaceError::FrameBindingMismatch {
                         frame_id: *frame_id,
@@ -310,9 +354,13 @@ impl RaceLedger {
                 let frame = self
                     .frames
                     .get_mut(frame_id)
-                    .ok_or(RaceError::UnknownFrame { frame_id: *frame_id })?;
+                    .ok_or(RaceError::UnknownFrame {
+                        frame_id: *frame_id,
+                    })?;
                 if frame.enqueued {
-                    return Err(RaceError::FrameAlreadyEnqueued { frame_id: *frame_id });
+                    return Err(RaceError::FrameAlreadyEnqueued {
+                        frame_id: *frame_id,
+                    });
                 }
                 // Do not reject post-veto enqueue: recording the stale fact is
                 // necessary to account for late completion of in-flight work.
@@ -371,10 +419,14 @@ impl RaceLedger {
                     .get_mut(frame_id)
                     .ok_or(RaceError::UnknownFrame { frame_id: *frame_id })?;
                 if !frame.enqueued {
-                    return Err(RaceError::FrameNotEnqueued { frame_id: *frame_id });
+                    return Err(RaceError::FrameNotEnqueued {
+                        frame_id: *frame_id,
+                    });
                 }
                 if frame.disposition.is_some() {
-                    return Err(RaceError::FrameAlreadyTerminal { frame_id: *frame_id });
+                    return Err(RaceError::FrameAlreadyTerminal {
+                        frame_id: *frame_id,
+                    });
                 }
                 if *observed_epoch < self.current_epoch {
                     return Err(RaceError::CallbackEpochRegression {
@@ -643,7 +695,10 @@ mod tests {
             "bad-retag",
             EventKind::Render {
                 frame_id: 8,
-                range: FrameRange { start: 800, end: 900 },
+                range: FrameRange {
+                    start: 800,
+                    end: 900,
+                },
                 authorization_id: "auth-1".into(),
                 plan_sha256: PLAN_A.into(),
                 captured_epoch: 1,
