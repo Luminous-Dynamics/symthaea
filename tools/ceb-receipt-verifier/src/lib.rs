@@ -287,10 +287,7 @@ const MAX_PATCH_RECONSTRUCTION_BYTES: u64 = 512 * 1024 * 1024;
 #[derive(Clone, Debug)]
 enum TreeEntryContent {
     File(PathBuf),
-    Symlink {
-        path: PathBuf,
-        target: Vec<u8>,
-    },
+    Symlink { path: PathBuf, target: Vec<u8> },
 }
 
 #[derive(Clone, Debug)]
@@ -1027,6 +1024,339 @@ fn hash_source_tree_inner(root: &Path) -> Result<String, Failure> {
         tree_hasher.update(content_digest);
     }
     Ok(format!("{:x}", tree_hasher.finalize()))
+}
+
+const MAX_AGENT_VIEW_MANIFEST_BYTES: usize = 8 * 1024 * 1024;
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct AgentViewManifest {
+    schema_version: u32,
+    manifest_kind: String,
+    task_id: String,
+    package_id: String,
+    status: String,
+    source_repository: String,
+    source_revision: String,
+    tree_digest_algorithm: String,
+    tree_sha256: String,
+    entry_count: usize,
+    entries: Vec<AgentViewManifestEntry>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct AgentViewManifestEntry {
+    path: String,
+    mode: String,
+    size_bytes: u64,
+    sha256: String,
+}
+
+/// Inputs for static verification of a released agent-view directory.
+///
+/// Both the manifest hash and tree digest are expected from an out-of-band
+/// task registry/control plane. Neither value is authenticated by the
+/// manifest itself.
+pub struct AgentViewInputs {
+    pub snapshot_dir: PathBuf,
+    pub manifest: Vec<u8>,
+    pub expected_manifest_sha256: String,
+    pub expected_tree_sha256: String,
+    pub expected_task_id: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct AgentViewReport {
+    pub report_version: u32,
+    pub verifier_version: &'static str,
+    pub status: String,
+    pub accepted: bool,
+    pub task_id: Option<String>,
+    pub manifest_sha256: Option<String>,
+    pub tree_sha256: Option<String>,
+    pub entry_count: usize,
+    pub reasons: Vec<String>,
+    pub claim_ceiling: &'static str,
+}
+
+fn safe_agent_view_relative_path(path: &str) -> bool {
+    if !safe_tree_relative_path(path) || !path.is_ascii() {
+        return false;
+    }
+    path.split('/').all(|component| {
+        if component.ends_with('.')
+            || component.ends_with(' ')
+            || component
+                .bytes()
+                .any(|byte| byte < 0x20 || matches!(byte, b'<' | b'>' | b'"' | b'|' | b'?' | b'*'))
+        {
+            return false;
+        }
+        let stem = component
+            .split('.')
+            .next()
+            .unwrap_or("")
+            .trim_end_matches(|character| matches!(character, ' ' | '.'))
+            .to_ascii_uppercase();
+        !matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+            && !(stem.len() == 4
+                && (stem.starts_with("COM") || stem.starts_with("LPT"))
+                && matches!(stem.as_bytes()[3], b'1'..=b'9'))
+    })
+}
+
+fn hash_agent_view_snapshot(root: &Path) -> Result<(String, Vec<AgentViewManifestEntry>), Failure> {
+    let root_metadata = fs::symlink_metadata(root).map_err(|error| {
+        Failure::protocol(format!(
+            "cannot stat agent-view root {}: {error}",
+            root.display()
+        ))
+    })?;
+    if !root_metadata.file_type().is_dir() {
+        return Err(Failure::protocol(
+            "agent-view snapshot root must be a real directory, not a symlink or file",
+        ));
+    }
+    let entries = collect_snapshot_entries(root)?;
+    if entries.is_empty() {
+        return Err(Failure::unresolved("agent view must not be empty"));
+    }
+
+    let mut seen_casefolded_prefixes: BTreeMap<String, String> = BTreeMap::new();
+    let mut manifest_entries = Vec::with_capacity(entries.len());
+    let mut tree_hasher = Sha256::new();
+    tree_hasher.update(b"CEB-TREE-V1\0");
+    tree_hasher.update((entries.len() as u64).to_be_bytes());
+
+    for entry in entries {
+        if !safe_agent_view_relative_path(&entry.relative_path) {
+            return Err(Failure::protocol(format!(
+                "agent view contains a non-portable or unsafe path: {}",
+                entry.relative_path
+            )));
+        }
+        let mut prefix = String::new();
+        for component in entry.relative_path.split('/') {
+            if !prefix.is_empty() {
+                prefix.push('/');
+            }
+            prefix.push_str(component);
+            let folded = prefix.to_ascii_lowercase();
+            if let Some(existing) = seen_casefolded_prefixes.get(&folded) {
+                if existing != &prefix {
+                    return Err(Failure::protocol(format!(
+                        "agent-view paths collide under case-insensitive extraction: {existing} vs {prefix}"
+                    )));
+                }
+            } else {
+                seen_casefolded_prefixes.insert(folded, prefix.clone());
+            }
+        }
+
+        let TreeEntryContent::File(path) = entry.content else {
+            return Err(Failure::protocol(format!(
+                "V0 agent views do not permit symlinks: {}",
+                entry.relative_path
+            )));
+        };
+        let metadata = fs::symlink_metadata(&path).map_err(|error| {
+            Failure::protocol(format!(
+                "cannot stat agent-view file {}: {error}",
+                path.display()
+            ))
+        })?;
+        if !metadata.file_type().is_file()
+            || metadata.len() != entry.size
+            || is_executable(&metadata) != entry.executable
+        {
+            return Err(Failure::unresolved(format!(
+                "agent-view file metadata changed while hashing: {}",
+                entry.relative_path
+            )));
+        }
+
+        let mut file = File::open(&path).map_err(|error| {
+            Failure::protocol(format!(
+                "cannot open agent-view file {}: {error}",
+                path.display()
+            ))
+        })?;
+        let mut content_hasher = Sha256::new();
+        let mut total = 0u64;
+        let mut buffer = [0u8; 64 * 1024];
+        loop {
+            let read = file.read(&mut buffer).map_err(|error| {
+                Failure::protocol(format!(
+                    "cannot read agent-view file {}: {error}",
+                    path.display()
+                ))
+            })?;
+            if read == 0 {
+                break;
+            }
+            total = total
+                .checked_add(read as u64)
+                .ok_or_else(|| Failure::protocol("agent-view file length overflow"))?;
+            if total > entry.size || total > MAX_TREE_BYTES {
+                return Err(Failure::unresolved(format!(
+                    "agent-view file changed or exceeded its declared size: {}",
+                    entry.relative_path
+                )));
+            }
+            content_hasher.update(&buffer[..read]);
+        }
+        if total != entry.size {
+            return Err(Failure::unresolved(format!(
+                "agent-view file size changed while hashing: {}",
+                entry.relative_path
+            )));
+        }
+        let content_digest = content_hasher.finalize();
+        let content_sha256 = format!("{content_digest:x}");
+
+        let path_bytes = entry.relative_path.as_bytes();
+        tree_hasher.update((path_bytes.len() as u64).to_be_bytes());
+        tree_hasher.update(path_bytes);
+        tree_hasher.update(entry.size.to_be_bytes());
+        tree_hasher.update([b'F']);
+        tree_hasher.update([u8::from(entry.executable)]);
+        // The CEB-TREE-V1 entry commits to the SHA-256 digest of the file bytes.
+        tree_hasher.update(content_digest);
+
+        manifest_entries.push(AgentViewManifestEntry {
+            path: entry.relative_path,
+            mode: if entry.executable { "100755" } else { "100644" }.to_string(),
+            size_bytes: entry.size,
+            sha256: content_sha256,
+        });
+    }
+
+    Ok((format!("{:x}", tree_hasher.finalize()), manifest_entries))
+}
+
+fn verify_agent_view_inner(inputs: &AgentViewInputs) -> Result<AgentViewReport, Failure> {
+    if inputs.manifest.len() > MAX_AGENT_VIEW_MANIFEST_BYTES {
+        return Err(Failure::protocol(
+            "agent-view manifest exceeds the 8 MiB limit",
+        ));
+    }
+    if !is_sha256(&inputs.expected_manifest_sha256)
+        || sha256_hex(&inputs.manifest) != inputs.expected_manifest_sha256
+    {
+        return Err(Failure::protocol(
+            "agent-view manifest does not match its out-of-band SHA-256 pin",
+        ));
+    }
+    if !is_sha256(&inputs.expected_tree_sha256) {
+        return Err(Failure::protocol(
+            "expected agent-view CEB-TREE-V1 SHA-256 must be lowercase 64-character hex",
+        ));
+    }
+
+    let value = parse_strict_json(&inputs.manifest, "agent-view manifest")?;
+    let manifest: AgentViewManifest = serde_json::from_value(value)
+        .map_err(|error| Failure::protocol(format!("invalid agent-view manifest: {error}")))?;
+
+    if manifest.schema_version != 0
+        || manifest.manifest_kind != "ceb-agent-view-v1"
+        || manifest.status != "public_development_only_not_sealed"
+        || manifest.tree_digest_algorithm != TREE_DIGEST_ALGORITHM
+        || manifest.task_id != inputs.expected_task_id
+        || manifest.task_id.trim().is_empty()
+        || manifest.package_id.trim().is_empty()
+        || manifest.source_repository.trim().is_empty()
+        || manifest.source_revision.trim().is_empty()
+    {
+        return Err(Failure::protocol(
+            "agent-view manifest identity, task binding, status or digest algorithm is invalid",
+        ));
+    }
+    if manifest.entries.is_empty()
+        || manifest.entries.len() != manifest.entry_count
+        || manifest.entries.len() > MAX_TREE_FILES
+    {
+        return Err(Failure::protocol(
+            "agent-view manifest entry_count is empty, oversized or inconsistent",
+        ));
+    }
+
+    let mut previous_path: Option<&str> = None;
+    for entry in &manifest.entries {
+        if !safe_agent_view_relative_path(&entry.path)
+            || !is_sha256(&entry.sha256)
+            || !matches!(entry.mode.as_str(), "100644" | "100755")
+            || previous_path.is_some_and(|previous| previous.as_bytes() >= entry.path.as_bytes())
+        {
+            return Err(Failure::protocol(
+                "agent-view manifest paths must be safe, ASCII, strictly sorted and unique; modes and hashes must be valid",
+            ));
+        }
+        previous_path = Some(&entry.path);
+    }
+
+    let (actual_tree_sha256, actual_entries) = hash_agent_view_snapshot(&inputs.snapshot_dir)?;
+    if actual_entries.len() != manifest.entries.len() {
+        return Err(Failure::protocol(
+            "agent-view inventory does not contain exactly the manifest-listed files",
+        ));
+    }
+    for (expected, actual) in manifest.entries.iter().zip(actual_entries.iter()) {
+        if expected.path != actual.path
+            || expected.mode != actual.mode
+            || expected.size_bytes != actual.size_bytes
+            || expected.sha256 != actual.sha256
+        {
+            return Err(Failure::protocol(format!(
+                "agent-view manifest entry does not match packaged file: {}",
+                expected.path
+            )));
+        }
+    }
+    if manifest.tree_sha256 != actual_tree_sha256
+        || inputs.expected_tree_sha256 != actual_tree_sha256
+    {
+        return Err(Failure::protocol(
+            "agent-view CEB-TREE-V1 digest does not match the manifest and out-of-band pin",
+        ));
+    }
+
+    Ok(AgentViewReport {
+        report_version: 1,
+        verifier_version: env!("CARGO_PKG_VERSION"),
+        status: "inventory_verified".to_string(),
+        accepted: true,
+        task_id: Some(manifest.task_id),
+        manifest_sha256: Some(sha256_hex(&inputs.manifest)),
+        tree_sha256: Some(actual_tree_sha256),
+        entry_count: actual_entries.len(),
+        reasons: Vec::new(),
+        claim_ceiling: "The pinned manifest exactly matches the enumerated public-development agent-view files, per-file hashes, modes and CEB-TREE-V1 digest. This does not establish hidden-oracle custody, sealed-holdout status, runner isolation, licensing rights or task correctness.",
+    })
+}
+
+/// Verify a source-only agent-view directory against a strict inventory manifest.
+///
+/// The expected manifest digest, expected task ID and expected CEB-TREE-V1
+/// digest must be supplied by an out-of-band task registry/control plane.
+/// V0 accepts only public-development manifests and regular files; it does not
+/// establish sealed-answer custody or runner isolation.
+pub fn verify_agent_view(inputs: AgentViewInputs) -> AgentViewReport {
+    match verify_agent_view_inner(&inputs) {
+        Ok(report) => report,
+        Err(failure) => AgentViewReport {
+            report_version: 1,
+            verifier_version: env!("CARGO_PKG_VERSION"),
+            status: failure.status.to_string(),
+            accepted: false,
+            task_id: None,
+            manifest_sha256: None,
+            tree_sha256: None,
+            entry_count: 0,
+            reasons: vec![failure.reason],
+            claim_ceiling: "No agent-view inventory acceptance claim; manifest, path, content or tree validation failed.",
+        },
+    }
 }
 
 fn validate_against_schema(
@@ -3043,6 +3373,328 @@ mod tests {
         .unwrap()
     }
 
+    #[cfg(unix)]
+    fn test_agent_view_manifest(root: &Path, task_id: &str) -> Vec<u8> {
+        let (tree_sha256, entries) = hash_agent_view_snapshot(root).unwrap();
+        let manifest = AgentViewManifest {
+            schema_version: 0,
+            manifest_kind: "ceb-agent-view-v1".into(),
+            task_id: task_id.into(),
+            package_id: "test-public-development-view".into(),
+            status: "public_development_only_not_sealed".into(),
+            source_repository: "Luminous-Dynamics/symthaea".into(),
+            source_revision: "0123456789abcdef".into(),
+            tree_digest_algorithm: TREE_DIGEST_ALGORITHM.into(),
+            tree_sha256,
+            entry_count: entries.len(),
+            entries,
+        };
+        serde_json::to_vec(&manifest).unwrap()
+    }
+
+    #[cfg(unix)]
+    fn verify_test_agent_view(
+        root: &Path,
+        manifest: &[u8],
+        task_id: &str,
+        tree_sha256: &str,
+    ) -> AgentViewReport {
+        verify_agent_view(AgentViewInputs {
+            snapshot_dir: root.to_path_buf(),
+            manifest: manifest.to_vec(),
+            expected_manifest_sha256: sha256_hex(manifest),
+            expected_tree_sha256: tree_sha256.to_string(),
+            expected_task_id: task_id.to_string(),
+        })
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_view_inventory_matches_existing_ceb_tree_digest() {
+        use std::fs;
+        let root = tempfile::tempdir().unwrap();
+        fs::create_dir_all(root.path().join("src")).unwrap();
+        fs::write(
+            root.path().join("Cargo.toml"),
+            b"[package]\nname = \"demo\"\n",
+        )
+        .unwrap();
+        fs::write(
+            root.path().join("src/lib.rs"),
+            b"pub fn answer() -> u8 { 42 }\n",
+        )
+        .unwrap();
+
+        let (view_digest, entries) = hash_agent_view_snapshot(root.path()).unwrap();
+        let receipt_digest = hash_source_tree_inner(root.path()).unwrap();
+        assert_eq!(view_digest, receipt_digest);
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].path, "Cargo.toml");
+        assert_eq!(entries[0].mode, "100644");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_view_verifier_accepts_exact_pinned_public_development_inventory() {
+        use std::fs;
+        let root = tempfile::tempdir().unwrap();
+        fs::create_dir_all(root.path().join("src")).unwrap();
+        fs::write(root.path().join("Cargo.toml"), b"[package]\n").unwrap();
+        fs::write(root.path().join("src/lib.rs"), b"pub fn ok() {}\n").unwrap();
+        let manifest = test_agent_view_manifest(root.path(), "CEB-REPO-001");
+        let tree_digest = hash_source_tree_inner(root.path()).unwrap();
+
+        let report = verify_test_agent_view(root.path(), &manifest, "CEB-REPO-001", &tree_digest);
+        assert!(report.accepted, "{:?}", report.reasons);
+        assert_eq!(report.status, "inventory_verified");
+        assert_eq!(report.entry_count, 2);
+        assert_eq!(report.tree_sha256.as_deref(), Some(tree_digest.as_str()));
+        assert!(
+            report
+                .claim_ceiling
+                .contains("does not establish hidden-oracle custody")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_view_verifier_rejects_extra_and_missing_files() {
+        use std::fs;
+        let root = tempfile::tempdir().unwrap();
+        fs::write(root.path().join("Cargo.toml"), b"[package]\n").unwrap();
+        let manifest = test_agent_view_manifest(root.path(), "CEB-REPO-001");
+        let tree_digest = hash_source_tree_inner(root.path()).unwrap();
+
+        fs::write(root.path().join("unexpected.txt"), b"extra").unwrap();
+        let extra = verify_test_agent_view(root.path(), &manifest, "CEB-REPO-001", &tree_digest);
+        assert!(!extra.accepted);
+        fs::remove_file(root.path().join("unexpected.txt")).unwrap();
+
+        fs::remove_file(root.path().join("Cargo.toml")).unwrap();
+        let missing = verify_test_agent_view(root.path(), &manifest, "CEB-REPO-001", &tree_digest);
+        assert!(!missing.accepted);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_view_verifier_rejects_wrong_task_and_out_of_band_pins() {
+        use std::fs;
+        let root = tempfile::tempdir().unwrap();
+        fs::write(root.path().join("lib.rs"), b"pub fn ok() {}\n").unwrap();
+        let manifest = test_agent_view_manifest(root.path(), "CEB-REPO-001");
+        let tree_digest = hash_source_tree_inner(root.path()).unwrap();
+
+        assert!(
+            !verify_test_agent_view(root.path(), &manifest, "CEB-REVIEW-001", &tree_digest)
+                .accepted
+        );
+        let wrong_tree_pin = verify_agent_view(AgentViewInputs {
+            snapshot_dir: root.path().to_path_buf(),
+            manifest: manifest.clone(),
+            expected_manifest_sha256: sha256_hex(&manifest),
+            expected_tree_sha256: "a".repeat(64),
+            expected_task_id: "CEB-REPO-001".into(),
+        });
+        assert!(!wrong_tree_pin.accepted);
+        let wrong_manifest_pin = verify_agent_view(AgentViewInputs {
+            snapshot_dir: root.path().to_path_buf(),
+            manifest: manifest.clone(),
+            expected_manifest_sha256: "b".repeat(64),
+            expected_tree_sha256: tree_digest,
+            expected_task_id: "CEB-REPO-001".into(),
+        });
+        assert!(!wrong_manifest_pin.accepted);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_view_verifier_rejects_symlinks() {
+        use std::fs;
+        use std::os::unix::fs::symlink;
+        let root = tempfile::tempdir().unwrap();
+        let outside = tempfile::NamedTempFile::new().unwrap();
+        fs::write(root.path().join("lib.rs"), b"pub fn ok() {}\n").unwrap();
+        let manifest = test_agent_view_manifest(root.path(), "CEB-REPO-001");
+        let tree_digest = hash_source_tree_inner(root.path()).unwrap();
+        symlink(outside.path(), root.path().join("linked.txt")).unwrap();
+        let report = verify_test_agent_view(root.path(), &manifest, "CEB-REPO-001", &tree_digest);
+        assert!(!report.accepted);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_view_manifest_rejects_unsafe_and_case_colliding_paths() {
+        use std::fs;
+        for path in [
+            "../secret",
+            "/etc/passwd",
+            "src\\escape.rs",
+            "CON.txt",
+            "CON .txt",
+            "nul ",
+            "src/trailing.",
+            "src/line\nfeed.rs",
+            "src/question?.rs",
+            "src/pipe|name.rs",
+        ] {
+            assert!(!safe_agent_view_relative_path(path), "accepted {path:?}");
+        }
+        assert!(safe_agent_view_relative_path("src/lib.rs"));
+        assert!(safe_agent_view_relative_path("Cargo.toml"));
+
+        let root = tempfile::tempdir().unwrap();
+        fs::create_dir_all(root.path().join("Src")).unwrap();
+        fs::write(root.path().join("Src/lib.rs"), b"upper").unwrap();
+        let manifest = test_agent_view_manifest(root.path(), "CEB-REPO-001");
+        fs::create_dir_all(root.path().join("src")).unwrap();
+        fs::write(root.path().join("src/other.rs"), b"lower").unwrap();
+        let tree_digest = hash_source_tree_inner(root.path()).unwrap();
+        let report = verify_test_agent_view(root.path(), &manifest, "CEB-REPO-001", &tree_digest);
+        assert!(!report.accepted);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_view_verifier_rejects_content_and_mode_changes() {
+        use std::fs;
+        use std::os::unix::fs::PermissionsExt;
+        let root = tempfile::tempdir().unwrap();
+        let file_path = root.path().join("lib.rs");
+        fs::write(&file_path, b"pub fn ok() {}\n").unwrap();
+        let manifest = test_agent_view_manifest(root.path(), "CEB-REPO-001");
+        let digest = hash_source_tree_inner(root.path()).unwrap();
+
+        fs::write(&file_path, b"pub fn no() {}\n").unwrap();
+        let changed_content =
+            verify_test_agent_view(root.path(), &manifest, "CEB-REPO-001", &digest);
+        assert!(!changed_content.accepted);
+
+        fs::write(&file_path, b"pub fn ok() {}\n").unwrap();
+        let manifest = test_agent_view_manifest(root.path(), "CEB-REPO-001");
+        let digest = hash_source_tree_inner(root.path()).unwrap();
+        let mut permissions = fs::metadata(&file_path).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&file_path, permissions).unwrap();
+        let changed_mode = verify_test_agent_view(root.path(), &manifest, "CEB-REPO-001", &digest);
+        assert!(!changed_mode.accepted);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_view_verifier_rejects_reordered_duplicate_and_wrong_mode_entries() {
+        use std::fs;
+        let root = tempfile::tempdir().unwrap();
+        fs::write(root.path().join("a.rs"), b"a").unwrap();
+        fs::write(root.path().join("b.rs"), b"b").unwrap();
+        let manifest = test_agent_view_manifest(root.path(), "CEB-REPO-001");
+        let digest = hash_source_tree_inner(root.path()).unwrap();
+        let mut value: Value = serde_json::from_slice(&manifest).unwrap();
+
+        value["entries"].as_array_mut().unwrap().swap(0, 1);
+        let reordered = serde_json::to_vec(&value).unwrap();
+        assert!(!verify_test_agent_view(root.path(), &reordered, "CEB-REPO-001", &digest).accepted);
+
+        let mut value: Value = serde_json::from_slice(&manifest).unwrap();
+        value["entries"][1]["path"] = value["entries"][0]["path"].clone();
+        let duplicate = serde_json::to_vec(&value).unwrap();
+        assert!(!verify_test_agent_view(root.path(), &duplicate, "CEB-REPO-001", &digest).accepted);
+
+        let mut value: Value = serde_json::from_slice(&manifest).unwrap();
+        value["entries"][0]["mode"] = Value::String("100755".into());
+        let wrong_mode = serde_json::to_vec(&value).unwrap();
+        assert!(
+            !verify_test_agent_view(root.path(), &wrong_mode, "CEB-REPO-001", &digest).accepted
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_view_verifier_rejects_symlink_snapshot_root() {
+        use std::fs;
+        use std::os::unix::fs::symlink;
+        let parent = tempfile::tempdir().unwrap();
+        let real_root = parent.path().join("real");
+        fs::create_dir_all(&real_root).unwrap();
+        fs::write(real_root.join("lib.rs"), b"pub fn ok() {}\n").unwrap();
+        let manifest = test_agent_view_manifest(&real_root, "CEB-REPO-001");
+        let digest = hash_source_tree_inner(&real_root).unwrap();
+        let linked_root = parent.path().join("linked");
+        symlink(&real_root, &linked_root).unwrap();
+        let report = verify_test_agent_view(&linked_root, &manifest, "CEB-REPO-001", &digest);
+        assert!(!report.accepted);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_view_verifier_rejects_manifest_tree_and_entry_digest_tampering() {
+        use std::fs;
+        let root = tempfile::tempdir().unwrap();
+        fs::write(root.path().join("lib.rs"), b"pub fn ok() {}\n").unwrap();
+        let manifest = test_agent_view_manifest(root.path(), "CEB-REPO-001");
+        let tree_digest = hash_source_tree_inner(root.path()).unwrap();
+
+        let mut value: Value = serde_json::from_slice(&manifest).unwrap();
+        value["tree_sha256"] = Value::String("a".repeat(64));
+        let wrong_tree = serde_json::to_vec(&value).unwrap();
+        assert!(
+            !verify_test_agent_view(root.path(), &wrong_tree, "CEB-REPO-001", &tree_digest)
+                .accepted
+        );
+
+        let mut value: Value = serde_json::from_slice(&manifest).unwrap();
+        value["entries"][0]["sha256"] = Value::String("b".repeat(64));
+        let wrong_entry = serde_json::to_vec(&value).unwrap();
+        assert!(
+            !verify_test_agent_view(root.path(), &wrong_entry, "CEB-REPO-001", &tree_digest)
+                .accepted
+        );
+
+        let mut value: Value = serde_json::from_slice(&manifest).unwrap();
+        value["entries"][0]["size_bytes"] = Value::from(999u64);
+        let wrong_size = serde_json::to_vec(&value).unwrap();
+        assert!(
+            !verify_test_agent_view(root.path(), &wrong_size, "CEB-REPO-001", &tree_digest)
+                .accepted
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_view_verifier_rejects_an_empty_snapshot() {
+        let root = tempfile::tempdir().unwrap();
+        let report = verify_agent_view(AgentViewInputs {
+            snapshot_dir: root.path().to_path_buf(),
+            manifest: b"{}".to_vec(),
+            expected_manifest_sha256: sha256_hex(b"{}"),
+            expected_tree_sha256: "a".repeat(64),
+            expected_task_id: "CEB-REPO-001".into(),
+        });
+        assert!(!report.accepted);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_view_manifest_rejects_sealed_status_and_unknown_fields() {
+        use std::fs;
+        let root = tempfile::tempdir().unwrap();
+        fs::write(root.path().join("lib.rs"), b"pub fn ok() {}\n").unwrap();
+        let manifest = test_agent_view_manifest(root.path(), "CEB-REPO-001");
+        let tree_digest = hash_source_tree_inner(root.path()).unwrap();
+        let mut value: Value = serde_json::from_slice(&manifest).unwrap();
+        value["status"] = Value::String("sealed_private_holdout".into());
+        let sealed = serde_json::to_vec(&value).unwrap();
+        assert!(
+            !verify_test_agent_view(root.path(), &sealed, "CEB-REPO-001", &tree_digest).accepted
+        );
+
+        value["status"] = Value::String("public_development_only_not_sealed".into());
+        value["unexpected"] = Value::Bool(true);
+        let unknown = serde_json::to_vec(&value).unwrap();
+        assert!(
+            !verify_test_agent_view(root.path(), &unknown, "CEB-REPO-001", &tree_digest).accepted
+        );
+    }
+
     #[test]
     fn complete_independently_signed_primary_regrade_pair_is_accepted() {
         use std::fs;
@@ -3521,5 +4173,4 @@ mod tests {
         let repository = git2::Repository::init_bare(&object_database).unwrap();
         assert!(build_git_tree_from_entries(&repository, &entries, "").is_err());
     }
-
 }

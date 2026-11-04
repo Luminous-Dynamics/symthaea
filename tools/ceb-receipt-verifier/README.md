@@ -71,6 +71,27 @@ This prints the algorithm identifier and lowercase SHA-256. The resulting digest
 must be committed to the task contract by the trusted task registry; do not accept
 a task and its purported digest from the same untrusted source.
 
+
+Verify a source-only public-development agent view. The manifest SHA-256 and
+CEB-TREE-V1 digest must both be supplied out-of-band by the task registry:
+
+```sh
+cargo run --manifest-path tools/ceb-receipt-verifier/Cargo.toml --release -- verify-agent-view \\
+  --directory ./agent-view/workspace \\
+  --manifest ./agent-view/manifest.v0.json \\
+  --task-id CEB-REPO-001 \\
+  --expected-manifest-sha256 <64-lowercase-hex> \\
+  --expected-tree-sha256 <64-lowercase-hex>
+```
+
+The V0 verifier accepts only a strict public-development manifest, exact
+regular-file inventories, `100644`/`100755` modes, per-file SHA-256 digests and
+the existing CEB-TREE-V1 digest. It rejects symlinks, special files, `.git`,
+non-ASCII and unsafe/non-portable names, case-fold collisions, extra/missing
+files, unsorted/duplicate manifest entries, unpinned manifests, and any
+manifest claiming sealed status. The manifest is metadata outside the hashed
+`workspace` payload so the digest is not self-referential.
+
 ```sh
 cargo run --manifest-path tools/ceb-receipt-verifier/Cargo.toml --release -- verify-pair \
   --task-contract task.json \
@@ -123,6 +144,10 @@ field, so the same immutable inputs produce byte-stable JSON.
 
 ## Claim boundary
 
+The `verify-agent-view` command validates only static package integrity:
+manifest pin, task binding, exact path inventory, per-file digests/modes and
+CEB-TREE-V1 payload digest. It does not prove answer secrecy, evaluator
+independence, licensing rights, sealed-holdout custody or runner isolation.
 This verifier validates evidence artifacts. It does not create a secure runner,
 prove that a claimed model provider served a named model, or turn signatures
 into proof that an untrusted machine was isolated. The runner, grader, signing
@@ -170,6 +195,12 @@ resulting Git tree object to match the independently built result snapshot. This
 closes the path-only consistency gap. Binary patches and quoted/ambiguous paths
 remain unresolved in CEB V0. The reconstruction limit is 512 MiB combined source
 and result snapshot bytes.
+
+A separate public-development agent-view inventory verifier and `verify-agent-view`
+CLI have been added on a follow-on branch. It uses the same CEB-TREE-V1 commitment
+and requires the manifest and tree digests to be pinned out of band. It is not
+part of the currently merged verifier and is not compiled or tested yet.
+That follow-on branch adds twelve inventory-specific unit tests (33 total `#[test]` functions in the current verifier source by static count). Coverage includes parity with the original CEB-TREE-V1 implementation, exact inventory, external pins, extra/missing paths, content/mode changes, unsafe Windows names and control characters, case-fold collisions, symlinks and symlink roots, duplicate/unsorted entries, sealed-status rejection, unknown fields, internal manifest tree/entry digest tampering and empty-view rejection. None of the 33 tests have been compiled or executed in this work session.
 
 The verifier still does not establish runner isolation, independently adjudicate
 test semantics, or authenticate that a named model provider served the claimed

@@ -4,13 +4,16 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use ceb_receipt_verifier::{PairInputs, TREE_DIGEST_ALGORITHM, hash_source_tree, verify_pair};
+use ceb_receipt_verifier::{
+    AgentViewInputs, PairInputs, TREE_DIGEST_ALGORITHM, hash_source_tree, verify_agent_view,
+    verify_pair,
+};
 
 #[derive(Debug, Parser)]
 #[command(
     name = "ceb-receipt-verifier",
     version,
-    about = "Offline verifier for signed CEB primary/regrade receipt pairs"
+    about = "Offline verifier for CEB source inventories and signed receipt pairs"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -23,6 +26,21 @@ enum Command {
     HashTree {
         #[arg(long)]
         directory: PathBuf,
+    },
+    /// Verify a public-development source-only agent-view inventory against out-of-band pins.
+    VerifyAgentView {
+        #[arg(long)]
+        directory: PathBuf,
+        #[arg(long)]
+        manifest: PathBuf,
+        #[arg(long)]
+        task_id: String,
+        /// Out-of-band SHA-256 pin for the exact manifest bytes.
+        #[arg(long)]
+        expected_manifest_sha256: String,
+        /// Out-of-band CEB-TREE-V1 SHA-256 pin for the packaged directory.
+        #[arg(long)]
+        expected_tree_sha256: String,
     },
     /// Verify one primary DSSE receipt and its independently signed pristine regrade.
     VerifyPair {
@@ -111,6 +129,54 @@ fn main() -> ExitCode {
                     eprintln!("tree hashing unresolved: {reason}");
                     ExitCode::from(2)
                 }
+            };
+        }
+        Command::VerifyAgentView {
+            directory,
+            manifest,
+            task_id,
+            expected_manifest_sha256,
+            expected_tree_sha256,
+        } => {
+            let manifest_bytes = match read_limited(&manifest, 8 * 1024 * 1024) {
+                Ok(bytes) => bytes,
+                Err(reason) => {
+                    let report = serde_json::json!({
+                        "report_version": 1,
+                        "verifier_version": env!("CARGO_PKG_VERSION"),
+                        "status": "protocol_violation",
+                        "accepted": false,
+                        "task_id": null,
+                        "manifest_sha256": null,
+                        "tree_sha256": null,
+                        "entry_count": 0,
+                        "reasons": [reason],
+                        "claim_ceiling": "No agent-view inventory acceptance claim; manifest could not be read safely."
+                    });
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&report)
+                            .unwrap_or_else(|_| "{\"status\":\"protocol_violation\"}".to_owned())
+                    );
+                    return ExitCode::from(2);
+                }
+            };
+            let report = verify_agent_view(AgentViewInputs {
+                snapshot_dir: directory,
+                manifest: manifest_bytes,
+                expected_manifest_sha256,
+                expected_tree_sha256,
+                expected_task_id: task_id,
+            });
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report)
+                    .unwrap_or_else(|_| "{\"status\":\"protocol_violation\"}".to_owned())
+            );
+            return if report.accepted {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(2)
             };
         }
         Command::VerifyPair {
