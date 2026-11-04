@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "crates/core/symthaea-core/src/physics/energy_meter.rs"
+      - "crates/core/symthaea-core/src/physics/energy_receipt.rs"
       - "crates/core/symthaea-core/src/physics/mod.rs"
       - "research/energy-meter-001/**"
       - ".github/workflows/energy-meter-001.yml"
