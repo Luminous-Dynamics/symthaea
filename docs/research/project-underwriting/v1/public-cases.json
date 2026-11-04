@@ -271,7 +271,45 @@
         ],
         "calibration_evidence_refs": [
           "ev_yield_meter"
-        ]
+        ],
+        "yield_assessment": {
+          "horizon_years": 1,
+          "quantile_convention": "exceedance_probability",
+          "p50_net_energy_mwh": "221000",
+          "p90_net_energy_mwh": "188000",
+          "p95_net_energy_mwh": "180000",
+          "method": "joint_monte_carlo",
+          "uncertainty_components": [
+            {
+              "component_id": "interannual-resource-variability",
+              "uncertainty_type": "aleatory",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "resource-data-and-site-adaptation",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "model-parameter-and-structure",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            },
+            {
+              "component_id": "availability-and-degradation",
+              "uncertainty_type": "mixed",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            }
+          ]
+        }
       },
       "grid_connection": {
         "point_of_connection_id": "synthetic-poc-001",
@@ -707,7 +745,45 @@
         ],
         "calibration_evidence_refs": [
           "ev_yield_meter"
-        ]
+        ],
+        "yield_assessment": {
+          "horizon_years": 1,
+          "quantile_convention": "exceedance_probability",
+          "p50_net_energy_mwh": "221000",
+          "p90_net_energy_mwh": "188000",
+          "p95_net_energy_mwh": "180000",
+          "method": "joint_monte_carlo",
+          "uncertainty_components": [
+            {
+              "component_id": "interannual-resource-variability",
+              "uncertainty_type": "aleatory",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "resource-data-and-site-adaptation",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "model-parameter-and-structure",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            },
+            {
+              "component_id": "availability-and-degradation",
+              "uncertainty_type": "mixed",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            }
+          ]
+        }
       },
       "grid_connection": {
         "point_of_connection_id": "synthetic-poc-001",
@@ -1143,7 +1219,45 @@
         ],
         "calibration_evidence_refs": [
           "ev_yield_meter"
-        ]
+        ],
+        "yield_assessment": {
+          "horizon_years": 1,
+          "quantile_convention": "exceedance_probability",
+          "p50_net_energy_mwh": "221000",
+          "p90_net_energy_mwh": "188000",
+          "p95_net_energy_mwh": "180000",
+          "method": "joint_monte_carlo",
+          "uncertainty_components": [
+            {
+              "component_id": "interannual-resource-variability",
+              "uncertainty_type": "aleatory",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "resource-data-and-site-adaptation",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "model-parameter-and-structure",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            },
+            {
+              "component_id": "availability-and-degradation",
+              "uncertainty_type": "mixed",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            }
+          ]
+        }
       },
       "grid_connection": {
         "point_of_connection_id": "synthetic-poc-001",
@@ -1586,7 +1700,45 @@
         ],
         "calibration_evidence_refs": [
           "ev_yield_meter"
-        ]
+        ],
+        "yield_assessment": {
+          "horizon_years": 1,
+          "quantile_convention": "exceedance_probability",
+          "p50_net_energy_mwh": "221000",
+          "p90_net_energy_mwh": "188000",
+          "p95_net_energy_mwh": "180000",
+          "method": "joint_monte_carlo",
+          "uncertainty_components": [
+            {
+              "component_id": "interannual-resource-variability",
+              "uncertainty_type": "aleatory",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "resource-data-and-site-adaptation",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "model-parameter-and-structure",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            },
+            {
+              "component_id": "availability-and-degradation",
+              "uncertainty_type": "mixed",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            }
+          ]
+        }
       },
       "grid_connection": {
         "point_of_connection_id": "synthetic-poc-001",
@@ -2033,7 +2185,45 @@
         ],
         "calibration_evidence_refs": [
           "ev_yield_meter"
-        ]
+        ],
+        "yield_assessment": {
+          "horizon_years": 1,
+          "quantile_convention": "exceedance_probability",
+          "p50_net_energy_mwh": "221000",
+          "p90_net_energy_mwh": "188000",
+          "p95_net_energy_mwh": "180000",
+          "method": "joint_monte_carlo",
+          "uncertainty_components": [
+            {
+              "component_id": "interannual-resource-variability",
+              "uncertainty_type": "aleatory",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "resource-data-and-site-adaptation",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "model-parameter-and-structure",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            },
+            {
+              "component_id": "availability-and-degradation",
+              "uncertainty_type": "mixed",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            }
+          ]
+        }
       },
       "grid_connection": {
         "point_of_connection_id": "synthetic-poc-001",
@@ -2468,7 +2658,45 @@
         ],
         "calibration_evidence_refs": [
           "ev_yield_meter"
-        ]
+        ],
+        "yield_assessment": {
+          "horizon_years": 1,
+          "quantile_convention": "exceedance_probability",
+          "p50_net_energy_mwh": "221000",
+          "p90_net_energy_mwh": "188000",
+          "p95_net_energy_mwh": "180000",
+          "method": "joint_monte_carlo",
+          "uncertainty_components": [
+            {
+              "component_id": "interannual-resource-variability",
+              "uncertainty_type": "aleatory",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "resource-data-and-site-adaptation",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "model-parameter-and-structure",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            },
+            {
+              "component_id": "availability-and-degradation",
+              "uncertainty_type": "mixed",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            }
+          ]
+        }
       },
       "grid_connection": {
         "point_of_connection_id": "synthetic-poc-001",
@@ -2925,7 +3153,45 @@
         ],
         "calibration_evidence_refs": [
           "ev_yield_meter"
-        ]
+        ],
+        "yield_assessment": {
+          "horizon_years": 1,
+          "quantile_convention": "exceedance_probability",
+          "p50_net_energy_mwh": "221000",
+          "p90_net_energy_mwh": "188000",
+          "p95_net_energy_mwh": "180000",
+          "method": "joint_monte_carlo",
+          "uncertainty_components": [
+            {
+              "component_id": "interannual-resource-variability",
+              "uncertainty_type": "aleatory",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "resource-data-and-site-adaptation",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_yield_meter"
+              ]
+            },
+            {
+              "component_id": "model-parameter-and-structure",
+              "uncertainty_type": "epistemic",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            },
+            {
+              "component_id": "availability-and-degradation",
+              "uncertainty_type": "mixed",
+              "evidence_refs": [
+                "ev_model"
+              ]
+            }
+          ]
+        }
       },
       "grid_connection": {
         "point_of_connection_id": "synthetic-poc-001",
