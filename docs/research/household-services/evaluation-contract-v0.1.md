@@ -24,9 +24,14 @@ All four terms must use the same observation window, distinct stream IDs and dis
 Known-answer negative control from WCONT-008:
 
     R = 480 - 120 - 520 - 40 = -200 L
-    interval = [-205 L, -195 L] for U_R = 5 L
+    The fixture provides meter_uncertainty_l = 5 L but does not say whether
+    that bound is per meter or already aggregated. The integration negative
+    control takes the conservative interpretation that each of the four terms
+    can contribute up to 5 L, so U_R = 4 × 5 L = 20 L:
 
-The interval excludes zero, so the declared values contradict closure. This fixture is synthetic; it does not size or qualify a tank, pump, meter or installation.
+    interval = [-220 L, -180 L]
+
+The interval still excludes zero, so the declared values contradict closure under this conservative interpretation. The uncertainty-scope ambiguity remains a fixture-schema issue to resolve before any physical use. This fixture is synthetic; it does not size or qualify a tank, pump, meter or installation.
 
 ## 3. Deliverable reserve contract
 
