@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/CONNECTOME_QUERY_DISAMBIGUATION_V1.json",
+  "title": "Deterministic connectome query-disambiguation observation plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "analysis_id",
+    "dataset_revision_commit_sha",
+    "query_id",
+    "query_spec_sha256",
+    "scenario_set_scope",
+    "scenario_set_sha256",
+    "effort_unit",
+    "max_total_effort_units",
+    "scenarios",
+    "actions"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "analysis_id": { "type": "string", "minLength": 1 },
+    "dataset_revision_commit_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "query_id": { "type": "string", "minLength": 1 },
+    "query_spec_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "scenario_set_scope": {
+      "enum": ["exhaustive_declared_scenario_space", "sampled_sensitivity_set"],
+      "description": "Scope of submitted reconstruction worlds; neither declaration proves biological completeness."
+    },
+    "scenario_set_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "effort_unit": { "type": "string", "minLength": 1 },
+    "max_total_effort_units": { "type": "integer", "minimum": 1 },
+    "scenarios": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 24,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scenario_id", "graph_sha256", "decision_met"],
+        "properties": {
+          "scenario_id": { "type": "string", "minLength": 1 },
+          "graph_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "decision_met": { "type": "boolean" }
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action_id",
+          "action_kind",
+          "effort_units",
+          "source_evidence_sha256",
+          "observation_model_sha256",
+          "dependence_groups",
+          "outcomes"
+        ],
+        "properties": {
+          "action_id": { "type": "string", "minLength": 1 },
+          "action_kind": {
+            "enum": ["image_inspection", "morphology_review", "synapse_adjudication", "orthogonal_measurement", "other"]
+          },
+          "effort_units": { "type": "integer", "minimum": 1 },
+          "source_evidence_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "observation_model_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "dependence_groups": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Shared ancestry labels are recorded; no statistical independence is inferred."
+          },
+          "outcomes": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["scenario_id", "outcome_id"],
+              "properties": {
+                "scenario_id": { "type": "string", "minLength": 1 },
+                "outcome_id": { "type": "string", "minLength": 1 }
+              }
+            },
+            "description": "Exactly one deterministic, declared outcome category per scenario. No observation noise or likelihood semantics in V1."
+          }
+        }
+      }
+    }
+  }
+}
