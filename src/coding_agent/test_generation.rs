@@ -235,7 +235,7 @@ impl TestGenerator {
                 Self::push_unique_reason(
                     &mut unsupported_reasons,
                     format!(
-                        "No safe boundary constructor is defined for parameter {} of type {}; no guessed Default::default() call was emitted.",
+                        "No safe boundary constructor is defined for parameter {} of type {}; no guessed default argument was emitted.",
                         parameter.name,
                         Self::type_name(&parameter.ty)
                     ),
@@ -326,7 +326,7 @@ impl TestGenerator {
                     _ => return None,
                 }
             }
-            Type::Path(path) if path.qself.is_none() => {
+            Type::Path(path) if path.qself.is_none() && path.path.segments.len() == 1 => {
                 let ident = path.path.segments.last()?.ident.to_string();
                 match ident.as_str() {
                     "u8" | "u16" | "u32" | "u64" | "u128" | "usize" => vec![("zero", "0".into()), ("one", "1".into())],
