@@ -90,6 +90,23 @@ pub struct RunnerCpalClockDescriptorV1 {
 }
 
 impl RunnerCpalClockDescriptorV1 {
+    /// Stable digest carried by each fixed-size callback record so an SPSC
+    /// stream cannot be accidentally replayed under another session/origin.
+    pub fn identity_sha256(&self) -> Option<[u8; 32]> {
+        if !self.is_valid() {
+            return None;
+        }
+        let canonical = format!(
+            "{RUNNER_CLOCK_BRIDGE_DESCRIPTOR_SCHEMA_V1}\\n{}\\n{}\\n{}\\n{}\\n{}",
+            self.session_id,
+            self.runner_clock_domain_id,
+            self.runner_origin_id,
+            self.stream_instance_id,
+            self.cpal_stream_descriptor_sha256
+        );
+        Some(Sha256::digest(canonical.as_bytes()).into())
+    }
+
     pub fn is_valid(&self) -> bool {
         self.schema_version == RUNNER_CLOCK_BRIDGE_DESCRIPTOR_SCHEMA_V1
             && !self.session_id.trim().is_empty()
@@ -118,6 +135,9 @@ pub enum RunnerCpalClockPairSchemaV1 {
 pub struct RunnerCpalClockPairV1 {
     pub schema_version: RunnerCpalClockPairSchemaV1,
     pub stream_instance_id: u64,
+    /// Fixed-size identity digest computed off the real-time thread from the
+    /// bridge descriptor. This keeps the pair Copy and SPSC-safe.
+    pub descriptor_identity_sha256: [u8; 32],
     pub pair_index: u64,
     /// CPAL OutputStreamTimestamp.callback normalized to this stream's
     /// callback-time origin, in nanoseconds.
@@ -315,7 +335,9 @@ pub fn fit_runner_cpal_clock_v1(
         if pair.schema_version != RunnerCpalClockPairSchemaV1::V1 {
             return Err(RunnerCpalClockFitErrorV1::InvalidPairSchema { index });
         }
-        if pair.stream_instance_id != descriptor.stream_instance_id {
+        if pair.stream_instance_id != descriptor.stream_instance_id
+            || Some(pair.descriptor_identity_sha256) != descriptor.identity_sha256()
+        {
             return Err(RunnerCpalClockFitErrorV1::DescriptorMismatch { index });
         }
         if pair.runner_time_after_ns < pair.runner_time_before_ns {
@@ -539,6 +561,7 @@ mod tests {
         RunnerCpalClockPairV1 {
             schema_version: RunnerCpalClockPairSchemaV1::V1,
             stream_instance_id: 7,
+            descriptor_identity_sha256: descriptor().identity_sha256().unwrap(),
             pair_index: index,
             cpal_callback_stream_time_ns: cpal_ns,
             runner_time_before_ns: runner_midpoint_ns - 50,
@@ -611,6 +634,7 @@ mod tests {
 
     #[test]
     fn descriptor_identity_binds_runner_session_clock_domain_and_origin() {
+        let pairs = exact_pairs();
         for mutate in 0..3 {
             let mut d = descriptor();
             match mutate {
@@ -619,10 +643,10 @@ mod tests {
                 _ => d.runner_origin_id = "another-origin".to_owned(),
             }
             assert!(d.is_valid());
-            // Identity is external to each compact Copy pair and therefore
-            // changes the fit receipt descriptor, not the real-time record.
-            let bundle = fit_runner_cpal_clock_bundle_v1(&d, &exact_pairs(), policy()).unwrap();
-            assert_eq!(bundle.descriptor, d);
+            assert!(matches!(
+                fit_runner_cpal_clock_v1(&d, &pairs, policy()),
+                Err(RunnerCpalClockFitErrorV1::DescriptorMismatch { index: 0 })
+            ));
         }
     }
 
