@@ -15,6 +15,10 @@ use std::fmt;
 pub enum CandidateIndexError {
     ActiveClauseLength { expected: usize, actual: usize },
     ClauseOutOfRange { clause: usize, clause_count: usize },
+    EmptyCandidateSet { record: usize },
+    SentinelMismatch { record: usize, expected: usize, actual: usize },
+    SentinelStillActive { record: usize, clause: usize },
+    InactivePromotionCandidate { record: usize, clause: usize, position: usize },
     DuplicateCandidate { record: usize, clause: usize },
     RecordOutOfRange { record: usize, record_count: usize },
     PositionOutOfRange { record: usize, position: usize, candidate_count: usize },
@@ -31,6 +35,21 @@ impl fmt::Display for CandidateIndexError {
             Self::ClauseOutOfRange { clause, clause_count } => {
                 write!(f, "clause {clause} is outside clause count {clause_count}")
             }
+            Self::EmptyCandidateSet { record } => {
+                write!(f, "protected record {record} has no candidate sentinel")
+            }
+            Self::SentinelMismatch { record, expected, actual } => write!(
+                f,
+                "record {record} is watched by sentinel {expected}, not deactivated clause {actual}"
+            ),
+            Self::SentinelStillActive { record, clause } => write!(
+                f,
+                "record {record} sentinel clause {clause} is still active"
+            ),
+            Self::InactivePromotionCandidate { record, clause, position } => write!(
+                f,
+                "record {record} cannot promote inactive candidate {clause} at position {position}"
+            ),
             Self::DuplicateCandidate { record, clause } => {
                 write!(f, "record {record} contains duplicate candidate clause {clause}")
             }
@@ -66,6 +85,24 @@ pub struct CandidateIndexStats {
     pub bitmap_words_read: u64,
     /// 64-bit words whose contents changed.
     pub bitmap_words_updated: u64,
+}
+
+/// Observable result of processing one deactivated current sentinel.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SuccessorTransition {
+    /// The first active candidate after the old sentinel was promoted by swap-to-front.
+    Relocated {
+        record: usize,
+        previous_sentinel: usize,
+        new_sentinel: usize,
+        new_position: usize,
+    },
+    /// Every opposing candidate after the deactivated sentinel is inactive.
+    /// The caller may now apply the theorem-backed target-clause deletion.
+    Exhausted {
+        record: usize,
+        sentinel: usize,
+    },
 }
 
 /// A multi-level bitmap. Level 0 stores candidate positions; each upper level
@@ -368,6 +405,7 @@ impl CandidateSuccessorIndex {
 
     /// Return the first active candidate after the current head (position 0).
     ///
+    /// This query is valid only after the current sentinel has been deactivated.
     /// The result includes the current array position so the caller can perform
     /// the exact D4 swap-to-front promotion.
     pub fn next_active_after_head(
@@ -379,6 +417,24 @@ impl CandidateSuccessorIndex {
             let set = self.records.get_mut(record).ok_or(
                 CandidateIndexError::RecordOutOfRange { record, record_count },
             )?;
+            let sentinel = set.candidates.first().copied().ok_or(
+                CandidateIndexError::EmptyCandidateSet { record },
+            )?;
+            match set.active_positions.get(0) {
+                Some(false) => {}
+                Some(true) => {
+                    return Err(CandidateIndexError::SentinelStillActive {
+                        record,
+                        clause: sentinel,
+                    });
+                }
+                None => {
+                    return Err(CandidateIndexError::InvalidState {
+                        record,
+                        clause: sentinel,
+                    });
+                }
+            }
             self.stats.successor_queries = self.stats.successor_queries.saturating_add(1);
             set.active_positions
                 .find_next_set(1)
@@ -387,10 +443,11 @@ impl CandidateSuccessorIndex {
         Ok(result)
     }
 
-    /// Swap the current head with an active candidate, exactly as D4 does.
+    /// Swap the current inactive sentinel with an active candidate, exactly as D4 does.
     ///
     /// This only changes the candidate permutation. Activity changes are still
     /// driven by set_clause_active, including when a branch is backtracked.
+    /// No mutation occurs unless both sentinel and replacement preconditions hold.
     pub fn promote_to_head(
         &mut self,
         record: usize,
@@ -408,16 +465,92 @@ impl CandidateSuccessorIndex {
             });
         }
 
-        let old_head = set.candidates[0];
+        let old_head = set.candidates.first().copied().ok_or(
+            CandidateIndexError::EmptyCandidateSet { record },
+        )?;
+        match set.active_positions.get(0) {
+            Some(false) => {}
+            Some(true) => {
+                return Err(CandidateIndexError::SentinelStillActive {
+                    record,
+                    clause: old_head,
+                });
+            }
+            None => {
+                return Err(CandidateIndexError::InvalidState {
+                    record,
+                    clause: old_head,
+                });
+            }
+        }
+
         let new_head = set.candidates[position];
-        set.candidates.swap(0, position);
-        set.positions.insert(old_head, position);
-        set.positions.insert(new_head, 0);
+        if set.active_positions.get(position) != Some(true) {
+            return Err(CandidateIndexError::InactivePromotionCandidate {
+                record,
+                clause: new_head,
+                position,
+            });
+        }
+        if set.positions.get(&old_head).copied() != Some(0)
+            || set.positions.get(&new_head).copied() != Some(position)
+        {
+            return Err(CandidateIndexError::InvalidState {
+                record,
+                clause: new_head,
+            });
+        }
+
         if !set.active_positions.swap_bits(0, position) {
             return Err(CandidateIndexError::InvalidState { record, clause: new_head });
         }
+        set.candidates.swap(0, position);
+        set.positions.insert(old_head, position);
+        set.positions.insert(new_head, 0);
         self.stats.promotions = self.stats.promotions.saturating_add(1);
         Ok(())
+    }
+
+    /// Process one deactivated current sentinel as a single checked transition.
+    ///
+    /// The caller first updates authoritative activity with set_clause_active.
+    /// This method then checks that the deactivated clause is exactly the
+    /// protected record's current sentinel, finds the first active successor,
+    /// and performs D4's swap-to-front promotion. Exhaustion is returned only
+    /// when every candidate after the sentinel is inactive.
+    pub fn advance_after_deactivation(
+        &mut self,
+        record: usize,
+        deactivated_clause: usize,
+    ) -> Result<SuccessorTransition, CandidateIndexError> {
+        let record_count = self.records.len();
+        let sentinel = self.records.get(record)
+            .ok_or(CandidateIndexError::RecordOutOfRange { record, record_count })?
+            .candidates
+            .first()
+            .copied()
+            .ok_or(CandidateIndexError::EmptyCandidateSet { record })?;
+
+        if sentinel != deactivated_clause {
+            return Err(CandidateIndexError::SentinelMismatch {
+                record,
+                expected: sentinel,
+                actual: deactivated_clause,
+            });
+        }
+
+        match self.next_active_after_head(record)? {
+            Some((new_sentinel, new_position)) => {
+                self.promote_to_head(record, new_position)?;
+                Ok(SuccessorTransition::Relocated {
+                    record,
+                    previous_sentinel: sentinel,
+                    new_sentinel,
+                    new_position,
+                })
+            }
+            None => Ok(SuccessorTransition::Exhausted { record, sentinel }),
+        }
     }
 
     pub fn stats(&self) -> CandidateIndexStats {
@@ -511,23 +644,48 @@ mod tests {
         .unwrap();
 
         index.set_clause_active(0, false).unwrap();
-        let (candidate, position) = index.next_active_after_head(0).unwrap().unwrap();
-        assert_eq!((candidate, position), (1, 1));
-        index.promote_to_head(0, position).unwrap();
+        assert_eq!(
+            index.advance_after_deactivation(0, 0).unwrap(),
+            SuccessorTransition::Relocated {
+                record: 0,
+                previous_sentinel: 0,
+                new_sentinel: 1,
+                new_position: 1,
+            }
+        );
         assert_eq!(index.candidates(0), Some(&[1, 0, 2, 3][..]));
 
         index.set_clause_active(1, false).unwrap();
-        let (candidate, position) = index.next_active_after_head(0).unwrap().unwrap();
-        assert_eq!((candidate, position), (2, 2));
-        index.promote_to_head(0, position).unwrap();
+        assert_eq!(
+            index.advance_after_deactivation(0, 1).unwrap(),
+            SuccessorTransition::Relocated {
+                record: 0,
+                previous_sentinel: 1,
+                new_sentinel: 2,
+                new_position: 2,
+            }
+        );
         assert_eq!(index.candidates(0), Some(&[2, 0, 1, 3][..]));
 
         // Backtracking restores active status, not candidate ordering.
         index.set_clause_active(0, true).unwrap();
         index.set_clause_active(1, true).unwrap();
         assert_eq!(index.candidates(0), Some(&[2, 0, 1, 3][..]));
-        assert_eq!(index.next_active_after_head(0).unwrap(), Some((0, 1)));
-        index.validate(&[true, true, true, true]).unwrap();
+
+        // Once the persistent sentinel is later deactivated, the reactivated
+        // former sentinel is selected from its current non-head position.
+        index.set_clause_active(2, false).unwrap();
+        assert_eq!(
+            index.advance_after_deactivation(0, 2).unwrap(),
+            SuccessorTransition::Relocated {
+                record: 0,
+                previous_sentinel: 2,
+                new_sentinel: 0,
+                new_position: 1,
+            }
+        );
+        assert_eq!(index.candidates(0), Some(&[0, 2, 1, 3][..]));
+        index.validate(&[true, true, false, true]).unwrap();
     }
 
     #[test]
@@ -539,17 +697,38 @@ mod tests {
         )
         .unwrap();
         index.set_clause_active(1, false).unwrap();
-        assert_eq!(index.next_active_after_head(0).unwrap(), None);
-        assert_eq!(index.next_active_after_head(1).unwrap(), None);
-        assert_eq!(index.next_active_after_head(2).unwrap(), None);
-        index.validate(&[true, false, true, true, true]).unwrap();
-        assert_eq!(index.stats().membership_status_updates, 2);
+        // Deactivating a non-sentinel candidate updates membership, but it must
+        // not trigger that protected record's successor transition.
+        assert!(matches!(
+            index.advance_after_deactivation(0, 1),
+            Err(CandidateIndexError::SentinelMismatch { .. })
+        ));
+        assert!(matches!(
+            index.advance_after_deactivation(1, 1),
+            Err(CandidateIndexError::SentinelMismatch { .. })
+        ));
+
+        index.set_clause_active(0, false).unwrap();
+        assert_eq!(
+            index.advance_after_deactivation(0, 0).unwrap(),
+            SuccessorTransition::Exhausted { record: 0, sentinel: 0 }
+        );
+        index.set_clause_active(2, false).unwrap();
+        assert_eq!(
+            index.advance_after_deactivation(1, 2).unwrap(),
+            SuccessorTransition::Exhausted { record: 1, sentinel: 2 }
+        );
+        index.validate(&[false, false, false, true, true]).unwrap();
+        assert_eq!(index.stats().membership_status_updates, 4);
     }
 
     #[test]
     fn empty_candidates_have_no_successor() {
         let mut index = CandidateSuccessorIndex::new(0, vec![vec![]], &[]).unwrap();
-        assert_eq!(index.next_active_after_head(0).unwrap(), None);
+        assert!(matches!(
+            index.next_active_after_head(0),
+            Err(CandidateIndexError::EmptyCandidateSet { record: 0 })
+        ));
         assert_eq!(index.candidates(0), Some(&[][..]));
     }
 
@@ -592,6 +771,52 @@ mod tests {
     }
 
     #[test]
+    fn successor_and_promotion_reject_invalid_sentinel_states() {
+        let mut index = CandidateSuccessorIndex::new(
+            3,
+            vec![vec![0, 1, 2]],
+            &[true, true, false],
+        )
+        .unwrap();
+
+        assert!(matches!(
+            index.next_active_after_head(0),
+            Err(CandidateIndexError::SentinelStillActive { record: 0, clause: 0 })
+        ));
+        assert!(matches!(
+            index.advance_after_deactivation(0, 1),
+            Err(CandidateIndexError::SentinelMismatch {
+                record: 0,
+                expected: 0,
+                actual: 1
+            })
+        ));
+
+        index.set_clause_active(0, false).unwrap();
+        assert!(matches!(
+            index.promote_to_head(0, 2),
+            Err(CandidateIndexError::InactivePromotionCandidate {
+                record: 0,
+                clause: 2,
+                position: 2
+            })
+        ));
+        assert_eq!(index.candidates(0), Some(&[0, 1, 2][..]));
+        index.validate(&[false, true, false]).unwrap();
+
+        assert_eq!(
+            index.advance_after_deactivation(0, 0).unwrap(),
+            SuccessorTransition::Relocated {
+                record: 0,
+                previous_sentinel: 0,
+                new_sentinel: 1,
+                new_position: 1
+            }
+        );
+        index.validate(&[false, true, false]).unwrap();
+    }
+
+    #[test]
     fn randomized_updates_match_linear_successor_oracle_after_promotions() {
         let clause_count = 193usize;
         let mut seed = 0xE7_032_2026u64;
@@ -620,23 +845,38 @@ mod tests {
         for step in 0..4_000usize {
             let clause = (next_random(&mut seed) as usize) % clause_count;
             let value = next_random(&mut seed) & 1 == 1;
+            let was_active = active[clause];
             active[clause] = value;
             index.set_clause_active(clause, value).unwrap();
 
-            for record in 0..candidate_lists.len() {
-                let current = index.candidates(record).unwrap().to_vec();
-                let expected_position = current
-                    .iter()
-                    .enumerate()
-                    .skip(1)
-                    .find_map(|(position, &candidate)| active[candidate].then_some(position));
-                let expected = expected_position.map(|position| {
-                    (current[position], position)
-                });
-                let actual = index.next_active_after_head(record).unwrap();
-                assert_eq!(actual, expected, "step={step}, record={record}");
-                if let Some((_, position)) = actual {
-                    index.promote_to_head(record, position).unwrap();
+            // D4 processes a record only when its current sentinel is the
+            // clause whose active state just changed to inactive. A candidate
+            // elsewhere in the list becoming inactive only updates membership.
+            if was_active && !value {
+                for record in 0..candidate_lists.len() {
+                    if index.current_head(record) != Some(clause) {
+                        continue;
+                    }
+                    let current = index.candidates(record).unwrap().to_vec();
+                    let expected_position = current
+                        .iter()
+                        .enumerate()
+                        .skip(1)
+                        .find_map(|(position, &candidate)| active[candidate].then_some(position));
+                    let expected = match expected_position {
+                        Some(position) => SuccessorTransition::Relocated {
+                            record,
+                            previous_sentinel: clause,
+                            new_sentinel: current[position],
+                            new_position: position,
+                        },
+                        None => SuccessorTransition::Exhausted {
+                            record,
+                            sentinel: clause,
+                        },
+                    };
+                    let actual = index.advance_after_deactivation(record, clause).unwrap();
+                    assert_eq!(actual, expected, "step={step}, record={record}");
                 }
             }
             index.validate(&active).unwrap();
