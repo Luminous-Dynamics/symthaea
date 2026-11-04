@@ -757,9 +757,10 @@ mod tests {
     fn event_outside_frozen_time_scope_is_not_estimable() {
         let (mut input, raw) = parse_fixture();
         input.source_exports[0].events[0].event_at = "2026-11-05T01:00:00Z".to_string();
-        input.source_exports[0].ordered_events_sha256 =
+        let event_digest =
             domain_hash("connectome-fusion-events-v0.1", &input.source_exports[0].events)
                 .expect("event digest");
+        input.source_exports[0].ordered_events_sha256 = event_digest;
         let report = verify(&input, &raw);
         assert_eq!(report.disposition, "NOT_ESTIMABLE");
         assert!(report.errors.iter().any(|e| e.starts_with("EVENT_OUTSIDE_DECLARED_SCOPE")));
@@ -768,7 +769,8 @@ mod tests {
     #[test]
     fn same_custodian_cannot_be_counted_as_independent_source_coverage() {
         let (mut input, raw) = parse_fixture();
-        input.source_exports[1].custodian_ref = input.source_exports[0].custodian_ref.clone();
+        let shared_custodian = input.source_exports[0].custodian_ref.clone();
+        input.source_exports[1].custodian_ref = shared_custodian;
         let report = verify(&input, &raw);
         assert_eq!(report.disposition, "SOURCE_COVERAGE_UNKNOWN");
         assert!(!report.promotion_authorized);
@@ -777,12 +779,16 @@ mod tests {
     #[test]
     fn conflicting_source_event_sets_are_not_estimable_as_closed() {
         let (mut input, raw) = parse_fixture();
-        let event = &mut input.source_exports[1].events[1];
-        event.evidence_ids = vec!["evidence-B".to_string(), "evidence-D".to_string()];
-        event.canonical_use_key = use_key(&input, event).expect("recomputed use key");
-        input.source_exports[1].ordered_events_sha256 =
+        let mut changed_event = input.source_exports[1].events[1].clone();
+        changed_event.evidence_ids =
+            vec!["evidence-B".to_string(), "evidence-D".to_string()];
+        changed_event.canonical_use_key =
+            use_key(&input, &changed_event).expect("recomputed use key");
+        input.source_exports[1].events[1] = changed_event;
+        let event_digest =
             domain_hash("connectome-fusion-events-v0.1", &input.source_exports[1].events)
                 .expect("event digest");
+        input.source_exports[1].ordered_events_sha256 = event_digest;
         let report = verify(&input, &raw);
         assert_eq!(report.disposition, "RECONCILIATION_CONFLICT");
         assert!(report.errors.iter().any(|e| e == "SOURCE_POPULATION_RECONCILIATION_MISMATCH"));
