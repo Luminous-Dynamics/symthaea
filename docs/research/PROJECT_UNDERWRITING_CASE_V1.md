@@ -104,6 +104,23 @@ The Electricity Annual Technology Baseline (ATB) is a useful *prior/reference fa
 Global cost benchmarks are not site-specific bids. IRENA's July 2026 report, *Renewable Power Generation Costs in 2025*, reports a global weighted-average utility-scale solar PV LCOE of USD 44/MWh for 2025. This is a sector reference—not a South African project forecast, a PPA tariff, a financing rate or a substitute for a site/resource/EPC assessment:
 - https://www.irena.org/Publications/2026/Jul/Renewable-Power-Generation-Costs-in-2025
 
+### Probabilistic energy yield (P50/P90/P95)
+
+A single annual-MWh estimate is not a bankability-grade uncertainty statement. For renewable generation cases, retain a declared energy-yield horizon and the exceedance convention:
+
+- **P50**: annual net energy expected to be exceeded with 50% probability (the median under a continuous distribution).
+- **P90**: annual net energy expected to be exceeded with 90% probability; this is the lower 10th percentile of the output distribution, not the 90th percentile.
+- **P95**: annual net energy expected to be exceeded with 95% probability; this is the lower 5th percentile.
+
+NREL's *Quantifying Uncertainty in PV Energy* documents that project-finance stakeholders use exceedance cases such as P50/P90 and that uncertainty arises from solar-resource variability, imperfect models/parameters and system reliability. Sandia's PV Performance Modeling Collaborative describes P50 as a typical case and P90 as a downside case used in financing structures. The case schema therefore records the horizon, convention, quantiles, method and uncertainty components separately.
+
+Do not assume that all uncertainty is Gaussian or independent. Separate at least aleatory variability, epistemic data/model uncertainty and systematic bias; propagate dependence where supported. Empirical calibration against operating fleets/site histories is preferable when the evidence supports it. Report quantile calibration and uncertainty in the calibration estimate, not just point coverage.
+
+Reference material:
+- https://www.nrel.gov/docs/fy23osti/84993.pdf
+- https://pvpmc.sandia.gov/modeling-guide/5-ac-system-output/uncertainty-quantification/
+- https://trust-pv.eu/wp-content/uploads/2024/04/D4.3_Technical_Bankability_Guidelines_Final-SB_Website_170215-1.pdf
+
 ## 6. Measurement and verification boundaries
 
 For PV monitoring, use IEC 61724-1:2021 as the monitoring vocabulary/reference for system performance, monitoring classes, sensors and analysis. It does not authenticate a particular project's data collection merely because the project claims alignment:
