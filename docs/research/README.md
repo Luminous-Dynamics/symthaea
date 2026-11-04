@@ -21,6 +21,7 @@ Symthaea is not just software - it's a research platform exploring fundamental q
 | [Research Roadmap](#research-roadmap) | Future research directions |
 | [Evidence-Driven Invention](INVENTOR_LOOP_001_PROGRAM_V0_1.md) | Engineering intelligence, physical validation and human learning |
 | [Bridge / Truss Learner Packet](INVENTOR_LOOP_001_BRIDGE_TRUSS_LEARNER_PACKET_V0_1.md) | Design-only first learner project using existing Symtropy truss analysis |
+| [Bridge / Truss Instructor Key](INVENTOR_LOOP_001_BRIDGE_TRUSS_INSTRUCTOR_KEY_V0_1.md) | Analytical reference for the paper-only symmetric two-bar exercise |
 
 ---
 
