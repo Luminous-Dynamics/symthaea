@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-mc-replicates-v1.schema.json",
+  "title": "Connectome Monte Carlo normalized replicate batch",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "records"
+  ],
+  "properties": {
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/replicate"
+      }
+    }
+  },
+  "$defs": {
+    "replicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "method_id",
+        "replicate_id",
+        "seed",
+        "structural_beta",
+        "null_is_true",
+        "status"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "replicate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "structural_beta": {
+          "type": "number"
+        },
+        "null_is_true": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "COMPLETED",
+            "FAILED",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "p_value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "point_estimate": {
+          "type": "number"
+        },
+        "confidence_set": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "components"
+          ],
+          "properties": {
+            "components": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "lower",
+                  "upper"
+                ],
+                "properties": {
+                  "lower": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "upper": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "runtime_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "peak_memory_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "FAILED",
+                  "NOT_APPLICABLE"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "p_value"
+                  ]
+                },
+                {
+                  "required": [
+                    "point_estimate"
+                  ]
+                },
+                {
+                  "required": [
+                    "confidence_set"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

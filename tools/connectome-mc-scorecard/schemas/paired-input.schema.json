@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-mc-paired-input-v1.schema.json",
+  "title": "Frozen paired Monte Carlo replicate plan and method outputs",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "planned_replicates",
+    "records"
+  ],
+  "properties": {
+    "planned_replicates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/planned_replicate"
+      }
+    },
+    "records": {
+      "type": "array",
+      "items": {
+        "$ref": "replicate.schema.json#/$defs/replicate"
+      }
+    }
+  },
+  "$defs": {
+    "planned_replicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "replicate_id",
+        "seed",
+        "structural_beta",
+        "null_is_true"
+      ],
+      "properties": {
+        "replicate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "structural_beta": {
+          "type": "number"
+        },
+        "null_is_true": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
