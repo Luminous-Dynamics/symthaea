@@ -208,7 +208,7 @@ pub struct FitResult {
 
 impl FitResult {
     fn failure(status: FitStatus, optimizer: Optimizer, note: impl Into<String>) -> Self {
-        Self::failure_after_starts(status, optimizer, note, 0)
+        Self::failure_after_starts(status, optimizer, note, 0, 0)
     }
 
     fn failure_after_starts(
