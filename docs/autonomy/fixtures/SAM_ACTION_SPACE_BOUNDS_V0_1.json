@@ -1,0 +1,341 @@
+{
+  "schema": "sam-action-space-bounds-v0.1",
+  "status": "analytic-golden-fixtures",
+  "claim_ceiling": "Synthetic one-dimensional arithmetic and partition tests only; no vehicle or safety evidence.",
+  "convention": {
+    "objective": "maximize",
+    "hard_constraint": "g(x) <= 0",
+    "utility_upper_from_lipschitz": "f(c) + L*r",
+    "regret_upper": "max(0, max_cell_utility_upper - selected_action_utility_lower)",
+    "unsupported_bound": "Unresolved or OutOfScope"
+  },
+  "cases": [
+    {
+      "id": "coarse-grid-misses-interior-optimum",
+      "domain": {
+        "mode": "brake",
+        "parameter": "deceleration_mps2",
+        "unit": "m/s^2",
+        "lower": 0,
+        "upper": 10
+      },
+      "objective": {
+        "id": "smooth_peak",
+        "function": "1 - ((x - 3.7) / 10)^2",
+        "exact_maximum": 1,
+        "maximizer": 3.7,
+        "max_abs_derivative": 0.074
+      },
+      "evaluated_actions": [
+        {
+          "x": 0,
+          "utility": 0.8631
+        },
+        {
+          "x": 5,
+          "utility": 0.9831
+        },
+        {
+          "x": 10,
+          "utility": 0.6031
+        }
+      ],
+      "partition": [
+        {
+          "lower": 0,
+          "upper": 10,
+          "representative": 5,
+          "radius": 5
+        }
+      ],
+      "bound": {
+        "method": "empirical_samples_only",
+        "lipschitz": null
+      },
+      "expected": {
+        "classification": "EmpiricalCoverageOnly",
+        "best_sample_x": 5,
+        "analytic_best_x": 3.7,
+        "completeness_claim": false
+      }
+    },
+    {
+      "id": "valid-lipschitz-prunes-region",
+      "domain": {
+        "mode": "continue",
+        "parameter": "normalized_control",
+        "unit": "1",
+        "lower": -1,
+        "upper": 1
+      },
+      "objective": {
+        "id": "decreasing_linear",
+        "function": "-x",
+        "exact_maximum": 1,
+        "maximizer": -1,
+        "max_abs_derivative": 1
+      },
+      "selected_action": {
+        "x": -1,
+        "utility": 1
+      },
+      "partition": [
+        {
+          "lower": -1,
+          "upper": 0,
+          "representative": -1,
+          "radius": 1,
+          "utility_lower": 0,
+          "utility_upper": 1
+        },
+        {
+          "lower": 0,
+          "upper": 1,
+          "representative": 0.5,
+          "radius": 0.5,
+          "utility_at_representative": -0.5,
+          "lipschitz": 1,
+          "utility_lower": -1,
+          "utility_upper": 0
+        }
+      ],
+      "expected": {
+        "classification": "BoundedDecisionSufficient",
+        "pruned_cell": "[0,1]",
+        "regret_upper": 0,
+        "proof": "upper utility bound of omitted cell <= selected utility"
+      }
+    },
+    {
+      "id": "understated-lipschitz-would-falsely-prune",
+      "domain": {
+        "mode": "continue",
+        "parameter": "normalized_control",
+        "unit": "1",
+        "lower": 0,
+        "upper": 1
+      },
+      "objective": {
+        "id": "increasing_linear",
+        "function": "x",
+        "exact_maximum": 1,
+        "maximizer": 1,
+        "max_abs_derivative": 1
+      },
+      "selected_action": {
+        "x": 0,
+        "utility": 0
+      },
+      "partition": [
+        {
+          "lower": 0,
+          "upper": 1,
+          "representative": 0.5,
+          "radius": 0.5,
+          "utility_at_representative": 0.5,
+          "claimed_lipschitz": 0.1,
+          "correct_lipschitz": 1
+        }
+      ],
+      "regret_tolerance": 0.6,
+      "expected": {
+        "classification": "RejectInvalidBound",
+        "reason": "claimed L=0.1 is inconsistent with independently verified derivative bound L=1",
+        "false_prune_if_trusted": true
+      }
+    },
+    {
+      "id": "hard-feasibility-crosses-cell",
+      "domain": {
+        "mode": "yield",
+        "parameter": "brake_delay_s",
+        "unit": "s",
+        "lower": 0,
+        "upper": 2
+      },
+      "constraint": {
+        "id": "clearance",
+        "function": "x - 1",
+        "sense": "<=0",
+        "range_over_cell": [
+          -1,
+          1
+        ]
+      },
+      "partition": [
+        {
+          "lower": 0,
+          "upper": 2,
+          "representative": 1,
+          "radius": 1
+        }
+      ],
+      "expected": {
+        "feasibility": "FeasibilityUnresolved",
+        "definitely_feasible": false,
+        "definitely_infeasible": false
+      }
+    },
+    {
+      "id": "hybrid-mode-boundary",
+      "domain": {
+        "modes": [
+          "continue",
+          "yield"
+        ],
+        "parameter": "mode",
+        "unit": "categorical"
+      },
+      "objective": {
+        "id": "mode_switch",
+        "function": "continue=>0;yield=>1"
+      },
+      "proposed_bound": {
+        "method": "single_smooth_lipschitz_bound_across_modes",
+        "accepted": false
+      },
+      "expected": {
+        "classification": "OutOfScope",
+        "reason": "discrete mode boundary requires separate cells/proofs"
+      }
+    },
+    {
+      "id": "missing-partition-gap",
+      "domain": {
+        "mode": "brake",
+        "parameter": "delay",
+        "unit": "s",
+        "lower": 0,
+        "upper": 1
+      },
+      "partition": [
+        {
+          "lower": 0,
+          "upper": 0.4,
+          "representative": 0.2,
+          "radius": 0.2
+        },
+        {
+          "lower": 0.6,
+          "upper": 1,
+          "representative": 0.8,
+          "radius": 0.2
+        }
+      ],
+      "expected": {
+        "classification": "Incomplete",
+        "uncovered_interval": [
+          0.4,
+          0.6
+        ],
+        "completeness_claim": false
+      }
+    },
+    {
+      "id": "overlapping-partition-cells",
+      "domain": {
+        "mode": "brake",
+        "parameter": "delay",
+        "unit": "s",
+        "lower": 0,
+        "upper": 1
+      },
+      "partition": [
+        {
+          "lower": 0,
+          "upper": 0.7
+        },
+        {
+          "lower": 0.6,
+          "upper": 1
+        }
+      ],
+      "expected": {
+        "classification": "Incomplete",
+        "reason": "overlapping cell interiors"
+      }
+    },
+    {
+      "id": "budget-exhaustion-preserves-unresolved",
+      "domain": {
+        "mode": "brake",
+        "parameter": "deceleration",
+        "unit": "m/s^2",
+        "lower": 0,
+        "upper": 10
+      },
+      "partition": [
+        {
+          "lower": 0,
+          "upper": 5,
+          "status": "certified"
+        },
+        {
+          "lower": 5,
+          "upper": 10,
+          "status": "unresolved"
+        }
+      ],
+      "budget": {
+        "max_refinements": 1,
+        "used_refinements": 1
+      },
+      "expected": {
+        "classification": "Unresolved",
+        "remaining_unresolved_cells": 1,
+        "pass": false
+      }
+    },
+    {
+      "id": "context-mismatch-invalidates-bound",
+      "domain": {
+        "mode": "brake",
+        "parameter": "deceleration",
+        "unit": "m/s^2",
+        "lower": 0,
+        "upper": 10
+      },
+      "bound_context": {
+        "dynamics_digest": "dynamics-A",
+        "horizon_ms": 2000
+      },
+      "execution_context": {
+        "dynamics_digest": "dynamics-B",
+        "horizon_ms": 2000
+      },
+      "expected": {
+        "classification": "Incomplete",
+        "reason": "bound and execution dynamics context mismatch"
+      }
+    },
+    {
+      "id": "order-invariance",
+      "inputs": {
+        "cells": [
+          "a",
+          "b",
+          "c"
+        ],
+        "actions": [
+          "u0",
+          "u1",
+          "u2"
+        ]
+      },
+      "permutations": 2,
+      "expected": {
+        "canonical_certificate_identical": true
+      }
+    }
+  ],
+  "invariants": [
+    "A finite sample without a covering domain partition is never exhaustive.",
+    "Every declared domain point belongs to at least one partition cell under the canonical boundary rule.",
+    "Overlapping cell interiors and uncovered domain gaps reject completeness.",
+    "Unsupported or unverified Lipschitz constants cannot support pruning.",
+    "A hard-constraint interval crossing zero remains feasibility-unresolved.",
+    "Hybrid mode and discontinuity boundaries cannot be crossed by an unqualified smoothness bound.",
+    "A budget-exhausted search retains every unresolved cell and never emits a pass.",
+    "All outputs are conditional on frozen domain, context, model/reference, objective and receipts."
+  ]
+}
