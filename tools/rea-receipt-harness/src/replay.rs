@@ -72,9 +72,8 @@ pub fn replay_member_claim(
         ));
     }
 
-    let max_central_directory =
-        decimal_at(receipt, &["limits", "max_central_directory_bytes"])?
-            .min(HARD_CENTRAL_DIRECTORY_LIMIT);
+    let max_central_directory = decimal_at(receipt, &["limits", "max_central_directory_bytes"])?
+        .min(HARD_CENTRAL_DIRECTORY_LIMIT);
     let max_entries = decimal_at(receipt, &["limits", "max_entries"])?.min(HARD_ENTRY_LIMIT);
     let preflight_entries = preflight_regular_zip(
         &mut source,
@@ -99,9 +98,10 @@ pub fn replay_member_claim(
     archive.validate_header_consistency().map_err(|error| {
         ReplayError::Rejected(format!("zip-rs header consistency failure: {error}"))
     })?;
-    if archive.has_overlapping_entries().map_err(|error| {
-        ReplayError::Rejected(format!("zip-rs overlap check failed: {error}"))
-    })? {
+    if archive
+        .has_overlapping_entries()
+        .map_err(|error| ReplayError::Rejected(format!("zip-rs overlap check failed: {error}")))?
+    {
         return Err(ReplayError::Rejected(
             "zip-rs reports overlapping member extents".into(),
         ));
@@ -124,7 +124,7 @@ pub fn replay_member_claim(
         ));
     }
     let raw_name = BASE64
-        .decode(string_at(receipt, &["occurrence", "raw_filename_base64"])? )
+        .decode(string_at(receipt, &["occurrence", "raw_filename_base64"])?)
         .map_err(|e| ReplayError::Rejected(format!("invalid raw filename base64: {e}")))?;
     if optional_decimal_at(receipt, &["occurrence", "duplicate_raw_name_count"])? != Some(1) {
         return Err(ReplayError::Unsupported(
@@ -275,8 +275,9 @@ fn preflight_regular_zip(
     file.seek(SeekFrom::Start(tail_start)).map_err(io_error)?;
     let mut tail = vec![
         0u8;
-        usize::try_from(tail_length)
-            .map_err(|_| ReplayError::Rejected("EOCD window does not fit address space".into()))?
+        usize::try_from(tail_length).map_err(|_| ReplayError::Rejected(
+            "EOCD window does not fit address space".into()
+        ))?
     ];
     file.read_exact(&mut tail).map_err(io_error)?;
 
@@ -330,15 +331,13 @@ fn preflight_regular_zip(
     }
 
     let eocd_absolute = tail_start + eocd as u64;
-    let central_absolute = eocd_absolute.checked_sub(central_bytes).ok_or_else(|| {
-        ReplayError::Rejected("central-directory range underflows source".into())
-    })?;
+    let central_absolute = eocd_absolute
+        .checked_sub(central_bytes)
+        .ok_or_else(|| ReplayError::Rejected("central-directory range underflows source".into()))?;
     let archive_start = central_absolute
         .checked_sub(central_offset)
         .ok_or_else(|| {
-            ReplayError::Rejected(
-                "ZIP-relative central-directory offset underflows source".into(),
-            )
+            ReplayError::Rejected("ZIP-relative central-directory offset underflows source".into())
         })?;
     if archive_start != 0 {
         return Err(ReplayError::Unsupported(
@@ -347,7 +346,8 @@ fn preflight_regular_zip(
     }
     if central_absolute.checked_add(central_bytes) != Some(eocd_absolute) {
         return Err(ReplayError::Unsupported(
-            "interstitial records between central directory and EOCD are not in replay subset".into(),
+            "interstitial records between central directory and EOCD are not in replay subset"
+                .into(),
         ));
     }
     Ok(u64::from(entries_total))
