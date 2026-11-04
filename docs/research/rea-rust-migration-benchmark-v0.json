@@ -309,7 +309,12 @@
         "cross_parser_disagreement_preserved_as_evidence_not_majority_vote",
         "concurrent_member_verification_independent_file_cursor",
         "same_reader_parallel_verification_deterministic_result",
-        "deterministic_256_sample_three_bit_mutation_no_panic_smoke"
+        "deterministic_256_sample_three_bit_mutation_no_panic_smoke",
+        "zip_rs_930_test_only_metadata_and_stored_stream_differential",
+        "zip_rs_header_consistency_and_overlapping_entry_oracle",
+        "rawzip_052_structural_oracle_consumer_policy_controls",
+        "oracle_dependency_and_codec_commonality_audit",
+        "content_addressed_minimized_regression_corpus"
       ],
       "metrics": [
         "entry_occurrence_precision_recall",
@@ -335,7 +340,12 @@
         "concurrent_verification_cross_talk_false_failure_rate",
         "concurrent_results_digest_consistency",
         "panic_count_under_deterministic_corruption_smoke",
-        "corrupt_input_structured_rejection_rate"
+        "corrupt_input_structured_rejection_rate",
+        "oracle_disagreement_rate_by_fault_family",
+        "minimized_disagreement_adjudication_completeness",
+        "fuzz_crashes_and_reproducer_count",
+        "coverage_guided_fuzz_execs_per_second",
+        "oracle_dependency_overlap_by_parser_and_codec"
       ],
       "target": "100_percent supported-subset parity against pinned upstream REA and separately pinned decoder oracles; zero false accepts for CRC/size corruption, partial streams, metadata disagreement, source mutation or actual-output limit violations; bounded memory independent of member size; performance scored only after correctness gates pass.",
       "boundaries": {
@@ -351,13 +361,16 @@
       },
       "library_candidates": {
         "zipcore": "zipcore 0.10.2 pinned candidate for bounded streaming, CRC/size verification and by-index duplicate occurrence access; audit source and dependency graph before promotion",
-        "zip_rs": "zip 9.3.0 candidate independent differential oracle; compare exact source, features and dependency lineage before counting independence",
+        "zip_rs": "zip 9.3.0 pinned test-only differential parser; the initial fixture validates central-directory order, duplicate raw names, local-header offsets, sizes, CRC, header consistency, overlap checks and Stored stream bytes. It is intentionally excluded from production dependencies.",
         "upstream": "pinned REA TypeScript ArtifactReader/ZipArtifactReader at upstream SHA 8250bf2320ea57aab4e664db4b4d44b8abd2004e remains the behavioral oracle",
-        "note": "An oracle disagreement is retained with provenance and minimized fixture; it is not resolved by selecting the majority implementation."
+        "note": "An oracle disagreement is retained with provenance and minimized fixture; it is not resolved by selecting the majority implementation.",
+        "rawzip": "rawzip 0.5.2 evaluation candidate for low-level structure/wayfinder oracle only. It delegates bomb limits, overlapping extent checks, duplicate names and expected central-directory entry-count reconciliation to the consumer; these are required adapter controls.",
+        "independence": "Parser implementation diversity does not prove independent codec or CRC lineage. Record the shared dependency and codec graph per method before granting independent-oracle credit."
       },
       "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10368",
       "related_owners": [
-        "https://github.com/Luminous-Dynamics/symthaea/issues/10410"
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10410",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10451"
       ],
       "protocol": [
         "freeze archive fixture bytes and hashes before runs; preserve per-occurrence central-directory identity",
@@ -367,7 +380,10 @@
         "report false accepts and false rejects by fault family with all skipped, unsupported and abstained cases retained in denominators",
         "run correctness and resource-safety gates before any throughput leaderboard",
         "run parallel verification on one reader instance and verify independent file-cursor isolation; include duplicate and distinct entry occurrences in a multi-thread schedule",
-        "run deterministic mutation smoke and preserve seed, corpus hash, mutation schedule and panic/error result; follow with coverage-guided fuzzing for promoted reader revisions"
+        "run deterministic mutation smoke and preserve seed, corpus hash, mutation schedule and panic/error result; follow with coverage-guided fuzzing for promoted reader revisions",
+        "include a test-only zip 9.3.0 parser arm and compare its indexed metadata and Stored stream against custom inventory",
+        "audit zipcore, zip and optional rawzip parser/codec dependency ancestry before classifying any oracle as independent",
+        "content-address every seed and minimized disagreement; retain unresolved oracle outcomes rather than voting"
       ]
     },
     {
