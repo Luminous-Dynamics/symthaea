@@ -800,3 +800,30 @@ The paradigm shift is **from binary comprehension to verified reconstruction of 
 Do not credit a mock service, host-native substitute or static-only hypothesis as a real firmware reproduction. Start with authorized public/vendor firmware and safe local validation: deterministic crash/marker evidence or patched-vs-unpatched differential tests inside a disposable, network-isolated environment. No third-party live-device test or remote exploitation is part of this initial benchmark.
 
 The six-phase evidence, A/B/C ablation and scorecards are defined in #10298 and the machine-readable benchmark manifest. Keep this separate from SRE-Bench, AgentRE-Bench and Decompile-Bench; they have different task starts and scoring contracts.
+
+
+## Upstream Evidence-contract drift audit (2026-11-04)
+
+A fresh audit compared the six Evidence identity/schema source files at the pinned reference commit
+`8250bf2320ea57aab4e664db4b4d44b8abd2004e` against upstream `main` at
+`89317a39fab23df81efa4331311d09d2110377bd` (2026-11-04 12:43:04 UTC).
+
+| Upstream source | Pinned bytes | Current-main bytes | Exact content match |
+|---|---:|---:|---|
+| `src/domain/evidence.ts` | 18,468 | 18,468 | yes |
+| `src/domain/canonicalDigest.ts` | 3,473 | 3,473 | yes |
+| `src/domain/analysisProfile.ts` | 2,571 | 2,571 | yes |
+| `src/domain/evidenceSubject.ts` | 1,784 | 1,784 | yes |
+| `src/domain/relationshipCoverage.ts` | 1,722 | 1,722 | yes |
+| `src/domain/evidenceBundle.ts` | 23,568 | 23,568 | yes |
+
+The current upstream package metadata still reports `rea-agents@6.8.0`. The six files above were byte-for-byte identical in this comparison; this is a narrow contract-drift result, **not** a claim that the complete REA repository is unchanged.
+
+### Engineering consequence
+
+- Keep the original pinned SHA as the immutable golden-corpus generator and compatibility oracle.
+- Record the current upstream HEAD separately as a drift-audit checkpoint.
+- Re-run this exact-file audit before changing the pinned oracle or promoting a native operation.
+- If any contract file changes, create a new schema/compatibility review and corpus version; do not silently regenerate old fixtures from new upstream code.
+
+This removes an avoidable source of uncertainty: as of this audit, the six Evidence semantic-contract files do not require a new pin merely because upstream `main` advanced.
