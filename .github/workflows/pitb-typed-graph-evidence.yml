@@ -456,7 +456,8 @@ jobs:
             "$RUNNER_TEMP/sorrydb-source-task.json" \
             "$PITB_SORRYDB_REAL_SOURCE_DIR" \
             "$RUNNER_TEMP/sorrydb-goal-replay.json" \
-            "$RUNNER_TEMP/sorrydb-goal-replay.log"
+            "$RUNNER_TEMP/sorrydb-goal-replay.log" \
+            "$RUNNER_TEMP/sorrydb-goal-replay-instrumented.lean"
 
       - name: Validate exact live goal replay receipt
         shell: bash
@@ -498,6 +499,7 @@ jobs:
               "source path": receipt["source_path"] == source_path,
               "goal digest": receipt["goal_sha256"] == hashlib.sha256(task["debug_info"]["goal"].encode()).hexdigest(),
               "source bytes": receipt["source_file_sha256"] == hashlib.sha256(source_bytes).hexdigest(),
+              "instrumented source artifact": receipt["instrumented_source_sha256"] == hashlib.sha256(Path(str(repo_path) + "/PrimeNumberTheoremAnd/FioriKadiriSwidinsky.PITBReplay7956fe8e.lean").read_bytes()).hexdigest(),
               "Lake manifest": receipt["lake_manifest_sha256"] == hashlib.sha256(manifest_bytes).hexdigest(),
               "toolchain file": receipt["toolchain_file_sha256"] == hashlib.sha256(toolchain_bytes).hexdigest(),
               "repository tree": receipt["repository_tree_sha256"] == tree,
@@ -523,6 +525,7 @@ jobs:
             ${{ runner.temp }}/sorrydb-real-source-checkout.json
             ${{ runner.temp }}/sorrydb-goal-replay.json
             ${{ runner.temp }}/sorrydb-goal-replay.log
+            ${{ runner.temp }}/sorrydb-goal-replay-instrumented.lean
             ${{ runner.temp }}/sorrydb-source-task.json
             ${{ runner.temp }}/sorrydb-real-source/
             ${{ runner.temp }}/sorrydb-input/
