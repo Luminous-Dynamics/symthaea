@@ -31,6 +31,9 @@ exclude = [
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # Standalone exact reference ledger and independent verifier for online-FDR
+    # research. Kept isolated from the main workspace until separately validated.
+    "research/compound-donation-ledger",
 ]
 default-members = [
     "xtask",
