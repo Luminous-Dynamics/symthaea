@@ -901,9 +901,9 @@ mod tests {
             ..Config::default()
         };
         let m = simulate(c, 8).unwrap().metrics()[0];
-        assert_eq!(m.machine_optimal_prevalence, 1.0);
-        assert_eq!(m.human_optimal_prevalence, 0.0);
-        assert_eq!(m.human_individual_optimal_discovery_rate, 0.0);
+        assert_eq!(m.machine_optimal_prevalence, Some(1.0));
+        assert_eq!(m.human_optimal_prevalence, Some(0.0));
+        assert_eq!(m.human_individual_optimal_discovery_rate, Some(0.0));
     }
 
     #[test]
