@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-household-bench-fixtures"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Strict offline validators for synthetic Verified Household Services benchmark fixtures"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
