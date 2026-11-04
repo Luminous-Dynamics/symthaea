@@ -18,12 +18,13 @@ The governing principle is:
 | Repair recurrence and durability | [HOME-REPAIR-RECURRENCE-001 #10431](https://github.com/Luminous-Dynamics/symthaea/issues/10431) | Measure recurrence, repeated repair burden and censored follow-up |
 | Metrology and evidence strata | [HOME-SVC-METROLOGY-001 #10341](https://github.com/Luminous-Dynamics/symthaea/issues/10341) | Repeatability, reproducibility, production variation and household validity |
 
-## Current research specifications
+## Current research specifications under review
 
-- [Physical validation protocols v0.1](physical-validation-protocols-v0.1.md) — preregistration templates for InstantClean, WaterLoop and HomeRenew.
-- [Competitive frontier snapshot (4 November 2026)](competitive-frontier-2026-11-04.md) — source-backed incumbent and research-method comparisons.
-- [Repair recurrence contract v0.1](home-repair-recurrence-contract-v0.1.md) — event identity, post-repair qualification, use exposure, competing events, recurrent burden and censoring.
-- [Household service continuity benchmark v0.1](household-service-continuity-benchmark-v0.1.md) — service envelopes, matched outage comparators, recovery trajectories and service-deficit metrics.
+- [PR #10386 — household services charter, physical validation protocols and competitive frontier](https://github.com/Luminous-Dynamics/symthaea/pull/10386). Those research files are on the PR branch and should not be assumed present on main until merged.
+- [PR #10432 — repair recurrence and post-repair durability contract](https://github.com/Luminous-Dynamics/symthaea/pull/10432). Defines repair episode identity, independent restoration, use exposure, competing events, recurrent burden and censoring.
+- [PR #10446 — household service continuity and recovery benchmark](https://github.com/Luminous-Dynamics/symthaea/pull/10446). Defines service envelopes, matched outage comparators, recovery trajectories and service-deficit metrics.
+
+The PR links are used intentionally: a research specification on an unmerged branch must not appear as a relative path that looks available on main.
 
 ## Current software evidence chain
 
