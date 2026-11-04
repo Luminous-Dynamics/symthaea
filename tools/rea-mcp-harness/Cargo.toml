@@ -3,7 +3,7 @@ members = [".", "symthaea-rea-compat"]
 resolver = "2"
 
 [package]
-name = "rea-mcp-harness"
+name = "symthaea-rea-mcp"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
@@ -13,7 +13,7 @@ path = "../../crates/domains/symthaea-rea-mcp/src/lib.rs"
 
 [[bin]]
 name = "rea-evidence-mcp"
-path = "src/main.rs"
+path = "../../crates/domains/symthaea-rea-mcp/src/main.rs"
 
 [[test]]
 name = "protocol"
