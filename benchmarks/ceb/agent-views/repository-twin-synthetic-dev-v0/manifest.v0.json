@@ -7,98 +7,98 @@
   "source_repository": "Luminous-Dynamics/symthaea",
   "source_revision": "7a563cd61f4bda3347119ea39169a2e2d1c4f30b",
   "tree_digest_algorithm": "ceb-tree-v1",
-  "tree_sha256": "1e8cfe4c7a7653764e37e4b4a9eaa083804a6614db03ed56dee822395b762e3e",
+  "tree_sha256": "9eb74b8c51a72e44328f55f8dbba4c3f340bb96fc3038764c88571b8466a7a92",
   "entry_count": 15,
   "entries": [
     {
       "path": "Cargo.toml",
       "mode": "100644",
       "size_bytes": 428,
-      "sha256": "e94590f967a50adda9a8079ebdadda092a7cdf3e3a06ee47ca2c6cfc06cf29ba"
+      "sha256": "1a6ac41b573d84d33e4e7c7169cf5b0668ecdebeebf49df26ea13e25257a7474"
     },
     {
       "path": "crates/api/Cargo.toml",
       "mode": "100644",
       "size_bytes": 475,
-      "sha256": "e5edfff7dc37805c75dea5cd217ca51bfe74c1d77dd6237b2e13bccd0c37a14c"
+      "sha256": "84468610f7b417bd91fb89ce49836e22ca0f8b28f3364132dc321588938dc726"
     },
     {
       "path": "crates/api/src/audit.rs",
       "mode": "100644",
       "size_bytes": 343,
-      "sha256": "78a5e9ae2983cdcddb9e52e1e7b5fb0ebcf84d2916363a3f08015082bead6fc7"
+      "sha256": "d608f23ba3d3fc4d8e4604aaeb4ca2d0ab322290ed73a9c4613b687ca0970d4f"
     },
     {
       "path": "crates/api/src/lib.rs",
       "mode": "100644",
       "size_bytes": 328,
-      "sha256": "9da4f2d1e96a48fc0277ddc2d0703fd665626b4c0f33c7d66dbe8428b00796ac"
+      "sha256": "c115e7fec3ddabd3d05022d0b7d36c07a47020576855f2ac3e0205a44b98b8b9"
     },
     {
       "path": "crates/api/src/profile_api.rs",
       "mode": "100644",
       "size_bytes": 413,
-      "sha256": "c8c4d8d34a2fe618bebfe4db167c70fc36e388a23f80934c2021608982cf0f88"
+      "sha256": "a89cdf1e6b8a865a2f5f1357eb6210951f67ac5bb37417d883f019017687eb38"
     },
     {
       "path": "crates/api/src/windows_native.rs",
       "mode": "100644",
       "size_bytes": 263,
-      "sha256": "3c350d4317c6e2bd841e67eb598566ecc3d6c5fb86930ba38906377ff6a0c798"
+      "sha256": "7cd9c5bb4e178cb910927acca37bb8ac04cb3064f56696ef664b422215efce9d"
     },
     {
       "path": "crates/api/tests/profile.rs",
       "mode": "100644",
       "size_bytes": 1086,
-      "sha256": "3d275bfcf111326e83645c0a5c9237e6392442ac2b475bdfa2fb0abc30301e2a"
+      "sha256": "aafcbc1478dccc77034064b304fcaf36890c0f535a147c29cfb1be4990d882d8"
     },
     {
       "path": "crates/cli/Cargo.toml",
       "mode": "100644",
       "size_bytes": 161,
-      "sha256": "3db88ffc3e8ca100dc389ca73c3bdd41d56e62bddfba1b03421e8ca5fc10dc8a"
+      "sha256": "abb339317ca1ef48547ed919aa8c3ce91480a7ca34513ece084cb83b1256878c"
     },
     {
       "path": "crates/cli/src/main.rs",
       "mode": "100644",
       "size_bytes": 105,
-      "sha256": "dd5d6d3d537093cf287c5ceed6a08b885deb75be709b5128d21c022c6e44767f"
+      "sha256": "d2f96e49fabb9559d178dd828b2dc37ffb59cddd7aba6dc16673e3ff21744999"
     },
     {
       "path": "crates/domain/Cargo.toml",
       "mode": "100644",
       "size_bytes": 114,
-      "sha256": "2fc2442e308ee8082472fa9e8fa6d8d70dfe9e733216229cbcbeb385bd0ccbe2"
+      "sha256": "34c3b4c32463dd0d79992d93da3d45057172844515da549da99a2777fa07969c"
     },
     {
       "path": "crates/domain/src/lib.rs",
       "mode": "100644",
       "size_bytes": 513,
-      "sha256": "07c07655ea0c4107a66b06fa8fe823682e31ae1048ae638dfc835dd268f25bb5"
+      "sha256": "4be4a637fd5ee0cf86d3fc8b632baa649adeda630c79bc327c2f237611a49c13"
     },
     {
       "path": "crates/service/Cargo.toml",
       "mode": "100644",
       "size_bytes": 204,
-      "sha256": "4f9a825eef05c633eef41f914d260efe6990fee7177e522766b1d4e7b08750bf"
+      "sha256": "57eb9fd0459b011616ce2385726807da90598f60ae9313c4886eff78e471bc79"
     },
     {
       "path": "crates/service/src/lib.rs",
       "mode": "100644",
       "size_bytes": 585,
-      "sha256": "acd35eea16b3124ccef0d14bda52054358cf5ab7369f05e181e1ef0f0ebae3a7"
+      "sha256": "20420f0a81f447c2ad23c19ad439cf828fd941a970f2287d8cd0ab45fe530ff1"
     },
     {
       "path": "crates/store/Cargo.toml",
       "mode": "100644",
       "size_bytes": 166,
-      "sha256": "17e06bc06f5b2226d8d4226f7039a3a8d8892a7735b87cd460fdccbd076383cb"
+      "sha256": "e07a7742a15c68a0dff27aa3bd2b64e5cc41f3c1811bbeee3c4a78579b4c3fa5"
     },
     {
       "path": "crates/store/src/lib.rs",
       "mode": "100644",
       "size_bytes": 552,
-      "sha256": "44cfdcc9a8eb853318e8e707e3259aa74d15228a5a344af88fca665082cdbe0f"
+      "sha256": "fd21a8ba6dd7e29407323fbc5921b91c4dce433d22175c3a36c573cd9ac723fb"
     }
   ]
 }
