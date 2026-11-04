@@ -1,109 +1,115 @@
-# MEL-CLOCK-002 — Runner/CPAL clock bridge v1
+# MEL-CLOCK-002 — Runner/CPAL/output-frame clock composition v1
 
-**Status:** pure Rust contract, deterministic fitter, strict schemas, nine synthetic fixtures and 18 authored Rust tests are committed; runtime callback wiring, Rust compilation and device testing are not yet qualified.
+**Status:** pure Rust clock-origin contract, three-stage point-estimate composition, strict schemas, nine runner-clock fixtures, and 22 authored Rust tests are committed. Runtime callback wiring, compilation, and device/loopback qualification remain outstanding.
 
 ## Objective
 
-Bridge the runner monotonic clock used by turn-taking/effect receipts directly to the **CPAL predicted-playback clock** of one output stream. Retain CPAL callback time as a separate diagnostic. This allows direct composition with MEL-CLOCK-001's playback-stream-time → output-frame fit without assuming shared clock origins.
+Build a replayable mapping from the runner monotonic clock used by turn-taking/effect receipts to the cumulative output-frame coordinate used by MEL-CLOCK-001, without treating CPAL callback and predicted-playback timestamps as the same instant.
 
-The v1 mapping is:
+The correct chain has three distinct relations:
 
-`runner monotonic time ~= offset + rate * CPAL playback-stream time`
+`runner monotonic time → CPAL callback time → CPAL predicted-playback time → output frame`
 
-Its inverse estimates the CPAL stream-clock instant corresponding to a runner timestamp.
+1. **Runner → callback:** simultaneous clock observation. The runner's `Instant` is sampled around the CPAL callback timestamp read.
+2. **Callback → predicted playback:** a scheduling relation learned from CPAL's paired callback/playback timestamps on the exact output-anchor vector.
+3. **Predicted playback → output frame:** MEL-CLOCK-001's existing fit from CPAL playback time to the cumulative frame index.
+
+The second relation is not another shared-origin clock calibration. It is a measured callback-to-scheduled-playback mapping and must not be replaced with nominal buffer duration.
 
 ## Exact clock-origin contract
 
 `RunnerMonotonicClockOriginV1` is a copyable wrapper around one `std::time::Instant` origin. Construct it once per session and use the exact same value in:
 - the streaming turn-taking receipt producer;
 - the action/effect receipt producer;
-- the CPAL callback clock-pair capture.
+- the CPAL callback timestamp observer.
 
-Persist only session-relative nanoseconds, never `Instant` internals. `runner_origin_id` names this exact origin; `runner_clock_domain_id` names its timebase; `session_id` binds it to the musical session. A process restart or new origin requires a new descriptor and fit segment.
+Persist only session-relative integer nanoseconds, never `Instant` internals. `runner_origin_id` names this exact origin; `runner_clock_domain_id` names its timebase; `session_id` binds it to the musical session. A process restart or new origin requires a new descriptor and fit segment.
 
-## Callback-pair capture
+## Runner-to-callback observation
 
-At callback entry, bracket the observation and normalization of both CPAL timestamps with runner time samples from the shared origin. Regress against `OutputStreamTimestamp.playback`; retain `OutputStreamTimestamp.callback` for monotonicity/diagnostic comparison.
+At callback entry, bracket the read/normalization of CPAL's `OutputStreamTimestamp.callback` and `OutputStreamTimestamp.playback` with runner monotonic samples. The OLS fit in `RunnerCpalClockFitV1` uses the **callback** timestamp because it represents the instant at which the callback was invoked. The paired playback timestamp is retained but is not treated as simultaneous with the runner clock.
 
-1. sample runner monotonic time before reading/normalizing the CPAL timestamp pair;
-2. read both `OutputStreamTimestamp.callback` and `OutputStreamTimestamp.playback`, normalizing both to the same first-callback stream origin;
-3. sample runner monotonic time immediately after;
-4. persist both CPAL timestamps; fit runner monotonic time against the **playback** timestamp, not callback invocation time;
-5. enqueue a fixed-size `RunnerCpalClockPairV1` to a bounded SPSC ring;
-6. increment the pair index even when the record cannot be retained, so gaps remain visible.
+Each fixed-size `RunnerCpalClockPairV1` includes:
+- session/runner-origin/stream identity digest;
+- pair index;
+- normalized CPAL callback timestamp;
+- normalized CPAL predicted-playback timestamp;
+- runner timestamp immediately before the CPAL timestamp read;
+- runner timestamp immediately after it.
 
-The callback record is `Copy` and contains only integers, an enum and a fixed 32-byte descriptor-identity digest. The identity digest is computed off the real-time thread. No allocation, mutex, blocking call, formatting or logging is needed for the pair record.
+The callback record is `Copy` and contains only fixed-size values. The identity digest is computed off the real-time thread. No allocation, mutex, blocking call, formatting or logging is needed to construct/enqueue a pair.
 
-The callback timestamp remains a diagnostic and must also be monotonic. The before/after bracket is an observed software capture interval. It is not a guarantee about backend callback-start error, predicted playback accuracy or DAC time. Fit residuals are not converted to accuracy bounds.
+The before/after bracket is an observed software capture interval. It is not a certified bound on backend timestamp error, callback-start accuracy, playback accuracy or DAC timing.
 
-## Identity and replay
+## Callback-to-predicted-playback scheduling fit
 
-The bridge descriptor binds:
-- session ID;
-- runner clock-domain ID;
-- exact runner-origin ID;
-- CPAL stream-instance ID;
-- SHA-256 digest of the matching CPAL stream descriptor/configuration.
+`fit_cpal_callback_playback_v1` consumes the exact `OutputClockAnchorV1` vector that MEL-CLOCK-001 uses for its output-frame fit.
 
-A canonical identity digest is copied into every fixed-size pair. The fitter rejects any pair whose stream or descriptor digest does not match. This prevents a compact callback ring from being replayed under a different session or origin.
+It estimates:
 
-The fit receipt binds the exact serialized pair vector and normalized fit policy with SHA-256. Missing pair records before or between observations are counted; they are never filled with zero timestamps. Trailing record drops remain available from the live capture counter and must be included in the enclosing evidence manifest.
+`predicted playback stream time ~= offset + rate * callback stream time`
 
-## Fit and rejection rules
+The fit:
+- validates descriptor, stream instance, sample rate and channel count;
+- validates callback/playback delta consistency;
+- requires strictly increasing anchor index, callback time and playback time;
+- rejects invalid frame counts, mixed anchor sources, excessive drift and residuals;
+- retains the exact serialized anchor-vector SHA-256 and fit-policy SHA-256;
+- carries explicit calibration validity and bounded extrapolation;
+- reports `point_estimate_only`; uncertainty remains absent.
 
-The deterministic OLS fitter:
-- requires the policy minimum pair count (never fewer than two);
-- requires strictly increasing pair indices, CPAL callback times, CPAL predicted-playback times, and runner bracket endpoints;
-- rejects reversed or over-wide capture brackets;
-- rejects mixed stream/session/origin identity;
-- estimates rate drift relative to 1 ns / 1 ns;
-- reports median, p95 and maximum absolute fit residuals;
-- rejects drift/residuals outside the frozen policy;
-- retains the observed validity interval and a bounded extrapolation horizon;
-- reports `point_estimate_only` and leaves uncertainty absent in v1.
+This is a scheduling relation, not a device-independent physical clock relation. A changed or substituted anchor record changes the anchor-set digest, even if its event timing happens to remain numerically identical.
 
-The fitter never silently removes outliers. A device restart, new stream instance, runner-origin reset or timestamp discontinuity requires a new segment.
+## Three-stage composition
 
-## Composition with output-frame fit
+`estimate_output_frame_at_runner_time_v1` composes:
+1. runner monotonic time → CPAL callback time using `RunnerCpalClockFitV1`;
+2. CPAL callback time → predicted playback time using `CpalCallbackPlaybackFitV1`;
+3. predicted playback time → cumulative output frame using `OutputClockFitBundleV1`.
 
-The module now provides `estimate_output_frame_at_runner_time_v1`, which composes:
-1. runner monotonic time → CPAL predicted-playback stream time;
-2. CPAL predicted-playback stream time → cumulative output frame.
+Before composition it requires:
+- matching stream-instance IDs across all three receipts;
+- matching CPAL configuration digest;
+- valid schema and stream descriptors;
+- the callback-to-playback fit's `anchor_set_sha256` to equal the output-frame bundle's anchor-set digest;
+- the query to remain within all fit-validity windows and extrapolation horizons.
 
-It checks stream instance, CPAL configuration digest, output-fit descriptor validity and both fit validity windows. The callback timestamp is retained in each pair as a distinct diagnostic; it is **not** substituted for the playback timestamp.
+No shared clock origin is assumed between runner and CPAL. No nominal callback-buffer duration is used as a substitute for the callback-to-playback anchors.
 
-**This composition is a point estimate only in v1.** It must not be labelled calibrated latency, absolute timing accuracy, DAC output or acoustic observation. A physical output claim still requires independent electrical/acoustic loopback.
+The returned estimate includes the callback time, predicted-playback time, output-frame estimate and playback-time integer quantization delta. All remain point estimates until uncertainty propagation is qualified.
 
-## Synthetic fixtures
+**Claim boundary:** this is not a calibrated absolute latency measurement, DAC observation or acoustic effect. CPAL's playback timestamp is a backend prediction. A physical-output claim still requires an independent electrical/acoustic loopback capture with its own clock, calibration and artifact provenance.
 
-The checked-in fixtures cover:
-- exact nominal mapping to the predicted-playback clock;
-- +25 ppm and -25 ppm in-policy drift;
-- callback-time monotonicity and predicted-playback-time monotonicity as distinct checks;
-- missing pair records with continuous clock progression;
-- over-wide observation bracket rejection;
-- descriptor/origin identity mismatch rejection;
-- out-of-policy drift rejection;
-- residual outlier rejection without silently dropping the record.
+## Synthetic conformance and adversarial coverage
 
-The unit suite also rejects runner-clock regression even when CPAL callback time continues increasing. It includes an exact synthetic composition test for runner 120 ms → predicted playback 25 ms → output frame 960, plus a mismatched-stream rejection test.
+The nine runner-clock fixtures cover exact mapping, ±25 ppm drift, missing pair records, wide bracket rejection, descriptor mismatch, out-of-policy drift, residual outlier and predicted-playback-clock regression while callback time remains increasing.
 
-These are conformance fixtures, not device measurements.
+The Rust test module additionally covers:
+- direct runner-to-callback fitting and runner-clock regression;
+- callback-to-playback exact scheduling fit;
+- callback-to-playback residual outlier rejection;
+- exact three-stage runner → callback → playback → output-frame composition;
+- rejection of a scheduling fit whose anchor-set digest differs from the output-frame bundle;
+- stream/configuration identity mismatch;
+- validity expiry, dropped observations, digest binding and point-estimate-only status.
 
-## Qualification targets
+The exact synthetic composition checks runner time 120 ms → callback time 20 ms → predicted playback 25 ms → output frame 960. These are authored tests and controlled fixture expectations—not executed Rust results or physical measurements.
 
-- 100% acceptance of valid exact and in-policy drift fixtures.
-- 100% rejection of identity mismatch, malformed bracket, non-monotonic clock and over-policy drift/residual cases.
-- Zero extrapolation beyond the declared validity horizon.
-- Exact replay of fit results from the same descriptor, pair bytes and policy.
-- No upgrade from point estimate to accuracy/latency claim without propagated uncertainty and independent device validation.
+## Qualification gates
+
+- 100% acceptance of valid exact and in-policy synthetic cases.
+- 100% rejection of identity mismatch, malformed/wide brackets, non-monotonic callback/playback/runner clocks, out-of-policy drift and residuals, expired calibration and anchor-set substitution.
+- Zero extrapolation beyond each declared validity horizon.
+- Exact replay from the same descriptor, pair/anchor bytes and fit policies.
+- No upgrade from point estimate to timing-accuracy claim without propagated uncertainty and independent device validation.
 
 ## Integration remaining
 
-- Wire the same `RunnerMonotonicClockOriginV1` instance into the #10309 receipt producer and #10345/#10327 CPAL callback.
-- Add bounded SPSC capture and non-real-time drain to the #10345 runtime branch.
-- Bind the pair-set receipt to the turn-taking session and action-effect ledger (#10382).
-- Implement uncertainty propagation or preserve point-estimate-only status.
-- Run Rust tests/format/clippy on an exact head, then test actual CPAL devices and independent loopback.
+- Wire the same `RunnerMonotonicClockOriginV1` into #10309 receipt production and the #10345/#10327 CPAL callback.
+- Capture both CPAL timestamps and runner brackets into a bounded SPSC ring; drain/fit outside the callback.
+- Use the exact output-anchor vector for both callback-to-playback fitting and MEL-CLOCK-001 output-frame fitting.
+- Bind the resulting receipts to the turn-taking session and action-effect ledger (#10382).
+- Qualify uncertainty propagation or preserve point-estimate-only status.
+- Run rustfmt, compilation, tests and feature configurations on an exact head, then test physical CPAL devices and independent loopback.
 
-No Rust test execution, CI pass, physical device measurement or acoustic latency result is claimed by this v1 source slice.
+No Rust test execution, CI pass, physical-device measurement or acoustic-latency result is claimed by this v1 source slice.
