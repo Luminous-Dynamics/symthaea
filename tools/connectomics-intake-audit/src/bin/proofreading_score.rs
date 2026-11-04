@@ -2436,8 +2436,14 @@ mod tests {
         let brier = first.brier_score_95.expect("Brier interval should be estimable");
         assert!((brier.lower - 0.04).abs() < 1.0e-12);
         assert!((brier.upper - 0.04).abs() < 1.0e-12);
-        assert_eq!(first.adaptive_confidence_ece_15_95, Some(Interval { lower: 0.2, upper: 0.2 }));
-        assert_eq!(first.reliability_curve_ece_12_95, Some(Interval { lower: 0.2, upper: 0.2 }));
+        let adaptive_ece = first.adaptive_confidence_ece_15_95
+            .expect("adaptive confidence ECE interval should be estimable");
+        assert!((adaptive_ece.lower - 0.2).abs() < 1.0e-12);
+        assert!((adaptive_ece.upper - 0.2).abs() < 1.0e-12);
+        let reliability_ece = first.reliability_curve_ece_12_95
+            .expect("reliability-curve ECE interval should be estimable");
+        assert!((reliability_ece.lower - 0.2).abs() < 1.0e-12);
+        assert!((reliability_ece.upper - 0.2).abs() < 1.0e-12);
     }
 
     #[test]
