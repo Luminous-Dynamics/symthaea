@@ -1392,6 +1392,10 @@ mod tests {
     fn dream_derived_score_cannot_be_promoted_to_causal_status() {
         let mut ledger = base_ledger();
         ledger.evidence[0].authority = EvidenceAuthority::DreamDerived;
+        ledger.evidence[0].source_action_id = None;
+        ledger.outcomes[0].status = OutcomeStatus::NotMeasurable;
+        ledger.outcomes[0].observation_evidence_id = None;
+        ledger.outcomes[0].realized_utility = MetricValue::NotMeasurable;
         assert_eq!(
             ledger.validate(),
             Err(ValidationError::CausalStatusWithoutIntervention)
