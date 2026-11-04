@@ -47,3 +47,38 @@ The repair evaluator keeps blocked access/parts, incomplete requalification, rec
 Public input and result types use explicit Serde contracts; enum dispositions serialize in snake_case for downstream report tooling. This is a serialization contract, not an authenticated evidence receipt.
 
 No network access, cloud service, live actuator, or safety-control authority is present.
+
+
+## Batch evaluation of the 20 frozen scenarios
+
+Build and evaluate both v0.1 corpora in one offline command:
+
+~~~bash
+cargo run --locked --manifest-path tools/household-service-evaluator/Cargo.toml -- \
+  --water docs/research/household-services/fixtures/water-continuity-scenarios-v0.1.json \
+  --repair docs/research/household-services/fixtures/repairability-scenarios-v0.1.json \
+  --output -
+~~~
+
+Use a file path instead of --output - to write a deterministic JSON report:
+
+~~~bash
+cargo run --locked --manifest-path tools/household-service-evaluator/Cargo.toml -- \
+  --water docs/research/household-services/fixtures/water-continuity-scenarios-v0.1.json \
+  --repair docs/research/household-services/fixtures/repairability-scenarios-v0.1.json \
+  --output target/household-service-batch-report.json
+~~~
+
+The report contains 10 water receipts and 10 repair receipts, corpus IDs, the fixture-declared disposition as reference metadata, evaluator dispositions, deterministic derived metrics, evidence notes, unresolved claims, per-disposition counts and the source claim ceilings. The expected fixture disposition is never copied into the evaluator result.
+
+The batch evaluator rejects a corpus with the wrong schema version/status/ID, an empty claim ceiling, missing/duplicate/unknown scenario IDs, wrong scenario count or missing contract fields. It has no clock, network, cloud, actuator or product-safety authority.
+
+Selected software-only calculations:
+- WCONT-001 integrates its declared constant 8 L/min over 24 h to 11,520 L, while withholding service qualification because no outlet/demand/pressure/quality evidence exists.
+- WCONT-003 integrates 0.8 L/min over 12 h to 576 L only under the explicit constant-flow synthetic assumption; low-pressure time series and delivered volume remain unresolved.
+- WCONT-004 reports the 82 L difference between the two fixture readings without selecting either as ground truth.
+- WCONT-005 integrates 0.5 L/min over 8 h to 240 L as unexplained flow, not proven leakage.
+- WCONT-008 recomputes -200 L and uses the conservative 20 L aggregate error bound (four 5 L per-term bounds) because the source fixture does not define the uncertainty field's scope. Its result remains synthetic and unqualified.
+- REPAIR-006/007/009 remain blocked; REPAIR-008 preserves observed recurrence; REPAIR-010 remains held; REPAIR-005 records that offline artifacts are available but does not claim a rollback was performed.
+
+The CI workflow runs this command and uploads the resulting JSON as a synthetic batch-report artifact. Artifact existence is not physical validation.
