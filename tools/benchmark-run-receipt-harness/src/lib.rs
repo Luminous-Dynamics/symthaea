@@ -1826,9 +1826,7 @@ mod tests {
         let eligible_digest = canonical_digest(&json!(eligible)).unwrap();
 
         let mut sorted = tasks;
-        sorted.sort_by(|left, right| {
-            left["task_id"].as_str().cmp(&right["task_id"].as_str())
-        });
+        sorted.sort_by(|left, right| left["task_id"].as_str().cmp(&right["task_id"].as_str()));
         let universe_digest = canonical_digest(&Value::Array(sorted)).unwrap();
 
         value["eligible_task_set_sha256"] = json!(eligible_digest);
