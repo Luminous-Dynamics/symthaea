@@ -282,6 +282,183 @@
         }
       ],
       "comparison_claim_ceiling": "Third-party listing scope only. Do not compare the H600 with H300 or WaterLoop without matching source, end-use class and measured functional units."
+    },
+    {
+      "comparator_id": "AQUALOOP-CLASS-C-SYSTEMS",
+      "manufacturer": "INTEWA Ingenieur-Gesellschaft für Energie- und Wassertechnik GmbH",
+      "model_scope": [
+        "AQUALOOP GW300",
+        "GW600",
+        "GW900",
+        "GW1200",
+        "GW1500",
+        "GW1800",
+        "GW3600",
+        "GW5400"
+      ],
+      "primary_service_function": "greywater_source_substitution",
+      "declared_source_streams": [
+        "showers",
+        "baths",
+        "washbasins"
+      ],
+      "process_description": "Manufacturer literature describes prefiltration, biological treatment/aeration, ultrafiltration membrane, clear-water storage, membrane backwash and sludge/overflow routing.",
+      "observations": [
+        {
+          "observation_id": "AQUALOOP-NSF350-CLASS-C-LISTING-2026-11-03",
+          "evidence_class": "third_party_listing",
+          "source_title": "NSF/ANSI 350 official listings, INTEWA",
+          "source_url": "https://info.nsf.org/Certified/Wastewater/Listings.asp?Standard=350",
+          "retrieved_date": "2026-11-04",
+          "listing_current_as_of": "2026-11-03",
+          "claims": {
+            "models": [
+              {
+                "model": "GW300",
+                "rated_capacity_us_gallons_per_day": 79,
+                "converted_litres_per_day": 299.2
+              },
+              {
+                "model": "GW600",
+                "rated_capacity_us_gallons_per_day": 158,
+                "converted_litres_per_day": 598.1
+              },
+              {
+                "model": "GW900",
+                "rated_capacity_us_gallons_per_day": 238,
+                "converted_litres_per_day": 900.9
+              },
+              {
+                "model": "GW1200",
+                "rated_capacity_us_gallons_per_day": 317,
+                "converted_litres_per_day": 1200
+              },
+              {
+                "model": "GW1500",
+                "rated_capacity_us_gallons_per_day": 396,
+                "converted_litres_per_day": 1499
+              },
+              {
+                "model": "GW1800",
+                "rated_capacity_us_gallons_per_day": 476,
+                "converted_litres_per_day": 1801
+              },
+              {
+                "model": "GW3600",
+                "rated_capacity_us_gallons_per_day": 951,
+                "converted_litres_per_day": 3600
+              },
+              {
+                "model": "GW5400",
+                "rated_capacity_us_gallons_per_day": 1427,
+                "converted_litres_per_day": 5400
+              }
+            ],
+            "classification": "Class C",
+            "type": "Laundry & Bathing"
+          },
+          "semantics": "Class C is the listing class shown for these systems; do not directly compare these multi-unit/commercial-scope product entries with H300/H350 Class R residential listing without matching building type, influent, rated-capacity basis and end-use.",
+          "missing_or_unresolved": [
+            "exact certification report and model/installation constraints",
+            "local South African market availability, SKU, installer and service route",
+            "actual measured output quality, net mains displacement, energy and maintenance under a matched installation"
+          ]
+        },
+        {
+          "observation_id": "AQUALOOP-GW300-MANUAL-SOURCE-AND-PROCESS",
+          "evidence_class": "manufacturer_technical_sheet",
+          "source_title": "AQUALOOP GW300 system manual v1.3",
+          "source_url": "https://www.intewa.com/fileadmin/documents/Anleitungen/AL_GW300_System_manuel_Vers.1.3_en.pdf",
+          "retrieved_date": "2026-11-04",
+          "claims": {
+            "stated_greywater_sources": [
+              "bathtub",
+              "shower",
+              "washbasin"
+            ],
+            "process_steps": [
+              "prefilter",
+              "bioreactor with aeration",
+              "ultrafiltration membrane",
+              "clear-water storage",
+              "membrane backwash",
+              "sludge/overflow discharge"
+            ],
+            "rejected_or_overflow_route": "sewer"
+          },
+          "semantics": "Manufacturer-described system design and flow path, not a matched independent output-quality or net-saving measurement.",
+          "missing_or_unresolved": [
+            "exact acceptance limits and local regulatory acceptance for the target end-use",
+            "measured reject/purge fraction, maintenance burden and energy per qualified litre for the exact configuration"
+          ]
+        },
+        {
+          "observation_id": "AQUALOOP-GW600-MANUFACTURER-REFERENCE-CASE",
+          "evidence_class": "manufacturer_declared",
+          "source_title": "INTEWA reference: greywater treatment in multi-generational house, Hamburg (2025)",
+          "source_url": "https://www.intewa.com/en/references/greywater-treatment-in-multi-generational-house-hamburg/",
+          "retrieved_date": "2026-11-04",
+          "claims": {
+            "model": "AQUALOOP GW600",
+            "treatment_volume_l_per_day": 600,
+            "connected_source_streams": [
+              "showers",
+              "washbasins"
+            ],
+            "internal_collection_tank_volume_l": 1100,
+            "reuse_end_use": "10 toilet facilities"
+          },
+          "semantics": "Manufacturer project case study, not an independent test report or directly comparable household result.",
+          "missing_or_unresolved": [
+            "metered annual mains displacement, actual energy and maintenance dataset",
+            "independent laboratory output report, installation configuration and occupancy/use profile"
+          ]
+        }
+      ],
+      "comparison_claim_ceiling": "Official listing and manufacturer descriptions establish a Class C product family and declared project details, not WaterLoop performance, local approval or single-family superiority."
+    },
+    {
+      "comparator_id": "PHYN-PLUS-WHOLE-HOME-SHUTOFF",
+      "manufacturer": "Phyn (Belkin)",
+      "model_scope": "Phyn Plus Smart Water Assistant + Automatic Shutoff; exact regional SKU/firmware to be frozen",
+      "primary_service_function": "leak_observability_and_containment",
+      "capabilities": [
+        "whole-home in-line water monitoring",
+        "automatic shutoff for catastrophic leaks",
+        "usage monitoring",
+        "daily plumbing diagnostic checks"
+      ],
+      "observations": [
+        {
+          "observation_id": "PHYN-PLUS-BELKIN-PAGE-001",
+          "evidence_class": "manufacturer_declared",
+          "source_title": "Phyn Plus Smart Water Assistant + Automatic Shutoff",
+          "source_url": "https://www.belkin.com/p/plus-smart-water-assistant-plus-shutoff/P-PHNSWA01.html",
+          "retrieved_date": "2026-11-04",
+          "claims": {
+            "daily_diagnostic_leak_check_declared_sensitivity_gallons_per_minute": 0.1,
+            "automatic_shutoff_for_catastrophic_leak": true,
+            "wi_fi_router_required": true,
+            "extra_hub_required": false,
+            "subscription_required_as_listed": false,
+            "power_supply_w": 19,
+            "supported_supply_volts": [
+              110,
+              220
+            ],
+            "declared_potable_water_certification": true,
+            "warranty_years": 2
+          },
+          "semantics": "Manufacturer-declared feature and system requirement. The 0.1 GPM diagnostic figure is not independently verified leak-class recall or guarantee of detection for all leak profiles. Potable-water material/system certification does not certify greywater treatment or reuse.",
+          "missing_or_unresolved": [
+            "exact local-market SKU, pipe size and firmware revision",
+            "independent leak challenge recall, false-shutoff rate, isolation latency and water loss",
+            "offline behavior when Wi-Fi/router/internet unavailable",
+            "South African availability, local installer, support, spares and lifecycle cost"
+          ]
+        }
+      ],
+      "comparison_claim_ceiling": "A second incumbent capability baseline only. Manufacturer claims do not establish independent leak-detection performance, greywater treatment, local availability or WaterLoop superiority."
     }
   ],
   "benchmark_separation": {
