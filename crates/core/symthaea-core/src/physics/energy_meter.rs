@@ -652,10 +652,7 @@ pub mod nvml_backend {
 
         /// Open a meter using a shared NVML instance and the current device
         /// index. The resolved UUID is retained for every subsequent read.
-        pub fn from_shared(
-            nvml: Arc<Nvml>,
-            index: u32,
-        ) -> Result<Self, EnergyMeterError> {
+        pub fn from_shared(nvml: Arc<Nvml>, index: u32) -> Result<Self, EnergyMeterError> {
             let device = nvml.device_by_index(index).map_err(map_nvml_error)?;
             let uuid = device.uuid().map_err(map_nvml_error)?;
             let initial_energy = device.total_energy_consumption().map_err(map_nvml_error)?;
@@ -761,11 +758,11 @@ pub mod nvml_backend {
         epoch: &mut u64,
     ) -> Result<(), EnergyMeterError> {
         if current < previous {
-            *epoch = epoch.checked_add(1).ok_or_else(|| {
-                EnergyMeterError::BackendFailure {
+            *epoch = epoch
+                .checked_add(1)
+                .ok_or_else(|| EnergyMeterError::BackendFailure {
                     reason: "NVML counter epoch overflow".into(),
-                }
-            })?;
+                })?;
         }
         Ok(())
     }
