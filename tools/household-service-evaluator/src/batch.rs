@@ -1463,6 +1463,29 @@ mod tests {
     }
 
     #[test]
+    fn source_commit_is_recorded_only_when_a_valid_full_object_id_is_supplied() {
+        let water = include_bytes!(
+            "../../../docs/research/household-services/fixtures/water-continuity-scenarios-v0.1.json"
+        );
+        let repair = include_bytes!(
+            "../../../docs/research/household-services/fixtures/repairability-scenarios-v0.1.json"
+        );
+        let report = evaluate_batch_from_bytes_with_source_commit(
+            water,
+            repair,
+            Some("0123456789abcdef0123456789abcdef01234567"),
+        )
+        .unwrap();
+        assert_eq!(
+            report.source_commit.as_deref(),
+            Some("0123456789abcdef0123456789abcdef01234567")
+        );
+        assert!(
+            evaluate_batch_from_bytes_with_source_commit(water, repair, Some("short")).is_err()
+        );
+    }
+
+    #[test]
     fn duplicate_water_scenario_is_rejected() {
         let (mut water, repair) = fixtures();
         water["scenarios"][1]["id"] = json!("WCONT-001");
