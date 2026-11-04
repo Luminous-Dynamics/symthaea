@@ -30,6 +30,9 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Generate isolated harness lockfile
+        run: cargo generate-lockfile --manifest-path research/energy-meter-001/Cargo.toml
+
       - name: Format isolated harness and included production module
         run: cargo fmt --manifest-path research/energy-meter-001/Cargo.toml -- --check
 
