@@ -115,6 +115,23 @@ pub fn replay_member_claim(
         ));
     }
 
+    let aggregate_limit =
+        decimal_at(receipt, &["limits", "max_total_declared_uncompressed_bytes"])?;
+    let mut aggregate_declared = 0u64;
+    for entry_index in 0..archive.len() {
+        let metadata = archive.by_index_data(entry_index).map_err(|error| {
+            ReplayError::Rejected(format!("cannot inspect entry metadata: {error}"))
+        })?;
+        aggregate_declared = aggregate_declared
+            .checked_add(metadata.size())
+            .ok_or_else(|| ReplayError::Rejected("aggregate declared size overflow".into()))?;
+        if aggregate_declared > aggregate_limit {
+            return Err(ReplayError::Rejected(
+                "aggregate declared uncompressed size exceeds receipt budget".into(),
+            ));
+        }
+    }
+
     let index = usize::try_from(decimal_at(
         receipt,
         &["occurrence", "central_directory_index"],
