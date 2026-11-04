@@ -23,7 +23,8 @@
     "target_goal_reproduced",
     "lake_manifest_sha256",
     "repository_tree_sha256",
-    "reproduction_log_sha256"
+    "reproduction_log_sha256",
+    "environment_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -94,6 +95,10 @@
       "pattern": "^[a-f0-9]{64}$"
     },
     "reproduction_log_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "environment_sha256": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
     }
