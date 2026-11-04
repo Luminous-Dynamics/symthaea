@@ -869,3 +869,27 @@ derived-output relays, unknown ancestry, disagreement preservation and confidenc
 inflation. It composes with the general measurement-dependence work in #6283 and the
 REA causal-investigation benchmark in #9911. It does not alter REA Evidence IDs and
 does not produce a scalar provider-independence score.
+
+## 18. 2026-11-04 — streamed ZIP content verification and cross-parser evidence
+
+The metadata-only reader in [#9965](https://github.com/Luminous-Dynamics/symthaea/pull/9965) is being extended by the stacked draft [#10368](https://github.com/Luminous-Dynamics/symthaea/pull/10368). The new API targets a single central-directory occurrence and keeps the custom parser as the policy authority.
+
+The draft uses `zipcore = 0.10.2` as a bounded Stored/Deflate streaming verifier and `sha2 = 0.10.9` for incremental SHA-256. Before consuming bytes, it compares archive count and central-directory location, ZIP64 status, central-directory occurrence index, raw filename bytes, raw local-header offset corrected by the known leading stub, general-purpose flags, method, declared compressed and uncompressed sizes, CRC, data-descriptor bit, encryption state and member kind. The decoder's own offset correction is therefore not allowed to silently substitute a different member.
+
+A member qualifies only after the stream reaches EOF and the decoder accepts CRC and declared-size checks. The caller budget is capped by the already-admitted declared uncompressed size. Encrypted entries, directories, symlinks and methods outside Stored/Deflate are explicit unsupported cases. No extraction, output file, password, decryption or execution path is added. The held source descriptor and selected path are revalidated after the attempt. The reported compressed length remains declared metadata.
+
+This is a per-member result, not archive completeness. Unlisted local-header scanning, APK Signing Block semantics, package-signature checks and remaining REA traversal semantics remain separate claims. The draft adds fixtures for duplicate names, CRC corruption, data descriptors, ZIP64 with a prefix, empty entries, Deflate, size-budget failure, oversized actual output, encrypted/unsupported methods and source mutation. These fixtures are authored; they are not considered passing until the exact-head workflow finishes.
+
+### Paradigm shift: parser disagreement is evidence
+
+The archive benchmark family in the machine-readable manifest now binds the implementation to #10368 and adds explicit cross-parser disagreement, source-race and output-bound controls. The custom reader, zipcore and pinned upstream REA implementation are separate adjudication arms, not a voting committee. A disagreement is preserved with exact source/version/feature/lockfile lineage and a minimized fixture. The zip-rs 9.3.0 candidate remains a separate possible oracle; shared dependency ancestry must be checked under [#10410](https://github.com/Luminous-Dynamics/symthaea/issues/10410) before calling two decoder results independent.
+
+The benchmark should report correctness before speed:
+- false accepts and false rejects by corruption/race family;
+- occurrence mapping and exact metadata parity, including duplicate raw names;
+- CRC and size failure recall, partial-stream false-accept rate, and source-mutation false-accept rate;
+- output budget adherence, buffer size and measured peak RSS versus member size;
+- only after these gates, throughput and energy per verified MiB, split by Stored and Deflate.
+
+No throughput advantage, production suitability or cross-implementation parity is claimed yet. The generated dependency lock must be committed and the exact-head formatting, tests and Clippy workflow must pass before the draft can be promoted.
+
