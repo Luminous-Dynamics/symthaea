@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/runner-cpal-clock-pair-set-v1.schema.json",
+  "title": "Melothaea runner/CPAL clock pair set v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_id",
+    "expected_disposition",
+    "descriptor",
+    "policy",
+    "pairs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-runner-cpal-clock-pair-set-v1"
+    },
+    "fixture_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expected_disposition": {
+      "enum": [
+        "fit",
+        "reject_capture_bracket",
+        "reject_descriptor_mismatch"
+      ]
+    },
+    "descriptor": {
+      "$ref": "#/$defs/descriptor"
+    },
+    "policy": {
+      "$ref": "#/$defs/policy"
+    },
+    "pairs": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/pair"
+      }
+    }
+  },
+  "$defs": {
+    "descriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "session_id",
+        "runner_clock_domain_id",
+        "runner_origin_id",
+        "stream_instance_id",
+        "cpal_stream_descriptor_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mel-runner-cpal-clock-descriptor-v1"
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runner_clock_domain_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runner_origin_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stream_instance_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cpal_stream_descriptor_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum_pair_count",
+        "maximum_abs_drift_ppm",
+        "maximum_abs_residual_ns",
+        "maximum_capture_bracket_ns",
+        "maximum_extrapolation_ns"
+      ],
+      "properties": {
+        "minimum_pair_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "maximum_abs_drift_ppm": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_abs_residual_ns": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_capture_bracket_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximum_extrapolation_ns": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "stream_instance_id",
+        "descriptor_identity_sha256",
+        "pair_index",
+        "cpal_callback_stream_time_ns",
+        "runner_time_before_ns",
+        "runner_time_after_ns"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mel-runner-cpal-clock-pair-v1"
+        },
+        "stream_instance_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "descriptor_identity_sha256": {
+          "type": "array",
+          "minItems": 32,
+          "maxItems": 32,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "pair_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cpal_callback_stream_time_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "runner_time_before_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "runner_time_after_ns": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
