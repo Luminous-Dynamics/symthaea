@@ -19,6 +19,8 @@
 | Expert-relative optimization | SWE-fficiency, 498 tasks / 9 repositories | Top evaluated agents average below 0.23× expert speedup | Performance improvements against expert reference workloads while preserving correctness |
 | Selective escalation | HiL-Bench, 300 tasks / 1,131 blockers | Historical paper/page takeaway: 24% combined Pass@3 and 44% highest ASK-F1 | Question precision/recall and task completion after help; metrics differ |
 | Paired act/abstain | AgentAbstain, 263 pairs / 42 environments / 8 scenarios | Gemini 3.1 Pro + Google ADK: 59.5% paired accuracy | Correct on both should-act and should-abstain members of a pair |
+| Context retrieval | ContextBench, 1,136 tasks / 66 repos / 8 languages | CodeNib Recall 0.779, Pass@1 77.6%, F1 0.281, $0.68/task; different system holds F1 0.389 | Evidence/context retrieval quality and efficiency; maxima are not one system |
+
 | Source-free reverse engineering | SRE-Bench, 19 private programs / 262 binary instances / 1,572 task grades | GPT-6-Astra: 5.55/6 on 181 graded instances; 149 fully solved | Semantic recovery and task completion from protected binaries without source |
 | Code review bug detection | CRBugBench, 1,000 OSS tasks / 98 repositories + 800 private tasks | Opus 5 + Copilot CLI: 71.9% of human-verified bugs surfaced in top 5 comments | Review-agent bug detection and reviewer-facing comment ranking |
 | Secure code generation | Agent Security League, 200 tasks / 108 Python projects / 77 CWE classes | Highest Secure score: 36.9%; highest Functional score: 91.6% (different system) | Security correctness in addition to functional correctness |
@@ -75,7 +77,7 @@ Source: https://proceedings.mlr.press/v306/ma26l.html
 
 The Scale page describes 300 tasks split evenly between software engineering and text-to-SQL, with 1,131 blockers, 200 public tasks and 100 private held-out tasks. Its explicit metric definitions say ASK-F1 is the harmonic mean of question precision and blocker recall, while Pass@3 asks whether one of three independent runs finishes the task after access to `ask_human()`.
 
-The page's takeaway section still reports an older 24% combined Pass@3 and highest ASK-F1 of 44%. Its later performance-comparison table includes values such as 79.67 but does not label the numeric column clearly in the extracted page. Do **not** relabel that 79.67 as ASK-F1 or Pass@3 without clarification from the benchmark owner. Treat the 24% / 44% values as the explicitly described older takeaway, not a current unqualified leaderboard claim.
+The page's explicit takeaway still reports the earlier benchmark result of 24% combined Pass@3 and highest ASK-F1 of 44%. The live comparison table now displays Muse Wonder 1.0 at 79.67±4.17, Muse Spark 1.3 at 66.89±5.12 and GPT-6 Astra at 65.32±5.19, but the numeric column is not labelled in the table text. Do **not** relabel 79.67 as ASK-F1 or Pass@3 without clarification from the benchmark owner. Preserve the two defined metrics separately and treat 24% / 44% as the older explicitly identified takeaway, not the current unqualified leaderboard.
 
 Source: https://labs.scale.com/leaderboard/hil
 
@@ -112,7 +114,7 @@ Source: https://www.microsoft.com/en-us/research/publication/when-should-a-softw
 
 ### Agent Security League — functional success is not secure success
 
-Endor Labs' Agent Security League reports 34 independently evaluated agent/model combinations. Its benchmark uses 200 tasks from 108 open-source Python projects spanning 77 CWE classes, with prompt hardening, workspace sanitization and automated cheating detection. The live page shows a highest Functional score of 91.6% (Muse Code / Muse Wonder) but a highest Secure score of 36.9% (Claude Code / Fable 5.1). The Secure metric requires passing security checks as well as functional tests; the two headline maxima belong to different system configurations.
+Endor Labs' Agent Security League reports 34 independently evaluated agent/model combinations. Its benchmark uses 200 tasks from 108 open-source Python projects spanning 77 CWE classes, with prompt hardening, workspace sanitization and automated cheating detection. The live page currently shows Claude Code / Fable 5.1 at 86.6% Functional and 36.9% Secure; Codex / GPT-6 Astra at 82.1% and 34.6%; and Codex / GPT-6.1 Sol at 77.7% and 34.1%. The highest Functional score is 91.6% for Muse Code / Muse Wonder, whose Secure score is 25.1%. Secure requires passing security checks as well as functional tests. The maxima are different configurations and should never be combined into a synthetic system.
 
 Source: https://www.endorlabs.com/research/ai-code-security-benchmark (live page accessed November 4, 2026)
 
@@ -128,7 +130,7 @@ Sources: https://arxiv.org/abs/2602.22764 and https://conf.researchr.org/details
 
 ### ContextBench — context retrieval quality is a first-class engineering variable
 
-ContextBench's live leaderboard was updated October 23, 2026. The dataset contains 1,136 tasks across 66 repositories and eight languages, including 63 Rust tasks. The best reported Recall is 0.779 with Pass@1 77.6%, Context F1 0.281 and average cost $0.68 for the same CodeNib system. A different system reports Context F1 0.389, illustrating why the best recall, task success and context F1 must not be merged into one row.
+ContextBench's live leaderboard was updated October 23, 2026. The dataset contains 1,136 tasks across 66 repositories and eight languages, including 63 Rust tasks. CodeNib (Haiku 5.5 search pair + Opus 5.5 mini-SWE-agent) leads Recall at 0.779, with Pass@1 77.6%, Context F1 0.281 and average cost $0.68. A different system, openJiuwen-JiuwenSwarm + DeepSeek-V4-Pro, has the best Context F1 at 0.389 (Recall 0.411, Pass@1 60.8%). This is a strong example of why best recall, task success and context F1 must not be merged into one row.
 
 Source: https://contextbench.github.io/ (accessed November 4, 2026); paper: https://arxiv.org/abs/2602.05892
 
