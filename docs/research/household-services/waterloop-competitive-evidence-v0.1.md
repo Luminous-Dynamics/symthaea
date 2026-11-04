@@ -53,8 +53,13 @@ The following are separate published data points, not yet reconciled to one froz
 | February 2025 Hydraloop Recycle Ready Guide | 360 L/day | Nominal cleaning capacity, dependent on user behaviour | Earlier document revision; do not overwrite current data |
 | February 2025 Hydraloop Recycle Ready Guide | 220 kWh/year | Published average power consumption | Historical/older figure; reconcile with current page before comparison |
 | NSF/ANSI 350 listing current 2026-11-03 | 52.8 US gal/day (~200 L/day) | H300/H350 Class R listing, Laundry & Bathing | Certification listing capacity and end-use class; not interchangeable with 360 L/day marketing/potential capacity |
-| January 2026 H300 data sheet | 2.1 bar / 210 kPa, 12 L/min | Nominal distribution-pump pressure and flow | Product-declared pump operating point; must be measured under the target plumbing/fixture load |
-| February 2025 Recycle Ready Guide | Internal Wi-Fi connection required | Connectivity prerequisite stated in an earlier guide | Must establish whether basic operation, settings, diagnostics and local service continue without internet/cloud, not infer cloud dependency from Wi-Fi wording |
+| January 2026 H300 V2.1 data sheet | 220 kWh/year; 25 W during treatment | Manufacturer-declared average energy and in-treatment power | Conflicts with current product page's 280 kWh/year; exact discrepancy unresolved |
+| January 2026 H300 V2.1 data sheet | Internet connection via Ethernet or internal Wi-Fi | Connectivity requirement stated in the technical sheet | Test whether loss of internet affects only remote support or also basic operation, local control and recovery |
+| January 2026 H300 V2.1 data sheet | Standard inlet: shower/bath; Premium: optional washing-machine inlet | Exact variant/source-stream boundary | Do not assume all H300 variants accept washing-machine discharge |
+| January 2026 H300 data sheet | 2.1 bar / 210 kPa, 12 L/min | Nominal distribution-pump pressure and flow | Product-declared pump operating point; must be measured under target plumbing and fixture load |
+| February 2025 Recycle Ready Guide | Internal Wi-Fi network connection required | Connectivity prerequisite stated in the earlier guide | The January 2026 technical sheet explicitly says internet connection is required; test the actual failure boundary |
+
+**Power/connectivity clarification from the January 2026 technical sheet:** it identifies the drawing/model as H300 V2.1 230V and states 220 kWh/year average consumption, 25 W during treatment, and an internet connection via Ethernet or internal Wi-Fi. The same sheet distinguishes H300 Standard (shower/bath input) from H300 Premium (optional washing-machine input); its toilet and washing-machine outlets are permanently pressurized, while the auxiliary outlet has a different pressure condition. The current product page inspected on 4 November 2026 still lists 280 kWh/year. Both 220 and 280 are therefore retained as manufacturer-declared values requiring direct reconciliation. The documents do not establish which number describes the exact locally offered SKU or which modes are included. Do not silently choose the lower figure.
 
 Primary sources:
 - Current H300 page: https://www.hydraloop.com/products/h300
@@ -72,7 +77,7 @@ Do not call the 360 L/day versus 52.8 GPD (~200 L/day) difference a defect or ce
 - whether daily capacity refers to treatment throughput, reusable output, or volume delivered at a specified quality/pressure;
 - the exact firmware/connectivity profile and whether local basic operation survives internet loss.
 
-Likewise, treat 220 versus 280 kWh/year as document/revision/operating-profile variation until the exact configuration, included standby/treatment/pumping modes and test conditions are confirmed. Do not select the lower figure as the benchmark.
+The current H300 product page's 280 kWh/year and January 2026 H300 V2.1 technical sheet's 220 kWh/year are both manufacturer-declared for the H300 family, and the reviewed sources do not publish a reconciliation. Do not assume they are explained by revision or operating profile; request a written, SKU-bound clarification of energy boundary, standby/treatment/pumping modes, duty assumptions and firmware/configuration before selecting a comparator value.
 
 The Class R / Laundry & Bathing listing is not a potable-water certification and must not be generalized to every use shown on a product page. The certification record, not a broad marketing phrase, defines the current claim boundary.
 
