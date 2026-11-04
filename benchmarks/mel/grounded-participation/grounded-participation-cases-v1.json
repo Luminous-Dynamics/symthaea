@@ -73,7 +73,9 @@
           }
         ],
         "claim_set_sha256": "39c4095d1d72d7b92363c9227f078abb2663c4526029ad687dea43a15d057edf",
-        "evidence_bundle_sha256": "eee7c981c7a0055922648441cc39f67fcbc1ba0597f308e06bcba4466e8ae85c"
+        "evidence_bundle_sha256": "eee7c981c7a0055922648441cc39f67fcbc1ba0597f308e06bcba4466e8ae85c",
+        "runner_clock_domain_id": "runner-monotonic-v1",
+        "runner_origin_id": "runner-origin-001"
       },
       "decision": {
         "schema_version": "mel-grounded-participation-receipt-v1",
@@ -96,21 +98,22 @@
           "invitation-001"
         ],
         "effect_window": {
-          "interval": {
-            "start_frame": 12100,
-            "end_frame": 14500
-          },
+          "not_before_runner_time_ns": 10000120,
+          "expires_at_runner_time_ns": 10100120,
           "authorization_id": "auth-001"
         },
         "collaborator_veto_active": false,
-        "policy_version": "mel-grounded-participation-policy-v1"
+        "policy_version": "mel-grounded-participation-policy-v1",
+        "runner_clock_domain_id": "runner-monotonic-v1",
+        "runner_origin_id": "runner-origin-001"
       },
       "policy": {
         "schema_version": "mel-grounded-participation-policy-v1",
         "policy_version": "mel-grounded-participation-policy-v1",
         "require_grounded_claims_for_wait": true,
         "maximum_evidence_age_ns": 2000000000,
-        "minimum_effect_lead_frames": 1
+        "minimum_effect_lead_ns": 10000000,
+        "maximum_effect_window_ns": 2000000000
       }
     },
     {
@@ -146,7 +149,9 @@
           }
         ],
         "claim_set_sha256": "49849b973f5fcd833613d31942dea5ae277bb56f8f2ecb1422b539efd6edb81e",
-        "evidence_bundle_sha256": "b0c06cd006b7a808a2de39646287ad9c156e1504b2304844a289ed1ca67911ac"
+        "evidence_bundle_sha256": "b0c06cd006b7a808a2de39646287ad9c156e1504b2304844a289ed1ca67911ac",
+        "runner_clock_domain_id": "runner-monotonic-v1",
+        "runner_origin_id": "runner-origin-001"
       },
       "decision": {
         "schema_version": "mel-grounded-participation-receipt-v1",
@@ -170,14 +175,17 @@
         ],
         "effect_window": null,
         "collaborator_veto_active": false,
-        "policy_version": "mel-grounded-participation-policy-v1"
+        "policy_version": "mel-grounded-participation-policy-v1",
+        "runner_clock_domain_id": "runner-monotonic-v1",
+        "runner_origin_id": "runner-origin-001"
       },
       "policy": {
         "schema_version": "mel-grounded-participation-policy-v1",
         "policy_version": "mel-grounded-participation-policy-v1",
         "require_grounded_claims_for_wait": true,
         "maximum_evidence_age_ns": 2000000000,
-        "minimum_effect_lead_frames": 1
+        "minimum_effect_lead_ns": 10000000,
+        "maximum_effect_window_ns": 2000000000
       }
     },
     {
@@ -213,7 +221,9 @@
           }
         ],
         "claim_set_sha256": "a01c3fa10a4eac02686b86ed254b84b729e6effbcd69f7d35d9c54151e04b6cc",
-        "evidence_bundle_sha256": "25009f62fc8e42de40a406de1c9947b39fb3360da74f3cc66c1a77597f1e438b"
+        "evidence_bundle_sha256": "25009f62fc8e42de40a406de1c9947b39fb3360da74f3cc66c1a77597f1e438b",
+        "runner_clock_domain_id": "runner-monotonic-v1",
+        "runner_origin_id": "runner-origin-001"
       },
       "decision": {
         "schema_version": "mel-grounded-participation-receipt-v1",
@@ -237,14 +247,17 @@
         ],
         "effect_window": null,
         "collaborator_veto_active": false,
-        "policy_version": "mel-grounded-participation-policy-v1"
+        "policy_version": "mel-grounded-participation-policy-v1",
+        "runner_clock_domain_id": "runner-monotonic-v1",
+        "runner_origin_id": "runner-origin-001"
       },
       "policy": {
         "schema_version": "mel-grounded-participation-policy-v1",
         "policy_version": "mel-grounded-participation-policy-v1",
         "require_grounded_claims_for_wait": true,
         "maximum_evidence_age_ns": 2000000000,
-        "minimum_effect_lead_frames": 1
+        "minimum_effect_lead_ns": 10000000,
+        "maximum_effect_window_ns": 2000000000
       }
     },
     {
@@ -332,7 +345,9 @@
           }
         ],
         "claim_set_sha256": "94ee2608746f3f87239b69356735c29fac15dc2e351ee11c25c486387cbc1ede",
-        "evidence_bundle_sha256": "169185d10f1658174c25392ee0a743ffa0b44af24f44798c360ead561ee7717a"
+        "evidence_bundle_sha256": "169185d10f1658174c25392ee0a743ffa0b44af24f44798c360ead561ee7717a",
+        "runner_clock_domain_id": "runner-monotonic-v1",
+        "runner_origin_id": "runner-origin-001"
       },
       "decision": {
         "schema_version": "mel-grounded-participation-receipt-v1",
@@ -356,21 +371,22 @@
           "collaborator-veto-001"
         ],
         "effect_window": {
-          "interval": {
-            "start_frame": 12100,
-            "end_frame": 14500
-          },
+          "not_before_runner_time_ns": 10000120,
+          "expires_at_runner_time_ns": 10100120,
           "authorization_id": "auth-001"
         },
         "collaborator_veto_active": true,
-        "policy_version": "mel-grounded-participation-policy-v1"
+        "policy_version": "mel-grounded-participation-policy-v1",
+        "runner_clock_domain_id": "runner-monotonic-v1",
+        "runner_origin_id": "runner-origin-001"
       },
       "policy": {
         "schema_version": "mel-grounded-participation-policy-v1",
         "policy_version": "mel-grounded-participation-policy-v1",
         "require_grounded_claims_for_wait": true,
         "maximum_evidence_age_ns": 2000000000,
-        "minimum_effect_lead_frames": 1
+        "minimum_effect_lead_ns": 10000000,
+        "maximum_effect_window_ns": 2000000000
       }
     }
   ]
