@@ -1,0 +1,33 @@
+# Typed connectome claim verifier
+
+Rust CLI semantic checker for the typed claim bundle V0.1.
+
+## Usage
+
+```sh
+cargo test --locked
+cargo run --locked -- bundle.json
+```
+
+## Structural and semantic checks
+
+- relation type matches evidence profile;
+- anatomical endpoints share a world and require separate presence, polarity and partner support;
+- correspondence endpoints are cross-release and match the evidence receipt world IDs and object type;
+- statistical evidence binds model, sample frame, conditioning set, hypothesis family, multiplicity procedure and sampling design;
+- functional evidence has a positive time window;
+- causal claims marked supported require adequate positivity and handled selection;
+- query paths are recomputed from claim IDs, checked against frozen relation-type grammar, and require exact endpoint/object-kind/world continuity across adjacent traversable claims;
+- causal-effect claims are attached estimand/identification assertions, not traversable graph edges;
+- mixed evidence cannot be promoted into an unqualified single-layer or causal conclusion;
+- counts and exact bundle digest are recomputed.
+
+## Trust boundary
+
+The report is `STRUCTURE_RECOMPUTED` with `trusted_promotion=false`. It does not authenticate external evidence bytes, model correctness, signer authority, biological truth or causal identification. Result-output digests are producer claims unless actual result bytes are separately supplied and verified.
+
+## Tests
+
+Twenty-six Rust tests are authored for known-answer, relation/evidence mismatch, same-world anatomical and correspondence errors, ambiguous polarity, statistical range, functional window, causal positivity, invalid causal promotion, query grammar, duplicate IDs and counter corruption.
+
+Tests are authored for exact-head execution by the isolated pinned Rust 1.96.0 workflow. Local execution is unavailable in this authoring environment; rely on the linked exact-head workflow run, not this local note, for pass/fail status.

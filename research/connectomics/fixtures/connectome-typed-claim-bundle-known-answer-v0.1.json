@@ -1,0 +1,253 @@
+{
+  "schema_version": "0.1.0",
+  "bundle_id": "synthetic-multiplex-claims-release-2",
+  "scope": {
+    "dataset_id": "synthetic-connectome",
+    "source_volume_id": "volume-syn-01",
+    "release_id": "release-2",
+    "source_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "claims": [
+    {
+      "claim_id": "anat-syn-17",
+      "relation_type": "ANATOMICAL_SYNAPSE_EDGE",
+      "source": {
+        "object_id": "neuron-A",
+        "object_kind": "NEURON",
+        "world_id": "world-release-2"
+      },
+      "target": {
+        "object_id": "neuron-B",
+        "object_kind": "NEURON",
+        "world_id": "world-release-2"
+      },
+      "claim_status": "CLAIMED_SUPPORTED",
+      "evidence": [
+        {
+          "evidence_type": "ANATOMICAL_SYNAPSE_EVIDENCE",
+          "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "image_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "synapse_candidate_id": "syn-17",
+          "presence": "CLAIMED_PRESENT",
+          "polarity": "CLAIMED_PRE_TO_POST",
+          "pre_partner": "CLAIMED_MATCH",
+          "post_partner": "CLAIMED_MATCH",
+          "coordinate_frame_id": "frame-nm-v2"
+        }
+      ]
+    },
+    {
+      "claim_id": "correspond-neuron-A",
+      "relation_type": "RECONSTRUCTION_CORRESPONDENCE",
+      "source": {
+        "object_id": "neuron-A-v1",
+        "object_kind": "NEURON",
+        "world_id": "world-release-1"
+      },
+      "target": {
+        "object_id": "neuron-A-v2",
+        "object_kind": "NEURON",
+        "world_id": "world-release-2"
+      },
+      "claim_status": "CLAIMED_SUPPORTED",
+      "evidence": [
+        {
+          "evidence_type": "RECONSTRUCTION_CORRESPONDENCE_EVIDENCE",
+          "mapping_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "mapping_id": "map-neuron-A",
+          "source_world_id": "world-release-1",
+          "target_world_id": "world-release-2",
+          "correspondence_relation": "NEURON_CORRESPONDENCE"
+        }
+      ]
+    },
+    {
+      "claim_id": "stat-edge-activity",
+      "relation_type": "STATISTICAL_DEPENDENCE_EDGE",
+      "source": {
+        "object_id": "neuron-B",
+        "object_kind": "NEURON",
+        "world_id": "world-release-2"
+      },
+      "target": {
+        "object_id": "neuron-C",
+        "object_kind": "NEURON",
+        "world_id": "world-release-2"
+      },
+      "claim_status": "CLAIMED_SUPPORTED",
+      "evidence": [
+        {
+          "evidence_type": "STATISTICAL_DEPENDENCE_EVIDENCE",
+          "model_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sample_frame_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "conditioning_set_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "hypothesis_id": "H-activity-A-B",
+          "hypothesis_family_id": "family-local-circuit-42",
+          "multiplicity_procedure_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "sampling_design_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "effect_estimate": 0.42,
+          "standard_error": 0.08,
+          "p_value": 0.0008,
+          "q_value": 0.012,
+          "effective_sample_size": 240
+        }
+      ]
+    },
+    {
+      "claim_id": "functional-edge-activity",
+      "relation_type": "FUNCTIONAL_ASSOCIATION_EDGE",
+      "source": {
+        "object_id": "unit-A",
+        "object_kind": "NEURON",
+        "world_id": "recording-session-1"
+      },
+      "target": {
+        "object_id": "unit-B",
+        "object_kind": "NEURON",
+        "world_id": "recording-session-1"
+      },
+      "claim_status": "CLAIMED_CONDITIONAL",
+      "evidence": [
+        {
+          "evidence_type": "FUNCTIONAL_ASSOCIATION_EVIDENCE",
+          "recording_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "acquisition_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "signal_pipeline_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "state_context_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "window_start_ms": 0,
+          "window_end_ms": 500
+        }
+      ]
+    },
+    {
+      "claim_id": "causal-edge-unresolved",
+      "relation_type": "CAUSAL_EFFECT_CLAIM",
+      "source": {
+        "object_id": "intervention-X",
+        "object_kind": "INTERVENTION",
+        "world_id": "experiment-1"
+      },
+      "target": {
+        "object_id": "outcome-Y",
+        "object_kind": "VARIABLE",
+        "world_id": "experiment-1"
+      },
+      "claim_status": "CLAIMED_NOT_ESTIMABLE",
+      "evidence": [
+        {
+          "evidence_type": "CAUSAL_EFFECT_EVIDENCE",
+          "intervention_protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "assignment_mechanism_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "target_population_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "outcome_definition_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "estimand": "ITT",
+          "identification_strategy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "assumption_bundle_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "positivity_status": "VIOLATION",
+          "selection_status": "UNRESOLVED"
+        }
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "query_id": "anatomical-path-query",
+      "query_definition_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "analysis_code_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "query_mode": "SINGLE_RELATION_LAYER",
+      "requested_claim_type": "ANATOMICAL_PATH",
+      "allowed_relation_type_paths": [
+        {
+          "path_id": "anat-only",
+          "relation_types": [
+            "ANATOMICAL_SYNAPSE_EDGE"
+          ]
+        }
+      ],
+      "path_results": [
+        {
+          "path_id": "anat-only",
+          "ordered_claim_ids": [
+            "anat-syn-17"
+          ],
+          "asserted_claim_type": "ANATOMICAL_PATH",
+          "result_status": "CLAIMED_SUPPORTED"
+        }
+      ],
+      "result_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "result_status": "CLAIMED_SUPPORTED"
+    },
+    {
+      "query_id": "statistical-local-graph-query",
+      "query_definition_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "analysis_code_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "query_mode": "SINGLE_RELATION_LAYER",
+      "requested_claim_type": "STATISTICAL_PATH",
+      "allowed_relation_type_paths": [
+        {
+          "path_id": "stat-only",
+          "relation_types": [
+            "STATISTICAL_DEPENDENCE_EDGE"
+          ]
+        }
+      ],
+      "path_results": [
+        {
+          "path_id": "stat-only",
+          "ordered_claim_ids": [
+            "stat-edge-activity"
+          ],
+          "asserted_claim_type": "STATISTICAL_PATH",
+          "result_status": "CLAIMED_SUPPORTED"
+        }
+      ],
+      "result_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "result_status": "CLAIMED_SUPPORTED"
+    },
+    {
+      "query_id": "invalid-anatomy-to-causality-attempt",
+      "query_definition_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "analysis_code_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "query_mode": "DECLARED_MIXED_LAYERS",
+      "requested_claim_type": "CAUSAL_EFFECT",
+      "allowed_relation_type_paths": [
+        {
+          "path_id": "anat-plus-stat",
+          "relation_types": [
+            "ANATOMICAL_SYNAPSE_EDGE",
+            "STATISTICAL_DEPENDENCE_EDGE"
+          ]
+        }
+      ],
+      "path_results": [
+        {
+          "path_id": "anat-plus-stat",
+          "ordered_claim_ids": [
+            "anat-syn-17",
+            "stat-edge-activity"
+          ],
+          "asserted_claim_type": "CAUSAL_EFFECT",
+          "result_status": "CLAIMED_SUPPORTED"
+        }
+      ],
+      "result_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "result_status": "CLAIMED_SUPPORTED"
+    }
+  ],
+  "summary": {
+    "claim_count": 5,
+    "query_count": 3,
+    "claim_type_counts": {
+      "ANATOMICAL_SYNAPSE_EDGE": 1,
+      "RECONSTRUCTION_CORRESPONDENCE": 1,
+      "STATISTICAL_DEPENDENCE_EDGE": 1,
+      "FUNCTIONAL_ASSOCIATION_EDGE": 1,
+      "CAUSAL_EFFECT_CLAIM": 1
+    }
+  },
+  "provenance": {
+    "claim_policy_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "query_grammar_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "producer_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  }
+}
