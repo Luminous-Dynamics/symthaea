@@ -304,6 +304,49 @@ fn model_has_independent_calibration(case: &Value, decision_time: &str) -> bool 
     })
 }
 
+fn required_evidence_gates_met(case: &Value, decision_time: &str) -> bool {
+    let gates = array(case, "required_gates");
+    if gates.is_empty() {
+        return false;
+    }
+    gates.iter().all(|gate| {
+        if gate.get("fail_closed").and_then(Value::as_bool) != Some(true) {
+            return false;
+        }
+        let claim_ids: Vec<&str> = array(gate, "claim_ids")
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        let permitted_classes: Vec<&str> = array(gate, "required_evidence_classes")
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        let subject = string(gate, "expected_subject_id").unwrap_or_default();
+        let boundary = string(gate, "expected_boundary_id").unwrap_or_default();
+        let issuer_role = string(gate, "expected_issuer_role").unwrap_or_default();
+        let require_valid = gate
+            .get("require_valid_at_decision")
+            .and_then(Value::as_bool)
+            .unwrap_or(true);
+        !claim_ids.is_empty()
+            && !permitted_classes.is_empty()
+            && !subject.is_empty()
+            && !boundary.is_empty()
+            && !issuer_role.is_empty()
+            && claim_ids.iter().all(|claim_id| {
+                claim_has_evidence(
+                    case,
+                    claim_id,
+                    decision_time,
+                    &permitted_classes,
+                    subject,
+                    boundary,
+                    issuer_role,
+                    require_valid,
+                )
+            })
+    })
+}
 fn yield_uncertainty_contract_valid(case: &Value) -> bool {
     let assessment = match case
         .get("physical_model")
@@ -432,6 +475,9 @@ pub fn evaluate_case(case: &Value) -> Disposition {
     }
     if !evidence_references_resolve(case) {
         blockers.push("EVIDENCE_REFERENCE_INTEGRITY_FAILURE".to_owned());
+    }
+    if !required_evidence_gates_met(case, decision_time) {
+        blockers.push("REQUIRED_EVIDENCE_GATE_FAILED".to_owned());
     }
 
     let grid = case.get("grid_connection");
@@ -710,6 +756,19 @@ mod tests {
         assert!(result.blockers.iter().any(|value| value == "PHYSICAL_MODEL_OUTSIDE_QUALIFIED_DOMAIN"));
     }
 
+    #[test]
+    fn a_gate_with_an_unexpected_issuer_role_fails_closed() {
+        let mut corpus = public_corpus();
+        let case = corpus["cases"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|item| item["case_id"] == "solar-storage-base-001")
+            .unwrap();
+        case["required_gates"][0]["expected_issuer_role"] = json!("developer");
+        let result = evaluate_case(case);
+        assert!(result.blockers.iter().any(|value| value == "REQUIRED_EVIDENCE_GATE_FAILED"));
+    }
     #[test]
     fn p90_must_not_exceed_p50_under_exceedance_convention() {
         let mut corpus = public_corpus();
