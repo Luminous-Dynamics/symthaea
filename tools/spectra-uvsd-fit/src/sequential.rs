@@ -227,7 +227,9 @@ impl PolicyHistory {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SequentialPolicyConfig {
     pub policy_version: String,
+    /// Frozen identifier for the candidate generative/observation model family.
     pub model_set_version: String,
+    /// Caller-computed digest of the complete canonical assessment vector.
     pub assessment_set_digest: String,
     pub seed: u64,
     pub decision_index: u64,
@@ -724,7 +726,7 @@ fn build_result(
         .iter()
         .find(|propensity| propensity.action_id == selected.action_id())
         .map(|propensity| propensity.probability)
-        .unwrap_or(0.0);
+        .expect("selected action has a recorded propensity");
     SelectionResult {
         action: selected.action.clone(),
         receipt: PolicyReceipt {
@@ -1012,10 +1014,13 @@ mod tests {
         assert_eq!(first.receipt.model_set_version, "spectra-uvsd-models-v1");
         assert_eq!(first.receipt.assessment_set_digest, "sha256:test-assessments");
         assert_eq!(first.receipt.candidate_assessments.len(), 3);
-        assert_eq!(
-            first.receipt.action_propensities.iter().map(|entry| entry.probability).sum::<f64>(),
-            1.0
-        );
+        let propensity_sum = first
+            .receipt
+            .action_propensities
+            .iter()
+            .map(|entry| entry.probability)
+            .sum::<f64>();
+        assert!((propensity_sum - 1.0).abs() < 1.0e-12);
         assert_eq!(first.receipt.random_generator, "splitmix64-v1");
     }
 
