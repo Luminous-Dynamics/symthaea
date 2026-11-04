@@ -41,3 +41,18 @@ jobs:
 
       - name: Run strict Clippy
         run: cargo clippy --locked --manifest-path tools/household-service-evaluator/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run all 20 synthetic household scenarios
+        run: |
+          mkdir -p target
+          cargo run --locked --manifest-path tools/household-service-evaluator/Cargo.toml -- \
+            --water docs/research/household-services/fixtures/water-continuity-scenarios-v0.1.json \
+            --repair docs/research/household-services/fixtures/repairability-scenarios-v0.1.json \
+            --output target/household-service-batch-report.json
+
+      - name: Upload synthetic batch report
+        uses: actions/upload-artifact@v4
+        with:
+          name: household-service-batch-report-${{ github.sha }}
+          path: target/household-service-batch-report.json
+          if-no-files-found: error
