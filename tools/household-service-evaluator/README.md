@@ -15,7 +15,7 @@ The signed equation is:
 
 A positive storage delta means the tank gained water; a negative delta means it lost water. The evaluator checks that four readings share one time window and use distinct stream and boundary identifiers. Each reading must have a qualified calibration state and a calibration-record digest reference before the result can be treated as calibration-qualified.
 
-The input carries a conservative aggregate absolute error bound for the complete residual. This crate does not assume independent errors, calculate covariance, or infer a residual uncertainty from a single meter's uncertainty. The supplied bound must come from the applicable metrology procedure. The WCONT-008 fixture's single `meter_uncertainty_l` field has ambiguous scope; its integration test conservatively sums four 5 L per-term bounds to a 20 L residual bound and records that interpretation explicitly.
+Each `MeterMeasurement` carries its own finite, nonnegative absolute error bound. The evaluator derives the complete residual bound as the sum of the four terms: `U_R = u_inlet + u_tank_delta + u_delivered + u_purge`. This is conservative worst-case interval propagation; it assumes neither independence nor a covariance model. The method and each bound still require justification by the applicable metrology procedure. The WCONT-008 fixture's single `meter_uncertainty_l` field has ambiguous scope; its integration test conservatively assigns 5 L to each of the four meter terms, and the evaluator derives the 20 L aggregate bound from the typed inputs.
 
 If zero lies inside the residual interval, the result is ZeroNotExcludedByDeclaredBound, not a physical pass. If it lies outside, the result is ContradictionBeyondDeclaredBound. A topology-audit report reference is separately required; a digest string is not proof that the topology is physically independent or that the report/auditor is trustworthy.
 
@@ -78,7 +78,7 @@ Selected software-only calculations:
 - WCONT-003 integrates 0.8 L/min over 12 h to 576 L only under the explicit constant-flow synthetic assumption; low-pressure time series and delivered volume remain unresolved.
 - WCONT-004 reports the 82 L difference between the two fixture readings without selecting either as ground truth.
 - WCONT-005 integrates 0.5 L/min over 8 h to 240 L as unexplained flow, not proven leakage.
-- WCONT-008 recomputes -200 L and uses the conservative 20 L aggregate error bound (four 5 L per-term bounds) because the source fixture does not define the uncertainty field's scope. Its result remains synthetic and unqualified.
+- WCONT-008 recomputes -200 L; each of the four synthetic meter observations is assigned the fixture's 5 L bound, and the evaluator derives a 20 L aggregate bound. The fixture's source field remains scope-ambiguous. Its result remains synthetic and unqualified.
 - REPAIR-006/007/009 remain blocked; REPAIR-008 preserves observed recurrence; REPAIR-010 remains held; REPAIR-005 records that offline artifacts are available but does not claim a rollback was performed.
 
 The CI workflow runs this command and uploads the resulting JSON as a synthetic batch-report artifact. Artifact existence is not physical validation.
