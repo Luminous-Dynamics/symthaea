@@ -73,6 +73,44 @@ The coarse signal reduced the declared disclosure-field-count proxy by 58.2–59
 
 The next comparison must either (a) hold the realized sender/receiver/message opportunities constant while varying the disclosed fields, or (b) run a predeclared Pareto sweep over signal quota, message quota and attention budget with cost-normalized outcomes. It must preserve the existing paired seeds and report message/attention use alongside coverage. Leakage attacks from issue #10413 remain unimplemented.
 
+
+## 3.2 Recipient-need quota sweep
+
+The follow-up API `simulate_with_program_and_disclosure_budget` exposes an explicit positive `max_signals_per_recipient` parameter for coarse-readiness mode. The compatibility API `simulate_with_program_and_disclosure` remains unchanged and continues to use the v0.1 default quota of two signals per recipient per step.
+
+The companion binary `privacy-disclosure-quota-sweep` compares signal quotas **1, 2, 4 and 8** on the same three task families and 256 seed IDs. Each family includes a central full-inventory control and a no-social control. It reports coverage, confidence-interval half-widths, depth, realized messages, attention uses, disclosure-field units, acquisitions, redundancies, individual discoveries and paired differences from central routing.
+
+This is a cost-frontier experiment, not a matched-realized-message experiment. Increasing the signal quota may alter both available content and the number/timing of transmissions. The resulting points should be plotted in at least three dimensions (coverage, realized communication/attention cost, disclosure-field volume). Interpolation between points is descriptive and must not be presented as a causal privacy estimate. The task/seed pairing does not imply exact action-level random-number matching when policies create different route/action sets.
+
+The 1/2/4/8 quotas are synthetic design points, not recommended deployment settings. The experiment remains non-private in the formal sense until the explicit inference attacks and authorization/consent tests in issue #10413 pass.
+
+
+## 3.3 Exact-head quota sweep results (4 November 2026)
+
+The 1/2/4/8 quota sweep completed successfully on [PR #10441 exact head](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41871549672): 256 seeds per task family, with central and no-social controls. The raw CSV is archived as `civbench-privacy-disclosure-quota-sweep`.
+
+### Collective coverage by quota
+
+| Task family | Central | k=1 | k=2 | k=4 | k=8 | No social |
+|---|---:|---:|---:|---:|---:|---:|
+| Layered | 65.96% | 53.54% | 59.46% | 65.79% | 65.96% | 38.73% |
+| Branching | 69.25% | 52.46% | 60.60% | 68.72% | 69.25% | 46.29% |
+| Convergent | 63.00% | 52.71% | 59.96% | 63.00% | 63.00% | 34.12% |
+
+### k=4 compared with central full inventory
+
+| Family | Paired coverage delta (95% interval) | Messages/run central → k=4 | Disclosure-field proxy reduction |
+|---|---:|---:|---:|
+| Layered | −0.17 pp [−0.39, +0.05] | 111.63 → 111.23 (−0.35%) | 17.59% |
+| Branching | −0.53 pp [−1.00, −0.06] | 116.50 → 115.59 (−0.78%) | 19.62% |
+| Convergent | 0.00 pp [0.00, 0.00] | 104.66 → 104.66 (0.00%) | 16.51% |
+
+At the tested settings, k=4 is a promising engineering trade-off: realized communication is almost unchanged, while the field-count proxy decreases by roughly one-sixth to one-fifth. In the branching case, the paired coverage loss is small but its reported 95% interval excludes zero; this is not a formal non-inferiority result. The intervals are descriptive paired t intervals, not a pre-registered equivalence test.
+
+k=1 reduces the field-count proxy by about 79% but loses 10.3–16.8 percentage points of coverage and substantially reduces message volume. k=2 reduces field counts by about 58–60% but loses 3.0–8.6 percentage points of coverage. k=8 reproduces central coverage and message volume in these fixtures but increases the field-count proxy by about 50–60% relative to central. None of these points proves privacy; the signal contents can still support reconstruction and inference attacks.
+
+The sweep therefore narrows the design question: test k=4 against explicit reconstruction/membership/progress/linkage attackers, add consent and expiry semantics, and replicate on held-out task families before treating it as a candidate operating point. Do not select k=4 on these same synthetic families for a deployment claim.
+
 ## 4. Required next-stage leakage evaluation
 
 A minimized feature should be tested against an explicit attacker, not judged by its field count. Add controlled attackers that attempt to infer:

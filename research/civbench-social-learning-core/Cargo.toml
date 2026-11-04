@@ -64,6 +64,10 @@ name = "privacy-disclosure-sweep"
 path = "src/bin/privacy_disclosure_sweep.rs"
 
 [[bin]]
+name = "privacy-disclosure-quota-sweep"
+path = "src/bin/privacy_disclosure_quota_sweep.rs"
+
+[[bin]]
 name = "environmental-adaptation-sweep"
 path = "src/bin/environmental_adaptation_sweep.rs"
 

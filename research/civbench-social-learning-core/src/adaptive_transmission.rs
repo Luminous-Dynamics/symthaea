@@ -422,6 +422,7 @@ pub enum ConfigError {
     InvalidProgramMessageLimit,
     InvalidProgramScoreWeights,
     UnsupportedFeatureForDisclosure { feature: &'static str },
+    ZeroCoarseNeedSignalBudget,
 }
 
 impl fmt::Display for ConfigError {
@@ -455,6 +456,10 @@ impl fmt::Display for ConfigError {
             Self::UnsupportedFeatureForDisclosure { feature } => write!(
                 f,
                 "program feature {feature} is unavailable under the selected recipient-state disclosure mode"
+            ),
+            Self::ZeroCoarseNeedSignalBudget => write!(
+                f,
+                "coarse recipient-need signal budget must be positive"
             ),
         }
     }
@@ -1136,14 +1141,16 @@ struct CoarseNeedSignal {
     prerequisite_match_milli: u16,
 }
 
-/// The recipient releases at most two prioritized need signals per step.
+/// The recipient releases at most the configured number of prioritized need signals per step.
 /// This avoids publishing the complete set of unheld recipes (whose
 /// complement would reconstruct its full recipe inventory).
-const COARSE_NEED_SIGNAL_BUDGET_PER_RECIPIENT: usize = 2;
+/// Default coarse disclosure quota used by the v0.1 compatibility API.
+pub const DEFAULT_COARSE_NEED_SIGNAL_BUDGET_PER_RECIPIENT: usize = 2;
 
 fn build_coarse_need_signals(
     task: &InnovationTask,
     agents: &[AgentKnowledge],
+    max_signals_per_recipient: usize,
 ) -> Vec<BTreeMap<u16, CoarseNeedSignal>> {
     agents.iter().map(|agent| {
         let mut candidates: Vec<(u16, u16, usize)> = task.recipes().iter()
@@ -1161,7 +1168,7 @@ fn build_coarse_need_signals(
                 .then_with(|| right.2.cmp(&left.2))
                 .then_with(|| left.0.cmp(&right.0))
         });
-        candidates.truncate(COARSE_NEED_SIGNAL_BUDGET_PER_RECIPIENT);
+        candidates.truncate(max_signals_per_recipient);
         candidates.into_iter().map(|(recipe_id, readiness, _)| {
             (
                 recipe_id,
@@ -1175,7 +1182,7 @@ fn build_coarse_need_signals(
 }
 
 /// Schedule using only recipient-local coarse need signals. The planner sees
-/// up to two recipient-selected recipe needs per step, sender-owned recipes,
+/// up to `max_signals_per_recipient` recipient-selected recipe needs per step, sender-owned recipes,
 /// graph neighbours, public task structure, and readiness scalars. It does not
 /// inspect receiver inventories. Recipients filter already-held recipes
 /// locally at the acquisition boundary.
@@ -1185,8 +1192,9 @@ fn program_schedule_coarse_need(
     agents: &[AgentKnowledge],
     config: Config,
     program: &TransmissionProgram,
+    max_signals_per_recipient: usize,
 ) -> (Vec<TransmissionAction>, usize) {
-    let need_signals = build_coarse_need_signals(task, agents);
+    let need_signals = build_coarse_need_signals(task, agents, max_signals_per_recipient);
     // Count three disclosed scalar fields per need: recipient reference,
     // recipe reference and readiness value. This is a field-volume proxy, not
     // an information-theoretic leakage or privacy metric.
@@ -1441,6 +1449,7 @@ pub fn simulate(
         seed,
         None,
         RecipientStateDisclosure::CentralFullInventory,
+        DEFAULT_COARSE_NEED_SIGNAL_BUDGET_PER_RECIPIENT,
     )
 }
 
@@ -1473,7 +1482,34 @@ pub fn simulate_with_program_and_disclosure(
     program: &TransmissionProgram,
     disclosure: RecipientStateDisclosure,
 ) -> Result<Run, ConfigError> {
+    simulate_with_program_and_disclosure_budget(
+        task,
+        config,
+        seed,
+        program,
+        disclosure,
+        DEFAULT_COARSE_NEED_SIGNAL_BUDGET_PER_RECIPIENT,
+    )
+}
+
+/// Run a bounded transmission program with an explicit recipient-side need
+/// signal quota. The quota is meaningful only for coarse disclosure and must
+/// be positive. This enables an auditable disclosure/communication/utility
+/// sweep without changing the existing v0.1 default (two signals).
+pub fn simulate_with_program_and_disclosure_budget(
+    task: &InnovationTask,
+    config: Config,
+    seed: u64,
+    program: &TransmissionProgram,
+    disclosure: RecipientStateDisclosure,
+    max_signals_per_recipient: usize,
+) -> Result<Run, ConfigError> {
     program.validate(config)?;
+    if disclosure == RecipientStateDisclosure::CoarseRecipeReadiness
+        && max_signals_per_recipient == 0
+    {
+        return Err(ConfigError::ZeroCoarseNeedSignalBudget);
+    }
     if disclosure == RecipientStateDisclosure::CoarseRecipeReadiness
         && (program.require_collective_novelty || program.weights.collective_novelty != 0)
     {
@@ -1481,7 +1517,14 @@ pub fn simulate_with_program_and_disclosure(
             feature: "collective_novelty",
         });
     }
-    simulate_internal(task, config, seed, Some(program), disclosure)
+    simulate_internal(
+        task,
+        config,
+        seed,
+        Some(program),
+        disclosure,
+        max_signals_per_recipient,
+    )
 }
 
 fn simulate_internal(
@@ -1490,6 +1533,7 @@ fn simulate_internal(
     seed: u64,
     program: Option<&TransmissionProgram>,
     disclosure: RecipientStateDisclosure,
+    max_signals_per_recipient: usize,
 ) -> Result<Run, ConfigError> {
     config.validate(task)?;
     let mut graph_rng = Rng::new(stream_seed(seed, STREAM_GRAPH, 0));
@@ -1541,7 +1585,14 @@ fn simulate_internal(
                 }
                 RecipientStateDisclosure::CoarseRecipeReadiness => {
                     let (actions, disclosure_units) =
-                        program_schedule_coarse_need(task, &graph, &agents, config, program);
+                        program_schedule_coarse_need(
+                            task,
+                            &graph,
+                            &agents,
+                            config,
+                            program,
+                            max_signals_per_recipient,
+                        );
                     recipient_state_disclosure_units += disclosure_units;
                     actions
                 }
@@ -1606,13 +1657,87 @@ mod tests {
         let mut agents = vec![AgentKnowledge::new(&task)];
         let already_held = task.recipes()[0].recipe_id;
         agents[0].known_recipes.insert(already_held);
-        let signals = build_coarse_need_signals(&task, &agents);
+        let signals = build_coarse_need_signals(
+            &task,
+            &agents,
+            DEFAULT_COARSE_NEED_SIGNAL_BUDGET_PER_RECIPIENT,
+        );
         assert_eq!(signals.len(), 1);
         assert!(!signals[0].contains_key(&already_held));
-        assert!(signals[0].len() <= COARSE_NEED_SIGNAL_BUDGET_PER_RECIPIENT);
+        assert!(signals[0].len() <= DEFAULT_COARSE_NEED_SIGNAL_BUDGET_PER_RECIPIENT);
         let signal = signals[0].values().next().unwrap();
         assert!((0..=1_000).contains(&signal.prerequisite_match_milli));
         assert!(task.recipe(signal.recipe_id).is_some());
+    }
+
+    #[test]
+    fn coarse_need_signal_quota_is_respected_and_monotone() {
+        let task = InnovationTask::family_task(TaskFamily::Branching);
+        let mut agents = vec![AgentKnowledge::new(&task); 3];
+        for (idx, agent) in agents.iter_mut().enumerate() {
+            for recipe in task.recipes().iter().take(idx + 1) {
+                agent.known_recipes.insert(recipe.recipe_id);
+                agent.apply_closure(&task);
+            }
+        }
+
+        let one = build_coarse_need_signals(&task, &agents, 1);
+        let two = build_coarse_need_signals(&task, &agents, 2);
+        let four = build_coarse_need_signals(&task, &agents, 4);
+        for idx in 0..agents.len() {
+            assert!(one[idx].len() <= 1);
+            assert!(two[idx].len() <= 2);
+            assert!(four[idx].len() <= 4);
+            assert!(one[idx].len() <= two[idx].len());
+            assert!(two[idx].len() <= four[idx].len());
+        }
+    }
+
+    #[test]
+    fn coarse_disclosure_budgeted_api_rejects_zero_signal_quota() {
+        let task = InnovationTask::family_task(TaskFamily::Branching);
+        let config = deterministic_config(TransmissionPolicy::StateAwareFrontier);
+        let mut program = TransmissionProgram::frontier_v1(config);
+        program.weights.collective_novelty = 0;
+        assert_eq!(
+            simulate_with_program_and_disclosure_budget(
+                &task,
+                config,
+                19,
+                &program,
+                RecipientStateDisclosure::CoarseRecipeReadiness,
+                0,
+            ),
+            Err(ConfigError::ZeroCoarseNeedSignalBudget)
+        );
+    }
+
+    #[test]
+    fn default_coarse_api_matches_explicit_default_quota() {
+        let task = InnovationTask::family_task(TaskFamily::Branching);
+        let config = deterministic_config(TransmissionPolicy::StateAwareFrontier);
+        let mut program = TransmissionProgram::frontier_v1(config);
+        program.weights.collective_novelty = 0;
+        let default_run = simulate_with_program_and_disclosure(
+            &task,
+            config,
+            23,
+            &program,
+            RecipientStateDisclosure::CoarseRecipeReadiness,
+        ).unwrap();
+        let explicit_run = simulate_with_program_and_disclosure_budget(
+            &task,
+            config,
+            23,
+            &program,
+            RecipientStateDisclosure::CoarseRecipeReadiness,
+            DEFAULT_COARSE_NEED_SIGNAL_BUDGET_PER_RECIPIENT,
+        ).unwrap();
+        assert_eq!(default_run.history, explicit_run.history);
+        assert_eq!(
+            default_run.recipient_state_disclosure_units,
+            explicit_run.recipient_state_disclosure_units
+        );
     }
 
     #[test]
@@ -1679,7 +1804,7 @@ mod tests {
         assert!(coarse.recipient_state_disclosure_units
             <= config.steps
                 * config.population_size
-                * COARSE_NEED_SIGNAL_BUDGET_PER_RECIPIENT
+                * DEFAULT_COARSE_NEED_SIGNAL_BUDGET_PER_RECIPIENT
                 * 3);
         assert!(central.recipient_state_disclosure_units
             > coarse.recipient_state_disclosure_units);
