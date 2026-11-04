@@ -75,12 +75,8 @@ pub fn replay_member_claim(
     let max_central_directory = decimal_at(receipt, &["limits", "max_central_directory_bytes"])?
         .min(HARD_CENTRAL_DIRECTORY_LIMIT);
     let max_entries = decimal_at(receipt, &["limits", "max_entries"])?.min(HARD_ENTRY_LIMIT);
-    let preflight_entries = preflight_regular_zip(
-        &mut source,
-        actual_size,
-        max_central_directory,
-        max_entries,
-    )?;
+    let preflight_entries =
+        preflight_regular_zip(&mut source, actual_size, max_central_directory, max_entries)?;
 
     let parser_handle = source.try_clone().map_err(io_error)?;
     let mut archive = zip::ZipArchive::new(parser_handle)
