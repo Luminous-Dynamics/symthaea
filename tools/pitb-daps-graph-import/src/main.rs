@@ -508,3 +508,90 @@ fn main() -> ExitCode {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_provenance() -> ProvenanceArgs {
+        ProvenanceArgs {
+            daps_repository_commit: "1".repeat(40),
+            source_graph_blob_sha1: "2".repeat(40),
+            extractor_blob_sha1: "3".repeat(40),
+            lake_manifest_blob_sha1: "4".repeat(40),
+            mathlib_commit: "5".repeat(40),
+            lean_toolchain: "leanprover/lean4:v4.22.0".into(),
+        }
+    }
+
+    fn graph_fixture() -> Value {
+        json!({
+            "nodes": [
+                {"name":"A","category":"theorem","statement":"theorem A : True","signature":"True","module":"Demo","line":1,"source_path":"Demo.lean"},
+                {"name":"B","category":"def","subcategory":"definition","statement":"def B : Nat := 1","signature":"Nat","module":"Demo","line":2,"source_path":"Demo.lean"},
+                {"name":"file_Demo","category":"file","subcategory":"file","statement":"Demo","module":"Demo","line":0,"source_path":"Demo.lean"}
+            ],
+            "edges": [
+                {"source_name":"A","target_name":"B","type":"USES_DEFINITION","explicit":false,"direct":true,"in_blacklist":false},
+                {"source_name":"file_Demo","target_name":"A","type":"CONTAINS","explicit":true,"direct":true,"in_blacklist":false}
+            ],
+            "metadata":{"version":"synthetic","node_count":3,"edge_count":2}
+        })
+    }
+
+    #[test]
+    fn daps_candidate_contract_controls_pass() {
+        run_self_test().expect("all DAPS importer self-tests must pass");
+    }
+
+    #[test]
+    fn unknown_edges_and_endpoints_fail_closed() {
+        let mut raw = graph_fixture();
+        raw["edges"][0]["target_name"] = Value::String("not-in-graph".into());
+        let bytes = json_bytes(&raw).unwrap();
+        assert!(convert(&raw, &bytes, &test_provenance()).is_err());
+
+        let mut raw = graph_fixture();
+        raw["edges"][0]["type"] = Value::String("UNKNOWN_EDGE".into());
+        let bytes = json_bytes(&raw).unwrap();
+        assert!(convert(&raw, &bytes, &test_provenance()).is_err());
+    }
+
+    #[test]
+    fn malformed_upstream_commit_identity_is_rejected() {
+        let raw = graph_fixture();
+        let bytes = json_bytes(&raw).unwrap();
+        let mut provenance = test_provenance();
+        provenance.mathlib_commit = "not-a-commit".into();
+        assert!(convert(&raw, &bytes, &provenance).is_err());
+    }
+
+    #[test]
+    fn imported_nodes_preserve_upstream_metadata_and_source_locator() {
+        let raw = graph_fixture();
+        let bytes = json_bytes(&raw).unwrap();
+        let result = convert(&raw, &bytes, &test_provenance()).unwrap();
+        let theorem = result.graph.nodes.iter().find(|n| n.label == "A").unwrap();
+        assert_eq!(theorem.kind, "formal_declaration");
+        assert_eq!(theorem.formal_name, Value::String("A".into()));
+        assert_eq!(theorem.source_locator, "Demo.lean:1-1");
+        assert_eq!(theorem.upstream_metadata["category"], "theorem");
+        assert_eq!(theorem.upstream_metadata["signature"], "True");
+        let file = result.graph.nodes.iter().find(|n| n.label == "file_Demo").unwrap();
+        assert_eq!(file.kind, "module");
+        assert!(file.formal_name.is_null());
+    }
+
+    #[test]
+    fn graph_environment_and_extractor_digests_bind_upstream_versions() {
+        let raw = graph_fixture();
+        let bytes = json_bytes(&raw).unwrap();
+        let a = convert(&raw, &bytes, &test_provenance()).unwrap();
+        let mut other = test_provenance();
+        other.lean_toolchain = "leanprover/lean4:v4.22.1".into();
+        let b = convert(&raw, &bytes, &other).unwrap();
+        assert_ne!(a.graph.snapshot.environment_sha256, b.graph.snapshot.environment_sha256);
+        assert_ne!(a.graph.snapshot.extractor_config_sha256, b.graph.snapshot.extractor_config_sha256);
+    }
+}
