@@ -6,6 +6,8 @@
 //! authenticate source records, inspect physical plumbing, establish water
 //! quality, certify a repair, control actuators, or make safety decisions.
 
+pub mod batch;
+
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::error::Error;
