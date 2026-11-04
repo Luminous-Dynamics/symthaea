@@ -1,0 +1,106 @@
+name: REA Rust Evidence Core
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/lib.rs"
+      - "src/rea_compat.rs"
+      - "scripts/rea/**"
+      - "crates/domains/symthaea-rea-compat/**"
+      - ".github/workflows/rea-rust-evidence-core.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/lib.rs"
+      - "src/rea_compat.rs"
+      - "scripts/rea/**"
+      - "crates/domains/symthaea-rea-compat/**"
+      - ".github/workflows/rea-rust-evidence-core.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-rust-evidence-core-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REA_REFERENCE_SHA: 8250bf2320ea57aab4e664db4b4d44b8abd2004e
+  REA_NODE_VERSION: 22.23.4
+  REA_NPM_VERSION: 11.16.0
+
+jobs:
+  evidence-core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      CARGO_BUILD_JOBS: 2
+      HUSKY: "0"
+    steps:
+      - name: Checkout Symthaea revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Checkout pinned upstream REA reference
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: morluto/rea
+          ref: 8250bf2320ea57aab4e664db4b4d44b8abd2004e
+          path: rea-upstream
+          persist-credentials: false
+
+      - name: Set up upstream-supported Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 22.23.4
+          cache: npm
+          cache-dependency-path: rea-upstream/package-lock.json
+
+      - name: Verify upstream source pin
+        working-directory: rea-upstream
+        run: test "$(git rev-parse HEAD)" = "$REA_REFERENCE_SHA"
+
+      - name: Install pinned upstream npm dependencies
+        working-directory: rea-upstream
+        run: |
+          npm install --global "npm@$REA_NPM_VERSION"
+          test "$(node --version)" = "v$REA_NODE_VERSION"
+          test "$(npm --version)" = "$REA_NPM_VERSION"
+          npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Execute the pinned upstream Evidence source and generate corpus
+        working-directory: rea-upstream
+        run: |
+          ./node_modules/.bin/tsx "$GITHUB_WORKSPACE/scripts/rea/generate-upstream-evidence.mjs" \
+            "$GITHUB_WORKSPACE/rea-upstream" \
+            "$RUNNER_TEMP/rea-evidence-upstream-v1"
+          echo "REA_UPSTREAM_EVIDENCE_FIXTURE_DIR=$RUNNER_TEMP/rea-evidence-upstream-v1" >> "$GITHUB_ENV"
+
+      - name: Validate Cargo-generated isolated harness lockfile
+        run: |
+          cargo metadata \
+            --manifest-path tools/rea-evidence-compat-harness/Cargo.toml \
+            --locked --format-version 1 \
+            > "$RUNNER_TEMP/rea-evidence-harness-metadata.json"
+
+      - name: Archive Cargo-generated harness lockfile
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-evidence-harness-lockfile
+          path: tools/rea-evidence-compat-harness/Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Rust format check
+        run: cargo fmt --manifest-path tools/rea-evidence-compat-harness/Cargo.toml -- --check
+
+      - name: Rust Evidence identity and upstream differential tests
+        run: cargo test --manifest-path tools/rea-evidence-compat-harness/Cargo.toml --locked
