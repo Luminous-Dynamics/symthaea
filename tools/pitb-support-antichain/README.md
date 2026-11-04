@@ -18,6 +18,7 @@ For one frozen target, fixed context, Lean environment/toolchain, solver policy 
 cargo fmt --check --manifest-path tools/pitb-support-antichain/Cargo.toml
 cargo test --locked --manifest-path tools/pitb-support-antichain/Cargo.toml
 cargo run --locked --manifest-path tools/pitb-support-antichain/Cargo.toml -- --self-test
+cargo run --locked --manifest-path tools/pitb-support-antichain/Cargo.toml -- --self-test-outcomes /tmp/support-outcomes.synthetic.jsonl
 cargo run --locked --manifest-path tools/pitb-support-antichain/Cargo.toml -- \
   --outcomes path/to/outcomes.jsonl \
   --predictions path/to/predictions.jsonl \
@@ -38,7 +39,9 @@ Every JSONL outcome row binds:
 - terminal outcome and both proof gates;
 - state, run, checker and semantic-gate receipt digests.
 
-The analyzer requires exactly one row for every subset in the registered powerset `2^D`. The full-context baseline must pass. Rows cannot mix identities or budgets, repeat local-context digests across distinct subsets, or classify an unresolved result as a non-solve. A `verified_success` must have both `kernel_passed=true` and `semantic_gate_passed=true`.
+The analyzer requires exactly one row for every subset in the registered powerset `2^D`. The full-context baseline must pass. Rows cannot mix identities or budgets, repeat local-context digests across distinct subsets, or classify an unresolved result as a non-solve. A `verified_success` must have both `kernel_passed=true` and `semantic_gate_passed=true`, `attempt_finished=true`, and `terminal_reason=verified_success`.
+
+A `non_solve` is admitted only when the attempt finished and the terminal reason is `budget_exhausted` or `search_exhausted`. Interrupted attempts, infrastructure failures, invalid targets, checker failures and unresolved results are **not** evidence that a premise subset is insufficient; they invalidate that ablation row and must be excluded/rerun. Each row carries a digest for the terminal-reason evidence. This prevents runner crashes or task corruption from manufacturing false members of the support antichain.
 
 The default exhaustive cap is 12 mutable declarations (4,096 subsets); a hard maximum of 16 (65,536 subsets) is enforced. Larger contexts require a separate approximate/design-based protocol and must not be labeled exhaustive.
 
@@ -68,6 +71,8 @@ A success/non-solve lattice is an experimental observation under the frozen prov
 - mixed budget identity rejection;
 - duplicate local-context digest rejection;
 - success without both proof gates rejection;
+- interrupted and infrastructure-failed runs cannot count as non-solves;
+- a non-solve must have a completed budget/search exhaustion reason;
 - exhaustive cap enforcement;
 - prediction coverage, sufficiency, exact route and Brier score.
 
