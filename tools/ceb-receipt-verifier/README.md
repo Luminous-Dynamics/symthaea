@@ -75,22 +75,22 @@ a task and its purported digest from the same untrusted source.
 Verify a source-only public-development agent view. The manifest SHA-256 and
 CEB-TREE-V1 digest must both be supplied out-of-band by the task registry:
 
-\`\`\`sh
+```sh
 cargo run --manifest-path tools/ceb-receipt-verifier/Cargo.toml --release -- verify-agent-view \\
   --directory ./agent-view/workspace \\
   --manifest ./agent-view/manifest.v0.json \\
   --task-id CEB-REPO-001 \\
   --expected-manifest-sha256 <64-lowercase-hex> \\
   --expected-tree-sha256 <64-lowercase-hex>
-\`\`\`
+```
 
 The V0 verifier accepts only a strict public-development manifest, exact
-regular-file inventories, \`100644\`/\`100755\` modes, per-file SHA-256 digests and
-the existing CEB-TREE-V1 digest. It rejects symlinks, special files, \`.git\`,
+regular-file inventories, `100644`/`100755` modes, per-file SHA-256 digests and
+the existing CEB-TREE-V1 digest. It rejects symlinks, special files, `.git`,
 non-ASCII and unsafe/non-portable names, case-fold collisions, extra/missing
 files, unsorted/duplicate manifest entries, unpinned manifests, and any
 manifest claiming sealed status. The manifest is metadata outside the hashed
-\`workspace\` payload so the digest is not self-referential.
+`workspace` payload so the digest is not self-referential.
 
 ```sh
 cargo run --manifest-path tools/ceb-receipt-verifier/Cargo.toml --release -- verify-pair \
