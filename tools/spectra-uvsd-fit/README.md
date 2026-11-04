@@ -43,7 +43,7 @@ The fit crate intentionally does not depend on symthaea-core or HDC-specific opt
 - `diagonal_curvature` is a coordinate-wise second derivative of the objective. It is not a full Hessian, covariance matrix, or uncertainty interval.
 - Expected Fisher information is computed from the fitted Gaussian category probabilities and the observed class totals. Wald intervals are emitted only for an interior converged fit using the unsmoothed primary likelihood.
 - The lowest finite objective is selected even when its run did not converge; in that case the result is `NotConverged`. A higher-objective converged start cannot mask a lower-objective failed start.
-- The primary likelihood has no pseudo-counts. A separately named reference-compatibility smoothing mode is not implemented yet, so exact numerical comparisons must match the reference preprocessing and correction convention first.
+- The primary likelihood has no pseudo-counts. The separately named `MiyoshiReferencePerCategory` mode matches the external `1/K` compatibility convention; exact comparisons must still pin category order, preprocessing and correction mode.
 
 ## Reproduction and benchmark programme
 
