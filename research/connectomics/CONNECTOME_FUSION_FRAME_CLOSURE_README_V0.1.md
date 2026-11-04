@@ -66,3 +66,16 @@ V0.1 remains intentionally narrow: it validates supplied export structure and de
 V0.1 accepts canonical UTC timestamps in `YYYY-MM-DDTHH:MM:SSZ` form. The selected `event_time_basis` must fall in the half-open interval `[start_at, end_at)`. Ingestion time may be later than event time but may not precede it. The verifier blocks a report when a required source role reuses a custodian reference or declares shared controls; this is a conservative source-separation check, not proof that distinct custodians have no hidden common control.
 
 The JSON Schema declares RFC 3339 date-time fields; the Rust profile intentionally narrows them to canonical UTC seconds so lexicographic interval checks are well-defined without a date/time dependency.
+
+
+## Independent reference oracle
+
+`research/connectomics/reference/verify_connectome_fusion_frame_closure.py` is a Python-standard-library-only test oracle, not a production dependency. It independently recomputes the canonical digests, evidence-use identities, two-source semantic reconciliation and frame anti-joins. Its self-tests include the omitted-use known answer, unknown coverage, shared custodians, orphan assertions, out-of-scope timestamps and conflicting source event sets.
+
+Run:
+
+```sh
+python3 research/connectomics/reference/verify_connectome_fusion_frame_closure.py --self-test
+```
+
+The isolated GitHub Actions lane compares the Rust report's disposition and key accounting fields against this reference result. A Rust/reference disagreement fails the lane.
