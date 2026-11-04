@@ -226,7 +226,7 @@ fn load_graph(bytes: &[u8]) -> Result<(String, String, String, BTreeSet<String>)
 fn validate_retriever(retriever: &Retriever) -> Result<(), String> {
     if !matches!(
         retriever.kind.as_str(),
-        "daps_selector" | "leangraphsearch" | "leansearch_v2" | "theoremgraph" | "bm25" | "pitb_union" | "other"
+        "daps_selector" | "leangraphsearch" | "leansearch_v2" | "leanfinder_v2" | "theoremgraph" | "bm25" | "pitb_union" | "other"
     ) {
         return Err(format!("unsupported retriever kind {}", retriever.kind));
     }
