@@ -792,7 +792,7 @@ fn run_self_tests() -> Result<(), String> {
     Ok(())
 }
 
-fn synthetic_report() -> Result<Report, String> {
+fn synthetic_outcomes() -> Result<Vec<Outcome>, String> {
     let alternative = build_synthetic_rows("self", "alternative", "component-a", &["d", "h", "hEq"], |set| {
         set.contains("h") || set.contains("hEq")
     });
@@ -801,6 +801,11 @@ fn synthetic_report() -> Result<Report, String> {
     });
     let mut outcomes = alternative;
     outcomes.extend(conjunctive);
+    Ok(outcomes)
+}
+
+fn synthetic_report() -> Result<Report, String> {
+    let outcomes = synthetic_outcomes()?;
     let reports = {
         let mut grouped = BTreeMap::<String, Vec<Outcome>>::new();
         for row in &outcomes {
@@ -904,6 +909,18 @@ fn execute() -> Result<(), String> {
         let bytes = serde_json::to_vec_pretty(&report).map_err(|e| format!("serialize synthetic report: {e}"))?;
         fs::write(&args[2], bytes).map_err(|e| format!("write synthetic report: {e}"))?;
         println!("PITB_SUPPORT_ANTICHAIN_SYNTHETIC_REPORT_OK");
+        return Ok(());
+    }
+    if args.len() == 3 && args[1] == "--self-test-outcomes" {
+        run_self_tests()?;
+        let outcomes = synthetic_outcomes()?;
+        let mut bytes = Vec::new();
+        for outcome in &outcomes {
+            bytes.extend(serde_json::to_vec(outcome).map_err(|e| format!("serialize synthetic outcome: {e}"))?);
+            bytes.push(b'\n');
+        }
+        fs::write(&args[2], bytes).map_err(|e| format!("write synthetic outcome JSONL: {e}"))?;
+        println!("PITB_SUPPORT_ANTICHAIN_SYNTHETIC_OUTCOMES_OK");
         return Ok(());
     }
     let (outcome_path, report_path, prediction_path, max_variables) = parse_args(&args)?;
