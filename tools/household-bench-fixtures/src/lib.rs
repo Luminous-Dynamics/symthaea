@@ -197,25 +197,25 @@ pub fn validate_water_continuity_corpus(
         }
     }
 
-    require_bool(
+    required_bool(
         &corpus.assumptions,
         "all_values_are_synthetic",
         true,
         "$.assumptions",
     )?;
-    require_bool(
+    required_bool(
         &corpus.assumptions,
         "no_live_actuation_authority",
         true,
         "$.assumptions",
     )?;
-    require_bool(
+    required_bool(
         &corpus.assumptions,
         "non_potable_reuse",
         false,
         "$.assumptions",
     )?;
-    require_string(
+    required_string(
         &corpus.assumptions,
         "potable_quality",
         "unknown_unqualified",
@@ -539,7 +539,7 @@ fn validate_water_semantics(scenario: &WaterScenario, path: &str) -> Result<(), 
                     "stable-supply fixture requires positive duration and inlet flow",
                 ));
             }
-            require_string(
+            required_string(
                 input,
                 "stored_water_quality_evidence",
                 "not_provided",
@@ -568,7 +568,7 @@ fn validate_water_semantics(scenario: &WaterScenario, path: &str) -> Result<(), 
                     "staggered recovery requires measured positive but constrained flow",
                 ));
             }
-            require_string(
+            required_string(
                 input,
                 "supply_pressure_profile",
                 "intermittent_below_nominal",
@@ -584,7 +584,7 @@ fn validate_water_semantics(scenario: &WaterScenario, path: &str) -> Result<(), 
                     "stuck-sensor challenge must disagree with the independent reference",
                 ));
             }
-            require_string(
+            required_string(
                 input,
                 "sensor_fault",
                 "stuck_value",
@@ -598,7 +598,7 @@ fn validate_water_semantics(scenario: &WaterScenario, path: &str) -> Result<(), 
                     "leak challenge requires positive unexplained flow",
                 ));
             }
-            require_string(
+            required_string(
                 input,
                 "leak_detected",
                 "candidate_alarm",
@@ -606,9 +606,9 @@ fn validate_water_semantics(scenario: &WaterScenario, path: &str) -> Result<(), 
             )?;
         }
         "WCONT-006" => {
-            require_bool(input, "grid_available", false, &format!("{path}.input"))?;
-            require_bool(input, "pump_available", false, &format!("{path}.input"))?;
-            require_bool(
+            required_bool(input, "grid_available", false, &format!("{path}.input"))?;
+            required_bool(input, "pump_available", false, &format!("{path}.input"))?;
+            required_bool(
                 input,
                 "backup_power_available",
                 false,
@@ -627,7 +627,7 @@ fn validate_water_semantics(scenario: &WaterScenario, path: &str) -> Result<(), 
                     "stale-quality challenge requires positive stored-water age",
                 ));
             }
-            require_string(
+            required_string(
                 input,
                 "water_quality_evidence",
                 "stale_or_missing",
@@ -645,13 +645,13 @@ fn validate_water_semantics(scenario: &WaterScenario, path: &str) -> Result<(), 
             let outlet = required_number(input, "outlet_meter_volume_l", path)?;
             let purge = required_number(input, "purge_and_overflow_meter_volume_l", path)?;
             let uncertainty = required_number(input, "meter_uncertainty_l", path)?;
-            require_string(
+            required_string(
                 input,
                 "storage_delta_sign_convention",
                 "positive_when_tank_volume_increases",
                 &format!("{path}.input"),
             )?;
-            require_string(
+            required_string(
                 input,
                 "mass_balance_formula",
                 "inlet_volume - positive_tank_storage_delta - outlet_volume - purge_overflow_volume",
@@ -670,7 +670,7 @@ fn validate_water_semantics(scenario: &WaterScenario, path: &str) -> Result<(), 
             )?;
         }
         "WCONT-009" => {
-            require_bool(input, "commanded_refill", true, &format!("{path}.input"))?;
+            required_bool(input, "commanded_refill", true, &format!("{path}.input"))?;
             if required_number(input, "municipal_inlet_flow_l_min", path)? != 0.0 {
                 return Err(ValidationError::new(
                     format!("{path}.input.municipal_inlet_flow_l_min"),
@@ -679,13 +679,13 @@ fn validate_water_semantics(scenario: &WaterScenario, path: &str) -> Result<(), 
             }
         }
         "WCONT-010" => {
-            require_string(
+            required_string(
                 input,
                 "municipal_inlet_flow_profile",
                 "unstable_recovery",
                 &format!("{path}.input"),
             )?;
-            require_string(
+            required_string(
                 input,
                 "pressure_profile",
                 "surge_then_decay",
@@ -706,13 +706,13 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
     let baseline = &task.synthetic_baseline;
     match task.id.as_str() {
         "REPAIR-001" => {
-            require_bool(
+            required_bool(
                 baseline,
                 "repair_instruction_available",
                 true,
                 &format!("{path}.synthetic_baseline"),
             )?;
-            require_bool(
+            required_bool(
                 baseline,
                 "offline_access",
                 true,
@@ -725,7 +725,7 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
             )?;
         }
         "REPAIR-002" => {
-            require_bool(
+            required_bool(
                 baseline,
                 "calibration_required",
                 true,
@@ -738,7 +738,7 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
             )?;
         }
         "REPAIR-003" => {
-            require_bool(
+            required_bool(
                 baseline,
                 "adhesive_or_destructive_disassembly",
                 false,
@@ -751,7 +751,7 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
             )?;
         }
         "REPAIR-004" => {
-            require_bool(
+            required_bool(
                 baseline,
                 "calibration_required",
                 true,
@@ -764,19 +764,19 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
             )?;
         }
         "REPAIR-005" => {
-            require_bool(
+            required_bool(
                 baseline,
                 "internet_available",
                 false,
                 &format!("{path}.synthetic_baseline"),
             )?;
-            require_bool(
+            required_bool(
                 baseline,
                 "signed_image_available",
                 true,
                 &format!("{path}.synthetic_baseline"),
             )?;
-            require_bool(
+            required_bool(
                 baseline,
                 "previous_known_good_image_available",
                 true,
@@ -789,19 +789,19 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
             )?;
         }
         "REPAIR-006" => {
-            require_bool(
+            required_bool(
                 baseline,
                 "catalog_part_exists",
                 true,
                 &format!("{path}.synthetic_baseline"),
             )?;
-            require_bool(
+            required_bool(
                 baseline,
                 "local_stock",
                 false,
                 &format!("{path}.synthetic_baseline"),
             )?;
-            require_bool(
+            required_bool(
                 baseline,
                 "approved_substitute",
                 false,
@@ -821,19 +821,19 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
             }
         }
         "REPAIR-007" => {
-            require_bool(
+            required_bool(
                 baseline,
                 "physical_fit",
                 true,
                 &format!("{path}.synthetic_baseline"),
             )?;
-            require_bool(
+            required_bool(
                 baseline,
                 "material_grade_known",
                 false,
                 &format!("{path}.synthetic_baseline"),
             )?;
-            require_string(
+            required_string(
                 baseline,
                 "qualification_state",
                 "unqualified",
@@ -846,13 +846,13 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
             )?;
         }
         "REPAIR-008" => {
-            require_bool(
+            required_bool(
                 baseline,
                 "initial_post_repair_function_pass",
                 true,
                 &format!("{path}.synthetic_baseline"),
             )?;
-            require_bool(
+            required_bool(
                 baseline,
                 "recurrence_observed_after_30_days",
                 true,
@@ -865,13 +865,13 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
             )?;
         }
         "REPAIR-009" => {
-            require_bool(
+            required_bool(
                 baseline,
                 "vendor_cloud_available",
                 false,
                 &format!("{path}.synthetic_baseline"),
             )?;
-            require_bool(
+            required_bool(
                 baseline,
                 "offline_diagnostics_available",
                 false,
@@ -884,13 +884,13 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
             )?;
         }
         "REPAIR-010" => {
-            require_bool(
+            required_bool(
                 baseline,
                 "critical_interface_changed",
                 true,
                 &format!("{path}.synthetic_baseline"),
             )?;
-            require_bool(
+            required_bool(
                 baseline,
                 "post_repair_test_available",
                 false,
