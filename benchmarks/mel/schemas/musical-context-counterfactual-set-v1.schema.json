@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/musical-context-counterfactual-set-v1.schema.json",
+  "title": "Melothaea musical context counterfactual set v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "families"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-musical-context-counterfactual-set-v1"
+    },
+    "families": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "family_id",
+          "kind",
+          "changed_factor",
+          "preserved_factor",
+          "members"
+        ],
+        "properties": {
+          "family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "context_change_must_change_action",
+              "surface_change_must_preserve_action",
+              "ambiguous_valid_action_set"
+            ]
+          },
+          "changed_factor": {
+            "type": "string",
+            "minLength": 1
+          },
+          "preserved_factor": {
+            "type": "string",
+            "minLength": 1
+          },
+          "members": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "variant_id",
+                "local_cue_signature",
+                "phrase_function",
+                "collaborator_intent",
+                "performer_role",
+                "surface_instrument",
+                "valid_action_set"
+              ],
+              "properties": {
+                "variant_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "local_cue_signature": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "phrase_function": {
+                  "enum": [
+                    "cadence",
+                    "phrase_internal_breath",
+                    "pickup",
+                    "fermata",
+                    "solo_handoff",
+                    "motif_completion",
+                    "dramatic_silence",
+                    "technical_dropout"
+                  ]
+                },
+                "collaborator_intent": {
+                  "enum": [
+                    "invites_response",
+                    "retains_floor",
+                    "continue_phrase",
+                    "ambiguous",
+                    "stream_unavailable"
+                  ]
+                },
+                "performer_role": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "surface_instrument": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "valid_action_set": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": [
+                      "WAIT",
+                      "RESPOND",
+                      "CONTINUE",
+                      "YIELD"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
