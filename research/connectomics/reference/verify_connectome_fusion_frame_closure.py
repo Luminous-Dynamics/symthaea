@@ -457,9 +457,39 @@ def main() -> int:
         result = unittest.TextTestRunner(verbosity=2).run(suite)
         return 0 if result.wasSuccessful() else 1
 
+    if len(sys.argv) == 4 and sys.argv[1] == "--assert-report":
+        actual = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+        bundle_path = Path(sys.argv[3])
+        bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+        expected = verify(bundle)
+        checks = {
+            "disposition": actual.get("disposition") == expected["disposition"],
+            "promotion_authorized": actual.get("promotion_authorized")
+            == expected["promotion_authorized"],
+            "source_population_match": actual.get("source_population_match")
+            == expected["source_population_match"],
+            "required_assertion_count": actual.get("required_assertion_count")
+            == expected.get("required_assertion_count"),
+            "frame_assertion_count": actual.get("frame_assertion_count")
+            == expected.get("frame_assertion_count"),
+            "missing_assertion_count": len(actual.get("missing_assertions", []))
+            == expected.get("missing_assertion_count"),
+            "orphan_assertion_count": len(actual.get("orphan_assertions", []))
+            == expected.get("orphan_assertion_count"),
+            "execution_without_claim": actual.get("execution_without_claim")
+            == expected.get("execution_without_claim"),
+            "claim_without_execution": actual.get("claim_without_execution")
+            == expected.get("claim_without_execution"),
+            "errors": actual.get("errors") == expected.get("errors"),
+        }
+        for name, passed in checks.items():
+            print(f"{name}: {'PASS' if passed else 'FAIL'}")
+        return 0 if all(checks.values()) else 1
+
     if len(sys.argv) != 2:
         print(
-            "usage: verify_connectome_fusion_frame_closure.py <input.json> | --self-test",
+            "usage: verify_connectome_fusion_frame_closure.py <input.json> "
+            "| --self-test | --assert-report <report.json> <input.json>",
             file=sys.stderr,
         )
         return 2
