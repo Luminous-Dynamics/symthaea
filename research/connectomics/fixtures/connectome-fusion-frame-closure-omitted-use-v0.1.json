@@ -30,7 +30,7 @@
       "sequence_end": 2,
       "record_count": 2,
       "unique_use_count": 2,
-      "ordered_events_sha256": "be54afb39b4637981914f2841ac7f543cc8a22e53b2a007e390fca1452f86c30",
+      "ordered_events_sha256": "52876860b6e4f42dcde66badd59a0352c355518350e8e332078d817f8e81b407",
       "coverage_disposition": "QUALIFIED_COMPLETE_WITHIN_DECLARED_SCOPE",
       "shared_controls": [],
       "events": [
@@ -52,7 +52,9 @@
             "evidence-A",
             "evidence-B"
           ],
-          "outcome": "CONTRIBUTED"
+          "outcome": "CONTRIBUTED",
+          "event_at": "2026-11-04T14:10:00Z",
+          "ingested_at": "2026-11-04T14:10:05Z"
         },
         {
           "event_id": "exec-event-002",
@@ -72,7 +74,9 @@
             "evidence-B",
             "evidence-C"
           ],
-          "outcome": "CONTRIBUTED"
+          "outcome": "CONTRIBUTED",
+          "event_at": "2026-11-04T14:11:00Z",
+          "ingested_at": "2026-11-04T14:11:05Z"
         }
       ]
     },
@@ -86,7 +90,7 @@
       "sequence_end": 2,
       "record_count": 2,
       "unique_use_count": 2,
-      "ordered_events_sha256": "5ce223b58a2f364a2b4942ea040ab1b74c619c042042752c80cf9945f70a7803",
+      "ordered_events_sha256": "e38ebeba105f210715c5a6ff9b4eb31e29d5913b7759b1ff5949cf13214624a5",
       "coverage_disposition": "QUALIFIED_COMPLETE_WITHIN_DECLARED_SCOPE",
       "shared_controls": [],
       "events": [
@@ -108,7 +112,9 @@
             "evidence-A",
             "evidence-B"
           ],
-          "outcome": "CONTRIBUTED"
+          "outcome": "CONTRIBUTED",
+          "event_at": "2026-11-04T14:10:00Z",
+          "ingested_at": "2026-11-04T14:10:05Z"
         },
         {
           "event_id": "claim-ledger-event-9002",
@@ -128,7 +134,9 @@
             "evidence-B",
             "evidence-C"
           ],
-          "outcome": "CONTRIBUTED"
+          "outcome": "CONTRIBUTED",
+          "event_at": "2026-11-04T14:11:00Z",
+          "ingested_at": "2026-11-04T14:11:05Z"
         }
       ]
     }
@@ -149,7 +157,6 @@
       }
     ]
   },
-  "scope_sha256": "c7765429a91fb7a76915b24613c286300376f04c6340a045e262ed7b95a48eba",
   "reconciliation_policy": {
     "required_source_roles": [
       "FUSION_EXECUTION_LEDGER",
