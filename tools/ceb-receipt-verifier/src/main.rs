@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use ceb_receipt_verifier::{
-    AgentViewInputs, PairInputs, TREE_DIGEST_ALGORITHM, hash_source_tree,
-    verify_agent_view, verify_pair,
+    AgentViewInputs, PairInputs, TREE_DIGEST_ALGORITHM, hash_source_tree, verify_agent_view,
+    verify_pair,
 };
 
 #[derive(Debug, Parser)]
@@ -153,7 +153,11 @@ fn main() -> ExitCode {
                         "reasons": [reason],
                         "claim_ceiling": "No agent-view inventory acceptance claim; manifest could not be read safely."
                     });
-                    println!("{}", serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{\"status\":\"protocol_violation\"}".to_owned()));
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&report)
+                            .unwrap_or_else(|_| "{\"status\":\"protocol_violation\"}".to_owned())
+                    );
                     return ExitCode::from(2);
                 }
             };
@@ -169,7 +173,11 @@ fn main() -> ExitCode {
                 serde_json::to_string_pretty(&report)
                     .unwrap_or_else(|_| "{\"status\":\"protocol_violation\"}".to_owned())
             );
-            return if report.accepted { ExitCode::SUCCESS } else { ExitCode::from(2) };
+            return if report.accepted {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(2)
+            };
         }
         Command::VerifyPair {
             task_contract,
