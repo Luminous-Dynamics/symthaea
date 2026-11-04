@@ -20,6 +20,12 @@ const VERSION: &str = "0.1.0";
 struct ClaimInfo {
     relation_type: String,
     claim_status: String,
+    source_id: String,
+    source_kind: String,
+    source_world: String,
+    target_id: String,
+    target_kind: String,
+    target_world: String,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -301,9 +307,17 @@ fn parse_claims(bundle: &Value) -> Result<ClaimIndex, String> {
             "CAUSAL_EFFECT_CLAIM" => counts.causal += 1,
             _ => unreachable!(),
         }
+        let source_id = string_field(source, "object_id", &format!("{context}.source"))?;
+        let target_id = string_field(target, "object_id", &format!("{context}.target"))?;
         let info = ClaimInfo {
             relation_type,
             claim_status,
+            source_id,
+            source_kind,
+            source_world,
+            target_id,
+            target_kind,
+            target_world,
         };
         if claims.insert(claim_id.clone(), info).is_some() {
             return Err(format!("duplicate claim_id {claim_id}"));
@@ -420,6 +434,8 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
             let mut relation_set = BTreeSet::new();
             let mut all_claims_supported = true;
             let mut contains_causal_claim = false;
+            let mut previous_traversable_target: Option<(String, String, String)> = None;
+            let mut path_composition_valid = true;
             for claim_id_value in claim_ids {
                 let claim_id = claim_id_value
                     .as_str()
@@ -433,6 +449,28 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                     .ok_or_else(|| format!("{result_context}: unknown claim ID {claim_id}"))?;
                 used.push(claim.relation_type.clone());
                 relation_set.insert(claim.relation_type.clone());
+
+                // Causal-effect claims are attached estimand/identification
+                // assertions, not traversable graph edges. Other relation
+                // classes must compose by exact object ID, kind and world.
+                if claim.relation_type != "CAUSAL_EFFECT_CLAIM" {
+                    if let Some((previous_id, previous_kind, previous_world)) =
+                        previous_traversable_target.as_ref()
+                    {
+                        if previous_id != &claim.source_id
+                            || previous_kind != &claim.source_kind
+                            || previous_world != &claim.source_world
+                        {
+                            path_composition_valid = false;
+                        }
+                    }
+                    previous_traversable_target = Some((
+                        claim.target_id.clone(),
+                        claim.target_kind.clone(),
+                        claim.target_world.clone(),
+                    ));
+                }
+
                 if claim.claim_status != "CLAIMED_SUPPORTED" {
                     all_claims_supported = false;
                 }
@@ -530,6 +568,13 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                     && requested_type == "MIXED_EVIDENCE_PATH");
             if violates_path_grammar {
                 disposition = "REJECTED_PATH_GRAMMAR";
+            }
+            if !path_composition_valid {
+                disposition = "REJECTED_PATH_COMPOSITION";
+                reasons.push(
+                    "adjacent traversable claims do not share the same endpoint object, kind and world"
+                        .to_owned(),
+                );
             }
             if disposition == "ACCEPTED_WITHIN_TYPED_SCOPE"
                 && claimed_result_status == "CLAIMED_REJECTED"
@@ -868,6 +913,32 @@ mod tests {
         assert!(
             verify(&bundle).unwrap()["query_path_results"][0]["recomputed_disposition"]
                 == "REJECTED_PATH_GRAMMAR"
+        );
+    }
+
+    #[test]
+    fn rejects_disconnected_traversable_claim_path() {
+        let mut bundle = parse_fixture();
+        bundle["claims"][2]["source"]["object_id"] =
+            Value::String("another-neuron".to_owned());
+        let report = verify(&bundle).expect("bundle structure");
+        assert_eq!(
+            report["query_path_results"][2]["recomputed_disposition"],
+            "REJECTED_PATH_COMPOSITION"
+        );
+    }
+
+    #[test]
+    fn accepts_composed_mixed_evidence_without_causal_promotion() {
+        let mut bundle = parse_fixture();
+        bundle["queries"][2]["requested_claim_type"] =
+            Value::String("MIXED_EVIDENCE_PATH".to_owned());
+        bundle["queries"][2]["path_results"][0]["asserted_claim_type"] =
+            Value::String("MIXED_EVIDENCE_PATH".to_owned());
+        let report = verify(&bundle).expect("composed mixed evidence");
+        assert_eq!(
+            report["query_path_results"][2]["recomputed_disposition"],
+            "ACCEPTED_WITHIN_TYPED_SCOPE"
         );
     }
 
