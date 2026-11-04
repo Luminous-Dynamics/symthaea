@@ -7,10 +7,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 const EPSILON: f64 = 1.0e-12;
-const IDENTIFICATION_FIXTURES: &str =
-    include_str!("../fixtures/identification-cases-v0.1.tsv");
-const CROSS_WORLD_FIXTURES: &str =
-    include_str!("../fixtures/cross-world-couplings-v0.1.tsv");
+const IDENTIFICATION_FIXTURES: &str = include_str!("../fixtures/identification-cases-v0.1.tsv");
+const CROSS_WORLD_FIXTURES: &str = include_str!("../fixtures/cross-world-couplings-v0.1.tsv");
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Disposition {
@@ -87,9 +85,9 @@ pub fn parse_cases(input: &str) -> Result<Vec<Case>, String> {
         }
 
         let parse_number = |index: usize, name: &str| -> Result<f64, String> {
-            let value = fields[index].parse::<f64>().map_err(|error| {
-                format!("line {}: invalid {name}: {error}", line_index + 1)
-            })?;
+            let value = fields[index]
+                .parse::<f64>()
+                .map_err(|error| format!("line {}: invalid {name}: {error}", line_index + 1))?;
             if !value.is_finite() {
                 return Err(format!("line {}: {name} must be finite", line_index + 1));
             }
@@ -127,10 +125,16 @@ pub fn parse_cases(input: &str) -> Result<Vec<Case>, String> {
         };
 
         if case.id.is_empty() {
-            return Err(format!("line {}: case_id must not be empty", line_index + 1));
+            return Err(format!(
+                "line {}: case_id must not be empty",
+                line_index + 1
+            ));
         }
         if !matches!(case.estimand.as_str(), "R1" | "R2" | "R3") {
-            return Err(format!("line {}: estimand must be R1, R2 or R3", line_index + 1));
+            return Err(format!(
+                "line {}: estimand must be R1, R2 or R3",
+                line_index + 1
+            ));
         }
         if !matches!(case.support.as_str(), "SUPPORTED" | "UNSUPPORTED" | "GLOBAL_ONLY" | "UNKNOWN") {
             return Err(format!("line {}: invalid support disposition", line_index + 1));
@@ -145,10 +149,16 @@ pub fn parse_cases(input: &str) -> Result<Vec<Case>, String> {
             return Err(format!("line {}: invalid mechanism scope", line_index + 1));
         }
         if !matches!(case.decision.as_str(), "INVARIANT" | "REVERSAL" | "NA") {
-            return Err(format!("line {}: invalid decision disposition", line_index + 1));
+            return Err(format!(
+                "line {}: invalid decision disposition",
+                line_index + 1
+            ));
         }
         if case.assumptions.is_empty() {
-            return Err(format!("line {}: assumptions must be explicit", line_index + 1));
+            return Err(format!(
+                "line {}: assumptions must be explicit",
+                line_index + 1
+            ));
         }
         if case.rho_low < -1.0 || case.rho_high > 1.0 || case.rho_low > case.rho_high {
             return Err(format!(
@@ -157,17 +167,26 @@ pub fn parse_cases(input: &str) -> Result<Vec<Case>, String> {
             ));
         }
         if case.identified_low > case.identified_high {
-            return Err(format!("line {}: identified interval is reversed", line_index + 1));
+            return Err(format!(
+                "line {}: identified interval is reversed",
+                line_index + 1
+            ));
         }
         if case.reported_low > case.reported_high {
-            return Err(format!("line {}: reported interval is reversed", line_index + 1));
+            return Err(format!(
+                "line {}: reported interval is reversed",
+                line_index + 1
+            ));
         }
 
         cases.push(case);
     }
 
     for index in 0..cases.len() {
-        if cases[..index].iter().any(|prior| prior.id == cases[index].id) {
+        if cases[..index]
+            .iter()
+            .any(|prior| prior.id == cases[index].id)
+        {
             return Err(format!("duplicate case_id: {}", cases[index].id));
         }
     }
@@ -191,8 +210,7 @@ pub fn assess(case: &Case) -> Assessment {
     } else if case.mechanism == "OUT_OF_SCOPE" {
         Disposition::OutOfScope
     } else if case.estimand == "R3"
-        && (case.factual_tail != "PRESENT"
-            || matches!(case.abduction.as_str(), "MISSING" | "NA"))
+        && (case.factual_tail != "PRESENT" || matches!(case.abduction.as_str(), "MISSING" | "NA"))
     {
         Disposition::NotIdentified
     } else if case.support != "SUPPORTED" && case.assumptions == "NONE" {
@@ -254,8 +272,7 @@ mod tests {
 
     #[test]
     fn same_marginals_can_hide_different_episode_counterfactuals() {
-        let mut marginals =
-            BTreeMap::<(String, String), BTreeMap<u64, f64>>::new();
+        let mut marginals = BTreeMap::<(String, String), BTreeMap<u64, f64>>::new();
         let mut conditional = BTreeMap::<String, f64>::new();
         let mut totals = BTreeMap::<String, f64>::new();
         let mut world_ids = BTreeSet::new();
@@ -323,14 +340,23 @@ mod tests {
     #[test]
     fn a_wider_identified_set_rejects_a_narrower_claimed_interval() {
         let cases = parse_cases(IDENTIFICATION_FIXTURES).expect("valid fixture set");
-        let case = cases.iter().find(|case| case.id == "CFI-09").expect("CFI-09");
-        assert_eq!(assess(case).disposition, Disposition::FalsePrecisionRejected);
+        let case = cases
+            .iter()
+            .find(|case| case.id == "CFI-09")
+            .expect("CFI-09");
+        assert_eq!(
+            assess(case).disposition,
+            Disposition::FalsePrecisionRejected
+        );
     }
 
     #[test]
     fn decision_can_be_invariant_even_when_the_outcome_is_set_identified() {
         let cases = parse_cases(IDENTIFICATION_FIXTURES).expect("valid fixture set");
-        let case = cases.iter().find(|case| case.id == "CFI-10").expect("CFI-10");
+        let case = cases
+            .iter()
+            .find(|case| case.id == "CFI-10")
+            .expect("CFI-10");
         let result = assess(case);
         assert_eq!(result.disposition, Disposition::SetIdentified);
         assert_eq!(result.decision_invariant, Some(true));
