@@ -1,0 +1,417 @@
+{
+  "schema_version": "0.2",
+  "snapshot_date": "2026-11-04",
+  "purpose": "Source-backed competitive comparator ledger for Verified Household Services. Manufacturer-declared specifications and announced product features are not independent physical test results.",
+  "claim_ceiling": [
+    "Manufacturer product fiches are source evidence for what the manufacturer declares, not independent performance verification.",
+    "Numbers from different programmes, markets, standards editions or loading protocols are not directly comparable without a matched test.",
+    "Announced products and concept studies are roadmap/context evidence, not purchasable test units.",
+    "Null metrics mean no applicable public quantitative value was found in the cited source; they must not be imputed."
+  ],
+  "comparators": [
+    {
+      "id": "MIELE-G7655-SCVI-XXL-AUTODOS-ECO",
+      "category": "household_dishwasher",
+      "manufacturer": "Miele",
+      "model": "G 7655 SCVi XXL AutoDos",
+      "market_variant": "GB product fiche",
+      "evidence_status": "manufacturer_declared_product_fiche",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "listed_product",
+      "functional_unit": "one Eco programme cycle",
+      "programme": "Eco",
+      "capacity_place_settings": 14,
+      "metrics": {
+        "electricity_kwh_per_cycle": 0.54,
+        "water_l_per_cycle": 8.4,
+        "duration_min_per_cycle": 230,
+        "noise_dba": 42,
+        "networked_standby_w": 0.9
+      },
+      "features": [
+        "AutoDos",
+        "SensorDry",
+        "AutoOpen drying",
+        "network connectivity",
+        "AI Diagnostics",
+        "Smart Home Integration"
+      ],
+      "notes": [
+        "Manufacturer product-sheet values.",
+        "The fiche also contains a manufacturer endurance statement; that is not a warranty or field-derived lifetime reliability distribution."
+      ],
+      "source": {
+        "title": "Miele G 7655 SCVi XXL AutoDos product data sheet",
+        "url": "https://media.miele.com/downloads/n-/gb/FS_12423980_GBE_GB-en-GB.pdf",
+        "source_date": null,
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "MIELE-G7655-SCVI-XXL-AUTODOS-AUTOMATIC",
+      "category": "household_dishwasher",
+      "manufacturer": "Miele",
+      "model": "G 7655 SCVi XXL AutoDos",
+      "market_variant": "GB product fiche",
+      "evidence_status": "manufacturer_declared_product_fiche",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "listed_product",
+      "functional_unit": "one Automatic programme cycle",
+      "programme": "Automatic",
+      "capacity_place_settings": 14,
+      "metrics": {
+        "electricity_kwh_per_cycle": null,
+        "water_l_per_cycle_from": 6,
+        "duration_min_per_cycle": null,
+        "noise_dba": null
+      },
+      "notes": [
+        "The 6.0 L value belongs to Automatic, not Eco.",
+        "Do not combine this value with the Eco 0.54 kWh figure as though both describe the same programme."
+      ],
+      "source": {
+        "title": "Miele G 7655 SCVi XXL AutoDos product data sheet",
+        "url": "https://media.miele.com/downloads/n-/gb/FS_12423980_GBE_GB-en-GB.pdf",
+        "source_date": null,
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "BEKO-DIN28428-ZA",
+      "category": "household_dishwasher",
+      "manufacturer": "Beko",
+      "model": "DIN28428",
+      "market_variant": "South Africa",
+      "evidence_status": "manufacturer_declared_product_page",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "listed_regional_product",
+      "functional_unit": "one manufacturer-declared programme cycle; programme-specific split not supplied for the headline values",
+      "programme": "headline per-cycle values; do not assume equivalence to Eco without a matched protocol",
+      "capacity_place_settings": 14,
+      "metrics": {
+        "electricity_kwh_per_cycle": 0.93,
+        "water_l_per_cycle": 9.5,
+        "duration_min_per_cycle": null,
+        "noise_dba": 46
+      },
+      "label": {
+        "value": "A++",
+        "note": "Older regional label scale; do not map directly to the current EU A-G scale."
+      },
+      "notes": [
+        "South African market comparator.",
+        "Freeze exact local product revision, programme and test method before a physical comparison."
+      ],
+      "source": {
+        "title": "Beko South Africa DIN28428 product page",
+        "url": "https://www.beko.com/za-en/products/integrated-dishwashers/dishwasher-14-place-settings-full-size-din28428",
+        "source_date": null,
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "MIELE-G8-DIAMOND",
+      "category": "household_dishwasher",
+      "manufacturer": "Miele",
+      "model": "G8 Diamond",
+      "market_variant": "announced DE/AT/CH launch first",
+      "evidence_status": "manufacturer_announcement",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "announced_future_product",
+      "planned_launch": "2027-04",
+      "capacity_place_settings": null,
+      "metrics": {
+        "electricity_kwh_per_cycle": null,
+        "water_l_per_cycle": null,
+        "duration_min_per_cycle": null,
+        "cleaning_performance": null,
+        "rinse_residue": null,
+        "drying_performance": null
+      },
+      "announced_features": [
+        "integrated camera",
+        "AI-assisted load recognition and wash adaptation",
+        "automatic dispensing",
+        "variable hot-air drying",
+        "app-based preference/start automation"
+      ],
+      "notes": [
+        "Miele states launch in Germany, Austria and Switzerland in April 2027, with additional countries later.",
+        "As of 2026-11-04 this is a roadmap comparator, not a retail unit available for matched physical testing."
+      ],
+      "source": {
+        "title": "Miele world premiere for the G8 Diamond",
+        "url": "https://www.miele.de/en/m/world-premiere-for-the-g8-diamond-8453.htm",
+        "source_date": "2026-09-02",
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "MIELE-CARY",
+      "category": "laundry_care",
+      "manufacturer": "Miele",
+      "model": "Cary",
+      "market_variant": "concept study",
+      "evidence_status": "manufacturer_concept_study",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "concept_only",
+      "metrics": {
+        "cleaning_performance": null,
+        "textile_damage": null,
+        "energy": null,
+        "water": null
+      },
+      "announced_features": [
+        "sensor/AI-assisted textile recognition",
+        "tailored wash-care process"
+      ],
+      "notes": [
+        "Concept study, not an established retail product or a matched benchmark unit."
+      ],
+      "source": {
+        "title": "How Miele eliminates household decisions — Cary concept",
+        "url": "https://www.miele.de/en/m/how-miele-eliminates-household-decisions-8441.htm",
+        "source_date": "2026-09-02",
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "SAMSUNG-BESPOKE-AI-DW80H77KBFFFA-ZA",
+      "category": "household_dishwasher",
+      "manufacturer": "Samsung",
+      "model": "DW80H77KBFFFA — Bespoke AI Dishwasher",
+      "market_variant": "South Africa official product page",
+      "evidence_status": "manufacturer_declared_product_page_and_regional_launch_announcement",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "live_product_page_currently_displays_not_for_sale",
+      "functional_unit": "one Eco programme cycle for stated energy/water/time headline values",
+      "programme": "Eco",
+      "capacity_place_settings": 14,
+      "metrics": {
+        "electricity_kwh_per_cycle": 0.69,
+        "water_l_per_cycle": 8,
+        "duration_min_per_cycle": 235,
+        "noise_dba": 42,
+        "annual_energy_kwh": 198
+      },
+      "label": {
+        "value": "A+++",
+        "note": "Legacy product-page class; do not map directly onto the current EU A-G label scale."
+      },
+      "features": [
+        "AI Wash using a high-resolution turbidity sensor and machine-learning-assisted adaptation",
+        "12 programmes",
+        "AutoRelease door opening",
+        "third rack / glide rail",
+        "Hygiene Plus final-rinse programme"
+      ],
+      "notes": [
+        "Samsung's South African product page currently shows the product as Not for sale; confirm exact availability before procurement.",
+        "Regional Samsung newsroom material describes the Bespoke dishwasher as launched in South Africa in 2025; the currently listed model and sales status must be verified at acquisition.",
+        "The product page's AI Wash is already a mainstream adaptive-control capability. Its declared sensor/ML feature is not evidence of independently verified cleaning quality or resource saving.",
+        "Eco headline values are manufacturer-declared values and require matched physical comparison before competitive claims."
+      ],
+      "source": {
+        "title": "Samsung South Africa Bespoke AI Dishwasher DW80H77KBFFFA",
+        "url": "https://www.samsung.com/za/dishwashers/built-under/dw90h24-dish-washer-energy-efficiency-ai-wash-3rd-rack-washing-system-14-place-settings-black-dw80h77kbfffa/",
+        "source_date": null,
+        "retrieved_date": "2026-11-04"
+      },
+      "regional_launch_source": {
+        "title": "Samsung South Africa — Bespoke dishwashers combine powerful performance with great design",
+        "url": "https://news.samsung.com/za/samsung-bespoke-dishwashers-combine-powerful-performance-with-great-design",
+        "source_date": "2025-10-28",
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "DEFY-DDW366-ZA",
+      "category": "household_dishwasher",
+      "manufacturer": "Defy",
+      "model": "DDW366",
+      "market_variant": "South Africa official product page",
+      "evidence_status": "manufacturer_declared_product_page",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "listed_regional_product",
+      "functional_unit": "one manufacturer-declared cycle; headline water and duration are not asserted to match Eco unless exact test mode is confirmed",
+      "programme": "programme-specific headline split requires confirmation from product manual/energy label",
+      "capacity_place_settings": 15,
+      "metrics": {
+        "electricity_kwh_per_cycle": null,
+        "water_l_per_cycle": 9.5,
+        "duration_min_per_cycle": 245,
+        "noise_dba": null,
+        "left_on_power_w": 1,
+        "off_mode_power_w": 0.5
+      },
+      "label": {
+        "value": "A++",
+        "note": "Legacy regional label; do not map directly onto current EU A-G scale."
+      },
+      "features": [
+        "CornerWash",
+        "dirt sensor",
+        "8 programmes",
+        "three spray levels",
+        "Aquastop / overflow protection",
+        "active ventilation"
+      ],
+      "notes": [
+        "Current Defy South Africa product page declares 15 place settings, 9.5 L and a 245-minute programme duration.",
+        "The official current product page does not provide a directly comparable kWh-per-cycle headline value; do not infer one from its old A++ class.",
+        "An older catalogue result carries different water/noise values; retain the current product-page values as the source-ledger baseline and resolve exact revision/manual before testing."
+      ],
+      "source": {
+        "title": "Defy South Africa DDW366 dishwasher",
+        "url": "https://www.defy.co.za/products/dishwashers/kitchen-dishwashes-ddw-366",
+        "source_date": null,
+        "retrieved_date": "2026-11-04"
+      }
+    }
+  ],
+  "research_frontier": [
+    {
+      "id": "DISHWASHER-MECHANISTIC-GA-OPTIMIZATION-2026",
+      "category": "optimization_method",
+      "publication_date": "2026-10",
+      "doi": "10.1016/j.compchemeng.2026.109771",
+      "title": "Optimization framework for detergent and wash cycle design in household automatic dishwashers",
+      "reported_results": {
+        "wash_time_reduction_percent": 31,
+        "drying_time_reduction_percent": 59,
+        "stain_removal_index_increase_percent": 5
+      },
+      "method": [
+        "mechanistic models of cycle stages",
+        "event-based coupling",
+        "genetic-algorithm optimization"
+      ],
+      "data_availability": "confidential",
+      "claim_ceiling": "Published result on the paper's reference formula/cycle; raw data are confidential, so full independent reproduction is not established."
+    },
+    {
+      "id": "DISHWASHER-FLUORESCENCE-OATMEAL-2026",
+      "category": "outcome_assay_method",
+      "publication_date": "2026-05-31",
+      "doi": "10.1016/j.foodres.2026.118853",
+      "title": "Classification of oatmeal residue levels on bowls using fluorescence imaging",
+      "method": [
+        "365 nm excitation",
+        "chromatic adaptation",
+        "FM-YOLO image model",
+        "bowl-surface area correction"
+      ],
+      "substrate_and_soil": "oatmeal/porridge residue on rice bowls",
+      "reported_overall_accuracy_percent": 86.7,
+      "reported_class_accuracy_percent": {
+        "score_5": 100,
+        "score_4": 100,
+        "score_3": 85,
+        "score_2": 65,
+        "score_1": 70,
+        "score_0": 100
+      },
+      "claim_ceiling": "Narrow soil/substrate assay lead, not a universal cleanliness detector. Intermediate-class accuracy and external assay validity require further qualification."
+    }
+  ],
+  "standards_and_adjacent_baselines": [
+    {
+      "id": "IEC-60436-2025-COR1-2026",
+      "category": "dishwasher_performance_method",
+      "version": "IEC 60436:2025, corrected version 2026-04",
+      "status": "current_research_baseline",
+      "relevant_changes": [
+        "new reference machine",
+        "reference detergent type E",
+        "low-power and network-standby measurement",
+        "unit-variation method",
+        "multi-compartment testing"
+      ],
+      "safety_or_minimum_performance_standard": false,
+      "source": {
+        "title": "IEC 60436:2025",
+        "url": "https://webstore.iec.ch/en/publication/80459",
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "JOJO-MUNICIPAL-BACKUP",
+      "category": "water_continuity_product",
+      "manufacturer": "JoJo Tanks",
+      "market": "South Africa",
+      "existing_capabilities": [
+        "automatic municipal tank fill",
+        "household backup storage",
+        "pump delivery to home",
+        "pressure-controller pump start/stop"
+      ],
+      "novelty_warning": "Tank, pump and pressure-controlled municipal backup are existing capabilities; WaterLoop must prove improved end-use-qualified service.",
+      "source": {
+        "title": "JoJo Municipal Backup Water Storage Solutions",
+        "url": "https://www.jojo.co.za/water-storage-solutions/municipal-backup-water-storage-solutions/",
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "MOEN-FLO",
+      "category": "water_monitoring_and_shutoff",
+      "manufacturer": "Moen",
+      "existing_capabilities": [
+        "flow/temperature/pressure monitoring",
+        "AI-assisted usage learning",
+        "daily micro-leak tests",
+        "real-time notifications",
+        "automatic water shutoff"
+      ],
+      "novelty_warning": "Smart leak monitoring and automatic shutoff are existing features; WaterLoop must prove qualified continuity and low false-shutoff burden.",
+      "source": {
+        "title": "Moen Flo Smart Water Monitor and Shutoff",
+        "url": "https://flo.moen.com/pages/flo-smart-water-monitor",
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "FRANCE-REPAIRABILITY-INDEX",
+      "category": "repairability_disclosure",
+      "existing_criteria": [
+        "technical documentation",
+        "disassembly/access/tools/fasteners",
+        "spare-parts availability and delivery",
+        "spare-parts price",
+        "category-specific criteria"
+      ],
+      "score_scale": "0-10",
+      "novelty_warning": "A repairability score alone is not novel; HomeRenew should measure actual qualified restoration and recurrence.",
+      "source": {
+        "title": "French repairability index",
+        "url": "https://www.ecologie.gouv.fr/politiques-publiques/indice-reparabilite",
+        "retrieved_date": "2026-11-04"
+      }
+    }
+  ],
+  "research_targets": {
+    "target_id": "INSTANTCLEAN-STRETCH-2026-11",
+    "evidence_status": "research_target_only_not_measured",
+    "functional_unit": "one matched Eco-equivalent full-load service with all prescribed independent item endpoints passed",
+    "targets": {
+      "place_settings": 16,
+      "electricity_kwh_per_cycle": 0.39,
+      "water_l_per_cycle": 6
+    },
+    "arithmetic_comparisons_only": [
+      {
+        "comparator_id": "SAMSUNG-BESPOKE-AI-DW80H77KBFFFA-ZA",
+        "implied_energy_reduction_percent": 43.4782608696,
+        "implied_water_reduction_percent": 25,
+        "implied_capacity_increase_percent": 14.2857142857
+      },
+      {
+        "comparator_id": "MIELE-G7655-SCVI-XXL-AUTODOS-ECO",
+        "implied_energy_reduction_percent": 27.7777777778,
+        "implied_water_reduction_percent": 28.5714285714,
+        "implied_capacity_increase_percent": 14.2857142857
+      }
+    ],
+    "caveat": "These are arithmetic comparisons between declared source values and aspirational targets only. Programmes, standard editions, load protocols, reference detergent, endpoints, market revisions and measurement boundaries are not yet matched. They are not independently verified superiority results."
+  }
+}
