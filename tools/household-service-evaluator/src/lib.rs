@@ -18,7 +18,10 @@ pub struct EvaluationError {
 
 impl EvaluationError {
     fn new(path: &'static str, message: impl Into<String>) -> Self {
-        Self { path, message: message.into() }
+        Self {
+            path,
+            message: message.into(),
+        }
     }
 }
 
@@ -116,10 +119,16 @@ pub fn evaluate_water_balance(
     let mut all_calibrated = true;
     for (name, measurement) in terms {
         if !measurement.value_l.is_finite() {
-            return Err(EvaluationError::new(name, "measurement value must be finite"));
+            return Err(EvaluationError::new(
+                name,
+                "measurement value must be finite",
+            ));
         }
         if measurement.stream_id.trim().is_empty() {
-            return Err(EvaluationError::new(name, "stream identifier must not be empty"));
+            return Err(EvaluationError::new(
+                name,
+                "stream identifier must not be empty",
+            ));
         }
         if measurement.measurement_boundary_id.trim().is_empty() {
             return Err(EvaluationError::new(
@@ -196,7 +205,10 @@ pub fn evaluate_water_balance(
         - input.delivered_outlet.value_l
         - input.purge_and_overflow.value_l;
     if !residual_l.is_finite() {
-        return Err(EvaluationError::new("residual_l", "computed residual is not finite"));
+        return Err(EvaluationError::new(
+            "residual_l",
+            "computed residual is not finite",
+        ));
     }
 
     let residual_lower_l = residual_l - input.residual_absolute_error_bound_l;
@@ -224,8 +236,7 @@ pub fn evaluate_water_balance(
         residual_upper_l,
         disposition,
         topology_audit_reference_present: input.topology_audit.is_some(),
-        uncertainty_semantics:
-            "declared aggregate absolute residual-error bound; no independence or covariance assumption",
+        uncertainty_semantics: "declared aggregate absolute residual-error bound; no independence or covariance assumption",
     })
 }
 
@@ -276,8 +287,14 @@ pub fn estimate_deliverable_service_hours(
         ("usable_volume_upper_l", input.usable_volume_upper_l),
         ("demand_lower_l_per_hour", input.demand_lower_l_per_hour),
         ("demand_upper_l_per_hour", input.demand_upper_l_per_hour),
-        ("minimum_observed_pressure_kpa", input.minimum_observed_pressure_kpa),
-        ("required_minimum_pressure_kpa", input.required_minimum_pressure_kpa),
+        (
+            "minimum_observed_pressure_kpa",
+            input.minimum_observed_pressure_kpa,
+        ),
+        (
+            "required_minimum_pressure_kpa",
+            input.required_minimum_pressure_kpa,
+        ),
     ] {
         if !value.is_finite() {
             return Err(EvaluationError::new(
@@ -303,9 +320,7 @@ pub fn estimate_deliverable_service_hours(
             "demand interval must be positive and ordered",
         ));
     }
-    if input.minimum_observed_pressure_kpa < 0.0
-        || input.required_minimum_pressure_kpa <= 0.0
-    {
+    if input.minimum_observed_pressure_kpa < 0.0 || input.required_minimum_pressure_kpa <= 0.0 {
         return Err(EvaluationError::new(
             "pressure",
             "observed pressure must be nonnegative and required pressure positive",
@@ -461,7 +476,9 @@ mod tests {
             delivered_outlet: measurement(520.0, "outlet-stream", "outlet-boundary", 1, 1001),
             purge_and_overflow: measurement(40.0, "purge-stream", "purge-boundary", 1, 1001),
             residual_absolute_error_bound_l: 5.0,
-            topology_audit: Some(TopologyAuditReference { report_sha256: "b".repeat(64) }),
+            topology_audit: Some(TopologyAuditReference {
+                report_sha256: "b".repeat(64),
+            }),
         }
     }
 
@@ -487,7 +504,10 @@ mod tests {
         assert_eq!(result.residual_l, -200.0);
         assert_eq!(result.residual_lower_l, -205.0);
         assert_eq!(result.residual_upper_l, -195.0);
-        assert_eq!(result.disposition, WaterBalanceDisposition::ContradictionBeyondDeclaredBound);
+        assert_eq!(
+            result.disposition,
+            WaterBalanceDisposition::ContradictionBeyondDeclaredBound
+        );
     }
 
     #[test]
@@ -600,7 +620,10 @@ mod tests {
     #[test]
     fn service_hours_use_deliverable_volume_and_bounded_demand() {
         let result = estimate_deliverable_service_hours(&reserve()).unwrap();
-        assert_eq!(result.disposition, ReserveDisposition::DurationRangeAvailable);
+        assert_eq!(
+            result.disposition,
+            ReserveDisposition::DurationRangeAvailable
+        );
         assert_eq!(result.lower_bound_hours, Some(10.0));
         assert_eq!(result.upper_bound_hours, Some(25.0));
     }
@@ -619,7 +642,10 @@ mod tests {
         let mut input = reserve();
         input.minimum_observed_pressure_kpa = 90.0;
         let result = estimate_deliverable_service_hours(&input).unwrap();
-        assert_eq!(result.disposition, ReserveDisposition::DeliveryEnvelopeUnqualified);
+        assert_eq!(
+            result.disposition,
+            ReserveDisposition::DeliveryEnvelopeUnqualified
+        );
     }
 
     #[test]
@@ -640,7 +666,11 @@ mod tests {
             evaluate_repair_attempt(&input, 30).unwrap().disposition,
             RepairDisposition::RecurrenceObserved
         );
-        assert!(!evaluate_repair_attempt(&input, 30).unwrap().lifetime_reliability_claim_permitted);
+        assert!(
+            !evaluate_repair_attempt(&input, 30)
+                .unwrap()
+                .lifetime_reliability_claim_permitted
+        );
     }
 
     #[test]
@@ -656,7 +686,10 @@ mod tests {
     #[test]
     fn followup_only_supports_a_bounded_no_recurrence_statement() {
         let result = evaluate_repair_attempt(&repair(), 30).unwrap();
-        assert_eq!(result.disposition, RepairDisposition::NoRecurrenceObservedDuringFollowUp);
+        assert_eq!(
+            result.disposition,
+            RepairDisposition::NoRecurrenceObservedDuringFollowUp
+        );
         assert_eq!(result.follow_up_days_observed, 30);
         assert!(!result.lifetime_reliability_claim_permitted);
     }
