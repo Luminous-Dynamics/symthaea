@@ -42,10 +42,33 @@ The loop must be allowed to conclude `unresolved`, `non_identifiable`, `abstaine
 
 - **Repository twin (#10173):** measures graph construction, typed relationships, invalidation and change-impact prediction. Causal debugging consumes that model but asks which intervention distinguishes competing explanations.
 - **Initial CEB task qualification (#10116):** supplies the eventual task/grader separation and execution prerequisites.
-- **Experiment allocation (#8721):** supplies reusable prospective value-of-computation and tool-allocation concepts. This work must not create a second generic scheduler.
+- **Experiment allocation (#8721):** supplies scientific tool-allocation lessons. This is related, but tool allocation is not identical to choosing an intervention that identifies a software fault.
+- **Prospective value-of-computation (#5476):** supplies the reusable forecast-before-outcome and separate realized-outcome contract. CEB must bind predictions before an experiment and must not turn unobserved counterfactual utility into zero.
+- **Causal metareasoning ablations (#5478):** supplies matched-budget treatment arms and intact/lesion/sham/rescue discipline for determining whether the causal policy itself produced a gain.
+- **Active probe design (#8286):** has an existing 100-seed Boolean mechanism pilot and a planned extension to noisy multi-node SCMs. Reuse its typed probe/intervention semantics where applicable; do not create a duplicate probe engine.
 - **Causal experience transfer (#9516):** supplies qualified experience lineage for later cross-task transfer tests.
 - **Receipt verification (#10167 / #10212):** supplies the CEB-specific evidence direction. Reconcile it with the general benchmark-run receipt work (#10314) before introducing any shared receipt contract; this programme must not create a third receipt format.
 - **Execution isolation (#10064):** remains a hard prerequisite before running repository-controlled build scripts, tests or candidate code.
+
+### 2.1 Existing Symthaea structures are not yet an engineering diagnosis loop
+
+A source review found two existing structures that are useful context but must not be treated as already-qualified capabilities:
+
+- `CausalHypothesis` in `crates/core/symthaea-core/src/hdc/consciousness_feedback_dynamics.rs` is currently a cause/effect/prior/HV/priority record used by `CausalDreamIntegrator`. Its extraction from `CausalMind` is explicitly a placeholder; hypotheses are manually queued. The "what if" operation returns a textual counterfactual question, not a controlled software intervention.
+- `InterventionPlan` in `src/consciousness/causal_byzantine.rs` recommends parameter adjustments for Byzantine-defense behavior. Its semantics are domain-specific and should not be repurposed as a generic repository repair experiment.
+
+The CEB integration should be a task-scoped evidence adapter, not a replacement for these modules and not a new generic scheduler. Its conceptual record should bind:
+
+1. exact task/source/configuration snapshot and evidence authority;
+2. competing fault hypotheses and unresolved alternatives;
+3. an immutable forecast linked to #5476 before the intervention;
+4. a typed experiment action and risk/reversibility contract linked to #8286;
+5. the predeclared predicted observation and actual outcome;
+6. the hypothesis update, including falsified explanations and missing counterfactuals;
+7. causal-ablation identity linked to #5478;
+8. any repair proposal and its independent outcome receipt.
+
+The adapter must distinguish observation, hard intervention, mechanism replacement, test execution, configuration perturbation and tool-allocation actions. They answer different questions and must not share an untyped "experiment" label. The explicit integration work is tracked by [#10387 — CEB-CAUSE-INTEGRATION-001](https://github.com/Luminous-Dynamics/symthaea/issues/10387).
 
 ## 3. Task and fault model
 
