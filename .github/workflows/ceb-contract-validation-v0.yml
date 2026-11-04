@@ -531,7 +531,7 @@ jobs:
               ("fail without a failed/error check", lambda p: p["result"].update({"verdict": "fail"})),
           ]:
               mutant = copy.deepcopy(valid_primary_pass)
-              mutate(mutant["predicate"] if label != "candidate subject digest mismatch" else mutant)
+              mutate(mutant["predicate"] if label not in {"candidate subject digest mismatch", "result tree subject digest mismatch"} else mutant)
               expect_statement_reject(mutant, label)
 
           # A shape-only envelope with a real serialized statement payload.
