@@ -8,6 +8,7 @@
 
 pub mod batch;
 pub mod service_deficit;
+pub mod water_quality;
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
