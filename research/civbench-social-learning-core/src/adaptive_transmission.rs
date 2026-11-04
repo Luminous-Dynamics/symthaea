@@ -1546,7 +1546,11 @@ mod tests {
     fn policy_runs_share_graph_and_first_step_innovation_randomness() {
         let task = InnovationTask::family_task(TaskFamily::Branching);
         for seed in 0..32 {
-            let base = deterministic_config(TransmissionPolicy::StateAwareFrontier);
+            let base = Config {
+                individual_attempts_per_agent_step: 2,
+                individual_discovery_probability: 0.4,
+                ..deterministic_config(TransmissionPolicy::StateAwareFrontier)
+            };
             let state_aware = simulate(&task, base, seed).unwrap();
             let shuffled = simulate(
                 &task,
