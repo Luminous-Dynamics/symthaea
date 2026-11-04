@@ -30,6 +30,7 @@
     "proof_inserted",
     "exact_sorry_replaced",
     "sorry_absent_after_replacement",
+    "target_sorry_ax_absent",
     "build_passed",
     "kernel_passed",
     "semantic_gate_passed",
@@ -232,6 +233,9 @@
       "pattern": "^[a-f0-9]{64}$"
     },
     "target_is_prop": {
+      "type": "boolean"
+    },
+    "target_sorry_ax_absent": {
       "type": "boolean"
     }
   },
