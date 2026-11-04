@@ -94,7 +94,7 @@ pub struct ThermodynamicPhysicsBridge {
     history: std::collections::VecDeque<[f64; 4]>,
 
     // ═══════════════════════════════════════════════════════════════════════
-    // Nonequilibrium Physics (Phase 6)
+    // Cognitive thermodynamic-analogy diagnostics (Phase 6)
     // ═══════════════════════════════════════════════════════════════════════
     /// Rolling model-derived "work" proxies. These are not work measurements
     /// from a defined nonequilibrium protocol and must not be treated as a
@@ -132,7 +132,7 @@ pub struct ThermodynamicPhysicsBridge {
     pub england_exploration_boost: bool,
 
     // ═══════════════════════════════════════════════════════════════════════
-    // Epistemic Free Energy (arXiv 2601.17607)
+    // Epistemic model diagnostics (feature-gated)
     // ═══════════════════════════════════════════════════════════════════════
     /// Heuristic epistemic score formed from scalar prediction error and
     /// entropy-production proxies. It is not a measured thermodynamic free
@@ -230,7 +230,7 @@ impl ThermodynamicPhysicsBridge {
         self.attention_erasure_cost = self.attention_demon_bits * k_eff * t_eff * ln2;
 
         // ═══════════════════════════════════════════════════════════════════
-        // Landauer Limit for Memory (Landauer 1961)
+        // Landauer-inspired memory-cost proxy
         // ═══════════════════════════════════════════════════════════════════
         // Model heuristic: prediction error is mapped to a nominal
         // information quantity. This is not a measured bit count, memory reset,
@@ -387,25 +387,13 @@ impl ThermodynamicPhysicsBridge {
         }
     }
 
-    /// Compute epistemic thermodynamic metrics for this cycle.
+    /// Compute heuristic epistemic diagnostics for this cycle.
     ///
-    /// # Arguments
-    /// - `effective_temperature` — system effective temperature (k_B_eff units)
-    /// - `entropy_production` — entropy production rate this cycle
-    /// - `belief_delta` — how far beliefs moved this cycle (Wasserstein-2 proxy)
-    ///
-    /// # Science
-    ///
-    /// The Thermodynamic Theory of Learning (arXiv 2601.17607) establishes that
-    /// learning has an intrinsic thermodynamic cost. The Epistemic Speed Limit
-    /// (ESL) bounds how fast beliefs can change:
-    ///
-    ///   T * sigma >= W_2(q_0, q_1)^2
-    ///
-    /// where T is temperature, sigma is entropy production, and W_2 is the
-    /// Wasserstein-2 distance between consecutive belief distributions.
-    /// Violation (ESL > 1.0) indicates beliefs changed faster than
-    /// thermodynamically permitted — a red flag for hallucination or instability.
+    /// The current inputs are effective model scales and a scalar prediction-error
+    /// displacement. This calculation does not compute a Wasserstein-2 distance
+    /// between belief distributions, estimate trajectory entropy production, or
+    /// test a physical thermodynamic speed limit. It is retained as a cognitive
+    /// heuristic pending a distribution-based, dimensionally specified estimator.
     #[cfg(feature = "epistemic")]
     pub(crate) fn compute_epistemic_thermodynamics(
         &mut self,
@@ -430,20 +418,17 @@ impl ThermodynamicPhysicsBridge {
             self.belief_wasserstein_distance.powi(2) / (t_eff * sigma);
     }
 
-    /// Compute the maximum number of knowledge claims that can be validated
-    /// this cycle given the available energy budget.
+    /// Estimate the number of claim-validation model operations allowed by
+    /// the abstract per-cycle budget.
     ///
-    /// Available energy = total budget - memory Landauer cost - attention erasure cost.
-    /// Each claim validation costs approximately one Landauer bit erasure at the
-    /// current effective temperature: k_B_eff * T * ln(2).
+    /// This subtracts the current attention/memory cost proxies and divides by a
+    /// configured per-claim model cost. The budget and costs are effective model
+    /// units, not joules, and this is not a Landauer-derived physical throughput
+    /// bound. Actual work/energy measurement and logical bit-erasure accounting
+    /// are separate requirements.
     ///
-    /// Returns 0 when energy is exhausted or temperature is negligible.
-    ///
-    /// # Science
-    ///
-    /// Landauer (1961) — each irreversible bit operation (claim evaluation)
-    /// dissipates at least k_B * T * ln(2) energy. This bounds epistemic
-    /// throughput by thermodynamic cost.
+    /// Returns zero when the abstract budget is exhausted or the configured
+    /// model cost is non-positive.
     #[cfg(feature = "epistemic")]
     pub fn epistemic_energy_budget(&self) -> usize {
         let available =
@@ -563,7 +548,7 @@ mod tests {
         );
         // Demon gathers bits = sensitivity × info
         assert!((b.attention_demon_bits - 80.0).abs() < 0.01);
-        // Erasure cost ≥ work extracted (Landauer bound)
+        // Configured erasure-cost proxy >= heuristic work proxy by policy.
         assert!(b.attention_erasure_cost >= b.attention_work);
         // Work = bits × k × T × ln2 × efficiency (THERMO_ATTENTION_DEMON_EFFICIENCY)
         // Erasure = bits × k × T × ln2
@@ -576,7 +561,7 @@ mod tests {
     }
 
     #[test]
-    fn test_landauer_cost_positive() {
+    fn test_memory_cost_proxy_positive() {
         let mut b = make_bridge();
         b.compute(
             0.5,
@@ -596,9 +581,9 @@ mod tests {
     }
 
     #[test]
-    fn test_carnot_efficiency_bounded() {
+    fn test_effective_temperature_normalization_bounded() {
         let mut b = make_bridge();
-        // High temperature → high Carnot efficiency
+        // Higher configured effective temperature raises the normalization.
         b.compute(
             0.5,
             50.0,
@@ -614,7 +599,7 @@ mod tests {
         );
         assert!(b.carnot_efficiency > 0.0);
         assert!(b.carnot_efficiency < 1.0);
-        // T_hot=1.0, T_cold=THERMO_CARNOT_T_COLD → η = 1 - T_cold/1.0
+        // Reference effective scale: eta_proxy = 1 - T_cold / T_eff.
         let t_cold = thresholds::THERMO_CARNOT_T_COLD;
         let expected = 1.0 - t_cold / 1.0;
         assert!(
@@ -624,7 +609,7 @@ mod tests {
         );
 
         // Low temperature → low efficiency
-        // T_hot=0.25+, T_cold=THERMO_CARNOT_T_COLD → approaches 0
+        // Lower effective temperature approaches a zero normalization.
         b.compute(
             0.5,
             50.0,
@@ -638,7 +623,7 @@ mod tests {
             0.5,
             &default_regime(),
         );
-        // With T_hot=0.25 < T_cold=0.3, Carnot = 0.0 (can't extract work)
+        // With effective T below the reference scale, the normalization is zero.
         assert!(
             b.carnot_efficiency < 0.01,
             "expected ~0 with T_hot < T_cold, got {}",
@@ -676,7 +661,7 @@ mod tests {
     }
 
     #[test]
-    fn test_onsager_symmetry() {
+    fn test_covariance_symmetry_residual_is_near_zero() {
         let mut b = make_bridge();
         // Feed identical samples → perfectly symmetric → asymmetry ≈ 0
         for _ in 0..5 {
@@ -730,7 +715,7 @@ mod tests {
     fn test_epistemic_speed_limit_respects_temperature() {
         let mut b = make_bridge();
 
-        // High temperature + high entropy production → ESL low (thermodynamically affordable)
+        // Larger model scales lower this heuristic ratio.
         b.compute_epistemic_thermodynamics(2.0, 1.0, 0.3);
         let esl_hot = b.epistemic_speed_limit_violation;
         // ESL = 0.3^2 / (2.0 * 1.0) = 0.09 / 2.0 = 0.045
@@ -739,7 +724,7 @@ mod tests {
             "hot system should allow fast belief change, got ESL={esl_hot}"
         );
 
-        // Low temperature + low entropy production → ESL high (thermodynamically expensive)
+        // Smaller model scales raise this heuristic ratio.
         b.compute_epistemic_thermodynamics(0.05, 0.01, 0.3);
         let esl_cold = b.epistemic_speed_limit_violation;
         // ESL = 0.09 / (0.05 * 0.01) = 0.09 / 0.0005 = 180.0
