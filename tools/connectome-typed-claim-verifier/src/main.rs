@@ -456,13 +456,11 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                 if claim.relation_type != "CAUSAL_EFFECT_CLAIM" {
                     if let Some((previous_id, previous_kind, previous_world)) =
                         previous_traversable_target.as_ref()
-                    {
-                        if previous_id != &claim.source_id
+                        && (previous_id != &claim.source_id
                             || previous_kind != &claim.source_kind
-                            || previous_world != &claim.source_world
-                        {
-                            path_composition_valid = false;
-                        }
+                            || previous_world != &claim.source_world)
+                    {
+                        path_composition_valid = false;
                     }
                     previous_traversable_target = Some((
                         claim.target_id.clone(),
