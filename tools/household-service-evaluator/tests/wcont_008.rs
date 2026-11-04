@@ -4,12 +4,7 @@ use symthaea_household_service_evaluator::{
     evaluate_water_balance,
 };
 
-fn meter(
-    value_l: f64,
-    error_bound_l: f64,
-    stream: &str,
-    boundary: &str,
-) -> MeterMeasurement {
+fn meter(value_l: f64, error_bound_l: f64, stream: &str, boundary: &str) -> MeterMeasurement {
     MeterMeasurement {
         value_l,
         absolute_error_bound_l: error_bound_l,
