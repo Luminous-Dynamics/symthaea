@@ -521,7 +521,13 @@ fn verify_reviewer_attestation(
     Ok(())
 }
 
-fn verify_bundle(run: &ProofRun, task: &SorryRecord, evidence_root: &Path) -> Result<RunClosure, String> {
+fn verify_bundle(
+    run: &ProofRun,
+    task: &SorryRecord,
+    evidence_root: &Path,
+    reviewer_registry_bytes: &[u8],
+    reviewer_registry_sha256: &str,
+) -> Result<RunClosure, String> {
     check_run_task(run, task)?;
     if run.outcome != "verified_success" {
         return Ok(RunClosure {
@@ -576,6 +582,7 @@ fn verify_bundle(run: &ProofRun, task: &SorryRecord, evidence_root: &Path) -> Re
     let source_receipt_bytes = read_required(evidence_root, &run.run_id, "source-binding-receipt.json")?;
     let checker_receipt_bytes = read_required(evidence_root, &run.run_id, "checker-receipt.json")?;
     let semantic_receipt_bytes = read_required(evidence_root, &run.run_id, "semantic-gate-receipt.json")?;
+    let reviewer_attestation_bytes = read_required(evidence_root, &run.run_id, "reviewer-attestation.json")?;
     if sha256(&source_receipt_bytes) != run.source_binding_receipt_sha256 {
         return Err(format!("run {} source-binding receipt digest mismatch", run.run_id));
     }
@@ -585,6 +592,7 @@ fn verify_bundle(run: &ProofRun, task: &SorryRecord, evidence_root: &Path) -> Re
     if sha256(&semantic_receipt_bytes) != run.semantic_gate_receipt_sha256 {
         return Err(format!("run {} semantic-gate receipt digest mismatch", run.run_id));
     }
+    let reviewer_attestation_digest = sha256(&reviewer_attestation_bytes);
 
     let source_receipt: SourceBindingReceipt = serde_json::from_slice(&source_receipt_bytes)
         .map_err(|e| format!("run {} source-binding receipt invalid: {e}", run.run_id))?;
@@ -705,6 +713,8 @@ fn verify_bundle(run: &ProofRun, task: &SorryRecord, evidence_root: &Path) -> Re
         || semantic.vacuity_audit_status != "pass"
         || semantic.reviewer_decision != "pass"
         || semantic.reviewer_id.trim().is_empty()
+        || !is_sha256(&semantic.reviewer_attestation_sha256)
+        || semantic.reviewer_attestation_sha256 != reviewer_attestation_digest
         || !semantic.semantic_gate_passed
         || !semantic.vacuity_gate_passed
         || semantic.semantic_gate_passed != run.semantic_gate_passed
@@ -721,6 +731,14 @@ fn verify_bundle(run: &ProofRun, task: &SorryRecord, evidence_root: &Path) -> Re
     if sha256(&semantic_log) != semantic.semantic_log_sha256 {
         return Err(format!("run {} semantic audit log digest mismatch", run.run_id));
     }
+    verify_reviewer_attestation(
+        &semantic,
+        &reviewer_attestation_bytes,
+        reviewer_registry_bytes,
+        reviewer_registry_sha256,
+        evidence_root,
+        &run.run_id,
+    )?;
 
     Ok(RunClosure {
         run_id: run.run_id.clone(), task_id: run.task_id.clone(), outcome: run.outcome.clone(),
