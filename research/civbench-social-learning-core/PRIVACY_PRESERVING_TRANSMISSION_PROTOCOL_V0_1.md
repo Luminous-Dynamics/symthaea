@@ -43,7 +43,7 @@ The `privacy-disclosure-sweep` binary compares three conditions:
 2. coarse recipe-readiness need signal with the same program weights and budgets;
 3. no-social-transmission control.
 
-The sweep uses three synthetic DAG task families (Layered, Branching, Convergent), 256 fixed seeds per family, 12 agents, 12 steps, a 12-message per-step budget and an attention capacity of two messages per recipient per step. Graphs and identity-keyed discovery/acquisition draws are shared across conditions for the same seed; message acquisition is keyed by sender/receiver/route-slot and excludes payload identity.
+The sweep uses three synthetic DAG task families (Layered, Branching, Convergent), 256 fixed seeds per family, 12 agents, 12 steps, a configured ceiling of 12 messages per step and an attention capacity ceiling of two messages per recipient per step. Graphs and identity-keyed discovery/acquisition draws are shared across conditions for the same seed; message acquisition is keyed by sender/receiver/route-slot and excludes payload identity. **These are matched configured ceilings, not matched realized communication volumes:** coarse mode's two-need-signal-per-recipient limit can cause fewer messages and attention uses than the central mode. This is a known confound in the preliminary sweep, not a controlled privacy-only treatment.
 
 Outputs report separately:
 - final collective result coverage and a conservative 95% Student-t interval;
@@ -57,6 +57,21 @@ Outputs report separately:
 The field-count proxy is not mutual information, attack advantage, or an information-theoretic privacy score. Repeated signals may reveal more than the per-run count suggests; inference attacks are the next-stage acceptance gate.
 
 The same program score weights are used for both state-aware modes, with collective novelty disabled in both. The experiment does not assert that the coarse mode is privacy-safe; it measures the utility cost of a particular minimized signal.
+
+
+## 3.1 Preliminary exact-head result (synthetic; not a privacy guarantee)
+
+The run at [Symthaea PR #9970 exact head 0d0966a](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41868358797) evaluated 256 common seeds per task family. Means and the reported 95% Student-t half-widths were:
+
+| Task family | Central coverage | Coarse coverage | No-social coverage | Coarse − central (paired, 95% half-width) | Central messages/run | Coarse messages/run |
+|---|---:|---:|---:|---:|---:|---:|
+| Layered | 65.96% | 59.46% | 38.73% | −6.50 pp ±1.03 pp | 111.63 | 91.80 |
+| Branching | 69.25% | 60.60% | 46.29% | −8.65 pp ±1.15 pp | 116.50 | 91.80 |
+| Convergent | 63.00% | 59.96% | 34.12% | −3.04 pp ±0.75 pp | 104.66 | 98.02 |
+
+The coarse signal reduced the declared disclosure-field-count proxy by 58.2–59.8% (not bits, mutual information or attack advantage). It also reduced realized messages by 6.3–21.2%. Consequently the coverage loss cannot be attributed solely to disclosure granularity. Both treatments shared the same per-step message ceiling and per-recipient attention ceiling, but not the same realized message count. These results demonstrate a preliminary utility/disclosure-volume trade-off only; they do not demonstrate privacy, anonymity, confidentiality, or differential privacy.
+
+The next comparison must either (a) hold the realized sender/receiver/message opportunities constant while varying the disclosed fields, or (b) run a predeclared Pareto sweep over signal quota, message quota and attention budget with cost-normalized outcomes. It must preserve the existing paired seeds and report message/attention use alongside coverage. Leakage attacks from issue #10413 remain unimplemented.
 
 ## 4. Required next-stage leakage evaluation
 
