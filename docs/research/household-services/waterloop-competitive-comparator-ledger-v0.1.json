@@ -1,0 +1,309 @@
+{
+  "schema_version": "1.0.0",
+  "ledger_id": "WATERLOOP-COMPETITIVE-EVIDENCE-001",
+  "snapshot_date": "2026-11-04",
+  "purpose": "Source-bound inventory of existing household water backup, reuse and leak-monitoring capabilities. Every source statement remains separate until model, revision, end-use, measurement basis and installation are matched.",
+  "evidence_classes": [
+    "manufacturer_declared",
+    "manufacturer_technical_sheet",
+    "third_party_listing",
+    "independent_physical_measurement"
+  ],
+  "unit_conversions": {
+    "us_gallon_to_litre": 3.785411784,
+    "note": "Converted values are arithmetic conversions of source-listed US gallons/day, not new test results."
+  },
+  "comparators": [
+    {
+      "comparator_id": "JOJO-MUNICIPAL-BACKUP-FAMILY",
+      "manufacturer": "JoJo Tanks",
+      "product_scope": "Municipal backup water storage product family; exact tank/pump SKU not yet frozen",
+      "primary_service_function": "outage_continuity",
+      "capabilities": [
+        "automatic municipal tank filling",
+        "pump-fed household water delivery",
+        "household backup storage"
+      ],
+      "observations": [
+        {
+          "observation_id": "JOJO-PAGE-001",
+          "evidence_class": "manufacturer_declared",
+          "source_title": "Municipal Backup Water Storage Solutions",
+          "source_url": "https://www.jojo.co.za/water-storage-solutions/municipal-backup-water-storage-solutions/",
+          "retrieved_date": "2026-11-04",
+          "claims": {
+            "automatic_municipal_fill": true,
+            "pump_fed_delivery": true
+          },
+          "missing_or_unresolved": [
+            "exact tank SKU and usable volume",
+            "exact pump model and pump curve",
+            "measured fixture pressure and flow under matched demand",
+            "installed and lifecycle cost in the target South African market",
+            "measured outage continuity and restoration performance"
+          ]
+        }
+      ],
+      "comparison_claim_ceiling": "Establishes an incumbent feature baseline only. No matched physical performance, service duration, cost or WaterLoop superiority is established."
+    },
+    {
+      "comparator_id": "MOEN-FLO-SMART-WATER-MONITOR",
+      "manufacturer": "Moen",
+      "model_scope": "Flo Smart Water Monitor and Shutoff; exact market SKU and plumbing size to be frozen",
+      "primary_service_function": "leak_observability_and_containment",
+      "capabilities": [
+        "household flow and pressure monitoring",
+        "usage-pattern learning",
+        "leak detection and alerting",
+        "automatic water shutoff"
+      ],
+      "observations": [
+        {
+          "observation_id": "MOEN-FLO-PAGE-001",
+          "evidence_class": "manufacturer_declared",
+          "source_title": "Flo Smart Water Monitor and Shutoff",
+          "source_url": "https://flo.moen.com/pages/flo-smart-water-monitor",
+          "retrieved_date": "2026-11-04",
+          "claims": {
+            "flow_monitoring": true,
+            "pressure_monitoring": true,
+            "leak_detection": true,
+            "automatic_shutoff": true
+          },
+          "missing_or_unresolved": [
+            "exact SKU, pipe-size and installation configuration",
+            "leak-class sensitivity/recall under independently controlled challenges",
+            "false-shutoff rate and service disruption burden",
+            "offline/local behavior and cloud-account dependency",
+            "South African availability, support and lifecycle cost"
+          ]
+        }
+      ],
+      "comparison_claim_ceiling": "Establishes an incumbent capability baseline, not independently verified leak performance or WaterLoop superiority."
+    },
+    {
+      "comparator_id": "HYDRALOOP-H300-CURRENT-PRODUCT-PAGE",
+      "manufacturer": "Hydraloop",
+      "model": "H300",
+      "market_variant": "Current manufacturer product-page description; exact sale-market hardware revision not yet frozen",
+      "primary_service_function": "greywater_source_substitution",
+      "declared_source_streams": [
+        "showers",
+        "baths"
+      ],
+      "declared_reuse_outputs": [
+        "toilet flushing",
+        "washing machine",
+        "garden irrigation"
+      ],
+      "observations": [
+        {
+          "observation_id": "H300-CURRENT-PAGE-001",
+          "evidence_class": "manufacturer_declared",
+          "source_title": "Hydraloop H300 product page",
+          "source_url": "https://www.hydraloop.com/products/h300",
+          "retrieved_date": "2026-11-04",
+          "claims": {
+            "potential_cleaning_capacity_l_per_day": 360,
+            "nominal_vessel_volume_l": 300,
+            "average_energy_kwh_per_year": 280,
+            "target_household_persons": 4,
+            "dimensions_mm": [
+              800,
+              360,
+              1990
+            ],
+            "noise_range_db": [
+              29,
+              50
+            ]
+          },
+          "capacity_semantics": "Manufacturer describes 360 L/day as potential/cleaning capacity, dependent on user behaviour. This is not accepted end-use delivery, measured net mains displacement or the NSF listing value.",
+          "missing_or_unresolved": [
+            "exact hardware/firmware and local-market revision",
+            "end-use split and time profile supporting the 360 L/day value",
+            "actual qualified output at target fixture pressure/flow",
+            "energy boundary and operating modes included in 280 kWh/year",
+            "South African installation, certification, service, spares and price"
+          ]
+        }
+      ],
+      "comparison_claim_ceiling": "Manufacturer-declared potential capacity and energy only; not independently measured delivery, net water saving, potable qualification or WaterLoop comparison."
+    },
+    {
+      "comparator_id": "HYDRALOOP-H300-RECYCLE-READY-2025",
+      "manufacturer": "Hydraloop",
+      "model": "H300",
+      "source_revision": "Recycle Ready Guide H300 Collection 2025, February 2025",
+      "primary_service_function": "greywater_source_substitution",
+      "observations": [
+        {
+          "observation_id": "H300-RECYCLE-GUIDE-2025-001",
+          "evidence_class": "manufacturer_technical_sheet",
+          "source_title": "Recycle Ready Guide H300 Collection 2025",
+          "source_url": "https://info.hydraloop.com/wp-content/uploads/2025/02/Recycle-Ready-Guide-H300-Collection-25-Metric-February-2025.pdf",
+          "retrieved_date": "2026-11-04",
+          "claims": {
+            "nominal_vessel_volume_l": 300,
+            "nominal_cleaning_capacity_l_per_day": 360,
+            "average_energy_kwh_per_year": 220,
+            "wifi_network_connection_required": true
+          },
+          "capacity_semantics": "The guide describes cleaning capacity as dependent on user behaviour. The Wi-Fi statement specifies an internal network; it does not by itself establish an internet/cloud dependency.",
+          "missing_or_unresolved": [
+            "whether 220 kWh/year applies to the currently marketed H300 revision",
+            "which standby, treatment and pump modes are included",
+            "whether an internal LAN is needed for normal operation, setup only, diagnostics or remote services",
+            "whether remote internet access is required for basic service and recovery"
+          ]
+        }
+      ],
+      "comparison_claim_ceiling": "Historical manufacturer guide only; do not silently substitute these figures for the current product page or a certified capacity."
+    },
+    {
+      "comparator_id": "HYDRALOOP-H300-H350-NSF350-LISTING",
+      "manufacturer": "Hydraloop International B.V.",
+      "model_scope": "H300/H350 as listed by NSF",
+      "primary_service_function": "greywater_source_substitution",
+      "observations": [
+        {
+          "observation_id": "H300-H350-NSF-LISTING-2026-11-03",
+          "evidence_class": "third_party_listing",
+          "source_title": "NSF/ANSI 350 official product listing",
+          "source_url": "https://info.nsf.org/Certified/Wastewater/Listings.asp?Company=C0427542&Standard=350",
+          "listing_current_as_of": "2026-11-03",
+          "retrieved_date": "2026-11-04",
+          "claims": {
+            "rated_capacity_us_gallons_per_day": 52.8,
+            "converted_capacity_litres_per_day": 199.9,
+            "classification": "Class R",
+            "use_type": "Laundry & Bathing"
+          },
+          "conversion": "52.8 US gal/day × 3.785411784 L/US gal = approximately 199.9 L/day.",
+          "semantics": "This is the rated capacity and use-class value shown in the NSF listing. It is distinct from the manufacturer's 360 L/day potential/cleaning-capacity statement.",
+          "missing_or_unresolved": [
+            "full certification report and rated-capacity definition",
+            "exact H300 versus H350 design/revision mapping",
+            "which specific reuse outlets are inside the certified claim scope",
+            "whether manufacturer 360 L/day and listed 52.8 GPD represent different test/claim bases"
+          ]
+        }
+      ],
+      "comparison_claim_ceiling": "Third-party listing evidence for the exact Class R / Laundry & Bathing scope only. Not potable approval, not a new independent field measurement and not proof of a product defect."
+    },
+    {
+      "comparator_id": "HYDRALOOP-H300-PUMP-DATASHEET-2026-01",
+      "manufacturer": "Hydraloop",
+      "model": "H300",
+      "source_revision": "Product data sheet, January 2026",
+      "primary_service_function": "greywater_source_substitution",
+      "observations": [
+        {
+          "observation_id": "H300-PUMP-DATASHEET-2026-01",
+          "evidence_class": "manufacturer_technical_sheet",
+          "source_title": "Product data sheet H300 (January 2026 metric)",
+          "source_url": "https://info.hydraloop.com/wp-content/uploads/2026/01/Product-data-sheet-H300-January-2026-metric.pdf",
+          "retrieved_date": "2026-11-04",
+          "claims": {
+            "nominal_distribution_pump_pressure_bar": 2.1,
+            "nominal_distribution_pump_pressure_kpa": 210,
+            "nominal_distribution_pump_flow_l_per_min": 12
+          },
+          "semantics": "Manufacturer-declared nominal pump figures. They are not fixture-boundary flow/pressure under a matched plumbing network and demand trace.",
+          "missing_or_unresolved": [
+            "pump curve and pressure/flow curve over the operating envelope",
+            "delivered pressure at simultaneous-use fixtures",
+            "head loss, pipe topology and lift-pump configuration effects"
+          ]
+        }
+      ],
+      "comparison_claim_ceiling": "Technical-sheet pump values only; physical fixture service remains to be measured."
+    },
+    {
+      "comparator_id": "HYDRALOOP-H600-NSF350-LISTING",
+      "manufacturer": "Hydraloop International B.V.",
+      "model": "H600",
+      "primary_service_function": "greywater_source_substitution",
+      "observations": [
+        {
+          "observation_id": "H600-NSF-LISTING-2026-11-03",
+          "evidence_class": "third_party_listing",
+          "source_title": "NSF/ANSI 350 official product listing",
+          "source_url": "https://info.nsf.org/Certified/Wastewater/Listings.asp?Company=C0427542&Standard=350",
+          "listing_current_as_of": "2026-11-03",
+          "retrieved_date": "2026-11-04",
+          "claims": {
+            "rated_capacity_us_gallons_per_day": 260,
+            "converted_capacity_litres_per_day": 984.2,
+            "classification": "Class R",
+            "use_type": "Laundry & Bathing"
+          },
+          "conversion": "260 US gal/day × 3.785411784 L/US gal = approximately 984.2 L/day.",
+          "missing_or_unresolved": [
+            "reconciliation against manufacturer-declared 850 L/day cleaning capacity",
+            "exact local-market model/revision and permitted output uses"
+          ]
+        }
+      ],
+      "comparison_claim_ceiling": "Third-party listing scope only. Do not compare the H600 with H300 or WaterLoop without matching source, end-use class and measured functional units."
+    }
+  ],
+  "benchmark_separation": {
+    "outage_continuity": {
+      "comparator_family": [
+        "JoJo-style tank_pump_backup"
+      ],
+      "functional_units": [
+        "fixture_delivered_litres_under_declared_pressure_floor",
+        "pressure_qualified_service_minutes_per_outage_trace",
+        "time_to_qualified_recovery"
+      ],
+      "must_not_credit": [
+        "gross_tank_inventory_without_deliverability",
+        "greywater_treatment_capacity",
+        "leak_alert_count"
+      ]
+    },
+    "greywater_substitution": {
+      "comparator_family": [
+        "Hydraloop H300/H600 and other exact certified configurations"
+      ],
+      "functional_units": [
+        "qualified_litres_by_end_use_per_day",
+        "net_metered_mains_litres_displaced",
+        "energy_per_qualified_litre",
+        "lifecycle_cost_per_qualified_displaced_litre"
+      ],
+      "must_not_credit": [
+        "recovered_but_rejected_volume",
+        "unused_output",
+        "treated_volume_not_substituting_mains_demand",
+        "outage_backup_hours"
+      ]
+    },
+    "leak_containment": {
+      "comparator_family": [
+        "Moen Flo"
+      ],
+      "functional_units": [
+        "missed_leak_volume",
+        "detection_and_isolation_latency",
+        "false_isolation_rate",
+        "successful_containment_rate"
+      ],
+      "must_not_credit": [
+        "unused_backup_inventory",
+        "greywater_treatment_throughput"
+      ]
+    }
+  },
+  "acquisition_gaps": [
+    "exact South African SKUs and local-market installation quotes",
+    "local distributor/installer, warranty, service response and spare-part availability",
+    "matched physical bench data for fixture pressure/flow, actual end-use quality, power and rejection/purge",
+    "current H300/H350 manufacturer-to-NSF capacity clarification",
+    "exact connectivity profile and local/offline functional boundary",
+    "local plumbing/backflow and product-category regulatory review"
+  ],
+  "claim_ceiling": "This ledger preserves public manufacturer and third-party listing statements only. It does not establish local availability, installation suitability, physical performance, water savings, potable quality, compliance, affordability, product superiority or market demand."
+}
