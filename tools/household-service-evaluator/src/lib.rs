@@ -6,11 +6,12 @@
 //! authenticate source records, inspect physical plumbing, establish water
 //! quality, certify a repair, control actuators, or make safety decisions.
 
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct EvaluationError {
     pub path: &'static str,
     pub message: String,
@@ -33,7 +34,7 @@ impl fmt::Display for EvaluationError {
 
 impl Error for EvaluationError {}
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct MeterMeasurement {
     pub value_l: f64,
     pub stream_id: String,
@@ -46,14 +47,14 @@ pub struct MeterMeasurement {
     pub calibration_record_sha256: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct TopologyAuditReference {
     /// Reference to an independently authored topology-audit report.
     /// The evaluator validates its shape, not its authorship or content.
     pub report_sha256: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct WaterBalanceInput {
     pub inlet: MeterMeasurement,
     /// Positive means tank storage increased; negative means it decreased.
@@ -67,7 +68,8 @@ pub struct WaterBalanceInput {
     pub topology_audit: Option<TopologyAuditReference>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum WaterBalanceDisposition {
     CalibrationUnresolved,
     TopologyUnresolved,
@@ -77,14 +79,14 @@ pub enum WaterBalanceDisposition {
     ContradictionBeyondDeclaredBound,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct WaterBalanceResult {
     pub residual_l: f64,
     pub residual_lower_l: f64,
     pub residual_upper_l: f64,
     pub disposition: WaterBalanceDisposition,
     pub topology_audit_reference_present: bool,
-    pub uncertainty_semantics: &'static str,
+    pub uncertainty_semantics: String,
 }
 
 /// Recompute inlet - tank storage delta - delivered outlet - purge/overflow.
@@ -236,11 +238,11 @@ pub fn evaluate_water_balance(
         residual_upper_l,
         disposition,
         topology_audit_reference_present: input.topology_audit.is_some(),
-        uncertainty_semantics: "declared aggregate absolute residual-error bound; no independence or covariance assumption",
+        uncertainty_semantics: "declared aggregate absolute residual-error bound; no independence or covariance assumption".to_owned(),
     })
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct ReserveEnvelopeInput {
     /// Usable volume at the declared delivery boundary, not gross tank level.
     pub usable_volume_lower_l: f64,
@@ -258,7 +260,8 @@ pub struct ReserveEnvelopeInput {
     pub end_use_quality_qualified: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ReserveDisposition {
     NoDeliveryPath,
     DeliveryEnvelopeUnqualified,
@@ -266,12 +269,12 @@ pub enum ReserveDisposition {
     DurationRangeAvailable,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct ReserveEstimate {
     pub disposition: ReserveDisposition,
     pub lower_bound_hours: Option<f64>,
     pub upper_bound_hours: Option<f64>,
-    pub functional_unit: &'static str,
+    pub functional_unit: String,
 }
 
 /// Estimate a conservative service-duration range.
@@ -344,7 +347,7 @@ pub fn estimate_deliverable_service_hours(
             disposition,
             lower_bound_hours: None,
             upper_bound_hours: None,
-            functional_unit: "hours of the declared qualified household service",
+            functional_unit: "hours of the declared qualified household service".to_owned(),
         });
     }
 
@@ -361,11 +364,11 @@ pub fn estimate_deliverable_service_hours(
         disposition,
         lower_bound_hours: Some(lower),
         upper_bound_hours: Some(upper),
-        functional_unit: "hours of the declared qualified household service",
+        functional_unit: "hours of the declared qualified household service".to_owned(),
     })
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct RepairAttempt {
     pub diagnosis_supported: bool,
     pub exact_spare_available: bool,
@@ -380,7 +383,8 @@ pub struct RepairAttempt {
     pub recurrence_observed: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum RepairDisposition {
     Blocked,
     HeldForRequalification,
