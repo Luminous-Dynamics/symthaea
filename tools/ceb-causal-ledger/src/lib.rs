@@ -65,6 +65,8 @@ pub struct EvidenceRecord {
     pub id: String,
     /// Exact task/source/configuration identity.
     pub binding: TaskBinding,
+    /// Content digest of the immutable evidence payload (not authenticated here).
+    pub content_digest: Digest,
     /// Authority level; never inferred from a digest or summary.
     pub authority: EvidenceAuthority,
     /// Stable origin grouping used to avoid double-counting copies/derivations.
@@ -221,6 +223,10 @@ pub struct ForecastRecord {
     pub action_kind: ActionKind,
     /// Digest of the competing hypothesis set used for this forecast.
     pub hypothesis_set_digest: Digest,
+    /// Digest of the policy/profile that generated this forecast.
+    pub policy_digest: Digest,
+    /// Digest of the exact proposed action parameters.
+    pub parameters_digest: Digest,
     /// Predicted observation state/distribution.
     pub predicted_observation: ForecastPrediction,
     /// Expected information gain (separate from decision value).
@@ -250,6 +256,8 @@ pub struct ActionRecord {
     pub forecast_id: String,
     /// Typed action semantics.
     pub kind: ActionKind,
+    /// Digest of the exact parameters authorized/executed.
+    pub parameters_digest: Digest,
     /// Authorization state.
     pub authorization: Authorization,
     /// Append order; must follow the forecast.
@@ -805,6 +813,7 @@ impl Ledger {
                 .ok_or(ValidationError::MissingReference)?;
             if forecast.action_id != action.id
                 || forecast.action_kind != action.kind
+                || forecast.parameters_digest != action.parameters_digest
                 || forecast.sequence >= action.sequence
                 || !forecast_action_ids.insert(forecast.id.as_str())
             {
@@ -908,7 +917,17 @@ impl Ledger {
             if decision.kind == DecisionKind::ProceedToRepair
                 && (decision.hypothesis_record_ids.is_empty()
                     || decision.required_evidence_ids.is_empty()
-                    || !decision.missing_requirements.is_empty())
+                    || !decision.missing_requirements.is_empty()
+                    || decision.required_evidence_ids.iter().all(|id| {
+                        evidence_by_id.get(id.as_str()).is_none_or(|evidence| {
+                            matches!(
+                                evidence.authority,
+                                EvidenceAuthority::DreamDerived
+                                    | EvidenceAuthority::Inferred
+                                    | EvidenceAuthority::Unresolved
+                            )
+                        })
+                    }))
             {
                 return Err(ValidationError::InvalidDecisionRecord);
             }
@@ -942,6 +961,9 @@ impl Ledger {
         }
 
         for repair in &self.repairs {
+            if repair.hypothesis_record_ids.is_empty() || repair.outcome_ids.is_empty() {
+                return Err(ValidationError::RepairReferenceMismatch);
+            }
             let decision = decisions_by_id
                 .get(repair.decision_id.as_str())
                 .ok_or(ValidationError::RepairWithoutProceedDecision)?;
@@ -1015,6 +1037,7 @@ mod tests {
             evidence: vec![EvidenceRecord {
                 id: "e-intervention".into(),
                 binding: binding.clone(),
+                content_digest: Digest([7; 32]),
                 authority: EvidenceAuthority::InterventionObserved,
                 origin_id: "origin-1".into(),
                 parent_ids: vec![],
@@ -1041,6 +1064,8 @@ mod tests {
                 action_id: "a1".into(),
                 action_kind: ActionKind::ConfigurationPerturbation,
                 hypothesis_set_digest: Digest([3; 32]),
+                policy_digest: Digest([6; 32]),
+                parameters_digest: Digest([5; 32]),
                 predicted_observation: ForecastPrediction::Uncalibrated,
                 information_gain: MetricValue::Value(0.4),
                 decision_value: MetricValue::Unknown,
@@ -1055,6 +1080,7 @@ mod tests {
                 binding: binding.clone(),
                 forecast_id: "f1".into(),
                 kind: ActionKind::ConfigurationPerturbation,
+                parameters_digest: Digest([5; 32]),
                 authorization: Authorization::Granted { decision_id: "auth-1".into() },
                 sequence: 3,
             }],
@@ -1133,6 +1159,7 @@ mod tests {
         ledger.evidence.push(EvidenceRecord {
             id: "e-compiler".into(),
             binding: ledger.binding.clone(),
+            content_digest: Digest([8; 32]),
             authority: EvidenceAuthority::CompilerResolved,
             origin_id: "compiler-resolution".into(),
             parent_ids: vec![],
@@ -1248,6 +1275,7 @@ mod tests {
         ledger.evidence.push(EvidenceRecord {
             id: "e-parent".into(),
             binding: ledger.binding.clone(),
+            content_digest: Digest([9; 32]),
             authority: EvidenceAuthority::SourceDeclared,
             origin_id: "source-1".into(),
             parent_ids: vec![],
@@ -1355,6 +1383,36 @@ mod tests {
         assert_eq!(
             ledger.validate(),
             Err(ValidationError::OutcomeEvidenceMismatch)
+        );
+    }
+
+    #[test]
+    fn action_parameters_must_match_the_sealed_forecast() {
+        let mut ledger = base_ledger();
+        ledger.actions[0].parameters_digest = Digest([10; 32]);
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::ForecastActionOutcomeOrder)
+        );
+    }
+
+    #[test]
+    fn proceed_decision_cannot_rely_only_on_inferred_or_dream_evidence() {
+        let mut ledger = base_ledger();
+        ledger.evidence[0].authority = EvidenceAuthority::DreamDerived;
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::InvalidDecisionRecord)
+        );
+    }
+
+    #[test]
+    fn repair_requires_at_least_one_prior_outcome() {
+        let mut ledger = base_ledger();
+        ledger.repairs[0].outcome_ids.clear();
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::RepairReferenceMismatch)
         );
     }
 
@@ -1479,6 +1537,7 @@ mod tests {
         ledger.evidence.push(EvidenceRecord {
             id: "e-parent".into(),
             binding: ledger.binding.clone(),
+            content_digest: Digest([9; 32]),
             authority: EvidenceAuthority::SourceDeclared,
             origin_id: "source-1".into(),
             parent_ids: vec![],
