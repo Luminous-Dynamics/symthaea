@@ -149,7 +149,7 @@ pub struct MusicalContextCounterfactualScoreV1 {
     pub family_id: String,
     pub member_count: usize,
     pub supported_prediction_count: usize,
-    pub member_action_accuracy: f64,
+    pub member_valid_action_support_rate: f64,
     /// None for the ambiguity-preservation task, where no cross-member
     /// equality/inequality relation is appropriate.
     pub pair_relation_correct: Option<bool>,
@@ -534,7 +534,7 @@ pub fn score_musical_context_counterfactual_v1(
         .zip(predicted_actions)
         .filter(|(member, prediction)| member.valid_action_set.contains(prediction))
         .count();
-    let member_action_accuracy =
+    let member_valid_action_support_rate =
         supported_prediction_count as f64 / family.members.len() as f64;
 
     let pair_relation_correct = match family.kind {
@@ -553,7 +553,7 @@ pub fn score_musical_context_counterfactual_v1(
         family_id: family.family_id.clone(),
         member_count: family.members.len(),
         supported_prediction_count,
-        member_action_accuracy,
+        member_valid_action_support_rate,
         pair_relation_correct,
         passed,
     })
@@ -568,7 +568,7 @@ pub struct MusicalContextCounterfactualAggregateV1 {
     pub family_count: usize,
     pub member_count: usize,
     pub supported_prediction_count: usize,
-    pub member_action_accuracy: f64,
+    pub member_valid_action_support_rate: f64,
     pub context_change_family_count: usize,
     pub context_change_relation_correct_count: usize,
     pub context_sensitivity_rate: Option<f64>,
@@ -647,7 +647,7 @@ pub fn score_musical_context_counterfactual_set_v1(
         family_count: set.families.len(),
         member_count,
         supported_prediction_count,
-        member_action_accuracy: supported_prediction_count as f64 / member_count as f64,
+        member_valid_action_support_rate: supported_prediction_count as f64 / member_count as f64,
         context_change_family_count,
         context_change_relation_correct_count,
         context_sensitivity_rate: rate(
@@ -682,7 +682,7 @@ mod tests {
 
     #[derive(Deserialize)]
     struct BaselineExpectedV1 {
-        member_action_accuracy: f64,
+        member_valid_action_support_rate: f64,
         context_sensitivity_rate: f64,
         surface_invariance_rate: f64,
         ambiguous_valid_action_rate: f64,
@@ -727,7 +727,7 @@ mod tests {
         )
         .unwrap();
         assert!(!insensitive.passed);
-        assert_eq!(insensitive.member_action_accuracy, 0.5);
+        assert_eq!(insensitive.member_valid_action_support_rate, 0.5);
         assert_eq!(insensitive.pair_relation_correct, Some(false));
     }
 
@@ -813,7 +813,7 @@ mod tests {
         )
         .unwrap();
         assert!(!local_cue_only.passed);
-        assert_eq!(local_cue_only.member_action_accuracy, 0.5);
+        assert_eq!(local_cue_only.member_valid_action_support_rate, 0.5);
         assert_eq!(local_cue_only.pair_relation_correct, Some(false));
     }
 
@@ -915,9 +915,9 @@ mod tests {
             .unwrap_or_else(|error| panic!("{}: {error:?}", baseline.baseline_id));
 
             assert!(
-                (report.member_action_accuracy - baseline.expected.member_action_accuracy)
+                (report.member_valid_action_support_rate - baseline.expected.member_valid_action_support_rate)
                     .abs() < 1e-9,
-                "{} member action accuracy",
+                "{} member valid-action support rate",
                 baseline.baseline_id
             );
             assert!(
@@ -968,7 +968,7 @@ mod tests {
         assert_eq!(report.family_count, 11);
         assert_eq!(report.member_count, 21);
         assert_eq!(report.supported_prediction_count, 21);
-        assert_eq!(report.member_action_accuracy, 1.0);
+        assert_eq!(report.member_valid_action_support_rate, 1.0);
         assert_eq!(report.context_sensitivity_rate, Some(1.0));
         assert_eq!(report.surface_invariance_rate, Some(1.0));
         assert_eq!(report.ambiguous_valid_action_rate, Some(1.0));
