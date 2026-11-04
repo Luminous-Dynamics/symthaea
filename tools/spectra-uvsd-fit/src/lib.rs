@@ -173,9 +173,11 @@ pub struct FitDiagnostics {
     pub iterations: usize,
     pub starts_attempted: usize,
     pub solution_objective_spread: Option<f64>,
-    /// Per-parameter max-minus-min across converged starts, when at least two converge.
+    /// Per-parameter max-minus-min across converged starts, in internal optimizer coordinates
+    /// (mu, log-sigma, first threshold, then log-gaps), when at least two converge.
     pub solution_parameter_spread: Option<Vec<f64>>,
-    /// Coordinate-wise observed curvature at the selected solution, not a full Hessian.
+    /// Coordinate-wise observed second derivative at the selected solution; not a full Hessian,
+    /// covariance matrix, or confidence interval.
     pub diagonal_curvature: Option<Vec<f64>>,
     pub at_parameter_boundary: bool,
     pub note: Option<String>,
