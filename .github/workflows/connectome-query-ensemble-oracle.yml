@@ -11,7 +11,7 @@ on:
       - "docs/neuroscience/CONNECTOME_QUERY_ENSEMBLE_ORACLE_V1.md"
       - ".github/workflows/connectome-query-ensemble-oracle.yml"
   push:
-    branches: [main]
+    branches: [main, "research/**"]
     paths:
       - "tools/connectomics-intake-audit/src/bin/connectome_query_ensemble_audit.rs"
       - "tools/connectomics-intake-audit/reference/**"
