@@ -75,6 +75,7 @@ struct GraphBinding {
 struct CandidatePool {
     candidate_count: usize,
     requested_top_k: usize,
+    candidate_node_ids: Vec<String>,
     node_id_set_sha256: String,
     candidate_policy_sha256: String,
 }
@@ -300,12 +301,19 @@ fn validate_receipt(
         return Err(format!("{label} graph identity/digest differs from the supplied graph manifest"));
     }
 
-    if receipt.candidate_pool.candidate_count != graph_node_ids.len() {
-        return Err(format!(
-            "{label} candidate_count {} differs from graph node count {}",
-            receipt.candidate_pool.candidate_count,
-            graph_node_ids.len()
-        ));
+    let candidate_ids: BTreeSet<String> =
+        receipt.candidate_pool.candidate_node_ids.iter().cloned().collect();
+    if receipt.candidate_pool.candidate_node_ids.len() != candidate_ids.len()
+        || receipt.candidate_pool.candidate_node_ids.iter().any(|id| id.trim().is_empty())
+        || !receipt.candidate_pool.candidate_node_ids.windows(2).all(|w| w[0] < w[1])
+    {
+        return Err(format!("{label} candidate_node_ids must be sorted, unique, non-empty IDs"));
+    }
+    if receipt.candidate_pool.candidate_count != candidate_ids.len() {
+        return Err(format!("{label} candidate_count differs from candidate_node_ids length"));
+    }
+    if candidate_ids.iter().any(|id| !graph_node_ids.contains(id)) {
+        return Err(format!("{label} candidate pool contains a node outside the graph snapshot"));
     }
     if receipt.candidate_pool.requested_top_k == 0
         || receipt.candidate_pool.requested_top_k > receipt.candidate_pool.candidate_count
@@ -314,8 +322,8 @@ fn validate_receipt(
     }
     digest_field(&receipt.candidate_pool.node_id_set_sha256, &format!("{label}.candidate_pool.node_id_set_sha256"))?;
     digest_field(&receipt.candidate_pool.candidate_policy_sha256, &format!("{label}.candidate_pool.candidate_policy_sha256"))?;
-    if receipt.candidate_pool.node_id_set_sha256 != canonical_node_id_set_digest(graph_node_ids)? {
-        return Err(format!("{label} candidate node-set digest differs from supplied graph"));
+    if receipt.candidate_pool.node_id_set_sha256 != canonical_node_id_set_digest(&candidate_ids)? {
+        return Err(format!("{label} candidate node-set digest differs from declared candidate pool"));
     }
 
     let (metric, direction) = (receipt.ranking.score_metric.as_str(), receipt.ranking.score_direction.as_str());
@@ -344,8 +352,8 @@ fn validate_receipt(
         if !seen_nodes.insert(candidate.node_id.clone()) {
             return Err(format!("{label} contains duplicate candidate node {}", candidate.node_id));
         }
-        if !graph_node_ids.contains(&candidate.node_id) {
-            return Err(format!("{label} references node {} outside the graph snapshot", candidate.node_id));
+        if !candidate_ids.contains(&candidate.node_id) {
+            return Err(format!("{label} references node {} outside the declared candidate pool", candidate.node_id));
         }
         digest_field(&candidate.evidence_artifact_sha256, &format!("{label}.candidate[{expected_rank}].evidence_artifact_sha256"))?;
         if let Some(upstream_id) = &candidate.upstream_candidate_id {
@@ -394,9 +402,8 @@ fn validate_all(graph_bytes: &[u8], receipt_bytes: &[u8]) -> Result<Report, Stri
     let graph_sha256 = sha256(graph_bytes);
     let (snapshot_id, repository_commit, environment, node_ids) = load_graph(graph_bytes)?;
     let receipts = load_receipts(receipt_bytes)?;
-    let mut seen_query_ids = BTreeSet::new();
+    let mut seen_query_retriever_pairs = BTreeSet::new();
     let mut summaries = Vec::new();
-    let mut budgets_by_query = BTreeMap::new();
     for (index, receipt) in receipts.iter().enumerate() {
         validate_receipt(
             receipt,
@@ -407,10 +414,22 @@ fn validate_all(graph_bytes: &[u8], receipt_bytes: &[u8]) -> Result<Report, Stri
             &graph_sha256,
             &node_ids,
         )?;
-        if !seen_query_ids.insert(receipt.query.query_id.clone()) {
-            return Err(format!("duplicate query_id {}", receipt.query.query_id));
+        let run_identity = format!(
+            "{}|{}|{}|{}|{}|{}|{}",
+            receipt.benchmark.benchmark_id,
+            receipt.benchmark.benchmark_version,
+            receipt.benchmark.split_id,
+            receipt.retriever.kind,
+            receipt.retriever.name,
+            receipt.retriever.version,
+            receipt.query.query_id
+        );
+        if !seen_query_retriever_pairs.insert(run_identity) {
+            return Err(format!(
+                "duplicate query receipt for retriever {} / query {}",
+                receipt.retriever.name, receipt.query.query_id
+            ));
         }
-        budgets_by_query.insert(receipt.query.query_id.clone(), receipt.budget.clone());
         summaries.push(RunSummary {
             query_id: receipt.query.query_id.clone(),
             retriever_kind: receipt.retriever.kind.clone(),
@@ -477,7 +496,7 @@ fn synthetic_receipt(graph: &Value, graph_bytes: &[u8]) -> Receipt {
     let nodes = graph["nodes"].as_array().unwrap();
     let mut ids: Vec<String> = nodes.iter().map(|x| x["node_id"].as_str().unwrap().to_owned()).collect();
     ids.sort();
-    let id_set: BTreeSet<String> = ids.into_iter().collect();
+    let candidate_ids: BTreeSet<String> = [ids[0].clone(), ids[1].clone()].into_iter().collect();
     let environment = graph["snapshot"]["environment_sha256"].as_str().unwrap().to_owned();
     let repository_commit = graph["snapshot"]["repository_commit"].as_str().unwrap().to_owned();
     let snapshot_id = graph["snapshot"]["snapshot_id"].as_str().unwrap().to_owned();
@@ -519,9 +538,10 @@ fn synthetic_receipt(graph: &Value, graph_bytes: &[u8]) -> Receipt {
             graph_manifest_sha256: sha256(graph_bytes),
         },
         candidate_pool: CandidatePool {
-            candidate_count: id_set.len(),
+            candidate_count: candidate_ids.len(),
             requested_top_k: 2,
-            node_id_set_sha256: canonical_node_id_set_digest(&id_set).unwrap(),
+            candidate_node_ids: candidate_ids.iter().cloned().collect(),
+            node_id_set_sha256: canonical_node_id_set_digest(&candidate_ids).unwrap(),
             candidate_policy_sha256: sha256(b"all-formal-declarations"),
         },
         ranking: Ranking {
@@ -631,7 +651,7 @@ fn execute() -> Result<(), String> {
         println!("PITB_RETRIEVAL_EVIDENCE_SELF_TEST_PASS");
         return Ok(());
     }
-    if args.len() != 4 || args[1] != "--verify" {
+    if args.len() != 5 || args[1] != "--verify" {
         return Err(format!(
             "usage: {} --verify <graph.json> <retrieval-runs.jsonl> <report.json> OR --self-test",
             args.first().map(String::as_str).unwrap_or("pitb-retrieval-evidence")
@@ -641,7 +661,7 @@ fn execute() -> Result<(), String> {
     let receipt_bytes = fs::read(&args[3]).map_err(|e| format!("read retrieval receipts: {e}"))?;
     let report = validate_all(&graph_bytes, &receipt_bytes)?;
     let output = serde_json::to_vec_pretty(&report).map_err(|e| format!("serialize retrieval report: {e}"))?;
-    fs::write(&args[3], output).map_err(|e| format!("write retrieval report: {e}"))?;
+    fs::write(&args[4], output).map_err(|e| format!("write retrieval report: {e}"))?;
     println!("PITB_RETRIEVAL_EVIDENCE_OK");
     Ok(())
 }
