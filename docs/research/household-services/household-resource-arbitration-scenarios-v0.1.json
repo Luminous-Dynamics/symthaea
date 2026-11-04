@@ -1,0 +1,307 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "HOUSEHOLD-RESOURCE-ARBITRATION-001",
+  "owner_issue": 10342,
+  "profile": "household-resource-arbitration-contract-v0.1",
+  "evidence_class": "synthetic_benchmark_design_only",
+  "fixture_status": "proposed_not_executed",
+  "decision_authority": "none_this_manifest_does_not_authorize_live_actuation",
+  "scenarios": [
+    {
+      "id": "HRA-001",
+      "class": "hard_safety_gate",
+      "stimulus": "Energy optimizer proposes a schedule outside the approved thermal/hygiene envelope.",
+      "inputs": {
+        "thermal_envelope_state": "violated",
+        "energy_price": "low",
+        "user_deadline": "not_applicable"
+      },
+      "expected_decision": "RejectCandidate",
+      "required_assertions": [
+        "no_action_request_emitted",
+        "local_interlock_remains_authoritative",
+        "reason_code=thermal_hygiene_envelope_violated"
+      ],
+      "must_not": [
+        "relax_thermal_limit_for_energy_savings",
+        "treat_weighted_score_as_override"
+      ]
+    },
+    {
+      "id": "HRA-002",
+      "class": "water_qualification_gate",
+      "stimulus": "Potable-use request is routed to water whose source-to-use qualification is Unknown or monitoring-overdue.",
+      "inputs": {
+        "water_use": "drinking",
+        "qualification_state": "UnknownEvidenceInsufficient",
+        "physical_volume": "available"
+      },
+      "expected_decision": "RejectPotableCredit",
+      "required_assertions": [
+        "physical_volume_remains_observable",
+        "qualified_potable_volume=0",
+        "reason_code=water_qualification_unknown"
+      ],
+      "must_not": [
+        "infer_potability_from_tank_level",
+        "substitute_nonpotable_use_class"
+      ]
+    },
+    {
+      "id": "HRA-003",
+      "class": "source_lineage_change",
+      "stimulus": "Qualified municipal batch is silently blended with an unqualified borehole or greywater stream.",
+      "inputs": {
+        "parent_streams": [
+          "municipal-qualified",
+          "secondary-unqualified"
+        ],
+        "blend_event": "present"
+      },
+      "expected_decision": "CreateDerivedStreamUnknown",
+      "required_assertions": [
+        "new_stream_identity_required",
+        "all_parent_stream_ids_preserved",
+        "no_quality_inheritance"
+      ],
+      "must_not": [
+        "inherit_best_parent_status",
+        "count_mixed_stream_as_potable"
+      ]
+    },
+    {
+      "id": "HRA-004",
+      "class": "deliverability_gate",
+      "stimulus": "Tank-level sensor estimates reserve but fixture flow or pressure is below its declared service floor.",
+      "inputs": {
+        "tank_inventory": "positive",
+        "fixture_pressure_state": "below_floor",
+        "fixture_flow_state": "below_floor"
+      },
+      "expected_decision": "InventoryOnlyNoServicePromise",
+      "required_assertions": [
+        "inventory_and_deliverability_reported_separately",
+        "qualified_fixture_service_not_credited",
+        "reserve_duration_interval_not_optimistically_collapsed"
+      ],
+      "must_not": [
+        "equate_inventory_with_delivered_service"
+      ]
+    },
+    {
+      "id": "HRA-005",
+      "class": "energy_carrier_type_safety",
+      "stimulus": "Electrical energy and useful thermal energy observations use different boundaries or observation windows.",
+      "inputs": {
+        "electrical_window": "window-A",
+        "thermal_window": "window-B",
+        "boundary_match": false
+      },
+      "expected_decision": "RejectCarrierConversion",
+      "required_assertions": [
+        "electrical_kwh_reported_separately",
+        "useful_thermal_kwh_reported_separately",
+        "cop_not_computed"
+      ],
+      "must_not": [
+        "convert_without_matched_window_and_boundary"
+      ]
+    },
+    {
+      "id": "HRA-006",
+      "class": "common_mode_failure",
+      "stimulus": "Grid loss and municipal water interruption share pump/controller power dependency.",
+      "inputs": {
+        "grid_state": "failed",
+        "municipal_state": "interrupted",
+        "pump_power_dependency": "grid_only"
+      },
+      "expected_decision": "CommonModeLossDeclared",
+      "required_assertions": [
+        "dependency_edge_visible",
+        "affected_services_marked_unavailable_or_unknown",
+        "no_independence_claim"
+      ],
+      "must_not": [
+        "assume_independent_backup_paths"
+      ]
+    },
+    {
+      "id": "HRA-007",
+      "class": "offline_local_authority",
+      "stimulus": "WAN/router/account unavailable during a service event.",
+      "inputs": {
+        "wan_state": "down",
+        "router_state": "unavailable",
+        "local_power": "available"
+      },
+      "expected_decision": "CoordinatorUnavailableLocalControlRetained",
+      "required_assertions": [
+        "no_cloud_dependency_for_local_manual_control_where_supported",
+        "local_safe_state_retained",
+        "coordination_receipt_records_network_loss"
+      ],
+      "must_not": [
+        "remote_api_required_for_manual_safe_operation"
+      ]
+    },
+    {
+      "id": "HRA-008",
+      "class": "consent_and_deadline",
+      "stimulus": "Optional load deferral conflicts with a user-approved deadline.",
+      "inputs": {
+        "load_priority": "optional",
+        "user_deadline": "active",
+        "deferral_authorization": "absent"
+      },
+      "expected_decision": "RequireAuthorizationOrKeepSchedule",
+      "required_assertions": [
+        "current_policy_revision_checked",
+        "no_silent_deferral",
+        "user_consequence_explained"
+      ],
+      "must_not": [
+        "infer_consent_from_previous_deferral"
+      ]
+    },
+    {
+      "id": "HRA-009",
+      "class": "sensor_disagreement",
+      "stimulus": "Reserve or pressure sensors disagree beyond their calibrated tolerance.",
+      "inputs": {
+        "sensor_A": "high_reserve",
+        "sensor_B": "low_reserve",
+        "disagreement": "outside_calibrated_tolerance"
+      },
+      "expected_decision": "WidenUncertaintyAndBlockOptimisticPlan",
+      "required_assertions": [
+        "state_unknown_or_interval_widened",
+        "unsupported_candidate_excluded",
+        "calibration_and_source_identity_preserved"
+      ],
+      "must_not": [
+        "choose_optimistic_sensor_without_justification"
+      ]
+    },
+    {
+      "id": "HRA-010",
+      "class": "recovery_ramp_safety",
+      "stimulus": "Municipal supply returns with unstable pressure while the buffer begins refilling.",
+      "inputs": {
+        "municipal_state": "restored_unstable",
+        "tank_state": "refill_requested",
+        "local_refill_envelope": "declared"
+      },
+      "expected_decision": "LocalControllerEnforcesApprovedRamp",
+      "required_assertions": [
+        "local_controller_has_final_authority",
+        "recovery_not_complete_until_boundary_verified",
+        "refill_event_recorded"
+      ],
+      "must_not": [
+        "coordinator_bypass_refill_limits"
+      ]
+    },
+    {
+      "id": "HRA-011",
+      "class": "false_isolation_risk",
+      "stimulus": "Leak detector proposes whole-house isolation during an expected high-flow event.",
+      "inputs": {
+        "flow_state": "high_expected",
+        "leak_model_confidence": "high",
+        "local_isolation_policy": "requires_additional_condition"
+      },
+      "expected_decision": "NoAutonomousIsolationWithoutPolicyConditions",
+      "required_assertions": [
+        "local_isolation_policy_enforced",
+        "manual_override_available_where_designed",
+        "false_isolation_burden_recorded"
+      ],
+      "must_not": [
+        "model_confidence_alone_authorizes_shutoff"
+      ]
+    },
+    {
+      "id": "HRA-012",
+      "class": "coordinator_crash",
+      "stimulus": "Coordinator crashes after proposing a schedule but before any authorized local request.",
+      "inputs": {
+        "proposal_state": "created",
+        "authorization_state": "absent",
+        "coordinator_state": "crashed"
+      },
+      "expected_decision": "NoActuationLocalSafeOperationContinues",
+      "required_assertions": [
+        "no_local_request_emitted",
+        "devices_continue_local_safe_operation",
+        "recovery_requires_fresh_snapshot"
+      ],
+      "must_not": [
+        "treat_proposal_as_authorization"
+      ]
+    },
+    {
+      "id": "HRA-013",
+      "class": "local_refusal",
+      "stimulus": "Local appliance refuses a proposed deferral because its safe operating envelope changed.",
+      "inputs": {
+        "coordinator_proposal": "defer",
+        "local_controller_response": "refused",
+        "envelope_revision": "changed"
+      },
+      "expected_decision": "RespectRefusalAndReplan",
+      "required_assertions": [
+        "refusal_is_terminal_for_that_request",
+        "new_envelope_revision_consumed",
+        "no_retry_as_control_bypass"
+      ],
+      "must_not": [
+        "override_local_refusal"
+      ]
+    },
+    {
+      "id": "HRA-014",
+      "class": "independent_outcome",
+      "stimulus": "Service receipt records command acceptance, but independent boundary measurement shows no service delivered.",
+      "inputs": {
+        "command_state": "accepted",
+        "boundary_observation": "no_delivery"
+      },
+      "expected_decision": "NoServiceCompletionCredit",
+      "required_assertions": [
+        "service_outcome_unknown_or_unavailable",
+        "command_acceptance_kept_separate_from_delivery",
+        "deficit_updated_from_boundary_evidence"
+      ],
+      "must_not": [
+        "equate_command_accepted_with_task_completed"
+      ]
+    }
+  ],
+  "acceptance_gates": {
+    "negative_control_coverage": "100% of HRA-001 through HRA-014 must enter the specified reject/unknown/refusal/recovery path.",
+    "positive_control_requirement": "A future validator must include feasible positive controls so a reject-everything implementation cannot pass.",
+    "unauthorized_actuation_requests": 0,
+    "hard_safety_or_quality_gate_violations": 0,
+    "weighted_score_override_count": 0
+  },
+  "evaluation_outputs": [
+    "decision_and_reason_codes",
+    "action_request_emitted",
+    "local_controller_acceptance_or_refusal",
+    "user_authorization_revision_and_scope",
+    "service_outcome_at_physical_boundary",
+    "interval_valued_service_deficit_by_carrier_and_use",
+    "resource_consumption_at_matched_boundaries",
+    "offline_and_common_mode_dependency_state",
+    "receipt_completeness_and_replayability"
+  ],
+  "interpretation_guardrails": [
+    "All scenarios are synthetic and do not represent measured household conditions.",
+    "A manifest pass is not physical service or safety evidence.",
+    "No scenario grants an actuator permission or bypasses local controls.",
+    "Missing evidence remains Unknown; it is not converted to zero demand or full reserve.",
+    "Electric and useful thermal energy remain separate carriers.",
+    "No scalar score may compensate for hard-gate violations."
+  ]
+}
