@@ -110,6 +110,8 @@ pub enum MusicalContextValidationIssueV1 {
     ContextCounterfactualChangedLocalCue { family_index: usize },
     ContextCounterfactualDidNotChangeIntent { family_index: usize },
     ContextCounterfactualDidNotChangeHarmonicContext { family_index: usize },
+    ContextCounterfactualDidNotChangePhraseFunction { family_index: usize },
+    ContextCounterfactualDidNotChangeRole { family_index: usize },
     ContextCounterfactualChangedHarmonicContextUnexpectedly { family_index: usize },
     ContextCounterfactualIntentChangedUnexpectedly { family_index: usize },
     UnsupportedChangedFactor { family_index: usize },
@@ -276,6 +278,27 @@ pub fn validate_musical_context_family_v1(
                             },
                         );
                     }
+                    if left.phrase_function != right.phrase_function {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualChangedPhraseFunction {
+                                family_index,
+                            },
+                        );
+                    }
+                    if left.performer_role != right.performer_role {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualChangedRole {
+                                family_index,
+                            },
+                        );
+                    }
+                    if left.surface_instrument != right.surface_instrument {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualChangedInstrument {
+                                family_index,
+                            },
+                        );
+                    }
                 }
                 "preceding_harmonic_context" => {
                     if left.preceding_harmonic_context_signature
@@ -294,29 +317,109 @@ pub fn validate_musical_context_family_v1(
                             },
                         );
                     }
+                    if left.phrase_function != right.phrase_function {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualChangedPhraseFunction {
+                                family_index,
+                            },
+                        );
+                    }
+                    if left.performer_role != right.performer_role {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualChangedRole {
+                                family_index,
+                            },
+                        );
+                    }
+                    if left.surface_instrument != right.surface_instrument {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualChangedInstrument {
+                                family_index,
+                            },
+                        );
+                    }
+                }
+                "phrase_function" => {
+                    if left.phrase_function == right.phrase_function {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualDidNotChangePhraseFunction {
+                                family_index,
+                            },
+                        );
+                    }
+                    if left.collaborator_intent != right.collaborator_intent {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualIntentChangedUnexpectedly {
+                                family_index,
+                            },
+                        );
+                    }
+                    if left.preceding_harmonic_context_signature
+                        != right.preceding_harmonic_context_signature
+                    {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualChangedHarmonicContextUnexpectedly {
+                                family_index,
+                            },
+                        );
+                    }
+                    if left.performer_role != right.performer_role {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualChangedRole {
+                                family_index,
+                            },
+                        );
+                    }
+                    if left.surface_instrument != right.surface_instrument {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualChangedInstrument {
+                                family_index,
+                            },
+                        );
+                    }
+                }
+                "performer_role" => {
+                    if left.performer_role == right.performer_role {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualDidNotChangeRole {
+                                family_index,
+                            },
+                        );
+                    }
+                    if left.collaborator_intent != right.collaborator_intent {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualIntentChangedUnexpectedly {
+                                family_index,
+                            },
+                        );
+                    }
+                    if left.preceding_harmonic_context_signature
+                        != right.preceding_harmonic_context_signature
+                    {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualChangedHarmonicContextUnexpectedly {
+                                family_index,
+                            },
+                        );
+                    }
+                    if left.phrase_function != right.phrase_function {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualChangedPhraseFunction {
+                                family_index,
+                            },
+                        );
+                    }
+                    if left.surface_instrument != right.surface_instrument {
+                        issues.push(
+                            MusicalContextValidationIssueV1::ContextCounterfactualChangedInstrument {
+                                family_index,
+                            },
+                        );
+                    }
                 }
                 _ => issues.push(MusicalContextValidationIssueV1::UnsupportedChangedFactor {
                     family_index,
                 }),
-            }
-            if left.phrase_function != right.phrase_function {
-                issues.push(
-                    MusicalContextValidationIssueV1::ContextCounterfactualChangedPhraseFunction {
-                        family_index,
-                    },
-                );
-            }
-            if left.performer_role != right.performer_role {
-                issues.push(MusicalContextValidationIssueV1::ContextCounterfactualChangedRole {
-                    family_index,
-                });
-            }
-            if left.surface_instrument != right.surface_instrument {
-                issues.push(
-                    MusicalContextValidationIssueV1::ContextCounterfactualChangedInstrument {
-                        family_index,
-                    },
-                );
             }
             if left
                 .valid_action_set
@@ -602,7 +705,7 @@ mod tests {
     fn checked_in_counterfactual_corpus_is_structurally_valid() {
         let set = fixture_set();
         assert!(validate_musical_context_counterfactual_set_v1(&set).is_empty());
-        assert_eq!(set.families.len(), 5);
+        assert_eq!(set.families.len(), 11);
     }
 
     #[test]
@@ -648,6 +751,48 @@ mod tests {
         assert_eq!(spurious_change.pair_relation_correct, Some(false));
     }
 
+
+    #[test]
+    fn phrase_function_can_change_action_with_same_local_cue_and_context() {
+        let set = fixture_set();
+        let family = &set.families[8];
+
+        let context_sensitive = score_musical_context_counterfactual_v1(
+            family,
+            &[MusicalActionV1::Continue, MusicalActionV1::Respond],
+        )
+        .unwrap();
+        assert!(context_sensitive.passed);
+
+        let phrase_function_blind = score_musical_context_counterfactual_v1(
+            family,
+            &[MusicalActionV1::Continue, MusicalActionV1::Continue],
+        )
+        .unwrap();
+        assert!(!phrase_function_blind.passed);
+        assert_eq!(phrase_function_blind.pair_relation_correct, Some(false));
+    }
+
+    #[test]
+    fn performer_role_can_change_action_when_other_context_is_fixed() {
+        let set = fixture_set();
+        let family = &set.families[9];
+
+        let role_sensitive = score_musical_context_counterfactual_v1(
+            family,
+            &[MusicalActionV1::Respond, MusicalActionV1::Wait],
+        )
+        .unwrap();
+        assert!(role_sensitive.passed);
+        assert_eq!(role_sensitive.pair_relation_correct, Some(true));
+
+        let role_blind = score_musical_context_counterfactual_v1(
+            family,
+            &[MusicalActionV1::Respond, MusicalActionV1::Respond],
+        )
+        .unwrap();
+        assert!(!role_blind.passed);
+    }
 
     #[test]
     fn preceding_harmonic_context_can_change_action_with_same_local_cue_and_intent() {
@@ -810,18 +955,24 @@ mod tests {
                 vec![MusicalActionV1::Respond, MusicalActionV1::Respond],
                 vec![MusicalActionV1::Wait, MusicalActionV1::Wait],
                 vec![MusicalActionV1::Wait],
+                vec![MusicalActionV1::Respond, MusicalActionV1::Continue],
+                vec![MusicalActionV1::Respond, MusicalActionV1::Continue],
+                vec![MusicalActionV1::Wait, MusicalActionV1::Respond],
+                vec![MusicalActionV1::Continue, MusicalActionV1::Respond],
+                vec![MusicalActionV1::Respond, MusicalActionV1::Wait],
+                vec![MusicalActionV1::Wait, MusicalActionV1::Wait],
             ],
         )
         .unwrap();
 
-        assert_eq!(report.family_count, 5);
-        assert_eq!(report.member_count, 9);
-        assert_eq!(report.supported_prediction_count, 5);
+        assert_eq!(report.family_count, 11);
+        assert_eq!(report.member_count, 21);
+        assert_eq!(report.supported_prediction_count, 21);
         assert_eq!(report.member_action_accuracy, 1.0);
         assert_eq!(report.context_sensitivity_rate, Some(1.0));
         assert_eq!(report.surface_invariance_rate, Some(1.0));
         assert_eq!(report.ambiguous_valid_action_rate, Some(1.0));
-        assert_eq!(report.per_family.len(), 5);
+        assert_eq!(report.per_family.len(), 11);
     }
 
     #[test]
@@ -833,7 +984,7 @@ mod tests {
                 &[vec![MusicalActionV1::Wait]]
             ),
             Err(MusicalContextScoreErrorV1::FamilyPredictionCountMismatch {
-                expected: 5,
+                expected: 11,
                 actual: 1
             })
         ));
