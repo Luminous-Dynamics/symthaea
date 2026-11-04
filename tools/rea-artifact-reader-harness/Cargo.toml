@@ -10,3 +10,7 @@ license = "AGPL-3.0-or-later"
 
 [lib]
 path = "../../crates/domains/symthaea-rea-artifact-reader/src/lib.rs"
+
+[dependencies]
+sha2 = "=0.10.9"
+zipcore = { version = "=0.10.2", default-features = false }
