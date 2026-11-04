@@ -306,7 +306,7 @@ fn nonempty(path: &'static str, value: &str) -> Result<(), EvaluationError> {
 }
 
 fn is_leap_year(year: u16) -> bool {
-    year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+    year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400))
 }
 
 fn parse_utc_instant(value: &str, path: &'static str) -> Result<UtcInstant, EvaluationError> {
@@ -456,10 +456,10 @@ fn validate_parameter_result(result: &WaterParameterResult) -> Result<(), Evalua
             result.uncertainty,
         ),
     ] {
-        if let Some(value) = value {
-            if !value.is_finite() || value < 0.0 {
-                return Err(invalid(path, "must be finite and non-negative"));
-            }
+        if let Some(value) = value
+            && (!value.is_finite() || value < 0.0)
+        {
+            return Err(invalid(path, "must be finite and non-negative"));
         }
     }
     Ok(())
@@ -548,13 +548,13 @@ pub fn validate_water_use_qualification(
     }
 
     let stream_start = parse_utc_instant(&input.stream.observed_from, "stream.observed_from")?;
-    if let Some(until) = &input.stream.observed_until {
-        if parse_utc_instant(until, "stream.observed_until")? <= stream_start {
-            return Err(invalid(
-                "stream.observed_until",
-                "must be later than observed_from",
-            ));
-        }
+    if let Some(until) = &input.stream.observed_until
+        && parse_utc_instant(until, "stream.observed_until")? <= stream_start
+    {
+        return Err(invalid(
+            "stream.observed_until",
+            "must be later than observed_from",
+        ));
     }
     let unique_parents: BTreeSet<_> = input.stream.blend_parent_ids.iter().collect();
     if unique_parents.len() != input.stream.blend_parent_ids.len() {
@@ -627,13 +627,13 @@ pub fn validate_water_use_qualification(
         )?;
         nonempty("sample_observations.method_id", &sample.method_id)?;
         let time = parse_utc_instant(&sample.collected_at, "sample_observations.collected_at")?;
-        if let Some(digest) = &sample.chain_of_custody_digest_sha256 {
-            if !valid_sha256(digest) {
-                return Err(invalid(
-                    "sample_observations.chain_of_custody_digest_sha256",
-                    "must be 64 hexadecimal characters",
-                ));
-            }
+        if let Some(digest) = &sample.chain_of_custody_digest_sha256
+            && !valid_sha256(digest)
+        {
+            return Err(invalid(
+                "sample_observations.chain_of_custody_digest_sha256",
+                "must be 64 hexadecimal characters",
+            ));
         }
         if sample_by_id
             .insert(sample.sample_id.as_str(), sample)
@@ -698,13 +698,13 @@ pub fn validate_water_use_qualification(
             return Err(invalid("event_history.event_id", "duplicate event ID"));
         }
         let time = parse_utc_instant(&event.occurred_at, "event_history.occurred_at")?;
-        if let Some(digest) = &event.details_digest_sha256 {
-            if !valid_sha256(digest) {
-                return Err(invalid(
-                    "event_history.details_digest_sha256",
-                    "must be 64 hexadecimal characters",
-                ));
-            }
+        if let Some(digest) = &event.details_digest_sha256
+            && !valid_sha256(digest)
+        {
+            return Err(invalid(
+                "event_history.details_digest_sha256",
+                "must be 64 hexadecimal characters",
+            ));
         }
         let affects_stream = event.affected_stream_ids.is_empty()
             || event
@@ -766,24 +766,24 @@ pub fn validate_water_use_qualification(
                 "must not occur after decision time",
             ));
         }
-        if let Some(latest_sample) = latest_supporting_sample {
-            if valid_from < latest_sample {
-                return Err(invalid(
-                    "decision.valid_from",
-                    "qualification validity cannot begin before its latest supporting sample",
-                ));
-            }
+        if let Some(latest_sample) = latest_supporting_sample
+            && valid_from < latest_sample
+        {
+            return Err(invalid(
+                "decision.valid_from",
+                "qualification validity cannot begin before its latest supporting sample",
+            ));
         }
     }
     if let Some(valid_until) = &input.decision.valid_until {
         let expiry = parse_utc_instant(valid_until, "decision.valid_until")?;
-        if let Some(valid_from) = &input.decision.valid_from {
-            if expiry <= parse_utc_instant(valid_from, "decision.valid_from")? {
-                return Err(invalid(
-                    "decision.valid_until",
-                    "must be later than valid_from",
-                ));
-            }
+        if let Some(valid_from) = &input.decision.valid_from
+            && expiry <= parse_utc_instant(valid_from, "decision.valid_from")?
+        {
+            return Err(invalid(
+                "decision.valid_until",
+                "must be later than valid_from",
+            ));
         }
         if decision_time >= expiry {
             return Err(invalid(
@@ -792,16 +792,15 @@ pub fn validate_water_use_qualification(
             ));
         }
     }
-    if let Some(next_review) = &input.quality_profile.next_required_review_at {
-        if parse_utc_instant(next_review, "quality_profile.next_required_review_at")?
+    if let Some(next_review) = &input.quality_profile.next_required_review_at
+        && parse_utc_instant(next_review, "quality_profile.next_required_review_at")?
             <= decision_time
-            && input.quality_profile.monitoring_status == MonitoringStatus::Current
-        {
-            return Err(invalid(
-                "quality_profile.monitoring_status",
-                "cannot be current at or after next required review time",
-            ));
-        }
+        && input.quality_profile.monitoring_status == MonitoringStatus::Current
+    {
+        return Err(invalid(
+            "quality_profile.monitoring_status",
+            "cannot be current at or after next required review time",
+        ));
     }
 
     if input.decision.status != WaterQualificationStatus::QualifiedForDeclaredUse
@@ -972,25 +971,28 @@ pub fn validate_water_use_qualification(
                 }
             }
         }
-        if let Some(latest_sample) = latest_supporting_sample {
-            if parsed_events.iter().any(|(kind, when, affects)| {
-                *affects && event_invalidates_claim(*kind) && *when > latest_sample
-            }) {
-                return Err(invalid(
-                    "event_history",
-                    "an invalidating event occurred after the latest supporting sample",
-                ));
-            }
+        if let Some(latest_sample) = latest_supporting_sample
+            && parsed_events.iter().any(|(kind, when, affects)| {
+                *affects
+                    && event_invalidates_claim(*kind)
+                    && *when > latest_sample
+                    && *when <= decision_time
+            })
+        {
+            return Err(invalid(
+                "event_history",
+                "an invalidating event occurred after the latest supporting sample and before the decision",
+            ));
         }
     }
 
-    if let Some(commit) = &input.evidence_lineage.source_repository_commit {
-        if commit.len() != 40 || !commit.bytes().all(|b| b.is_ascii_hexdigit()) {
-            return Err(invalid(
-                "evidence_lineage.source_repository_commit",
-                "must be a full 40-character Git object ID",
-            ));
-        }
+    if let Some(commit) = &input.evidence_lineage.source_repository_commit
+        && (commit.len() != 40 || !commit.bytes().all(|b| b.is_ascii_hexdigit()))
+    {
+        return Err(invalid(
+            "evidence_lineage.source_repository_commit",
+            "must be a full 40-character Git object ID",
+        ));
     }
 
     Ok(WaterUseQualificationValidation {
@@ -1127,6 +1129,19 @@ mod tests {
         let mut record = valid_record();
         record.quality_profile.monitoring_status = MonitoringStatus::Overdue;
         assert!(validate_water_use_qualification(&record).is_err());
+    }
+
+    #[test]
+    fn event_after_decision_does_not_rewrite_historical_qualification() {
+        let mut record = valid_record();
+        record.event_history.push(WaterQualificationEvent {
+            event_id: "future-switch".into(),
+            event_type: WaterEventType::SourceSwitch,
+            occurred_at: "2026-11-04T11:00:00Z".into(),
+            affected_stream_ids: vec!["stream-01".into()],
+            details_digest_sha256: None,
+        });
+        assert!(validate_water_use_qualification(&record).is_ok());
     }
 
     #[test]
