@@ -1100,7 +1100,7 @@ fn safe_agent_view_relative_path(path: &str) -> bool {
             .split('.')
             .next()
             .unwrap_or("")
-            .trim_end_matches([' ', '.'])
+            .trim_end_matches(|character| matches!(character, ' ' | '.'))
             .to_ascii_uppercase();
         !matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
             && !(stem.len() == 4
