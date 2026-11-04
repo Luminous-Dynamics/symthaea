@@ -614,6 +614,7 @@ mod tests {
         schema_version: String,
         fixture_id: String,
         expected_disposition: String,
+        stream_descriptor: OutputClockStreamDescriptorV1,
         anchors: Vec<OutputClockAnchorV1>,
     }
 
@@ -633,6 +634,30 @@ mod tests {
                 fixture.schema_version,
                 "mel-output-clock-anchor-set-v1",
                 "{}",
+                fixture.fixture_id
+            );
+            assert_eq!(
+                fixture.stream_descriptor.stream_instance_id,
+                fixture.anchors[0].stream_instance_id,
+                "{} stream descriptor identity",
+                fixture.fixture_id
+            );
+            assert_eq!(
+                fixture.stream_descriptor.sample_rate_hz,
+                fixture.anchors[0].sample_rate_hz,
+                "{} stream descriptor sample rate",
+                fixture.fixture_id
+            );
+            assert_eq!(
+                fixture.stream_descriptor.channel_count,
+                fixture.anchors[0].channel_count,
+                "{} stream descriptor channel count",
+                fixture.fixture_id
+            );
+            assert_eq!(
+                fixture.stream_descriptor.sample_format,
+                OutputClockSampleFormatV1::F32,
+                "{} stream sample format",
                 fixture.fixture_id
             );
 
