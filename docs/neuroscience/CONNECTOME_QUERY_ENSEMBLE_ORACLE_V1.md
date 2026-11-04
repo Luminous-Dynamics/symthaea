@@ -51,7 +51,7 @@ The production known-answer fixture is also checked independently. Its reconstru
 ## Run locally
 
     cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
-      --bin connectome-query-ensemble-audit -- \
+      --bin connectome_query_ensemble_audit -- \
       --input docs/neuroscience/examples/CONNECTOME_QUERY_ENSEMBLE_AUDIT.example.json \
       --output query-ensemble-report.json
 
@@ -63,7 +63,7 @@ The production known-answer fixture is also checked independently. Its reconstru
       /tmp/connectome-query-ensemble-exhaustive.json
 
     cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
-      --bin connectome-query-ensemble-audit -- \
+      --bin connectome_query_ensemble_audit -- \
       --input /tmp/connectome-query-ensemble-exhaustive.json \
       --output /tmp/connectome-query-ensemble-exhaustive-report.json
 
