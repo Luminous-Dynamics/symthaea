@@ -46,32 +46,16 @@
       "pattern": "^[a-f0-9]{64}$"
     },
     "source_correspondence_status": {
-      "enum": [
-        "pass",
-        "fail",
-        "unresolved"
-      ]
+      "const": "pass"
     },
     "hypothesis_audit_status": {
-      "enum": [
-        "pass",
-        "fail",
-        "unresolved"
-      ]
+      "const": "pass"
     },
     "vacuity_audit_status": {
-      "enum": [
-        "pass",
-        "fail",
-        "unresolved"
-      ]
+      "const": "pass"
     },
     "reviewer_decision": {
-      "enum": [
-        "pass",
-        "fail",
-        "abstain"
-      ]
+      "const": "pass"
     },
     "reviewer_id": {
       "type": "string",
@@ -86,10 +70,10 @@
       "pattern": "^[a-f0-9]{64}$"
     },
     "semantic_gate_passed": {
-      "type": "boolean"
+      "const": true
     },
     "vacuity_gate_passed": {
-      "type": "boolean"
+      "const": true
     }
   }
 }
