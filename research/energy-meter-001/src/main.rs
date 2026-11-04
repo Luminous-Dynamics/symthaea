@@ -14,8 +14,8 @@ use std::path::Path;
 use std::thread;
 use std::time::Duration;
 use symthaea_energy_meter_verification::physics::energy_meter::{
-    EnergyCounterReading, EnergyDelta, EnergyMeter, EnergyMeterAvailability,
-    EnergyMeterDescriptor, EnergyMeterError, EnergyScope,
+    EnergyCounterReading, EnergyDelta, EnergyMeter, EnergyMeterAvailability, EnergyMeterDescriptor,
+    EnergyMeterError, EnergyScope,
 };
 
 #[derive(Serialize)]
@@ -167,12 +167,9 @@ fn discover_powercap(
 }
 
 #[cfg(feature = "nvml")]
-fn discover_nvml(
-    meters: &mut Vec<Box<dyn EnergyMeter>>,
-    errors: &mut Vec<ProbeResult>,
-) {
-    use std::sync::Arc;
+fn discover_nvml(meters: &mut Vec<Box<dyn EnergyMeter>>, errors: &mut Vec<ProbeResult>) {
     use nvml_wrapper::Nvml;
+    use std::sync::Arc;
     use symthaea_energy_meter_verification::physics::energy_meter::nvml_backend::NvmlEnergyMeter;
 
     let nvml = match Nvml::init() {
@@ -204,8 +201,7 @@ fn discover_nvml(
 }
 
 #[cfg(not(feature = "nvml"))]
-fn discover_nvml(_meters: &mut Vec<Box<dyn EnergyMeter>>, _errors: &mut Vec<ProbeResult>) {
-}
+fn discover_nvml(_meters: &mut Vec<Box<dyn EnergyMeter>>, _errors: &mut Vec<ProbeResult>) {}
 
 fn probe_meters(
     meters: Vec<Box<dyn EnergyMeter>>,
@@ -315,7 +311,12 @@ fn main() {
     let mut errors = Vec::new();
 
     #[cfg(target_os = "linux")]
-    discover_powercap(Path::new("/sys/class/powercap"), 0, &mut meters, &mut errors);
+    discover_powercap(
+        Path::new("/sys/class/powercap"),
+        0,
+        &mut meters,
+        &mut errors,
+    );
 
     #[cfg(not(target_os = "linux"))]
     errors.push(failed_result(
@@ -384,11 +385,7 @@ mod tests {
             "permission denied",
             "discovery_directory_error",
         );
-        let unsupported = failed_result(
-            "nvml-device-1",
-            "counter not supported",
-            "unsupported",
-        );
+        let unsupported = failed_result("nvml-device-1", "counter not supported", "unsupported");
 
         assert!(!discovery_is_complete(&[unavailable, unsupported]));
         assert!(discovery_is_complete(&[unsupported]));
