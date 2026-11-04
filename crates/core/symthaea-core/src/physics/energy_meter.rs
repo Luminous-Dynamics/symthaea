@@ -272,6 +272,273 @@ impl EnergyDelta {
     }
 }
 
+/// Linux powercap/RAPL adapter backed by the kernel's energy counter files.
+///
+/// The caller supplies paths and the physical sensor scope explicitly. This
+/// avoids assuming a particular Intel/AMD hierarchy or treating a package
+/// counter as whole-system energy. The adapter has no external crate dependency.
+#[cfg(target_os = "linux")]
+pub mod linux_powercap {
+    use super::*;
+    use std::fs;
+    use std::io::ErrorKind;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::Instant;
+
+    static NEXT_METER_EPOCH: AtomicU64 = AtomicU64::new(1);
+
+    /// Linux powercap energy counter reader.
+    pub struct LinuxPowercapMeter {
+        descriptor: EnergyMeterDescriptor,
+        energy_path: PathBuf,
+        max_range_path: Option<PathBuf>,
+        counter_epoch: u64,
+        started_at: Instant,
+    }
+
+    impl LinuxPowercapMeter {
+        /// Open a powercap zone using its energy_uj path and optional
+        /// max_energy_range_uj path.
+        ///
+        /// sensor_id, device_id and scope are supplied by the caller so the
+        /// adapter never guesses whether a zone is a package, core or system.
+        pub fn open(
+            sensor_id: impl Into<String>,
+            device_id: impl Into<String>,
+            scope: EnergyScope,
+            energy_path: impl Into<PathBuf>,
+            max_range_path: Option<PathBuf>,
+        ) -> Result<Self, EnergyMeterError> {
+            let energy_path = energy_path.into();
+            let max_range = match max_range_path.as_ref() {
+                Some(path) => Some(read_counter_file(path)?),
+                None => None,
+            };
+            // Probe the counter at construction; permission and path failures
+            // are surfaced now rather than converted into a zero reading.
+            let _ = read_counter_file(&energy_path)?;
+
+            Ok(Self {
+                descriptor: EnergyMeterDescriptor {
+                    backend: EnergyMeterBackend::LinuxPowercap,
+                    sensor_id: sensor_id.into(),
+                    device_id: device_id.into(),
+                    scope,
+                    unit: EnergyCounterUnit::Microjoules,
+                    wrap_modulus: max_range,
+                },
+                energy_path,
+                max_range_path,
+                counter_epoch: NEXT_METER_EPOCH.fetch_add(1, Ordering::Relaxed),
+                started_at: Instant::now(),
+            })
+        }
+
+        fn read_energy(&self) -> Result<u64, EnergyMeterError> {
+            read_counter_file(&self.energy_path)
+        }
+
+        fn refresh_wrap_modulus(&mut self) -> Result<(), EnergyMeterError> {
+            let Some(path) = self.max_range_path.as_ref() else {
+                return Ok(());
+            };
+            let current = Some(read_counter_file(path)?);
+            if current != self.descriptor.wrap_modulus {
+                self.counter_epoch = self
+                    .counter_epoch
+                    .checked_add(1)
+                    .ok_or_else(|| EnergyMeterError::BackendFailure {
+                        reason: "counter epoch overflow".into(),
+                    })?;
+                self.descriptor.wrap_modulus = current;
+            }
+            Ok(())
+        }
+    }
+
+    impl EnergyMeter for LinuxPowercapMeter {
+        fn descriptor(&self) -> &EnergyMeterDescriptor {
+            &self.descriptor
+        }
+
+        fn availability(&self) -> EnergyMeterAvailability {
+            match self.read_energy() {
+                Ok(_) => match self.max_range_path.as_ref() {
+                    Some(path) => match read_counter_file(path) {
+                        Ok(_) => EnergyMeterAvailability::Available,
+                        Err(EnergyMeterError::PermissionDenied { reason }) => {
+                            EnergyMeterAvailability::PermissionDenied { reason }
+                        }
+                        Err(EnergyMeterError::Unavailable { reason }) => {
+                            EnergyMeterAvailability::Unavailable { reason }
+                        }
+                        Err(EnergyMeterError::Unsupported { reason }) => {
+                            EnergyMeterAvailability::Unsupported { reason }
+                        }
+                        Err(EnergyMeterError::BackendFailure { reason }) => {
+                            EnergyMeterAvailability::Unavailable { reason }
+                        }
+                        Err(EnergyMeterError::ClockUnavailable) => {
+                            EnergyMeterAvailability::Unavailable {
+                                reason: "monotonic clock unavailable".into(),
+                            }
+                        }
+                    },
+                    None => EnergyMeterAvailability::Available,
+                },
+                Err(EnergyMeterError::PermissionDenied { reason }) => {
+                    EnergyMeterAvailability::PermissionDenied { reason }
+                }
+                Err(EnergyMeterError::Unavailable { reason }) => {
+                    EnergyMeterAvailability::Unavailable { reason }
+                }
+                Err(EnergyMeterError::Unsupported { reason }) => {
+                    EnergyMeterAvailability::Unsupported { reason }
+                }
+                Err(EnergyMeterError::BackendFailure { reason }) => {
+                    EnergyMeterAvailability::Unavailable { reason }
+                }
+                Err(EnergyMeterError::ClockUnavailable) => EnergyMeterAvailability::Unavailable {
+                    reason: "monotonic clock unavailable".into(),
+                },
+            }
+        }
+
+        fn read_counter(&mut self) -> Result<EnergyCounterReading, EnergyMeterError> {
+            self.refresh_wrap_modulus()?;
+            let raw_counter = self.read_energy()?;
+            Ok(EnergyCounterReading {
+                descriptor: self.descriptor.clone(),
+                counter_epoch: self.counter_epoch,
+                raw_counter,
+                monotonic_timestamp_ns: self.started_at.elapsed().as_nanos(),
+            })
+        }
+    }
+
+    fn read_counter_file(path: &PathBuf) -> Result<u64, EnergyMeterError> {
+        let contents = fs::read_to_string(path).map_err(|error| match error.kind() {
+            ErrorKind::PermissionDenied => EnergyMeterError::PermissionDenied {
+                reason: format!("cannot read {}: {error}", path.display()),
+            },
+            ErrorKind::NotFound => EnergyMeterError::Unavailable {
+                reason: format!("counter file not found: {}", path.display()),
+            },
+            _ => EnergyMeterError::BackendFailure {
+                reason: format!("cannot read {}: {error}", path.display()),
+            },
+        })?;
+        contents
+            .trim()
+            .parse::<u64>()
+            .map_err(|error| EnergyMeterError::BackendFailure {
+                reason: format!("invalid counter value in {}: {error}", path.display()),
+            })
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        struct TestZone {
+            directory: PathBuf,
+            energy_path: PathBuf,
+            range_path: PathBuf,
+        }
+
+        impl TestZone {
+            fn new(energy_uj: u64, max_range_uj: u64) -> Self {
+                let nonce = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos();
+                let directory = std::env::temp_dir().join(format!(
+                    "symthaea-powercap-{}-{nonce}",
+                    std::process::id()
+                ));
+                fs::create_dir(&directory).unwrap();
+                let energy_path = directory.join("energy_uj");
+                let range_path = directory.join("max_energy_range_uj");
+                fs::write(&energy_path, energy_uj.to_string()).unwrap();
+                fs::write(&range_path, max_range_uj.to_string()).unwrap();
+                Self {
+                    directory,
+                    energy_path,
+                    range_path,
+                }
+            }
+        }
+
+        impl Drop for TestZone {
+            fn drop(&mut self) {
+                let _ = fs::remove_dir_all(&self.directory);
+            }
+        }
+
+        #[test]
+        fn reads_microjoule_counter_with_explicit_scope() {
+            let zone = TestZone::new(10_000, 1_000_000);
+            let mut meter = LinuxPowercapMeter::open(
+                "intel-rapl:0",
+                "package-0",
+                EnergyScope::CpuPackage { package_id: 0 },
+                &zone.energy_path,
+                Some(zone.range_path.clone()),
+            )
+            .unwrap();
+
+            assert_eq!(meter.availability(), EnergyMeterAvailability::Available);
+            assert_eq!(meter.descriptor().unit, EnergyCounterUnit::Microjoules);
+            assert_eq!(meter.descriptor().scope, EnergyScope::CpuPackage { package_id: 0 });
+            assert_eq!(meter.read_counter().unwrap().raw_counter, 10_000);
+        }
+
+        #[test]
+        fn changed_wrap_range_starts_a_new_counter_epoch() {
+            let zone = TestZone::new(10_000, 1_000_000);
+            let mut meter = LinuxPowercapMeter::open(
+                "intel-rapl:0",
+                "package-0",
+                EnergyScope::CpuPackage { package_id: 0 },
+                &zone.energy_path,
+                Some(zone.range_path.clone()),
+            )
+            .unwrap();
+            let first = meter.read_counter().unwrap();
+            fs::write(&zone.range_path, "2_000_000").unwrap();
+            let second = meter.read_counter().unwrap();
+
+            assert_ne!(first.counter_epoch, second.counter_epoch);
+            assert_ne!(first.descriptor.wrap_modulus, second.descriptor.wrap_modulus);
+            assert_eq!(
+                EnergyDelta::between(&first, &second),
+                Err(EnergyDeltaError::DescriptorMismatch)
+            );
+        }
+
+        #[test]
+        fn malformed_counter_file_is_not_reported_as_zero_energy() {
+            let zone = TestZone::new(10_000, 1_000_000);
+            let mut meter = LinuxPowercapMeter::open(
+                "intel-rapl:0",
+                "package-0",
+                EnergyScope::CpuPackage { package_id: 0 },
+                &zone.energy_path,
+                Some(zone.range_path.clone()),
+            )
+            .unwrap();
+            fs::write(&zone.energy_path, "not-an-integer").unwrap();
+
+            assert!(matches!(
+                meter.read_counter(),
+                Err(EnergyMeterError::BackendFailure { .. })
+            ));
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
