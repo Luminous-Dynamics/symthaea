@@ -247,7 +247,9 @@ pub fn evaluate_water_balance(
         aggregate_absolute_error_bound_l,
         disposition,
         topology_audit_reference_present: input.topology_audit.is_some(),
-        uncertainty_semantics: "worst-case interval propagation by summing per-term absolute error bounds; no independence or covariance assumption".to_owned(),
+        uncertainty_semantics:
+            "worst-case interval propagation by summing per-term absolute error bounds; no independence or covariance assumption"
+                .to_owned(),
     })
 }
 
