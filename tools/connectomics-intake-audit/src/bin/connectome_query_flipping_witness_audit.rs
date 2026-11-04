@@ -79,7 +79,7 @@ enum DecisionRule {
     BetweenInclusive { lower: f64, upper: f64 },
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 enum EditKind {
     GraphEdit,
