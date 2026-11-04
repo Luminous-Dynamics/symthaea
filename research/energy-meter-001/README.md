@@ -34,6 +34,10 @@ not equate a package zone with whole-workstation energy, and does not infer
 uncovered sensor domains. Its JSON is a capability and short-interval
 diagnostic, not by itself a matched-quality benchmark receipt.
 
+The probe binary is covered by the same exact-source harness. Its tests verify
+that unsupported sensors serialize with null energy values (not numeric zero)
+and that filesystem discovery errors make the inventory incomplete.
+
 ## Evidence classes
 
 Keep these classes separate in every report:
