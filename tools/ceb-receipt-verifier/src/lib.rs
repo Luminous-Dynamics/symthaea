@@ -3601,6 +3601,46 @@ mod tests {
         assert!(!report.accepted);
     }
 
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_view_verifier_rejects_manifest_tree_and_entry_digest_tampering() {
+        use std::fs;
+        let root = tempfile::tempdir().unwrap();
+        fs::write(root.path().join("lib.rs"), b"pub fn ok() {}\n").unwrap();
+        let manifest = test_agent_view_manifest(root.path(), "CEB-REPO-001");
+        let tree_digest = hash_source_tree_inner(root.path()).unwrap();
+
+        let mut value: Value = serde_json::from_slice(&manifest).unwrap();
+        value["tree_sha256"] = Value::String("a".repeat(64));
+        let wrong_tree = serde_json::to_vec(&value).unwrap();
+        assert!(!verify_test_agent_view(root.path(), &wrong_tree, "CEB-REPO-001", &tree_digest).accepted);
+
+        let mut value: Value = serde_json::from_slice(&manifest).unwrap();
+        value["entries"][0]["sha256"] = Value::String("b".repeat(64));
+        let wrong_entry = serde_json::to_vec(&value).unwrap();
+        assert!(!verify_test_agent_view(root.path(), &wrong_entry, "CEB-REPO-001", &tree_digest).accepted);
+
+        let mut value: Value = serde_json::from_slice(&manifest).unwrap();
+        value["entries"][0]["size_bytes"] = Value::from(999u64);
+        let wrong_size = serde_json::to_vec(&value).unwrap();
+        assert!(!verify_test_agent_view(root.path(), &wrong_size, "CEB-REPO-001", &tree_digest).accepted);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_view_verifier_rejects_an_empty_snapshot() {
+        let root = tempfile::tempdir().unwrap();
+        let report = verify_agent_view(AgentViewInputs {
+            snapshot_dir: root.path().to_path_buf(),
+            manifest: b"{}".to_vec(),
+            expected_manifest_sha256: sha256_hex(b"{}"),
+            expected_tree_sha256: "a".repeat(64),
+            expected_task_id: "CEB-REPO-001".into(),
+        });
+        assert!(!report.accepted);
+    }
+
     #[cfg(unix)]
     #[test]
     fn agent_view_manifest_rejects_sealed_status_and_unknown_fields() {
