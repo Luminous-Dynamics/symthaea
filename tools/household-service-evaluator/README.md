@@ -1,9 +1,10 @@
 # Household Service Evaluator
 
-A small, offline Rust evaluation core with Serde-serializable evidence inputs and result receipts for two bounded household-service questions:
+A small, offline Rust evaluation core with Serde-serializable evidence inputs and result receipts for three bounded household-service questions:
 
 1. Is a metered water balance compatible with its declared residual error bound, calibration evidence and topology-audit reference?
 2. Does a repair attempt meet its declared prerequisites, post-repair qualification and follow-up gate?
+3. What interval of requested service remains unmet when physical delivery and end-use qualification have explicit uncertainty states?
 
 It is intentionally separate from the fixture-integrity validator in tools/household-bench-fixtures.
 
@@ -29,6 +30,33 @@ It computes:
     upper_hours = usable_volume_upper_l / demand_lower_l_per_hour
 
 It never accepts gross tank level as a substitute for usable deliverable volume. If the pump, electrical path, measured pressure, delivery qualification or end-use quality gate is missing, no duration is returned.
+
+## Interval-valued service deficit
+
+`service_deficit::evaluate_service_deficit` integrates a bounded requested rate and a separately measured physical-delivery rate over a positive observation window. It retains:
+- physical quantity measured at the declared service boundary;
+- quantity credited as qualified for the declared end-use;
+- requested quantity; and
+- resulting interval-valued deficit.
+
+Qualification state is explicit:
+- `qualified`: use the physical-delivery interval as qualified delivery;
+- `known_failure`: credit zero qualified delivery for the affected use class while retaining measured physical flow;
+- `unknown`: retain an explicit unknown state and use [0, physical upper bound] as the qualified-delivery interval. This gives no guaranteed-service credit without converting missing/stale/contradictory evidence into a known physical failure.
+
+For demand interval [d-, d+] and qualified-delivery interval [q-, q+], the deficit-rate interval is:
+
+    [max(0, d- - q+), max(0, d+ - q-)]
+
+Unit rules are explicit and no implicit conversion is performed:
+- L/min integrates over minutes to L;
+- L/hour integrates over hours to L;
+- Electrical kW integrates over hours to kWh-electric;
+- Useful thermal kW integrates over hours to kWh-thermal. These energy carriers are distinct and cannot be mixed.
+
+The operation uses conservative interval bounds and assumes neither statistical independence nor a covariance model. Floating-point duration conversion, division, subtraction and integration are widened outward by adjacent representable f64 values so rounding-to-nearest does not silently shrink the interval; if outward widening becomes non-finite, evaluation fails closed. It rejects unit mismatch, non-finite/negative/reversed intervals, zero duration and non-finite integrated results.
+
+This is arithmetic over caller-supplied bounds and declared qualification state. It does not validate a meter, assay, calibration, topology, pressure threshold, end-use suitability or physical delivery record. Unknown qualification remains unknown; no result is a product safety or service-availability verdict.
 
 ## Repair
 

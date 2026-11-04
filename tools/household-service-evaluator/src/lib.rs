@@ -7,6 +7,7 @@
 //! quality, certify a repair, control actuators, or make safety decisions.
 
 pub mod batch;
+pub mod service_deficit;
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;

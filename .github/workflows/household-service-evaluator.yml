@@ -5,6 +5,7 @@ on:
     branches:
       - research/household-service-evaluator-v0.1-stacked-10388
       - research/household-service-receipt-v0.1-stacked-10403
+      - feat/household-service-deficit-interval-v0-1-rebased
   pull_request:
     paths:
       - "tools/household-service-evaluator/**"
