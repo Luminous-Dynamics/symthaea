@@ -5,13 +5,17 @@ use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use zip::CompressionMethod;
 
 const HARD_ARCHIVE_LIMIT: u64 = 512 * 1024 * 1024;
 const HARD_ENTRY_LIMIT: u64 = 100_000;
 const HARD_BUFFER_LIMIT: usize = 1024 * 1024;
+const HARD_CENTRAL_DIRECTORY_LIMIT: u64 = 64 * 1024 * 1024;
+const EOCD_SIGNATURE: u32 = 0x0605_4b50;
+const EOCD_FIXED_BYTES: usize = 22;
+const EOCD_MAX_COMMENT_BYTES: usize = u16::MAX as usize;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReplayError {
@@ -67,6 +71,19 @@ pub fn replay_member_claim(
             "archive SHA-256 differs from receipt".into(),
         ));
     }
+
+    let max_central_directory = decimal_at(
+        receipt,
+        &["limits", "max_central_directory_bytes"],
+    )?
+    .min(HARD_CENTRAL_DIRECTORY_LIMIT);
+    let max_entries = decimal_at(receipt, &["limits", "max_entries"])?.min(HARD_ENTRY_LIMIT);
+    preflight_regular_zip(
+        &mut source,
+        actual_size,
+        max_central_directory,
+        max_entries,
+    )?;
 
     let parser_handle = source.try_clone().map_err(io_error)?;
     let mut archive = zip::ZipArchive::new(parser_handle)
@@ -229,6 +246,105 @@ pub fn replay_member_claim(
         oracle: "zip 9.3.0",
         codec: "flate2 / zlib-rs",
     })
+}
+
+/// Reject oversized or unsupported EOCD layouts before zip-rs allocates its index.
+fn preflight_regular_zip(
+    file: &mut File,
+    file_length: u64,
+    max_central_directory_bytes: u64,
+    max_entries: u64,
+) -> Result<(), ReplayError> {
+    let tail_length = file_length.min((EOCD_FIXED_BYTES + EOCD_MAX_COMMENT_BYTES) as u64);
+    let tail_start = file_length.checked_sub(tail_length).ok_or_else(|| {
+        ReplayError::Rejected("EOCD window underflow".into())
+    })?;
+    file.seek(SeekFrom::Start(tail_start)).map_err(io_error)?;
+    let mut tail = vec![0u8; usize::try_from(tail_length).map_err(|_| {
+        ReplayError::Rejected("EOCD window does not fit address space".into())
+    })?];
+    file.read_exact(&mut tail).map_err(io_error)?;
+
+    let mut candidates = Vec::new();
+    if tail.len() >= EOCD_FIXED_BYTES {
+        for offset in (0..=tail.len() - EOCD_FIXED_BYTES).rev() {
+            if read_u32(&tail, offset) != EOCD_SIGNATURE {
+                continue;
+            }
+            let comment_len =
+                u16::from_le_bytes([tail[offset + 20], tail[offset + 21]]) as usize;
+            if offset + EOCD_FIXED_BYTES + comment_len == tail.len() {
+                candidates.push(offset);
+            }
+        }
+    }
+    if candidates.len() != 1 {
+        return Err(ReplayError::Unsupported(
+            "EOCD is absent or ambiguous in the bounded tail".into(),
+        ));
+    }
+
+    let eocd = candidates[0];
+    let disk = read_u16(&tail, eocd + 4);
+    let central_disk = read_u16(&tail, eocd + 6);
+    let entries_on_disk = read_u16(&tail, eocd + 8);
+    let entries_total = read_u16(&tail, eocd + 10);
+    let central_bytes = u64::from(read_u32(&tail, eocd + 12));
+    let central_offset = u64::from(read_u32(&tail, eocd + 16));
+
+    if disk != 0 || central_disk != 0 || entries_on_disk != entries_total {
+        return Err(ReplayError::Unsupported(
+            "multi-disk or split ZIP archives are not in the independent replay subset".into(),
+        ));
+    }
+    if entries_total == u16::MAX || central_bytes == u64::from(u32::MAX)
+        || central_offset == u64::from(u32::MAX)
+    {
+        return Err(ReplayError::Unsupported(
+            "ZIP64 is outside the first independent replay subset".into(),
+        ));
+    }
+    if central_bytes > max_central_directory_bytes
+        || central_bytes > HARD_CENTRAL_DIRECTORY_LIMIT
+        || u64::from(entries_total) > max_entries
+        || u64::from(entries_total) > HARD_ENTRY_LIMIT
+    {
+        return Err(ReplayError::Rejected(
+            "central-directory bytes or entry count exceed replay limits".into(),
+        ));
+    }
+
+    let eocd_absolute = tail_start + eocd as u64;
+    let central_absolute = eocd_absolute.checked_sub(central_bytes).ok_or_else(|| {
+        ReplayError::Rejected("central-directory range underflows source".into())
+    })?;
+    let archive_start = central_absolute.checked_sub(central_offset).ok_or_else(|| {
+        ReplayError::Rejected("ZIP-relative central-directory offset underflows source".into())
+    })?;
+    if archive_start != 0 {
+        return Err(ReplayError::Unsupported(
+            "prefixed/self-extracting carrier layouts are outside this replay subset".into(),
+        ));
+    }
+    if central_absolute.checked_add(central_bytes) != Some(eocd_absolute) {
+        return Err(ReplayError::Unsupported(
+            "interstitial records between central directory and EOCD are not in replay subset".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn read_u16(bytes: &[u8], offset: usize) -> u16 {
+    u16::from_le_bytes([bytes[offset], bytes[offset + 1]])
+}
+
+fn read_u32(bytes: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes([
+        bytes[offset],
+        bytes[offset + 1],
+        bytes[offset + 2],
+        bytes[offset + 3],
+    ])
 }
 
 fn hash_open_file(file: &mut File, limit: u64) -> Result<(String, u64), ReplayError> {
