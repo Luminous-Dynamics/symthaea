@@ -1116,3 +1116,18 @@ Apple's code-signing model separately validates static/dynamic code and code-sig
 
 The proposed result is a separate versioned PackageSignatureEvaluation linked to the member receipt by the whole-package digest. It separates cryptographic signature validity, certificate/key identity, chain/trust-anchor policy, platform-version policy, package/distribution authorization (App ID, Bundle ID, Team ID, provisioning profile and entitlements), and installability/runtime observations. A valid signature from an unexpected signer remains cryptographically valid but policy-denied. A trusted publisher can still distribute malicious software. No aggregate trust scalar is permitted.
 
+### Draft package-signature evaluation schema
+
+The draft schema is now at `docs/research/rea-package-signature-evaluation-v0.schema.json`. It contains separate structures for:
+- package digest and target platform/environment;
+- per-scheme presence, cryptographic validity, coverage scope and verifier;
+- signer certificate/public-key digests and separate identity attribution evidence;
+- key-rotation lineage;
+- trust-policy result, exact policy/time/trust-anchor digest and revocation disposition;
+- package authorization, app/bundle/team identifiers and entitlement allowlist comparison;
+- nested executable/framework/extension coverage;
+- installability and runtime observations;
+- verifier provenance, claim scope and separate optional in-toto/DSSE envelope reference.
+
+The schema intentionally defines no generic `trusted` boolean. Its scheme enumeration distinguishes Android APK v1/v2/v3/v3.1/v4 from Apple CodeDirectory, CMS, resource-envelope, DER-entitlement and provisioning-profile observations. It is a draft data contract only; no parser, cryptographic verifier or platform-equivalent acceptance is claimed yet. The existing #10508 issue owns implementation and adversarial corpus.
+
