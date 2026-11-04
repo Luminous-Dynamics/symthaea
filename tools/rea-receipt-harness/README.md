@@ -53,7 +53,7 @@ cargo run --locked --manifest-path tools/rea-receipt-harness/Cargo.toml --bin re
 
 The CLI embeds the pinned receipt schema, rejects duplicate JSON properties, validates schema and semantic claim ceilings, canonicalizes the receipt through RFC 8785, then replays the member through `zip 9.3.0` using `flate2 / zlib-rs`. The production member verifier uses `zipcore / miniz_oxide`, so this is a separate parser/Deflate path.
 
-It hashes the same opened archive object before and after replay, checks source size and SHA-256, compares the raw filename bytes, occurrence index, local-header/data offsets, flags, method, declared sizes and CRC, and streams output through the receipt's bounded buffer while recomputing SHA-256 and bitwise CRC-32. It performs no extraction or file writes.
+Both the CLI and the public replay API validate the schema and semantic claim ceiling before reading archive bytes. The replayer preflights EOCD, central-directory byte size and entry count before constructing the independent index, rejects aggregate declared output beyond the receipt budget, and requires canonical base64 for raw filename bytes. It hashes the same opened archive object before and after replay, checks source size and SHA-256, compares the raw filename bytes, occurrence index, local-header/data offsets, flags, method, declared sizes and CRC, and streams output through the receipt's bounded buffer while recomputing SHA-256 and bitwise CRC-32. It performs no extraction or file writes.
 
 The current independent replay subset is deliberately narrower:
 - Stored and Deflate regular-file entries only.
