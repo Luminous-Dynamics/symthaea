@@ -47,6 +47,7 @@
 
 // Core infrastructure for MAGI Loop
 pub mod candidate_archive;
+pub mod paired_evaluation;
 pub mod core;
 pub mod types;
 
@@ -70,6 +71,11 @@ pub use types::{
 pub use candidate_archive::{
     CandidateArchive, CandidateArchiveError, CandidateRecord, CapabilityVector,
     EvaluationContext, EvaluationPartition,
+};
+
+pub use paired_evaluation::{
+    CandidateEvaluationReceipt, CaseScore, MetricPairedResult, PairedComparison,
+    PairedEvaluationError,
 };
 
 pub use core::{
