@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/output-clock-anchor-set-v1.schema.json",
+  "title": "Melothaea output-clock anchor set v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_id",
+    "anchors"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-output-clock-anchor-set-v1"
+    },
+    "fixture_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "anchors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "source",
+          "stream_instance_id",
+          "anchor_index",
+          "first_output_frame_index",
+          "frame_count",
+          "sample_rate_hz",
+          "callback_stream_time_ns",
+          "playback_stream_time_ns",
+          "callback_to_playback_ns",
+          "timestamp_uncertainty_ns"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "mel-output-clock-anchor-v1"
+          },
+          "source": {
+            "enum": [
+              "cpal_output_stream_timestamp_v1",
+              "synthetic_fixture_v1"
+            ]
+          },
+          "stream_instance_id": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "anchor_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "first_output_frame_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "frame_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "sample_rate_hz": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 768000
+          },
+          "callback_stream_time_ns": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "playback_stream_time_ns": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "callback_to_playback_ns": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "timestamp_uncertainty_ns": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "expected_disposition": {
+      "type": "string",
+      "enum": [
+        "fit",
+        "reject_drift",
+        "reject_residual",
+        "reject_discontinuity"
+      ]
+    }
+  }
+}
