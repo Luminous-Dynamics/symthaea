@@ -2665,7 +2665,7 @@
           "p50_net_energy_mwh": "221000",
           "p90_net_energy_mwh": "188000",
           "p95_net_energy_mwh": "180000",
-          "method": "joint_monte_carlo",
+          "method": "empirical_bootstrap",
           "uncertainty_components": [
             {
               "component_id": "interannual-resource-variability",
