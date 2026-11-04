@@ -32,6 +32,9 @@ struct Outcome {
     available_declarations: Vec<String>,
     local_context_sha256: String,
     outcome: String,
+    terminal_reason: String,
+    terminal_reason_evidence_sha256: String,
+    attempt_finished: bool,
     kernel_passed: bool,
     semantic_gate_passed: bool,
     state_receipt_sha256: String,
@@ -235,6 +238,7 @@ fn validate_outcome(row: &Outcome, index: usize, max_variables: usize) -> Result
         ("budget_sha256", &row.budget_sha256),
         ("solver_policy_sha256", &row.solver_policy_sha256),
         ("local_context_sha256", &row.local_context_sha256),
+        ("terminal_reason_evidence_sha256", &row.terminal_reason_evidence_sha256),
         ("state_receipt_sha256", &row.state_receipt_sha256),
         ("run_receipt_sha256", &row.run_receipt_sha256),
         ("checker_receipt_sha256", &row.checker_receipt_sha256),
@@ -254,12 +258,33 @@ fn validate_outcome(row: &Outcome, index: usize, max_variables: usize) -> Result
     if row.available_declarations.iter().any(|x| !universe.contains(x.as_str())) {
         return Err(format!("{label} contains a declaration outside its mutable universe"));
     }
+    if !row.attempt_finished {
+        return Err(format!("{label} is interrupted or unfinished and cannot enter an exhaustive support lattice"));
+    }
+    if !matches!(
+        row.terminal_reason.as_str(),
+        "verified_success" | "budget_exhausted" | "search_exhausted"
+    ) {
+        return Err(format!(
+            "{label} terminal_reason={} is not a completed proof-search outcome; infrastructure failures, invalid targets, checker failures, unresolved runs and interruptions must be excluded and rerun",
+            row.terminal_reason
+        ));
+    }
     if !matches!(row.outcome.as_str(), "verified_success" | "non_solve") {
         return Err(format!("{label} has unresolved or unsupported outcome"));
     }
     let passed = row.kernel_passed && row.semantic_gate_passed;
-    if (row.outcome == "verified_success") != passed {
-        return Err(format!("{label} outcome contradicts kernel/semantic-gate booleans"));
+    if row.outcome == "verified_success" {
+        if row.terminal_reason != "verified_success" || !passed {
+            return Err(format!("{label} verified_success requires a verified_success terminal reason and both proof gates"));
+        }
+    } else {
+        if !matches!(row.terminal_reason.as_str(), "budget_exhausted" | "search_exhausted") {
+            return Err(format!("{label} non_solve must be a completed budget_exhausted or search_exhausted attempt"));
+        }
+        if row.kernel_passed || row.semantic_gate_passed {
+            return Err(format!("{label} non_solve cannot claim a passed kernel or semantic gate"));
+        }
     }
     Ok(())
 }
@@ -614,6 +639,9 @@ fn build_synthetic_rows(
             available_declarations: subset,
             local_context_sha256: fake_digest(&format!("{study}:{target}:{available_json}")),
             outcome: if pass { "verified_success" } else { "non_solve" }.into(),
+            terminal_reason: if pass { "verified_success" } else { "budget_exhausted" }.into(),
+            terminal_reason_evidence_sha256: fake_digest(&format!("terminal:{target}:{available_json}")),
+            attempt_finished: true,
             kernel_passed: pass,
             semantic_gate_passed: pass,
             state_receipt_sha256: fake_digest(&format!("state:{target}:{available_json}")),
@@ -676,6 +704,47 @@ fn run_self_tests() -> Result<(), String> {
         return Err("success without both proof gates was accepted".into());
     }
     println!("SELF_TEST_PASS success requires kernel and semantic gates");
+
+    let mut interrupted = alternative[0].clone();
+    interrupted.outcome = "non_solve".into();
+    interrupted.terminal_reason = "interrupted".into();
+    interrupted.kernel_passed = false;
+    interrupted.semantic_gate_passed = false;
+    if validate_outcome(&interrupted, 1000, 12).is_ok() {
+        return Err("interrupted search was accepted as an exhaustive non-solve".into());
+    }
+    println!("SELF_TEST_PASS interrupted search cannot be counted as an insufficient support set");
+
+    let mut infrastructure = alternative[0].clone();
+    infrastructure.outcome = "non_solve".into();
+    infrastructure.terminal_reason = "infrastructure_failure".into();
+    infrastructure.kernel_passed = false;
+    infrastructure.semantic_gate_passed = false;
+    if validate_outcome(&infrastructure, 1001, 12).is_ok() {
+        return Err("infrastructure failure was accepted as an insufficient support set".into());
+    }
+    println!("SELF_TEST_PASS infrastructure failure must be excluded and rerun");
+
+    let mut fake_non_solve = alternative[0].clone();
+    fake_non_solve.outcome = "non_solve".into();
+    fake_non_solve.terminal_reason = "verified_success".into();
+    fake_non_solve.kernel_passed = false;
+    fake_non_solve.semantic_gate_passed = false;
+    if validate_outcome(&fake_non_solve, 1002, 12).is_ok() {
+        return Err("verified-success terminal reason was accepted as a non-solve".into());
+    }
+    println!("SELF_TEST_PASS terminal reason must agree with outcome and proof gates");
+
+    let mut unfinished = alternative[0].clone();
+    unfinished.outcome = "non_solve".into();
+    unfinished.terminal_reason = "budget_exhausted".into();
+    unfinished.attempt_finished = false;
+    unfinished.kernel_passed = false;
+    unfinished.semantic_gate_passed = false;
+    if validate_outcome(&unfinished, 1003, 12).is_ok() {
+        return Err("unfinished budget-limited run was accepted in the support lattice".into());
+    }
+    println!("SELF_TEST_PASS unfinished attempts cannot contaminate exhaustive support analysis");
 
     // Explicitly test the configured cap without generating a powerset.
     let mut row = alternative[0].clone();
