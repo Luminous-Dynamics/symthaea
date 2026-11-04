@@ -49,10 +49,11 @@ These descriptors describe the system; the four coordinates describe the evidenc
 
 - **Role:** high-level, long-tail closed-loop driving and rule/norm-sensitive decisions.
 - **Protocol:** 330 routes (~150 m each), 30 high-level ability categories, 94 scenario instantiations, CARLA UE5.
-- **Metrics:** Route Completion (RC), Legal Score (LS), Ethics Score (ES), Drive Score (DS = RC × LS × ES). Always report RC/LS/ES separately.
+- **Metrics:** per-route Drive Score (DSᵢ = RCᵢ × LSᵢ × ESᵢ), Route Completion (RC), Legal Score (LS), Ethics Score (ES). Split-level DS is the mean of per-route DSᵢ; RC and LS use the valid-route denominator, while ES is averaged only over ethics-applicable routes. Therefore the aggregate DS is not generally the product of the aggregate RC, LS and ES columns. Always report denominators and all components separately.
+- **Metric semantics:** RC is usually waypoint completion but some safety-critical dilemma routes set it to 1 after the primary objective is met. LS is affected by legal, collision and route-lane events, with brake-aware relief for selected collisions; it is not a pure legal-only measure. ES covers ethics-relevant events and has a separate applicability denominator.
 - **Upstream-reported snapshot:** KnowVal DS 46.6 / RC 73.8 / LS 69.3 / ES 97.4; SimLingo 42.3 / 70.5 / 63.3 / 94.8; ORION 37.4 / 65.3 / 54.8 / 93.5; DiffusionDrive 34.2 / 58.3 / 49.1 / 91.4.
 - **Rights:** repository says free for academic research only; commercial use requires authorization. Record `AcademicOnlyUnlessAuthorized`; do not download/vendor or use commercial assets without permission.
-- **Claim boundary:** benchmark-defined legal/ethics scores are not a universal moral-truth measure or proof of real-world compliance.
+- **Claim boundary:** benchmark-defined legal/ethics scores are not a universal moral-truth measure or proof of real-world compliance. Do not interpret the aggregate DS product formula as permission to multiply split-level mean columns.
 - **Sources:** [paper](https://arxiv.org/abs/2605.09972), [official repository](https://github.com/VDIGPKU/HiDrive).
 
 ### Fail2Drive
