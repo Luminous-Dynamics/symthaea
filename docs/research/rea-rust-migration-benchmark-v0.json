@@ -1648,6 +1648,75 @@
         "semantics": "A byte digest does not establish installability, runtime behavior, maliciousness/benignness or MASVS control pass.",
         "identity": "A source file identity tuple is distinct from a whole-archive digest and distinct from an immutable content snapshot."
       }
+    },
+    {
+      "id": "independent_artifact_member_receipt_replay",
+      "status": "research_contract_drafted",
+      "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10492",
+      "implementation_pr": null,
+      "contract": "docs/research/rea-member-receipt-replay-v0.md",
+      "objective": "Independently replay a member-integrity receipt against original content-addressed archive bytes, recomputing source hash, exact raw central-directory occurrence, local/central binding, bounded decompression, SHA-256 and CRC rather than trusting receipt assertions.",
+      "oracle": {
+        "parser": "rawzip 0.5.2 low-level file-backed central-directory parser and per-entry wayfinder",
+        "decoder": "flate2 with zlib-rs, exact version and feature graph to be pinned; distinct from zipcore/miniz_oxide",
+        "checksum": "separately implemented incremental CRC-32/ISO-HDLC; compare against central declaration and decoder result",
+        "note": "Parser, codec, CRC and source binding are independent dimensions. rawzip delegates consumer policy for bombs, overlaps, duplicate filenames and expected entry-count reconciliation."
+      },
+      "cases": [
+        "raw_receipt_duplicate_key_schema_semantic_jcs_intake",
+        "whole_archive_sha256_recomputed_before_member_replay",
+        "rawzip_central_directory_iteration_count_reconciles_eocd_zip64_hint",
+        "exact_occurrence_index_raw_name_and_wayfinder_match",
+        "duplicate_raw_names_preserved_as_distinct_occurrences",
+        "local_central_header_and_data_descriptor_consistency",
+        "compressed_data_ranges_no_overlap_and_in_archive",
+        "independent_stored_and_deflate_member_decode",
+        "decoder_eof_size_crc_and_independent_crc_must_all_match",
+        "member_and_aggregate_output_budgets_enforced_before_decode",
+        "receipt_one_field_mutation_rejected",
+        "archive_one_byte_mutation_rejected_by_whole_archive_digest",
+        "source_path_replacement_and_same_size_rewrite",
+        "unsupported_method_and_non_unix_identity_abstain",
+        "prefixed_zip64_and_data_descriptor_replay",
+        "receipt_and_archive_replay_run_receipt_provenance"
+      ],
+      "metrics": [
+        "receipt_replay_false_accept_rate",
+        "receipt_replay_false_reject_rate",
+        "whole_archive_binding_match_rate",
+        "central_directory_occurrence_mapping_precision",
+        "directory_count_reconciliation_rate",
+        "local_central_consistency_detection_recall",
+        "overlap_and_extent_detection_recall",
+        "independent_codec_byte_parity",
+        "independent_crc_byte_parity",
+        "resource_limit_false_accept_rate",
+        "replay_p50_p95_p99_ms",
+        "replay_peak_rss_mib",
+        "replay_energy_per_verified_mib",
+        "parser_codec_crc_and_source_independence_vector"
+      ],
+      "target": "100_percent replay agreement for frozen supported receipts; zero false accepts for all receipt mutations, archive corruption, duplicate occurrence ambiguity, count mismatch, overlap, CRC/size/truncation, source change and resource-limit faults. 100_percent exact duplicate-occurrence mapping. Report parser, codec, CRC and source-binding independence separately.",
+      "protocol": [
+        "read raw receipt bytes, reject duplicate object keys, validate schema/semantics, canonicalize JCS and recompute receipt digest before replay",
+        "recompute whole archive SHA-256 from supplied original bytes, compare to receipt, and independently establish file identity",
+        "use a file-backed low-level rawzip iterator, count every central record and reconcile actual count with EOCD/ZIP64 count",
+        "select exact raw central-directory occurrence index and wayfinder; compare raw filename bytes rather than decoded path only",
+        "inspect local header and data descriptor; compare required fields, preserve bit-3 placeholder semantics and bind exact compressed range",
+        "compute all compressed data extents and detect out-of-archive ranges, aliases and overlaps before decompression",
+        "apply per-entry, aggregate, ratio, time, buffer and archive limits; rawzip does not automatically enforce these consumer policies",
+        "decode Stored/Deflate through pinned independent implementation; require EOF, size and CRC; independently compute SHA-256 and incremental CRC",
+        "preserve duplicate names and count discrepancies; never choose a member by unique-name lookup",
+        "emit replayed_match, replayed_mismatch, unsupported, source_changed, limit_exceeded or abstained with exact reason and provenance",
+        "record parser, codec, CRC, source binding, toolchain, dependency locks, corpus hash, platform and raw receipt digest in every run receipt"
+      ],
+      "claim_boundaries": {
+        "replay_match": "Reproduces scoped member-byte integrity for the exact source archive and occurrence; no producer authenticity or semantic truth.",
+        "parser_independence": "rawzip is a separate structure parser but relies on consumer-supplied decoder and policies.",
+        "codec_independence": "Use zlib-rs for replay against zipcore/miniz_oxide and record exact crate/feature lineage.",
+        "crc_independence": "Compute a separate streaming bitwise CRC-32 and record its relationship to decoder and archive declaration.",
+        "duplicates": "raw central-directory occurrence index plus exact raw bytes are authoritative; decoded name/path lookup cannot be the occurrence identity."
+      }
     }
   ],
   "promotion_policy": {
