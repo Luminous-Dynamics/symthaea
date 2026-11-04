@@ -1,0 +1,57 @@
+name: Reward Network III v2.0 archive inventory
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    name: Fetch, verify and inventory Zenodo archive
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out research protocol
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Syntax-check inventory helper
+        run: python -m py_compile research/civbench-social-learning-core/scripts/inspect_reward_network_archive.py
+
+      - name: Download exact Zenodo v2.0 archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/reward-network-iii /tmp/reward-network-iii-report
+          curl --fail --location --retry 4 --retry-all-errors --retry-delay 2 \
+            "https://zenodo.org/records/18547122/files/center-for-humans-and-machines/reward-network-iii-v2.0.zip?download=1" \
+            --output /tmp/reward-network-iii/reward-network-iii-v2.0.zip
+          echo "archive_size_bytes=$(stat -c%s /tmp/reward-network-iii/reward-network-iii-v2.0.zip)"
+          echo "archive_md5=$(md5sum /tmp/reward-network-iii/reward-network-iii-v2.0.zip | cut -d' ' -f1)"
+          echo "archive_sha256=$(sha256sum /tmp/reward-network-iii/reward-network-iii-v2.0.zip | cut -d' ' -f1)"
+          unzip -t /tmp/reward-network-iii/reward-network-iii-v2.0.zip
+
+      - name: Verify digest and inspect metadata only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python research/civbench-social-learning-core/scripts/inspect_reward_network_archive.py \
+            --archive /tmp/reward-network-iii/reward-network-iii-v2.0.zip \
+            --output-json /tmp/reward-network-iii-report/archive-inventory.json \
+            --output-markdown /tmp/reward-network-iii-report/archive-inventory.md
+          cat /tmp/reward-network-iii-report/archive-inventory.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload metadata-only inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: reward-network-iii-v2.0-metadata-inventory
+          path: |
+            /tmp/reward-network-iii-report/archive-inventory.json
+            /tmp/reward-network-iii-report/archive-inventory.md
+          if-no-files-found: error
+          retention-days: 30

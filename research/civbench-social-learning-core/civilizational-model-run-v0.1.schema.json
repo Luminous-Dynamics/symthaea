@@ -1,0 +1,583 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.luminousdynamics.org/civilizational-systems-science/model-run/0.1",
+  "title": "Civilizational Systems Science Model Run Receipt v0.1",
+  "description": "Reproducibility receipt for model-based historical reconstruction, hindcast, forecast or scenario simulation. A scenario is not a prediction by virtue of being executable.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "run_kind",
+    "system_boundary",
+    "excluded_processes",
+    "model",
+    "state_variables",
+    "parameters",
+    "initial_and_boundary_conditions",
+    "stochasticity",
+    "runtime",
+    "data_snapshots",
+    "split_identities",
+    "baselines",
+    "ablations",
+    "outputs",
+    "diagnostics",
+    "known_failures"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_kind": {
+      "enum": [
+        "historical_reconstruction",
+        "hindcast",
+        "forecast",
+        "scenario",
+        "sensitivity_analysis",
+        "synthetic_benchmark"
+      ]
+    },
+    "target_horizon": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "forecast_origin": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "system_boundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "excluded_processes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "model": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "source_digest",
+        "config_digest"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "source_digest": {
+          "type": "string",
+          "pattern": "^(sha-256:)?[a-f0-9]{64}$"
+        },
+        "config_digest": {
+          "type": "string",
+          "pattern": "^(sha-256:)?[a-f0-9]{64}$"
+        },
+        "parent_model_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "state_variables": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "unit",
+          "role"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "stock",
+              "flow",
+              "rate",
+              "capacity",
+              "state",
+              "control",
+              "outcome",
+              "index"
+            ]
+          },
+          "equation_or_update_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bounds": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "parameters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "value",
+          "unit"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "value": {},
+          "unit": {
+            "type": "string"
+          },
+          "prior_or_range_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "calibration_data_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "initial_and_boundary_conditions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "variable",
+          "value",
+          "unit",
+          "scope"
+        ],
+        "properties": {
+          "variable": {
+            "type": "string"
+          },
+          "value": {},
+          "unit": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "source_claim_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "uncertainty_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "stochasticity": {
+      "type": "object",
+      "required": [
+        "seed_set_digest",
+        "replication_count",
+        "rng_or_sampler"
+      ],
+      "properties": {
+        "seed_set_digest": {
+          "type": "string",
+          "pattern": "^(sha-256:)?[a-f0-9]{64}$"
+        },
+        "replication_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rng_or_sampler": {
+          "type": "string"
+        },
+        "common_random_numbers": {
+          "type": "boolean"
+        },
+        "seed_schedule_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "runtime": {
+      "type": "object",
+      "required": [
+        "runtime_id",
+        "runtime_version",
+        "solver",
+        "compute_budget"
+      ],
+      "properties": {
+        "runtime_id": {
+          "type": "string"
+        },
+        "runtime_version": {
+          "type": "string"
+        },
+        "solver": {
+          "type": "string"
+        },
+        "compute_budget": {
+          "type": "object",
+          "required": [
+            "wall_time_ms",
+            "cpu_or_gpu"
+          ],
+          "properties": {
+            "wall_time_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cpu_or_gpu": {
+              "type": "string"
+            },
+            "memory_bytes": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "energy_joules": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "data_snapshots": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "snapshot_id",
+          "digest",
+          "source_claim_refs",
+          "transform_refs"
+        ],
+        "properties": {
+          "snapshot_id": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^(sha-256:)?[a-f0-9]{64}$"
+          },
+          "source_claim_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "transform_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "access_conditions_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "split_identities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "split_id",
+          "purpose",
+          "data_ids_digest",
+          "cutoff_time"
+        ],
+        "properties": {
+          "split_id": {
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "training",
+              "calibration",
+              "validation",
+              "test",
+              "hindcast_cutoff",
+              "forecast_origin"
+            ]
+          },
+          "data_ids_digest": {
+            "type": "string",
+            "pattern": "^(sha-256:)?[a-f0-9]{64}$"
+          },
+          "cutoff_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "leakage_audit_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "baselines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "baseline_id",
+          "source_digest",
+          "config_digest"
+        ],
+        "properties": {
+          "baseline_id": {
+            "type": "string"
+          },
+          "source_digest": {
+            "type": "string",
+            "pattern": "^(sha-256:)?[a-f0-9]{64}$"
+          },
+          "config_digest": {
+            "type": "string",
+            "pattern": "^(sha-256:)?[a-f0-9]{64}$"
+          },
+          "result_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "ablations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "ablation_id",
+          "removed_or_changed_mechanism"
+        ],
+        "properties": {
+          "ablation_id": {
+            "type": "string"
+          },
+          "removed_or_changed_mechanism": {
+            "type": "string"
+          },
+          "result_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "output_id",
+          "digest",
+          "description",
+          "epistemic_class"
+        ],
+        "properties": {
+          "output_id": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^(sha-256:)?[a-f0-9]{64}$"
+          },
+          "description": {
+            "type": "string"
+          },
+          "epistemic_class": {
+            "enum": [
+              "model_inference",
+              "scenario_assumption",
+              "observed_measurement",
+              "other"
+            ]
+          },
+          "claim_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "value",
+          "unit"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "value": {},
+          "unit": {
+            "type": "string"
+          },
+          "uncertainty_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "known_failures": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "run_kind": {
+            "enum": [
+              "forecast",
+              "hindcast"
+            ]
+          }
+        },
+        "required": [
+          "run_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "split_identities": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "run_kind": {
+            "const": "scenario"
+          }
+        },
+        "required": [
+          "run_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "outputs": {
+            "items": {
+              "properties": {
+                "epistemic_class": {
+                  "not": {
+                    "const": "observed_measurement"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

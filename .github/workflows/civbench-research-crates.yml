@@ -1,0 +1,140 @@
+name: CivBench standalone research crates
+
+on:
+  pull_request:
+    paths:
+      - "research/**/Cargo.toml"
+      - "research/**/Cargo.lock"
+      - "research/**/src/**"
+      - ".github/workflows/civbench-research-crates.yml"
+      - "research/civbench-social-learning-core/scripts/inspect_reward_network_archive.py"
+  push:
+    paths:
+      - "research/**/Cargo.toml"
+      - "research/**/Cargo.lock"
+      - "research/**/src/**"
+      - ".github/workflows/civbench-research-crates.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-research-crates:
+    name: Test standalone Rust research crates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Test every standalone research crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          manifests=(research/*/Cargo.toml)
+          if (("${#manifests[@]}" == 0)); then
+            echo "No standalone research crates found."
+            exit 0
+          fi
+
+          for manifest in "${manifests[@]}"; do
+            echo "::group::${manifest}"
+            cargo check --locked --manifest-path "${manifest}" --all-targets
+            cargo test --locked --manifest-path "${manifest}" --all-targets
+            echo "::endgroup::"
+          done
+
+  inventory-reward-network-iii:
+    name: Verify and inventory Reward Network III v2.0 archive
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out research sources
+        uses: actions/checkout@v4
+
+      - name: Set up Python for metadata inspection
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Syntax-check inventory helper
+        run: python -m py_compile research/civbench-social-learning-core/scripts/inspect_reward_network_archive.py
+
+      - name: Download exact Zenodo v2.0 archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/reward-network-iii /tmp/reward-network-iii-report
+          curl --fail --location --retry 4 --retry-all-errors --retry-delay 2 \
+            "https://zenodo.org/records/18547122/files/center-for-humans-and-machines/reward-network-iii-v2.0.zip?download=1" \
+            --output /tmp/reward-network-iii/reward-network-iii-v2.0.zip
+          echo "archive_md5=$(md5sum /tmp/reward-network-iii/reward-network-iii-v2.0.zip | cut -d' ' -f1)"
+          echo "archive_sha256=$(sha256sum /tmp/reward-network-iii/reward-network-iii-v2.0.zip | cut -d' ' -f1)"
+          unzip -t /tmp/reward-network-iii/reward-network-iii-v2.0.zip
+
+      - name: Verify source digest and inspect metadata only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python research/civbench-social-learning-core/scripts/inspect_reward_network_archive.py \
+            --archive /tmp/reward-network-iii/reward-network-iii-v2.0.zip \
+            --output-json /tmp/reward-network-iii-report/archive-inventory.json \
+            --output-markdown /tmp/reward-network-iii-report/archive-inventory.md
+          cat /tmp/reward-network-iii-report/archive-inventory.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload metadata-only inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: reward-network-iii-v2.0-metadata-inventory
+          path: |
+            /tmp/reward-network-iii-report/archive-inventory.json
+            /tmp/reward-network-iii-report/archive-inventory.md
+          if-no-files-found: error
+          retention-days: 30
+
+  run-privacy-disclosure-sweep:
+    name: Run privacy disclosure performance sweep
+    needs: test-research-crates
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run matched-seed disclosure sweep
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/civbench-privacy
+          cargo run --locked \
+            --manifest-path research/civbench-social-learning-core/Cargo.toml \
+            --bin privacy-disclosure-sweep \
+            > /tmp/civbench-privacy/privacy-disclosure-sweep.csv
+          {
+            echo "## Privacy disclosure sweep"
+            echo ""
+            echo "Synthetic matched-seed comparison: centralized full inventory vs coarse recipe-readiness signal vs no-social control."
+            echo ""
+            echo "`$(wc -l < /tmp/civbench-privacy/privacy-disclosure-sweep.csv)` CSV lines (including header)."
+            echo ""
+            echo "```csv"
+            cat /tmp/civbench-privacy/privacy-disclosure-sweep.csv
+            echo "```"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload synthetic sweep results
+        uses: actions/upload-artifact@v4
+        with:
+          name: civbench-privacy-disclosure-sweep
+          path: /tmp/civbench-privacy/privacy-disclosure-sweep.csv
+          if-no-files-found: error
+          retention-days: 30
+
