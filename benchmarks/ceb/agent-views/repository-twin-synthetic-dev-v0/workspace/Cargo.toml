@@ -1,0 +1,20 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/domain",
+    "crates/store",
+    "crates/service",
+    "crates/api",
+    "crates/cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[workspace.dependencies]
+symthaea-ceb-domain = { path = "crates/domain" }
+symthaea-ceb-store = { path = "crates/store" }
+symthaea-ceb-service = { path = "crates/service" }
+symthaea-ceb-api = { path = "crates/api" }
