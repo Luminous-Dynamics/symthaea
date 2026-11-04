@@ -130,6 +130,7 @@
         "infrastructure_failure",
         "invalid_target",
         "checker_failure",
+        "semantic_rejection",
         "unresolved"
       ]
     },
