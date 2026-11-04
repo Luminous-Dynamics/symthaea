@@ -89,6 +89,7 @@ pub enum MusicalParticipationValidationIssueV1 {
     EmptyChangedFactor { family_index: usize },
     UnsupportedChangedFactor { family_index: usize },
     MissingPreservedFactors { family_index: usize },
+    IncorrectPreservedFactorSet { family_index: usize },
     WrongMemberCount { family_index: usize, actual: usize },
     EmptyVariantId { family_index: usize, member_index: usize },
     DuplicateVariantId { family_index: usize },
@@ -201,6 +202,47 @@ fn valid_decision_for_requirement(
     }
 }
 
+fn expected_preserved_factors(changed_factor: &str) -> Option<&'static [&'static str]> {
+    match changed_factor {
+        "collaborator_intent" => Some(&[
+            "local_cue_signature",
+            "preceding_context_signature",
+            "performer_role",
+            "stream_available",
+            "collaborator_veto",
+        ]),
+        "preceding_context" => Some(&[
+            "local_cue_signature",
+            "collaborator_intent",
+            "performer_role",
+            "stream_available",
+            "collaborator_veto",
+        ]),
+        "performer_role" => Some(&[
+            "local_cue_signature",
+            "preceding_context_signature",
+            "collaborator_intent",
+            "stream_available",
+            "collaborator_veto",
+        ]),
+        "stream_integrity" => Some(&[
+            "local_cue_signature",
+            "preceding_context_signature",
+            "collaborator_intent",
+            "performer_role",
+            "collaborator_veto",
+        ]),
+        "collaborator_veto" => Some(&[
+            "local_cue_signature",
+            "preceding_context_signature",
+            "collaborator_intent",
+            "performer_role",
+            "stream_available",
+        ]),
+        _ => None,
+    }
+}
+
 pub fn validate_musical_participation_family_v1(
     family: &MusicalParticipationCounterfactualFamilyV1,
     family_index: usize,
@@ -218,6 +260,16 @@ pub fn validate_musical_participation_family_v1(
         issues.push(MusicalParticipationValidationIssueV1::MissingPreservedFactors {
             family_index,
         });
+    } else if let Some(expected) = expected_preserved_factors(&family.changed_factor) {
+        let exact_set_matches = family.preserved_factors.len() == expected.len()
+            && expected.iter().all(|factor| {
+                family.preserved_factors.iter().filter(|value| value.as_str() == *factor).count() == 1
+            });
+        if !exact_set_matches {
+            issues.push(MusicalParticipationValidationIssueV1::IncorrectPreservedFactorSet {
+                family_index,
+            });
+        }
     }
     if !matches!(
         family.changed_factor.as_str(),
@@ -666,6 +718,41 @@ mod tests {
         assert_eq!(score.missed_invitation_count, 0);
         assert_eq!(score.valid_decision_support_rate, 1.0);
         assert!(score.risk_coverage.iter().all(|point| point.coverage <= 1.0));
+    }
+
+    #[test]
+    fn veto_and_unavailable_stream_must_be_withhold_conditions() {
+        let mut set = fixture_set();
+        set.families[3].members[1].requirement = MusicalParticipationRequirementV1::Act;
+        let issues = validate_musical_participation_set_v1(&set);
+        assert!(issues.contains(
+            &MusicalParticipationValidationIssueV1::VetoedMemberRequiresWithhold {
+                family_index: 3,
+                member_index: 1,
+            }
+        ));
+
+        let mut set = fixture_set();
+        set.families[2].members[1].requirement = MusicalParticipationRequirementV1::Act;
+        let issues = validate_musical_participation_set_v1(&set);
+        assert!(issues.contains(
+            &MusicalParticipationValidationIssueV1::UnavailableStreamRequiresWithhold {
+                family_index: 2,
+                member_index: 1,
+            }
+        ));
+    }
+
+    #[test]
+    fn counterfactual_declared_preserved_factor_set_is_exact() {
+        let mut set = fixture_set();
+        set.families[0].preserved_factors.pop();
+        let issues = validate_musical_participation_set_v1(&set);
+        assert!(issues.contains(
+            &MusicalParticipationValidationIssueV1::IncorrectPreservedFactorSet {
+                family_index: 0,
+            }
+        ));
     }
 
     #[test]
