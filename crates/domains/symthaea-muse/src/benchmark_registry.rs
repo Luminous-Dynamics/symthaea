@@ -326,6 +326,10 @@ pub enum MusicBenchmarkRegistryIssueV1 {
     ResourceBudgetExceeded { field: String },
     FailureItemsNotInDenominator,
     EmptyMetricSet,
+    MutableBenchmarkVersion,
+    MutableModelVersion,
+    ModelArtifactDigestRequired,
+    ObservedAtNotUtc,
     InvalidMetric { metric_index: usize, field: String },
     MetricDenominatorExceedsAttempts { metric_index: usize },
     InvalidMetricValue { metric_index: usize },
@@ -455,6 +459,20 @@ pub fn validate_music_benchmark_run_v1(
     ] {
         push_required(&mut issues, field, value);
     }
+    if matches!(
+        run.model.immutable_version.to_ascii_lowercase().as_str(),
+        "latest" | "current" | "stable"
+    ) {
+        issues.push(MusicBenchmarkRegistryIssueV1::MutableModelVersion);
+    }
+    if !run.model.observed_at_utc.ends_with('Z') {
+        issues.push(MusicBenchmarkRegistryIssueV1::ObservedAtNotUtc);
+    }
+    if run.model.provider.eq_ignore_ascii_case("local")
+        && run.model.model_artifact_sha256.is_none()
+    {
+        issues.push(MusicBenchmarkRegistryIssueV1::ModelArtifactDigestRequired);
+    }
     for (field, digest) in [
         ("profile_sha256", run.profile_sha256.as_str()),
         ("prompt_template_sha256", run.execution.prompt_template_sha256.as_str()),
@@ -490,11 +508,11 @@ pub fn validate_music_benchmark_run_v1(
     }
 
     let counts_sum = run.succeeded_items
-        .saturating_add(run.failed_items)
-        .saturating_add(run.timed_out_items)
-        .saturating_add(run.unparseable_items)
-        .saturating_add(run.abstained_items);
-    if counts_sum != run.attempted_items
+        .checked_add(run.failed_items)
+        .and_then(|sum| sum.checked_add(run.timed_out_items))
+        .and_then(|sum| sum.checked_add(run.unparseable_items))
+        .and_then(|sum| sum.checked_add(run.abstained_items));
+    if counts_sum != Some(run.attempted_items)
         || run.failure_policy != MusicBenchmarkFailurePolicyV1::EveryAttemptRetainedInDenominator
     {
         issues.push(MusicBenchmarkRegistryIssueV1::FailureItemsNotInDenominator);
@@ -617,6 +635,9 @@ pub fn compare_music_benchmark_runs_v1(
     }
     if left_profile.comparison_scope_id != right_profile.comparison_scope_id {
         reasons.push("comparison_scope_id differs".to_owned());
+    }
+    if left_profile.native_metric_ids != right_profile.native_metric_ids {
+        reasons.push("native metric identifiers differ".to_owned());
     }
     if left_run.execution.budget != right_run.execution.budget {
         reasons.push("inference budgets differ".to_owned());
@@ -776,6 +797,33 @@ mod tests {
         };
         manifest.run_manifest_sha256 = manifest.expected_run_manifest_sha256().unwrap();
         manifest
+    }
+
+    #[test]
+    fn checked_in_synthetic_profile_fixture_is_valid_and_rights_scoped() {
+        let profile: MusicBenchmarkProfileV1 = serde_json::from_str(include_str!(
+            "../../../../benchmarks/mel/registry/internal-synthetic-profile-v1.json"
+        ))
+        .expect("registry profile fixture must parse");
+        assert!(validate_music_benchmark_profile_v1(&profile).is_empty());
+        assert_eq!(profile.intended_use, MusicBenchmarkUseV1::EvaluationOnly);
+        assert!(profile.rights.permitted_uses.contains(&MusicBenchmarkUseV1::EvaluationOnly));
+        assert!(!profile.rights.permitted_uses.contains(&MusicBenchmarkUseV1::Training));
+    }
+
+    #[test]
+    fn mutable_latest_aliases_are_rejected_for_benchmark_and_model_versions() {
+        let mut profile = profile();
+        profile.benchmark_version = "latest".to_owned();
+        assert!(validate_music_benchmark_profile_v1(&profile)
+            .contains(&MusicBenchmarkRegistryIssueV1::MutableBenchmarkVersion));
+
+        let mut profile = profile();
+        let mut run = run(&profile);
+        run.model.immutable_version = "latest".to_owned();
+        run.run_manifest_sha256 = run.expected_run_manifest_sha256().unwrap();
+        assert!(validate_music_benchmark_run_v1(&profile, &run)
+            .contains(&MusicBenchmarkRegistryIssueV1::MutableModelVersion));
     }
 
     #[test]
