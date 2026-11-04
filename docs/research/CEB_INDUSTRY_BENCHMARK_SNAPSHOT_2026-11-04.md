@@ -20,6 +20,10 @@
 | Selective escalation | HiL-Bench, 300 tasks / 1,131 blockers | Historical paper/page takeaway: 24% combined Pass@3 and 44% highest ASK-F1 | Question precision/recall and task completion after help; metrics differ |
 | Paired act/abstain | AgentAbstain, 263 pairs / 42 environments / 8 scenarios | Gemini 3.1 Pro + Google ADK: 59.5% paired accuracy | Correct on both should-act and should-abstain members of a pair |
 | Source-free reverse engineering | SRE-Bench, 19 private programs / 262 binary instances / 1,572 task grades | GPT-6-Astra: 5.55/6 on 181 graded instances; 149 fully solved | Semantic recovery and task completion from protected binaries without source |
+| Code review bug detection | CRBugBench, 1,000 OSS tasks / 98 repositories + 800 private tasks | Opus 5 + Copilot CLI: 71.9% of human-verified bugs surfaced in top 5 comments | Review-agent bug detection and reviewer-facing comment ranking |
+| Secure code generation | Agent Security League, 200 tasks / 108 Python projects / 77 CWE classes | Highest Secure score: 36.9%; highest Functional score: 91.6% (different system) | Security correctness in addition to functional correctness |
+| Rust repository issue repair | Rust-SWE-bench, 500 tasks / 34 Rust repositories | RUSTFORGER: 28.6% using Claude Sonnet 3.7 | Rust-specific issue reproduction, repository structure and type/trait reasoning |
+| Context retrieval | ContextBench, 1,136 tasks / 66 repositories / 8 languages (63 Rust tasks) | CodeNib: Recall 0.779, Pass@1 77.6%, Context F1 0.281, $0.68/task; another system reports F1 0.389 | Evidence/context retrieval quality and cost before task resolution |
 
 The percentages and scores above are not mutually comparable. In particular, issue resolution, QnA rubric scores, mutation-validated test writing, binary RE task grades, ASK-F1 and Pass@3 have different units and evaluation pipelines.
 
@@ -98,19 +102,55 @@ Sources:
 
 **CEB implication:** every leaderboard needs coverage, graded denominator and refusal/unsupported/timeout reporting alongside conditional success. This is directly relevant to #10314 and #10370.
 
+### CRBugBench — code review and change-level defect detection
+
+Microsoft Research's October 2026 CRBugBench pairs human-verified bugs with the PRs that introduced them. It contains 1,000 open-source review tasks across 98 repositories and another 800 tasks from proprietary industry repositories. The best reported system, Claude Opus 5 with Copilot CLI, surfaced 71.9% of bugs within its top five comments. The study reports weaker detection on complex changes and bugs requiring non-local reasoning, with a sharp decline on proprietary repositories. An exploration-oriented prompt increased performance by up to 5.8% at 10% higher cost.
+
+Source: https://www.microsoft.com/en-us/research/publication/when-should-a-software-factory-be-lights-off-benchmarking-code-review-agents-on-bug-detection/ (October 2026); paper: https://arxiv.org/abs/2610.13668
+
+**CEB implication:** add review-agent tasks that predict defects before editing, with Recall@1/3/5, actionable precision, severity-weighted recall, false-positive review burden and non-local dependency reasoning. The system must cite exact changed lines and supporting repository paths. A plausible warning is not a detected bug; reviewers must adjudicate the bug claim.
+
+### Agent Security League — functional success is not secure success
+
+Endor Labs' Agent Security League reports 34 independently evaluated agent/model combinations. Its benchmark uses 200 tasks from 108 open-source Python projects spanning 77 CWE classes, with prompt hardening, workspace sanitization and automated cheating detection. The live page shows a highest Functional score of 91.6% (Muse Code / Muse Wonder) but a highest Secure score of 36.9% (Claude Code / Fable 5.1). The Secure metric requires passing security checks as well as functional tests; the two headline maxima belong to different system configurations.
+
+Source: https://www.endorlabs.com/research/ai-code-security-benchmark (live page accessed November 4, 2026)
+
+**CEB implication:** every engineering task that can introduce security regressions needs separate functional and security outcomes. Report CWE-stratified outcomes, high-severity false accepts, unsafe data flows, authorization boundary violations, dependency/supply-chain behavior and remediation correctness. A functionally passing but vulnerable patch is a failure, not a partial success disguised in an aggregate.
+
+### Rust-SWE-bench — Rust deserves a dedicated lane
+
+Rust-SWE-bench contains 500 repository-level tasks from 34 Rust repositories. Its February 2026 study reports ReAct-style agents resolving up to 21.2% of issues and RUSTFORGER with Claude Sonnet 3.7 resolving 28.6%, a 34.9% improvement over the strongest baseline used in that study. The paper highlights repository structure, Rust type/trait semantics and issue reproduction as major limitations. This is an important Rust-specific baseline, but the reported model/harness is not a November 2026 frontier comparison.
+
+Sources: https://arxiv.org/abs/2602.22764 and https://conf.researchr.org/details/icse-2026/icse-2026-research-track/67/Evaluating-and-Improving-Automated-Repository-Level-Rust-Issue-Resolution-with-LLM-ba
+
+**CEB implication:** use Rust-SWE-bench as an external replication target after license and task-access review. Measure issue reproduction, trait/type resolution, feature/target correctness, compiler diagnostics, repair precision and accepted patch rate separately. Compare the same model and harness against RUSTFORGER-style reproduction/tracing and the Symthaea repository/specification components.
+
+### ContextBench — context retrieval quality is a first-class engineering variable
+
+ContextBench's live leaderboard was updated October 23, 2026. The dataset contains 1,136 tasks across 66 repositories and eight languages, including 63 Rust tasks. The best reported Recall is 0.779 with Pass@1 77.6%, Context F1 0.281 and average cost $0.68 for the same CodeNib system. A different system reports Context F1 0.389, illustrating why the best recall, task success and context F1 must not be merged into one row.
+
+Source: https://contextbench.github.io/ (accessed November 4, 2026); paper: https://arxiv.org/abs/2602.05892
+
+**CEB implication:** extend repository-twin evaluation with gold-context Recall@k, Precision@k, Context F1, context sufficiency, irrelevant-token fraction, latency, retrieval cost and downstream task success. Symthaea should test whether typed graph traversal improves context quality over lexical search, AST retrieval and a matched agent scaffold—not merely whether it retrieves more files.
+
 ---
 
 ## 3. The actual competitive gap
 
-The benchmark landscape suggests five distinct gaps between coding success and engineering competence:
+The benchmark landscape now exposes nine separable gaps between coding success and engineering competence:
 
-1. **Understanding before action:** SWE Atlas QnA demonstrates that source-level repository comprehension remains difficult even when issue-resolution rates are high.
-2. **Knowing what should be true:** test writing and mutation checks still struggle to capture all required behaviour. CEB adds explicit specification recovery and source/authority separation.
-3. **Changing only what is necessary:** PDB shows the mismatch between test success and precise edits.
+1. **Understanding before action:** SWE Atlas QnA and ContextBench make repository comprehension and context retrieval separate measurable capabilities.
+2. **Knowing what should be true:** test writing, mutation checks and CEB-SPEC measure whether the agent recovers the right contract rather than inventing one.
+3. **Changing only what is necessary:** PDB separates resolved bugs from necessary edits and collateral changes.
 4. **Improving systems against a real reference:** SWE-fficiency exposes weak expert-relative optimization.
-5. **Knowing when to ask, stop or abstain:** HiL-Bench and AgentAbstain expose different parts of the autonomy problem.
+5. **Reviewing changes before merge:** CRBugBench measures whether agents detect human-verified defects in incoming changes, including non-local bugs.
+6. **Producing secure software:** Agent Security League shows that functional correctness and security correctness can diverge sharply.
+7. **Handling language-specific semantics:** Rust-SWE-bench identifies Rust type/trait reasoning and issue reproduction as a distinct bottleneck.
+8. **Knowing when to ask, stop or abstain:** HiL-Bench and AgentAbstain measure different aspects of selective autonomy.
+9. **Accounting for assurance and coverage:** SRE-Bench's graded denominator and CEB's evidence receipts show why conditional score and assurance cannot be collapsed.
 
-SRE-Bench adds a sixth capability: recovering semantics when source is unavailable. Symthaea should treat binary RE as an optional adjacent evaluation lane, not conflate it with source-based repository comprehension.
+SRE-Bench remains a separate optional source-free reverse-engineering capability, not a substitute for source-based repository comprehension.
 
 ## 4. CEB strategy
 
@@ -123,6 +163,10 @@ SRE-Bench adds a sixth capability: recovering semantics when source is unavailab
 - **CEB-OPT:** expert-relative performance improvement under fixed workloads and correctness gates.
 - **CEB-AUTONOMY:** paired act/abstain and targeted escalation under progressive blocker discovery.
 - **CEB-INTEGRITY:** full task accounting, hidden answer custody, exact-head evidence, trust qualification and isolated execution.
+- **CEB-REVIEW:** pre-merge defect discovery with top-k recall, actionable precision, severity and reviewer burden.
+- **CEB-SECURE:** secure code-change correctness, CWE coverage, false-accept rate and functional/security non-inferiority.
+- **CEB-RUST:** Rust-specific issue reproduction, trait/type correctness, configuration scope and repository comprehension.
+- **CEB-CONTEXT:** context retrieval precision/recall/F1, sufficiency, token cost and downstream task success.
 
 ### Matched baseline design
 
@@ -160,7 +204,11 @@ Suggested first gates already tracked in #10385 / #10400:
 - paired act/abstain correctness >= 0.75 initially, then >= 0.85;
 - ASK-F1 >= 0.65 initially, then >= 0.75;
 - 100% evidence/provenance coverage for claims used to authorize a repair;
-- high-impact false-action rate <= 1% initially, <= 0.5% holdout.
+- high-impact false-action rate <= 1% initially, <= 0.5% holdout;
+- code-review defect recall@5 >= 0.80 initially, >= 0.85 on sealed holdout, with actionable precision and reviewer burden reported separately;
+- secure-task pass >= 0.55 initially, >= 0.65 on sealed holdout, while functional correctness remains within a preregistered 2 pp non-inferiority margin;
+- context retrieval Recall@10 >= 0.85 initially, >= 0.90 sealed; Context F1 >= 0.45 initially, >= 0.50 sealed, with downstream task success and retrieval cost reported;
+- Rust-SWE-bench issue resolution >30% in a matched replication before pursuing >35%; do not compare this directly with the February 2026 RUSTFORGER/Claude Sonnet 3.7 result without matched harness and model controls.
 
 These are prospective CEB goals, not current Symthaea results. Final sample sizes and confidence bounds must be set from pilot variance and repository/fault-family clustering.
 
@@ -188,5 +236,9 @@ The immediate route is runner-independent authoring, static source/manifest chec
 - HiL-Bench: Scale Labs benchmark page and paper.
 - AgentAbstain: Liu et al., 2026; official code and leaderboard.
 - SRE-Bench: Columbia University DAPLab, October 2026 update.
+- CRBugBench: Microsoft Research / Yang et al., October 2026: https://arxiv.org/abs/2610.13668
+- Agent Security League: Endor Labs, live benchmark page: https://www.endorlabs.com/research/ai-code-security-benchmark
+- Rust-SWE-bench / RUSTFORGER: Xiang et al., ICSE 2026: https://arxiv.org/abs/2602.22764
+- ContextBench: Li et al., 2026, leaderboard updated October 23: https://contextbench.github.io/
 
 **Snapshot limitation:** this is a dated source audit. Re-read the cited pages before future claims; live score tables, model identities, harness settings and benchmark revisions can change.
