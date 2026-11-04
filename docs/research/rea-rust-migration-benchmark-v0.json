@@ -1,7 +1,7 @@
 {
   "schema": "luminous.rea-rust-migration-benchmark.v0",
   "status": "proposal_not_results",
-  "as_of": "2026-11-03",
+  "as_of": "2026-11-04",
   "upstream": {
     "repository": "https://github.com/morluto/rea",
     "source_commit": "8250bf2320ea57aab4e664db4b4d44b8abd2004e",
@@ -1329,6 +1329,75 @@
         "physical_device_tests_require_owner_consent_and_bound_invocation"
       ],
       "claim_ceiling": "A static hypothesis is not exploitability; an emulator crash is not physical-device triggerability; a receipt is not producer authenticity; results apply only to the named firmware/device scope."
+    },
+    {
+      "id": "provider_lineage_and_common_mode_corroboration",
+      "status": "planned",
+      "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10410",
+      "related_owners": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/6283",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/9911",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/8135"
+      ],
+      "principle": "Provider-name diversity is not independent corroboration. Preserve declared/observed dependency ancestry and do not infer independence from missing lineage.",
+      "dimensions": [
+        "provider_id_version_and_executable_digest",
+        "operation_configuration_and_analysis_profile",
+        "embedded_or_invoked_engine_plugin_and_parser_versions",
+        "shared_libraries_decoders_disassemblers_decompilers",
+        "signature_rules_database_and_update_revision",
+        "model_family_weights_training_and_calibration_data",
+        "acquisition_channel_session_runtime_os_emulator_or_device",
+        "upstream_artifacts_and_derived_evidence",
+        "operator_manual_interpretation_and_reviewer_lineage",
+        "unknown_or_undisclosed_dependencies"
+      ],
+      "relationship_types": [
+        "EXECUTED_BY",
+        "USES_LIBRARY",
+        "USES_ENGINE",
+        "USES_RULESET",
+        "USES_MODEL",
+        "CALIBRATED_FROM",
+        "ACQUIRED_THROUGH",
+        "DERIVED_FROM",
+        "REPLAYED_FROM",
+        "SAME_ENGINE_FAMILY"
+      ],
+      "seeded_controls": [
+        "different_provider_names_same_parser_binary",
+        "separate_providers_same_analysis_engine",
+        "different_engines_same_rules_database",
+        "different_llm_endpoints_same_model_family_or_corpus",
+        "provider_b_reformats_provider_a_output",
+        "two_reports_derived_from_one_acquisition_session",
+        "independent_acquisition_channels",
+        "same_provider_name_different_binary_digest",
+        "unknown_or_proprietary_dependency_ancestry",
+        "common_mode_false_fact_shared_by_dependent_providers",
+        "independent_source_contradicts_provider_consensus",
+        "missing_stale_or_cyclic_lineage"
+      ],
+      "metrics": [
+        "lineage_field_completeness_by_provider_and_dependency_type",
+        "dependency_edge_precision_recall",
+        "common_mode_detection_precision_recall",
+        "false_independence_rate",
+        "unsupported_consensus_confidence_inflation",
+        "disagreement_preservation_and_abstention_correctness",
+        "conclusion_stability_after_removing_one_provider_root",
+        "investigator_time_to_expose_shared_dependency"
+      ],
+      "target": "100_percent_detection_of_seeded_shared_roots_and_derivation_edges; zero independence credit from unknown ancestry or provider-name diversity; zero confidence uplift for duplicated/relayed observations; zero false confident conclusions on common-mode false-fact controls.",
+      "reporting": [
+        "known_declared_inferred_and_unknown_edges_separately",
+        "provider_and_artifact_versions",
+        "common_mode_attack_family",
+        "all_negative_controls_and_denominators",
+        "no_global_independence_or_trust_score",
+        "no_change_to_pinned_REA_Evidence_identity_projection"
+      ],
+      "claim_ceiling": "This evaluates whether declared/observed provider dependency lineage is preserved and used correctly on the named corpus. It does not prove absence of undisclosed dependencies, statistical independence, producer authenticity or conclusion truth."
     }
   ],
   "promotion_policy": {
