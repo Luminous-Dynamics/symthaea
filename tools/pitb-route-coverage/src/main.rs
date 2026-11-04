@@ -1191,14 +1191,53 @@ fn run_self_tests() -> Result<(), String> {
         return Err("stale graph mapping was accepted".into());
     }
     println!("SELF_TEST_PASS declaration crosswalk binds exact graph manifest digest");
+
+    let paired_report = synthetic_report()?;
+    if paired_report.paired_comparisons.len() != 1 {
+        return Err("synthetic paired comparison was not generated".into());
+    }
+    let paired = &paired_report.paired_comparisons[0];
+    if paired.reference_kind != "leansearch_v2"
+        || paired.challenger_kind != "pitb_union"
+        || paired.matched_assessment_count != 1
+        || paired.matched_query_count != 1
+        || paired.challenger_only_route_count != 1
+        || paired.reference_only_route_count != 0
+        || paired.complete_route_coverage_delta != 1.0
+        || paired.component_cluster_count != 1
+        || paired.cluster_bootstrap_ci_low.is_some()
+        || paired.exact_mcnemar_p_value != 1.0
+    {
+        return Err("paired query-level comparison controls failed".into());
+    }
+    println!("SELF_TEST_PASS same-query retrieval comparison reports challenger route gain");
+    println!("SELF_TEST_PASS single-component bootstrap interval remains unavailable rather than pretending IID");
+
     Ok(())
 }
 
 fn synthetic_report() -> Result<Report, String> {
     let support = synthetic_support_report();
     let support_bytes = serde_json::to_vec_pretty(&support).map_err(|e| e.to_string())?;
-    let receipt = synthetic_receipt();
-    let receipts_bytes = [serde_json::to_vec(&receipt).map_err(|e| e.to_string())?, b"\n".to_vec()].concat();
+
+    // LeanSearch v2 control returns one member of the AND-route.
+    let mut reference = synthetic_receipt();
+    reference.retriever.kind = "leansearch_v2".into();
+    reference.retriever.name = "LeanSearch v2".into();
+    reference.retriever.version = "synthetic-v0".into();
+    reference.ranking.candidates.pop();
+
+    // PITB union returns both members of the same minimal sufficient route.
+    let mut challenger = synthetic_receipt();
+    challenger.retriever.kind = "pitb_union".into();
+    challenger.retriever.name = "PITB union".into();
+    challenger.retriever.version = "synthetic-v0".into();
+
+    let mut receipts_bytes = Vec::new();
+    for receipt in [&reference, &challenger] {
+        receipts_bytes.extend(serde_json::to_vec(receipt).map_err(|e| e.to_string())?);
+        receipts_bytes.push(b'\n');
+    }
     let mappings = vec![
         synthetic_mapping("node-h1","h1"),
         synthetic_mapping("node-h2","h2")
