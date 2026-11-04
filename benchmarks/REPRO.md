@@ -83,7 +83,7 @@ Run all 29 dev tasks. For a Luminous matched comparison, preregister three indep
 
 The official site reports Claude Opus 5.5 at 48.3% (±1.4%) and GPT-6 Astra at 45.8% (±0.6%) on the 56-task hidden test leaderboard. The paper abstract separately states that the strongest configuration reached a 50.6% mean score. The published page and paper describe different reported summaries; this registry stores both as context only and forbids treating them as a single matched baseline.
 
-The official site also reports 91% average individual-constraint satisfaction but only 41% all-hard-check clearance, with 27M tokens and 63 minutes per task for the top configuration. These are different measures and must remain separate. The hard-check gate is non-compensatory: a good cost score cannot rescue a critical constraint failure.
+The Google Cloud / Mercor launch report (3 November 2026) reports 91% average individual-constraint satisfaction on co-authored tasks but only 41.3% of those deliverables passing every hard safety and feasibility check. The paper reports about 27M tokens and 63 minutes per task for the strongest configuration. These are cohort- and source-scoped measures and must remain separate. The hard-check gate is non-compensatory: a good cost score cannot rescue a critical constraint failure.
 
 For CEB comparisons, first reproduce the official public dev leaderboard using the exact 29-task dev split and same scoring protocol. Only then estimate matched improvements. Never compare a local dev-set score to a hidden-set leaderboard score.
 
