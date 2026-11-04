@@ -4,7 +4,7 @@
 **Status:** `public_development_only_not_sealed`  
 **Pinned source revision:** `7a563cd61f4bda3347119ea39169a2e2d1c4f30b`  
 **Payload:** `workspace/`  
-**Payload CEB-TREE-V1:** `1e8cfe4c7a7653764e37e4b4a9eaa083804a6614db03ed56dee822395b762e3e`
+**Payload CEB-TREE-V1:** `9eb74b8c51a72e44328f55f8dbba4c3f340bb96fc3038764c88571b8466a7a92`
 
 The `workspace/` directory contains 15 allowlisted files from the synthetic five-crate Rust fixture: Cargo manifests, Rust source and integration-test source. The manifest is outside the payload tree to avoid self-reference. It records each file's mode, byte length and SHA-256 digest and pins the existing CEB-TREE-V1 payload digest.
 
