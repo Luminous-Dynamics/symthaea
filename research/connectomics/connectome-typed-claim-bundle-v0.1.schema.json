@@ -415,6 +415,7 @@
         "claim_status": {
           "enum": [
             "CLAIMED_SUPPORTED",
+            "CLAIMED_CONDITIONAL",
             "CLAIMED_AMBIGUOUS",
             "CLAIMED_NOT_ESTIMABLE",
             "CLAIMED_REJECTED"
