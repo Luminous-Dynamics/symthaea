@@ -605,6 +605,12 @@ pub fn compare_music_benchmark_runs_v1(
     right_run: &MusicBenchmarkRunManifestV1,
 ) -> MusicBenchmarkComparisonV1 {
     let mut reasons = Vec::new();
+    if !validate_music_benchmark_run_v1(left_profile, left_run).is_empty() {
+        reasons.push("left run manifest is invalid".to_owned());
+    }
+    if !validate_music_benchmark_run_v1(right_profile, right_run).is_empty() {
+        reasons.push("right run manifest is invalid".to_owned());
+    }
     if left_profile.benchmark_id != right_profile.benchmark_id {
         reasons.push("benchmark_id differs".to_owned());
     }
@@ -879,6 +885,20 @@ mod tests {
             .contains(&MusicBenchmarkRegistryIssueV1::ResourceBudgetExceeded {
                 field: "resource_usage".to_owned()
             }));
+    }
+
+    #[test]
+    fn invalid_run_manifest_is_never_directly_comparable() {
+        let profile = profile();
+        let mut left = run(&profile);
+        left.run_manifest_sha256 = "0".repeat(64);
+        let right = run(&profile);
+        let comparison = compare_music_benchmark_runs_v1(&profile, &left, &profile, &right);
+        assert_eq!(
+            comparison.comparability,
+            MusicBenchmarkComparabilityV1::DescriptiveOnly
+        );
+        assert!(comparison.reasons.iter().any(|reason| reason.contains("left run manifest is invalid")));
     }
 
     #[test]
