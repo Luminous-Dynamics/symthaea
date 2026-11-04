@@ -1,6 +1,6 @@
 # ETH-032 — rollback-aware candidate successor index
 
-**Status:** dependency-free Rust module and tests committed; Python mirror exercised; Rust compilation and GitHub CI remain unverified. No D4 binary differential, formal proof, or runtime speedup is claimed.
+**Status:** dependency-free Rust module, source-semantic transition guards and tests authored; Python mirror previously exercised; Rust compilation and GitHub CI remain unverified. No D4 binary differential, formal proof, or runtime speedup is claimed.
 
 ## Design
 
@@ -12,7 +12,7 @@ The module in src/candidate_successor.rs preserves D4's exact candidate permutat
 
 Backtracking reactivates bitmap positions through reverse incidence but does not undo candidate permutations or sentinel relocation.
 
-Public API: CandidateSuccessorIndex::new, set_clause_active, next_active_after_head, promote_to_head, validate and stats.
+Public API: CandidateSuccessorIndex::new, set_clause_active, advance_after_deactivation, next_active_after_head, promote_to_head, validate and stats. `advance_after_deactivation(record, clause)` is the canonical D4-shaped operation: it requires that `clause` is the record's current sentinel and is already inactive, then returns either `Relocated` (the first active successor was promoted) or `Exhausted` (no active successor remains). The lower-level query and promotion methods independently reject an active sentinel; promotion also rejects an inactive replacement. This prevents accidental successor queries on a non-sentinel candidate and prevents promoting an inactive candidate.
 
 ## Complexity hypothesis
 
@@ -64,3 +64,19 @@ The word-access column includes reads for swap-bit operations, not only successo
 3. Differential against an unchanged pinned D4v2 build.
 4. HOL4 refinement theorem for the protected-triple, sentinel and backtrack invariants.
 5. Benchmark on the pinned D4 build and SAT 2024 BCEi cohort; include initialization, update fanout, memory and runtime.
+
+
+## Sentinel-precondition hardening — 2026-11-04
+
+The Rust API now makes D4's `inprocessing()` call preconditions explicit:
+
+- A successor transition must name the record's current sentinel clause.
+- The sentinel must already have transitioned to inactive in the authoritative clause-activity table.
+- The returned successor is the first active candidate in the current permutation after position zero.
+- Promotion is accepted only when the old sentinel is inactive and the replacement candidate is active.
+- A no-successor result is represented as `SuccessorTransition::Exhausted`; the caller remains responsible for the theorem-backed target deletion and queue event.
+- Candidate order remains persistent across later clause reactivation; only activity bits are updated on backtrack.
+
+New Rust unit tests cover active-sentinel query rejection, mismatched-sentinel rejection, inactive-replacement rejection without mutation, exhausted records, and reactivation of an old candidate at its current non-head position. The randomized transition test now triggers successor processing only when the deactivated clause is the current sentinel, matching the source-level watch-trigger semantics rather than querying every record after every clause update.
+
+**Execution status:** these are authored Rust tests and source changes. They have not been compiled or run because `rustc` and `cargo` are unavailable in this execution environment. No test-pass claim is made for the new Rust code. The existing Python reference model remains separate evidence and does not substitute for Rust execution or D4-binary differential.
