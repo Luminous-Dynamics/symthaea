@@ -151,26 +151,40 @@ fn claim_has_evidence(
 }
 
 fn has_material_source_conflict(case: &Value, decision_time: &str) -> bool {
-    let critical_claims: Vec<&str> = array(case, "claims")
+    let critical_claims: Vec<&Value> = array(case, "claims")
         .iter()
-        .filter(|claim| {
-            matches!(
-                string(claim, "materiality"),
-                Some("critical" | "high")
-            )
-        })
-        .filter_map(|claim| string(claim, "claim_id"))
+        .filter(|claim| matches!(string(claim, "materiality"), Some("critical" | "high")))
         .collect();
 
-    array(case, "evidence").iter().any(|evidence| {
-        let known_at = string(evidence, "known_at").unwrap_or_default();
-        string(evidence, "evidence_class") == Some("contradictory_document")
-            && string(evidence, "record_state") == Some("current")
-            && critical_claims.contains(&string(evidence, "claim_id").unwrap_or_default())
-            && timestamp_le(known_at, decision_time)
+    critical_claims.iter().any(|claim| {
+        let claim_id = string(claim, "claim_id").unwrap_or_default();
+        let referenced_subjects: HashSet<(&str, &str)> = array(claim, "evidence_refs")
+            .iter()
+            .filter_map(Value::as_str)
+            .filter_map(|evidence_id| find_evidence(case, evidence_id))
+            .filter(|evidence| {
+                string(evidence, "record_state") == Some("current")
+                    && string(evidence, "known_at")
+                        .is_some_and(|known_at| timestamp_le(known_at, decision_time))
+            })
+            .filter_map(|evidence| {
+                Some((string(evidence, "subject_id")?, string(evidence, "boundary_id")?))
+            })
+            .collect();
+
+        array(case, "evidence").iter().any(|evidence| {
+            string(evidence, "evidence_class") == Some("contradictory_document")
+                && string(evidence, "claim_id") == Some(claim_id)
+                && string(evidence, "record_state") == Some("current")
+                && string(evidence, "known_at")
+                    .is_some_and(|known_at| timestamp_le(known_at, decision_time))
+                && referenced_subjects.contains(&(
+                    string(evidence, "subject_id").unwrap_or_default(),
+                    string(evidence, "boundary_id").unwrap_or_default(),
+                ))
+        })
     })
 }
-
 fn evidence_references_resolve(case: &Value) -> bool {
     let evidence = array(case, "evidence");
     let evidence_ids: HashSet<&str> = evidence
@@ -725,6 +739,46 @@ mod tests {
             .retain(|item| item["evidence_id"] != "ev_grid_agreement");
         let result = evaluate_case(case);
         assert!(result.blockers.iter().any(|value| value == "EVIDENCE_REFERENCE_INTEGRITY_FAILURE"));
+    }
+
+    #[test]
+    fn evidence_from_another_boundary_cannot_satisfy_a_gate() {
+        let mut corpus = public_corpus();
+        let case = corpus["cases"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|item| item["case_id"] == "solar-storage-base-001")
+            .unwrap();
+        let tariff = case["evidence"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|item| item["evidence_id"] == "ev_tariff")
+            .unwrap();
+        tariff["boundary_id"] = json!("different-project-offtake-boundary");
+        let result = evaluate_case(case);
+        assert!(result.blockers.iter().any(|value| value == "NO_DECISION_TIME_VALID_TARIFF_EVIDENCE"));
+    }
+
+    #[test]
+    fn issuer_signature_without_verified_authenticity_is_rejected() {
+        let mut corpus = public_corpus();
+        let case = corpus["cases"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|item| item["case_id"] == "solar-storage-base-001")
+            .unwrap();
+        let tariff = case["evidence"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|item| item["evidence_id"] == "ev_tariff")
+            .unwrap();
+        tariff["authenticity_status"] = json!("unverified");
+        let result = evaluate_case(case);
+        assert!(result.blockers.iter().any(|value| value == "NO_DECISION_TIME_VALID_TARIFF_EVIDENCE"));
     }
 
     #[test]
