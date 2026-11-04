@@ -219,6 +219,7 @@ pub enum OutputClockFitErrorV1 {
     NonMonotonicAnchorIndex { index: usize },
     NonMonotonicPlaybackTime { index: usize },
     NonContiguousFrameIndex { index: usize },
+    FrameIndexOverlap { index: usize },
     ZeroTimeVariance,
     NonFiniteFit,
     DriftOutsidePolicy { drift_ppm: f64, maximum_abs_ppm: f64 },
@@ -344,7 +345,25 @@ pub fn fit_output_clock_v1(
             let expected_frame = previous
                 .first_output_frame_index
                 .checked_add(previous.frame_count as u64);
-            if expected_frame != Some(anchor.first_output_frame_index) {
+            let Some(expected_frame) = expected_frame else {
+                return Err(OutputClockFitErrorV1::NonFiniteFit);
+            };
+            if anchor.first_output_frame_index < expected_frame {
+                return Err(OutputClockFitErrorV1::FrameIndexOverlap { index });
+            }
+            let missing_anchor_records = anchor.anchor_index - previous.anchor_index - 1;
+            if missing_anchor_records == 0
+                && anchor.first_output_frame_index != expected_frame
+            {
+                // Consecutive anchor records must describe consecutive audio
+                // blocks. A gap here is a clock/frame discontinuity.
+                return Err(OutputClockFitErrorV1::NonContiguousFrameIndex { index });
+            }
+            if missing_anchor_records > 0
+                && anchor.first_output_frame_index == expected_frame
+            {
+                // A skipped anchor index must correspond to at least one
+                // omitted non-empty callback block.
                 return Err(OutputClockFitErrorV1::NonContiguousFrameIndex { index });
             }
         }
@@ -545,6 +564,34 @@ mod tests {
         assert!(matches!(
             fit_output_clock_v1(&anchors, policy()),
             Err(OutputClockFitErrorV1::NonContiguousFrameIndex { index: 2 })
+        ));
+    }
+
+
+    #[test]
+    fn skipped_anchor_records_do_not_masquerade_as_frame_discontinuity() {
+        let anchors = vec![
+            anchor(0, 0, 5_000_000),
+            anchor(1, 480, 15_000_000),
+            anchor(3, 1440, 35_000_000),
+            anchor(4, 1920, 45_000_000),
+        ];
+        let fit = fit_output_clock_v1(&anchors, policy()).unwrap();
+        assert!((fit.estimated_drift_ppm).abs() < 1e-6);
+        assert_eq!(fit.anchor_count, 4);
+    }
+
+    #[test]
+    fn overlapping_output_frame_ranges_are_rejected_even_when_anchor_records_were_skipped() {
+        let anchors = vec![
+            anchor(0, 0, 5_000_000),
+            anchor(1, 480, 15_000_000),
+            anchor(3, 400, 35_000_000),
+            anchor(4, 880, 45_000_000),
+        ];
+        assert!(matches!(
+            fit_output_clock_v1(&anchors, policy()),
+            Err(OutputClockFitErrorV1::FrameIndexOverlap { index: 2 })
         ));
     }
 
