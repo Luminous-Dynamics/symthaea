@@ -685,7 +685,7 @@ mod tests {
             }
         );
         assert_eq!(index.candidates(0), Some(&[0, 2, 1, 3][..]));
-        index.validate(&[true, false, false, true]).unwrap();
+        index.validate(&[true, true, false, true]).unwrap();
     }
 
     #[test]
