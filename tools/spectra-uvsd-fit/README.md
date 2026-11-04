@@ -71,10 +71,21 @@ The public R example uses `nr_s1 = [10, 7, 16, 27, 29, 10]` and `nr_s2 = [43, 21
 
 An independent Python reference replay of the same six-start design obtained `mu=1.231422`, `sigma=1.252292`, `d_a=1.086687`, and `logL=-315.878077`. This is a Python algorithm check, not execution of the Rust test.
 
+## Class-stratified bootstrap intervals
+
+The crate exposes `bootstrap_intervals` for a deterministic nonparametric multinomial bootstrap conditional on the observed signal and noise trial totals. It resamples category assignments independently inside each stimulus class, holds the ordered category design fixed, and refits every replicate. The default requests 2,000 replicates and requires at least 1,600 successful interior fits plus a 90% success fraction before emitting percentile 95% intervals for mu, sigma and d_a.
+
+Only `Converged` fits enter the interval distribution. Boundary, weakly identified, non-identifiable, non-converged and non-evaluable replicates remain in the denominator and are returned separately. Insufficient success returns no intervals. The seed and count-correction mode are recorded.
+
+The `bootstrap_coverage` binary simulates known-answer Gaussian category counts and compares the returned mu, sigma and d_a intervals with the generating values. It reports the full-fit disposition counts, interval-return rate, coverage conditional on a returned qualified interval, mean interval widths and bootstrap failure fractions. Its defaults (50 outer campaigns × 100 bootstrap replicates) are a smoke/calibration pilot only; increase outer campaigns, bootstrap replicates and trial budgets for formal Monte Carlo assessment, and use disjoint calibration/held-out seed sets.
+
+These are conditional category-count bootstrap intervals, not participant-level cluster bootstrap intervals or a proof of calibrated 95% coverage. They do not account for sampling variability across participants, sessions or sites, and their coverage must be benchmarked against known-answer synthetic campaigns and the external reference workflow before use for scientific conclusions. A large failed-fit fraction is itself a design/identifiability warning, not a nuisance to be silently filtered out.
+
 ## Run
 
     cargo test --manifest-path tools/spectra-uvsd-fit/Cargo.toml
     cargo run --release --manifest-path tools/spectra-uvsd-fit/Cargo.toml --bin recovery_sweep > uvsd-recovery.csv
+    cargo run --release --manifest-path tools/spectra-uvsd-fit/Cargo.toml --bin bootstrap_coverage -- --outer=50 --bootstraps=100 --trials-per-class=400 > bootstrap-coverage.csv
 
 The recovery runner emits one CSV row per frozen synthetic campaign across mu, sigma and independent seeds, including optimizer and Fisher-information diagnostics. It is a parameter-recovery smoke benchmark only; its Wald intervals are not yet coverage-calibrated and the runner does not estimate false UVSD declaration rates, power, or empirical performance.
 
