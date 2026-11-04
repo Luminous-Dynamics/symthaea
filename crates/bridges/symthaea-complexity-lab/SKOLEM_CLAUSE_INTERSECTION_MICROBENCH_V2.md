@@ -10,7 +10,7 @@ The SCPOG paper describes reverse checking each input clause by traversing the P
 - 672 synthetic Skolem nodes, 96 each at degrees 1, 4, 16, 64, 256, 1,024 and 4,096.
 - 128 input-clause queries per node; clause lengths cycle through 3, 8 and 16.
 - Half the queries contain one Skolem literal, half contain none.
-- 86,016 clause-intersection queries and 774,144 candidate literal positions.
+- 86,016 clause-intersection queries and 769,440 candidate literal positions.
 - Identical generated query stream for all layouts; seed 0xE7029.
 
 Representations: Python hash set, sorted packed uint32 IDs with binary search, dense 2-bit variable state (absent/positive/negative), and a sparse/dense hybrid.
