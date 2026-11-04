@@ -37,8 +37,14 @@ pub enum MusicalParticipationDecisionV1 {
 }
 
 impl MusicalParticipationDecisionV1 {
+    /// Any explicit interaction intervention, including relinquishing the floor.
     pub fn is_contribution(self) -> bool {
         matches!(self, Self::Respond | Self::Continue | Self::Yield)
+    }
+
+    /// An audible/new musical entry or continuation, excluding YIELD.
+    pub fn is_entry(self) -> bool {
+        matches!(self, Self::Respond | Self::Continue)
     }
 
     pub fn is_epistemic_withhold(self) -> bool {
@@ -149,6 +155,8 @@ pub struct MusicalParticipationFamilyScoreV1 {
     pub valid_decision_support_rate: f64,
     pub paired_correct: bool,
     pub false_entry_count: usize,
+    pub unauthorized_yield_count: usize,
+    pub withhold_violation_count: usize,
     pub missed_invitation_count: usize,
     pub intentional_wait_count: usize,
     pub epistemic_abstain_count: usize,
@@ -180,6 +188,9 @@ pub struct MusicalParticipationAggregateV1 {
     pub paired_act_withhold_accuracy: f64,
     pub false_entry_count: usize,
     pub false_entry_rate: f64,
+    pub unauthorized_yield_count: usize,
+    pub withhold_violation_count: usize,
+    pub withhold_violation_rate: f64,
     pub missed_invitation_count: usize,
     pub missed_invitation_rate: f64,
     pub intentional_wait_count: usize,
@@ -478,6 +489,8 @@ pub fn score_musical_participation_set_v1(
     let mut valid_decision_support_count = 0usize;
     let mut paired_correct_count = 0usize;
     let mut false_entry_count = 0usize;
+    let mut unauthorized_yield_count = 0usize;
+    let mut withhold_violation_count = 0usize;
     let mut missed_invitation_count = 0usize;
     let mut intentional_wait_count = 0usize;
     let mut epistemic_abstain_count = 0usize;
@@ -499,6 +512,8 @@ pub fn score_musical_participation_set_v1(
 
         let mut family_support = 0usize;
         let mut family_false_entries = 0usize;
+        let mut family_unauthorized_yields = 0usize;
+        let mut family_withhold_violations = 0usize;
         let mut family_missed_invitations = 0usize;
         let mut family_brier = 0.0;
 
@@ -574,6 +589,8 @@ pub fn score_musical_participation_set_v1(
             valid_decision_support_rate: family_support as f64 / 2.0,
             paired_correct: family_paired_correct,
             false_entry_count: family_false_entries,
+            unauthorized_yield_count: family_unauthorized_yields,
+            withhold_violation_count: family_withhold_violations,
             missed_invitation_count: family_missed_invitations,
             intentional_wait_count: predictions
                 .iter()
@@ -623,6 +640,10 @@ pub fn score_musical_participation_set_v1(
         paired_act_withhold_accuracy: paired_correct_count as f64 / set.families.len() as f64,
         false_entry_count,
         false_entry_rate: false_entry_count as f64 / withhold_required_count as f64,
+        unauthorized_yield_count,
+        withhold_violation_count,
+        withhold_violation_rate: withhold_violation_count as f64
+            / withhold_required_count as f64,
         missed_invitation_count,
         missed_invitation_rate: missed_invitation_count as f64 / act_required_count as f64,
         intentional_wait_count,
