@@ -341,5 +341,87 @@
     "exact connectivity profile and local/offline functional boundary",
     "local plumbing/backflow and product-category regulatory review"
   ],
-  "claim_ceiling": "This ledger preserves public manufacturer and third-party listing statements only. It does not establish local availability, installation suitability, physical performance, water savings, potable quality, compliance, affordability, product superiority or market demand."
+  "claim_ceiling": "This ledger preserves public manufacturer and third-party listing statements only. It does not establish local availability, installation suitability, physical performance, water savings, potable quality, compliance, affordability, product superiority or market demand.",
+  "connectivity_qualification_matrix": [
+    {
+      "id": "NET-001",
+      "failure": "WAN internet down; local router/LAN remain up",
+      "required_observations": [
+        "basic treatment/service",
+        "pump/valve control",
+        "local manual control",
+        "alarms",
+        "storage/delivery",
+        "local logs"
+      ]
+    },
+    {
+      "id": "NET-002",
+      "failure": "Wi-Fi disabled; Ethernet retained where supported",
+      "required_observations": [
+        "wired-mode operation",
+        "local diagnostics",
+        "safe fallback"
+      ]
+    },
+    {
+      "id": "NET-003",
+      "failure": "Ethernet disabled; configured Wi-Fi retained",
+      "required_observations": [
+        "wireless-mode operation",
+        "local diagnostics",
+        "safe fallback"
+      ]
+    },
+    {
+      "id": "NET-004",
+      "failure": "LAN/router/DNS unavailable while appliance power remains",
+      "required_observations": [
+        "local controls",
+        "safe state",
+        "manual override",
+        "physical service continuity"
+      ]
+    },
+    {
+      "id": "NET-005",
+      "failure": "vendor account/authentication/remote API unavailable",
+      "required_observations": [
+        "basic operation",
+        "local diagnosis",
+        "user override",
+        "reset/recovery dependency"
+      ]
+    },
+    {
+      "id": "NET-006",
+      "failure": "vendor update/support endpoint unavailable",
+      "required_observations": [
+        "fault handling",
+        "offline firmware recovery",
+        "update deferral",
+        "rollback boundary"
+      ]
+    },
+    {
+      "id": "NET-007",
+      "failure": "network equipment power lost while appliance remains powered",
+      "required_observations": [
+        "unnecessary halt",
+        "service continuity",
+        "operator notification"
+      ]
+    },
+    {
+      "id": "NET-008",
+      "failure": "complete appliance power interruption and restoration",
+      "required_observations": [
+        "safe restart",
+        "default valve/pump state",
+        "stale evidence handling",
+        "required requalification"
+      ]
+    }
+  ],
+  "connectivity_qualification_claim_ceiling": "Challenges are proposed test cases, not findings about the current Hydraloop, JoJo or Moen products. Exact SKU, firmware, network topology and manufacturer-approved test conditions must be frozen. No safety interlock is bypassed."
 }
