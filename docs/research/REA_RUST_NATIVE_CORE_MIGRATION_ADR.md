@@ -975,3 +975,5 @@ The known-answer test checks CRC-32/ISO-HDLC `123456789 -> 0xcbf43926`, empty in
 
 This does not authenticate the declared CRC or prove the archive producer is honest; it independently checks that the decompressed stream matches the archive's own declaration. A malicious producer can still consistently declare and encode malicious bytes. The content SHA-256, CRC consistency and producer attestation remain distinct facts.
 
+The fuzz workflow now pins `nightly-2026-11-03` rather than following the moving `nightly` channel. The run receipt must bind that exact toolchain together with cargo-fuzz 0.13.2, libfuzzer-sys 0.4.13, seed digest, generated Cargo.lock and bounded runtime/resource configuration.
+
