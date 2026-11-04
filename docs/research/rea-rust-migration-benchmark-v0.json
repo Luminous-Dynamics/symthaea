@@ -316,7 +316,10 @@
         "oracle_dependency_and_codec_commonality_audit",
         "content_addressed_minimized_regression_corpus",
         "custom_crc32_standard_123456789_known_answer",
-        "shared_crc32fast_dependency_common_mode_not_independent_checksum_evidence"
+        "shared_crc32fast_dependency_common_mode_not_independent_checksum_evidence",
+        "libfuzzer_admission_and_content_target_seeded_zip",
+        "fuzz_harness_temp_path_symlink_prevention_create_new",
+        "content_addressed_starter_seed_reproducibility"
       ],
       "metrics": [
         "entry_occurrence_precision_recall",
@@ -349,7 +352,11 @@
         "coverage_guided_fuzz_execs_per_second",
         "oracle_dependency_overlap_by_parser_and_codec",
         "checksum_known_answer_correctness",
-        "shared_checksum_dependency_correlation_reported"
+        "shared_checksum_dependency_correlation_reported",
+        "fuzz_smoke_elapsed_seconds",
+        "fuzz_peak_rss_mib",
+        "starter_seed_digest_reproducibility",
+        "fuzz_target_crash_and_timeout_counts"
       ],
       "target": "100_percent supported-subset parity against pinned upstream REA and separately pinned decoder oracles; zero false accepts for CRC/size corruption, partial streams, metadata disagreement, source mutation or actual-output limit violations; bounded memory independent of member size; performance scored only after correctness gates pass.",
       "boundaries": {
@@ -390,8 +397,31 @@
         "content-address every seed and minimized disagreement; retain unresolved oracle outcomes rather than voting",
         "audit exact Cargo.lock dependency edges and checksum implementations; zipcore and zip share crc32fast 1.5.4 in the current resolved graph",
         "do not count two parsers using the same CRC crate as independent checksum corroboration; retain Symthaea custom CRC as a separately implemented known-answer arm",
-        "report independent parser, codec and checksum ancestry separately"
-      ]
+        "report independent parser, codec and checksum ancestry separately",
+        "run the standalone REA ZIP libFuzzer target on Linux x86-64/nightly with a content-addressed seed and bounded input/output/RSS/time budgets",
+        "the fuzz target must create unique temporary input files with create_new and never extract entries; remove temp files through an RAII guard",
+        "report bounded smoke status separately from sustained coverage-guided fuzz qualification; persist fuzz artifacts and lockfile"
+      ],
+      "fuzz_qualification": {
+        "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10451",
+        "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10451",
+        "target": "zip_inventory_and_content",
+        "runner": "cargo-fuzz 0.13.2; libfuzzer-sys 0.4.13; Linux x86-64 nightly",
+        "starter_seed_sha256": "dd8a2bd8c16d808363a1d1e7560a4cc86494393c1a202a478db00f00ae53d099",
+        "limits": {
+          "input_bytes": 1048576,
+          "central_directory_bytes": 262144,
+          "max_entries": 256,
+          "aggregate_declared_output_bytes": 4194304,
+          "per_member_output_bytes": 262144,
+          "verified_members_per_input": 8,
+          "read_buffer_bytes": 4096,
+          "workflow_seconds": 180,
+          "rss_mib": 512
+        },
+        "current_status": "draft_target_authored; workflow queued; no fuzz executions claimed",
+        "claim_ceiling": "A bounded 180-second smoke run is only evidence for the exact head, toolchain, seed corpus, runtime and environment. It is not security certification or proof of bug absence."
+      }
     },
     {
       "id": "causal_diagnosis_and_next_experiment",
