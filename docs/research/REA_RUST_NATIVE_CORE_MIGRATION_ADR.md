@@ -989,3 +989,23 @@ The new [#10455 — amortize ZIP decoder admission without weakening per-member 
 
 No performance optimization may proceed by weakening per-member decompression limits. A one-byte-overrun sentinel could be evaluated only with explicit proof that the decoder cannot allocate or emit beyond the bounded caller-controlled read buffer and that every understated-size entry is rejected. Otherwise keep the current per-member-open reference. All session designs must retain independent decoder cursors and per-attempt source revalidation.
 
+## 22. 2026-11-04 — versioned member-verification evidence receipt
+
+A typed in-memory `VerifiedEntryContent` is not enough for downstream reproducibility: copying only a digest can lose the exact central-directory occurrence, raw filename bytes, source identity strength, verifier build, decoder/codec lineage, resource limits, and claim ceiling.
+
+A first draft JSON Schema is now in `docs/research/rea-zip-content-verification-receipt-v0.schema.json`, owned by [#10477 — versioned evidence receipt for verified artifact member claims](https://github.com/Luminous-Dynamics/symthaea/issues/10477). The new benchmark family `artifact_member_receipt_reproducibility` binds it to an independent replay programme.
+
+The schema's core separations are deliberate:
+- **Source binding:** archive size, platform, identity scheme, held-descriptor and selected-path observations, and optional whole-archive SHA-256. Filesystem identity is not silently relabelled as an archive digest or immutable snapshot.
+- **Occurrence identity:** central-directory index and exact raw filename bytes (base64); decoded filename is presentation metadata. Duplicate-name count remains separate.
+- **Observed content:** decompressed byte count, payload SHA-256, observed CRC-32, decoder EOF/CRC/size outcomes, independent CRC result and metadata-parity outcome.
+- **Verifier lineage:** exact source commit, toolchain, target, Cargo.lock digest, SHA implementation, independent CRC implementation, secondary decoder and explicitly used differential oracles.
+- **Limits:** configured archive, central-directory, entry-count, total declared output, per-entry output and read-buffer limits are distinct from observed bytes.
+- **Outcome:** verified, rejected, unsupported, source-changed, limit-exceeded or abstained; an unknown or unsupported path cannot be a pass.
+- **Claim ceiling:** producer authenticity, APK/IPA signature validity, archive completeness, installability, runtime behavior and MASVS control pass are explicitly not established by a member digest/CRC receipt.
+- **Attestation:** absent by default. A future in-toto/DSSE envelope is a separate statement and trust policy, not a field that silently upgrades the payload observation.
+
+A verified receipt requires qualified source binding plus decoder EOF, decoder CRC/size acceptance, independent CRC agreement and exact metadata parity. A receipt with best-effort source identity cannot claim `verified`. Replay against content-addressed original archive bytes is the qualification target; the receipt's own signature/digest will authenticate the statement, not the truth of the underlying bytes.
+
+Canonical serialization is not yet frozen. RFC 8785 conformance must be established with vectors before any deterministic receipt digest is assigned. No runtime receipt serializer or replay tool is claimed yet.
+
