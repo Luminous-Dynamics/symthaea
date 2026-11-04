@@ -11,7 +11,9 @@
     "paper": "https://proceedings.mlr.press/v306/letson26a.html",
     "database_spec": "https://github.com/SorryDB/SorryDB/blob/master/doc/DATABASE.md",
     "task_goal_text_distributed": false,
-    "blame_email_hash_distributed": false
+    "blame_email_hash_distributed": false,
+    "source_file_sha256": "26bfd11099f6b8db7f80d49bdea5d9f8ea0d23ba65d44d93f67ed42ba1530062",
+    "snapshot_description": "Frozen 1,000-task evaluation split from the SorryDB_2601 benchmark release. Repository commit and Git blob identity pin the source database file; each task pins its own project commit and Lean toolchain."
   },
   "statistics": {
     "task_count": 1000,
