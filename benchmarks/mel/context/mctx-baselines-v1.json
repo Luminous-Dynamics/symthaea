@@ -3,7 +3,7 @@
   "baselines": [
     {
       "baseline_id": "LOCAL-CUE-ONLY-001",
-      "description": "Negative control: same local cue signature maps to the same action, ignoring collaborator intent, performer context and longer musical history.",
+      "description": "Negative control: maps each local cue signature to one action, ignoring explicit collaborator intent and preceding harmonic context.",
       "predictions_by_family": [
         [
           "RESPOND",
@@ -14,11 +14,19 @@
           "RESPOND"
         ],
         [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "WAIT",
+          "WAIT"
+        ],
+        [
           "WAIT"
         ]
       ],
       "expected": {
-        "member_action_accuracy": 0.8,
+        "member_action_accuracy": 0.7777777777777778,
         "context_sensitivity_rate": 0,
         "surface_invariance_rate": 1,
         "ambiguous_valid_action_rate": 1
@@ -26,8 +34,12 @@
     },
     {
       "baseline_id": "INSTRUMENT-SURFACE-ONLY-001",
-      "description": "Negative control: piano maps to RESPOND and guitar to WAIT, ignoring that the instrumental surface is an irrelevant change to the same invitation.",
+      "description": "Negative control: chooses actions from surface instrument identity alone, ignoring intent, harmonic history and phrase context.",
       "predictions_by_family": [
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
         [
           "RESPOND",
           "RESPOND"
@@ -37,11 +49,15 @@
           "WAIT"
         ],
         [
+          "WAIT",
+          "RESPOND"
+        ],
+        [
           "WAIT"
         ]
       ],
       "expected": {
-        "member_action_accuracy": 0.6,
+        "member_action_accuracy": 0.5555555555555556,
         "context_sensitivity_rate": 0,
         "surface_invariance_rate": 0,
         "ambiguous_valid_action_rate": 1
@@ -49,7 +65,7 @@
     },
     {
       "baseline_id": "EXPLICIT-CONTEXT-RULE-SANITY-001",
-      "description": "Hand-written symbolic rule sanity check: respond to an explicit invitation, wait when the collaborator retains the floor, preserve response across instrument changes, and choose one member of the declared ambiguous valid-action set. This is not a learned model or SOTA result.",
+      "description": "Hand-written symbolic rule sanity check: uses explicit invitations and preceding harmonic context, preserves actions across instrument-only changes, and chooses one action within an explicitly valid ambiguous set. This is not a learned model or SOTA result.",
       "predictions_by_family": [
         [
           "RESPOND",
@@ -57,7 +73,15 @@
         ],
         [
           "RESPOND",
+          "CONTINUE"
+        ],
+        [
+          "RESPOND",
           "RESPOND"
+        ],
+        [
+          "WAIT",
+          "WAIT"
         ],
         [
           "WAIT"
