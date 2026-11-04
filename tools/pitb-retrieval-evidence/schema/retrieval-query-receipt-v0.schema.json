@@ -368,5 +368,123 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "retriever": {
+            "properties": {
+              "kind": {
+                "const": "daps_selector"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          }
+        },
+        "required": [
+          "retriever"
+        ]
+      },
+      "then": {
+        "properties": {
+          "retriever": {
+            "properties": {
+              "checkpoint_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "ranking": {
+            "properties": {
+              "score_metric": {
+                "const": "rank_only"
+              }
+            },
+            "required": [
+              "score_metric"
+            ]
+          }
+        },
+        "required": [
+          "ranking"
+        ]
+      },
+      "then": {
+        "properties": {
+          "ranking": {
+            "properties": {
+              "score_direction": {
+                "const": "rank_only"
+              },
+              "candidates": {
+                "items": {
+                  "properties": {
+                    "score": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "ranking": {
+            "properties": {
+              "score_metric": {
+                "enum": [
+                  "cosine_similarity",
+                  "dot_product",
+                  "logit",
+                  "distance"
+                ]
+              }
+            },
+            "required": [
+              "score_metric"
+            ]
+          }
+        },
+        "required": [
+          "ranking"
+        ]
+      },
+      "then": {
+        "properties": {
+          "ranking": {
+            "properties": {
+              "score_direction": {
+                "enum": [
+                  "higher_better",
+                  "lower_better"
+                ]
+              },
+              "candidates": {
+                "items": {
+                  "properties": {
+                    "score": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
