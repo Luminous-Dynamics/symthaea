@@ -172,13 +172,22 @@ fn graph_from_edges(edges: &[Edge]) -> Result<Graph, String> {
     let mut graph = BTreeMap::new();
     for edge in edges {
         if edge.source == edge.target {
-            return Err(format!("self-loop {} -> {} is not admitted", edge.source, edge.target));
+            return Err(format!(
+                "self-loop {} -> {} is not admitted",
+                edge.source, edge.target
+            ));
         }
         if !edge.weight.is_finite() || edge.weight <= 0.0 {
             return Err("baseline graph weights must be finite and strictly positive".into());
         }
-        if graph.insert((edge.source, edge.target), edge.weight).is_some() {
-            return Err(format!("duplicate directed edge {} -> {}", edge.source, edge.target));
+        if graph
+            .insert((edge.source, edge.target), edge.weight)
+            .is_some()
+        {
+            return Err(format!(
+                "duplicate directed edge {} -> {}",
+                edge.source, edge.target
+            ));
         }
     }
     Ok(graph)
@@ -211,7 +220,11 @@ fn query_value(graph: &Graph, metric: &QueryMetric) -> f64 {
             .map(|(_, weight)| *weight)
             .sum(),
         QueryMetric::PathExists { source, target } => {
-            if path_exists(graph, *source, *target) { 1.0 } else { 0.0 }
+            if path_exists(graph, *source, *target) {
+                1.0
+            } else {
+                0.0
+            }
         }
     }
 }
@@ -267,7 +280,9 @@ fn validate_query(query: &Query) -> Result<(), String> {
         (_, DecisionRule::GreaterThan { threshold })
         | (_, DecisionRule::GreaterOrEqual { threshold })
         | (_, DecisionRule::LessThan { threshold })
-        | (_, DecisionRule::LessOrEqual { threshold }) if !threshold.is_finite() => {
+        | (_, DecisionRule::LessOrEqual { threshold })
+            if !threshold.is_finite() =>
+        {
             return Err("query threshold must be finite".into());
         }
         (_, DecisionRule::BetweenInclusive { lower, upper })
@@ -280,7 +295,10 @@ fn validate_query(query: &Query) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_requirement_dag(edits: &[EditAtom], indices: &BTreeMap<String, usize>) -> Result<(), String> {
+fn validate_requirement_dag(
+    edits: &[EditAtom],
+    indices: &BTreeMap<String, usize>,
+) -> Result<(), String> {
     fn visit(
         index: usize,
         edits: &[EditAtom],
@@ -295,7 +313,10 @@ fn validate_requirement_dag(edits: &[EditAtom], indices: &BTreeMap<String, usize
         colors[index] = 1;
         for required in &edits[index].requires {
             let child = *indices.get(required).ok_or_else(|| {
-                format!("edit {} requires unknown edit {}", edits[index].edit_id, required)
+                format!(
+                    "edit {} requires unknown edit {}",
+                    edits[index].edit_id, required
+                )
             })?;
             visit(child, edits, indices, colors)?;
         }
@@ -318,7 +339,9 @@ fn validate(input: &Input) -> Result<Graph, String> {
         return Err("analysis_id must be non-empty".into());
     }
     if !valid_hex(&input.dataset_revision_commit_sha, 40) {
-        return Err("dataset_revision_commit_sha must be 40 lowercase hexadecimal characters".into());
+        return Err(
+            "dataset_revision_commit_sha must be 40 lowercase hexadecimal characters".into(),
+        );
     }
     if !matches!(
         input.edit_universe_scope.as_str(),
@@ -345,7 +368,9 @@ fn validate(input: &Input) -> Result<Graph, String> {
     }
     validate_query(&input.query)?;
     if input.edits.is_empty() || input.edits.len() > MAX_EDIT_ATOMS {
-        return Err(format!("edits must contain between 1 and {MAX_EDIT_ATOMS} atoms for exact enumeration"));
+        return Err(format!(
+            "edits must contain between 1 and {MAX_EDIT_ATOMS} atoms for exact enumeration"
+        ));
     }
 
     let mut indices = BTreeMap::<String, usize>::new();
@@ -355,20 +380,32 @@ fn validate(input: &Input) -> Result<Graph, String> {
             return Err("edit IDs must be non-empty and unique".into());
         }
         if edit.effort_units == 0 {
-            return Err(format!("edit {} effort_units must be positive", edit.edit_id));
+            return Err(format!(
+                "edit {} effort_units must be positive",
+                edit.edit_id
+            ));
         }
         total_effort = total_effort
             .checked_add(edit.effort_units)
             .ok_or_else(|| "sum of edit effort_units overflows u64".to_string())?;
         if !valid_hex(&edit.evidence_sha256, 64) {
-            return Err(format!("edit {} evidence_sha256 must be lowercase SHA-256", edit.edit_id));
+            return Err(format!(
+                "edit {} evidence_sha256 must be lowercase SHA-256",
+                edit.edit_id
+            ));
         }
         match edit.kind {
             EditKind::GraphEdit if edit.changes.is_empty() => {
-                return Err(format!("graph_edit {} must contain at least one edge change", edit.edit_id));
+                return Err(format!(
+                    "graph_edit {} must contain at least one edge change",
+                    edit.edit_id
+                ));
             }
             EditKind::EvidenceGate if !edit.changes.is_empty() => {
-                return Err(format!("evidence_gate {} must not mutate the graph", edit.edit_id));
+                return Err(format!(
+                    "evidence_gate {} must not mutate the graph",
+                    edit.edit_id
+                ));
             }
             _ => {}
         }
@@ -376,32 +413,50 @@ fn validate(input: &Input) -> Result<Graph, String> {
         let mut required_ids = BTreeSet::new();
         for required in &edit.requires {
             if required == &edit.edit_id || !required_ids.insert(required) {
-                return Err(format!("edit {} has a self or duplicate requirement", edit.edit_id));
+                return Err(format!(
+                    "edit {} has a self or duplicate requirement",
+                    edit.edit_id
+                ));
             }
         }
         let mut conflict_ids = BTreeSet::new();
         for conflict in &edit.conflicts_with {
             if conflict == &edit.edit_id || !conflict_ids.insert(conflict) {
-                return Err(format!("edit {} has a self or duplicate conflict", edit.edit_id));
+                return Err(format!(
+                    "edit {} has a self or duplicate conflict",
+                    edit.edit_id
+                ));
             }
         }
 
         let mut touched_edges = BTreeSet::new();
         for change in &edit.changes {
             if change.source == change.target {
-                return Err(format!("edit {} contains a self-loop mutation", edit.edit_id));
+                return Err(format!(
+                    "edit {} contains a self-loop mutation",
+                    edit.edit_id
+                ));
             }
             if !change.expected_weight.is_finite()
                 || change.expected_weight < 0.0
                 || !change.replacement_weight.is_finite()
                 || change.replacement_weight < 0.0
             {
-                return Err(format!("edit {} contains a non-finite or negative edge weight", edit.edit_id));
+                return Err(format!(
+                    "edit {} contains a non-finite or negative edge weight",
+                    edit.edit_id
+                ));
             }
             if !touched_edges.insert((change.source, change.target)) {
-                return Err(format!("edit {} mutates one directed edge more than once", edit.edit_id));
+                return Err(format!(
+                    "edit {} mutates one directed edge more than once",
+                    edit.edit_id
+                ));
             }
-            let current = graph.get(&(change.source, change.target)).copied().unwrap_or(0.0);
+            let current = graph
+                .get(&(change.source, change.target))
+                .copied()
+                .unwrap_or(0.0);
             if current.to_bits() != change.expected_weight.to_bits() {
                 return Err(format!(
                     "edit {} precondition mismatch for {} -> {}: expected {}, baseline has {}",
@@ -417,15 +472,27 @@ fn validate(input: &Input) -> Result<Graph, String> {
     for edit in &input.edits {
         for required in &edit.requires {
             if !indices.contains_key(required) {
-                return Err(format!("edit {} requires unknown edit {}", edit.edit_id, required));
+                return Err(format!(
+                    "edit {} requires unknown edit {}",
+                    edit.edit_id, required
+                ));
             }
         }
         for conflict in &edit.conflicts_with {
             let other_index = *indices.get(conflict).ok_or_else(|| {
-                format!("edit {} conflicts with unknown edit {}", edit.edit_id, conflict)
+                format!(
+                    "edit {} conflicts with unknown edit {}",
+                    edit.edit_id, conflict
+                )
             })?;
-            if !input.edits[other_index].conflicts_with.contains(&edit.edit_id) {
-                return Err(format!("conflict {} <-> {} must be declared symmetrically", edit.edit_id, conflict));
+            if !input.edits[other_index]
+                .conflicts_with
+                .contains(&edit.edit_id)
+            {
+                return Err(format!(
+                    "conflict {} <-> {} must be declared symmetrically",
+                    edit.edit_id, conflict
+                ));
             }
         }
     }
@@ -434,7 +501,10 @@ fn validate(input: &Input) -> Result<Graph, String> {
     let mut edge_owners = BTreeMap::<(u64, u64), Vec<usize>>::new();
     for (index, edit) in input.edits.iter().enumerate() {
         for change in &edit.changes {
-            edge_owners.entry((change.source, change.target)).or_default().push(index);
+            edge_owners
+                .entry((change.source, change.target))
+                .or_default()
+                .push(index);
         }
     }
     for owners in edge_owners.values() {
@@ -442,7 +512,8 @@ fn validate(input: &Input) -> Result<Graph, String> {
             for right in (left + 1)..owners.len() {
                 let a = &input.edits[owners[left]];
                 let b = &input.edits[owners[right]];
-                if !a.conflicts_with.contains(&b.edit_id) || !b.conflicts_with.contains(&a.edit_id) {
+                if !a.conflicts_with.contains(&b.edit_id) || !b.conflicts_with.contains(&a.edit_id)
+                {
                     return Err(format!(
                         "edits {} and {} mutate the same edge and must explicitly conflict",
                         a.edit_id, b.edit_id
@@ -465,7 +536,8 @@ fn canonical_edit_universe_sha256(edits: &[EditAtom]) -> Result<String, String> 
     for edit in &mut rows {
         edit.requires.sort();
         edit.conflicts_with.sort();
-        edit.changes.sort_by_key(|change| (change.source, change.target));
+        edit.changes
+            .sort_by_key(|change| (change.source, change.target));
     }
     rows.sort_by(|left, right| left.edit_id.cmp(&right.edit_id));
     let bytes = serde_json::to_vec(&rows)
@@ -542,7 +614,8 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         return Err("baseline query produced a non-finite value".into());
     }
     let baseline_met = decision_met(baseline_value, &input.query.decision);
-    let indices = input.edits
+    let indices = input
+        .edits
         .iter()
         .enumerate()
         .map(|(index, edit)| (edit.edit_id.clone(), index))
@@ -673,7 +746,9 @@ fn main() -> ExitCode {
     let rendered = match serde_json::to_string_pretty(&report) {
         Ok(json) => json + "\n",
         Err(error) => {
-            eprintln!("connectome-query-flipping-witness-audit: could not serialize report: {error}");
+            eprintln!(
+                "connectome-query-flipping-witness-audit: could not serialize report: {error}"
+            );
             return ExitCode::from(2);
         }
     };
@@ -719,12 +794,77 @@ mod tests {
         assert_eq!(report.subset_count_evaluated, 127);
         assert_eq!(report.minimal_witnesses_truncated, false);
         assert!(report.witnesses.iter().all(|witness| {
-            witness.effort_units == 5 && !witness.resulting_decision_met
+            witness.effort_units == 5
+                && !witness.resulting_decision_met
                 && witness.edit_ids.contains(&"adjudication-gate".to_string())
         }));
         assert!(report.witnesses.iter().all(|witness| {
             !(witness.edit_ids.contains(&"remove-13-a".to_string())
                 && witness.edit_ids.contains(&"remove-13-b".to_string()))
+        }));
+    }
+
+    #[test]
+    fn three_edit_synergy_is_found_when_no_singleton_or_pair_flips() {
+        let baseline_graph = vec![
+            Edge { source: 1, target: 2, weight: 0.5 },
+            Edge { source: 1, target: 3, weight: 0.5 },
+            Edge { source: 1, target: 4, weight: 0.5 },
+            Edge { source: 1, target: 5, weight: 0.5 },
+        ];
+        let graph = graph_from_edges(&baseline_graph).unwrap();
+        let targets = [2_u64, 3, 4, 5];
+        let edits = targets
+            .iter()
+            .enumerate()
+            .map(|(index, target)| EditAtom {
+                edit_id: format!("remove-{target}"),
+                kind: EditKind::GraphEdit,
+                effort_units: 1,
+                evidence_sha256: format!("{:064x}", index + 1),
+                requires: Vec::new(),
+                conflicts_with: Vec::new(),
+                changes: vec![EdgeChange {
+                    source: 1,
+                    target: *target,
+                    expected_weight: 0.5,
+                    replacement_weight: 0.0,
+                }],
+            })
+            .collect::<Vec<_>>();
+        let input = Input {
+            schema_version: 1,
+            analysis_id: "three-way-synergy-unit-test".into(),
+            dataset_revision_commit_sha: "a".repeat(40),
+            edit_universe_scope: "exhaustive_declared_edit_universe".into(),
+            baseline_graph_sha256: graph_sha256(&graph),
+            baseline_graph,
+            query: Query {
+                query_id: "out-degree-at-least-0-75".into(),
+                metric: QueryMetric::OutDegree { node: 1 },
+                decision: DecisionRule::GreaterOrEqual { threshold: 0.75 },
+            },
+            effort_unit: "synthetic_effort_units".into(),
+            max_total_effort_units: 3,
+            edits,
+        };
+        let baseline = validate(&input).unwrap();
+        for mask in 1_u64..(1_u64 << input.edits.len()) {
+            if mask.count_ones() <= 2 {
+                let graph = apply_subset(&baseline, mask, &input.edits);
+                assert!(decision_met(
+                    query_value(&graph, &input.query.metric),
+                    &input.query.decision
+                ));
+            }
+        }
+        let bytes = serde_json::to_vec(&input).unwrap();
+        let report = evaluate(&input, &bytes).unwrap();
+        assert_eq!(report.minimal_witness_effort_units, Some(3));
+        assert_eq!(report.minimal_witness_count, 4);
+        assert_eq!(report.decision_flipping_subset_count_within_budget, 5);
+        assert!(report.witnesses.iter().all(|witness| {
+            witness.edit_ids.len() == 3 && !witness.resulting_decision_met
         }));
     }
 
@@ -736,9 +876,15 @@ mod tests {
         let report = evaluate(&input, &bytes).unwrap();
         assert_eq!(report.minimal_witness_effort_units, None);
         assert_eq!(report.minimal_witness_count, 0);
-        assert_eq!(report.status, "NO_WITNESS_WITHIN_DECLARED_EDIT_UNIVERSE_AND_BUDGET");
+        assert_eq!(
+            report.status,
+            "NO_WITNESS_WITHIN_DECLARED_EDIT_UNIVERSE_AND_BUDGET"
+        );
         assert!(report.search_complete);
-        assert_eq!(report.probability_claim, "NONE_DETERMINISTIC_FINITE_EDIT_UNIVERSE_ONLY");
+        assert_eq!(
+            report.probability_claim,
+            "NONE_DETERMINISTIC_FINITE_EDIT_UNIVERSE_ONLY"
+        );
     }
 
     #[test]
@@ -750,10 +896,17 @@ mod tests {
             if edit.kind != EditKind::GraphEdit {
                 continue;
             }
-            let index = input.edits.iter().position(|candidate| candidate.edit_id == edit.edit_id).unwrap();
+            let index = input
+                .edits
+                .iter()
+                .position(|candidate| candidate.edit_id == edit.edit_id)
+                .unwrap();
             let graph = apply_subset(&baseline, 1_u64 << index, &input.edits);
             assert_eq!(
-                decision_met(query_value(&graph, &input.query.metric), &input.query.decision),
+                decision_met(
+                    query_value(&graph, &input.query.metric),
+                    &input.query.decision
+                ),
                 decision_met(baseline_value, &input.query.decision),
                 "single edit {} unexpectedly flips the query",
                 edit.edit_id
@@ -766,23 +919,37 @@ mod tests {
         let input = fixture();
         let report = evaluate(&input, &fixture_bytes()).unwrap();
         for witness in report.witnesses {
-            assert!(!(witness.edit_ids.contains(&"remove-13-a".to_string())
-                && witness.edit_ids.contains(&"remove-13-b".to_string())));
+            assert!(
+                !(witness.edit_ids.contains(&"remove-13-a".to_string())
+                    && witness.edit_ids.contains(&"remove-13-b".to_string()))
+            );
         }
     }
 
     #[test]
     fn stale_edge_preconditions_fail_closed() {
         let mut input = fixture();
-        let edit = input.edits.iter_mut().find(|edit| edit.edit_id == "remove-12").unwrap();
+        let edit = input
+            .edits
+            .iter_mut()
+            .find(|edit| edit.edit_id == "remove-12")
+            .unwrap();
         edit.changes[0].expected_weight = 0.5;
-        assert!(validate(&input).unwrap_err().contains("precondition mismatch"));
+        assert!(
+            validate(&input)
+                .unwrap_err()
+                .contains("precondition mismatch")
+        );
     }
 
     #[test]
     fn dependency_cycles_fail_closed() {
         let mut input = fixture();
-        let gate = input.edits.iter_mut().find(|edit| edit.edit_id == "adjudication-gate").unwrap();
+        let gate = input
+            .edits
+            .iter_mut()
+            .find(|edit| edit.edit_id == "adjudication-gate")
+            .unwrap();
         gate.requires.push("remove-12".into());
         assert!(validate(&input).unwrap_err().contains("cycle"));
     }
@@ -790,7 +957,11 @@ mod tests {
     #[test]
     fn conflict_declarations_must_be_symmetric() {
         let mut input = fixture();
-        let edit = input.edits.iter_mut().find(|edit| edit.edit_id == "remove-13-b").unwrap();
+        let edit = input
+            .edits
+            .iter_mut()
+            .find(|edit| edit.edit_id == "remove-13-b")
+            .unwrap();
         edit.conflicts_with.clear();
         assert!(validate(&input).unwrap_err().contains("symmetrically"));
     }
@@ -798,7 +969,11 @@ mod tests {
     #[test]
     fn same_edge_mutations_require_explicit_conflicts() {
         let mut input = fixture();
-        let edit = input.edits.iter_mut().find(|edit| edit.edit_id == "replace-12-small").unwrap();
+        let edit = input
+            .edits
+            .iter_mut()
+            .find(|edit| edit.edit_id == "replace-12-small")
+            .unwrap();
         edit.conflicts_with.clear();
         assert!(validate(&input).unwrap_err().contains("symmetrically"));
     }
