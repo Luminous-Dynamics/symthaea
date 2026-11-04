@@ -46,7 +46,7 @@ The normative draft shape is in [`water-use-qualification-v1.schema.json`](water
 | Decision | state, reason, evidence IDs, decision time and monitoring status | replacing uncertainty with a pass |
 | Events | source switches, mixing, treatment faults, storage events, non-compliance and corrective actions | reusing evidence after a material change |
 
-A valid observation remains attached to its sample point and time. A decision can be reused only where the declared profile establishes that the evidence applies to the same source/system, stream, treatment state, use class, boundary and monitoring period.
+A valid observation remains attached to its exact source ID, stream/batch ID, sample point and time. A decision can be reused only where the declared profile establishes that the evidence applies to the same source/system, stream, treatment state, use class, boundary and monitoring period.
 
 ## 4. Qualification states and service-credit mapping
 
@@ -219,3 +219,8 @@ The target is to exceed the best matched operational baseline on a declared deci
 The current Rust adapter requires every timestamp used in temporal comparisons to be normalized to UTC RFC3339 with a trailing Z. Offset-bearing values (for example +02:00) must be converted by the producer before evaluation; the adapter rejects ambiguous/non-normalized offsets rather than comparing timestamp strings lexicographically. This is an adapter constraint, not a claim that the source system's original timezone metadata should be discarded: retain the original timestamp and timezone in the upstream receipt when present.
 
 The boundary record includes both boundary_id and sample_point_id. They identify different concepts: the service outlet and the exact sampling location. same_physical_point requires them to denote the same physical point; validated_transfer requires an explicit transfer-validation reference.
+
+
+### Sample source and stream binding
+
+Every sample observation carries both source_id and stream_id. A supporting sample must match the qualification record's exact source and stream/batch. A sample from a different batch at the same physical tap is not a supporting sample; neither matching outlet geometry nor a similar result can repair that identity mismatch. A validated boundary transfer is a separate relation and does not erase source/stream lineage.
