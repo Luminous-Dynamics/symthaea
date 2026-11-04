@@ -32,4 +32,6 @@ The reducer additionally:
 
 This is a deterministic **reference reducer/model**, not a test of the production CPAL callback or its atomic memory ordering. Trace order represents the linearization order of modeled producer-start, veto/expiry, render-completion, enqueue and callback-epoch-observation events. Production integration must persist/reconstruct this order (or use callback-observed epochs as the authority for classifying frames).
 
+All `*_at_ns` values in one reducer trace are assumed to be normalized to the same runner-monotonic clock domain and origin bound by the upstream decision/grounding receipts. The reducer does not perform cross-clock conversion or authenticate the origin; the live adapter must reject mismatched domain/origin receipts before constructing this trace.
+
 The crate does not prove physical silence, DAC cancellation, acoustic latency, human musical usefulness or artistic quality. Those require separate device, calibrated loopback and musician cohorts. It has no audio callback, thread scheduler, I/O or timing-performance claim.
