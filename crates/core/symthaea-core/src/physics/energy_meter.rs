@@ -739,13 +739,11 @@ pub mod nvml_backend {
             // NVML's total-energy API has no documented rollover modulus and
             // resets on driver reload. A decrease starts a new epoch; callers
             // cannot compute an interval across that boundary.
-            if raw_counter < self.last_raw_counter {
-                self.counter_epoch = self.counter_epoch.checked_add(1).ok_or_else(|| {
-                    EnergyMeterError::BackendFailure {
-                        reason: "NVML counter epoch overflow".into(),
-                    }
-                })?;
-            }
+            advance_epoch_on_counter_decrease(
+                self.last_raw_counter,
+                raw_counter,
+                &mut self.counter_epoch,
+            )?;
             self.last_raw_counter = raw_counter;
 
             Ok(EnergyCounterReading {
@@ -755,6 +753,21 @@ pub mod nvml_backend {
                 monotonic_timestamp_ns: self.started_at.elapsed().as_nanos(),
             })
         }
+    }
+
+    fn advance_epoch_on_counter_decrease(
+        previous: u64,
+        current: u64,
+        epoch: &mut u64,
+    ) -> Result<(), EnergyMeterError> {
+        if current < previous {
+            *epoch = epoch.checked_add(1).ok_or_else(|| {
+                EnergyMeterError::BackendFailure {
+                    reason: "NVML counter epoch overflow".into(),
+                }
+            })?;
+        }
+        Ok(())
     }
 
     fn map_nvml_error(error: NvmlError) -> EnergyMeterError {
@@ -780,6 +793,25 @@ pub mod nvml_backend {
     #[cfg(test)]
     mod tests {
         use super::*;
+
+        #[test]
+        fn a_decreased_counter_advances_epoch_but_a_monotonic_counter_does_not() {
+            let mut epoch = 7;
+            advance_epoch_on_counter_decrease(100, 120, &mut epoch).unwrap();
+            assert_eq!(epoch, 7);
+            advance_epoch_on_counter_decrease(120, 3, &mut epoch).unwrap();
+            assert_eq!(epoch, 8);
+        }
+
+        #[test]
+        fn counter_epoch_overflow_is_rejected() {
+            let mut epoch = u64::MAX;
+            assert!(matches!(
+                advance_epoch_on_counter_decrease(10, 1, &mut epoch),
+                Err(EnergyMeterError::BackendFailure { .. })
+            ));
+            assert_eq!(epoch, u64::MAX);
+        }
 
         #[test]
         fn not_supported_is_not_reported_as_zero_energy() {
