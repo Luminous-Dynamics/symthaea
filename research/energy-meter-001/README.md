@@ -19,6 +19,12 @@ Keep these classes separate in every report:
    outside the scope of an on-device counter.
 4. **Model estimate** — FLOP count, nominal TDP/clock, architecture or
    theoretical lower bound. This is not a hardware energy measurement.
+5. **GPU cumulative counter (NVML)** — whole-device energy in millijoules
+   since driver reload. This is still a direct cumulative counter, but its scope
+   is the GPU device, not a process or whole workstation. If the selected
+   driver/device returns NotSupported, preserve Unsupported. Do not allocate
+   board energy to a process using utilization share and call it measured.
+
 
 Never silently combine different classes. A missing counter is Unsupported,
 not zero. A package counter is not automatically whole-system energy.
@@ -139,6 +145,12 @@ samples/joule, and GPU joules are not comparable to whole-system joules.
   Use this as a model for quality-gated energy frontiers: energy or throughput
   is only comparable when every required quality point passes. It is not itself
   an energy benchmark.
+- **NVML total energy counter**: the NVIDIA API reports cumulative GPU energy in
+  mJ since the driver was last reloaded, for Volta-or-newer fully supported
+  devices. NVML dynamically loads on supported platforms and may return
+  NotSupported or GPU-lost errors. Probe the actual device/driver at runtime;
+  an architecture generation is not proof that a mobile/GeForce product exposes
+  the counter.
 - **MuJoCo 3.17.0**: batch API results are documented as bit-identical to the
   sequential loop across thread counts. Treat deterministic multi-run replay as
   a comparator target, alongside contact, stiffness and work-precision tests.
