@@ -169,6 +169,10 @@ A superiority claim requires matched inputs, budgets, safety settings, attempts 
 - #10026 — Decompile-Bench and OWASP control-verification programme.
 - #10029 — benchmark run receipt and denominator/accounting validator.
 - #10298 — from-scratch firmware reconstruction.
+- #10368 — bounded per-occurrence ZIP content verification, incremental SHA-256 and independent CRC-32, with a test-only zlib-rs Deflate differential oracle.
+- #10451 — content-addressed ZIP corpus and bounded coverage-guided fuzz qualification.
+- #10452 — platform-qualified held-file identity; non-Unix content verification remains fail-closed until this is resolved.
+- #10455 — archive-session performance research without weakening per-member decompression limits.
 
 
 ## Verification refresh — 2026-11-04
