@@ -52,7 +52,7 @@ Authoritative public references:
 
 The benchmark contains 85 tasks: structural 10, civil 18, electrical 27 and mechanical 30. Its public development split contains 29 tasks: 4 structural, 9 civil, 9 electrical and 7 mechanical. The hidden test split contains 56 tasks and must remain in the official competition trust boundary.
 
-The dataset card identifies 12 `checks`, 14 `rubric` and 3 `checks-judge` dev tasks. Seventeen tasks require the official evaluation runner to build task-specific verifier images; standalone Harbor is not a full substitute. The official runner requires Harbor 0.20.0, uses `eval/run.py`, and enforces a six-hour per-task limit. The official paper/site report three-run evaluation; each local repetition must be separately identified.
+The dataset card identifies 12 `checks`, 14 `rubric` and 3 `checks-judge` dev tasks. Seventeen tasks require the official evaluation runner to build task-specific verifier images; standalone Harbor is not a full substitute. The official runner requires Harbor 0.20.0, uses `eval/run.py`, and enforces a six-hour per-task limit. The official competition runs the harness three times on the 56-task hidden test split. The public dev workflow grades committed artifacts and runs the harness live on a sample to check reproducibility; three full development repetitions are a proposed Luminous matched-comparison protocol, not an official PLE dev-set requirement.
 
 ### Required gates before any run
 
