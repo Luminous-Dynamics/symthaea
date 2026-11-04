@@ -227,6 +227,8 @@ impl PolicyHistory {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SequentialPolicyConfig {
     pub policy_version: String,
+    pub model_set_version: String,
+    pub assessment_set_digest: String,
     pub seed: u64,
     pub decision_index: u64,
     /// Marginal exploration probability outside forced audit decisions.
@@ -265,6 +267,8 @@ pub struct ExcludedAction {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SelectionError {
     MissingPolicyVersion,
+    MissingModelSetVersion,
+    MissingAssessmentSetDigest,
     InvalidExplorationProbability,
     InvalidRepresentativenessFloor,
     InvalidModelDiscriminationFloor,
@@ -283,6 +287,8 @@ impl fmt::Display for SelectionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
             Self::MissingPolicyVersion => "policy version must not be empty",
+            Self::MissingModelSetVersion => "model-set version must not be empty",
+            Self::MissingAssessmentSetDigest => "assessment-set digest must not be empty",
             Self::InvalidExplorationProbability => "exploration probability must be in [0, 1]",
             Self::InvalidRepresentativenessFloor => "representativeness floor must be in [0, 1]",
             Self::InvalidModelDiscriminationFloor => {
@@ -314,6 +320,13 @@ impl From<HistoryError> for SelectionError {
     }
 }
 
+/// Marginal propensity for one eligible action under the selected policy.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ActionPropensity {
+    pub action_id: u32,
+    pub probability: f64,
+}
+
 /// Replay record for a single sequential action decision.
 ///
 /// selection_probability is the marginal probability of the selected action
@@ -322,8 +335,13 @@ impl From<HistoryError> for SelectionError {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PolicyReceipt {
     pub policy_version: String,
+    pub model_set_version: String,
+    pub assessment_set_digest: String,
     pub action_set_digest: String,
     pub history_digest: String,
+    pub policy_config: SequentialPolicyConfig,
+    pub candidate_assessments: Vec<CandidateAssessment>,
+    pub action_propensities: Vec<ActionPropensity>,
     pub random_generator: &'static str,
     pub seed: u64,
     pub decision_index: u64,
@@ -400,6 +418,9 @@ pub fn select_next_action(
         validate_assessment_values(assessment)?;
     }
 
+    let mut canonical_assessments = assessments.to_vec();
+    canonical_assessments.sort_by_key(|assessment| assessment.action_id);
+
     let mut eligible = Vec::new();
     let mut excluded = Vec::new();
     for action in action_set.actions() {
@@ -434,16 +455,28 @@ pub fn select_next_action(
         }
         let (index, draw) = rng.uniform_index(audit_candidates.len());
         let selected = audit_candidates[index];
-        let probability = 1.0 / audit_candidates.len() as f64;
+        let audit_probability = 1.0 / audit_candidates.len() as f64;
+        let propensities = eligible
+            .iter()
+            .map(|candidate| ActionPropensity {
+                action_id: candidate.action_id(),
+                probability: if candidate.action.audit_stratum == stratum {
+                    audit_probability
+                } else {
+                    0.0
+                },
+            })
+            .collect();
         return Ok(build_result(
             selected,
             action_set,
             history,
             config,
             &eligible,
+            &canonical_assessments,
             excluded,
             SelectionMode::ForcedAudit,
-            probability,
+            propensities,
             None,
             Some(draw),
             Some(stratum),
@@ -462,12 +495,18 @@ pub fn select_next_action(
     };
 
     let random_mass = config.exploration_probability / eligible.len() as f64;
-    let exploitation_mass = if selected.action_id() == exploitation_winner.action_id() {
-        1.0 - config.exploration_probability
-    } else {
-        0.0
-    };
-    let selection_probability = random_mass + exploitation_mass;
+    let propensities = eligible
+        .iter()
+        .map(|candidate| ActionPropensity {
+            action_id: candidate.action_id(),
+            probability: random_mass
+                + if candidate.action_id() == exploitation_winner.action_id() {
+                    1.0 - config.exploration_probability
+                } else {
+                    0.0
+                },
+        })
+        .collect();
 
     Ok(build_result(
         selected,
@@ -475,9 +514,10 @@ pub fn select_next_action(
         history,
         config,
         &eligible,
+        &canonical_assessments,
         excluded,
         mode,
-        selection_probability,
+        propensities,
         Some(branch_draw),
         candidate_draw,
         None,
@@ -487,6 +527,12 @@ pub fn select_next_action(
 fn validate_config(config: &SequentialPolicyConfig) -> Result<(), SelectionError> {
     if config.policy_version.trim().is_empty() {
         return Err(SelectionError::MissingPolicyVersion);
+    }
+    if config.model_set_version.trim().is_empty() {
+        return Err(SelectionError::MissingModelSetVersion);
+    }
+    if config.assessment_set_digest.trim().is_empty() {
+        return Err(SelectionError::MissingAssessmentSetDigest);
     }
     if !config.exploration_probability.is_finite()
         || !(0.0..=1.0).contains(&config.exploration_probability)
@@ -518,11 +564,16 @@ fn validate_history(
     if history.digest.trim().is_empty() {
         return Err(SelectionError::History(HistoryError::MissingHistoryDigest));
     }
-    for action_id in history.action_counts.keys() {
+    let mut total = 0u64;
+    for (action_id, count) in &history.action_counts {
         if action_set.action(*action_id).is_none() {
             return Err(SelectionError::History(HistoryError::UnknownActionId));
         }
+        total = total
+            .checked_add(*count)
+            .ok_or(SelectionError::History(HistoryError::CountOverflow))?;
     }
+    let _ = total;
     Ok(())
 }
 
@@ -660,20 +711,31 @@ fn build_result(
     history: &PolicyHistory,
     config: &SequentialPolicyConfig,
     eligible: &[EligibleCandidate<'_>],
+    candidate_assessments: &[CandidateAssessment],
     excluded: Vec<ExcludedAction>,
     mode: SelectionMode,
-    selection_probability: f64,
+    action_propensities: Vec<ActionPropensity>,
     branch_random_u64: Option<u64>,
     candidate_random_u64: Option<u64>,
     audit_stratum: Option<u16>,
 ) -> SelectionResult {
     let assessment = selected.assessment;
+    let selection_probability = action_propensities
+        .iter()
+        .find(|propensity| propensity.action_id == selected.action_id())
+        .map(|propensity| propensity.probability)
+        .unwrap_or(0.0);
     SelectionResult {
         action: selected.action.clone(),
         receipt: PolicyReceipt {
             policy_version: config.policy_version.clone(),
+            model_set_version: config.model_set_version.clone(),
+            assessment_set_digest: config.assessment_set_digest.clone(),
             action_set_digest: action_set.digest().to_owned(),
             history_digest: history.digest.clone(),
+            policy_config: config.clone(),
+            candidate_assessments: candidate_assessments.to_vec(),
+            action_propensities,
             random_generator: "splitmix64-v1",
             seed: config.seed,
             decision_index: config.decision_index,
@@ -784,6 +846,8 @@ mod tests {
     fn make_config() -> SequentialPolicyConfig {
         SequentialPolicyConfig {
             policy_version: "spectra-policy-test-v1".to_owned(),
+            model_set_version: "spectra-uvsd-models-v1".to_owned(),
+            assessment_set_digest: "sha256:test-assessments".to_owned(),
             seed: 7,
             decision_index: 11,
             exploration_probability: 0.2,
@@ -945,6 +1009,13 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(first.receipt.history_digest, "sha256:test-history");
         assert_eq!(first.receipt.action_set_digest, "sha256:action-set");
+        assert_eq!(first.receipt.model_set_version, "spectra-uvsd-models-v1");
+        assert_eq!(first.receipt.assessment_set_digest, "sha256:test-assessments");
+        assert_eq!(first.receipt.candidate_assessments.len(), 3);
+        assert_eq!(
+            first.receipt.action_propensities.iter().map(|entry| entry.probability).sum::<f64>(),
+            1.0
+        );
         assert_eq!(first.receipt.random_generator, "splitmix64-v1");
     }
 
