@@ -51,5 +51,8 @@ Reference work:
 ## Run
 
     cargo test --manifest-path tools/spectra-uvsd-fit/Cargo.toml
+    cargo run --release --manifest-path tools/spectra-uvsd-fit/Cargo.toml --bin recovery_sweep > uvsd-recovery.csv
+
+The recovery runner emits one CSV row per frozen synthetic campaign across mu, sigma and independent seeds. It is a parameter-recovery smoke benchmark only; it does not calculate calibrated power, interval coverage, a false-discovery rate or empirical performance.
 
 This code is an estimator prototype, not an empirical result. It has not been compiled or run in the current environment. Human-subject collection, physical actuation and causal/anomalous information claims are out of scope.
