@@ -211,6 +211,36 @@ jobs:
           cargo fmt --check --manifest-path "$PITB_SORRYDB_MANIFEST"
           cargo test --locked --manifest-path "$PITB_SORRYDB_MANIFEST"
 
+      - name: Generate immutable-source checkout receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path "$PITB_SORRYDB_MANIFEST" -- \
+            --self-test-checkout-report "$RUNNER_TEMP/sorrydb-source-checkout.json"
+
+      - name: Validate source checkout receipt schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-sorrydb-venv/bin/python" - "$RUNNER_TEMP/sorrydb-source-checkout.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("tools/pitb-sorrydb-audit/schema/sorrydb-source-checkout-v0.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          receipt = json.loads(Path(sys.argv[1]).read_text())
+          errors = list(Draft202012Validator(schema).iter_errors(receipt))
+          if errors:
+              raise SystemExit("source checkout receipt schema errors: " + "; ".join(e.message for e in errors))
+          if receipt["source_span"] != "sorry" or receipt["source_span_verified_as_sorry"] is not True:
+              raise SystemExit("committed source token span was not verified")
+          if receipt["scoring_admission"] is not False:
+              raise SystemExit("source-only receipt cannot admit a proof result")
+          print("PITB_SORRYDB_SOURCE_CHECKOUT_SCHEMA_PASS")
+          PY
+
       - name: Generate schema-checkable audit report and proof-run JSONL
         shell: bash
         run: |
@@ -332,108 +362,9 @@ jobs:
             ${{ runner.temp }}/sorrydb-audit.json
             ${{ runner.temp }}/sorrydb-audit.synthetic.json
             ${{ runner.temp }}/sorrydb-audit.synthetic-runs.jsonl
+            ${{ runner.temp }}/sorrydb-source-checkout.json
             ${{ runner.temp }}/sorrydb-input/
             ${{ runner.temp }}/pitb-sorrydb-audit/src/main.rs
             ${{ runner.temp }}/pitb-sorrydb-audit/Cargo.lock
-          if-no-files-found: warn
-          retention-days: 30
-
-
-  sorrydb-source-integrity-contract:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Check out exact pull request head
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
-
-      - name: Install stable Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-
-      - name: Install JSON Schema validator
-        run: |
-          python3 -m venv "$RUNNER_TEMP/pitb-sorrydb-venv"
-          "$RUNNER_TEMP/pitb-sorrydb-venv/bin/pip" install "jsonschema==4.25.1"
-
-      - name: Stage isolated SorryDB validator
-        shell: bash
-        run: |
-          set -euo pipefail
-          staged="$RUNNER_TEMP/pitb-sorrydb-integrity"
-          mkdir -p "$staged/src"
-          cp tools/pitb-sorrydb-integrity/Cargo.toml "$staged/Cargo.toml"
-          cp tools/pitb-sorrydb-integrity/Cargo.lock "$staged/Cargo.lock"
-          cp tools/pitb-sorrydb-integrity/src/main.rs "$staged/src/main.rs"
-          echo "PITB_SORRYDB_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
-          echo "PITB_SORRYDB_DIR=$staged" >> "$GITHUB_ENV"
-
-      - name: Format and test SorryDB integrity validator
-        shell: bash
-        run: |
-          set -euo pipefail
-          rustfmt --edition 2021 "$PITB_SORRYDB_DIR/src/main.rs"
-          cargo fmt --check --manifest-path "$PITB_SORRYDB_MANIFEST"
-          cargo test --locked --manifest-path "$PITB_SORRYDB_MANIFEST"
-
-      - name: Emit synthetic snapshot report and task identity
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo run --locked --manifest-path "$PITB_SORRYDB_MANIFEST" -- \
-            --self-test-report \
-            "$RUNNER_TEMP/sorrydb-integrity-report.json" \
-            "$RUNNER_TEMP/sorrydb-task-identity.json"
-
-      - name: Validate task identity and report schemas
-        shell: bash
-        run: |
-          set -euo pipefail
-          "$RUNNER_TEMP/pitb-sorrydb-venv/bin/python" - \
-            "$RUNNER_TEMP/sorrydb-integrity-report.json" \
-            "$RUNNER_TEMP/sorrydb-task-identity.json" <<'PY'
-          import json
-          import sys
-          from pathlib import Path
-          from jsonschema import Draft202012Validator
-
-          root = Path("tools/pitb-sorrydb-integrity/schema")
-          report_schema = json.loads((root / "sorrydb-integrity-report-v0.schema.json").read_text())
-          task_schema = json.loads((root / "sorrydb-task-identity-v0.schema.json").read_text())
-          Draft202012Validator.check_schema(report_schema)
-          Draft202012Validator.check_schema(task_schema)
-          report = json.loads(Path(sys.argv[1]).read_text())
-          task = json.loads(Path(sys.argv[2]).read_text())
-          for label, schema, value in (
-              ("report", report_schema, report),
-              ("task", task_schema, task),
-          ):
-              errors = list(Draft202012Validator(schema).iter_errors(value))
-              if errors:
-                  raise SystemExit(f"{label} schema errors: " + "; ".join(e.message for e in errors))
-          if report["task_count"] != 1 or report["unique_task_count"] != 1:
-              raise SystemExit("synthetic SorryDB task denominator changed")
-          if report["scoring_admission"] is not False:
-              raise SystemExit("snapshot-only verification must not admit tasks for scoring")
-          if task["source_goal_trust"] != "debug_hint_not_reproduced":
-              raise SystemExit("debug goal was promoted to an authoritative source goal")
-          if task["prop_parent_type_trust"] != "database_inclusion_claim_not_independently_rechecked":
-              raise SystemExit("database Prop inclusion claim was promoted without rechecking")
-          print("PITB_SORRYDB_REPORT_AND_TASK_SCHEMA_PASS")
-          PY
-
-      - name: Retain synthetic SorryDB integrity evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pitb-sorrydb-integrity
-          path: |
-            ${{ runner.temp }}/sorrydb-integrity-report.json
-            ${{ runner.temp }}/sorrydb-task-identity.json
-            ${{ runner.temp }}/pitb-sorrydb-integrity/src/main.rs
-            ${{ runner.temp }}/pitb-sorrydb-integrity/Cargo.lock
           if-no-files-found: warn
           retention-days: 30
