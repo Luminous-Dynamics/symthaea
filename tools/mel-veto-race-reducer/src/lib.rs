@@ -35,6 +35,11 @@ pub enum RaceError {
         at_ns: u64,
         expires_at_ns: u64,
     },
+    ExpirationBeforeDeadline {
+        authorization_id: String,
+        observed_at_ns: u64,
+        expires_at_ns: u64,
+    },
     InvalidAuthorizationTime {
         authorized_at_ns: u64,
         expires_at_ns: u64,
@@ -233,6 +238,15 @@ pub enum EventKind {
         participant_id: String,
         authority_valid: bool,
         control_sequence: u64,
+        prior_epoch: u64,
+        new_epoch: u64,
+    },
+    ExpireAuthorization {
+        authorization_id: String,
+        session_id: String,
+        turn_id: String,
+        control_sequence: u64,
+        observed_at_ns: u64,
         prior_epoch: u64,
         new_epoch: u64,
     },
@@ -618,6 +632,52 @@ impl RaceLedger {
                 self.current_epoch = *new_epoch;
                 self.last_control_sequence = *control_sequence;
             }
+            EventKind::ExpireAuthorization {
+                authorization_id,
+                session_id,
+                turn_id,
+                control_sequence,
+                observed_at_ns,
+                prior_epoch,
+                new_epoch,
+            } => {
+                self.check_control_sequence(*control_sequence)?;
+                let auth = self
+                    .authorizations
+                    .get_mut(authorization_id)
+                    .ok_or_else(|| RaceError::UnknownAuthorization {
+                        authorization_id: authorization_id.clone(),
+                    })?;
+                if auth.session_id != *session_id || auth.turn_id != *turn_id {
+                    return Err(RaceError::VetoTurnMismatch);
+                }
+                if auth.revoked {
+                    return Err(RaceError::RevokedAuthorization {
+                        authorization_id: authorization_id.clone(),
+                    });
+                }
+                if *observed_at_ns < auth.expires_at_ns {
+                    return Err(RaceError::ExpirationBeforeDeadline {
+                        authorization_id: authorization_id.clone(),
+                        observed_at_ns: *observed_at_ns,
+                        expires_at_ns: auth.expires_at_ns,
+                    });
+                }
+                let expected_next = self
+                    .current_epoch
+                    .checked_add(1)
+                    .ok_or(RaceError::EpochExhausted)?;
+                if *prior_epoch != self.current_epoch || *new_epoch != expected_next {
+                    return Err(RaceError::VetoEpochMismatch {
+                        expected: self.current_epoch,
+                        prior: *prior_epoch,
+                        next: *new_epoch,
+                    });
+                }
+                auth.revoked = true;
+                self.current_epoch = *new_epoch;
+                self.last_control_sequence = *control_sequence;
+            }
             EventKind::CallbackEpochCheck {
                 frame_id,
                 observed_epoch,
@@ -833,6 +893,22 @@ mod tests {
                 participant_id: "performer-1".into(),
                 authority_valid: true,
                 control_sequence: 2,
+                prior_epoch: 0,
+                new_epoch: 1,
+            },
+        )
+    }
+
+    fn expiration_event(order: u64, observed_at_ns: u64) -> LedgerEvent {
+        event(
+            order,
+            "expire-auth-1",
+            EventKind::ExpireAuthorization {
+                authorization_id: "auth-1".into(),
+                session_id: "session-1".into(),
+                turn_id: "turn-1".into(),
+                control_sequence: 2,
+                observed_at_ns,
                 prior_epoch: 0,
                 new_epoch: 1,
             },
@@ -1122,6 +1198,49 @@ mod tests {
             .unwrap();
         assert!(ledger.producer("producer-2").unwrap().completed);
         assert_eq!(ledger.summary().rendered_frames, 200);
+    }
+
+    #[test]
+    fn expiry_invalidates_queued_old_epoch_frames_before_callback_admission() {
+        let mut ledger = authorized_ledger();
+        ledger
+            .apply(producer_start_event(2, "producer-7", 0))
+            .unwrap();
+        ledger
+            .apply(render_complete_event(3, "producer-7", 7))
+            .unwrap();
+        ledger.apply(enqueue_event(4, 7)).unwrap();
+        ledger.apply(expiration_event(5, 10_000_000_000)).unwrap();
+        ledger.apply(callback_event(6, 7, 1)).unwrap();
+
+        assert_eq!(
+            ledger.frame(7).unwrap().disposition,
+            Some(FrameDisposition::StaleDiscarded { observed_epoch: 1 })
+        );
+        assert_eq!(ledger.summary().stale_discarded_frames, 100);
+        assert_eq!(ledger.summary().callback_admitted_frames, 0);
+        assert_eq!(ledger.summary().revoked_authorization_count, 1);
+    }
+
+    #[test]
+    fn callback_admitted_before_expiry_is_not_retroactively_cancelled() {
+        let mut ledger = authorized_ledger();
+        ledger
+            .apply(producer_start_event(2, "producer-7", 0))
+            .unwrap();
+        ledger
+            .apply(render_complete_event(3, "producer-7", 7))
+            .unwrap();
+        ledger.apply(enqueue_event(4, 7)).unwrap();
+        ledger.apply(callback_event(5, 7, 0)).unwrap();
+        ledger.apply(expiration_event(6, 10_000_000_000)).unwrap();
+
+        assert_eq!(
+            ledger.frame(7).unwrap().disposition,
+            Some(FrameDisposition::CallbackAdmitted { observed_epoch: 0 })
+        );
+        assert_eq!(ledger.summary().callback_admitted_frames, 100);
+        assert_eq!(ledger.summary().stale_discarded_frames, 0);
     }
 
     #[test]
