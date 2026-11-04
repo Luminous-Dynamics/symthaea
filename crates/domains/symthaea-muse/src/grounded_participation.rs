@@ -854,6 +854,55 @@ mod tests {
         assert!(!changed_policy.is_commitment_valid());
     }
 
+    #[derive(Deserialize)]
+    struct GroundedParticipationFixtureSetV1 {
+        schema_version: String,
+        cases: Vec<GroundedParticipationFixtureCaseV1>,
+    }
+
+    #[derive(Deserialize)]
+    struct GroundedParticipationFixtureCaseV1 {
+        case_id: String,
+        expected_disposition: String,
+        evidence: GroundedMusicalEvidenceBundleV1,
+        decision: GroundedMusicalDecisionReceiptV1,
+        policy: GroundedParticipationPolicyV1,
+    }
+
+    #[test]
+    fn checked_in_evidence_to_action_cases_match_the_authorization_validator() {
+        let fixtures: GroundedParticipationFixtureSetV1 = serde_json::from_str(include_str!(
+            "../../../../benchmarks/mel/grounded-participation/grounded-participation-cases-v1.json"
+        ))
+        .expect("grounded participation fixture set must parse");
+        assert_eq!(
+            fixtures.schema_version,
+            "mel-grounded-participation-cases-v1"
+        );
+        assert_eq!(fixtures.cases.len(), 4);
+
+        for case in fixtures.cases {
+            let issues = validate_grounded_decision_v1(
+                &case.evidence,
+                &case.decision,
+                &case.policy,
+            );
+            match case.expected_disposition.as_str() {
+                "accept" => assert!(
+                    issues.is_empty(),
+                    "{} unexpectedly rejected: {issues:?}",
+                    case.case_id
+                ),
+                "reject_veto" => assert!(
+                    issues.contains(&GroundedParticipationIssueV1::VetoBlocksActiveIntervention),
+                    "{} must reject a vetoed intervention: {issues:?}",
+                    case.case_id
+                ),
+                other => panic!("{} has unsupported expected disposition {other}", case.case_id),
+            }
+        }
+    }
+
     #[test]
     fn grounded_invitation_authorizes_a_bounded_response() {
         let evidence = bundle();
