@@ -252,19 +252,18 @@ pub fn fit_with_optimizer(
         );
     }
 
-    let has_converged = runs.iter().any(|run| run.converged);
     let mut all_objectives: Vec<f64> = runs.iter().map(|run| run.objective).collect();
     all_objectives.sort_by(f64::total_cmp);
-    runs.sort_by(|a, b| {
-        b.converged.cmp(&a.converged).then_with(|| a.objective.total_cmp(&b.objective))
-    });
     let parameter_spread = converged_parameter_spread(&runs);
+    // Select the lowest objective regardless of status. A converged but worse
+    // start must not hide a lower-NLL non-converged candidate.
+    runs.sort_by(|a, b| a.objective.total_cmp(&b.objective));
     let best = runs.remove(0);
     let curvature = diagonal_curvature(table, &best.parameters);
     let estimate = decode_parameters(&best.parameters, table.categories.len())
         .and_then(|(mu, sigma, thresholds, _)| UvsdEstimate::new(mu, sigma, thresholds));
 
-    let status = if !has_converged {
+    let status = if !best.converged {
         FitStatus::NotConverged
     } else if best.at_boundary {
         FitStatus::Boundary
