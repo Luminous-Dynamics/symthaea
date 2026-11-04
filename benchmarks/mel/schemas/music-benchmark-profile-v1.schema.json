@@ -19,6 +19,7 @@
     "scorer_version",
     "scorer_sha256",
     "native_metric_ids",
+    "native_metric_ids",
     "comparison_scope_id",
     "intended_use",
     "rights"
