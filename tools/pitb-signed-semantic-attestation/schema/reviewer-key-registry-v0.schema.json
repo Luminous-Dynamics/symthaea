@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/reviewer-key-registry-v0.schema.json",
+  "title": "PITB signed reviewer key registry v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "registry_id",
+    "registry_version",
+    "generated_at_unix",
+    "authority_key_id",
+    "keys",
+    "signature_hex"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.reviewer-key-registry.v0"
+    },
+    "registry_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "registry_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "generated_at_unix": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "authority_key_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "keys": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key_id",
+          "reviewer_id",
+          "public_key_der_hex",
+          "status",
+          "valid_from_unix",
+          "valid_until_unix",
+          "scopes"
+        ],
+        "properties": {
+          "key_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "reviewer_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "public_key_der_hex": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{88}$"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "revoked"
+            ]
+          },
+          "valid_from_unix": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "valid_until_unix": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "scopes": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "semantic_gate",
+                "hypothesis_audit",
+                "vacuity_audit"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "signature_hex": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{128}$"
+    }
+  }
+}
