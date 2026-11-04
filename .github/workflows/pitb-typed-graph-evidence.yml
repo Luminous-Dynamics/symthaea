@@ -5,6 +5,7 @@ on:
     paths:
       - "tools/pitb-graph-evidence/**"
       - "tools/pitb-retrieval-evidence/**"
+      - "tools/pitb-route-coverage/**"
       - ".github/workflows/pitb-typed-graph-evidence.yml"
   workflow_dispatch:
 
@@ -241,5 +242,117 @@ jobs:
             ${{ runner.temp }}/retrieval-runs.synthetic.jsonl
             ${{ runner.temp }}/retrieval-report.synthetic.json
             ${{ runner.temp }}/pitb-retrieval-evidence/src/main.rs
+          if-no-files-found: warn
+          retention-days: 30
+
+
+  retrieval-support-route-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Install JSON Schema validator
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pitb-route-venv"
+          "$RUNNER_TEMP/pitb-route-venv/bin/pip" install "jsonschema==4.25.1"
+
+      - name: Stage route coverage analyzer outside production workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/pitb-route-coverage"
+          mkdir -p "$staged/src"
+          cp tools/pitb-route-coverage/Cargo.toml "$staged/Cargo.toml"
+          cp tools/pitb-route-coverage/Cargo.lock "$staged/Cargo.lock"
+          cp tools/pitb-route-coverage/src/main.rs "$staged/src/main.rs"
+          echo "PITB_ROUTE_COVERAGE_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+          echo "PITB_ROUTE_COVERAGE_DIR=$staged" >> "$GITHUB_ENV"
+
+      - name: Format and test Rust route coverage analyzer
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2021 "$PITB_ROUTE_COVERAGE_DIR/src/main.rs"
+          cargo fmt --check --manifest-path "$PITB_ROUTE_COVERAGE_MANIFEST"
+          cargo test --locked --manifest-path "$PITB_ROUTE_COVERAGE_MANIFEST"
+
+      - name: Generate synthetic route coverage report
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path "$PITB_ROUTE_COVERAGE_MANIFEST" -- \
+            --self-test-report "$RUNNER_TEMP/pitb-route-coverage-report.json"
+
+      - name: Validate route mapping and report schemas
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-route-venv/bin/python" - \
+            "$RUNNER_TEMP/pitb-route-coverage-report.json" <<'PY'
+          import hashlib
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("tools/pitb-route-coverage/schema")
+          mapping_schema = json.loads((root / "retrieval-declaration-mapping-v0.schema.json").read_text())
+          report_schema = json.loads((root / "retrieval-support-route-coverage-v0.schema.json").read_text())
+          Draft202012Validator.check_schema(mapping_schema)
+          Draft202012Validator.check_schema(report_schema)
+
+          mapping = {
+              "schema_version": "pitb.retrieval-declaration-mapping.v0",
+              "graph_manifest_sha256": hashlib.sha256(b"graph manifest").hexdigest(),
+              "node_id": "node-h1",
+              "mapping_status": "exact",
+              "declaration_id": "h1",
+              "mapping_method": "exact_formal_name",
+              "mapping_evidence_sha256": hashlib.sha256(b"mapping evidence").hexdigest(),
+              "reviewer_attestation_sha256": None,
+          }
+          if list(Draft202012Validator(mapping_schema).iter_errors(mapping)):
+              raise SystemExit("synthetic exact mapping failed its schema")
+          bad = dict(mapping, mapping_status="ambiguous")
+          if not list(Draft202012Validator(mapping_schema).iter_errors(bad)):
+              raise SystemExit("ambiguous mapping with a declaration ID was incorrectly schema-accepted")
+
+          report = json.loads(Path(sys.argv[1]).read_text())
+          errors = list(Draft202012Validator(report_schema).iter_errors(report))
+          if errors:
+              raise SystemExit("route coverage report schema errors: " + "; ".join(e.message for e in errors))
+          if report["support_group_count"] != 1 or report["retrieval_receipt_count"] != 1 or report["matched_assessment_count"] != 1:
+              raise SystemExit("synthetic route join denominator changed")
+          row = report["route_assessments"][0]
+          if row["any_complete_route_covered_at_returned_k"] is not True:
+              raise SystemExit("retrieved joint support route was not recovered")
+          if row["minimal_route_coverage_at_returned_k"] != 0.5 or row["best_route_completion_rank"] != 2:
+              raise SystemExit("retrieved route coverage or completion rank changed")
+          if row["necessary_declaration_count"] != 0 or row["useful_novel_premise_rate"] != 1.0:
+              raise SystemExit("alternative/conjunctive support semantics changed")
+          if "never promotes" not in report["admission_boundary"]:
+              raise SystemExit("candidate-only admission boundary changed")
+          print("PITB_RETRIEVAL_SUPPORT_ROUTE_COVERAGE_SCHEMA_PASS")
+          PY
+
+      - name: Retain route coverage report and analyzer source
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-retrieval-support-route-coverage
+          path: |
+            ${{ runner.temp }}/pitb-route-coverage-report.json
+            ${{ runner.temp }}/pitb-route-coverage/src/main.rs
+            ${{ runner.temp }}/pitb-route-coverage/Cargo.lock
           if-no-files-found: warn
           retention-days: 30
