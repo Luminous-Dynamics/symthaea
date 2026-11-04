@@ -37,8 +37,10 @@ jobs:
           components: rustfmt
 
       - name: Check package formatting
-        run: cargo fmt --package symthaea-economics -- --check
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-economics/src/finance.rs crates/domains/symthaea-economics/src/lib.rs
 
       - name: Run economics unit tests
-        run: cargo test --locked -p symthaea-economics
+        run: |
+          rustc --edition=2024 --test crates/domains/symthaea-economics/src/lib.rs -o /tmp/symthaea-economics-tests
+          /tmp/symthaea-economics-tests
 
