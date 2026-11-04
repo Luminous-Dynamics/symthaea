@@ -1,0 +1,39 @@
+name: Pinned Cargo lockfile regeneration probe
+
+on:
+  push:
+    branches: [research/cargo-lockfile-probe-20261104]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cargo-lockfile-probe-20261104
+  cancel-in-progress: true
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: research/cargo-lockfile-probe-20261104
+      - name: Install exact Rust and Cargo 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Regenerate lockfile with pinned Cargo
+        run: cargo generate-lockfile --manifest-path tools/connectome-worldset-verifier/Cargo.toml
+      - name: Require exact locked metadata
+        run: cargo metadata --manifest-path tools/connectome-worldset-verifier/Cargo.toml --locked --format-version 1 > /tmp/connectome-worldset-metadata.json
+      - name: Review lockfile and commit only the generated change
+        run: |
+          git diff --check
+          git diff -- tools/connectome-worldset-verifier/Cargo.lock
+          if ! git diff --quiet -- tools/connectome-worldset-verifier/Cargo.lock; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add tools/connectome-worldset-verifier/Cargo.lock
+            git commit -m "build(connectomics): regenerate worldset lockfile with Cargo 1.96.0"
+            git push origin HEAD:research/cargo-lockfile-probe-20261104
+          else
+            echo "Cargo 1.96.0 considers the existing lockfile current."
+          fi
