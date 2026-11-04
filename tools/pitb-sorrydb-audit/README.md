@@ -133,7 +133,7 @@ Each receipt binds the original SorryDB task ID to the exact repository commit, 
 A run is counted as `verified_success` only if all of the following are true:
 
 - the proof was inserted and the exact recorded sorry range was replaced;
-- the original sorry is absent after replacement;
+- the original sorry is absent after replacement, and the target proof term no longer depends on `sorryAx`;
 - the target elaborates as a proposition (`Prop`);
 - the declaration signature digest before and after the replacement is identical, preventing theorem weakening or target substitution;
 - the project builds and Lean's kernel accepts the resulting proof;
