@@ -77,6 +77,20 @@ The public `expected_fisher_information_for_design` API computes local expected 
 
 This is a **model-based design sensitivity analysis**, not evidence that an optimized category scale improves real participant measurements. It assumes the specified Gaussian distributions and known design parameters; the next qualification step is Monte Carlo recovery under lapses, RT/confidence noise, criterion changes, class imbalance and missingness, with frozen design choices and disjoint held-out seeds. Use worst-case and average precision together; do not choose a design solely from one parameter point.
 
+## Latent-threshold finite-sample design recovery
+
+The `latent_design_recovery` binary compares four six-category evidence-threshold vectors: equal-probability, fixed-spacing, the current minimax candidate, and the trade-off candidate. Every design is simulated at the same signal/noise trial totals. It reports per-cell fit dispositions, parameter bias/RMSE, expected-Fisher diagnostics at the generating values, and local Wald interval availability, conditional coverage, Wilson bounds and widths.
+
+All four design arms use common random numbers: the same underlying latent Gaussian draws for a given (mu, sigma, replicate) are categorized by each threshold vector. This permits paired comparisons and reduces avoidable Monte Carlo noise between candidate designs. The seed root and PRNG are emitted in the CSV receipt. Use a seed root reserved for evaluation; do not use the same campaigns to select the design and claim its performance.
+
+Example:
+
+```bash
+cargo run --release --manifest-path tools/spectra-uvsd-fit/Cargo.toml --bin latent_design_recovery -- --outer=2000 --trials-per-class=250 --seed=0x5350454344455349 > latent-design-recovery.csv
+```
+
+The default 50 outer campaigns are a smoke pilot, not a coverage qualification. Coverage is conditional on returned local Wald intervals; availability and Wilson intervals are reported separately, along with the fit disposition denominator. The output labels every row `LATENT_CONDITIONAL_ONLY`: the candidate evidence thresholds are not controlled participant settings, and this runner does not operationalize confidence criteria or RT measurement. A future operational design must add the observer/channel mapping and burden qualification specified by #10464. These are Gaussian simulation results only, not participant data, a protocol recommendation, or evidence of superiority over external methods.
+
 ## Run
 
     cargo test --manifest-path tools/spectra-uvsd-fit/Cargo.toml
