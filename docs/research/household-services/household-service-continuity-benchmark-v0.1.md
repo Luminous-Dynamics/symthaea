@@ -434,3 +434,29 @@ This crosswalk is a research benchmark interpretation, not legal advice, a munic
 
 
 **Machine-readable national profile:** [`south-africa-water-service-standard-profile-v0.1.json`](south-africa-water-service-standard-profile-v0.1.json). It preserves the formal-settlement, interim informal-settlement and >48-hour alternative drinking-water profiles as distinct records, with regulatory clauses, boundaries, requirements and interpretation guards. JSON was parsed and fetched back after creation; this is not a legal-compliance validator.
+
+
+## 15.7 SANS 241:2025 — risk-driven, time-bounded quality evidence
+
+The legal standard names "SANS 241" as the drinking-water standard "as may be updated". The current technical migration must therefore be version-aware: a benchmark or product must not pin its interpretation to SANS 241:2015 merely because an older municipal report or archived lab result used that edition.
+
+Rand Water's 2026 technical briefing on migrating from SANS 241:2015 to SANS 241:2025 describes a substantive shift from a result-only checklist toward an integrated risk-management and evidence process:
+- water-quality risk assessment is ongoing and specific to the supply system;
+- mandatory process-risk parameters are monitored routinely in all relevant supply systems;
+- system-specific risk-defined parameters are selected through risk assessment and become part of the programme when risks are confirmed;
+- monitoring locations and frequency are driven by system risks and representative source / final-water / distribution sample points;
+- the standard includes distinct sections for water-supply and borehole systems, mobile tankers and static tanks, plus management of non-compliant results and verification.
+
+This is a technical interpretation from a Rand Water water-quality specialist's migration briefing, not a substitute for the licensed current SANS text. The detailed parameter limits, sampling frequencies and applicability conditions must be taken from the current SANS 241 edition and the qualified risk assessment for the actual system. Do not copy numerical tables from the presentation into product firmware or treat the presentation itself as a certification criterion.
+
+**Benchmark consequences:**
+1. A historic lab result is a time- and sample-point-bound observation, not a perpetual approval for a source, tank, treatment unit or household outlet.
+2. The sample point must match the claimed delivery boundary. A raw-source result does not qualify treated output; a treatment outlet does not automatically qualify a downstream storage tank or a household fixture.
+3. Source changes, treatment bypass/faults, storage/stagnation events, material changes in risk, and non-compliance/corrective-action states must be visible in the currentness model. The qualified monitoring programme—not an arbitrary universal TTL—determines required sampling and review timing.
+4. "Continuous monitoring" telemetry may support process control but does not replace required laboratory or qualified verification methods unless the governing standard and approved programme explicitly permit it.
+5. A non-compliant result requires an explicit incident/corrective-action path. The service state remains restricted or Unknown until the relevant requalification evidence is accepted.
+6. Where the current standard has distinct supply-system, borehole, tanker or static-tank regimes, the source/system classification must be preserved. Do not apply municipal-network assumptions blindly to private boreholes or stored water.
+
+The machine-readable profile captures the standard revision and evidence-boundary requirements but intentionally contains no SANS numerical parameter limits. Its role is to prevent a false "quality pass" from stale, wrong-source, wrong-boundary or out-of-context evidence; it is not a substitute for water-quality testing.
+
+**Technical reference:** Rand Water, *Migrating from SANS 241:2015 to SANS 241:2025 — Practical implications*, presentation by a Rand Water Water Quality Specialist (2026): https://www.randwater.co.za/media/forums/presentations/RW%20-%20Migrating%20from%20SANS%20241%202015%20to%20SANS%20241%202025.pdf. Supporting SABS-referenced update: https://plumbingafrica.co.za/update-to-sans-241/ (2026-05-12). Treat the current SANS publication as controlling; these explanatory sources are not the standard itself.
