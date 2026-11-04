@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use symthaea_rea_mcp::ReaEvidenceMcpServer;
 use rmcp::{
-    CallToolResponse, RoleClient, ServiceExt,
-    model::CallToolRequestParams,
+    RoleClient, ServiceExt,
+    model::{CallToolRequestParams, CallToolResponse},
 };
 use serde_json::{Value, json};
 
