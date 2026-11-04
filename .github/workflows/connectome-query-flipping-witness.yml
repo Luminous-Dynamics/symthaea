@@ -8,6 +8,8 @@ on:
       - "docs/neuroscience/CONNECTOME_QUERY_FLIPPING_WITNESS.schema.json"
       - "docs/neuroscience/CONNECTOME_QUERY_FLIPPING_WITNESS_V1.md"
       - "docs/neuroscience/examples/CONNECTOME_QUERY_FLIPPING_WITNESS.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_FLIPPING_WITNESS_THREE_WAY.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_FLIPPING_WITNESS_BOUNDED_NO_WITNESS.example.json"
       - ".github/workflows/connectome-query-flipping-witness.yml"
   push:
     branches: [main, "research/**"]
@@ -17,6 +19,8 @@ on:
       - "docs/neuroscience/CONNECTOME_QUERY_FLIPPING_WITNESS.schema.json"
       - "docs/neuroscience/CONNECTOME_QUERY_FLIPPING_WITNESS_V1.md"
       - "docs/neuroscience/examples/CONNECTOME_QUERY_FLIPPING_WITNESS.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_FLIPPING_WITNESS_THREE_WAY.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_FLIPPING_WITNESS_BOUNDED_NO_WITNESS.example.json"
       - ".github/workflows/connectome-query-flipping-witness.yml"
   workflow_dispatch:
 
@@ -53,6 +57,32 @@ jobs:
           python3 tools/connectomics-intake-audit/reference/verify_query_flipping_witness_oracle.py \
             --input docs/neuroscience/examples/CONNECTOME_QUERY_FLIPPING_WITNESS.example.json \
             --report "$RUNNER_TEMP/query-flipping-witness-report.json"
+
+      - name: Evaluate three-way synergy fixture
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
+            --bin connectome_query_flipping_witness_audit -- \
+            --input docs/neuroscience/examples/CONNECTOME_QUERY_FLIPPING_WITNESS_THREE_WAY.example.json \
+            --output "$RUNNER_TEMP/query-flipping-witness-three-way-report.json"
+
+      - name: Independently verify three-way synergy fixture
+        run: |
+          python3 tools/connectomics-intake-audit/reference/verify_query_flipping_witness_oracle.py \
+            --input docs/neuroscience/examples/CONNECTOME_QUERY_FLIPPING_WITNESS_THREE_WAY.example.json \
+            --report "$RUNNER_TEMP/query-flipping-witness-three-way-report.json"
+
+      - name: Evaluate bounded no-witness fixture
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
+            --bin connectome_query_flipping_witness_audit -- \
+            --input docs/neuroscience/examples/CONNECTOME_QUERY_FLIPPING_WITNESS_BOUNDED_NO_WITNESS.example.json \
+            --output "$RUNNER_TEMP/query-flipping-witness-no-witness-report.json"
+
+      - name: Independently verify bounded no-witness disposition
+        run: |
+          python3 tools/connectomics-intake-audit/reference/verify_query_flipping_witness_oracle.py \
+            --input docs/neuroscience/examples/CONNECTOME_QUERY_FLIPPING_WITNESS_BOUNDED_NO_WITNESS.example.json \
+            --report "$RUNNER_TEMP/query-flipping-witness-no-witness-report.json"
 
       - name: Verify oracle source syntax
         run: python3 -m py_compile tools/connectomics-intake-audit/reference/verify_query_flipping_witness_oracle.py
