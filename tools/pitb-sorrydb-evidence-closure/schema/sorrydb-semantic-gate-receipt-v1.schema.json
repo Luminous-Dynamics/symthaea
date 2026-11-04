@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-semantic-gate-receipt-v1.schema.json",
+  "title": "PITB SorryDB semantic-gate receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "task_id",
+    "goal_sha256",
+    "declaration_signature_sha256",
+    "source_binding_receipt_sha256",
+    "source_correspondence_status",
+    "hypothesis_audit_status",
+    "vacuity_audit_status",
+    "reviewer_decision",
+    "reviewer_id",
+    "reviewer_attestation_sha256",
+    "semantic_log_sha256",
+    "semantic_gate_passed",
+    "vacuity_gate_passed"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-semantic-gate-receipt.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "goal_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "declaration_signature_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_binding_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_correspondence_status": {
+      "enum": [
+        "pass",
+        "fail",
+        "unresolved"
+      ]
+    },
+    "hypothesis_audit_status": {
+      "enum": [
+        "pass",
+        "fail",
+        "unresolved"
+      ]
+    },
+    "vacuity_audit_status": {
+      "enum": [
+        "pass",
+        "fail",
+        "unresolved"
+      ]
+    },
+    "reviewer_decision": {
+      "enum": [
+        "pass",
+        "fail",
+        "abstain"
+      ]
+    },
+    "reviewer_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reviewer_attestation_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "semantic_log_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "semantic_gate_passed": {
+      "type": "boolean"
+    },
+    "vacuity_gate_passed": {
+      "type": "boolean"
+    }
+  }
+}
