@@ -189,6 +189,9 @@ pub struct VerifiedEntryContent {
     pub declared_compressed_bytes: u64,
     pub declared_uncompressed_bytes: u64,
     pub observed_uncompressed_bytes: u64,
+    /// CRC-32/ISO-HDLC computed independently over the observed decompressed bytes.
+    pub observed_crc32: u32,
+    /// True only after both the secondary decoder and independent CRC routine accept EOF.
     pub verified_crc32: bool,
     pub compression_method: u16,
 }
@@ -531,6 +534,7 @@ impl ZipArtifactReader {
             })?;
             let mut buffer = vec![0u8; limits.read_buffer_bytes];
             let mut hasher = Sha256::new();
+            let mut observed_crc32 = Crc32State::new();
             let mut observed_uncompressed_bytes = 0u64;
 
             loop {
@@ -565,14 +569,23 @@ impl ZipArtifactReader {
                     ));
                 }
                 hasher.update(&buffer[..read]);
+                observed_crc32.update(&buffer[..read]);
             }
 
             member.verify_to_end().map_err(|error| {
                 map_zipcore_error("ZIP member did not reach a verified end state", error)
             })?;
+            let observed_crc32 = observed_crc32.finish();
+            if observed_crc32 != expected.declared_crc32 {
+                return Err(ReaderError::new(
+                    ReaderErrorKind::InvalidArchive,
+                    "independent streaming CRC-32 differs from the central-directory declaration",
+                ));
+            }
             Ok((
                 format!("{:x}", hasher.finalize()),
                 observed_uncompressed_bytes,
+                observed_crc32,
             ))
         })();
 
@@ -586,7 +599,7 @@ impl ZipArtifactReader {
             ));
         }
         self.verify_source()?;
-        let (sha256, observed_uncompressed_bytes) = stream_result?;
+        let (sha256, observed_uncompressed_bytes, observed_crc32) = stream_result?;
 
         Ok(VerifiedEntryContent {
             occurrence_index,
@@ -594,6 +607,7 @@ impl ZipArtifactReader {
             declared_compressed_bytes: expected.declared_compressed_size,
             declared_uncompressed_bytes: expected.declared_uncompressed_size,
             observed_uncompressed_bytes,
+            observed_crc32,
             verified_crc32: true,
             compression_method: expected.compression_method,
         })
@@ -1825,19 +1839,38 @@ fn read_u64(bytes: &[u8]) -> u64 {
     ])
 }
 
-fn crc32(bytes: &[u8]) -> u32 {
-    let mut crc = u32::MAX;
-    for byte in bytes {
-        crc ^= *byte as u32;
-        for _ in 0..8 {
-            crc = if crc & 1 == 1 {
-                (crc >> 1) ^ 0xEDB8_8320
-            } else {
-                crc >> 1
-            };
+#[derive(Debug, Clone, Copy)]
+struct Crc32State {
+    value: u32,
+}
+
+impl Crc32State {
+    fn new() -> Self {
+        Self { value: u32::MAX }
+    }
+
+    fn update(&mut self, bytes: &[u8]) {
+        for byte in bytes {
+            self.value ^= *byte as u32;
+            for _ in 0..8 {
+                self.value = if self.value & 1 == 1 {
+                    (self.value >> 1) ^ 0xEDB8_8320
+                } else {
+                    self.value >> 1
+                };
+            }
         }
     }
-    !crc
+
+    fn finish(self) -> u32 {
+        !self.value
+    }
+}
+
+fn crc32(bytes: &[u8]) -> u32 {
+    let mut state = Crc32State::new();
+    state.update(bytes);
+    state.finish()
 }
 
 #[cfg(test)]
