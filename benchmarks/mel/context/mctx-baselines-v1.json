@@ -50,7 +50,7 @@
         ]
       ],
       "expected": {
-        "member_action_accuracy": 0.6666666666666666,
+        "member_valid_action_support_rate": 0.6666666666666666,
         "context_sensitivity_rate": 0,
         "surface_invariance_rate": 1,
         "ambiguous_valid_action_rate": 1
@@ -105,7 +105,7 @@
         ]
       ],
       "expected": {
-        "member_action_accuracy": 0.5238095238095238,
+        "member_valid_action_support_rate": 0.5238095238095238,
         "context_sensitivity_rate": 0,
         "surface_invariance_rate": 0,
         "ambiguous_valid_action_rate": 1
@@ -160,7 +160,7 @@
         ]
       ],
       "expected": {
-        "member_action_accuracy": 1,
+        "member_valid_action_support_rate": 1,
         "context_sensitivity_rate": 1,
         "surface_invariance_rate": 1,
         "ambiguous_valid_action_rate": 1
