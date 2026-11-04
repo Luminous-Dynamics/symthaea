@@ -247,10 +247,12 @@ impl Summary {
         if let (Some(mu_ci), Some(sigma_ci), Some(da_ci)) =
             (mu_interval, sigma_interval, da_interval)
         {
-            if mu_ci.iter().all(|value| value.is_finite() && value >= mu_ci[0] && value <= mu_ci[1])
-                && sigma_ci.iter().all(|value| value.is_finite() && value >= sigma_ci[0] && value <= sigma_ci[1])
-                && da_ci.iter().all(|value| value.is_finite() && value >= da_ci[0] && value <= da_ci[1])
-            {
+            let ordered_finite = |interval: [f64; 2]| {
+                interval[0].is_finite()
+                    && interval[1].is_finite()
+                    && interval[0] <= interval[1]
+            };
+            if ordered_finite(mu_ci) && ordered_finite(sigma_ci) && ordered_finite(da_ci) {
                 self.joint_interval_returned += 1;
                 if mu_ci[0] <= mu
                     && mu <= mu_ci[1]
