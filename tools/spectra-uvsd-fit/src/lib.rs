@@ -94,10 +94,32 @@ impl CategoryTable {
     }
 }
 
+/// Optional count correction used to reproduce an external implementation.
+///
+/// The primary analysis is unsmoothed. MiyoshiReferencePerCategory adds 1/K
+/// to every category in each stimulus class, where K is the number of ordered
+/// response categories. This matches the authors' public R implementation
+/// (1 / length(nr_s1)) and the independent rt-da Python implementation
+/// (1 / (2 * n_bins)); it is not a trial-count-scaled correction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CountCorrection {
+    None,
+    MiyoshiReferencePerCategory,
+}
+
+impl CountCorrection {
+    fn additive_count(self, category_count: usize) -> f64 {
+        match self {
+            Self::None => 0.0,
+            Self::MiyoshiReferencePerCategory => 1.0 / category_count as f64,
+        }
+    }
+}
+
 /// Optimizer used to find the maximum-likelihood estimate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Optimizer {
-    /// Multi-start BFGS with central finite-difference gradients.
+    /// Multi-start BFGS with analytic gradients and a finite-difference fallback.
     Bfgs,
     /// Derivative-free Nelder-Mead simplex.
     NelderMead,
@@ -110,6 +132,9 @@ pub struct FitOptions {
     pub max_iterations: usize,
     pub gradient_tolerance: f64,
     pub starts: usize,
+    /// Defaults to no smoothing; select the reference correction only for
+    /// explicitly labelled compatibility comparisons.
+    pub count_correction: CountCorrection,
 }
 
 impl Default for FitOptions {
@@ -118,6 +143,7 @@ impl Default for FitOptions {
             max_iterations: 800,
             gradient_tolerance: 1.0e-6,
             starts: 6,
+            count_correction: CountCorrection::None,
         }
     }
 }
@@ -291,7 +317,7 @@ pub fn fit_with_optimizer(
     // start must not hide a lower-NLL non-converged candidate.
     runs.sort_by(|a, b| a.objective.total_cmp(&b.objective));
     let best = runs.remove(0);
-    let curvature = diagonal_curvature(table, &best.parameters);
+    let curvature = diagonal_curvature_with_correction(table, &best.parameters, options.count_correction);
     let estimate = decode_parameters(&best.parameters, table.categories.len())
         .and_then(|(mu, sigma, thresholds, _)| UvsdEstimate::new(mu, sigma, thresholds));
 
@@ -348,9 +374,20 @@ pub fn fit_ordered_counts(
 /// Returns None for invalid parameters or a non-finite positive-count cell.
 /// Unsmoothed negative multinomial log likelihood for a supplied parameter set.
 /// Returns None for invalid parameters or a non-finite positive-count cell.
+/// Unsmoothed negative multinomial log likelihood for a supplied parameter set.
 pub fn negative_log_likelihood(
     table: &CategoryTable,
     estimate: &UvsdEstimate,
+) -> Option<f64> {
+    negative_log_likelihood_with_correction(table, estimate, CountCorrection::None)
+}
+
+/// Negative multinomial log likelihood with a separately named count correction.
+/// The primary likelihood is always available through negative_log_likelihood().
+pub fn negative_log_likelihood_with_correction(
+    table: &CategoryTable,
+    estimate: &UvsdEstimate,
+    correction: CountCorrection,
 ) -> Option<f64> {
     if !estimate.mu.is_finite()
         || !estimate.sigma.is_finite()
@@ -362,6 +399,7 @@ pub fn negative_log_likelihood(
         return None;
     }
 
+    let additive = correction.additive_count(table.categories.len());
     let mut nll = 0.0;
     for (index, row) in table.categories.iter().enumerate() {
         let lower = if index == 0 { f64::NEG_INFINITY } else { estimate.thresholds[index - 1] };
@@ -370,34 +408,41 @@ pub fn negative_log_likelihood(
         } else {
             estimate.thresholds[index]
         };
-        if row.noise > 0 {
+        let noise_count = row.noise as f64 + additive;
+        let signal_count = row.signal as f64 + additive;
+        if noise_count > 0.0 {
             let log_probability = normal_log_interval(lower, upper);
             if !log_probability.is_finite() {
                 return None;
             }
-            nll -= row.noise as f64 * log_probability;
+            nll -= noise_count * log_probability;
         }
-        if row.signal > 0 {
+        if signal_count > 0.0 {
             let signal_lower = standardize_boundary(lower, estimate.mu, estimate.sigma);
             let signal_upper = standardize_boundary(upper, estimate.mu, estimate.sigma);
             let log_probability = normal_log_interval(signal_lower, signal_upper);
             if !log_probability.is_finite() {
                 return None;
             }
-            nll -= row.signal as f64 * log_probability;
+            nll -= signal_count * log_probability;
         }
     }
     if nll.is_finite() { Some(nll) } else { None }
 }
 
 /// Analytic gradient of the unsmoothed negative multinomial log likelihood.
-///
-/// Returns derivatives with respect to mu, ln(sigma), and each ordered
-/// threshold. This is independently testable against finite differences and
-/// does not change the primary unsmoothed likelihood.
 pub fn negative_log_likelihood_gradient(
     table: &CategoryTable,
     estimate: &UvsdEstimate,
+) -> Option<UvsdGradient> {
+    negative_log_likelihood_gradient_with_correction(table, estimate, CountCorrection::None)
+}
+
+/// Analytic gradient with an explicitly selected count correction.
+pub fn negative_log_likelihood_gradient_with_correction(
+    table: &CategoryTable,
+    estimate: &UvsdEstimate,
+    correction: CountCorrection,
 ) -> Option<UvsdGradient> {
     if !estimate.mu.is_finite()
         || !estimate.sigma.is_finite()
@@ -415,6 +460,7 @@ pub fn negative_log_likelihood_gradient(
         thresholds: vec![0.0; estimate.thresholds.len()],
     };
     let inverse_sigma = 1.0 / estimate.sigma;
+    let additive = correction.additive_count(table.categories.len());
 
     for (index, row) in table.categories.iter().enumerate() {
         let lower = if index == 0 { f64::NEG_INFINITY } else { estimate.thresholds[index - 1] };
@@ -424,7 +470,8 @@ pub fn negative_log_likelihood_gradient(
             estimate.thresholds[index]
         };
 
-        if row.noise > 0 {
+        let noise_count = row.noise as f64 + additive;
+        if noise_count > 0.0 {
             let log_probability = normal_log_interval(lower, upper);
             if !log_probability.is_finite() {
                 return None;
@@ -434,16 +481,16 @@ pub fn negative_log_likelihood_gradient(
             if !lower_ratio.is_finite() || !upper_ratio.is_finite() {
                 return None;
             }
-            let count = row.noise as f64;
             if index > 0 {
-                gradient.thresholds[index - 1] += count * lower_ratio;
+                gradient.thresholds[index - 1] += noise_count * lower_ratio;
             }
             if index < estimate.thresholds.len() {
-                gradient.thresholds[index] -= count * upper_ratio;
+                gradient.thresholds[index] -= noise_count * upper_ratio;
             }
         }
 
-        if row.signal > 0 {
+        let signal_count = row.signal as f64 + additive;
+        if signal_count > 0.0 {
             let signal_lower = standardize_boundary(lower, estimate.mu, estimate.sigma);
             let signal_upper = standardize_boundary(upper, estimate.mu, estimate.sigma);
             let log_probability = normal_log_interval(signal_lower, signal_upper);
@@ -456,16 +503,15 @@ pub fn negative_log_likelihood_gradient(
                 return None;
             }
 
-            let count = row.signal as f64;
-            gradient.mu -= count * (lower_ratio - upper_ratio) * inverse_sigma;
-            gradient.log_sigma -= count
+            gradient.mu -= signal_count * (lower_ratio - upper_ratio) * inverse_sigma;
+            gradient.log_sigma -= signal_count
                 * (finite_z_ratio_product(signal_lower, lower_ratio)
                     - finite_z_ratio_product(signal_upper, upper_ratio));
             if index > 0 {
-                gradient.thresholds[index - 1] += count * lower_ratio * inverse_sigma;
+                gradient.thresholds[index - 1] += signal_count * lower_ratio * inverse_sigma;
             }
             if index < estimate.thresholds.len() {
-                gradient.thresholds[index] -= count * upper_ratio * inverse_sigma;
+                gradient.thresholds[index] -= signal_count * upper_ratio * inverse_sigma;
             }
         }
     }
@@ -518,8 +564,16 @@ fn converged_parameter_spread(runs: &[RunResult]) -> Option<Vec<f64>> {
 }
 
 fn diagonal_curvature(table: &CategoryTable, parameters: &[f64]) -> Option<Vec<f64>> {
+    diagonal_curvature_with_correction(table, parameters, CountCorrection::None)
+}
+
+fn diagonal_curvature_with_correction(
+    table: &CategoryTable,
+    parameters: &[f64],
+    correction: CountCorrection,
+) -> Option<Vec<f64>> {
     let (lower, upper) = parameter_bounds(table.categories.len());
-    let center = objective(table, parameters);
+    let center = objective_with_correction(table, parameters, correction);
     if !center.is_finite() {
         return None;
     }
@@ -535,8 +589,8 @@ fn diagonal_curvature(table: &CategoryTable, parameters: &[f64]) -> Option<Vec<f
         let mut minus = parameters.to_vec();
         plus[index] += step;
         minus[index] -= step;
-        let high = objective(table, &plus);
-        let low = objective(table, &minus);
+        let high = objective_with_correction(table, &plus, correction);
+        let low = objective_with_correction(table, &minus, correction);
         let value = (high - 2.0 * center + low) / (step * step);
         if !value.is_finite() {
             return None;
@@ -634,10 +688,18 @@ fn decode_parameters(
 }
 
 fn objective(table: &CategoryTable, parameters: &[f64]) -> f64 {
+    objective_with_correction(table, parameters, CountCorrection::None)
+}
+
+fn objective_with_correction(
+    table: &CategoryTable,
+    parameters: &[f64],
+    correction: CountCorrection,
+) -> f64 {
     match decode_parameters(parameters, table.categories.len()) {
         Some((mu, sigma, thresholds, _)) => {
             match UvsdEstimate::new(mu, sigma, thresholds)
-                .and_then(|estimate| negative_log_likelihood(table, &estimate))
+                .and_then(|estimate| negative_log_likelihood_with_correction(table, &estimate, correction))
             {
                 Some(value) => value,
                 None => f64::INFINITY,
@@ -694,34 +756,48 @@ struct RunResult {
 }
 
 fn parameter_gradient(table: &CategoryTable, parameters: &[f64]) -> Vec<f64> {
+    parameter_gradient_with_correction(table, parameters, CountCorrection::None)
+}
+
+fn parameter_gradient_with_correction(
+    table: &CategoryTable,
+    parameters: &[f64],
+    correction: CountCorrection,
+) -> Vec<f64> {
     let Some((mu, sigma, thresholds, _)) = decode_parameters(parameters, table.categories.len()) else {
         return vec![f64::NAN; parameters.len()];
     };
     let Some(estimate) = UvsdEstimate::new(mu, sigma, thresholds) else {
         return vec![f64::NAN; parameters.len()];
     };
-    let Some(natural) = negative_log_likelihood_gradient(table, &estimate) else {
+    let Some(natural) = negative_log_likelihood_gradient_with_correction(table, &estimate, correction) else {
         let (lower, upper) = parameter_bounds(table.categories.len());
-        return numeric_gradient(table, parameters, &lower, &upper);
+        return numeric_gradient_with_correction(table, parameters, &lower, &upper, correction);
     };
 
     let mut gradient = vec![0.0; parameters.len()];
     gradient[0] = natural.mu;
     gradient[1] = natural.log_sigma;
     gradient[2] = natural.thresholds.iter().sum();
-
     for gap_index in 0..natural.thresholds.len().saturating_sub(1) {
         let gap = parameters[3 + gap_index].exp();
-        let downstream_gradient: f64 = natural.thresholds
-            .iter()
-            .skip(gap_index + 1)
-            .sum();
+        let downstream_gradient: f64 = natural.thresholds.iter().skip(gap_index + 1).sum();
         gradient[3 + gap_index] = gap * downstream_gradient;
     }
     gradient
 }
 
 fn numeric_gradient(table: &CategoryTable, x: &[f64], lower: &[f64], upper: &[f64]) -> Vec<f64> {
+    numeric_gradient_with_correction(table, x, lower, upper, CountCorrection::None)
+}
+
+fn numeric_gradient_with_correction(
+    table: &CategoryTable,
+    x: &[f64],
+    lower: &[f64],
+    upper: &[f64],
+    correction: CountCorrection,
+) -> Vec<f64> {
     let mut gradient = vec![0.0; x.len()];
     for index in 0..x.len() {
         let step = 1.0e-5 * x[index].abs().max(1.0);
@@ -731,7 +807,8 @@ fn numeric_gradient(table: &CategoryTable, x: &[f64], lower: &[f64], upper: &[f6
         minus[index] = (x[index] - step).max(lower[index]);
         let width = plus[index] - minus[index];
         if width > 0.0 {
-            gradient[index] = (objective(table, &plus) - objective(table, &minus)) / width;
+            gradient[index] = (objective_with_correction(table, &plus, correction)
+                - objective_with_correction(table, &minus, correction)) / width;
         }
     }
     gradient
@@ -753,8 +830,8 @@ fn run_bfgs(table: &CategoryTable, mut x: Vec<f64>, options: FitOptions) -> RunR
     for (index, row) in inverse_hessian.iter_mut().enumerate() {
         row[index] = 1.0;
     }
-    let mut value = objective(table, &x);
-    let mut gradient = parameter_gradient(table, &x);
+    let mut value = objective_with_correction(table, &x, options.count_correction);
+    let mut gradient = parameter_gradient_with_correction(table, &x, options.count_correction);
     let mut converged = false;
     let mut iterations = 0usize;
 
@@ -794,7 +871,7 @@ fn run_bfgs(table: &CategoryTable, mut x: Vec<f64>, options: FitOptions) -> RunR
                 .map(|(current, delta)| current + step * delta)
                 .collect();
             project(&mut candidate, &lower, &upper);
-            let candidate_value = objective(table, &candidate);
+            let candidate_value = objective_with_correction(table, &candidate, options.count_correction);
             if candidate_value.is_finite()
                 && candidate_value <= value + 1.0e-4 * step * directional_derivative
             {
@@ -807,7 +884,7 @@ fn run_bfgs(table: &CategoryTable, mut x: Vec<f64>, options: FitOptions) -> RunR
             break;
         };
 
-        let next_gradient = parameter_gradient(table, &next_x);
+        let next_gradient = parameter_gradient_with_correction(table, &next_x, options.count_correction);
         let s: Vec<f64> = next_x.iter().zip(x.iter()).map(|(a, b)| a - b).collect();
         let y: Vec<f64> = next_gradient.iter().zip(gradient.iter()).map(|(a, b)| a - b).collect();
         let ys = dot(&y, &s);
@@ -839,7 +916,7 @@ fn run_bfgs(table: &CategoryTable, mut x: Vec<f64>, options: FitOptions) -> RunR
         }
     }
 
-    let gradient_norm = vector_norm(&parameter_gradient(table, &x));
+    let gradient_norm = vector_norm(&parameter_gradient_with_correction(table, &x, options.count_correction));
     let at_boundary = decode_parameters(&x, table.categories.len())
         .map(|value| value.3)
         .unwrap_or(true);
@@ -864,7 +941,7 @@ fn run_nelder_mead(table: &CategoryTable, initial: Vec<f64>, options: FitOptions
     let (lower, upper) = parameter_bounds(table.categories.len());
     let mut simplex = Vec::with_capacity(dimension + 1);
     simplex.push(Vertex {
-        value: objective(table, &initial),
+        value: objective_with_correction(table, &initial, options.count_correction),
         point: initial.clone(),
     });
     for index in 0..dimension {
@@ -872,7 +949,7 @@ fn run_nelder_mead(table: &CategoryTable, initial: Vec<f64>, options: FitOptions
         point[index] += 0.15 * (1.0 + point[index].abs());
         project(&mut point, &lower, &upper);
         simplex.push(Vertex {
-            value: objective(table, &point),
+            value: objective_with_correction(table, &point, options.count_correction),
             point,
         });
     }
@@ -913,7 +990,7 @@ fn run_nelder_mead(table: &CategoryTable, initial: Vec<f64>, options: FitOptions
             .map(|(center, bad)| center + (center - bad))
             .collect();
         project(&mut reflected, &lower, &upper);
-        let reflected_value = objective(table, &reflected);
+        let reflected_value = objective_with_correction(table, &reflected, options.count_correction);
 
         if reflected_value < best_value {
             let mut expanded: Vec<f64> = centroid
@@ -922,7 +999,7 @@ fn run_nelder_mead(table: &CategoryTable, initial: Vec<f64>, options: FitOptions
                 .map(|(center, reflected)| center + 2.0 * (reflected - center))
                 .collect();
             project(&mut expanded, &lower, &upper);
-            let expanded_value = objective(table, &expanded);
+            let expanded_value = objective_with_correction(table, &expanded, options.count_correction);
             if expanded_value < reflected_value {
                 simplex[dimension] = Vertex { point: expanded, value: expanded_value };
             } else {
@@ -939,7 +1016,7 @@ fn run_nelder_mead(table: &CategoryTable, initial: Vec<f64>, options: FitOptions
                 .map(|(center, target)| center + 0.5 * (target - center))
                 .collect();
             project(&mut contracted, &lower, &upper);
-            let contracted_value = objective(table, &contracted);
+            let contracted_value = objective_with_correction(table, &contracted, options.count_correction);
             let should_accept = if outside {
                 contracted_value <= reflected_value
             } else {
@@ -954,7 +1031,7 @@ fn run_nelder_mead(table: &CategoryTable, initial: Vec<f64>, options: FitOptions
                         vertex.point[index] = best[index] + 0.5 * (vertex.point[index] - best[index]);
                     }
                     project(&mut vertex.point, &lower, &upper);
-                    vertex.value = objective(table, &vertex.point);
+                    vertex.value = objective_with_correction(table, &vertex.point, options.count_correction);
                 }
             }
         }
@@ -962,7 +1039,7 @@ fn run_nelder_mead(table: &CategoryTable, initial: Vec<f64>, options: FitOptions
 
     simplex.sort_by(|left, right| left.value.total_cmp(&right.value));
     let best = &simplex[0];
-    let gradient_norm = vector_norm(&parameter_gradient(table, &best.point));
+    let gradient_norm = vector_norm(&parameter_gradient_with_correction(table, &best.point, options.count_correction));
     let at_boundary = decode_parameters(&best.point, table.categories.len())
         .map(|value| value.3)
         .unwrap_or(true);
@@ -1114,7 +1191,12 @@ mod tests {
     #[test]
     fn derivative_free_optimizer_produces_inspectable_fit() {
         let table = synthetic_table(1.0, 1.35, 100_000);
-        let options = FitOptions { max_iterations: 2_000, gradient_tolerance: 1.0e-5, starts: 3 };
+        let options = FitOptions {
+            max_iterations: 2_000,
+            gradient_tolerance: 1.0e-5,
+            starts: 3,
+            count_correction: CountCorrection::None,
+        };
         let result = fit_with_optimizer(&table, options, Optimizer::NelderMead);
         assert!(matches!(result.status, FitStatus::Converged | FitStatus::Boundary), "{result:?}");
         assert!(result.estimate.is_some());
