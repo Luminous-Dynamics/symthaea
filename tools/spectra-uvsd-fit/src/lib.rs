@@ -247,7 +247,11 @@ pub fn fit_with_optimizer(
     }
 
     let has_converged = runs.iter().any(|run| run.converged);
-    runs.sort_by(|a, b| a.objective.total_cmp(&b.objective));
+    let mut all_objectives: Vec<f64> = runs.iter().map(|run| run.objective).collect();
+    all_objectives.sort_by(f64::total_cmp);
+    runs.sort_by(|a, b| {
+        b.converged.cmp(&a.converged).then_with(|| a.objective.total_cmp(&b.objective))
+    });
     let best = runs.remove(0);
     let estimate = decode_parameters(&best.parameters, table.categories.len())
         .and_then(|(mu, sigma, thresholds, _)| UvsdEstimate::new(mu, sigma, thresholds));
@@ -260,14 +264,9 @@ pub fn fit_with_optimizer(
         FitStatus::Converged
     };
 
-    let objective_values = std::iter::once(best.objective)
-        .chain(runs.iter().map(|run| run.objective));
-    let min_objective = objective_values.clone().fold(f64::INFINITY, f64::min);
-    let max_objective = objective_values.fold(f64::NEG_INFINITY, f64::max);
-    let spread = if min_objective.is_finite() && max_objective.is_finite() {
-        Some((max_objective - min_objective).max(0.0))
-    } else {
-        None
+    let spread = match (all_objectives.first(), all_objectives.last()) {
+        (Some(minimum), Some(maximum)) => Some((maximum - minimum).max(0.0)),
+        _ => None,
     };
 
     FitResult {
@@ -358,7 +357,7 @@ fn standardize_boundary(value: f64, mu: f64, sigma: f64) -> f64 {
 }
 
 fn is_identifiable_from_category_support(table: &CategoryTable) -> bool {
-    let populated = table.categories.iter().filter(|row| row.signal + row.noise > 0).count();
+    let populated = table.categories.iter().filter(|row| row.signal > 0 || row.noise > 0).count();
     let signal_categories = table.categories.iter().filter(|row| row.signal > 0).count();
     let noise_categories = table.categories.iter().filter(|row| row.noise > 0).count();
     populated >= 3 && signal_categories >= 2 && noise_categories >= 2
