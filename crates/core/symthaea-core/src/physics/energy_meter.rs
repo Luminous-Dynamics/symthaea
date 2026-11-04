@@ -207,10 +207,10 @@ impl EnergyDelta {
             return Err(EnergyDeltaError::TimestampDidNotAdvance);
         }
 
-        if let Some(modulus) = earlier.descriptor.wrap_modulus {
-            if modulus == 0 || earlier.raw_counter >= modulus || later.raw_counter >= modulus {
-                return Err(EnergyDeltaError::CounterOutsideModulus);
-            }
+        if let Some(modulus) = earlier.descriptor.wrap_modulus
+            && (modulus == 0 || earlier.raw_counter >= modulus || later.raw_counter >= modulus)
+        {
+            return Err(EnergyDeltaError::CounterOutsideModulus);
         }
 
         let raw_delta = match earlier.raw_counter.cmp(&later.raw_counter) {
