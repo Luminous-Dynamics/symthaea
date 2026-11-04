@@ -21,6 +21,7 @@ The governing principle is:
 ## Current research specifications under review
 
 - [#10342 — household water/energy/thermal coordination](https://github.com/Luminous-Dynamics/symthaea/issues/10342): [household-resource-arbitration-contract-v0.1.md](household-resource-arbitration-contract-v0.1.md) defines non-compensatory safety/quality/consent gates, local appliance authority, uncertainty-bounded resource planning and 14 adversarial HRA scenarios. Design-only; no live control.
+- [Household resource arbitration scenarios v0.1](household-resource-arbitration-scenarios-v0.1.json) — machine-readable HRA-001…014 challenge manifest; synthetic-only and not executed.
 
 - [PR #10386 — household services charter, physical validation protocols and competitive frontier](https://github.com/Luminous-Dynamics/symthaea/pull/10386). Those research files are on the PR branch and should not be assumed present on main until merged.
 - [PR #10432 — repair recurrence and post-repair durability contract](https://github.com/Luminous-Dynamics/symthaea/pull/10432). Defines repair episode identity, independent restoration, use exposure, competing events, recurrent burden and censoring.
