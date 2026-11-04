@@ -120,6 +120,7 @@ pub struct BatchReport {
     pub adapter_version: String,
     pub evidence_class: EvidenceClass,
     pub source_repository: String,
+    pub source_commit: Option<String>,
     pub water_corpus_id: String,
     pub repair_corpus_id: String,
     pub water_source: SourceCorpusManifest,
@@ -172,6 +173,7 @@ pub fn evaluate_batch(
         &water_bytes,
         &repair_bytes,
         DigestScope::CanonicalizedJsonValue,
+        None,
     )
 }
 
@@ -180,6 +182,17 @@ pub fn evaluate_batch_from_bytes(
     water_bytes: &[u8],
     repair_bytes: &[u8],
 ) -> Result<BatchReport, EvaluationError> {
+    evaluate_batch_from_bytes_with_source_commit(water_bytes, repair_bytes, None)
+}
+
+/// Parse and evaluate exact source bytes while recording the exact Git commit
+/// that supplied the evaluator build, when the caller has that provenance.
+pub fn evaluate_batch_from_bytes_with_source_commit(
+    water_bytes: &[u8],
+    repair_bytes: &[u8],
+    source_commit: Option<&str>,
+) -> Result<BatchReport, EvaluationError> {
+    let source_commit = source_commit.map(validate_source_commit).transpose()?;
     let water_corpus: Value = serde_json::from_slice(water_bytes)
         .map_err(|error| EvaluationError::new("water_fixture_json", error.to_string()))?;
     let repair_corpus: Value = serde_json::from_slice(repair_bytes)
@@ -190,6 +203,7 @@ pub fn evaluate_batch_from_bytes(
         water_bytes,
         repair_bytes,
         DigestScope::ExactSourceBytes,
+        source_commit,
     )
 }
 
@@ -199,6 +213,7 @@ fn evaluate_batch_with_sources(
     water_source_bytes: &[u8],
     repair_source_bytes: &[u8],
     digest_scope: DigestScope,
+    source_commit: Option<String>,
 ) -> Result<BatchReport, EvaluationError> {
     let water_corpus_id = validate_corpus_header(
         water_corpus,
@@ -248,6 +263,7 @@ fn evaluate_batch_with_sources(
         adapter_version: "water-continuity-v0.1+repairability-v0.1".to_owned(),
         evidence_class: EvidenceClass::SyntheticFixtureOnly,
         source_repository: "Luminous-Dynamics/symthaea".to_owned(),
+        source_commit,
         water_corpus_id,
         repair_corpus_id,
         water_source,
@@ -266,11 +282,29 @@ pub fn evaluate_batch_from_paths(
     water_path: impl AsRef<Path>,
     repair_path: impl AsRef<Path>,
 ) -> Result<BatchReport, EvaluationError> {
+    evaluate_batch_from_paths_with_source_commit(water_path, repair_path, None)
+}
+
+pub fn evaluate_batch_from_paths_with_source_commit(
+    water_path: impl AsRef<Path>,
+    repair_path: impl AsRef<Path>,
+    source_commit: Option<&str>,
+) -> Result<BatchReport, EvaluationError> {
     let water_bytes = fs::read(water_path)
         .map_err(|error| EvaluationError::new("water_fixture", error.to_string()))?;
     let repair_bytes = fs::read(repair_path)
         .map_err(|error| EvaluationError::new("repair_fixture", error.to_string()))?;
-    evaluate_batch_from_bytes(&water_bytes, &repair_bytes)
+    evaluate_batch_from_bytes_with_source_commit(&water_bytes, &repair_bytes, source_commit)
+}
+
+fn validate_source_commit(value: &str) -> Result<String, EvaluationError> {
+    if value.len() != 40 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(EvaluationError::new(
+            "source_commit",
+            "source commit must be a full 40-character hexadecimal Git object ID",
+        ));
+    }
+    Ok(value.to_ascii_lowercase())
 }
 
 fn source_manifest(
