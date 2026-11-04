@@ -16,6 +16,9 @@
     "end_line",
     "end_column",
     "goal_sha256",
+    "target_is_prop",
+    "declaration_signature_after_sha256",
+    "declaration_signature_before_sha256",
     "source_file_sha256",
     "replacement_patch_sha256",
     "proof_artifact_sha256",
@@ -219,6 +222,17 @@
           "minLength": 1
         }
       ]
+    },
+    "declaration_signature_before_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "declaration_signature_after_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "target_is_prop": {
+      "type": "boolean"
     }
   },
   "allOf": [
