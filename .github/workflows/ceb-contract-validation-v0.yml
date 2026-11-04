@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "benchmarks/ceb/**"
+      - "docs/**/*.md"
+      - "scripts/audit_doc_command_claims.py"
       - "docs/research/COMPUTATIONAL_ENGINEERING_BENCH_V0_2026-11-02.md"
       - "docs/research/CEB_VERIFIER_INTEGRITY_PROTOCOL_V0_2026-11-02.md"
       - ".github/workflows/ceb-contract-validation-v0.yml"
@@ -559,3 +561,9 @@ jobs:
           )
           print("CEB_CLAIM_BOUNDARY: schema validation is not DSSE signature verification or runner qualification")
           PY
+      - name: Audit documented Cargo command targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/audit_doc_command_claims.py --self-test
+          python scripts/audit_doc_command_claims.py --repo-root .
