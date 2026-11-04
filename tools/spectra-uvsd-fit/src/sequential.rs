@@ -911,13 +911,13 @@ mod tests {
             match result.receipt.selection_mode {
                 SelectionMode::Exploration => {
                     saw_exploration = true;
-                    assert!((result.receipt.selection_probability - 0.1).abs() < 1.0e-12);
+                    let expected = if result.action.action_id == 2 { 0.8 } else { 0.1 };
+                    assert!((result.receipt.selection_probability - expected).abs() < 1.0e-12);
                 }
                 SelectionMode::Exploitation => {
                     saw_exploitation = true;
-                    let exploitation_mass = if result.action.action_id == 2 { 0.7 } else { 0.0 };
-                    let expected = exploitation_mass + 0.1;
-                    assert!((result.receipt.selection_probability - expected).abs() < 1.0e-12);
+                    assert_eq!(result.action.action_id, 2);
+                    assert!((result.receipt.selection_probability - 0.8).abs() < 1.0e-12);
                 }
                 SelectionMode::ForcedAudit => panic!("no audit floor was configured"),
             }
