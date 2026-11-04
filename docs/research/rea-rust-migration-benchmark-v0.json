@@ -1819,6 +1819,78 @@
         "authenticity": "Replay verifies observed bytes against a receipt, not the producer's identity or truthfulness.",
         "checksum_commonality": "zipcore/zip use crc32fast in ZIP parsing; the replay custom CRC path is required as a second calculation."
       }
+    },
+    {
+      "id": "platform_package_signature_evidence",
+      "status": "research_issue_opened",
+      "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10508",
+      "objective": "Produce independently qualified, platform-version-scoped signature and authorization evidence for APK and iOS packages without conflating content integrity, signature validity, signer identity, trust policy, distribution authorization or runtime safety.",
+      "cases": [
+        "apk_v1_signature_validity_and_metadata_coverage_boundary",
+        "apk_v2_signing_block_and_protected_content_digest",
+        "apk_v3_min_sdk_max_sdk_and_proof_of_rotation_lineage",
+        "apk_v31_key_rotation_platform_scoped_signer",
+        "apk_v4_idsig_merkle_tree_and_required_v2_v3_binding",
+        "apk_idsig_wrong_archive_digest_or_merkle_root_rejection",
+        "apk_signing_block_size_pair_and_eocd_adjacency_validation",
+        "apk_unknown_signature_algorithm_and_strongest_supported_algorithm_selection",
+        "apk_unexpected_signer_valid_crypto_but_policy_denied",
+        "apk_expired_not_yet_valid_untrusted_and_revoked_certificate_policy_cases",
+        "ios_macho_code_directory_alternate_code_directories_and_page_hashes",
+        "ios_cms_signature_and_certificate_chain_validation",
+        "ios_resource_envelope_CodeResources_tamper_detection",
+        "ios_nested_framework_extension_and_watch_app_team_id_consistency",
+        "ios_signature_entitlement_must_be_subset_of_provisioning_profile_allowlist",
+        "ios_provisioning_profile_cms_der_profile_app_id_team_id_expiry_device_policy",
+        "ios_der_entitlements_required_by_named_platform_version",
+        "ios_valid_signature_unexpected_team_id_policy_denial",
+        "offline_structural_parser_vs_platform_native_api_disagreement"
+      ],
+      "metrics": [
+        "scheme_presence_and_verification_accuracy_by_platform_version",
+        "signature_corruption_false_accept_rate",
+        "trust_policy_false_accept_rate",
+        "signer_certificate_and_public_key_digest_accuracy",
+        "key_rotation_lineage_detection_recall",
+        "nested_code_identity_coverage",
+        "resource_envelope_tamper_detection_recall",
+        "provisioning_profile_entitlement_authorization_accuracy",
+        "unsupported_and_abstention_rate_by_scheme",
+        "platform_oracle_agreement_rate",
+        "verification_p50_p95_latency_and_peak_rss",
+        "trust_context_completeness"
+      ],
+      "target": "Zero false accepts in seeded cryptographic-corruption controls; 100_percent correct distinction between cryptographic validity and named-policy acceptance; 100_percent explicit Unsupported/Unknown for untested platform/scheme combinations; no single aggregate trust scalar.",
+      "protocol": [
+        "bind every result to whole-package SHA-256, exact parser/verifier build, toolchain, trust anchors, revocation policy, verification time and target platform/API version",
+        "preserve raw observations, cryptographic verification, certificate/path evaluation, platform policy and authorization as separate stages",
+        "Android: compare v1/v2/v3/v3.1/v4 separately against apksig/apksigner and platform Package Manager on named API versions",
+        "Android v4 must bind companion apk.idsig to same APK content and Merkle parameters; record v2/v3 prerequisite and signature verification result",
+        "Apple: compare offline structural parser separately from Security.framework SecStaticCodeCheckValidity and supported codesign validation on macOS/iOS-equivalent platform environments",
+        "Apple: compare signed entitlements to provisioning-profile authorization; don't treat a provisioning profile as generic X.509 identity or rely on undocumented profile format",
+        "record certificate chain/path result, time, trust anchors, revocation behavior and signer key/certificate digests separately from human organization attribution",
+        "valid cryptographic signature from an unexpected signer must remain cryptographically valid but policy denied",
+        "preserve nested code identities, CodeResources, DER entitlements, bundle identifiers, Team ID and key rotation lineage as separate claims",
+        "report Unsupported and abstained cases separately from invalid signatures; do not coerce unknown to false or true",
+        "keep content integrity, signature validity, signer identity, trust, authorization, installability, runtime behavior and MASVS control outcome as independent fields"
+      ],
+      "claim_boundaries": {
+        "content_integrity": "ZIP SHA-256/CRC and member receipts do not establish package signature validity.",
+        "cryptographic_validity": "Signature mathematics passing does not establish that the signer is expected or trusted.",
+        "signer_identity": "A certificate/key digest identifies public key or certificate bytes; mapping it to a legal entity requires separate evidence.",
+        "trust_policy": "Trust depends on named anchors, time, revocation and platform policy version.",
+        "authorization": "A valid signature may still violate app-ID, bundle-ID, Team ID, entitlement or distribution policy.",
+        "runtime": "Signature validity does not establish safe or benign runtime behavior."
+      },
+      "sources": [
+        "https://source.android.com/docs/security/features/apksigning/v2",
+        "https://source.android.com/docs/security/features/apksigning/v3",
+        "https://source.android.com/docs/security/features/apksigning/v4",
+        "https://developer.apple.com/documentation/security/code-signing-services",
+        "https://developer.apple.com/documentation/technotes/tn3125-inside-code-signing-provisioning-profiles",
+        "https://developer.apple.com/documentation/technotes/tn3126-inside-code-signing-hashes",
+        "https://support.apple.com/guide/security/app-code-signing-process-in-ios-ipados-tvos-visionos-and-watchos-sec7c917bf14/web"
+      ]
     }
   ],
   "promotion_policy": {
