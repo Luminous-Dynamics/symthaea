@@ -39,6 +39,7 @@ pub enum CandidateArchiveError {
     InvalidScore(String),
     DuplicateCandidate(String),
     MissingParent(String),
+    DuplicateParent(String),
     SelfParent(String),
     MetricSchemaMismatch,
 }
@@ -58,6 +59,7 @@ impl fmt::Display for CandidateArchiveError {
             }
             Self::DuplicateCandidate(id) => write!(f, "candidate already exists: {id}"),
             Self::MissingParent(id) => write!(f, "candidate parent does not exist: {id}"),
+            Self::DuplicateParent(id) => write!(f, "candidate declares the same parent more than once: {id}"),
             Self::SelfParent(id) => write!(f, "candidate cannot be its own parent: {id}"),
             Self::MetricSchemaMismatch => {
                 write!(f, "candidate capability dimensions do not match this archive")
@@ -211,7 +213,7 @@ impl CapabilityVector {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CandidateRecord {
     candidate_id: String,
-    parent_id: Option<String>,
+    parent_ids: Vec<String>,
     source_tree_digest: String,
     receipt_digest: String,
     capabilities: CapabilityVector,
@@ -220,7 +222,7 @@ pub struct CandidateRecord {
 impl CandidateRecord {
     pub fn new(
         candidate_id: impl Into<String>,
-        parent_id: Option<String>,
+        mut parent_ids: Vec<String>,
         source_tree_digest: impl Into<String>,
         receipt_digest: impl Into<String>,
         capabilities: CapabilityVector,
@@ -233,16 +235,22 @@ impl CandidateRecord {
         validate_digest(&source_tree_digest, "source_tree_digest")?;
         validate_digest(&receipt_digest, "receipt_digest")?;
 
-        if let Some(parent) = parent_id.as_deref() {
+        let mut unique_parents = BTreeSet::new();
+        for parent in &parent_ids {
             validate_identifier(parent, "parent_id")?;
-            if parent == candidate_id.as_str() {
+            if parent == &candidate_id {
                 return Err(CandidateArchiveError::SelfParent(candidate_id));
+            }
+            if !unique_parents.insert(parent.clone()) {
+                return Err(CandidateArchiveError::DuplicateParent(parent.clone()));
             }
         }
 
+        parent_ids.sort_unstable();
+
         Ok(Self {
             candidate_id,
-            parent_id,
+            parent_ids,
             source_tree_digest,
             receipt_digest,
             capabilities,
@@ -253,8 +261,13 @@ impl CandidateRecord {
         &self.candidate_id
     }
 
-    pub fn parent_id(&self) -> Option<&str> {
-        self.parent_id.as_deref()
+    /// All declared parents in canonical identifier order.
+    pub fn parent_ids(&self) -> &[String] {
+        &self.parent_ids
+    }
+
+    pub fn has_parent(&self, parent_id: &str) -> bool {
+        self.parent_ids.iter().any(|id| id.as_str() == parent_id)
     }
 
     pub fn source_tree_digest(&self) -> &str {
@@ -291,8 +304,8 @@ impl CandidateArchive {
         }
     }
 
-    /// Insert a validated candidate. Parents must already exist, which makes
-    /// the recorded lineage acyclic by construction.
+    /// Insert a validated candidate. Every parent must already exist, which
+    /// makes the recorded multi-parent lineage acyclic by construction.
     pub fn insert(
         &mut self,
         candidate: CandidateRecord,
@@ -302,9 +315,9 @@ impl CandidateArchive {
             return Err(CandidateArchiveError::DuplicateCandidate(candidate_id));
         }
 
-        if let Some(parent_id) = candidate.parent_id.as_deref() {
+        for parent_id in &candidate.parent_ids {
             if !self.candidates.contains_key(parent_id) {
-                return Err(CandidateArchiveError::MissingParent(parent_id.to_owned()));
+                return Err(CandidateArchiveError::MissingParent(parent_id.clone()));
             }
         }
 
@@ -424,7 +437,7 @@ mod tests {
 
     fn candidate(
         id: &str,
-        parent: Option<&str>,
+        parents: &[&str],
         source_byte: char,
         receipt_byte: char,
         scores: &[(&str, f64)],
@@ -437,7 +450,7 @@ mod tests {
         .unwrap();
         CandidateRecord::new(
             id,
-            parent.map(str::to_owned),
+            parents.iter().map(|parent| (*parent).to_owned()).collect(),
             digest(source_byte),
             digest(receipt_byte),
             capabilities,
@@ -452,7 +465,7 @@ mod tests {
         archive
             .insert(candidate(
                 "baseline",
-                None,
+                &[],
                 '1',
                 'a',
                 &[("coding", 0.70), ("generalization", 0.70), ("retention", 0.90)],
@@ -461,7 +474,7 @@ mod tests {
         archive
             .insert(candidate(
                 "coding-specialist",
-                Some("baseline"),
+                &["baseline"],
                 '2',
                 'b',
                 &[("coding", 0.92), ("generalization", 0.70), ("retention", 0.90)],
@@ -470,7 +483,7 @@ mod tests {
         archive
             .insert(candidate(
                 "generalist",
-                Some("baseline"),
+                &["baseline"],
                 '3',
                 'c',
                 &[("coding", 0.82), ("generalization", 0.91), ("retention", 0.90)],
@@ -479,7 +492,7 @@ mod tests {
         archive
             .insert(candidate(
                 "regressed",
-                Some("coding-specialist"),
+                &["coding-specialist"],
                 '4',
                 'd',
                 &[("coding", 0.60), ("generalization", 0.60), ("retention", 0.80)],
@@ -501,7 +514,7 @@ mod tests {
         archive
             .insert(candidate(
                 "coding",
-                None,
+                &[],
                 '1',
                 'a',
                 &[("coding", 0.95), ("safety", 0.80)],
@@ -510,7 +523,7 @@ mod tests {
         archive
             .insert(candidate(
                 "safety",
-                Some("coding"),
+                &["coding"],
                 '2',
                 'b',
                 &[("coding", 0.85), ("safety", 0.98)],
@@ -523,7 +536,7 @@ mod tests {
     #[test]
     fn rejects_missing_parent_without_mutating_archive() {
         let mut archive = CandidateArchive::new(context(EvaluationPartition::Development));
-        let orphan = candidate("orphan", Some("unknown"), '1', 'a', &[("coding", 0.5)]);
+        let orphan = candidate("orphan", &["unknown"], '1', 'a', &[("coding", 0.5)]);
 
         assert_eq!(
             archive.insert(orphan),
@@ -532,12 +545,68 @@ mod tests {
         assert!(archive.is_empty());
 
         archive
-            .insert(candidate("root", None, '2', 'b', &[("coding", 0.5)]))
+            .insert(candidate("root", &[], '2', 'b', &[("coding", 0.5)]))
             .unwrap();
+        assert_eq!(
+            archive.insert(candidate(
+                "incomplete-hybrid",
+                &["root", "missing"],
+                '3',
+                'c',
+                &[("coding", 0.6)],
+            )),
+            Err(CandidateArchiveError::MissingParent("missing".into()))
+        );
+        assert_eq!(archive.len(), 1);
         archive
-            .insert(candidate("child", Some("root"), '3', 'c', &[("coding", 0.6)]))
+            .insert(candidate("child", &["root"], '4', 'd', &[("coding", 0.6)]))
             .unwrap();
         assert_eq!(archive.len(), 2);
+    }
+
+    #[test]
+    fn supports_two_parent_hybrid_lineage_and_rejects_bad_parent_sets() {
+        let mut archive = CandidateArchive::new(context(EvaluationPartition::Development));
+        archive
+            .insert(candidate("left", &[], '1', 'a', &[("coding", 0.7)]))
+            .unwrap();
+        archive
+            .insert(candidate("right", &[], '2', 'b', &[("coding", 0.8)]))
+            .unwrap();
+
+        let hybrid = candidate(
+            "hybrid",
+            &["right", "left"],
+            '3',
+            'c',
+            &[("coding", 0.9)],
+        );
+        archive.insert(hybrid).unwrap();
+        let stored = archive.candidate("hybrid").unwrap();
+        assert_eq!(stored.parent_ids(), &["left".to_string(), "right".to_string()]);
+        assert!(stored.has_parent("left"));
+        assert!(stored.has_parent("right"));
+
+        assert_eq!(
+            CandidateRecord::new(
+                "duplicate-parent",
+                vec!["left".into(), "left".into()],
+                digest('4'),
+                digest('d'),
+                CapabilityVector::new(vec![("coding".into(), 0.9)]).unwrap(),
+            ),
+            Err(CandidateArchiveError::DuplicateParent("left".into()))
+        );
+        assert_eq!(
+            CandidateRecord::new(
+                "self-parent",
+                vec!["self-parent".into()],
+                digest('5'),
+                digest('e'),
+                CapabilityVector::new(vec![("coding".into(), 0.9)]).unwrap(),
+            ),
+            Err(CandidateArchiveError::SelfParent("self-parent".into()))
+        );
     }
 
     #[test]
@@ -546,7 +615,7 @@ mod tests {
         archive
             .insert(candidate(
                 "first",
-                None,
+                &[],
                 '1',
                 'a',
                 &[("coding", 0.5), ("retention", 0.8)],
@@ -567,7 +636,7 @@ mod tests {
         assert_eq!(
             archive.insert(candidate(
                 "wrong-schema",
-                Some("first"),
+                &["first"],
                 '3',
                 'c',
                 &[("coding", 0.6)],
