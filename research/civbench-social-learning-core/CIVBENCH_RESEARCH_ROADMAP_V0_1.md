@@ -218,3 +218,16 @@ A proposed event contract now links the state-aware transmission benchmark with 
 The contract binds the exact payload and task scope to a program/version digest, sender/recipient references, consent mode, minimized recipient-need signal, route and resource budget, and separate delivery/observation/acquisition/integration/execution/retention/correction/transfer outcomes. It explicitly supports positive skills, scoped negative results, corrections, requests and contextual warnings.
 
 This is not a new evidence ledger and does not require a central collector to ingest full recipient inventories. Symthaea owns cognitive selection and learning; Symtropy owns population-scale simulation; Mycelix owns identity/rights/provenance/disputes; Sol-Atlas owns projection and spatial-temporal inspection. Runtime enforcement is not yet implemented.
+
+
+## New implementation update — recipient-state disclosure frontier (4 November 2026)
+
+The adaptive-transmission engine now records an explicit `RecipientStateDisclosure` on each run:
+- `CentralFullInventory` is the centralized research upper bound.
+- `CoarseRecipeReadiness` receives a minimized per-recipe request/readiness signal (recipe ID plus prerequisite-match fraction) rather than the full recipient inventory.
+
+The coarse mode rejects collective-novelty policy features that require global inventory knowledge. A multi-seed runner compares centralized, coarse and no-social conditions across Layered, Branching and Convergent DAG families (256 fixed seeds per family) under identical population, message and attention budgets. CI executes the sweep and stores a CSV artifact after the compile/test job.
+
+**Interpretation boundary:** the coarse signal can still reveal which recipe is missing and how ready the recipient is. This is not differential privacy, anonymity, secure aggregation, cryptographic secrecy, or consent enforcement. Its purpose is to measure the utility cost of a minimized signal and establish a baseline for explicit leakage attacks. Runtime consent/rights enforcement and inference attacks are tracked in [Symthaea issue #10413](https://github.com/Luminous-Dynamics/symthaea/issues/10413).
+
+This completes a first synthetic vertical slice across the architecture: Symthaea emits a bounded state-aware decision; Mycelix's proposed event envelope references consent/rights/provenance; Symtropy can study population effects and shocks; Sol-Atlas can visualize spatial and temporal transmission paths. These integrations remain interface-level research work, not deployed cross-project runtime capabilities.
