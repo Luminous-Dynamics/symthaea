@@ -56,8 +56,8 @@
         "dataset_revision": null,
         "execution_authorized": false,
         "official_hidden_test_repeat_count": 3,
-        "local_development_repeat_count": 3,
-        "repeat_policy": "Official hidden competition evaluation uses three runs; public development evaluation scores committed artifacts and verifies the harness on a sample. Three full development repetitions are a proposed Luminous reproducibility protocol, not an official PLE requirement."
+        "repeat_policy": "The published public development leaderboard reports model results averaged over three runs. The competition submission dev score is based on committed artifacts and a live harness check on a sample. The hidden competition leaderboard averages three harness runs. A Luminous matched dev comparison should use three independently identified full-set runs to align with the published dev baseline.",
+        "official_development_baseline_repeat_count": 3
       },
       "baseline_context": {
         "hidden_test_leaderboard_score": 0.483,
