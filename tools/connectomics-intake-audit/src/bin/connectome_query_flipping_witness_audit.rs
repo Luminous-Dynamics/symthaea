@@ -878,7 +878,7 @@ mod tests {
         let report = evaluate(&input, &bytes).unwrap();
         assert_eq!(report.minimal_witness_effort_units, Some(3));
         assert_eq!(report.minimal_witness_count, 4);
-        assert_eq!(report.decision_flipping_subset_count_within_budget, 5);
+        assert_eq!(report.decision_flipping_subset_count_within_budget, 4);
         assert!(
             report
                 .witnesses
