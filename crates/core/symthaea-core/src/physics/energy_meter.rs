@@ -213,21 +213,25 @@ impl EnergyDelta {
 
         let raw_delta = match earlier.raw_counter.cmp(&later.raw_counter) {
             std::cmp::Ordering::Less | std::cmp::Ordering::Equal => {
-                later.raw_counter - earlier.raw_counter
+                u128::from(later.raw_counter - earlier.raw_counter)
             }
             std::cmp::Ordering::Greater => {
-                let modulus = earlier
-                    .descriptor
-                    .wrap_modulus
-                    .ok_or(EnergyDeltaError::CounterDecreasedWithoutModulus)?;
+                let modulus = u128::from(
+                    earlier
+                        .descriptor
+                        .wrap_modulus
+                        .ok_or(EnergyDeltaError::CounterDecreasedWithoutModulus)?,
+                );
+                let earlier_value = u128::from(earlier.raw_counter);
+                let later_value = u128::from(later.raw_counter);
                 modulus
-                    .checked_sub(earlier.raw_counter)
-                    .and_then(|remaining| remaining.checked_add(later.raw_counter))
+                    .checked_sub(earlier_value)
+                    .and_then(|remaining| remaining.checked_add(later_value))
                     .ok_or(EnergyDeltaError::ArithmeticOverflow)?
             }
         };
 
-        let energy_microjoules = u128::from(raw_delta)
+        let energy_microjoules = raw_delta
             .checked_mul(earlier.descriptor.unit.microjoules_per_unit())
             .ok_or(EnergyDeltaError::ArithmeticOverflow)?;
         let elapsed_ns = later.monotonic_timestamp_ns - earlier.monotonic_timestamp_ns;
