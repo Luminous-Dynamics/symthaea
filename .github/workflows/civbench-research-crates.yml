@@ -96,3 +96,45 @@ jobs:
             /tmp/reward-network-iii-report/archive-inventory.md
           if-no-files-found: error
           retention-days: 30
+
+  run-privacy-disclosure-sweep:
+    name: Run privacy disclosure performance sweep
+    needs: test-research-crates
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run matched-seed disclosure sweep
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/civbench-privacy
+          cargo run --locked \
+            --manifest-path research/civbench-social-learning-core/Cargo.toml \
+            --bin privacy-disclosure-sweep \
+            > /tmp/civbench-privacy/privacy-disclosure-sweep.csv
+          {
+            echo "## Privacy disclosure sweep"
+            echo ""
+            echo "Synthetic matched-seed comparison: centralized full inventory vs coarse recipe-readiness signal vs no-social control."
+            echo ""
+            echo "`$(wc -l < /tmp/civbench-privacy/privacy-disclosure-sweep.csv)` CSV lines (including header)."
+            echo ""
+            echo "```csv"
+            cat /tmp/civbench-privacy/privacy-disclosure-sweep.csv
+            echo "```"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload synthetic sweep results
+        uses: actions/upload-artifact@v4
+        with:
+          name: civbench-privacy-disclosure-sweep
+          path: /tmp/civbench-privacy/privacy-disclosure-sweep.csv
+          if-no-files-found: error
+          retention-days: 30
+
