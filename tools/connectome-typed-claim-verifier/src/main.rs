@@ -919,8 +919,7 @@ mod tests {
     #[test]
     fn rejects_disconnected_traversable_claim_path() {
         let mut bundle = parse_fixture();
-        bundle["claims"][2]["source"]["object_id"] =
-            Value::String("another-neuron".to_owned());
+        bundle["claims"][2]["source"]["object_id"] = Value::String("another-neuron".to_owned());
         let report = verify(&bundle).expect("bundle structure");
         assert_eq!(
             report["query_path_results"][2]["recomputed_disposition"],
