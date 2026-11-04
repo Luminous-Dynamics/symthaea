@@ -44,6 +44,14 @@ jobs:
           Draft202012Validator.check_schema(schema)
           Draft202012Validator(schema).validate(receipt)
 
+          target_bytes = Path("research/connectomics/fixtures/connectome-target-fate-target-world-v0.1.json").read_bytes()
+          correspondence_bytes = Path("research/connectomics/fixtures/connectome-target-fate-correspondence-v0.1.json").read_bytes()
+          import hashlib
+          target_digest = hashlib.sha256(target_bytes).hexdigest()
+          correspondence_digest = hashlib.sha256(correspondence_bytes).hexdigest()
+          assert target_digest == receipt["target_manifest_sha256"] == receipt["provenance"]["target_manifest_sha256"]
+          assert correspondence_digest == receipt["correspondence_receipt_sha256"] == receipt["provenance"]["correspondence_receipt_sha256"]
+
           target_ids = {item["object_id"]: item["object_type"] for item in target["world"]["objects"]}
           fate_ids = [item["target_object_id"] for item in receipt["fates"]]
           assert len(fate_ids) == len(set(fate_ids)), "duplicate target fate"
