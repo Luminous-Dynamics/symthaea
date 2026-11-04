@@ -47,5 +47,13 @@ jobs:
         run: cargo fmt --manifest-path tools/rea-artifact-reader-harness/Cargo.toml -- --check
       - name: ZIP reader adversarial unit tests
         run: cargo test --manifest-path tools/rea-artifact-reader-harness/Cargo.toml --locked
+      - name: Archive resolved isolated harness lockfile
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: rea-artifact-reader-cargo-lock
+          path: tools/rea-artifact-reader-harness/Cargo.lock
+          if-no-files-found: error
+          retention-days: 14
       - name: Clippy with warnings denied
         run: cargo clippy --manifest-path tools/rea-artifact-reader-harness/Cargo.toml --locked --all-targets -- -D warnings
