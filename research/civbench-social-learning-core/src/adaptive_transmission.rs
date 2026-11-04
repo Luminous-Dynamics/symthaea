@@ -691,11 +691,9 @@ const STREAM_DISCOVERY_ORDER: u64 = 0x4A2D_93F6_B10C_75E8;
 const STREAM_SCHEDULE: u64 = 0x91F0_2C6B_D835_A47E;
 const STREAM_ACQUISITION: u64 = 0xE43B_19D7_6A20_F58C;
 
-/// Derive an independent deterministic stream for a subsystem and step.
-/// This prevents policy-specific scheduler draws from shifting the graph,
-/// discovery or acquisition random streams in matched policy comparisons.
-/// It does not promise per-action pairing when policy-dependent candidate
-/// sets differ.
+/// Derive an independent deterministic stream for the graph/scheduler
+/// subsystem and step. Individual discovery and acquisition use the stronger
+/// identity-keyed helpers below.
 fn stream_seed(master_seed: u64, domain: u64, step: usize) -> u64 {
     let mixed = master_seed
         ^ domain
