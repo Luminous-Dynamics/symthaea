@@ -2,6 +2,7 @@ use std::env;
 use std::ffi::OsString;
 use std::fs::File;
 use std::io::{self, Read};
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use serde_json::{Value, json};
@@ -230,7 +231,7 @@ fn print_error(format: OutputFormat, code: &str, message: &str) {
 }
 
 fn run(arguments: Arguments) -> u8 {
-    let file = match File::open(&arguments.input) {
+    let file = match File::open(PathBuf::from(&arguments.input)) {
         Ok(file) => file,
         Err(_) => {
             print_error(arguments.format, "io_error", "unable to read Evidence file");
