@@ -36,6 +36,25 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 static NEXT_STREAM_INSTANCE_ID: AtomicU64 = AtomicU64::new(1);
+const MAX_DEVICE_CHANNELS: usize = 8;
+
+/// Convert one stereo synth frame to one negotiated output-channel sample.
+///
+/// Mono is an arithmetic stereo downmix; stereo preserves L/R; additional
+/// device channels are explicitly zero-filled. This is pure and allocation-free.
+fn stereo_sample_for_device_channel(
+    stereo: [f32; 2],
+    channel_index: usize,
+    channel_count: usize,
+) -> f32 {
+    match channel_count {
+        0 => 0.0,
+        1 => (stereo[0] + stereo[1]) * 0.5,
+        _ if channel_index == 0 => stereo[0],
+        _ if channel_index == 1 => stereo[1],
+        _ => 0.0,
+    }
+}
 
 /// Errors from the live audio system.
 #[derive(Debug)]
@@ -46,6 +65,7 @@ pub enum LiveError {
     StreamError(String),
     StreamInstanceIdExhausted,
     InvalidClockStreamDescriptor,
+    UnsupportedChannelCount(usize),
 }
 
 impl std::fmt::Display for LiveError {
@@ -57,6 +77,9 @@ impl std::fmt::Display for LiveError {
             Self::StreamError(e) => write!(f, "audio stream error: {e}"),
             Self::StreamInstanceIdExhausted => write!(f, "CPAL stream instance ID space exhausted"),
             Self::InvalidClockStreamDescriptor => write!(f, "invalid CPAL output clock stream descriptor"),
+            Self::UnsupportedChannelCount(count) => {
+                write!(f, "unsupported CPAL output channel count: {count}")
+            }
         }
     }
 }
@@ -131,7 +154,10 @@ impl LiveMuseOutput {
 
         let sample_rate = stream_config.sample_rate;
         let channel_count = stream_config.channels;
-        let channels = (channel_count as usize).max(1);
+        let channels = channel_count as usize;
+        if channels == 0 || channels > MAX_DEVICE_CHANNELS {
+            return Err(LiveError::UnsupportedChannelCount(channels));
+        }
 
         let stream_instance_id = NEXT_STREAM_INSTANCE_ID
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
@@ -148,7 +174,9 @@ impl LiveMuseOutput {
             .ok_or(LiveError::InvalidClockStreamDescriptor)?;
 
         // Ring buffer: 4096 stereo frames (~93ms at 44100Hz)
-        let ring_capacity = 4096 * channels;
+        let ring_capacity = 4096_usize
+            .checked_mul(channels)
+            .ok_or(LiveError::UnsupportedChannelCount(channels))?;
         let ring = ringbuf::HeapRb::<f32>::new(ring_capacity);
         let (mut prod, mut cons) = ring.split();
 
@@ -186,7 +214,8 @@ impl LiveMuseOutput {
 
                     // Interleave stereo pairs into ring buffer
                     for pair in &chunk {
-                        // Back-pressure: if ring is full, spin-wait briefly
+                        // Back-pressure: reserve space for one complete device
+                        // frame so callback sample alignment cannot drift.
                         let mut attempts = 0;
                         while prod.vacant_len() < channels {
                             std::thread::sleep(std::time::Duration::from_micros(100));
@@ -195,9 +224,15 @@ impl LiveMuseOutput {
                                 return;
                             }
                         }
-                        let _ = prod.try_push(pair[0]);
-                        if channels > 1 {
-                            let _ = prod.try_push(pair[1]);
+                        for channel_index in 0..channels {
+                            let sample = stereo_sample_for_device_channel(
+                                *pair,
+                                channel_index,
+                                channels,
+                            );
+                            if prod.try_push(sample).is_err() {
+                                return;
+                            }
                         }
                     }
                 }
@@ -397,3 +432,33 @@ impl Drop for LiveMuseOutput {
         self.running.store(false, Ordering::Relaxed);
     }
 }
+
+#[cfg(test)]
+mod channel_mapping_tests {
+    use super::*;
+
+    #[test]
+    fn mono_output_is_explicit_stereo_downmix() {
+        assert_eq!(stereo_sample_for_device_channel([0.8, 0.2], 0, 1), 0.5);
+    }
+
+    #[test]
+    fn stereo_output_preserves_left_and_right_channels() {
+        assert_eq!(stereo_sample_for_device_channel([0.8, -0.4], 0, 2), 0.8);
+        assert_eq!(stereo_sample_for_device_channel([0.8, -0.4], 1, 2), -0.4);
+    }
+
+    #[test]
+    fn multichannel_output_zeros_unrepresented_channels() {
+        assert_eq!(stereo_sample_for_device_channel([0.8, -0.4], 0, 6), 0.8);
+        assert_eq!(stereo_sample_for_device_channel([0.8, -0.4], 1, 6), -0.4);
+        assert_eq!(stereo_sample_for_device_channel([0.8, -0.4], 2, 6), 0.0);
+        assert_eq!(stereo_sample_for_device_channel([0.8, -0.4], 5, 6), 0.0);
+    }
+
+    #[test]
+    fn zero_channel_mapping_is_silent_and_does_not_panic() {
+        assert_eq!(stereo_sample_for_device_channel([0.8, -0.4], 0, 0), 0.0);
+    }
+}
+
