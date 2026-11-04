@@ -1,6 +1,6 @@
 # MEL-CLOCK-002 — Runner/CPAL clock bridge v1
 
-**Status:** pure Rust contract, deterministic fitter, strict schemas and synthetic fixtures authored; runtime callback wiring, Rust compilation and device testing are not yet qualified.
+**Status:** pure Rust contract, deterministic fitter, strict schemas, nine synthetic fixtures and 18 authored Rust tests are committed; runtime callback wiring, Rust compilation and device testing are not yet qualified.
 
 ## Objective
 
@@ -29,8 +29,8 @@ At callback entry, bracket the observation and normalization of both CPAL timest
 2. read both `OutputStreamTimestamp.callback` and `OutputStreamTimestamp.playback`, normalizing both to the same first-callback stream origin;
 3. sample runner monotonic time immediately after;
 4. persist both CPAL timestamps; fit runner monotonic time against the **playback** timestamp, not callback invocation time;
-4. enqueue a fixed-size `RunnerCpalClockPairV1` to a bounded SPSC ring;
-5. increment the pair index even when the record cannot be retained, so gaps remain visible.
+5. enqueue a fixed-size `RunnerCpalClockPairV1` to a bounded SPSC ring;
+6. increment the pair index even when the record cannot be retained, so gaps remain visible.
 
 The callback record is `Copy` and contains only integers, an enum and a fixed 32-byte descriptor-identity digest. The identity digest is computed off the real-time thread. No allocation, mutex, blocking call, formatting or logging is needed for the pair record.
 
@@ -53,7 +53,7 @@ The fit receipt binds the exact serialized pair vector and normalized fit policy
 
 The deterministic OLS fitter:
 - requires the policy minimum pair count (never fewer than two);
-- requires strictly increasing pair indices, CPAL callback times, and runner bracket endpoints;
+- requires strictly increasing pair indices, CPAL callback times, CPAL predicted-playback times, and runner bracket endpoints;
 - rejects reversed or over-wide capture brackets;
 - rejects mixed stream/session/origin identity;
 - estimates rate drift relative to 1 ns / 1 ns;
@@ -80,15 +80,13 @@ The checked-in fixtures cover:
 - exact nominal mapping to the predicted-playback clock;
 - +25 ppm and -25 ppm in-policy drift;
 - callback-time monotonicity and predicted-playback-time monotonicity as distinct checks;
-- exact runner-to-predicted-playback-to-output-frame composition with matching descriptor identity;
-- exact runner → predicted-playback → output-frame composition with matching stream/configuration identity;
 - missing pair records with continuous clock progression;
 - over-wide observation bracket rejection;
 - descriptor/origin identity mismatch rejection;
 - out-of-policy drift rejection;
 - residual outlier rejection without silently dropping the record.
 
-The unit suite also rejects runner-clock regression even when CPAL callback time continues increasing.
+The unit suite also rejects runner-clock regression even when CPAL callback time continues increasing. It includes an exact synthetic composition test for runner 120 ms → predicted playback 25 ms → output frame 960, plus a mismatched-stream rejection test.
 
 These are conformance fixtures, not device measurements.
 
