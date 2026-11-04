@@ -17,6 +17,11 @@
 //! not a promotion rule, does not establish practical significance, and does
 //! not correct for repeated candidate selection or multiple metrics.
 //!
+//! The sign-test p-value assumes independent non-tied case-pair signs. When
+//! benchmark cases cluster by repository, task family, project, or run, case-level
+//! p-values are descriptive only; confirmation must use independent groups or a
+//! cluster-aware analysis in the qualification layer.
+//!
 //! This adapter does not authenticate input rows, evaluator identity, or
 //! benchmark isolation. A digest is an identity commitment, not a signature
 //! or proof.
@@ -242,7 +247,7 @@ impl MetricPairedResult {
         self.mean_delta
     }
 
-    /// Exact one-sided sign-test tail probability, or None if every pair ties.
+    /// Exact one-sided sign-test tail probability under independent pair signs; None if every pair ties.
     pub fn sign_test_p_value(&self) -> Option<f64> {
         self.sign_test_p_value
     }
@@ -375,7 +380,9 @@ impl PairedComparison {
 }
 
 /// Exact one-sided binomial tail P[X >= wins], X ~ Binomial(wins + losses, 0.5).
-/// Ties are excluded. The recurrence is evaluated relative to its boundary
+/// Ties are excluded. This assumes independent non-tied case-pair signs; clustered
+/// cases require a group-level or cluster-aware confirmation outside this helper.
+/// The recurrence is evaluated relative to its boundary
 /// term, avoiding direct integer binomial coefficients and their overflow.
 fn exact_sign_test_upper_tail(wins: usize, losses: usize) -> Option<f64> {
     let n = wins.checked_add(losses)?;
