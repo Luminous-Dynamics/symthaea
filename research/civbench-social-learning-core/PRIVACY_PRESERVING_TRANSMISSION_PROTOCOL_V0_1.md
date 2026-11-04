@@ -73,6 +73,17 @@ The coarse signal reduced the declared disclosure-field-count proxy by 58.2–59
 
 The next comparison must either (a) hold the realized sender/receiver/message opportunities constant while varying the disclosed fields, or (b) run a predeclared Pareto sweep over signal quota, message quota and attention budget with cost-normalized outcomes. It must preserve the existing paired seeds and report message/attention use alongside coverage. Leakage attacks from issue #10413 remain unimplemented.
 
+
+## 3.2 Recipient-need quota sweep
+
+The follow-up API `simulate_with_program_and_disclosure_budget` exposes an explicit positive `max_signals_per_recipient` parameter for coarse-readiness mode. The compatibility API `simulate_with_program_and_disclosure` remains unchanged and continues to use the v0.1 default quota of two signals per recipient per step.
+
+The companion binary `privacy-disclosure-quota-sweep` compares signal quotas **1, 2, 4 and 8** on the same three task families and 256 seed IDs. Each family includes a central full-inventory control and a no-social control. It reports coverage, confidence-interval half-widths, depth, realized messages, attention uses, disclosure-field units, acquisitions, redundancies, individual discoveries and paired differences from central routing.
+
+This is a cost-frontier experiment, not a matched-realized-message experiment. Increasing the signal quota may alter both available content and the number/timing of transmissions. The resulting points should be plotted in at least three dimensions (coverage, realized communication/attention cost, disclosure-field volume). Interpolation between points is descriptive and must not be presented as a causal privacy estimate. The task/seed pairing does not imply exact action-level random-number matching when policies create different route/action sets.
+
+The 1/2/4/8 quotas are synthetic design points, not recommended deployment settings. The experiment remains non-private in the formal sense until the explicit inference attacks and authorization/consent tests in issue #10413 pass.
+
 ## 4. Required next-stage leakage evaluation
 
 A minimized feature should be tested against an explicit attacker, not judged by its field count. Add controlled attackers that attempt to infer:
