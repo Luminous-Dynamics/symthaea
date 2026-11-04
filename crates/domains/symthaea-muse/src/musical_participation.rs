@@ -645,7 +645,7 @@ mod tests {
             ],
             vec![
                 prediction(MusicalParticipationDecisionV1::Continue, 0.85, 0.9),
-                prediction(MusicalParticipationDecisionV1::Wait, 0.85, 0.1),
+                prediction(MusicalParticipationDecisionV1::Ask, 0.7, 0.1),
             ],
             vec![
                 prediction(MusicalParticipationDecisionV1::Respond, 0.9, 0.9),
@@ -653,7 +653,7 @@ mod tests {
             ],
             vec![
                 prediction(MusicalParticipationDecisionV1::Yield, 0.9, 0.9),
-                prediction(MusicalParticipationDecisionV1::Ask, 0.7, 0.15),
+                prediction(MusicalParticipationDecisionV1::Wait, 0.9, 0.1),
             ],
         ];
         let score = score_musical_participation_set_v1(&set, &predictions).unwrap();
