@@ -95,3 +95,6 @@ Derived numeric metrics are now typed quantities with explicit units and derivat
 The CLI wraps the report in an output envelope. Its report_sha256 hashes the compact deterministic serialization of the report body only; report_byte_length records that body's length. The envelope is excluded from its own digest to avoid a self-reference. The serialization identifier declares the struct-field and BTreeMap ordering contract.
 
 These SHA-256 digests establish byte identity only. They do not authenticate the source author, signer, calibration record, topology auditor, physical measurement boundary or truth of the input. The evidence class remains synthetic-only and cannot be promoted to E1/E2/E3/E4 by a software run.
+
+
+Each source manifest carries both a digest of the exact corpus bytes and a separate SHA-256 of the canonicalized scenario array. The latter changes when scenario content changes even if the schema version remains the same, and remains stable when only whitespace outside the parsed JSON value changes. It is a content revision, not a claim about authorship.
