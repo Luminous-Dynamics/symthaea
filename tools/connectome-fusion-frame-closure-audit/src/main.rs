@@ -316,7 +316,7 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
     if input.audit_id.trim().is_empty() || input.scope.scope_id.trim().is_empty() {
         errors.push("MISSING_STABLE_AUDIT_OR_SCOPE_ID".to_string());
     }
-    if input.scope.start_at >= input.scope.end_at {
+    if input.scope.start_at >= input.scope.end_at || !input.scope.start_at.ends_with("Z") || !input.scope.end_at.ends_with("Z") {
         errors.push("INVALID_SCOPE_INTERVAL".to_string());
     }
     if !matches!(input.scope.event_time_basis.as_str(), "EVENT_TIME" | "INGESTION_TIME") {
@@ -333,7 +333,7 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
     }
 
     let computed_scope = domain_hash("connectome-fusion-scope-v0.1", &input.scope);
-    if computed_scope.as_deref() != Ok(input.scope_sha256.as_str()) {
+    if !computed_scope.as_ref().is_ok_and(|digest| digest == &input.scope_sha256) {
         errors.push("SCOPE_DIGEST_MISMATCH".to_string());
     }
 
@@ -342,7 +342,7 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
         rule: input.fusion_policy_projection.rule.clone(),
     };
     let computed_projection = domain_hash("connectome-fusion-projection-v0.1", &projection_material);
-    if computed_projection.as_deref() != Ok(input.fusion_policy_projection.projection_sha256.as_str()) {
+    if !computed_projection.as_ref().is_ok_and(|digest| digest == &input.fusion_policy_projection.projection_sha256) {
         errors.push("PROJECTION_DIGEST_MISMATCH".to_string());
     }
     if input.fusion_policy_projection.rule != "ALL_UNORDERED_EVIDENCE_PAIRS" {
@@ -356,10 +356,17 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
     }
 
     let mut source_checks = Vec::new();
+    let mut source_ids = BTreeSet::new();
     let mut role_counts: BTreeMap<String, usize> = BTreeMap::new();
     let mut exports_by_role: BTreeMap<String, &SourceExport> = BTreeMap::new();
 
     for source in &input.source_exports {
+        if !source_ids.insert(source.source_id.as_str()) {
+            errors.push(format!("DUPLICATE_SOURCE_ID:{}", source.source_id));
+        }
+        if source.source_role != EXECUTION_ROLE && source.source_role != CLAIM_ROLE {
+            errors.push(format!("UNSUPPORTED_SOURCE_ROLE:{}", source.source_role));
+        }
         *role_counts.entry(source.source_role.clone()).or_default() += 1;
         if exports_by_role.insert(source.source_role.clone(), source).is_some() {
             errors.push(format!("DUPLICATE_SOURCE_ROLE:{}", source.source_role));
@@ -372,7 +379,7 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
         let unique_use_keys: BTreeSet<&str> = source.events.iter().map(|e| e.canonical_use_key.as_str()).collect();
         let sequence_contiguous = source.events.len() as u64 == source.record_count
             && seqs.len() == source.events.len()
-            && source.events.iter().enumerate().all(|(i, e)| e.sequence == source.sequence_start + i as u64)
+            && source.events.iter().enumerate().all(|(i, e)| source.sequence_start.checked_add(i as u64) == Some(e.sequence))
             && if source.events.is_empty() {
                 source.sequence_end == source.sequence_start
             } else {
@@ -458,7 +465,7 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
         errors.push("FRAME_ASSERTION_COUNT_MISMATCH".to_string());
     }
     let computed_frame = domain_hash("connectome-fusion-frame-v0.1", &input.declared_frame.assertions);
-    if computed_frame.as_deref() != Ok(input.declared_frame.frame_sha256.as_str()) {
+    if !computed_frame.as_ref().is_ok_and(|digest| digest == &input.declared_frame.frame_sha256) {
         errors.push("FRAME_DIGEST_MISMATCH".to_string());
     }
 
@@ -609,7 +616,6 @@ fn verify(input: &Input, raw: &[u8]) -> Report {
 }
 
 #[derive(Serialize)]
-#[serde(deny_unknown_fields)]
 struct ProjectionMaterial {
     projection_id: String,
     rule: String,
