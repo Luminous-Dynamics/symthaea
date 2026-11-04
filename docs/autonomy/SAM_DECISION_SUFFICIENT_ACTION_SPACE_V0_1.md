@@ -129,7 +129,7 @@ If the selected-action value itself is interval-valued, use its lower bound in t
 The result is conditional on the action domain, objective, reference/model profile and all bound assumptions.
 
 An unselected cell can be safely pruned from further refinement only when:
-- it is definitely infeasible under every required hard constraint; or
+- at least one required hard constraint is definitely violated throughout the cell (so the cell is definitely infeasible); or
 - its objective upper bound cannot improve the selected action beyond the frozen regret tolerance (single-objective V0); or
 - a separately specified interval-Pareto rule proves it cannot improve the frontier on any objective (later multi-objective work).
 
