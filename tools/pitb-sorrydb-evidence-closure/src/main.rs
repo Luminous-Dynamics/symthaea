@@ -212,6 +212,7 @@ struct Report {
     evaluation_split_git_blob_sha1: String,
     evaluation_split_raw_sha256: String,
     proof_runs_jsonl_sha256: String,
+    reviewer_key_registry_sha256: String,
     attempt_count: usize,
     verified_success_run_count: usize,
     closed_verified_success_run_count: usize,
@@ -815,6 +816,7 @@ fn verify_all(
         evaluation_split_git_blob_sha1: evaluation_blob,
         evaluation_split_raw_sha256: sha256(evaluation_bytes),
         proof_runs_jsonl_sha256: sha256(runs_bytes),
+        reviewer_key_registry_sha256: reviewer_registry_sha256.to_owned(),
         attempt_count: runs.len(),
         verified_success_run_count: verified_successes,
         closed_verified_success_run_count: closed,
@@ -836,20 +838,6 @@ fn encode_hex(bytes: &[u8]) -> String {
     output
 }
 
-fn run_openssl(args: &[&str], label: &str) -> Result<Vec<u8>, String> {
-    let output = Command::new("openssl")
-        .args(args)
-        .output()
-        .map_err(|e| format!("run OpenSSL {label}: {e}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "OpenSSL {label} failed: {}{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
-    Ok(output.stdout)
-}
 
 fn create_synthetic_reviewer_identity(root: &Path) -> Result<(Vec<u8>, String, PathBuf), String> {
     let key_dir = root.join("synthetic-reviewer-keygen");
