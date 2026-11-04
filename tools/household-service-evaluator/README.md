@@ -66,7 +66,8 @@ Use a file path instead of --output - to write a deterministic JSON report:
 cargo run --locked --manifest-path tools/household-service-evaluator/Cargo.toml -- \
   --water docs/research/household-services/fixtures/water-continuity-scenarios-v0.1.json \
   --repair docs/research/household-services/fixtures/repairability-scenarios-v0.1.json \
-  --output target/household-service-batch-report.json
+  --output target/household-service-batch-report.json \\
+  --digest-output target/household-service-batch-report.json.sha256
 ~~~
 
 The report contains 10 water receipts and 10 repair receipts, corpus IDs, the fixture-declared disposition as reference metadata, evaluator dispositions, deterministic derived metrics, evidence notes, unresolved claims, per-disposition counts and the source claim ceilings. The expected fixture disposition is never copied into the evaluator result.
@@ -82,3 +83,25 @@ Selected software-only calculations:
 - REPAIR-006/007/009 remain blocked; REPAIR-008 preserves observed recurrence; REPAIR-010 remains held; REPAIR-005 records that offline artifacts are available but does not claim a rollback was performed.
 
 The CI workflow runs this command and uploads the resulting JSON as a synthetic batch-report artifact. Artifact existence is not physical validation.
+
+
+## Receipt manifest v0.2
+
+The batch report's `report_schema_version` is now `0.2`. Its top-level manifest contains:
+- `adapter_version`: frozen adapter identity for the two v0.1 corpora;
+- `evidence_class`: fixed to `synthetic_software_conformance_only`;
+- `source_commit`: supplied by the exact-head GitHub Actions workflow, or `not_recorded` for a standalone build without the environment variable;
+- `serialization_contract`: exact report serialization profile;
+- `source_artifacts`: raw byte length, SHA-256, algorithm and digest scope for each source corpus.
+
+When called through the CLI with file paths, the source digest is computed over the exact bytes read from disk (`digest_scope: raw_file_bytes`). The Value-based Rust API hashes the compact Serde JSON encoding of the supplied values (`normalized_serde_json_value_bytes)); that scope is labelled explicitly and is not interchangeable with a raw-file digest.
+
+Each `derived_metrics` entry is tagged as either:
+- `quantity`: numeric value, explicit unit and derivation label;
+- `boolean`: JSON boolean and interpretation.
+
+Booleans are never encoded as 0/1 quantities. The evaluator rejects quantity keys without a unit contract and boolean keys without an interpretation contract.
+
+The CLI writes a SHA-256 sidecar for the exact pretty-printed report bytes (default `<output>.sha256`, or `--digest-output PATH`). In CI, both the JSON report and sidecar are uploaded. The Actions run and its exact commit provide a separate retrieval path for the artifact metadata.
+
+A digest establishes byte identity only. It does not authenticate a source, calibration certificate, author, signer, topology audit or physical measurement. The synthetic evidence class cannot be upgraded by this evaluator to laboratory, production or household evidence.
