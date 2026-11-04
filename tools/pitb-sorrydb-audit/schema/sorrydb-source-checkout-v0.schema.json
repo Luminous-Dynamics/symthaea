@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-source-checkout-v0.schema.json",
+  "title": "PITB SorryDB source checkout receipt v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_database_task_id",
+    "repository_remote",
+    "repository_commit",
+    "lean_version",
+    "source_path",
+    "start_line",
+    "start_column",
+    "end_line",
+    "end_column",
+    "committed_toolchain_file",
+    "source_file_sha256",
+    "source_span",
+    "source_span_verified_as_sorry",
+    "scoring_admission",
+    "limitation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-source-checkout.v0"
+    },
+    "source_database_task_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "repository_remote": {
+      "type": "string",
+      "pattern": "^https://github\\.com/"
+    },
+    "repository_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "lean_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "start_line": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "start_column": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "end_line": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "end_column": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "committed_toolchain_file": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_file_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_span": {
+      "const": "sorry"
+    },
+    "source_span_verified_as_sorry": {
+      "const": true
+    },
+    "scoring_admission": {
+      "const": false
+    },
+    "limitation": {
+      "type": "string",
+      "minLength": 40
+    }
+  }
+}
