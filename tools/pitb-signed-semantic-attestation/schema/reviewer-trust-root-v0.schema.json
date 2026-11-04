@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/reviewer-trust-root-v0.schema.json",
+  "title": "PITB reviewer trust root v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "root_key_id",
+    "registry_id",
+    "minimum_registry_version",
+    "public_key_der_hex"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.reviewer-trust-root.v0"
+    },
+    "root_key_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "registry_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "minimum_registry_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "public_key_der_hex": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{88}$"
+    }
+  }
+}
