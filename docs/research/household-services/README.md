@@ -42,6 +42,10 @@ The following pull requests form the household synthetic-evidence and receipt se
 
 The #10476 exact-head focused evaluator workflow passed formatting, locked tests, strict Clippy and all 20 synthetic case evaluations. The #10480 exact-head focused workflow passed on commit `2399a0d2c00e90d3e259dc9835c85c0776a8ce9e`: 42 tests passed (31 existing + 11 new), formatting, strict Clippy and all 20 synthetic case evaluations; batch artifact uploaded at [run #41902426526](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41902426526). Repository-wide CI, PR Governance and Workflow Syntax were skipped, not passed. The earlier pre-rebase PR #10475 is closed as superseded.
 
+A subsequent #10480 change is being qualified: it separates electrical kWh from useful thermal kWh, preventing cross-carrier comparisons. It is tracked by [HOME-SVC-ENERGY-CARRIER-001 #10486](https://github.com/Luminous-Dynamics/symthaea/issues/10486). The 42-test PASS above predates this latest carrier-specific change; do not inherit that PASS until its exact-head workflow completes.
+
+WaterLoop's separate competitive work is tracked by [#10483](https://github.com/Luminous-Dynamics/symthaea/issues/10483) and draft [PR #10485](https://github.com/Luminous-Dynamics/symthaea/pull/10485), which separates outage backup, greywater substitution and leak containment and adds source-stream, local-installation and offline-operation qualification.
+
 The current follow-on research documentation is under review:
 - [#10432 — repair recurrence and post-repair durability](https://github.com/Luminous-Dynamics/symthaea/pull/10432)
 - [#10446 — household service continuity and recovery](https://github.com/Luminous-Dynamics/symthaea/pull/10446)
