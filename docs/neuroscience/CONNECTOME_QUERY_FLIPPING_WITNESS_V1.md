@@ -168,7 +168,7 @@ For larger candidate sets, compare exact search on smaller prefixes, admissible 
 
 Scientific utility is not just minimum number of edits: future versions should compare expert minutes, evidence acquisition cost, expected scientific decision loss and robust worst-case regret. An effort-minimum witness is a review lead, not a posterior risk estimate.
 
-## 9. Integration boundaries
+## 10. Integration boundaries
 
 - **#9344:** reconstruction-world uncertainty and query robustness. The witness search supplies a concrete falsifying edit set within a declared edit universe.
 - **#9250:** correction interaction/portfolio semantics. The witness tool searches for decision-flipping sets; the portfolio tool optimizes utility under review budgets. Keep these estimands separate.
@@ -177,6 +177,6 @@ Scientific utility is not just minimum number of edits: future versions should c
 - **#10435/#10453:** frame closure and execution-route observability remain upstream conjunctive prerequisites. This tool does not prove that all edit/evidence routes are registered or observable.
 - **#10406:** evidence-dependence verification remains a separate prerequisite. The edit evidence digests identify artifacts but do not establish independent evidence.
 
-## 10. Promotion boundary
+## 11. Promotion boundary
 
 This tool is research infrastructure and does not apply corrections to CAVE, H01, MICrONS, FlyWire or any production connectome. Every returned witness should route to human review and independent adjudication. Do not turn the result into an automated edit action, a biological error probability, or a scientific certificate until source, frame, dependence, query semantics, scenario coverage and prospective biological validation are separately qualified.
