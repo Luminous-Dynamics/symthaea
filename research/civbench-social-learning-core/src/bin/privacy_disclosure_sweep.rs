@@ -58,6 +58,7 @@ struct OutcomeStats {
     acquisitions: OnlineStats,
     redundancies: OnlineStats,
     individual_discoveries: OnlineStats,
+    disclosure_units: OnlineStats,
 }
 
 impl OutcomeStats {
@@ -80,6 +81,7 @@ impl OutcomeStats {
         self.individual_discoveries.push(
             run.history.iter().map(|step| step.individual_recipe_discoveries).sum::<usize>() as f64,
         );
+        self.disclosure_units.push(run.recipient_state_disclosure_units as f64);
     }
 }
 
@@ -123,7 +125,7 @@ fn fmt(value: Option<f64>) -> String {
 
 fn main() {
     println!(
-        "task_family,disclosure_mode,replicates,coverage_mean,coverage_ci95_t,max_depth_mean,messages_per_run,attention_uses_per_run,acquisitions_per_run,redundant_messages_per_run,individual_discoveries_per_run,paired_delta_vs_central_ci95_t"
+        "task_family,disclosure_mode,replicates,coverage_mean,coverage_ci95_t,max_depth_mean,messages_per_run,attention_uses_per_run,disclosure_field_units_per_run,acquisitions_per_run,redundant_messages_per_run,individual_discoveries_per_run,paired_delta_vs_central_ci95_t"
     );
 
     for family in TASK_FAMILIES {
@@ -186,7 +188,7 @@ fn main() {
             ),
         ] {
             println!(
-                "{},{},{},{},{},{},{},{},{},{},{},{}",
+                "{},{},{},{},{},{},{},{},{},{},{},{},{}",
                 family.name(),
                 name,
                 REPLICATES,
@@ -195,6 +197,7 @@ fn main() {
                 fmt(stats.depth.mean()),
                 fmt(stats.messages.mean()),
                 fmt(stats.attention.mean()),
+                fmt(stats.disclosure_units.mean()),
                 fmt(stats.acquisitions.mean()),
                 fmt(stats.redundancies.mean()),
                 fmt(stats.individual_discoveries.mean()),
@@ -216,6 +219,31 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn coarse_signal_discloses_fewer_fields_than_full_inventory() {
+        let config = config();
+        let task = InnovationTask::family_task(TaskFamily::Branching);
+        let program = program(config);
+        let full = simulate_with_program_and_disclosure(
+            &task,
+            config,
+            707,
+            &program,
+            RecipientStateDisclosure::CentralFullInventory,
+        ).unwrap();
+        let coarse = simulate_with_program_and_disclosure(
+            &task,
+            config,
+            707,
+            &program,
+            RecipientStateDisclosure::CoarseRecipeReadiness,
+        ).unwrap();
+        assert!(coarse.recipient_state_disclosure_units
+            <= config.steps * config.population_size * 2 * 3);
+        assert!(full.recipient_state_disclosure_units
+            > coarse.recipient_state_disclosure_units);
+    }
 
     #[test]
     fn disclosure_runner_uses_same_task_budget_and_seed_range() {
