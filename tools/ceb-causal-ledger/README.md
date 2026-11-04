@@ -10,9 +10,10 @@ It validates inert records for:
 - evidence-parent ordering and duplicate evidence-origin detection;
 - prospective forecast → action → outcome ordering;
 - typed action categories and explicit authorization for side-effecting/test actions;
-- intervention-authority constraints;
+- intervention-authority constraints and explicitly assumption-bounded identification from compiler/runtime evidence;
 - explicit missingness rather than converting unobserved outcomes to numeric zero;
 - explicit proceed / abstain / escalate decisions, with missing requirements recorded;
+- repairs bound to the current hypothesis revision and an explicit proceed decision;
 - version-linked hypothesis revisions, repair, primary-grade and pristine-regrade identity links.
 
 ## Non-goals
@@ -35,7 +36,7 @@ From the repository root:
 cargo test --manifest-path tools/ceb-causal-ledger/Cargo.toml --locked
 ```
 
-The crate has its own `[workspace]` boundary and is intentionally not a member or dependency of the production workspace. Twenty-six unit tests are authored. Integrate it only after exact-head compilation, independent review, and reconciliation with the existing CEB/general receipt and DSSE work.
+The crate has its own `[workspace]` boundary and is intentionally not a member or dependency of the production workspace. Twenty-seven unit tests are authored. Integrate it only after exact-head compilation, independent review, and reconciliation with the existing CEB/general receipt and DSSE work.
 
 ## Status
 
