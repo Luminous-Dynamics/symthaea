@@ -285,6 +285,31 @@ mod tests {
     }
 
     #[test]
+    fn concurrent_invalidations_allocate_unique_monotonic_epochs() {
+        let clock = OutputEpochClock::new();
+        let mut workers = Vec::new();
+
+        for _ in 0..8 {
+            let worker_clock = clock.clone();
+            workers.push(std::thread::spawn(move || {
+                (0..128)
+                    .map(|_| worker_clock.invalidate().expect("epoch space remains"))
+                    .collect::<Vec<_>>()
+            }));
+        }
+
+        let mut epochs = workers
+            .into_iter()
+            .flat_map(|worker| worker.join().expect("worker completes"))
+            .collect::<Vec<_>>();
+        epochs.sort_unstable();
+
+        assert_eq!(epochs.len(), 1024);
+        assert_eq!(epochs, (1..=1024).collect::<Vec<_>>());
+        assert_eq!(clock.current(), 1024);
+    }
+
+    #[test]
     fn exhaustion_fails_closed_without_wrapping() {
         let clock = OutputEpochClock {
             current: Arc::new(AtomicU64::new(u64::MAX)),
