@@ -106,6 +106,8 @@ pub enum MusicalParticipationValidationIssueV1 {
     UnexpectedRoleChange { family_index: usize },
     UnexpectedStreamAvailabilityChange { family_index: usize },
     UnexpectedVetoChange { family_index: usize },
+    VetoedMemberRequiresWithhold { family_index: usize, member_index: usize },
+    UnavailableStreamRequiresWithhold { family_index: usize, member_index: usize },
     LocalCueChanged { family_index: usize },
 }
 
@@ -284,6 +286,29 @@ pub fn validate_musical_participation_family_v1(
                 );
                 break;
             }
+        }
+    }
+
+    for (member_index, member) in family.members.iter().enumerate() {
+        if member.collaborator_veto
+            && member.requirement != MusicalParticipationRequirementV1::Withhold
+        {
+            issues.push(
+                MusicalParticipationValidationIssueV1::VetoedMemberRequiresWithhold {
+                    family_index,
+                    member_index,
+                },
+            );
+        }
+        if !member.stream_available
+            && member.requirement != MusicalParticipationRequirementV1::Withhold
+        {
+            issues.push(
+                MusicalParticipationValidationIssueV1::UnavailableStreamRequiresWithhold {
+                    family_index,
+                    member_index,
+                },
+            );
         }
     }
 
