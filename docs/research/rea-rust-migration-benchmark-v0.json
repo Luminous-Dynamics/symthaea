@@ -323,7 +323,9 @@
         "non_unix_best_effort_source_identity_content_verification_explicit_unsupported",
         "unix_device_inode_size_mode_mtime_ctime_source_identity_parity",
         "same_size_rewrite_timestamp_restore_source_identity_rejection",
-        "held_descriptor_vs_selected_path_file_object_identity"
+        "held_descriptor_vs_selected_path_file_object_identity",
+        "independent_deflate_zlib_rs_backend_decodes_zipcore_miniz_oxide_stream",
+        "deflate_decoder_cross_implementation_output_and_size_parity"
       ],
       "metrics": [
         "entry_occurrence_precision_recall",
@@ -363,7 +365,9 @@
         "fuzz_target_crash_and_timeout_counts",
         "source_identity_false_accept_rate_by_platform",
         "unsupported_platform_content_verification_rate",
-        "held_descriptor_selected_path_identity_mismatch_rate"
+        "held_descriptor_selected_path_identity_mismatch_rate",
+        "independent_deflate_decoder_byte_for_byte_parity",
+        "independent_deflate_decoder_failure_disagreement_rate"
       ],
       "target": "100_percent supported-subset parity against pinned upstream REA and separately pinned decoder oracles; zero false accepts for CRC/size corruption, partial streams, metadata disagreement, source mutation or actual-output limit violations; bounded memory independent of member size; performance scored only after correctness gates pass.",
       "boundaries": {
@@ -377,11 +381,13 @@
         "source_race": "a changed held descriptor or selected path suppresses any would-be content result",
         "resource_bound": "read buffer 1..=1 MiB; decoder state measured separately; never claim constant memory without peak RSS evidence",
         "source_identity_platform_scope": "Unix content verification uses device/inode/size/mode/mtime/ctime descriptor and path checks. Non-Unix content verification is explicitly Unsupported until handle-bound identity is independently qualified in #10452; metadata inventory remains best-effort.",
-        "file_identity_claim": "File identity is not content immutability, producer authenticity, or proof no malicious writer exists."
+        "file_identity_claim": "File identity is not content immutability, producer authenticity, or proof no malicious writer exists.",
+        "deflate_oracle": "zip 9.3.0 test-only with flate2/zlib-rs decodes the exact Deflate stream emitted by zipcore/miniz_oxide; this qualifies codec implementation diversity, not independent ZIP CRC lineage.",
+        "crc_oracle": "zipcore and zip use crc32fast 1.5.4 at the ZIP CRC layer; Symthaea's bitwise CRC known-answer test is separate but not equivalent to a fully independent end-to-end corruption oracle."
       },
       "library_candidates": {
         "zipcore": "zipcore 0.10.2 pinned candidate for bounded streaming, CRC/size verification and by-index duplicate occurrence access; audit source and dependency graph before promotion",
-        "zip_rs": "zip 9.3.0 pinned test-only differential parser; the initial fixture validates central-directory order, duplicate raw names, local-header offsets, sizes, CRC, header consistency, overlap checks and Stored stream bytes. It is intentionally excluded from production dependencies.",
+        "zip_rs": "zip 9.3.0 test-only oracle with deflate-flate2-zlib-rs enabled. The test harness decodes the exact zipcore/miniz_oxide-generated Deflate stream through flate2/zlib-rs, then compares the output to the production zipcore verifier. Parser, Deflate codec and ZIP-level CRC lineage are separate dimensions; zip and zipcore still share crc32fast 1.5.4 for ZIP CRC.",
         "upstream": "pinned REA TypeScript ArtifactReader/ZipArtifactReader at upstream SHA 8250bf2320ea57aab4e664db4b4d44b8abd2004e remains the behavioral oracle",
         "note": "An oracle disagreement is retained with provenance and minimized fixture; it is not resolved by selecting the majority implementation.",
         "rawzip": "rawzip 0.5.2 evaluation candidate for low-level structure/wayfinder oracle only. It delegates bomb limits, overlapping extent checks, duplicate names and expected central-directory entry-count reconciliation to the consumer; these are required adapter controls.",
@@ -413,7 +419,9 @@
         "report bounded smoke status separately from sustained coverage-guided fuzz qualification; persist fuzz artifacts and lockfile",
         "separate Unix strong file identity from non-Unix best-effort metadata identity; content verification must fail closed on platforms lacking qualified held-handle identity",
         "report platform, filesystem, kernel, toolchain and file-id API used; test same-size rewrite with restored timestamp and same-size path replacement",
-        "do not claim the non-Unix fallback has Unix-equivalent protection; keep content verification explicitly unsupported until #10452 is resolved"
+        "do not claim the non-Unix fallback has Unix-equivalent protection; keep content verification explicitly unsupported until #10452 is resolved",
+        "run the same zipcore/miniz_oxide-generated Deflate byte stream through zip 9.3.0 with flate2/zlib-rs enabled and compare decoded bytes exactly",
+        "record that zip-rs/zipcore share crc32fast for ZIP-level CRC validation; independent Deflate decoding does not imply independent ZIP CRC corroboration"
       ],
       "fuzz_qualification": {
         "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10451",
