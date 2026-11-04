@@ -17,15 +17,14 @@
 //! - `perceptual_grain`: `Option<f64>`, `None` unless an organism was explicitly constructed
 //!   as part of the Hoffman Fitness-Beats-Truth experiment
 //!   (`tests/hoffman_fitness_beats_truth.rs`, per `HOFFMAN_INTERFACE_THEORY_PLAN_2026-07-22.md`).
-//!   `None` reproduces this crate's exact pre-existing behavior (raw, unquantized resource
-//!   observation, no added perceptual-resolution energy cost) and mutation never activates it --
-//!   `Genome::mutate` only perturbs an already-`Some` value, so every organism/population that
-//!   doesn't explicitly opt in is provably unaffected by this trait's existence. `Some(grain)`
-//!   coarse-grains the resource observation to bucket width `grain` and charges a real Landauer
-//!   cost for the resolved detail (see `metabolism::{quantize_to_grain,
-//!   perceptual_resolution_bits}`) -- smaller `grain` is finer/costlier/closer to truth-tracking,
-//!   larger `grain` is coarser/cheaper/closer to Hoffman's "interface" strategies.
-//!
+//!   `None` reproduces this crate's exact pre-existing behavior (raw, unquantized
+//!   resource observation, no added resolution model cost) and mutation never activates it --
+//!   `Genome::mutate` only perturbs an already-`Some` value, so populations that do not
+//!   explicitly opt in are unaffected. `Some(grain)` coarsens the resource observation to
+//!   bucket width `grain` and charges the ALife dimensionless information-cost policy for
+//!   modeled resolution detail (see `metabolism::{quantize_to_grain,
+//!   perceptual_resolution_bits}`). Smaller `grain` is finer and has a larger model cost;
+//!   it is not a measured Landauer erasure cost.
 //! All other `OrganismConfig` fields (metabolic/activity costs, thermodynamic constants, death
 //! threshold, `goal_precision`) are treated as fixed environmental/physiological constants
 //! shared by the whole population, not individual traits -- a deliberate scope boundary, not an
