@@ -12,7 +12,9 @@
     "declaration_id",
     "mapping_method",
     "mapping_evidence_sha256",
-    "reviewer_attestation_sha256"
+    "reviewer_attestation_sha256",
+    "source_locator",
+    "statement_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -65,25 +67,52 @@
           "pattern": "^[a-f0-9]{64}$"
         }
       ]
+    },
+    "source_locator": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "minLength": 1
+        }
+      ]
+    },
+    "statement_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
     }
   },
   "allOf": [
     {
       "if": {
         "properties": {
-          "mapping_status": {
-            "const": "exact"
+          "mapping_method": {
+            "const": "exact_formal_name"
           }
         },
         "required": [
-          "mapping_status"
+          "mapping_method"
         ]
       },
       "then": {
         "properties": {
-          "declaration_id": {
-            "type": "string",
-            "minLength": 1
+          "source_locator": {
+            "type": "null"
+          },
+          "statement_sha256": {
+            "type": "null"
+          },
+          "reviewer_attestation_sha256": {
+            "type": "null"
           }
         }
       }
@@ -91,20 +120,25 @@
     {
       "if": {
         "properties": {
-          "mapping_status": {
-            "enum": [
-              "unresolved",
-              "ambiguous"
-            ]
+          "mapping_method": {
+            "const": "exact_source_identity"
           }
         },
         "required": [
-          "mapping_status"
+          "mapping_method"
         ]
       },
       "then": {
         "properties": {
-          "declaration_id": {
+          "source_locator": {
+            "type": "string",
+            "minLength": 1
+          },
+          "statement_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "reviewer_attestation_sha256": {
             "type": "null"
           }
         }
@@ -133,20 +167,26 @@
     {
       "if": {
         "properties": {
-          "mapping_method": {
+          "mapping_status": {
             "enum": [
-              "exact_formal_name",
-              "exact_source_identity"
+              "unresolved",
+              "ambiguous"
             ]
           }
         },
         "required": [
-          "mapping_method"
+          "mapping_status"
         ]
       },
       "then": {
         "properties": {
-          "reviewer_attestation_sha256": {
+          "declaration_id": {
+            "type": "null"
+          },
+          "source_locator": {
+            "type": "null"
+          },
+          "statement_sha256": {
             "type": "null"
           }
         }
