@@ -353,6 +353,87 @@ jobs:
           print(json.dumps(report, sort_keys=True))
           PY
 
+      - name: Prepare one frozen SorryDB source task
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-sorrydb-venv/bin/python" - \
+            "$PITB_SORRYDB_INPUT_DIR/evaluation-split.json" \
+            "$RUNNER_TEMP/sorrydb-source-task.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          dataset = json.loads(Path(sys.argv[1]).read_text())
+          expected = "7956fe8e4946a9ddf7098ee84c69669db5bc902715dad6e7cdf0db121aa5bfce"
+          record = next((row for row in dataset["sorries"] if row["id"] == expected), None)
+          if record is None:
+              raise SystemExit("pinned source sample is missing from frozen SorryDB evaluation split")
+          if record["repo"]["commit"] != "ddcb6542f2b62883c8642d3db4ecc115afcce33e":
+              raise SystemExit("pinned source sample repository commit changed")
+          Path(sys.argv[2]).write_text(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+          print("PITB_SORRYDB_REAL_TASK_SELECTED", record["id"])
+          PY
+
+      - name: Checkout one real SorryDB source at its exact commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo_dir="$RUNNER_TEMP/sorrydb-real-source"
+          mkdir -p "$repo_dir"
+          git -C "$repo_dir" init -q
+          git -C "$repo_dir" remote add origin https://github.com/AlexKontorovich/PrimeNumberTheoremAnd.git
+          git -C "$repo_dir" fetch --depth=1 origin ddcb6542f2b62883c8642d3db4ecc115afcce33e
+          git -C "$repo_dir" checkout --detach FETCH_HEAD
+          actual_commit="$(git -C "$repo_dir" rev-parse HEAD)"
+          test "$actual_commit" = "ddcb6542f2b62883c8642d3db4ecc115afcce33e"
+          toolchain_blob="$(git -C "$repo_dir" rev-parse HEAD:lean-toolchain)"
+          source_blob="$(git -C "$repo_dir" rev-parse HEAD:PrimeNumberTheoremAnd/FioriKadiriSwidinsky.lean)"
+          test "$toolchain_blob" = "2654c20bb16bfd3a12f77a6cdeb73d48bf3b8359"
+          test "$source_blob" = "6214f90ce5f8c61aca4a4d696ff5687d872dfc0e"
+          git -C "$repo_dir" show HEAD:lean-toolchain
+          echo "PITB_SORRYDB_REAL_SOURCE_COMMIT_PASS $actual_commit"
+          echo "PITB_SORRYDB_REAL_SOURCE_FILE_BLOB_PASS $source_blob"
+          echo "PITB_SORRYDB_REAL_SOURCE_TOOLCHAIN_BLOB_PASS $toolchain_blob"
+          echo "PITB_SORRYDB_REAL_SOURCE_DIR=$repo_dir" >> "$GITHUB_ENV"
+
+      - name: Verify real SorryDB task source coordinates from Git objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path "$PITB_SORRYDB_MANIFEST" -- \
+            --verify-checkout \
+            "$RUNNER_TEMP/sorrydb-source-task.json" \
+            "$PITB_SORRYDB_REAL_SOURCE_DIR" \
+            "$RUNNER_TEMP/sorrydb-real-source-checkout.json"
+
+      - name: Validate real source checkout receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-sorrydb-venv/bin/python" - "$RUNNER_TEMP/sorrydb-real-source-checkout.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("tools/pitb-sorrydb-audit/schema/sorrydb-source-checkout-v0.schema.json").read_text())
+          receipt = json.loads(Path(sys.argv[1]).read_text())
+          errors = list(Draft202012Validator(schema).iter_errors(receipt))
+          if errors:
+              raise SystemExit("real source checkout receipt schema errors: " + "; ".join(e.message for e in errors))
+          if receipt["source_database_task_id"] != "7956fe8e4946a9ddf7098ee84c69669db5bc902715dad6e7cdf0db121aa5bfce":
+              raise SystemExit("source checkout receipt task ID changed")
+          if receipt["repository_commit"] != "ddcb6542f2b62883c8642d3db4ecc115afcce33e":
+              raise SystemExit("source checkout receipt commit changed")
+          if receipt["source_span"] != "sorry" or receipt["source_span_verified_as_sorry"] is not True:
+              raise SystemExit("real source coordinates do not select exactly the sorry token")
+          if receipt["scoring_admission"] is not False:
+              raise SystemExit("source-only check cannot admit a scored proof result")
+          print("PITB_SORRYDB_REAL_SOURCE_CHECKOUT_PASS")
+          print(json.dumps(receipt, sort_keys=True))
+          PY
+
       - name: Retain SorryDB audit evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -363,6 +444,9 @@ jobs:
             ${{ runner.temp }}/sorrydb-audit.synthetic.json
             ${{ runner.temp }}/sorrydb-audit.synthetic-runs.jsonl
             ${{ runner.temp }}/sorrydb-source-checkout.json
+            ${{ runner.temp }}/sorrydb-real-source-checkout.json
+            ${{ runner.temp }}/sorrydb-source-task.json
+            ${{ runner.temp }}/sorrydb-real-source/
             ${{ runner.temp }}/sorrydb-input/
             ${{ runner.temp }}/pitb-sorrydb-audit/src/main.rs
             ${{ runner.temp }}/pitb-sorrydb-audit/Cargo.lock
