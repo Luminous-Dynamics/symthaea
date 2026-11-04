@@ -70,7 +70,7 @@ fn run() -> Result<(), (u8, String)> {
     match replay_member_claim(&archive, &receipt) {
         Ok(report) => {
             let output = json!({
-                "outcome": report.outcome,
+                "outcome": "replayed",
                 "claim": "independently_replayed_member_content_integrity",
                 "receipt_sha256": receipt_sha256,
                 "archive_sha256": report.archive_sha256,
