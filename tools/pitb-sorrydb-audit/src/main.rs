@@ -4,8 +4,8 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     env, fs,
-    path::PathBuf,
-    process::ExitCode,
+    path::{Path, PathBuf},
+    process::{Command, ExitCode},
 };
 
 const UPSTREAM_REPOSITORY: &str = "SorryDB/SorryDB";
@@ -428,6 +428,168 @@ fn cluster_summary(rows: &[SorryRecord]) -> ClusterSummary {
 }
 
 
+#[derive(Debug, Clone, Serialize)]
+struct SourceCheckoutReceipt {
+    schema_version: String,
+    source_database_task_id: String,
+    repository_remote: String,
+    repository_commit: String,
+    lean_version: String,
+    source_path: String,
+    start_line: u64,
+    start_column: u64,
+    end_line: u64,
+    end_column: u64,
+    committed_toolchain_file: String,
+    source_file_sha256: String,
+    source_span: String,
+    source_span_verified_as_sorry: bool,
+    scoring_admission: bool,
+    limitation: String,
+}
+
+fn git_output(repo: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(repo)
+        .output()
+        .map_err(|e| format!("run git {:?}: {e}", args))?;
+    if !output.status.success() {
+        return Err(format!(
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(output.stdout)
+}
+
+fn normalize_remote(remote: &str) -> String {
+    let mut value = remote.trim().to_owned();
+    if let Some(rest) = value.strip_prefix("git@github.com:") {
+        value = format!("https://github.com/{rest}");
+    }
+    if value.ends_with(".git") {
+        value.truncate(value.len() - 4);
+    }
+    value.trim_end_matches('/').to_ascii_lowercase()
+}
+
+fn position_to_byte_index(source: &str, line: u64, column: u64) -> Result<usize, String> {
+    if line == 0 {
+        return Err("SorryDB source lines are 1-based".into());
+    }
+    let line_index = usize::try_from(line - 1)
+        .map_err(|_| "source line coordinate exceeds platform range".to_owned())?;
+    let column_index = usize::try_from(column)
+        .map_err(|_| "source column coordinate exceeds platform range".to_owned())?;
+    let lines: Vec<&str> = source.split('\n').collect();
+    let selected = lines
+        .get(line_index)
+        .ok_or_else(|| format!("source line {line} is outside the committed file"))?;
+    let character_count = selected.chars().count();
+    if column_index > character_count {
+        return Err(format!(
+            "source column {column} exceeds line {line} character count {character_count}"
+        ));
+    }
+    let byte_column = selected
+        .char_indices()
+        .nth(column_index)
+        .map(|(offset, _)| offset)
+        .unwrap_or(selected.len());
+    let byte_prefix = lines.iter().take(line_index).map(|line| line.len() + 1).sum::<usize>();
+    Ok(byte_prefix + byte_column)
+}
+
+fn verify_source_checkout(
+    record: &SorryRecord,
+    repo_root: &Path,
+) -> Result<SourceCheckoutReceipt, String> {
+    validate_record(record, "checkout task")?;
+
+    let commit_bytes = git_output(repo_root, &["rev-parse", "HEAD"])?;
+    let commit = String::from_utf8(commit_bytes)
+        .map_err(|e| format!("git HEAD is not UTF-8: {e}"))?
+        .trim()
+        .to_owned();
+    if commit != record.repo.commit {
+        return Err(format!(
+            "checkout commit mismatch: expected {}, got {commit}",
+            record.repo.commit
+        ));
+    }
+
+    let remote_bytes = git_output(repo_root, &["remote", "get-url", "origin"])?;
+    let remote = String::from_utf8(remote_bytes)
+        .map_err(|e| format!("git origin remote is not UTF-8: {e}"))?
+        .trim()
+        .to_owned();
+    if normalize_remote(&remote) != normalize_remote(&record.repo.remote) {
+        return Err(format!(
+            "checkout remote mismatch: expected {}, got {remote}",
+            record.repo.remote
+        ));
+    }
+
+    let toolchain_bytes = git_output(repo_root, &["show", "HEAD:lean-toolchain"])?;
+    let toolchain = String::from_utf8(toolchain_bytes)
+        .map_err(|e| format!("committed lean-toolchain is not UTF-8: {e}"))?
+        .trim()
+        .to_owned();
+    if toolchain != record.repo.lean_version {
+        return Err(format!(
+            "committed Lean toolchain mismatch: expected {}, got {toolchain}",
+            record.repo.lean_version
+        ));
+    }
+
+    let source_spec = format!("HEAD:{}", record.location.path);
+    let source_bytes = git_output(repo_root, &["show", &source_spec])?;
+    let source = std::str::from_utf8(&source_bytes)
+        .map_err(|e| format!("committed Lean source is not UTF-8: {e}"))?;
+    let start = position_to_byte_index(
+        source,
+        record.location.start_line,
+        record.location.start_column,
+    )?;
+    let end = position_to_byte_index(
+        source,
+        record.location.end_line,
+        record.location.end_column,
+    )?;
+    if end <= start {
+        return Err("SorryDB source span is empty or reversed".into());
+    }
+    let span = source
+        .get(start..end)
+        .ok_or("SorryDB source span does not align to UTF-8 character boundaries")?;
+    if span != "sorry" {
+        return Err(format!(
+            "pinned source coordinates do not select exactly the sorry token: {span:?}"
+        ));
+    }
+
+    Ok(SourceCheckoutReceipt {
+        schema_version: "pitb.sorrydb-source-checkout.v0".into(),
+        source_database_task_id: record.id.clone(),
+        repository_remote: record.repo.remote.clone(),
+        repository_commit: commit,
+        lean_version: record.repo.lean_version.clone(),
+        source_path: record.location.path.clone(),
+        start_line: record.location.start_line,
+        start_column: record.location.start_column,
+        end_line: record.location.end_line,
+        end_column: record.location.end_column,
+        committed_toolchain_file: toolchain,
+        source_file_sha256: sha256(&source_bytes),
+        source_span: span.to_owned(),
+        source_span_verified_as_sorry: true,
+        scoring_admission: false,
+        limitation: "This receipt verifies only immutable Git identity, the committed Lean toolchain and the exact sorry source span. It does not run Lake/Lean, reproduce the elaborated Prop goal, verify a proof, or audit informal-to-formal specification fidelity.".into(),
+    })
+}
+
 fn validate_proof_run(
     run: &ProofRun,
     index: usize,
@@ -738,7 +900,7 @@ fn audit(
 fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, PathBuf, Option<PathBuf>), String> {
     if args.len() < 7 || args[1] != "--verify" {
         return Err(format!(
-            "usage: {} --verify <full-snapshot.json> <evaluation-split.json> <report.json> [--runs proof-runs.jsonl] --pinned-source SorryDB/SorryDB@74b3b63f8ba890d675f362924b21ac55db410383",
+            "usage: {} --verify <full-snapshot.json> <evaluation-split.json> <report.json> [--runs proof-runs.jsonl] --pinned-source SorryDB/SorryDB@74b3b63f8ba890d675f362924b21ac55db410383 | --verify-checkout <sorry-record.json> <repo-root> <receipt.json>",
             args.first().map(String::as_str).unwrap_or("pitb-sorrydb-audit")
         ));
     }
@@ -1090,6 +1252,19 @@ fn execute() -> Result<(), String> {
         println!("PITB_SORRYDB_AUDIT_SYNTHETIC_REPORT_OK");
         return Ok(());
     }
+    if args.len() == 5 && args[1] == "--verify-checkout" {
+        let record_bytes = fs::read(&args[2])
+            .map_err(|e| format!("read SorryDB task record: {e}"))?;
+        let record: SorryRecord = serde_json::from_slice(&record_bytes)
+            .map_err(|e| format!("parse SorryDB task record: {e}"))?;
+        let receipt = verify_source_checkout(&record, Path::new(&args[3]))?;
+        let receipt_bytes = serde_json::to_vec_pretty(&receipt)
+            .map_err(|e| format!("serialize source checkout receipt: {e}"))?;
+        fs::write(&args[4], receipt_bytes)
+            .map_err(|e| format!("write source checkout receipt: {e}"))?;
+        println!("PITB_SORRYDB_SOURCE_CHECKOUT_OK");
+        return Ok(());
+    }
     let (full_path, evaluation_path, report_path, runs_path) = parse_args(&args)?;
     let full_bytes = fs::read(&full_path).map_err(|e| format!("read full SorryDB snapshot: {e}"))?;
     let evaluation_bytes =
@@ -1145,6 +1320,78 @@ mod tests {
     #[test]
     fn registered_sorrydb_integrity_controls_pass() {
         run_self_tests().expect("all SorryDB integrity controls must pass");
+    }
+
+    #[test]
+    fn checkout_verification_reads_source_and_toolchain_from_exact_git_commit() {
+        let root = std::env::temp_dir().join(format!(
+            "pitb-sorrydb-checkout-self-test-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("Demo")).unwrap();
+        fs::write(root.join("lean-toolchain"), "v4.27.0\n").unwrap();
+        let source = "import Lean\n theorem sample : True := by sorry\n";
+        fs::write(root.join("Demo/Sample.lean"), source).unwrap();
+
+        assert!(Command::new("git").args(["init", "-q"]).current_dir(&root).status().unwrap().success());
+        for (key, value) in [("user.name", "PITB test"), ("user.email", "pitb@example.invalid")] {
+            assert!(Command::new("git").args(["config", key, value]).current_dir(&root).status().unwrap().success());
+        }
+        assert!(Command::new("git").args(["remote", "add", "origin", "https://github.com/example/lean-demo.git"]).current_dir(&root).status().unwrap().success());
+        assert!(Command::new("git").args(["add", "."]).current_dir(&root).status().unwrap().success());
+        assert!(Command::new("git").args(["commit", "-q", "-m", "sorry fixture"]).current_dir(&root).status().unwrap().success());
+
+        let commit = String::from_utf8(git_output(&root, &["rev-parse", "HEAD"]).unwrap()).unwrap().trim().to_owned();
+        let line = source.split('\n').nth(1).unwrap();
+        let start_column = line.find("sorry").unwrap() as u64;
+        let record = SorryRecord {
+            id: sha256(b"source-task"),
+            repo: RepoInfo {
+                remote: "https://github.com/example/lean-demo".into(),
+                branch: "main".into(),
+                commit,
+                lean_version: "v4.27.0".into(),
+            },
+            location: Location {
+                path: "Demo/Sample.lean".into(),
+                start_line: 2,
+                start_column,
+                end_line: 2,
+                end_column: start_column + 5,
+            },
+            debug_info: DebugInfo {
+                goal: "⊢ True".into(),
+                url: format!(
+                    "https://github.com/example/lean-demo/blob/{}/{}/#L2",
+                    "1".repeat(40),
+                    "Demo/Sample.lean"
+                ).replace("Demo/Sample.lean/", "Demo/Sample.lean"),
+            },
+            metadata: Metadata {
+                blame_email_hash: "0123456789ab".into(),
+                blame_date: "2026-01-01T00:00:00+00:00".into(),
+                inclusion_date: "2026-01-02T00:00:00+00:00".into(),
+            },
+        };
+        // Set the source URL to the actual immutable commit after building the task.
+        let mut record = record;
+        record.debug_info.url = format!(
+            "{}/blob/{}/{}#L2",
+            record.repo.remote, record.repo.commit, record.location.path
+        );
+
+        // A dirty worktree must not change which bytes are being audited.
+        fs::write(root.join("Demo/Sample.lean"), "modified working tree\n").unwrap();
+        let receipt = verify_source_checkout(&record, &root).unwrap();
+        assert!(receipt.source_span_verified_as_sorry);
+        assert_eq!(receipt.source_span, "sorry");
+        assert!(!receipt.scoring_admission);
+
+        let mut wrong_commit = record.clone();
+        wrong_commit.repo.commit = "2".repeat(40);
+        assert!(verify_source_checkout(&wrong_commit, &root).is_err());
+        fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]
