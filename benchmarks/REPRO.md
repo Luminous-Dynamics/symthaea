@@ -16,6 +16,27 @@
 7. Use the benchmark maintainer's official evaluator where available. Do not rewrite a grader and claim equivalent scoring without an independent equivalence study.
 8. A schema-valid manifest does not authorize access, execution, security claims, engineering approval or performance claims.
 
+## PLE-to-Luminous evidence mapping
+
+**Do not force PLE deliverables into CEB's patch-centric v0 receipt.** The current CEB v0 schema requires a candidate patch, reference-patch hash and source/result tree subjects. PLE grades engineering deliverables such as calculations, technical reports, drawings, CAD/BIM artifacts and schedules; a source patch is not the semantic unit of result. Treating a PLE deliverable as a patch would misstate what was evaluated.
+
+The adapter boundary must be resolved through the existing **benchmark-neutral run-accounting contract #10314** and **evidence-convergence issue #10370**. CEB #10115 / DSSE #10167/#10212 remains authoritative for Symthaea code-change tasks that actually have source patches. Do not add a third receipt schema or alter the meaning of the CEB patch subject.
+
+| PLE evidence | Canonical Luminous mapping | Invariant |
+|---|---|---|
+| Official benchmark/split/task universe | Generic benchmark identity + complete task-universe commitment (#10314) | Every eligible PLE task has exactly one terminal disposition per run |
+| Dataset revision + PLE task ID + task bundle bytes | Task-row input identity and digest | Record the Hugging Face dataset commit and exact task ID; compute a separate digest over the permitted materialized task bundle |
+| Agent/harness/model/configuration | Candidate/agent/harness identity in the generic run record | Pin model, provider, effort, prompt, harness, tool policy and retry policy |
+| Task/serve/verifier images and Harbor/runner | Environment/execution identity | Pin immutable image digests, official PLE runner commit, Harbor 0.20.0, platform and resource limits |
+| Official `checks`, `rubric`, `checks-judge` grader | Grader identity, grading protocol and raw grader output digest | Use official verifier unchanged; preserve the grader type and judge model/revision |
+| Deliverable files, trajectory, logs and resource data | Evidence-artifact inventory | Hash every artifact; do not invent a patch hash for a report, drawing or STEP file |
+| Official per-task reward and hard-check outcomes | Official score plus separately derived coverage/yield/feasibility metrics | Never replace official score with a local approximation; never average away hard-gate failure |
+| Three repeated runs | Distinct run IDs linked to one benchmark configuration | Do not confuse `--trials` parallelism or evaluator retries with independent benchmark repetitions |
+
+The adapter may use a small **benchmark-profile mapping** to project PLE task metadata into generic accounting fields. That projection must not duplicate PLE task prompts, tests, graders or hidden labels, and it must not change official scoring semantics. A CEB task ID may identify the Luminous adapter/profile work, but the external PLE task ID remains a separate source identifier.
+
+Before execution, #10370 must decide normative ownership for benchmark/task identity, accounting rows, artifact digests, official score provenance, and interaction with CEB's DSSE receipts. If those contracts are not yet reconciled, the PLE score remains an external source observation attached to its own official artifacts—not a qualified CEB run.
+
 ## PLE — metadata-only procedure
 
 The first registered suite is Physical-Engineering's Last Exam (PLE).
