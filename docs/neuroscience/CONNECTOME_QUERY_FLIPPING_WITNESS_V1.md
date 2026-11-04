@@ -127,7 +127,7 @@ Permanent known-answer and negative controls should include:
 11. **Held-out edit:** add a scientifically admissible edit outside the declared universe; use it to demonstrate why a no-witness result is universe-bounded.
 12. **Baseline revision:** change the baseline edge state; stale edit preconditions must reject the old universe.
 
-V1 has unit tests for pair synergy, a separate three-edit case where no singleton or pair flips, tied minima, preconditions, dependency cycles, symmetric conflicts, same-edge alternatives, no-witness under a smaller budget, digest mismatch, input-order canonicalization and the 20-edit bound. The next extension should add generated families of held-out edits and dependent hyperedge/motif query semantics.
+V1 includes three executable known-answer inputs: the pair-synergy/evidence-gate case, a four-edit case where no singleton or pair flips but any three edits do, and a bounded candidate-subset case with no witness. Each fixture is run through Rust and independently checked by the Python oracle. In the no-witness case, an omitted candidate edit that would flip the query is described in the protocol as a deliberate scope-boundary example; its absence from the input demonstrates why a no-witness result cannot establish global robustness. Unit tests also cover tied minima, preconditions, dependency cycles, symmetric conflicts, same-edge alternatives, budget cutoff, digest mismatch, input-order canonicalization and the 20-edit bound.
 
 ## 8. Position against graph-counterfactual minimization SOTA
 
