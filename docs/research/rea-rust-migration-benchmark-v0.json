@@ -486,7 +486,9 @@
           "rss_limit_mib",
           "max_input_bytes",
           "fuzz_artifact_digest"
-        ]
+        ],
+        "seed_path": "fuzz/seeds/minimal-stored-entry.zip.b64",
+        "decoded_seed_path": "fuzz/corpus/zip_inventory_and_content/minimal-stored-entry.zip"
       }
     },
     {
