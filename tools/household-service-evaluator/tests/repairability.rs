@@ -12,29 +12,19 @@ fn repair_task<'a>(corpus: &'a Value, id: &str) -> &'a Value {
         .expect("expected repair task must exist")
 }
 
-fn repair_attempt(
-    exact_spare_available: bool,
-    replacement_compatibility_qualified: bool,
-    offline_service_required: bool,
-    offline_service_available: bool,
-    affected_calibration_requalified: bool,
-    post_repair_function_passed: bool,
-    post_repair_safety_check_passed: bool,
-    follow_up_days_observed: u32,
-    recurrence_observed: bool,
-) -> RepairAttempt {
+fn qualified_repair_attempt() -> RepairAttempt {
     RepairAttempt {
         diagnosis_supported: true,
-        exact_spare_available,
-        replacement_compatibility_qualified,
-        offline_service_required,
-        offline_service_available,
-        affected_calibration_requalified,
-        post_repair_function_passed,
+        exact_spare_available: true,
+        replacement_compatibility_qualified: true,
+        offline_service_required: false,
+        offline_service_available: true,
+        affected_calibration_requalified: true,
+        post_repair_function_passed: true,
         safety_check_required: true,
-        post_repair_safety_check_passed,
-        follow_up_days_observed,
-        recurrence_observed,
+        post_repair_safety_check_passed: true,
+        follow_up_days_observed: 0,
+        recurrence_observed: false,
     }
 }
 
@@ -47,21 +37,12 @@ fn unavailable_market_spare_is_a_blocked_repair() {
     let task = repair_task(&corpus, "REPAIR-006");
     let baseline = &task["synthetic_baseline"];
 
-    let result = evaluate_repair_attempt(
-        &repair_attempt(
-            baseline["local_stock"].as_bool().unwrap(),
-            baseline["approved_substitute"].as_bool().unwrap(),
-            false,
-            true,
-            true,
-            true,
-            true,
-            0,
-            false,
-        ),
-        30,
-    )
-    .unwrap();
+    let mut attempt = qualified_repair_attempt();
+    attempt.exact_spare_available = baseline["local_stock"].as_bool().unwrap();
+    attempt.replacement_compatibility_qualified =
+        baseline["approved_substitute"].as_bool().unwrap();
+
+    let result = evaluate_repair_attempt(&attempt, 30).unwrap();
 
     assert_eq!(
         task["expected_disposition"],
@@ -83,11 +64,11 @@ fn cloud_independent_recovery_is_not_blocked_when_offline_artifacts_exist() {
             .as_bool()
             .unwrap();
 
-    let result = evaluate_repair_attempt(
-        &repair_attempt(true, true, true, offline_available, true, true, true, 0, false),
-        30,
-    )
-    .unwrap();
+    let mut attempt = qualified_repair_attempt();
+    attempt.offline_service_required = true;
+    attempt.offline_service_available = offline_available;
+
+    let result = evaluate_repair_attempt(&attempt, 30).unwrap();
 
     assert_eq!(
         task["expected_disposition"],
@@ -108,25 +89,16 @@ fn a_mechanical_restore_with_thirty_day_recurrence_is_not_durable_success() {
     let task = repair_task(&corpus, "REPAIR-008");
     let baseline = &task["synthetic_baseline"];
 
-    let result = evaluate_repair_attempt(
-        &repair_attempt(
-            true,
-            true,
-            false,
-            true,
-            true,
-            baseline["initial_post_repair_function_pass"]
-                .as_bool()
-                .unwrap(),
-            true,
-            30,
-            baseline["recurrence_observed_after_30_days"]
-                .as_bool()
-                .unwrap(),
-        ),
-        30,
-    )
-    .unwrap();
+    let mut attempt = qualified_repair_attempt();
+    attempt.post_repair_function_passed = baseline["initial_post_repair_function_pass"]
+        .as_bool()
+        .unwrap();
+    attempt.follow_up_days_observed = 30;
+    attempt.recurrence_observed = baseline["recurrence_observed_after_30_days"]
+        .as_bool()
+        .unwrap();
+
+    let result = evaluate_repair_attempt(&attempt, 30).unwrap();
 
     assert_eq!(
         task["expected_disposition"],
@@ -150,21 +122,12 @@ fn critical_interface_without_a_post_repair_test_remains_held() {
         .as_bool()
         .unwrap();
 
-    let result = evaluate_repair_attempt(
-        &repair_attempt(
-            true,
-            true,
-            false,
-            true,
-            !critical_interface_changed,
-            post_repair_test_available,
-            post_repair_test_available,
-            0,
-            false,
-        ),
-        30,
-    )
-    .unwrap();
+    let mut attempt = qualified_repair_attempt();
+    attempt.affected_calibration_requalified = !critical_interface_changed;
+    attempt.post_repair_function_passed = post_repair_test_available;
+    attempt.post_repair_safety_check_passed = post_repair_test_available;
+
+    let result = evaluate_repair_attempt(&attempt, 30).unwrap();
 
     assert_eq!(
         task["expected_disposition"],
