@@ -87,7 +87,15 @@ For each product profile, identify the exact current appliance-specific test met
 
 ### InstantClean — verified warewashing
 
-Use household IEC 60436, matched commercial rack/glasswasher cohorts, and a separate QuickCell micro-batch cohort. Report item-level cleaning/rinse/cross-transfer outcomes, first-pass yield, quality-qualified throughput, all retries, resource boundaries and maintenance. Multi-compartment layout, turbidity sensing and genetic optimization are not novelty claims by themselves.
+Use household IEC 60436, matched commercial rack/glasswasher cohorts, and a separate QuickCell micro-batch cohort. Report item-level cleaning/rinse/cross-transfer outcomes, first-pass yield, quality-qualified throughput, all retries, resource boundaries and maintenance. Multi-compartment layout, turbidity sensing, genetic optimization, automatic dispensing, camera-based load recognition, AI-selected wash options and solar-aware start scheduling are not novelty claims by themselves.
+
+Miele announced the G8 Diamond on 2 September 2026 with an integrated AutoVision camera using image processing/AI to detect load level and dish types and adapt wash options, plus automatic dispensing, variable hot-air drying and app-based start preferences:
+https://www.miele.de/en/m/world-premiere-for-the-g8-diamond-8453.htm
+
+Miele also showed Cary, a laundry-care concept study using sensors/AI to recognize laundry and tailor the process; this is a concept study, not an established retail product:
+https://www.miele.de/en/m/how-miele-eliminates-household-decisions-8441.htm
+
+For future comparison, distinguish announced concepts from commercially purchasable models. Once the G8 Diamond is available in the target market, acquire exact regional model/firmware and run the same independent service test; a press release is not a laboratory benchmark.
 
 For acquisition/reference context, current EPREL records include:
 - Miele G 7040 SCU AutoDos: 14 rated place settings, 0.540 kWh and 8.4 L per Eco cycle, 3:50 programme duration, cleaning performance index 1.125: https://eprel.ec.europa.eu/screen/product/dishwashers2019/2241809
@@ -269,6 +277,8 @@ Never use "passed", "validated", "qualified", "safe", "certified", "SOTA" or "be
 - Dynamic shelf-life study (2025): https://pmc.ncbi.nlm.nih.gov/articles/PMC12269072/
 - Refrigerator use / food waste study (2025): https://www.sciencedirect.com/science/article/pii/S0921344925001533
 - WIRED home composters comparative review (2026): https://www.wired.com/story/home-composters-buying-guide/
+- Miele G8 Diamond AutoVision / AI dishwasher announcement, 2 Sep 2026: https://www.miele.de/en/m/world-premiere-for-the-g8-diamond-8453.htm
+- Miele Cary laundry-care concept announcement, 2 Sep 2026: https://www.miele.de/en/m/how-miele-eliminates-household-decisions-8441.htm
 - EU Commission repairability consultation, 3 Nov 2026: https://environment.ec.europa.eu/news/commission-launches-public-consultation-making-products-easier-repair-2026-11-03_en
 - Directive (EU) 2024/1799 consolidated text 31 Jul 2026: https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024L1799-20260731
 - Johannesburg water supply status, SAnews, 3 Nov 2026: https://www.sanews.gov.za/node/85387
