@@ -20,6 +20,10 @@ const VERSION: &str = "0.1.0";
 struct ClaimInfo {
     relation_type: String,
     claim_status: String,
+    source_id: String,
+    target_id: String,
+    source_world: String,
+    target_world: String,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -142,6 +146,8 @@ fn parse_claims(bundle: &Value) -> Result<ClaimIndex, String> {
         let target = claim
             .get("target")
             .ok_or_else(|| format!("{context}.target missing"))?;
+        let source_id = string_field(source, "object_id", &format!("{context}.source"))?;
+        let target_id = string_field(target, "object_id", &format!("{context}.target"))?;
         let source_kind = string_field(source, "object_kind", &format!("{context}.source"))?;
         let target_kind = string_field(target, "object_kind", &format!("{context}.target"))?;
         let source_world = string_field(source, "world_id", &format!("{context}.source"))?;
@@ -304,6 +310,10 @@ fn parse_claims(bundle: &Value) -> Result<ClaimIndex, String> {
         let info = ClaimInfo {
             relation_type,
             claim_status,
+            source_id,
+            target_id,
+            source_world,
+            target_world,
         };
         if claims.insert(claim_id.clone(), info).is_some() {
             return Err(format!("duplicate claim_id {claim_id}"));
@@ -437,7 +447,7 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
             let mut seen_claims = BTreeSet::new();
             let mut relation_set = BTreeSet::new();
             let mut all_claims_supported = true;
-            let mut contains_causal_claim = false;
+            let mut previous_target: Option<(String, String)> = None;
             for claim_id_value in claim_ids {
                 let claim_id = claim_id_value
                     .as_str()
@@ -455,11 +465,14 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                 if claim.claim_status != "CLAIMED_SUPPORTED" {
                     all_claims_supported = false;
                 }
-                if claim.relation_type == "CAUSAL_EFFECT_CLAIM"
-                    && claim.claim_status == "CLAIMED_SUPPORTED"
+                if let Some((previous_id, previous_world)) = previous_target.as_ref()
+                    && (previous_id != &claim.source_id || previous_world != &claim.source_world)
                 {
-                    contains_causal_claim = true;
+                    return Err(format!(
+                        "{result_context}: path claims are not endpoint-contiguous at {claim_id}"
+                    ));
                 }
+                previous_target = Some((claim.target_id.clone(), claim.target_world.clone()));
             }
             let asserted = string_field(result, "asserted_claim_type", &result_context)?;
             if !matches!(
@@ -502,13 +515,9 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                 reasons.push("single-layer query cannot request MIXED_EVIDENCE_PATH".to_owned());
             }
             if relation_set.len() > 1 {
-                let explicit_causal_composition = asserted == "CAUSAL_EFFECT"
-                    && requested_type == "CAUSAL_EFFECT"
-                    && query_mode == "DECLARED_MIXED_LAYERS"
-                    && contains_causal_claim;
-                if asserted != "MIXED_EVIDENCE_PATH" && !explicit_causal_composition {
+                if asserted != "MIXED_EVIDENCE_PATH" {
                     disposition = "REJECTED_TYPE_PROMOTION";
-                    reasons.push("mixed relation types require MIXED_EVIDENCE_PATH or an explicit supported causal-effect claim".to_owned());
+                    reasons.push("mixed relation types cannot be promoted to a single relation claim".to_owned());
                 }
                 if asserted == "MIXED_EVIDENCE_PATH"
                     && (query_mode != "DECLARED_MIXED_LAYERS"
@@ -518,11 +527,10 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                     reasons.push("MIXED_EVIDENCE_PATH requires declared mixed-layer mode and mixed requested type".to_owned());
                 }
             }
-            if asserted == "CAUSAL_EFFECT" && !contains_causal_claim {
+            if asserted == "CAUSAL_EFFECT" && relation_set != BTreeSet::from(["CAUSAL_EFFECT_CLAIM".to_owned()]) {
                 disposition = "REJECTED_TYPE_PROMOTION";
                 reasons.push(
-                    "causal conclusion lacks a supported CAUSAL_EFFECT_CLAIM in its path"
-                        .to_owned(),
+                    "causal conclusions require a standalone CAUSAL_EFFECT_CLAIM path; other evidence layers cannot promote causality".to_owned(),
                 );
             }
             if relation_set.len() == 1 {
@@ -538,6 +546,23 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
             if requested_type != asserted {
                 disposition = "REJECTED_TYPE_PROMOTION";
                 reasons.push(format!("asserted path type {asserted} differs from requested query type {requested_type}"));
+            }
+            if disposition == "ACCEPTED_WITHIN_TYPED_SCOPE" {
+                match claimed_result_status.as_str() {
+                    "CLAIMED_REJECTED" => {
+                        disposition = "REJECTED_EVIDENCE_CLAIM";
+                        reasons.push("the producer marks the path result rejected".to_owned());
+                    }
+                    "CLAIMED_NOT_ESTIMABLE" => {
+                        disposition = "NOT_ESTIMABLE";
+                        reasons.push("the producer marks the path result not estimable".to_owned());
+                    }
+                    "CLAIMED_CONDITIONAL" => {
+                        disposition = "CONDITIONAL_ONLY";
+                        reasons.push("the producer marks the path result conditional".to_owned());
+                    }
+                    _ => {}
+                }
             }
             if disposition == "ACCEPTED_WITHIN_TYPED_SCOPE"
                 && claimed_result_status == "CLAIMED_REJECTED"
