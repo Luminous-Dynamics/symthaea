@@ -168,7 +168,7 @@ jobs:
           from pathlib import Path
 
           relative = "tools/pitb-daps-graph-import/fixtures/daps-example-graph.json"
-          expected = "ff3e07e7a4867c969f4ed739497f78b6a77209f"
+          expected = "ff3e07e7a4867c969f4fed739497f78b6a77209f"
           tree = subprocess.check_output(
               ["git", "ls-tree", "HEAD", "--", relative], text=True
           ).strip()
@@ -242,7 +242,7 @@ jobs:
             tools/pitb-daps-graph-import/fixtures/daps-example-graph.json \
             "$RUNNER_TEMP/pitb-daps-import-output" \
             978ca6bebb4c56e03795b4f5e34fcbdc6cb2d153 \
-            ff3e07e7a4867c969f4ed739497f78b6a77209f \
+            ff3e07e7a4867c969f4fed739497f78b6a77209f \
             66eb2045724da71e32b765223c6c4fdcc903f466 \
             778cba54c3e6117ad357e192d421d196b7d1eb6c \
             79e94a093aff4a60fb1b1f92d9681e407124c2ca \
