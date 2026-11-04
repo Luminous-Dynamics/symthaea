@@ -452,3 +452,80 @@ jobs:
             ${{ runner.temp }}/pitb-sorrydb-audit/Cargo.lock
           if-no-files-found: warn
           retention-days: 30
+
+
+  sorrydb-snapshot-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Install JSON Schema validator
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pitb-sorrydb-venv"
+          "$RUNNER_TEMP/pitb-sorrydb-venv/bin/pip" install "jsonschema==4.25.1"
+
+      - name: Stage isolated SorryDB validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/pitb-sorrydb-integrity"
+          mkdir -p "$staged/src"
+          cp tools/pitb-sorrydb-integrity/Cargo.toml "$staged/Cargo.toml"
+          cp tools/pitb-sorrydb-integrity/Cargo.lock "$staged/Cargo.lock"
+          cp tools/pitb-sorrydb-integrity/src/main.rs "$staged/src/main.rs"
+          echo "PITB_SORRYDB_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+          echo "PITB_SORRYDB_DIR=$staged" >> "$GITHUB_ENV"
+
+      - name: Format and test SorryDB snapshot validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2021 "$PITB_SORRYDB_DIR/src/main.rs"
+          cargo fmt --check --manifest-path "$PITB_SORRYDB_MANIFEST"
+          cargo test --locked --manifest-path "$PITB_SORRYDB_MANIFEST"
+          cargo run --locked --manifest-path "$PITB_SORRYDB_MANIFEST" -- --self-test
+
+      - name: Validate pinned SorryDB manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-sorrydb-venv/bin/python" - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("tools/pitb-sorrydb-integrity")
+          schema = json.loads((root / "schema/sorrydb-snapshot-manifest-v0.schema.json").read_text())
+          manifest = json.loads((root / "snapshot/SorryDB_2601.pin.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          errors = list(Draft202012Validator(schema).iter_errors(manifest))
+          if errors:
+              raise SystemExit("SorryDB pin schema errors: " + "; ".join(e.message for e in errors))
+          if manifest["expected_full_task_count"] != 2601 or manifest["expected_evaluation_task_count"] != 1000:
+              raise SystemExit("pinned SorryDB task denominators changed")
+          if manifest["expected_unique_repository_count"] != 78:
+              raise SystemExit("pinned SorryDB repository denominator changed")
+          print("PITB_SORRYDB_PIN_SCHEMA_PASS")
+          PY
+
+      - name: Retain snapshot pin and validator source
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-sorrydb-snapshot-integrity
+          path: |
+            tools/pitb-sorrydb-integrity/snapshot/SorryDB_2601.pin.json
+            tools/pitb-sorrydb-integrity/src/main.rs
+            tools/pitb-sorrydb-integrity/Cargo.lock
+          if-no-files-found: warn
+          retention-days: 30
