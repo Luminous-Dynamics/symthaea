@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-snapshot-integrity-report-v0.schema.json",
+  "title": "PITB SorryDB Snapshot Integrity Report v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark",
+    "snapshot_id",
+    "upstream_repository",
+    "upstream_repository_commit",
+    "snapshot_file_path",
+    "snapshot_git_blob_sha1",
+    "snapshot_raw_sha256",
+    "evaluation_split_file_path",
+    "evaluation_split_git_blob_sha1",
+    "evaluation_split_raw_sha256",
+    "sorrydb_id_algorithm",
+    "full_snapshot",
+    "evaluation_split",
+    "evaluation_ids_subset_of_snapshot",
+    "repository_registry_count",
+    "split_repositories_subset_of_snapshot",
+    "structural_integrity_passed",
+    "source_checkout_reproduction_verified",
+    "goal_to_source_semantic_fidelity_verified",
+    "proof_solution_integrity_verified",
+    "score_baseline",
+    "trust_boundary",
+    "next_qualification_requirements"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-snapshot-integrity-report.v0"
+    },
+    "benchmark": {
+      "const": "SorryDB"
+    },
+    "snapshot_id": {
+      "const": "SorryDB-2601"
+    },
+    "upstream_repository": {
+      "const": "SorryDB/SorryDB"
+    },
+    "upstream_repository_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "snapshot_file_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "snapshot_git_blob_sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "snapshot_raw_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "evaluation_split_file_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_split_git_blob_sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "evaluation_split_raw_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sorrydb_id_algorithm": {
+      "type": "string",
+      "minLength": 30
+    },
+    "full_snapshot": {
+      "$ref": "#/$defs/record_stats"
+    },
+    "evaluation_split": {
+      "$ref": "#/$defs/record_stats"
+    },
+    "evaluation_ids_subset_of_snapshot": {
+      "const": true
+    },
+    "repository_registry_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "split_repositories_subset_of_snapshot": {
+      "const": true
+    },
+    "structural_integrity_passed": {
+      "const": true
+    },
+    "source_checkout_reproduction_verified": {
+      "const": false
+    },
+    "goal_to_source_semantic_fidelity_verified": {
+      "const": false
+    },
+    "proof_solution_integrity_verified": {
+      "const": false
+    },
+    "score_baseline": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "trust_boundary": {
+      "type": "string",
+      "minLength": 40
+    },
+    "next_qualification_requirements": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "string",
+        "minLength": 20
+      }
+    }
+  },
+  "$defs": {
+    "record_stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_count",
+        "unique_id_count",
+        "computed_id_match_count",
+        "unique_repository_count",
+        "unique_goal_count",
+        "unique_source_location_count"
+      ],
+      "properties": {
+        "record_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "unique_id_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "computed_id_match_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "unique_repository_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "unique_goal_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "unique_source_location_count": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}
