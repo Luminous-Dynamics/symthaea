@@ -913,6 +913,20 @@ fn run_self_tests() -> Result<(), String> {
     println!("SELF_TEST_PASS proof receipt binds exact source task, range, commit, toolchain and goal");
 
     let mut bad_run = valid_run.clone();
+    bad_run.goal_sha256 = sha256(b"different theorem");
+    if validate_proof_run(&bad_run, 2, &evaluation_by_id).is_ok() {
+        return Err("proof receipt with changed goal identity was accepted".into());
+    }
+    println!("SELF_TEST_PASS proof receipt rejects a changed formal goal");
+
+    let mut bad_run = valid_run.clone();
+    bad_run.start_column += 1;
+    if validate_proof_run(&bad_run, 3, &evaluation_by_id).is_ok() {
+        return Err("proof receipt with changed source coordinates was accepted".into());
+    }
+    println!("SELF_TEST_PASS proof receipt rejects changed source coordinates");
+
+    let mut bad_run = valid_run.clone();
     bad_run.semantic_gate_passed = false;
     if validate_proof_run(&bad_run, 2, &evaluation_by_id).is_ok() {
         return Err("kernel-only success without semantic gate was accepted".into());
