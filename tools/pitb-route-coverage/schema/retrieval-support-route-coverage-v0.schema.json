@@ -18,7 +18,8 @@
     "route_assessments",
     "comparison_summaries",
     "admission_boundary",
-    "interpretation_boundary"
+    "interpretation_boundary",
+    "paired_comparisons"
   ],
   "properties": {
     "schema_version": {
@@ -437,6 +438,161 @@
     "interpretation_boundary": {
       "type": "string",
       "minLength": 80
+    },
+    "paired_comparisons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reference_kind",
+          "reference_name",
+          "reference_version",
+          "challenger_kind",
+          "challenger_name",
+          "challenger_version",
+          "matched_assessment_count",
+          "matched_query_count",
+          "reference_only_route_count",
+          "challenger_only_route_count",
+          "both_route_count",
+          "neither_route_count",
+          "reference_complete_route_coverage",
+          "challenger_complete_route_coverage",
+          "complete_route_coverage_delta",
+          "mean_minimal_route_coverage_delta",
+          "component_cluster_count",
+          "cluster_bootstrap_replicates",
+          "cluster_bootstrap_ci_low",
+          "cluster_bootstrap_ci_high",
+          "exact_mcnemar_p_value",
+          "holm_adjusted_mcnemar_p_value",
+          "interpretation_boundary"
+        ],
+        "properties": {
+          "reference_kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reference_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reference_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "challenger_kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "challenger_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "challenger_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "matched_assessment_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "matched_query_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reference_only_route_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "challenger_only_route_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "both_route_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "neither_route_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reference_complete_route_coverage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "challenger_complete_route_coverage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "complete_route_coverage_delta": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          },
+          "mean_minimal_route_coverage_delta": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          },
+          "component_cluster_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cluster_bootstrap_replicates": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cluster_bootstrap_ci_low": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "number",
+                "minimum": -1,
+                "maximum": 1
+              }
+            ]
+          },
+          "cluster_bootstrap_ci_high": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "number",
+                "minimum": -1,
+                "maximum": 1
+              }
+            ]
+          },
+          "exact_mcnemar_p_value": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "holm_adjusted_mcnemar_p_value": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            ]
+          },
+          "interpretation_boundary": {
+            "type": "string",
+            "minLength": 50
+          }
+        }
+      }
     }
   }
 }
