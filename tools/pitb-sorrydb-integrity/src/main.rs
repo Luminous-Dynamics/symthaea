@@ -701,6 +701,61 @@ mod tests {
     }
 
     #[test]
+    fn checkout_verification_uses_exact_commit_objects_not_worktree_bytes() {
+        let root = std::env::temp_dir().join(format!(
+            "pitb-sorrydb-integrity-self-test-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("Math")).unwrap();
+        fs::write(root.join("lean-toolchain"), "leanprover/lean4:v4.18.0-rc1\n").unwrap();
+        let source = "import Mathlib\n  theorem t : True := by sorry\n";
+        fs::write(root.join("Math/Example.lean"), source).unwrap();
+
+        let init = Command::new("git").args(["init", "-q"]).current_dir(&root).status().unwrap();
+        assert!(init.success());
+        for (key, value) in [("user.name", "PITB test"), ("user.email", "pitb@example.invalid")] {
+            assert!(Command::new("git").args(["config", key, value]).current_dir(&root).status().unwrap().success());
+        }
+        assert!(Command::new("git").args(["remote", "add", "origin", "https://github.com/example/math.git"]).current_dir(&root).status().unwrap().success());
+        assert!(Command::new("git").args(["add", "."]).current_dir(&root).status().unwrap().success());
+        assert!(Command::new("git").args(["commit", "-q", "-m", "fixture"]).current_dir(&root).status().unwrap().success());
+
+        let commit = run_git(&root, &["rev-parse", "HEAD"]).unwrap();
+        let line = source.split('\n').nth(1).unwrap();
+        let start_column = line.find("sorry").unwrap();
+        let raw = json!({
+            "repo": {
+                "remote": "https://github.com/example/math",
+                "branch": "main",
+                "commit": commit,
+                "lean_version": "v4.18.0-rc1"
+            },
+            "location": {
+                "path": "Math/Example.lean",
+                "start_line": 2,
+                "start_column": start_column,
+                "end_line": 2,
+                "end_column": start_column + 5
+            },
+            "debug_info": {"goal":"⊢ True","url":"https://example.invalid"},
+            "metadata": {}
+        });
+        let task = build_task(&raw, 0).unwrap();
+
+        // Deliberately dirty the working tree. The verifier must still inspect HEAD:path.
+        fs::write(root.join("Math/Example.lean"), "this working-tree file is not the benchmark source\n").unwrap();
+        let verified = verify_checkout(&task, &root).unwrap();
+        assert!(verified.source_span_verified_as_sorry);
+        assert_eq!(verified.source_span, "sorry");
+
+        let mut wrong_commit = task.clone();
+        wrong_commit.repository_commit = "2".repeat(40);
+        assert!(verify_checkout(&wrong_commit, &root).is_err());
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
     fn debug_goal_is_not_treated_as_authoritative_source_goal() {
         let task = build_task(&synthetic_database()["sorries"][0], 0).unwrap();
         assert_eq!(task.source_goal_trust, "debug_hint_not_reproduced");
