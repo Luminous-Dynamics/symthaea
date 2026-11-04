@@ -3,12 +3,14 @@ name: Typed Connectome Claim Bundle Schema
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    branches: [main]
+    branches: [main, research/connectome-typed-claim-queries-v0-1-20261104]
     paths:
       - "research/connectomics/connectome-typed-claim-bundle-v0.1.schema.json"
       - "research/connectomics/CONNECTOME_TYPED_CLAIM_QUERY_PROTOCOL_V0.1.md"
       - "research/connectomics/fixtures/connectome-typed-claim-bundle-known-answer-v0.1.json"
+      - "tools/connectome-typed-claim-verifier/**"
       - ".github/workflows/connectome-typed-claim-bundle-v1.yml"
+      - ".github/workflows/connectome-typed-claim-verifier-v1.yml"
 
 permissions:
   contents: read
@@ -58,3 +60,20 @@ jobs:
           assert used == ["ANATOMICAL_SYNAPSE_EDGE", "STATISTICAL_DEPENDENCE_EDGE"]
           assert invalid["asserted_claim_type"] == "CAUSAL_EFFECT"
           PY
+
+  verifier:
+    name: Typed claim semantic verifier
+    if: github.event.pull_request.base.ref == 'research/connectome-typed-claim-queries-v0-1-20261104'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Formatting
+        run: cargo fmt --manifest-path tools/connectome-typed-claim-verifier/Cargo.toml -- --check
+      - name: Tests
+        run: cargo test --manifest-path tools/connectome-typed-claim-verifier/Cargo.toml --locked
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path tools/connectome-typed-claim-verifier/Cargo.toml --locked --all-targets -- -D warnings
