@@ -20,8 +20,9 @@ name = "protocol"
 path = "tests/protocol.rs"
 
 [dependencies]
-rmcp = { version = "=3.8.0", default-features = false, features = ["server", "client", "macros", "transport-io"] }
+rmcp = { version = "=3.8.0", default-features = false, features = ["server", "client", "macros", "schemars", "transport-io"] }
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = { version = "=1.0.150", features = ["preserve_order"] }
+schemars = "1"
 symthaea-rea-compat = { path = "symthaea-rea-compat" }
 tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread", "io-std", "io-util", "net", "sync", "time"] }
