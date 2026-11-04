@@ -547,14 +547,15 @@ fn validate_jcs_number_subset(value: &Value) -> Result<(), ReceiptError> {
     Ok(())
 }
 
-fn object_at<'a>(
-    value: &'a Value,
-    path: &[&str],
-) -> Result<&'a serde_json::Map<String, Value>, ReceiptError> {
+fn object_at<'a>(value: &'a Value, path: &[&str]) -> Result<&'a Value, ReceiptError> {
     let child = value_at(value, path)?;
-    child.as_object().ok_or_else(|| {
-        ReceiptError::SemanticViolation(format!("{} must be an object", path.join(".")))
-    })
+    if !child.is_object() {
+        return Err(ReceiptError::SemanticViolation(format!(
+            "{} must be an object",
+            path.join(".")
+        )));
+    }
+    Ok(child)
 }
 
 fn string_at<'a>(value: &'a Value, path: &[&str]) -> Result<&'a str, ReceiptError> {
