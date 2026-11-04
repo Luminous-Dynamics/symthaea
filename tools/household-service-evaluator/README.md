@@ -1,6 +1,6 @@
 # Household Service Evaluator
 
-A small, offline Rust evaluation core for two bounded household-service questions:
+A small, offline Rust evaluation core with Serde-serializable evidence inputs and result receipts for two bounded household-service questions:
 
 1. Is a metered water balance compatible with its declared residual error bound, calibration evidence and topology-audit reference?
 2. Does a repair attempt meet its declared prerequisites, post-repair qualification and follow-up gate?
@@ -43,5 +43,7 @@ The repair evaluator keeps blocked access/parts, incomplete requalification, rec
 - The reserve estimator does not establish potability, pathogen safety, plumbing compliance or safe installation.
 - A repair disposition is not a safety certification or authorization to work on energized, pressurized, hot or otherwise hazardous equipment.
 - Synthetic tests establish only software behavior. They are not physical product evidence.
+
+Public input and result types use explicit Serde contracts; enum dispositions serialize in snake_case for downstream report tooling. This is a serialization contract, not an authenticated evidence receipt.
 
 No network access, cloud service, live actuator, or safety-control authority is present.
