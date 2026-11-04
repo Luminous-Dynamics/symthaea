@@ -106,7 +106,7 @@ The adaptive-transmission-sweep binary runs a predeclared grid:
 - per-step transmission budget equal to the population size;
 - successful acquisition probability 0.9.
 
-This is 378 conditions and 48,384 total simulation runs. All policies in a given task/population/topology/attention condition use the same seed IDs and configuration. The current single-PRNG design makes this a matched-seed design, not a guarantee of perfectly aligned random draws after policy-dependent control flow; a separate-stream common-random-number implementation is a later hardening step.
+This is 378 conditions and 48,384 total simulation runs. All policies in a given task/population/topology/attention condition use the same seed IDs and configuration. The simulator now derives independent deterministic streams for graph generation, individual discovery, schedule randomness and message acquisition. All policies with the same master seed therefore share the same generated graph and subsystem seed schedule; scheduler RNG consumption cannot shift later acquisition outcomes. Acquisition draws are consumed per scheduled-message slot before redundancy checks, which preserves slot alignment for the two matched-schedule content ablations. This is stronger than merely reusing a seed, but not perfect per-action common-random-number pairing: policy-dependent inventories can change the candidate list/order used by individual exploration, and different schedules can associate the same acquisition slot with different messages. The held-out paired-difference estimator remains the correct basis for the comparison.
 
 Outputs include:
 - final collective result coverage and a 95% normal-approximation interval over simulation seeds;
