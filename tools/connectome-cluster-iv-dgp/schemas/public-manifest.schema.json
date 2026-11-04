@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/tools/connectome-cluster-iv-dgp/schemas/public-manifest.schema.json",
+  "title": "Public observed-data manifest for clustered-IV DGP",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "generator_algorithm",
+    "observation_count",
+    "cluster_count",
+    "instrument_count",
+    "cluster_sizes",
+    "instrument_assignment_level",
+    "observed_columns",
+    "oracle_truth_state",
+    "row_order",
+    "hashing_note"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "artifact_type": {
+      "const": "PUBLIC_OBSERVED_DATA_MANIFEST"
+    },
+    "generator_algorithm": {
+      "const": "splitmix64-box-muller-cos-open01-v2"
+    },
+    "observation_count": {
+      "type": "integer",
+      "minimum": 3
+    },
+    "cluster_count": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "instrument_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "cluster_sizes": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "instrument_assignment_level": {
+      "enum": [
+        "within_cluster",
+        "cluster_level"
+      ]
+    },
+    "observed_columns": {
+      "const": "unit_id,cluster_id,z*,treatment,outcome"
+    },
+    "oracle_truth_state": {
+      "const": "SEALED_UNTIL_PREDICTIONS_FROZEN"
+    },
+    "row_order": {
+      "const": "cluster-major then ascending unit index"
+    },
+    "hashing_note": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$comment": "The public manifest is intentionally prohibited from carrying seed, beta, pi, gamma, direct-effect support, realized disturbances or cluster-level truth. The evaluator must keep oracle truth separate until prediction artifacts are frozen."
+}

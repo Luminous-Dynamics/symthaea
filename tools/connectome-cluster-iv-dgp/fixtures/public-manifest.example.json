@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "PUBLIC_OBSERVED_DATA_MANIFEST",
+  "generator_algorithm": "splitmix64-box-muller-cos-open01-v2",
+  "observation_count": 4,
+  "cluster_count": 2,
+  "instrument_count": 2,
+  "cluster_sizes": [
+    2,
+    2
+  ],
+  "instrument_assignment_level": "within_cluster",
+  "observed_columns": "unit_id,cluster_id,z*,treatment,outcome",
+  "oracle_truth_state": "SEALED_UNTIL_PREDICTIONS_FROZEN",
+  "row_order": "cluster-major then ascending unit index",
+  "hashing_note": "Synthetic example. Hash this manifest and the observed CSV separately."
+}
