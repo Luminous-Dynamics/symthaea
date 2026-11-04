@@ -21,7 +21,6 @@ The evaluator compares two already-frozen feasible actions for one metric across
 - scenario, action-set, reference, action, metric, unit and coordinate-frame identity checks;
 - frozen metric-definition and metric-evaluator digests;
 - shared execution-context, exact action-payload, output and source-artifact digest format checks;
-- shared execution-context, action-payload, output and source-artifact digest format checks;
 - exact action-payload matching across all admitted references;
 - incomplete outcomes for missing, censored, timed-out, unsupported and failed cells;
 - duplicate reference and receipt rejection;
