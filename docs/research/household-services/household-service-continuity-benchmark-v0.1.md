@@ -344,3 +344,90 @@ No candidate pump/valve/actuator logic is executed on live household plumbing or
 A synthetic pass is contract conformance only. Modelled service gains remain modelled. E1 does not imply E3; E2 does not imply E4.
 
 This specification does not establish actual household resilience, drinking-water safety, plumbing/electrical safety, municipal reliability, regulatory compliance, utility independence or deployment authority.
+
+
+## 15. South African national service-standard crosswalk (2025)
+
+This benchmark now records the **Revised Compulsory National Water and Sanitation Services Standards**, Government Gazette 52814, Government Notice 6292, published 6 June 2025. The standards were prescribed under section 9(1) of the Water Services Act. Regulation 29 expressly repeals the 2001 Regulations (GNR 509). Do not use the older 25 L/person/day and seven-days-per-year wording as the current basic-service threshold without a separate legal basis.
+
+### 15.1 Basic water service — formal settlements
+
+Regulation 2(2) states a minimum basic-service profile comprising each of the following independent requirements:
+
+| Dimension | Published requirement | Benchmark treatment |
+|---|---|---|
+| Household quantity | 6 kL per household per month | Compare measured monthly delivery at the declared user-connection boundary; retain household occupancy separately |
+| Minimum flow | At least 10 L/min | Measure flow at the applicable service boundary under the declared test condition; do not infer it from tank volume or pump nameplate |
+| Annual availability | Water made available for at least 358 days per year | Report available days and the exact observation window; do not replace the condition with a favourable average alone |
+| Maximum continuous interruption | Not interrupted for longer than 48 consecutive hours | Preserve event-level start/end times and every interruption; a monthly volume pass cannot compensate for a >48-hour interruption |
+| Drinking-water quality | Must comply with SANS 241 | Quality is a hard eligibility gate for drinking-water service, not a model estimate or a reuse-water proxy |
+
+Regulation 2(2)(a) also specifies that, within two years of promulgation, an access/delivery point is to be at least at the end boundary of the yard (user connection point) of an existing settlement. The two-year date from publication is 6 June 2027; do not treat the future transition date as already elapsed on this benchmark's 4 November 2026 reference date.
+
+Regulation 2(3) separates maintenance responsibility: the Water Services Institution is responsible up to the user connection; maintenance within the property boundary is the owner's responsibility. The benchmark therefore needs both a user-connection measurement boundary and an internal fixture boundary. A low-flow fixture result must not automatically be attributed to the utility, and a utility-side delivery result must not prove internal fixture service.
+
+### 15.2 Interim service in informal settlements
+
+Regulation 3(5) has a distinct interim-service path:
+- a communal standpipe / delivery point within a reasonable walking distance of no more than 200 m from the furthest household;
+- at least 6 kL/household/month;
+- at least 10 L/min;
+- availability at least 358 days/year;
+- no interruption longer than 48 consecutive hours; and
+- drinking water compliant with SANS 241.
+
+Regulation 3(7) states that interim water services provided through tankers must not exceed 12 consecutive months. Preserve this as an interim-service / public-authority condition, not a product feature or an assumption that household storage is a compliant substitute.
+
+### 15.3 Alternative drinking water when an interruption exceeds 48 hours
+
+Regulation 4(1) requires the Water Services Authority, in agreement with relevant Water Services Institutions, to take reasonable measures to ensure access to alternative water supply where an interruption lasts more than 48 hours. The prescribed minimum is:
+- at least 15 L of **drinking water per person per day**; and
+- delivery at strategically determined points that are relatively convenient and safe.
+
+Regulation 4(2) requires emergency/alternative water to be fit for human consumption under SANS 241. Where alternative drinking-water services are used for longer than a week, Regulation 4(3) requires a registered monitoring programme that records the alternative source and compliance results for disinfectant residuals, turbidity, *E. coli*, heterotrophic plate count, conductivity and pH until tankering is discontinued. The tanker record requirements include vehicle/driver, volume per trip, schedule, delivery point and appropriate cleanliness evidence; Regulation 4(3)(viii) says alternatives to tankering for mid- and longer-term supply must be prioritised.
+
+The 15 L/person/day quantity is an alternative-supply obligation at designated delivery points; do not silently reinterpret it as a guarantee of 15 L/person/day at each household fixture. The benchmark should record the offered quantity, actual availability, collection/delivery location, user receipt, access burden and quality evidence separately.
+
+### 15.4 Benchmark profile and attribution rules
+
+Add the following crosswalk cases to the HSC test plan (they are benchmark cases, not additional claims about current municipal compliance):
+
+- **HSC-SA-001 — basic formal-settlement service:** independently assess household-month quantity, minimum flow, annual availability, maximum consecutive interruption and SANS 241 status. Keep each dimension as its own pass/fail/unknown outcome.
+- **HSC-SA-002 — extended-interruption alternative supply:** trigger at a >48-hour interruption; assess the 15 L/person/day drinking-water quantity at designated delivery points, convenience/safety evidence, actual collection and SANS 241 quality.
+- **HSC-SA-003 — interim informal-settlement service:** separately assess the <=200 m access condition, quantity, flow, availability, interruption duration, drinking-water quality and the 12-consecutive-month tanker ceiling.
+- **HSC-SA-004 — boundary attribution:** inject the same restriction at (a) the utility/user-connection boundary and (b) the internal household plumbing/fixture boundary. The report must identify the observed boundary and not assign responsibility beyond the measurement evidence.
+- **HSC-SA-005 — unknown quality:** keep delivered physical litres visible but credit zero confirmed drinking-water service when required SANS 241 evidence is absent, stale or contradictory; record the state as Unknown rather than asserting a physical contaminant failure.
+
+The benchmark shall distinguish:
+1. public/utility basic service at the statutory access or user-connection boundary;
+2. emergency alternative supply at designated public delivery points;
+3. private household storage and actual fixture delivery; and
+4. private non-potable reuse, which is not drinking water and cannot satisfy a drinking-water quantity/quality gate.
+
+A household tank, WaterLoop device, private borehole, treated-greywater output or water-level sensor does not by itself establish SANS 241 conformity. Any drinking-water credit needs appropriate source identity, sampling, method, result, time validity and qualified interpretation. A household buffer may improve a measured service trajectory, but it does not discharge the Water Services Authority's duties or demonstrate restoration of the public network.
+
+### 15.5 WHO service-level context — not South African legal thresholds
+
+WHO's 2020 *Domestic water quantity, service level and health* guidance distinguishes access levels and associated health concerns. Its summary table describes basic access as unlikely to exceed about 20 L/person/day on average, intermediate access as approximately 50 L/person/day, and optimal access as exceeding 100 L/person/day, with access distance/time and reliability also relevant.
+
+Keep WHO's access-level framework separate from the South African legal standard. The 6 kL/month South African basic-service quantity is defined per household, not per person. Any per-capita normalization must use declared household occupancy and the actual calendar-month length. For illustration only, 6,000 L over a 30-day month is 50 L/person/day for a four-person household; that arithmetic does not turn the legal household allocation into a universal per-capita threshold or a WHO service-level classification.
+
+### 15.6 Competitive and product implications
+
+The benchmark should compare the best matched operational household backup baseline (including properly sized tank + pump + automatic switching) against any WaterLoop configuration, while preserving the independent public-service reference. The national standard is a public service duty and an adequacy/accountability reference, not a product-performance certification.
+
+A candidate product may claim only the service actually demonstrated at its own boundary. It must not:
+- describe stored volume as qualified drinking water without SANS 241 evidence;
+- count greywater reuse as potable or emergency drinking-water supply;
+- count public standpipe/tanker availability as household fixture delivery;
+- claim that meeting a private reserve target makes a municipality compliant; or
+- use a 6 kL/month volume result to hide a >48-hour service interruption, a flow shortfall or a quality failure.
+
+Regulation 27 permits a Water Services Authority to identify provisions where immediate compliance cannot be achieved and submit a progressive compliance plan to the Department for consideration and approval. The benchmark must therefore distinguish the published national standard, an authority's approved implementation plan (if evidenced), and observed service. The existence of a plan is not proof that a service requirement has been met.
+
+**Primary sources**
+- Department of Water and Sanitation, Government Gazette 52814, GoN 6292, 6 June 2025, especially Regulations 2–5, 27 and 29: https://www.gov.za/sites/default/files/gcis_document/202506/52814gon6292.pdf
+- WHO, *Domestic water quantity, service level and health*, second edition, 23 December 2020: https://www.who.int/publications/i/item/9789240015241
+- WHO access-level table: https://www.ncbi.nlm.nih.gov/books/NBK579449/table/ch5.tab1/?report=objectonly
+
+This crosswalk is a research benchmark interpretation, not legal advice, a municipal compliance finding, a plumbing approval or a product certification. Confirm current legal interpretation and any municipal implementation detail with qualified South African water-services counsel / authorities before a deployment or compliance claim.
