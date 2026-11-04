@@ -10,7 +10,9 @@ It validates inert records for:
 - evidence-parent ordering and duplicate evidence-origin detection;
 - prospective forecast → action → outcome ordering;
 - typed action categories and explicit authorization for side-effecting/test actions;
-- intervention-authority constraints and explicitly assumption-bounded identification from compiler/runtime evidence;
+- action-kind-specific evidence authority (source/compiler facts are not runtime outcomes; tests require runtime observations; interventions require intervention observations); 
+- explicit decision-evidence linkage to considered hypotheses and fail-closed rejection of any unqualified evidence cited by a repair decision;
+- matched ablation-group validation requiring an intact arm and comparator with identical policy and budget digests;
 - explicit missingness rather than converting unobserved outcomes to numeric zero;
 - explicit proceed / abstain / escalate decisions, with missing requirements recorded;
 - repairs bound to the current hypothesis revision and an explicit proceed decision;
@@ -36,7 +38,7 @@ From the repository root:
 cargo test --manifest-path tools/ceb-causal-ledger/Cargo.toml --locked
 ```
 
-The crate has its own `[workspace]` boundary and is intentionally not a member or dependency of the production workspace. Thirty-five unit tests are authored in the current source revision (35 `#[test]` attributes counted at review time). Integrate it only after exact-head compilation, independent review, and reconciliation with the existing CEB/general receipt and DSSE work.
+The crate has its own `[workspace]` boundary and is intentionally not a member or dependency of the production workspace. Forty-one unit tests are authored in the current source revision (41 `#[test]` attributes counted by static source inspection). The six newest tests cover mixed qualified/unqualified decision evidence, outcome authority by action kind, hypothesis/evidence linkage, matched-arm completeness, and policy/budget drift. Integrate it only after exact-head compilation, independent review, and reconciliation with the existing CEB/general receipt and DSSE work.
 
 ## Status
 
