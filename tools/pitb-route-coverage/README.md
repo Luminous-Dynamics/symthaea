@@ -12,7 +12,7 @@ For each matched retrieval query and support group, it reports:
 - **Minimal-route coverage:** fraction of the observed antichain's routes covered.
 - **Route completion rank:** the highest rank needed to complete the earliest route.
 - **Partial-route fraction:** mean fraction of each route present in the retrieved set.
-- **Useful-novel-premise rate:** fraction of exact-mapped mutable candidates appearing in at least one minimal route.
+- **Useful route-premise rate:** fraction of exact-mapped mutable candidates appearing in at least one minimal route.
 - **Necessary-declaration recall:** recall of the intersection of all observed minimal routes (null when the intersection is empty).
 - **Exact minimal-route recovery:** whether the entire exact-mapped mutable candidate set equals a minimal route.
 - **Coverage at K:** K = 1, 5, 10, 32, 64 and 100.
@@ -41,7 +41,7 @@ Mapping row:
 }
 ```
 
-`mapping_status` is `exact`, `unresolved`, or `ambiguous`. Non-exact rows must have a null `declaration_id` and cannot contribute to route coverage. Mapping methods are `exact_formal_name`, `exact_source_identity`, or `human_reviewed`. Human-reviewed mappings require a reviewer-attestation digest. The analyzer checks digest syntax and graph binding; it does not open or authenticate the referenced evidence bytes.
+`mapping_status` is `exact`, `unresolved`, or `ambiguous`. Non-exact rows must have a null `declaration_id` and cannot contribute to route coverage. Mapping methods are `exact_formal_name`, `exact_source_identity`, or `human_reviewed`. Human-reviewed mappings require a reviewer-attestation digest. The analyzer checks digest syntax and graph binding; it does not open or authenticate the referenced evidence bytes. “Novel” is deliberately not claimed: novelty requires a matched baseline candidate-set comparison.
 
 ## Run
 
