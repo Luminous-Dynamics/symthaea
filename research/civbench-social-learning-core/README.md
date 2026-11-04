@@ -261,7 +261,7 @@ cargo run --locked --manifest-path research/civbench-social-learning-core/Cargo.
 
 The adaptive-transmission engine now distinguishes:
 - `CentralFullInventory`: explicit research upper bound with full recipient state available to the scheduler;
-- `CoarseRecipeReadiness`: recipient-side need signal containing only an unheld recipe ID and prerequisite-readiness scalar; the scheduler does not receive the recipient's full element/recipe inventory.
+- `CoarseRecipeReadiness`: at most two recipient-selected unheld recipe IDs plus prerequisite-readiness scalars per recipient per step; this avoids publishing the full complement of the recipient's held-recipe inventory.
 
 The coarse mode rejects collective-novelty filters/weights because those require a global inventory signal. Every run records its disclosure mode. The new `privacy-disclosure-sweep` binary compares centralized, coarse-readiness and no-social conditions over 3 task families × 256 fixed seeds, with paired coverage deltas, confidence intervals, messages, attention, acquisitions, redundancy and independent discovery metrics. This is a minimization experiment, **not** a cryptographic privacy or differential-privacy guarantee; repeated need signals can still reveal recipient state.
 
