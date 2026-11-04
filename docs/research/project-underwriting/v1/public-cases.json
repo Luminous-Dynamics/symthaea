@@ -1640,23 +1640,6 @@
           ]
         },
         {
-          "claim_id": "fx_basis",
-          "proposition": "The USD/ZAR conversion basis is evidenced for the declared reporting date.",
-          "materiality": "high",
-          "assessment": "supported",
-          "evidence_refs": [
-            "ev_fx"
-          ]
-        },
-        {
-          "claim_id": "fx_basis",
-          "proposition": "An evidenced FX conversion is available for translating USD cash flows into ZAR.",
-          "materiality": "critical",
-          "assessment": "unresolved",
-          "evidence_refs": [],
-          "notes": "No conversion observation is supplied."
-        },
-        {
           "claim_id": "operating_cost_basis",
           "proposition": "A declared operating-cost assumption is available for scenario analysis.",
           "materiality": "medium",
@@ -1665,6 +1648,14 @@
             "ev_opex"
           ],
           "notes": "Synthetic analyst assumption; not an observed cost or a qualified supplier quote."
+        },
+        {
+          "claim_id": "fx_basis",
+          "proposition": "An evidenced FX conversion is available for translating USD cash flows into ZAR.",
+          "materiality": "critical",
+          "assessment": "unresolved",
+          "evidence_refs": [],
+          "notes": "No conversion observation is supplied."
         }
       ],
       "physical_model": {
