@@ -45,7 +45,9 @@ The fixture labels are controlled symbolic signatures. They do not prove that tw
 The Rust scorer reports, independently:
 - member-level valid-decision support;
 - paired act/withhold accuracy (both variants must be supported);
-- false-entry rate on withhold-required members;
+- false-entry rate on withhold-required members (RESPOND/CONTINUE only);
+- unauthorized YIELD count on withhold-required members;
+- total withhold-policy violation count/rate, including false entries and unauthorized YIELD;
 - missed-invitation rate on act-required members;
 - WAIT, ABSTAIN and ASK counts;
 - Brier score for the declared probability of an act being appropriate;
@@ -59,10 +61,12 @@ The risk–coverage curve excludes ASK/ABSTAIN from committed coverage, but keep
 
 ## Frozen baselines
 
+The report keeps false audible entries (RESPOND/CONTINUE), unauthorized YIELD, and total withhold-policy violations separate. The checked-in baseline file freezes all three metrics.
+
 The checked-in baseline file contains:
-- ALWAYS-WAIT: 4/8 member support, 0/4 fully correct pairs, four missed invitations, zero false entries.
-- ALWAYS-RESPOND: 4/8 member support, 0/4 fully correct pairs, zero missed invitations, four false entries.
-- CONTEXT-RULE-FIXTURE-SANITY: 8/8 member support, 4/4 fully correct pairs, zero missed invitations and false entries; the decisions include two WAITs, one ABSTAIN and one ASK.
+- ALWAYS-WAIT: 4/8 member support, 0/4 fully correct pairs, four missed invitations, zero false entries, zero unauthorized YIELD and zero withhold violations.
+- ALWAYS-RESPOND: 4/8 member support, 0/4 fully correct pairs, zero missed invitations, four false entries, zero unauthorized YIELD and four total withhold violations.
+- CONTEXT-RULE-FIXTURE-SANITY: 8/8 member support, 4/4 fully correct pairs, zero missed invitations, false entries, unauthorized YIELD and withhold violations; the decisions include two WAITs, one ABSTAIN and one ASK.
 
 These figures are expected results of the controlled fixture evaluator, not model performance or human-level capability. The context-rule baseline is hand-written against the fixtures and is not a learned policy.
 
