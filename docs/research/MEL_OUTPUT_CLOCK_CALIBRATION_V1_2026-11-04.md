@@ -47,7 +47,7 @@ The fitter does not silently remove outliers. A discontinuity or suspicious anch
 
 CPAL supplies predicted playback timestamps, not a universal accuracy bound and not a measurement of physical DAC output. A low fit residual demonstrates internal consistency of the anchor series; it does not establish absolute timestamp accuracy.
 
-When every anchor includes an independently justified timestamp uncertainty bound, the fit propagates that declared bound plus residual and half-frame quantization. If no bound is supplied, reported_uncertainty_frames remains absent and status is point_estimate_only.
+Raw per-anchor timestamp uncertainty metadata is retained, but v1 does not yet propagate those bounds through regression slope and intercept estimation. Therefore reported_uncertainty_frames remains absent and status is point_estimate_only even when anchors carry declared bounds. This deliberately avoids converting a fit residual or incomplete error-propagation model into an accuracy guarantee.
 
 Electrical/acoustic output latency still requires independent loopback observation. Mapping CPAL stream time to runner monotonic time requires a separate set of paired observations and a separately qualified cross-clock fit.
 
@@ -66,4 +66,4 @@ These fixtures are synthetic conformance cases, not device traces or performance
 - 100% estimation of declared in-policy drift fixtures within test tolerance.
 - 100% rejection of injected discontinuities and out-of-policy residuals.
 - Zero extrapolation outside the declared validity horizon.
-- Zero absolute-accuracy claim without a qualified source uncertainty bound.
+- Zero absolute-accuracy claim until both source uncertainty and regression-parameter uncertainty propagation are qualified.
