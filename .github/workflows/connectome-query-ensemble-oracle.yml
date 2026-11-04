@@ -42,7 +42,7 @@ jobs:
       - name: Evaluate checked-in known-answer fixture
         run: |
           cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
-            --bin connectome-query-ensemble-audit -- \
+            --bin connectome_query_ensemble_audit -- \
             --input docs/neuroscience/examples/CONNECTOME_QUERY_ENSEMBLE_AUDIT.example.json \
             --output "$RUNNER_TEMP/query-ensemble-fixture-report.json"
 
@@ -60,7 +60,7 @@ jobs:
       - name: Evaluate the exhaustive finite graph universe in Rust
         run: |
           cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
-            --bin connectome-query-ensemble-audit -- \
+            --bin connectome_query_ensemble_audit -- \
             --input "$RUNNER_TEMP/query-ensemble-exhaustive-input.json" \
             --output "$RUNNER_TEMP/query-ensemble-exhaustive-report.json"
 
