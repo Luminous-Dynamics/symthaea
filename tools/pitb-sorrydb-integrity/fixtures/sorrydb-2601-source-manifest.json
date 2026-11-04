@@ -1,0 +1,21 @@
+{
+  "schema_version": "pitb.external-benchmark-source-manifest.v0",
+  "benchmark_id": "SorryDB",
+  "benchmark_snapshot_id": "SorryDB_2601",
+  "source_repository": "https://github.com/SorryDB/SorryDB",
+  "source_repository_commit": "74b3b63f8ba890d675f362924b21ac55db410383",
+  "full_snapshot_path": "data/SorryDB_2601/SorryDB_2601.json",
+  "full_snapshot_git_blob_sha1": "5fafddac467af6d30d8f5c8731d6edec9c273a47",
+  "evaluation_split_path": "data/SorryDB_2601/SorryDB_2601_1000_evaluation_split.json",
+  "evaluation_split_git_blob_sha1": "af3b663429dc4689ee728d2fb5c7d8d5034476f7",
+  "reported_evaluation_split_tasks": 1000,
+  "paper_reported_snapshot_tasks": 5663,
+  "paper_reported_repository_count": 78,
+  "license": "Apache-2.0",
+  "license_path": "LICENSE",
+  "license_git_blob_sha1": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+  "paper_url": "https://proceedings.mlr.press/v306/letson26a.html",
+  "leaderboard_url": "https://sorrydb.org/",
+  "pinned_at_utc": "2026-11-04",
+  "integrity_note": "The split and full snapshot are pinned by immutable Git blob IDs. The task payloads are not vendored in this adapter branch; the historical split's reported size comes from the SorryDB paper and should not be presented as an independently parsed task count until the source bytes are retrieved and parsed."
+}
