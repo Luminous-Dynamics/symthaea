@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.1",
+  "schema_version": "0.2",
   "snapshot_date": "2026-11-04",
   "purpose": "Source-backed competitive comparator ledger for Verified Household Services. Manufacturer-declared specifications and announced product features are not independent physical test results.",
   "claim_ceiling": [
@@ -174,6 +174,99 @@
         "source_date": "2026-09-02",
         "retrieved_date": "2026-11-04"
       }
+    },
+    {
+      "id": "SAMSUNG-BESPOKE-AI-DW80H77KBFFFA-ZA",
+      "category": "household_dishwasher",
+      "manufacturer": "Samsung",
+      "model": "DW80H77KBFFFA — Bespoke AI Dishwasher",
+      "market_variant": "South Africa official product page",
+      "evidence_status": "manufacturer_declared_product_page_and_regional_launch_announcement",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "live_product_page_currently_displays_not_for_sale",
+      "functional_unit": "one Eco programme cycle for stated energy/water/time headline values",
+      "programme": "Eco",
+      "capacity_place_settings": 14,
+      "metrics": {
+        "electricity_kwh_per_cycle": 0.69,
+        "water_l_per_cycle": 8,
+        "duration_min_per_cycle": 235,
+        "noise_dba": 42,
+        "annual_energy_kwh": 198
+      },
+      "label": {
+        "value": "A+++",
+        "note": "Legacy product-page class; do not map directly onto the current EU A-G label scale."
+      },
+      "features": [
+        "AI Wash using a high-resolution turbidity sensor and machine-learning-assisted adaptation",
+        "12 programmes",
+        "AutoRelease door opening",
+        "third rack / glide rail",
+        "Hygiene Plus final-rinse programme"
+      ],
+      "notes": [
+        "Samsung's South African product page currently shows the product as Not for sale; confirm exact availability before procurement.",
+        "Regional Samsung newsroom material describes the Bespoke dishwasher as launched in South Africa in 2025; the currently listed model and sales status must be verified at acquisition.",
+        "The product page's AI Wash is already a mainstream adaptive-control capability. Its declared sensor/ML feature is not evidence of independently verified cleaning quality or resource saving.",
+        "Eco headline values are manufacturer-declared values and require matched physical comparison before competitive claims."
+      ],
+      "source": {
+        "title": "Samsung South Africa Bespoke AI Dishwasher DW80H77KBFFFA",
+        "url": "https://www.samsung.com/za/dishwashers/built-under/dw90h24-dish-washer-energy-efficiency-ai-wash-3rd-rack-washing-system-14-place-settings-black-dw80h77kbfffa/",
+        "source_date": null,
+        "retrieved_date": "2026-11-04"
+      },
+      "regional_launch_source": {
+        "title": "Samsung South Africa — Bespoke dishwashers combine powerful performance with great design",
+        "url": "https://news.samsung.com/za/samsung-bespoke-dishwashers-combine-powerful-performance-with-great-design",
+        "source_date": "2025-10-28",
+        "retrieved_date": "2026-11-04"
+      }
+    },
+    {
+      "id": "DEFY-DDW366-ZA",
+      "category": "household_dishwasher",
+      "manufacturer": "Defy",
+      "model": "DDW366",
+      "market_variant": "South Africa official product page",
+      "evidence_status": "manufacturer_declared_product_page",
+      "independent_measurement_status": "not_independently_verified",
+      "availability_status": "listed_regional_product",
+      "functional_unit": "one manufacturer-declared cycle; headline water and duration are not asserted to match Eco unless exact test mode is confirmed",
+      "programme": "programme-specific headline split requires confirmation from product manual/energy label",
+      "capacity_place_settings": 15,
+      "metrics": {
+        "electricity_kwh_per_cycle": null,
+        "water_l_per_cycle": 9.5,
+        "duration_min_per_cycle": 245,
+        "noise_dba": null,
+        "left_on_power_w": 1,
+        "off_mode_power_w": 0.5
+      },
+      "label": {
+        "value": "A++",
+        "note": "Legacy regional label; do not map directly onto current EU A-G scale."
+      },
+      "features": [
+        "CornerWash",
+        "dirt sensor",
+        "8 programmes",
+        "three spray levels",
+        "Aquastop / overflow protection",
+        "active ventilation"
+      ],
+      "notes": [
+        "Current Defy South Africa product page declares 15 place settings, 9.5 L and a 245-minute programme duration.",
+        "The official current product page does not provide a directly comparable kWh-per-cycle headline value; do not infer one from its old A++ class.",
+        "An older catalogue result carries different water/noise values; retain the current product-page values as the source-ledger baseline and resolve exact revision/manual before testing."
+      ],
+      "source": {
+        "title": "Defy South Africa DDW366 dishwasher",
+        "url": "https://www.defy.co.za/products/dishwashers/kitchen-dishwashes-ddw-366",
+        "source_date": null,
+        "retrieved_date": "2026-11-04"
+      }
     }
   ],
   "research_frontier": [
@@ -295,5 +388,30 @@
         "retrieved_date": "2026-11-04"
       }
     }
-  ]
+  ],
+  "research_targets": {
+    "target_id": "INSTANTCLEAN-STRETCH-2026-11",
+    "evidence_status": "research_target_only_not_measured",
+    "functional_unit": "one matched Eco-equivalent full-load service with all prescribed independent item endpoints passed",
+    "targets": {
+      "place_settings": 16,
+      "electricity_kwh_per_cycle": 0.39,
+      "water_l_per_cycle": 6
+    },
+    "arithmetic_comparisons_only": [
+      {
+        "comparator_id": "SAMSUNG-BESPOKE-AI-DW80H77KBFFFA-ZA",
+        "implied_energy_reduction_percent": 43.4782608696,
+        "implied_water_reduction_percent": 25,
+        "implied_capacity_increase_percent": 14.2857142857
+      },
+      {
+        "comparator_id": "MIELE-G7655-SCVI-XXL-AUTODOS-ECO",
+        "implied_energy_reduction_percent": 27.7777777778,
+        "implied_water_reduction_percent": 28.5714285714,
+        "implied_capacity_increase_percent": 14.2857142857
+      }
+    ],
+    "caveat": "These are arithmetic comparisons between declared source values and aspirational targets only. Programmes, standard editions, load protocols, reference detergent, endpoints, market revisions and measurement boundaries are not yet matched. They are not independently verified superiority results."
+  }
 }
