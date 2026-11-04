@@ -1,0 +1,653 @@
+{
+  "schema": "sam-benchmark-evidence-registry-v0.1",
+  "snapshot_date": "2026-11-04",
+  "parent_issue": "Luminous-Dynamics/symthaea#6256",
+  "semantics": {
+    "source_status": [
+      "upstream_reported",
+      "secondary_leaderboard_snapshot",
+      "independently_reproduced",
+      "sam_reproduced"
+    ],
+    "rights_status": [
+      "rights_unverified",
+      "academic_only_unless_authorized",
+      "code_noncommercial_license_data_rights_separate",
+      "source_terms_to_check"
+    ],
+    "comparability_rule": "Only compare raw scores when task, protocol, output type, metric, unit, data split, observation/action privilege, compute, latency and evaluator match.",
+    "no_composite_score": true,
+    "missingness": "Missing, timeout, censored, unsupported and failed outcomes retain distinct typed dispositions."
+  },
+  "model_design_descriptors": [
+    "state_abstraction",
+    "temporal_dynamics",
+    "uncertainty_source_and_treatment",
+    "structural_prior",
+    "observation_modality",
+    "decision_coupling"
+  ],
+  "external_evidence_coordinates": [
+    "capability_target",
+    "evaluation_protocol",
+    "metric_family",
+    "evaluation_data_source"
+  ],
+  "benchmarks": [
+    {
+      "id": "bench2drive-v0.0.4",
+      "name": "Bench2Drive",
+      "category": "driving_closed_loop",
+      "capability_target": [
+        "route_completion",
+        "closed_loop_driving",
+        "infractions"
+      ],
+      "protocol": {
+        "kind": "closed_loop",
+        "route_count": 220,
+        "scenario_types": 44,
+        "routes_per_scenario": 5,
+        "release": "0.0.4"
+      },
+      "metrics": [
+        "DrivingScore",
+        "SuccessRate",
+        "Efficiency",
+        "Comfort",
+        "per_route_events"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "LEAD": {
+          "DS": 95.59,
+          "SR": 87.28
+        },
+        "Simlingo": {
+          "DS": 86.55,
+          "SR": 70.45
+        },
+        "Drive-Pi0": {
+          "DS": 69.71,
+          "SR": 45.91
+        },
+        "DriveTransformer": {
+          "DS": 60.2,
+          "SR": 35.91
+        },
+        "DriveAdapter": {
+          "DS": 54.96,
+          "SR": 30.45
+        }
+      },
+      "caveats": [
+        "Upstream-published; not reproduced by SAM.",
+        "Do not mix 0.0.3 and 0.0.4.",
+        "Efficiency and comfort remain separate metrics."
+      ],
+      "sources": [
+        "https://github.com/Thinklab-SJTU/Bench2Drive/tree/0.0.4"
+      ]
+    },
+    {
+      "id": "hidrive-2026",
+      "name": "HiDrive",
+      "category": "driving_closed_loop_long_tail",
+      "capability_target": [
+        "rare_objects",
+        "legal_compliance",
+        "norm_sensitive_decisions",
+        "emergency_response"
+      ],
+      "protocol": {
+        "kind": "closed_loop",
+        "routes": 330,
+        "approx_route_length_m": 150,
+        "ability_categories": 30,
+        "scenario_instantiations": 94,
+        "simulator": "CARLA UE5"
+      },
+      "metrics": [
+        "DriveScore",
+        "RouteCompletion",
+        "LegalScore",
+        "EthicsScore"
+      ],
+      "score_definition": "DS = RC * LS * ES",
+      "source_status": "upstream_reported",
+      "rights_status": "academic_only_unless_authorized",
+      "snapshot": {
+        "KnowVal": {
+          "DS": 46.6,
+          "RC": 73.8,
+          "LS": 69.3,
+          "ES": 97.4
+        },
+        "SimLingo": {
+          "DS": 42.3,
+          "RC": 70.5,
+          "LS": 63.3,
+          "ES": 94.8
+        },
+        "ORION": {
+          "DS": 37.4,
+          "RC": 65.3,
+          "LS": 54.8,
+          "ES": 93.5
+        },
+        "DiffusionDrive": {
+          "DS": 34.2,
+          "RC": 58.3,
+          "LS": 49.1,
+          "ES": 91.4
+        }
+      },
+      "caveats": [
+        "Report RC/LS/ES separately; DS is a product.",
+        "Repository says academic research only unless commercial permission is obtained.",
+        "EthicsScore is benchmark-defined, not universal ethical truth."
+      ],
+      "sources": [
+        "https://arxiv.org/abs/2605.09972",
+        "https://github.com/VDIGPKU/HiDrive"
+      ]
+    },
+    {
+      "id": "fail2drive-2026",
+      "name": "Fail2Drive",
+      "category": "driving_distribution_shift",
+      "capability_target": [
+        "ood_robustness",
+        "paired_success_degradation"
+      ],
+      "protocol": {
+        "kind": "paired_closed_loop",
+        "paired_routes": 200,
+        "shift_classes": 17
+      },
+      "metrics": [
+        "IDSuccessRate",
+        "OODSuccessRate",
+        "PairedDegradation",
+        "family_macro_degradation"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "paper_reported_average_success_degradation_percent": 22.8
+      },
+      "caveats": [
+        "22.8% is specific to evaluated models and study protocol.",
+        "Simulation degradation is not real-world crash probability."
+      ],
+      "sources": [
+        "https://arxiv.org/abs/2604.08535"
+      ]
+    },
+    {
+      "id": "colt-drive-2026",
+      "name": "CoLT-Drive",
+      "category": "counterfactual_driving_affordance",
+      "capability_target": [
+        "rare_object_affordance",
+        "longitudinal_lateral_meta_action"
+      ],
+      "protocol": {
+        "kind": "counterfactual_curated",
+        "samples": 3536
+      },
+      "metrics": [
+        "acceptable_action_pair_accuracy",
+        "per_object_family_accuracy"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "KPA_pair_accuracy_percent": 60.8,
+        "Qwen3_VL_2B_pair_accuracy_percent": 50.3,
+        "LoRA_SFT_pair_accuracy_percent": 32.4
+      },
+      "caveats": [
+        "Pair accuracy does not prove action-domain completeness or safety.",
+        "Use to stress SAM #10338, not as a regret certificate."
+      ],
+      "sources": [
+        "https://aclanthology.org/2026.findings-emnlp.545/",
+        "https://arxiv.org/abs/2609.00242"
+      ]
+    },
+    {
+      "id": "icr-drive-2026",
+      "name": "ICR-Drive",
+      "category": "instruction_counterfactual_robustness",
+      "capability_target": [
+        "instruction_robustness",
+        "goal_preservation",
+        "misleading_instruction_resistance"
+      ],
+      "protocol": {
+        "kind": "matched_closed_loop",
+        "route_and_seed_fixed": true,
+        "perturbation_families": [
+          "paraphrase",
+          "ambiguity",
+          "noise",
+          "misleading_conflict"
+        ]
+      },
+      "metrics": [
+        "route_outcomes",
+        "per_family_degradation",
+        "goal_adherence",
+        "rule_outcomes"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "caveats": [
+        "Instruction perturbation is separate from scene-physics distribution shift.",
+        "Robustness must not be achieved by ignoring legitimate goals."
+      ],
+      "sources": [
+        "https://openaccess.thecvf.com/content/CVPR2026W/WDFM-EAI/html/Hamid_ICR-Drive_Instruction_Counterfactual_Robustness_for_End-to-End_Language-Driven_Autonomous_Driving_CVPRW_2026_paper.html"
+      ]
+    },
+    {
+      "id": "waymo-open-motion-2025",
+      "name": "Waymo Open Motion Dataset",
+      "category": "open_loop_motion_forecasting",
+      "capability_target": [
+        "multi_agent_motion_forecasting",
+        "trajectory_prediction"
+      ],
+      "protocol": {
+        "kind": "open_loop",
+        "segments": 103354,
+        "segment_seconds": 20,
+        "frequency_hz": 10,
+        "hours": 574,
+        "last_official_page_update": "2025-10"
+      },
+      "metrics": [
+        "minADE",
+        "minFDE",
+        "miss_rate",
+        "calibration_if_defined"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "caveats": [
+        "Recorded factual futures are not episode-specific counterfactual ground truth.",
+        "Not a closed-loop decision benchmark."
+      ],
+      "sources": [
+        "https://www.waymo.com/open/about/"
+      ]
+    },
+    {
+      "id": "wosac-2025",
+      "name": "Waymo Open Sim Agents Challenge",
+      "category": "interactive_agent_simulation",
+      "capability_target": [
+        "multi_agent_realism",
+        "interactivity",
+        "kinematics",
+        "map_adherence"
+      ],
+      "protocol": {
+        "kind": "simulated_multi_agent",
+        "release": "2025 challenge"
+      },
+      "metrics": [
+        "realism",
+        "kinematics",
+        "interactivity",
+        "map_adherence"
+      ],
+      "source_status": "secondary_leaderboard_snapshot",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "SMART_R1": {
+          "realism": 78.58,
+          "kinematics": 49.44,
+          "interactivity": 81.1,
+          "map_adherence": 92.01
+        }
+      },
+      "caveats": [
+        "SOTA2 is secondary leaderboard signal, not independently verified official score.",
+        "Do not infer human behavior validity or ego-controller safety."
+      ],
+      "sources": [
+        "https://www.sota2.com/research/sota/motion-simulation-on-waymo-open-sim-agents-challenge-2025"
+      ]
+    },
+    {
+      "id": "carla-leaderboard-2.1",
+      "name": "CARLA Leaderboard",
+      "category": "driving_closed_loop",
+      "capability_target": [
+        "route_completion",
+        "infraction_robustness"
+      ],
+      "protocol": {
+        "kind": "closed_loop",
+        "version": "2.1"
+      },
+      "metrics": [
+        "route_completion",
+        "driving_score",
+        "linear_infraction_penalty"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "caveats": [
+        "Version 2.1 documents early-stop score exploit and scoring change.",
+        "Pin CARLA and ScenarioRunner revisions."
+      ],
+      "sources": [
+        "https://leaderboard.carla.org/"
+      ]
+    },
+    {
+      "id": "causaldrivebench-2026",
+      "name": "CausalDriveBench",
+      "category": "causal_vla_understanding",
+      "capability_target": [
+        "causal_scene_qa",
+        "counterfactual_trajectory_reasoning"
+      ],
+      "protocol": {
+        "kind": "curated_and_synthetic_counterfactual",
+        "qa_pairs": 7285,
+        "counterfactual_trajectories": 1000,
+        "frequency_hz": 2,
+        "initial_scope": "urban nuScenes Boston/Singapore"
+      },
+      "metrics": [
+        "causal_QA_accuracy",
+        "CTE",
+        "trajectory_error_by_rung"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "best_QA_accuracy_percent": 70.6,
+        "models_below_chance": 4,
+        "total_models": 13
+      },
+      "caveats": [
+        "Paper reports no statistical correlation between QA and trajectory accuracy.",
+        "R3 trajectories are planner/LLM-synthesized and audited, not observed human counterfactuals."
+      ],
+      "sources": [
+        "https://arxiv.org/abs/2609.32157"
+      ]
+    },
+    {
+      "id": "driving-world-model-counterfactual-2026",
+      "name": "How Can Driving World Models Do Counterfactual Prediction?",
+      "category": "episode_specific_counterfactual",
+      "capability_target": [
+        "factual_continuation_abduction",
+        "event_preservation",
+        "counterfactual_visual_fidelity"
+      ],
+      "protocol": {
+        "kind": "controlled_carla",
+        "cases": 186,
+        "placements": 72,
+        "towns": 3,
+        "scenario_types": 3,
+        "arms": [
+          "factual",
+          "counterfactual",
+          "event_free_null"
+        ]
+      },
+      "metrics": [
+        "event_recovered_fraction",
+        "event_identity",
+        "event_timing",
+        "LPIPS"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "direct_prediction_recovered_fraction_range": [
+          0.23,
+          0.45
+        ],
+        "factual_evidence_AAP_range": [
+          0.64,
+          0.7
+        ]
+      },
+      "caveats": [
+        "Values are paper-specific metrics on two tested backbones.",
+        "Other actors are open-loop scripted; does not test interactive actor response.",
+        "Reproduce exact encoder and scoring before comparison."
+      ],
+      "sources": [
+        "https://arxiv.org/abs/2608.11601"
+      ]
+    },
+    {
+      "id": "world-in-world-2026",
+      "name": "World-In-World",
+      "category": "non_driving_closed_loop_embodied",
+      "capability_target": [
+        "world_model_incremental_task_value",
+        "controllability"
+      ],
+      "protocol": {
+        "kind": "closed_loop",
+        "tasks": [
+          "active_recognition",
+          "active_embodied_QA",
+          "image_goal_navigation",
+          "robotic_manipulation"
+        ]
+      },
+      "metrics": [
+        "task_success",
+        "active_recognition_success",
+        "QA_score",
+        "navigation_success",
+        "SPL",
+        "manipulation_success"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "caveats": [
+        "Non-driving embodied track; do not combine scores with AV benchmarks.",
+        "Paper emphasizes controllability and action-observation post-training over visual quality alone."
+      ],
+      "sources": [
+        "https://world-in-world.github.io/",
+        "https://proceedings.iclr.cc/paper_files/paper/2026/hash/5b4263be85820683d78675cc18d2efc7-Abstract-Conference.html"
+      ]
+    },
+    {
+      "id": "mrsq-icml-2026",
+      "name": "MRS.Q",
+      "category": "model_based_rl_search",
+      "capability_target": [
+        "search_value_bias",
+        "model_use_incremental_return"
+      ],
+      "protocol": {
+        "kind": "closed_loop_model_based_rl",
+        "environment_families": [
+          "Gym",
+          "DMC",
+          "HumanoidBench"
+        ]
+      },
+      "metrics": [
+        "return",
+        "lower_tail_return",
+        "value_overestimation_gap",
+        "search_regret",
+        "compute_cost"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "code_noncommercial_license_data_rights_separate",
+      "caveats": [
+        "Paper reports search can degrade performance even with accurate models.",
+        "Minimum ensemble value aggregation is a task-specific pessimism baseline.",
+        "Code CC BY-NC 4.0; data and environment terms separate."
+      ],
+      "sources": [
+        "https://proceedings.mlr.press/v306/chang26a.html",
+        "https://github.com/facebookresearch/MRSQ"
+      ]
+    },
+    {
+      "id": "alpamayo-2-super-2026",
+      "name": "NVIDIA Alpamayo 2 Super",
+      "category": "external_black_box_model",
+      "capability_target": [
+        "trajectory_prediction",
+        "causal_reasoning",
+        "VLA_action_generation"
+      ],
+      "protocol": {
+        "kind": "vendor_named_evaluations",
+        "parameter_count_billions": 34,
+        "backbone_billions": 32,
+        "action_expert_billions": 2
+      },
+      "metrics": [
+        "minADE6_at_6_4s",
+        "reasoning_score",
+        "LingoQA"
+      ],
+      "source_status": "upstream_reported",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "minADE6_m": 0.911,
+        "reasoning_score": 0.433,
+        "LingoQA": 79.2
+      },
+      "caveats": [
+        "Vendor-reported results on a named 1434-sample evaluation.",
+        "Not directly comparable to Bench2Drive, Fail2Drive or Waymo Motion."
+      ],
+      "sources": [
+        "https://developer.nvidia.com/blog/generate-trajectories-reasoning-traces-and-auto-labels-with-nvidia-alpamayo-2-super/",
+        "https://developer.nvidia.com/drive/downloads"
+      ]
+    },
+    {
+      "id": "nist-mavs-2026",
+      "name": "NIST Measurement Science for Automated Vehicles",
+      "category": "measurement_framework_not_leaderboard",
+      "capability_target": [
+        "surrogate_measurement",
+        "outcome_prediction",
+        "counterfactual_action_measurement",
+        "recurring_deviation_diagnosis"
+      ],
+      "protocol": {
+        "kind": "four_tier_measurement_framework",
+        "tiers": [
+          "surrogate_metrics",
+          "outcome_prediction",
+          "counterfactual_action_comparison",
+          "recurring_deviation_diagnosis"
+        ]
+      },
+      "metrics": [
+        "tier_specific_measurands"
+      ],
+      "source_status": "framework_reference",
+      "rights_status": "source_terms_to_check",
+      "caveats": [
+        "Alignment target only; no NIST endorsement or conformance claim."
+      ],
+      "sources": [
+        "https://www.nist.gov/programs-projects/measurement-science-automated-vehicles-0"
+      ]
+    },
+    {
+      "id": "world-model-benchmark-survey-2026",
+      "name": "A Survey of World Model Benchmarks",
+      "category": "survey_not_benchmark",
+      "capability_target": [
+        "benchmark_taxonomy",
+        "evidence_protocol_coverage"
+      ],
+      "protocol": {
+        "kind": "systematic_benchmark_survey",
+        "benchmark_count": 102,
+        "final_snapshot": "2026-09-15"
+      },
+      "metrics": [
+        "protocol_coverage",
+        "metric_level_coverage",
+        "data_source_categories"
+      ],
+      "source_status": "survey_coded_snapshot",
+      "rights_status": "source_terms_to_check",
+      "snapshot": {
+        "closed_loop_benchmarks": 13,
+        "downstream_outcome_benchmarks": 14
+      },
+      "caveats": [
+        "Survey-specific coding counts, not a universal census."
+      ],
+      "sources": [
+        "https://world-model-benchmarks.github.io/"
+      ]
+    },
+    {
+      "id": "physical-ai-world-model-survey-2026",
+      "name": "A survey of world models for physical AI with uncertainty representation and control",
+      "category": "survey_not_benchmark",
+      "capability_target": [
+        "model_design_taxonomy",
+        "closed_loop_control_synthesis"
+      ],
+      "protocol": {
+        "kind": "survey",
+        "published": "2026-09-03",
+        "design_axes": [
+          "state_abstraction",
+          "temporal_dynamics",
+          "uncertainty_source_and_treatment",
+          "structural_prior",
+          "observation_modality",
+          "decision_coupling"
+        ]
+      },
+      "metrics": [
+        "taxonomy_descriptors"
+      ],
+      "source_status": "peer_reviewed_survey",
+      "rights_status": "source_terms_to_check",
+      "caveats": [
+        "Use as design taxonomy, not an empirical performance benchmark."
+      ],
+      "sources": [
+        "https://link.springer.com/article/10.1007/s44163-026-02122-1"
+      ]
+    }
+  ],
+  "prospective_targets": {
+    "bench2drive-v0.0.4": "Exceed the strongest reproduced DS without regressing SR, efficiency, comfort or scenario-family outcomes.",
+    "hidrive-2026": "Improve DS without regression in RC, LS or ES; report all 30 ability categories; require commercial authorization before commercial asset use.",
+    "fail2drive-2026": "At least 25% lower relative paired OOD degradation than strongest reproduced baseline with ID SR within 1 percentage point.",
+    "colt-drive-2026": "Exceed 60.8% action-pair accuracy at matched split/input privilege and report worst rare-object-family errors.",
+    "driving-world-model-counterfactual-2026": "At least +0.15 absolute event recovered fraction over direct prediction on exact same cases, with identity/timing/geometry non-inferior.",
+    "mrsq-icml-2026": "Reduce search-induced optimism/regret at matched compute without worsening tail performance, feasibility or deadlines."
+  },
+  "global_rules": [
+    "No composite score across non-comparable benchmark families.",
+    "Author-reported, secondary-board, independently-reproduced and SAM-reproduced result states remain distinct.",
+    "A public code license does not automatically grant dataset/asset rights.",
+    "Missing, timeout, censored and unsupported scenarios remain in the denominator with typed status.",
+    "Benchmark adapters do not constitute benchmark reproduction.",
+    "All target thresholds are prospective, not measured Symthaea results."
+  ]
+}
