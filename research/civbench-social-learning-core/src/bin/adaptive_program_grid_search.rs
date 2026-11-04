@@ -46,7 +46,35 @@ impl OnlineStats {
         let n = self.n as f64;
         let centered = (self.sum_squares - self.sum * self.sum / n).max(0.0);
         let standard_deviation = (centered / (n - 1.0)).sqrt();
-        Some(1.96 * standard_deviation / n.sqrt())
+        let critical = student_t_critical_95(self.n - 1);
+        Some(critical * standard_deviation / n.sqrt())
+    }
+}
+
+/// Conservative two-sided 95% Student-t critical values. Each interval uses
+/// the value at the *lowest* df in its bucket, so this lookup does not
+/// understate the t multiplier for any df in that bucket. For df >= 120,
+/// 1.98 is a conservative upper bound approaching the asymptotic 1.96.
+fn student_t_critical_95(degrees_of_freedom: u64) -> f64 {
+    match degrees_of_freedom {
+        0 => f64::INFINITY,
+        1 => 12.706,
+        2 => 4.303,
+        3 => 3.182,
+        4 => 2.776,
+        5 => 2.571,
+        6 => 2.447,
+        7 => 2.365,
+        8 => 2.306,
+        9 => 2.262,
+        10 => 2.228,
+        11..=14 => 2.201,
+        15..=21 => 2.131,
+        22..=29 => 2.074,
+        30..=39 => 2.042,
+        40..=59 => 2.021,
+        60..=119 => 2.000,
+        _ => 1.980,
     }
 }
 
@@ -226,7 +254,7 @@ fn main() {
     assert_eq!(candidates.len(), 108);
 
     println!(
-        "stage,task_family,program_id,replicates,coverage_mean,coverage_ci95,max_depth_mean,messages_per_run,individual_discoveries_per_run,paired_coverage_delta"
+        "stage,task_family,program_id,replicates,coverage_mean,coverage_ci95_t,max_depth_mean,messages_per_run,individual_discoveries_per_run,paired_coverage_delta_ci95_t"
     );
 
     // Training selection uses Layered and Branching only, with a locked seed range.
@@ -334,6 +362,26 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn student_t_critical_values_are_conservative_for_small_validation_samples() {
+        assert!((student_t_critical_95(11) - 2.201).abs() < 1e-12);
+        assert!((student_t_critical_95(23) - 2.074).abs() < 1e-12);
+        assert!((student_t_critical_95(31) - 2.042).abs() < 1e-12);
+        assert!((student_t_critical_95(63) - 2.000).abs() < 1e-12);
+        assert!(student_t_critical_95(11) > student_t_critical_95(63));
+        assert!(student_t_critical_95(119) >= student_t_critical_95(120));
+    }
+
+    #[test]
+    fn confidence_half_width_is_undefined_with_fewer_than_two_replicates() {
+        let mut stats = OnlineStats::default();
+        assert_eq!(stats.ci95_half_width(), None);
+        stats.push(0.25);
+        assert_eq!(stats.ci95_half_width(), None);
+        stats.push(0.75);
+        assert!(stats.ci95_half_width().is_some());
+    }
 
     #[test]
     fn candidate_grid_has_108_bounded_programs() {
