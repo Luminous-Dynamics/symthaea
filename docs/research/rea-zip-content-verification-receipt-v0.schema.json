@@ -412,7 +412,10 @@
       ],
       "properties": {
         "asserted_claim": {
-          "const": "member_content_integrity_only"
+          "enum": [
+            "member_content_integrity_only",
+            "none"
+          ]
         },
         "not_established": {
           "type": "array",
@@ -554,6 +557,13 @@
                 "maximum": 1048576
               }
             }
+          },
+          "claim_scope": {
+            "properties": {
+              "asserted_claim": {
+                "const": "member_content_integrity_only"
+              }
+            }
           }
         },
         "required": [
@@ -565,6 +575,17 @@
           "claim_scope",
           "attestation"
         ]
+      },
+      "else": {
+        "properties": {
+          "claim_scope": {
+            "properties": {
+              "asserted_claim": {
+                "const": "none"
+              }
+            }
+          }
+        }
       }
     }
   ]
