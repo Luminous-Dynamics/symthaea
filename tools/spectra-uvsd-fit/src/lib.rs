@@ -1446,6 +1446,31 @@ mod tests {
     }
 
     #[test]
+    fn signal_category_fisher_mu_score_matches_log_probability_derivative() {
+        let mu = 0.8;
+        let sigma = 1.3;
+        let lower = -0.5;
+        let upper = 0.7;
+        let lower_z = (lower - mu) / sigma;
+        let upper_z = (upper - mu) / sigma;
+        let log_probability = normal_log_interval(lower_z, upper_z);
+        let lower_ratio = density_probability_ratio(lower_z, log_probability);
+        let upper_ratio = density_probability_ratio(upper_z, log_probability);
+        let analytic = (lower_ratio - upper_ratio) / sigma;
+
+        let epsilon = 1.0e-6;
+        let log_probability_at = |candidate_mu: f64| {
+            normal_log_interval(
+                (lower - candidate_mu) / sigma,
+                (upper - candidate_mu) / sigma,
+            )
+        };
+        let numeric = (log_probability_at(mu + epsilon) - log_probability_at(mu - epsilon))
+            / (2.0 * epsilon);
+        assert!((analytic - numeric).abs() < 1.0e-7, "{analytic} vs {numeric}");
+    }
+
+    #[test]
     fn analytic_likelihood_gradient_matches_central_differences() {
         let table = synthetic_table(1.35, 1.45, 120_000);
         let estimate = UvsdEstimate::new(1.2, 1.3, vec![-0.8, 0.1, 1.2]).unwrap();
