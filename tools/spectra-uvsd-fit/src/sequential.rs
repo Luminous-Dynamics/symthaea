@@ -341,6 +341,10 @@ pub struct PolicyReceipt {
     pub assessment_set_digest: String,
     pub action_set_digest: String,
     pub history_digest: String,
+    /// Canonically ordered action snapshot addressed by action_set_digest.
+    pub action_set_snapshot: Vec<OperationalAction>,
+    /// Allocation counts used by the audit-floor decision.
+    pub history_action_counts: BTreeMap<u32, u64>,
     pub policy_config: SequentialPolicyConfig,
     pub candidate_assessments: Vec<CandidateAssessment>,
     pub action_propensities: Vec<ActionPropensity>,
@@ -735,6 +739,8 @@ fn build_result(
             assessment_set_digest: config.assessment_set_digest.clone(),
             action_set_digest: action_set.digest().to_owned(),
             history_digest: history.digest.clone(),
+            action_set_snapshot: action_set.actions().to_vec(),
+            history_action_counts: history.action_counts.clone(),
             policy_config: config.clone(),
             candidate_assessments: candidate_assessments.to_vec(),
             action_propensities,
@@ -1027,6 +1033,8 @@ mod tests {
         assert_eq!(first.receipt.model_set_version, "spectra-uvsd-models-v1");
         assert_eq!(first.receipt.assessment_set_digest, "sha256:test-assessments");
         assert_eq!(first.receipt.candidate_assessments.len(), 3);
+        assert_eq!(first.receipt.action_set_snapshot.len(), 3);
+        assert_eq!(first.receipt.history_action_counts.get(&1), Some(&2));
         let propensity_sum = first
             .receipt
             .action_propensities
