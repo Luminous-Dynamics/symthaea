@@ -328,7 +328,11 @@
         "deflate_decoder_cross_implementation_output_and_size_parity",
         "symthaea_incremental_bitwise_crc_matches_declared_crc_per_stream_chunk",
         "decoder_crc_and_custom_incremental_crc_both_required_for_verified_result",
-        "custom_incremental_crc_chunk_boundary_invariance"
+        "custom_incremental_crc_chunk_boundary_invariance",
+        "per_member_decoder_open_vs_archive_scoped_session",
+        "many_small_entries_100_1000_10000_full_archive_verification",
+        "session_global_decoder_cap_vs_declared_member_bound_overrun",
+        "per_member_decoder_options_amortized_archive_parse"
       ],
       "metrics": [
         "entry_occurrence_precision_recall",
@@ -373,7 +377,12 @@
         "independent_deflate_decoder_failure_disagreement_rate",
         "independent_incremental_crc_detection_recall",
         "secondary_decoder_vs_custom_crc_disagreement_rate",
-        "crc_verification_chunk_boundary_invariance"
+        "crc_verification_chunk_boundary_invariance",
+        "archive_parser_initialization_count",
+        "first_member_vs_subsequent_member_latency",
+        "full_archive_verification_p50_p95_p99",
+        "declared_size_overrun_bytes_before_rejection",
+        "session_memory_and_energy_per_verified_mib"
       ],
       "target": "100_percent supported-subset parity against pinned upstream REA and separately pinned decoder oracles; zero false accepts for CRC/size corruption, partial streams, metadata disagreement, source mutation or actual-output limit violations; bounded memory independent of member size; performance scored only after correctness gates pass.",
       "boundaries": {
@@ -390,7 +399,8 @@
         "file_identity_claim": "File identity is not content immutability, producer authenticity, or proof no malicious writer exists.",
         "deflate_oracle": "zip 9.3.0 test-only with flate2/zlib-rs decodes the exact Deflate stream emitted by zipcore/miniz_oxide; this qualifies codec implementation diversity, not independent ZIP CRC lineage.",
         "crc_oracle": "zipcore and zip use crc32fast 1.5.4 at the ZIP CRC layer; Symthaea's bitwise CRC known-answer test is separate but not equivalent to a fully independent end-to-end corruption oracle.",
-        "crc_verification": "A verified result requires both zipcore's decoder CRC/size EOF acceptance and Symthaea's independently implemented incremental bitwise CRC-32 matching the declared ZIP CRC. zip and zipcore still share crc32fast 1.5.4 and therefore do not count as independent ZIP CRC libraries."
+        "crc_verification": "A verified result requires both zipcore's decoder CRC/size EOF acceptance and Symthaea's independently implemented incremental bitwise CRC-32 matching the declared ZIP CRC. zip and zipcore still share crc32fast 1.5.4 and therefore do not count as independent ZIP CRC libraries.",
+        "session_optimization": "Current per-member decoder open preserves max_entry_size=min(caller_limit,member_declared_size). A reusable archive session may reduce repeated metadata parsing, but must retain equivalent per-member output bounds; a single global Archive ReadOptions cap is not assumed equivalent."
       },
       "library_candidates": {
         "zipcore": "zipcore 0.10.2 pinned candidate for bounded streaming, CRC/size verification and by-index duplicate occurrence access; audit source and dependency graph before promotion",
@@ -404,7 +414,8 @@
       "related_owners": [
         "https://github.com/Luminous-Dynamics/symthaea/issues/10410",
         "https://github.com/Luminous-Dynamics/symthaea/issues/10451",
-        "https://github.com/Luminous-Dynamics/symthaea/issues/10452"
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10452",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10455"
       ],
       "protocol": [
         "freeze archive fixture bytes and hashes before runs; preserve per-occurrence central-directory identity",
@@ -434,7 +445,11 @@
         "do not count zipcore and zip's shared crc32fast dependency as independent ZIP CRC libraries; the custom incremental CRC is the separate algorithmic path",
         "pin the fuzz compiler nightly date, cargo-fuzz version, libfuzzer-sys, seed corpus and resolved Cargo.lock digest in every run receipt",
         "verify the decoded seed SHA-256 with sha256sum --check before executing the fuzzer",
-        "archive a run-context receipt with source commit, exact compiler, cargo-fuzz, runner OS/kernel, lockfile digest and both source/decoded seed digests"
+        "archive a run-context receipt with source commit, exact compiler, cargo-fuzz, runner OS/kernel, lockfile digest and both source/decoded seed digests",
+        "benchmark the current per-member decoder-open reference at 1, 10, 100, 1000 and 10000 entries before introducing an archive session",
+        "compare archive-scoped sessions only when the exact per-member output cap remains enforced; global archive cap alone is not equivalent",
+        "report first-member and subsequent-member latency separately, parser initialization count, all-member completion, peak RSS and energy",
+        "include understated/overstated per-member sizes in batch runs and reject any optimization that weakens per-member or caller bounds"
       ],
       "fuzz_qualification": {
         "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10451",
