@@ -22,10 +22,12 @@ This is useful as an upper-bound comparator. It is not the default architecture 
 
 ### `CoarseRecipeReadiness`
 
-A recipient-side feature extractor emits a minimized `CoarseNeedSignal` for each recipe the recipient does not already hold:
+A recipient-side feature extractor emits at most **two prioritized `CoarseNeedSignal` records per recipient per step**, selected from recipes the recipient does not already hold. Candidates are prioritized by prerequisite readiness, then downstream unlock count, then stable recipe ID:
 
 - recipe identifier (the requested/needed rule);
 - prerequisite readiness in thousandths (0–1000).
+
+The cap matters: publishing every missing recipe would reveal the complement of the recipient's held-recipe set and could reconstruct its entire recipe inventory. A two-item budget limits that direct complement attack but does not prevent inference from repeated observations.
 
 It does **not** expose the recipient's element IDs or full recipe/element inventory to the scheduler. The scheduler ranks using only this scalar, the sender's own held recipes, public task structure, graph neighbours and the declared program weights. A duplicate is filtered at the recipient-side acquisition boundary.
 
@@ -47,9 +49,12 @@ Outputs report separately:
 - final collective result coverage and a conservative 95% Student-t interval;
 - maximum discovered depth;
 - messages and attention used;
+- **disclosure field units per run** (a transparent field-count proxy: centralized mode counts known element/recipe entries visible to the scheduler; coarse mode counts three fields per released need signal);
 - successful acquisitions and redundant messages;
 - independent discoveries;
 - paired coverage deltas against centralized routing.
+
+The field-count proxy is not mutual information, attack advantage, or an information-theoretic privacy score. Repeated signals may reveal more than the per-run count suggests; inference attacks are the next-stage acceptance gate.
 
 The same program score weights are used for both state-aware modes, with collective novelty disabled in both. The experiment does not assert that the coarse mode is privacy-safe; it measures the utility cost of a particular minimized signal.
 
