@@ -252,8 +252,9 @@ jobs:
               return len(world_ids), len(facts)
 
           world_count, conditional_fact_count = validate_repository_worlds(worlds, graph)
-          if world_count != 8 or conditional_fact_count != 7:
-              raise SystemExit("repository target/feature world matrix changed without an explicit benchmark revision")
+          # V0 schema and worlds.v0.json pin five feature modes on each of two target OSes.
+          if world_count != 10 or conditional_fact_count != 7:
+              raise SystemExit("repository target/feature world matrix differs from the pinned V0 schema")
 
           def expect_world_reject(worlds_value, graph_value, label):
               try:
