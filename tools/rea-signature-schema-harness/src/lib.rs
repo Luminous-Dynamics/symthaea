@@ -4,7 +4,7 @@
 //! trust-policy acceptance, package authorization, installability and runtime observations.
 
 use jsonschema::draft202012;
-use serde_json::{Value, json};
+use serde_json::Value;
 
 const PACKAGE_SIGNATURE_SCHEMA: &str =
     include_str!("../../../docs/research/rea-package-signature-evaluation-v0.schema.json");
