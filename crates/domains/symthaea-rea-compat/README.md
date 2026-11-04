@@ -96,3 +96,6 @@ The distinction matters: \`pull_adb_file\` writes a host-side copy but does not 
 MCP annotations are derived from effects exactly as in upstream REA. They are not the policy authority. Unknown or unaudited names fail closed. Authorization results bind a JCS digest of the effect row and a JCS digest of the policy ceiling. The dedicated upstream CI generator also compares all 30 effect rows, annotations and target-content trust flags with the pinned TypeScript source.
 
 This is a policy evaluator and typed catalog, not yet proof that every MCP/CLI/provider execution path calls it. Adapter wiring and exact tool-catalog parity remain acceptance requirements in issue #9909.
+
+
+The root facade is `symthaea::mobile_tool_policy` under the `rea-compat` feature. It provides direct in-process authorization; MCP is not required. The policy evaluator does not itself execute tools and this module does not prove every provider/CLI/MCP call path invokes the evaluator. Invocation/session/consent enforcement remains a separate gateway obligation (#9838 and #10025).
