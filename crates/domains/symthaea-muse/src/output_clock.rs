@@ -527,6 +527,56 @@ mod tests {
         ));
     }
 
+
+    #[derive(Deserialize)]
+    struct OutputClockFixtureV1 {
+        schema_version: String,
+        fixture_id: String,
+        expected_disposition: String,
+        anchors: Vec<OutputClockAnchorV1>,
+    }
+
+    #[test]
+    fn checked_in_clock_fixtures_match_the_rust_evaluator() {
+        let fixtures = [
+            include_str!("../../../../benchmarks/mel/clock/clock-exact-v1.json"),
+            include_str!("../../../../benchmarks/mel/clock/clock-drift-minus-25ppm-v1.json"),
+            include_str!("../../../../benchmarks/mel/clock/clock-outlier-v1.json"),
+            include_str!("../../../../benchmarks/mel/clock/clock-discontinuity-v1.json"),
+        ];
+
+        for fixture_json in fixtures {
+            let fixture: OutputClockFixtureV1 =
+                serde_json::from_str(fixture_json).expect("fixture must parse");
+            assert_eq!(
+                fixture.schema_version,
+                "mel-output-clock-anchor-set-v1",
+                "{}",
+                fixture.fixture_id
+            );
+
+            let result = fit_output_clock_v1(&fixture.anchors, policy());
+            match fixture.expected_disposition.as_str() {
+                "fit" => {
+                    result.unwrap_or_else(|error| {
+                        panic!("{} unexpectedly rejected: {error}", fixture.fixture_id)
+                    });
+                }
+                "reject_residual" => assert!(
+                    matches!(result, Err(OutputClockFitErrorV1::ResidualOutsidePolicy { .. })),
+                    "{} must fail the residual gate",
+                    fixture.fixture_id
+                ),
+                "reject_discontinuity" => assert!(
+                    matches!(result, Err(OutputClockFitErrorV1::NonContiguousFrameIndex { .. })),
+                    "{} must fail the frame-contiguity gate",
+                    fixture.fixture_id
+                ),
+                other => panic!("{} has unsupported expected disposition {other}", fixture.fixture_id),
+            }
+        }
+    }
+
     #[test]
     fn sample_rate_change_is_not_mixed_into_one_segment() {
         let mut anchors = vec![
