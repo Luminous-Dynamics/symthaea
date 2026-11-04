@@ -1,0 +1,46 @@
+name: Economics dated cash-flow tests
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-economics/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/economics-dated-cashflows.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-economics/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/economics-dated-cashflows.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  dated-cash-flow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Capture exact checked-out commit
+        run: echo "ECONOMICS_SOURCE_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+
+      - name: Check package formatting
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-economics/src/finance.rs crates/domains/symthaea-economics/src/lib.rs
+
+      - name: Run economics unit tests
+        run: |
+          rustc --edition=2024 --test crates/domains/symthaea-economics/src/lib.rs -o /tmp/symthaea-economics-tests
+          /tmp/symthaea-economics-tests
+

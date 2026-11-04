@@ -226,7 +226,8 @@ impl IrrOptions {
 /// Classification of an IRR search.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IrrStatus {
-    /// Every cash flow is zero, so every rate is a root.
+    /// A unique rate cannot be identified because every rate is a root or
+    /// the dated schedule has no elapsed time and a zero net amount.
     Indeterminate,
     /// No root was found in the configured search domain.
     NoRoot,
@@ -550,9 +551,449 @@ pub fn amortization_schedule(
     Ok(schedule)
 }
 
+/// A dated cash flow on a UTC Unix timestamp, in seconds.
+///
+/// Amounts in one schedule must already share the same currency and unit.
+/// This is an analytical value type, not a ledger-money representation.
+/// Persistent financial records should use exact integer minor units or a
+/// specified decimal representation.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DatedCashFlow {
+    pub timestamp_seconds: i64,
+    pub amount: f64,
+}
+
+impl DatedCashFlow {
+    /// Construct a dated cash flow after checking that its amount is finite.
+    pub fn new(timestamp_seconds: i64, amount: f64) -> Result<Self> {
+        ensure_finite(amount, "dated cash-flow amount")?;
+        Ok(Self {
+            timestamp_seconds,
+            amount,
+        })
+    }
+}
+
+const ACTUAL_365_FIXED_SECONDS: f64 = 365.0 * 24.0 * 60.0 * 60.0;
+
+fn validate_dated_cash_flows(cash_flows: &[DatedCashFlow], context: &'static str) -> Result<()> {
+    if cash_flows.is_empty() {
+        return Err(EconomicsError::EmptyInput { context });
+    }
+    for flow in cash_flows {
+        ensure_finite(flow.amount, "dated cash-flow amount")?;
+    }
+    if cash_flows
+        .windows(2)
+        .any(|pair| pair[0].timestamp_seconds > pair[1].timestamp_seconds)
+    {
+        return Err(EconomicsError::InvalidParameter {
+            context: "dated cash flows must be ordered by nondecreasing UTC timestamp",
+        });
+    }
+    Ok(())
+}
+
+fn dated_year_fraction(base_seconds: i64, timestamp_seconds: i64) -> f64 {
+    let elapsed_seconds = (timestamp_seconds as i128 - base_seconds as i128) as f64;
+    elapsed_seconds / ACTUAL_365_FIXED_SECONDS
+}
+
+fn neumaier_add(sum: &mut f64, correction: &mut f64, term: f64) {
+    let next = *sum + term;
+    if sum.abs() >= term.abs() {
+        *correction += (*sum - next) + term;
+    } else {
+        *correction += (term - next) + *sum;
+    }
+    *sum = next;
+}
+
+/// Net present value for irregularly dated cash flows using Actual/365 Fixed.
+///
+/// The first cash-flow timestamp is the valuation date (time zero). Later
+/// flows are discounted using elapsed UTC seconds divided by 365 days.
+/// Inputs must be sorted by nondecreasing timestamp and share one currency
+/// and unit. This function does not perform FX conversion or ledger rounding.
+pub fn xnpv(rate: f64, cash_flows: &[DatedCashFlow]) -> Result<f64> {
+    ensure_rate(rate, "XNPV discount rate must be greater than -1")?;
+    validate_dated_cash_flows(cash_flows, "XNPV requires at least one dated cash flow")?;
+
+    let base_seconds = cash_flows[0].timestamp_seconds;
+    let log_growth = rate.ln_1p();
+    let mut sum = 0.0;
+    let mut correction = 0.0;
+
+    for flow in cash_flows {
+        let years = dated_year_fraction(base_seconds, flow.timestamp_seconds);
+        let discount = (-years * log_growth).exp();
+        let term = flow.amount * discount;
+        if !term.is_finite() {
+            return Err(EconomicsError::NumericalFailure {
+                context: "XNPV term overflowed",
+            });
+        }
+        neumaier_add(&mut sum, &mut correction, term);
+    }
+
+    checked_output(sum + correction, "XNPV summation overflowed")
+}
+
+fn xnpv_and_derivative(rate: f64, cash_flows: &[DatedCashFlow]) -> Result<(f64, f64)> {
+    let growth = 1.0 + rate;
+    let log_growth = rate.ln_1p();
+    let base_seconds = cash_flows[0].timestamp_seconds;
+    let mut value_sum = 0.0;
+    let mut value_correction = 0.0;
+    let mut derivative_sum = 0.0;
+    let mut derivative_correction = 0.0;
+
+    for flow in cash_flows {
+        let years = dated_year_fraction(base_seconds, flow.timestamp_seconds);
+        let term = flow.amount * (-years * log_growth).exp();
+        if !term.is_finite() {
+            return Err(EconomicsError::NumericalFailure {
+                context: "XIRR scan overflowed",
+            });
+        }
+        neumaier_add(&mut value_sum, &mut value_correction, term);
+
+        let derivative_term = -years * term / growth;
+        if !derivative_term.is_finite() {
+            return Err(EconomicsError::NumericalFailure {
+                context: "XIRR derivative overflowed",
+            });
+        }
+        neumaier_add(
+            &mut derivative_sum,
+            &mut derivative_correction,
+            derivative_term,
+        );
+    }
+
+    let value = value_sum + value_correction;
+    let derivative = derivative_sum + derivative_correction;
+    if value.is_finite() && derivative.is_finite() {
+        Ok((value, derivative))
+    } else {
+        Err(EconomicsError::NumericalFailure {
+            context: "XIRR scan overflowed",
+        })
+    }
+}
+
+fn bisect_xirr_value_root(
+    mut lo: f64,
+    mut hi: f64,
+    mut f_lo: f64,
+    cash_flows: &[DatedCashFlow],
+    options: IrrOptions,
+) -> Result<f64> {
+    for _ in 0..options.max_iterations {
+        let mid = lo + (hi - lo) * 0.5;
+        let (f_mid, _) = xnpv_and_derivative(mid, cash_flows)?;
+        if f_mid.abs() <= options.tolerance
+            || (hi - lo).abs() <= options.tolerance * mid.abs().max(1.0)
+        {
+            return Ok(mid);
+        }
+        if f_lo.signum() == f_mid.signum() {
+            lo = mid;
+            f_lo = f_mid;
+        } else {
+            hi = mid;
+        }
+    }
+    Ok(lo + (hi - lo) * 0.5)
+}
+
+fn bisect_xirr_stationary_point(
+    mut lo: f64,
+    mut hi: f64,
+    mut d_lo: f64,
+    cash_flows: &[DatedCashFlow],
+    options: IrrOptions,
+) -> Result<f64> {
+    for _ in 0..options.max_iterations {
+        let mid = lo + (hi - lo) * 0.5;
+        let (_, d_mid) = xnpv_and_derivative(mid, cash_flows)?;
+        if d_mid.abs() <= options.tolerance
+            || (hi - lo).abs() <= options.tolerance * mid.abs().max(1.0)
+        {
+            return Ok(mid);
+        }
+        if d_lo.signum() == d_mid.signum() {
+            lo = mid;
+            d_lo = d_mid;
+        } else {
+            hi = mid;
+        }
+    }
+    Ok(lo + (hi - lo) * 0.5)
+}
+
+/// Discover all XIRR roots found in a bounded rate domain.
+///
+/// The search uses the same explicit bounds and tolerances as IrrOptions.
+/// It scans uniformly in ln(1 + rate), refines sign-changing roots by
+/// bisection, and checks stationary points for repeated roots. The
+/// search_complete field means every scan-grid evaluation was computable; it
+/// is not a formal interval proof that every multiple or tangent root was
+/// found. The strict xirr helper accepts only a single-sign-change schedule.
+pub fn xirr_analysis(cash_flows: &[DatedCashFlow], options: IrrOptions) -> Result<IrrAnalysis> {
+    options.validate()?;
+    validate_dated_cash_flows(cash_flows, "XIRR requires at least one dated cash flow")?;
+
+    let scale = cash_flows
+        .iter()
+        .map(|flow| flow.amount.abs())
+        .fold(0.0_f64, f64::max);
+    let amounts: Vec<f64> = cash_flows.iter().map(|flow| flow.amount).collect();
+    let sign_changes = cash_flow_sign_changes(&amounts);
+
+    if scale == 0.0 {
+        return Ok(IrrAnalysis {
+            roots: Vec::new(),
+            cash_flow_sign_changes: 0,
+            status: IrrStatus::Indeterminate,
+            search_complete: true,
+            searched_rate_range: (options.min_rate, options.max_rate),
+        });
+    }
+
+    let normalized: Vec<DatedCashFlow> = cash_flows
+        .iter()
+        .map(|flow| DatedCashFlow {
+            timestamp_seconds: flow.timestamp_seconds,
+            amount: flow.amount / scale,
+        })
+        .collect();
+    if normalized
+        .iter()
+        .all(|flow| flow.timestamp_seconds == normalized[0].timestamp_seconds)
+    {
+        let (value, _) = xnpv_and_derivative(0.0, &normalized)?;
+        return Ok(IrrAnalysis {
+            roots: Vec::new(),
+            cash_flow_sign_changes: sign_changes,
+            status: if value.abs() <= options.tolerance {
+                IrrStatus::Indeterminate
+            } else {
+                IrrStatus::NoRoot
+            },
+            search_complete: true,
+            searched_rate_range: (options.min_rate, options.max_rate),
+        });
+    }
+
+    let min_log = options.min_rate.ln_1p();
+    let max_log = options.max_rate.ln_1p();
+    let mut roots = Vec::new();
+    let mut search_complete = true;
+    let mut previous: Option<(f64, f64, f64)> = None;
+
+    for step in 0..=options.scan_steps {
+        let fraction = step as f64 / options.scan_steps as f64;
+        let rate = (min_log + (max_log - min_log) * fraction).exp_m1();
+        let evaluation = xnpv_and_derivative(rate, &normalized);
+        let (value, derivative) = match evaluation {
+            Ok(result) => result,
+            Err(EconomicsError::NumericalFailure { .. }) => {
+                search_complete = false;
+                previous = None;
+                continue;
+            }
+            Err(error) => return Err(error),
+        };
+
+        if value.abs() <= options.tolerance {
+            push_root(&mut roots, rate, options.tolerance);
+        }
+
+        if let Some((previous_rate, previous_value, previous_derivative)) = previous {
+            if previous_value.signum() != value.signum() {
+                let root = bisect_xirr_value_root(
+                    previous_rate,
+                    rate,
+                    previous_value,
+                    &normalized,
+                    options,
+                )?;
+                push_root(&mut roots, root, options.tolerance);
+            }
+
+            if previous_derivative.signum() != derivative.signum() {
+                let stationary = bisect_xirr_stationary_point(
+                    previous_rate,
+                    rate,
+                    previous_derivative,
+                    &normalized,
+                    options,
+                )?;
+                let (stationary_value, _) = xnpv_and_derivative(stationary, &normalized)?;
+                if stationary_value.abs() <= options.tolerance * 100.0 {
+                    push_root(&mut roots, stationary, options.tolerance);
+                }
+            }
+        }
+        previous = Some((rate, value, derivative));
+    }
+
+    roots.sort_by(f64::total_cmp);
+    let status = match roots.len() {
+        0 => IrrStatus::NoRoot,
+        1 => IrrStatus::Unique,
+        _ => IrrStatus::Multiple,
+    };
+    Ok(IrrAnalysis {
+        roots,
+        cash_flow_sign_changes: sign_changes,
+        status,
+        search_complete,
+        searched_rate_range: (options.min_rate, options.max_rate),
+    })
+}
+
+/// Return one unambiguous XIRR using Actual/365 Fixed.
+///
+/// Non-conventional cash flows with multiple sign changes are rejected even
+/// when this bounded search finds only one root. Use xirr_analysis to inspect
+/// the roots and search-completeness status explicitly.
+pub fn xirr(cash_flows: &[DatedCashFlow]) -> Result<f64> {
+    let analysis = xirr_analysis(cash_flows, IrrOptions::default())?;
+    if !analysis.search_complete {
+        return Err(EconomicsError::NumericalFailure {
+            context: "XIRR search incomplete in the configured rate domain",
+        });
+    }
+    match analysis.status {
+        IrrStatus::Unique if analysis.cash_flow_sign_changes <= 1 => Ok(analysis.roots[0]),
+        IrrStatus::NoRoot => Err(EconomicsError::NoSolution {
+            context: "no XIRR found in the configured search domain",
+        }),
+        IrrStatus::Indeterminate => Err(EconomicsError::AmbiguousSolution {
+            context: "all-zero dated cash flows make every rate an XIRR",
+        }),
+        IrrStatus::Unique | IrrStatus::Multiple => Err(EconomicsError::AmbiguousSolution {
+            context: "dated cash flows require multi-root XIRR analysis",
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn dated_flow(day: i64, amount: f64) -> DatedCashFlow {
+        DatedCashFlow::new(day * 86_400, amount).unwrap()
+    }
+
+    #[test]
+    fn xnpv_matches_periodic_npv_for_annual_dates() {
+        let flows = [
+            dated_flow(0, -1_000.0),
+            dated_flow(365, 500.0),
+            dated_flow(730, 500.0),
+        ];
+        let dated = xnpv(0.10, &flows).unwrap();
+        let periodic = npv(0.10, &[-1_000.0, 500.0, 500.0]).unwrap();
+        assert!((dated - periodic).abs() < 1e-10);
+    }
+
+    #[test]
+    fn xnpv_uses_actual_elapsed_days() {
+        let flows = [
+            dated_flow(0, -1_000.0),
+            dated_flow(180, 600.0),
+            dated_flow(547, 600.0),
+        ];
+        let expected =
+            -1_000.0 + 600.0 / 1.10_f64.powf(180.0 / 365.0) + 600.0 / 1.10_f64.powf(547.0 / 365.0);
+        assert!((xnpv(0.10, &flows).unwrap() - expected).abs() < 1e-10);
+    }
+
+    #[test]
+    fn xirr_recovers_known_rate_from_dated_cash_flows() {
+        let flows = [dated_flow(0, -1_000.0), dated_flow(730, 1_210.0)];
+        let rate = xirr(&flows).unwrap();
+        assert!((rate - 0.10).abs() < 1e-8);
+        assert!(xnpv(rate, &flows).unwrap().abs() < 1e-7);
+    }
+
+    #[test]
+    fn xirr_analysis_finds_multiple_dated_roots() {
+        let flows = [
+            dated_flow(0, -100.0),
+            dated_flow(365, 230.0),
+            dated_flow(730, -132.0),
+        ];
+        let analysis = xirr_analysis(&flows, IrrOptions::default()).unwrap();
+        assert_eq!(analysis.status, IrrStatus::Multiple);
+        assert!(analysis.search_complete);
+        assert_eq!(analysis.roots.len(), 2);
+        assert!((analysis.roots[0] - 0.10).abs() < 1e-7);
+        assert!((analysis.roots[1] - 0.20).abs() < 1e-7);
+        assert!(matches!(
+            xirr(&flows),
+            Err(EconomicsError::AmbiguousSolution { .. })
+        ));
+    }
+
+    #[test]
+    fn xirr_analysis_marks_zero_duration_net_zero_schedule_indeterminate() {
+        let flows = [dated_flow(0, -100.0), dated_flow(0, 100.0)];
+        let analysis = xirr_analysis(&flows, IrrOptions::default()).unwrap();
+        assert_eq!(analysis.status, IrrStatus::Indeterminate);
+        assert!(analysis.search_complete);
+        assert!(analysis.roots.is_empty());
+        assert!(matches!(
+            xirr(&flows),
+            Err(EconomicsError::AmbiguousSolution { .. })
+        ));
+    }
+
+    #[test]
+    fn xirr_analysis_rejects_zero_duration_nonzero_schedule() {
+        let flows = [dated_flow(0, -100.0), dated_flow(0, 150.0)];
+        let analysis = xirr_analysis(&flows, IrrOptions::default()).unwrap();
+        assert_eq!(analysis.status, IrrStatus::NoRoot);
+        assert!(analysis.search_complete);
+        assert!(analysis.roots.is_empty());
+        assert!(matches!(
+            xirr(&flows),
+            Err(EconomicsError::NoSolution { .. })
+        ));
+    }
+
+    #[test]
+    fn xnpv_rejects_unsorted_dates() {
+        let flows = [dated_flow(365, 100.0), dated_flow(0, -100.0)];
+        assert!(matches!(
+            xnpv(0.10, &flows),
+            Err(EconomicsError::InvalidParameter { .. })
+        ));
+    }
+
+    #[test]
+    fn xnpv_rejects_non_finite_amounts() {
+        let flows = [DatedCashFlow {
+            timestamp_seconds: 0,
+            amount: f64::NAN,
+        }];
+        assert!(matches!(
+            xnpv(0.10, &flows),
+            Err(EconomicsError::NonFiniteInput { .. })
+        ));
+    }
+
+    #[test]
+    fn xirr_analysis_marks_zero_cash_flows_indeterminate() {
+        let flows = [dated_flow(0, 0.0), dated_flow(365, 0.0)];
+        let analysis = xirr_analysis(&flows, IrrOptions::default()).unwrap();
+        assert_eq!(analysis.status, IrrStatus::Indeterminate);
+        assert!(analysis.search_complete);
+        assert!(analysis.roots.is_empty());
+    }
 
     #[test]
     fn fv_pv_roundtrip() {
