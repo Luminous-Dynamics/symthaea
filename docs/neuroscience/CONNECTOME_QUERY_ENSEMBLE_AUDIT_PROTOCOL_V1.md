@@ -2,7 +2,7 @@
 
 **Status:** first Rust evaluator, JSON Schema and synthetic fixture committed; no Rust compilation or biological result claimed.  
 **Tracking:** [#9344 — Query robustness across plausible connectome reconstructions](https://github.com/Luminous-Dynamics/symthaea/issues/9344).  
-**Tool:** `connectome-query-ensemble-audit`.
+**Tool:** `connectome_query_ensemble_audit`.
 
 ## Research question
 
@@ -16,12 +16,12 @@ V1 is intentionally a **finite unweighted scenario evaluator**. It does not esti
 
 ```sh
 cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
-  --bin connectome-query-ensemble-audit -- \
+  --bin connectome_query_ensemble_audit -- \
   --input docs/neuroscience/examples/CONNECTOME_QUERY_ENSEMBLE_AUDIT.example.json \
   --output query-ensemble-report.json
 
 cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml \
-  --bin connectome-query-ensemble-audit
+  --bin connectome_query_ensemble_audit
 ```
 
 Input schema: `CONNECTOME_QUERY_ENSEMBLE_AUDIT.schema.json`. The fixture is synthetic and deliberately contains one reconstruction-sensitive path query plus two decision-stable control queries.
@@ -112,3 +112,10 @@ These are exact synthetic fixture expectations, not biological measurements.
 ## Non-claims
 
 V1 does not prove biological correctness, complete scenario coverage, calibration, posterior probability, or query truth. A graph digest proves identity of the serialized graph under this canonicalization, not that the graph is the correct biological reconstruction. The tool does not authorize edits to source annotations or production connectome data.
+
+
+## Independent query-calculation oracle
+
+The independent, standard-library reference implementation and exhaustive four-node differential contract are specified in [CONNECTOME_QUERY_ENSEMBLE_ORACLE_V1.md](CONNECTOME_QUERY_ENSEMBLE_ORACLE_V1.md). The oracle recomputes each report value and decision using a matrix/Floyd–Warshall implementation, independently recomputes graph and scenario-set digests, and rejects deliberately mutated output values, digests, and scenario membership.
+
+The dedicated workflow evaluates the checked-in known-answer fixture and all 4,096 loop-free directed graph topologies on four vertices. It compares 36 query semantics per graph (edge weight, weighted in/out degree, and directed reachability), for 147,456 production-vs-oracle comparisons. This is software-semantic qualification on a finite synthetic domain, not evidence of biological correctness or scenario-universe adequacy.
