@@ -36,7 +36,10 @@ pub enum Applicability {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Qualification {
-    Qualified { record_id: String },
+    Qualified {
+        record_id: String,
+        source_artifact_digest: String,
+    },
     NotQualified,
 }
 
@@ -78,6 +81,15 @@ pub enum MetricOutcome {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ActionResult {
     pub receipt_id: String,
+    pub scenario_id: String,
+    pub action_set_id: String,
+    pub reference_id: String,
+    pub action_id: String,
+    pub metric_id: String,
+    pub unit: String,
+    pub execution_context_digest: String,
+    pub action_payload_digest: String,
+    pub output_digest: String,
     pub feasibility: Feasibility,
     pub outcome: MetricOutcome,
 }
@@ -105,6 +117,8 @@ pub struct ComparisonContext {
     pub scenario_id: String,
     pub action_set_id: String,
     pub action_set_complete: bool,
+    /// Frozen expected portfolio membership; omission of a reference row is incomplete.
+    pub expected_reference_ids: Vec<String>,
     pub action_a_id: String,
     pub action_b_id: String,
     pub metric: MetricDefinition,
@@ -133,6 +147,8 @@ pub enum DecisionClass {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum IncompleteReason {
     ActionSetDeclaredIncomplete,
+    MissingExpectedReference(String),
+    UnexpectedReference(String),
     ApplicabilityUnknown { reference_id: String },
     MissingActionResult {
         reference_id: String,
@@ -201,7 +217,11 @@ pub enum EvaluationError {
     EmptyField(&'static str),
     DuplicateActionId,
     InvalidEquivalenceMargin,
+    DuplicateActionId,
     DuplicateReferenceId(String),
+    InvalidDigest { field: &'static str },
+    ContextMismatch { reference_id: String, action_id: String },
+    NonFiniteDifference { reference_id: String },
     DuplicateReceiptId(String),
     NonFiniteMetricValue {
         reference_id: String,
@@ -247,6 +267,27 @@ pub fn evaluate_pair(
 
     let mut seen_references = HashSet::with_capacity(ordered_rows.len());
     let mut seen_receipts = HashSet::with_capacity(ordered_rows.len() * 2);
+    let mut expected = BTreeSet::new();
+    for reference_id in &context.expected_reference_ids {
+        validate_nonempty(reference_id, "expected_reference_id")?;
+        if !expected.insert(reference_id.as_str()) {
+            return Err(EvaluationError::DuplicateReferenceId(reference_id.clone()));
+        }
+    }
+    let provided: BTreeSet<&str> = ordered_rows.iter().map(|row| row.reference_id.as_str()).collect();
+    if let Some(missing) = expected.difference(&provided).next() {
+        return Ok(empty_envelope(
+            DecisionClass::Incomplete,
+            Some(IncompleteReason::MissingExpectedReference((*missing).to_owned())),
+        ));
+    }
+    if let Some(unexpected) = provided.difference(&expected).next() {
+        return Ok(empty_envelope(
+            DecisionClass::Incomplete,
+            Some(IncompleteReason::UnexpectedReference((*unexpected).to_owned())),
+        ));
+    }
+
     for row in &ordered_rows {
         validate_nonempty(&row.reference_id, "reference_id")?;
         validate_nonempty(&row.dependency_family_id, "dependency_family_id")?;
@@ -258,6 +299,9 @@ pub fn evaluate_pair(
             .flatten()
         {
             validate_nonempty(&result.receipt_id, "receipt_id")?;
+            validate_digest(&result.execution_context_digest, "execution_context_digest")?;
+            validate_digest(&result.action_payload_digest, "action_payload_digest")?;
+            validate_digest(&result.output_digest, "output_digest")?;
             if !seen_receipts.insert(result.receipt_id.as_str()) {
                 return Err(EvaluationError::DuplicateReceiptId(result.receipt_id.clone()));
             }
@@ -302,7 +346,10 @@ pub fn evaluate_pair(
             Applicability::Applicable => {}
         }
 
-        let Qualification::Qualified { record_id } = &row.qualification else {
+        let Qualification::Qualified {
+            record_id,
+            source_artifact_digest,
+        } = &row.qualification else {
             return Ok(DecisionEnvelope {
                 classification: DecisionClass::OutOfScope,
                 incomplete_reason: None,
@@ -314,6 +361,7 @@ pub fn evaluate_pair(
             });
         };
         validate_nonempty(record_id, "qualification_record_id")?;
+        validate_digest(source_artifact_digest, "reference_source_artifact_digest")?;
 
         applicable_count += 1;
         families.insert(row.dependency_family_id.clone());
@@ -342,6 +390,15 @@ pub fn evaluate_pair(
                 comparisons,
             ));
         };
+
+        validate_action_identity(context, row, &context.action_a_id, action_a)?;
+        validate_action_identity(context, row, &context.action_b_id, action_b)?;
+        if action_a.execution_context_digest != action_b.execution_context_digest {
+            return Err(EvaluationError::ContextMismatch {
+                reference_id: row.reference_id.clone(),
+                action_id: "shared_execution_context".into(),
+            });
+        }
 
         for (action_id, action) in [
             (context.action_a_id.as_str(), action_a),
@@ -444,6 +501,11 @@ pub fn evaluate_pair(
                     lower: a_lower - b_upper,
                     upper: a_upper - b_lower,
                 };
+                if !difference.lower.is_finite() || !difference.upper.is_finite() {
+                    return Err(EvaluationError::NonFiniteDifference {
+                        reference_id: row.reference_id.clone(),
+                    });
+                }
                 comparisons.push(ReferenceComparison {
                     reference_id: row.reference_id.clone(),
                     dependency_family_id: row.dependency_family_id.clone(),
@@ -462,6 +524,11 @@ pub fn evaluate_pair(
                     Direction::LowerIsBetter => (-*a_value, -*b_value),
                 };
                 let difference = a_value - b_value;
+                if !difference.is_finite() {
+                    return Err(EvaluationError::NonFiniteDifference {
+                        reference_id: row.reference_id.clone(),
+                    });
+                }
                 let preference = if difference > context.metric.equivalence_margin {
                     Preference::ActionA
                 } else if difference < -context.metric.equivalence_margin {
@@ -579,10 +646,41 @@ fn validate_context(context: &ComparisonContext) -> Result<(), EvaluationError> 
     if context.action_a_id == context.action_b_id {
         return Err(EvaluationError::DuplicateActionId);
     }
+    if context.expected_reference_ids.is_empty() {
+        return Err(EvaluationError::EmptyField("expected_reference_ids"));
+    }
     if !context.metric.equivalence_margin.is_finite()
         || context.metric.equivalence_margin < 0.0
     {
         return Err(EvaluationError::InvalidEquivalenceMargin);
+    }
+    Ok(())
+}
+
+fn validate_digest(value: &str, field: &'static str) -> Result<(), EvaluationError> {
+    if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(EvaluationError::InvalidDigest { field });
+    }
+    Ok(())
+}
+
+fn validate_action_identity(
+    context: &ComparisonContext,
+    row: &ReferenceRow,
+    expected_action_id: &str,
+    action: &ActionResult,
+) -> Result<(), EvaluationError> {
+    let matches = action.scenario_id == context.scenario_id
+        && action.action_set_id == context.action_set_id
+        && action.reference_id == row.reference_id
+        && action.action_id == expected_action_id
+        && action.metric_id == context.metric.metric_id
+        && action.unit == context.metric.unit;
+    if !matches {
+        return Err(EvaluationError::ContextMismatch {
+            reference_id: row.reference_id.clone(),
+            action_id: expected_action_id.to_owned(),
+        });
     }
     Ok(())
 }
@@ -756,6 +854,7 @@ mod tests {
             scenario_id: "crossing-001".into(),
             action_set_id: "actions-v1".into(),
             action_set_complete: true,
+            expected_reference_ids: Vec::new(),
             action_a_id: "continue".into(),
             action_b_id: "yield".into(),
             metric: MetricDefinition {
@@ -783,12 +882,34 @@ mod tests {
         MetricOutcome::Observed(MetricEvidence::PointEstimateOnly { value })
     }
 
-    fn action(receipt_id: &str, outcome: MetricOutcome) -> ActionResult {
+    fn action(reference_id: &str, action_id: &str, receipt_id: &str, outcome: MetricOutcome) -> ActionResult {
+        let action_payload_digest = if action_id == "continue" { "b" } else { "c" };
         ActionResult {
             receipt_id: receipt_id.into(),
+            scenario_id: "crossing-001".into(),
+            action_set_id: "actions-v1".into(),
+            reference_id: reference_id.into(),
+            action_id: action_id.into(),
+            metric_id: "clearance-margin".into(),
+            unit: "m".into(),
+            execution_context_digest: "d".repeat(64),
+            action_payload_digest: action_payload_digest.repeat(64),
+            output_digest: format!("{:0<64}", receipt_id),
             feasibility: Feasibility::Feasible,
             outcome,
         }
+    }
+
+    fn evaluate(
+        context: &ComparisonContext,
+        rows: &[ReferenceRow],
+    ) -> Result<DecisionEnvelope, EvaluationError> {
+        let mut bound_context = context.clone();
+        if bound_context.expected_reference_ids.is_empty() {
+            bound_context.expected_reference_ids =
+                rows.iter().map(|row| row.reference_id.clone()).collect();
+        }
+        evaluate_pair(&bound_context, rows)
     }
 
     fn row(
@@ -802,10 +923,11 @@ mod tests {
             dependency_family_id: family.into(),
             qualification: Qualification::Qualified {
                 record_id: format!("qualification-{reference_id}"),
+                source_artifact_digest: "a".repeat(64),
             },
             applicability: Applicability::Applicable,
-            action_a: Some(action(&format!("{reference_id}-a"), a)),
-            action_b: Some(action(&format!("{reference_id}-b"), b)),
+            action_a: Some(action(reference_id, "continue", &format!("{reference_id}-a"), a)),
+            action_b: Some(action(reference_id, "yield", &format!("{reference_id}-b"), b)),
         }
     }
 
@@ -815,7 +937,7 @@ mod tests {
             row("r0", "analytic", interval(0.20, 0.25), interval(-0.10, -0.05)),
             row("r1", "independent-code", interval(0.15, 0.22), interval(-0.08, -0.02)),
         ];
-        let envelope = evaluate_pair(&context(Direction::HigherIsBetter, 0.02), &rows).unwrap();
+        let envelope = evaluate(&context(Direction::HigherIsBetter, 0.02), &rows).unwrap();
         assert_eq!(envelope.classification, DecisionClass::PortfolioDominatesA);
         assert_eq!(envelope.applicable_reference_count, 2);
         assert_eq!(envelope.dependency_family_count, 2);
@@ -994,7 +1116,7 @@ mod tests {
         let mut ctx = context(Direction::HigherIsBetter, 0.1);
         ctx.action_set_complete = false;
         let rows = vec![row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2))];
-        let envelope = evaluate_pair(&ctx, &rows).unwrap();
+        let envelope = evaluate(&ctx, &rows).unwrap();
         assert_eq!(envelope.classification, DecisionClass::Incomplete);
         assert_eq!(
             envelope.incomplete_reason,
@@ -1022,6 +1144,38 @@ mod tests {
         let right = evaluate_pair(&context(Direction::HigherIsBetter, 0.1), &[second, first]).unwrap();
         assert_eq!(left, right);
         assert_eq!(left.comparisons[0].reference_id, "r0");
+    }
+
+    #[test]
+    fn missing_expected_reference_suppresses_portfolio_dominance() {
+        let mut ctx = context(Direction::HigherIsBetter, 0.1);
+        ctx.expected_reference_ids = vec!["r0".into(), "r1".into()];
+        let rows = vec![row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2))];
+        let envelope = evaluate_pair(&ctx, &rows).unwrap();
+        assert_eq!(envelope.classification, DecisionClass::Incomplete);
+        assert_eq!(
+            envelope.incomplete_reason,
+            Some(IncompleteReason::MissingExpectedReference("r1".into()))
+        );
+    }
+
+    #[test]
+    fn mismatched_action_context_is_rejected() {
+        let mut bad = row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2));
+        bad.action_a.as_mut().unwrap().action_set_id = "other-actions".into();
+        assert!(matches!(
+            evaluate(&context(Direction::HigherIsBetter, 0.1), &[bad]),
+            Err(EvaluationError::ContextMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn overflowing_pairwise_difference_is_rejected() {
+        let rows = vec![row("r0", "family-a", point(f64::MAX), point(-f64::MAX))];
+        assert!(matches!(
+            evaluate(&context(Direction::HigherIsBetter, 0.1), &rows),
+            Err(EvaluationError::NonFiniteDifference { .. })
+        ));
     }
 
     #[test]
