@@ -1048,6 +1048,55 @@ mod tests {
     }
 
     #[test]
+    fn correlational_status_requires_runtime_evidence() {
+        let mut ledger = base_ledger();
+        ledger.evidence[0].authority = EvidenceAuthority::SourceDeclared;
+        ledger.hypotheses[0].status = HypothesisStatus::Correlational;
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::CorrelationalStatusWithoutRuntimeEvidence)
+        );
+    }
+
+    #[test]
+    fn duplicate_evidence_parents_are_rejected() {
+        let mut ledger = base_ledger();
+        ledger.evidence[0].parent_ids = vec!["e-parent".into(), "e-parent".into()];
+        ledger.evidence.push(EvidenceRecord {
+            id: "e-parent".into(),
+            binding: ledger.binding.clone(),
+            authority: EvidenceAuthority::SourceDeclared,
+            origin_id: "source-1".into(),
+            parent_ids: vec![],
+            source_action_id: None,
+            sequence: 1,
+        });
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::DuplicateId("evidence parent"))
+        );
+    }
+
+    #[test]
+    fn hypothesis_revision_forks_are_rejected() {
+        let mut ledger = base_ledger();
+        let mut revision_two = ledger.hypotheses[0].clone();
+        revision_two.id = "h1-r2".into();
+        revision_two.previous_record_id = Some("h1-r1".into());
+        revision_two.sequence = 7;
+        let mut revision_three = revision_two.clone();
+        revision_three.id = "h1-r3".into();
+        revision_three.sequence = 8;
+        ledger.hypotheses.extend([revision_two, revision_three]);
+        ledger.repairs[0].sequence = 9;
+        ledger.grades[0].sequence = 10;
+        assert_eq!(
+            ledger.validate(),
+            Err(ValidationError::HypothesisRevisionChain)
+        );
+    }
+
+    #[test]
     fn post_hoc_forecast_is_rejected() {
         let mut ledger = base_ledger();
         ledger.actions[0].sequence = 2;
