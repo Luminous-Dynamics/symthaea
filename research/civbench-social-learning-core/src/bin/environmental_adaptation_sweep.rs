@@ -76,6 +76,7 @@ fn regime_name(regime: EnvironmentRegime) -> &'static str {
 
 fn policies() -> [EncodingPolicy; 4] {
     [
+        EncodingPolicy::NoTransmission,
         EncodingPolicy::AlwaysProcedure,
         EncodingPolicy::AlwaysOutcomeGoal,
         EncodingPolicy::AlwaysCausalModel,
@@ -85,6 +86,7 @@ fn policies() -> [EncodingPolicy; 4] {
 
 fn policy_name(policy: EncodingPolicy) -> &'static str {
     match policy {
+        EncodingPolicy::NoTransmission => "individual_only_no_message",
         EncodingPolicy::AlwaysProcedure => "procedure_only",
         EncodingPolicy::AlwaysOutcomeGoal => "outcome_goal_only",
         EncodingPolicy::AlwaysCausalModel => "causal_model",
@@ -114,13 +116,13 @@ fn main() {
                     bucket.optimal_action_rate.push(metrics.optimal_action_rate);
                     bucket.payload_bits.push(metrics.outgoing_payload_bits as f64);
                     bucket.procedure_share.push(
-                        f64::from(metrics.outgoing_message == MessageKind::Procedure)
+                        if metrics.outgoing_message == MessageKind::Procedure { 1.0 } else { 0.0 }
                     );
                     bucket.outcome_goal_share.push(
-                        f64::from(metrics.outgoing_message == MessageKind::OutcomeGoal)
+                        if metrics.outgoing_message == MessageKind::OutcomeGoal { 1.0 } else { 0.0 }
                     );
                     bucket.causal_model_share.push(
-                        f64::from(metrics.outgoing_message == MessageKind::CausalModel)
+                        if metrics.outgoing_message == MessageKind::CausalModel { 1.0 } else { 0.0 }
                     );
                     if let Some(trial) = metrics.first_optimal_choice_trial {
                         bucket.first_optimal_choice.push(trial as f64);
