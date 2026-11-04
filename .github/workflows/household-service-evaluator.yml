@@ -45,7 +45,7 @@ jobs:
       - name: Upload canonical lockfile for review
         uses: actions/upload-artifact@v4
         with:
-          name: household-service-evaluator-lock-\${{ github.sha }}
+          name: household-service-evaluator-resolved-lock
           path: target/household-service-evaluator-Cargo.lock
           if-no-files-found: error
 
