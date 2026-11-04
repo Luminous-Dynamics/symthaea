@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/musical-participation-baselines-v1.schema.json",
+  "title": "Melothaea selective musical participation baseline predictions v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "baselines"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-musical-participation-baselines-v1"
+    },
+    "baselines": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/baseline"
+      }
+    }
+  },
+  "$defs": {
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_id",
+        "description",
+        "predictions_by_family",
+        "expected"
+      ],
+      "properties": {
+        "baseline_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "predictions_by_family": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "enum": [
+                "WAIT",
+                "RESPOND",
+                "CONTINUE",
+                "YIELD",
+                "ABSTAIN",
+                "ASK"
+              ]
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "valid_decision_support_count",
+            "paired_correct_count",
+            "false_entry_count",
+            "missed_invitation_count",
+            "intentional_wait_count",
+            "epistemic_abstain_count",
+            "clarification_ask_count",
+            "mean_brier_score"
+          ],
+          "properties": {
+            "valid_decision_support_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "paired_correct_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "false_entry_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "missed_invitation_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "intentional_wait_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "epistemic_abstain_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "clarification_ask_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "mean_brier_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}
