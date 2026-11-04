@@ -169,6 +169,11 @@ class D4BCEStateModel:
         return self.snapshot()
 
     def _assert_watch_invariant(self):
+        # Initial constructor cleanup removes watch-list entries for targets
+        # already inactive after the complete initial scan. Dynamic deletions,
+        # by contrast, leave their triggering sentinel parked. Consequently,
+        # every active target must have exactly one watch, while an inactive
+        # target may have no watch or one parked watch.
         seen={}
         for sentinel,info_ids in self.watchlists.items():
             for info_id in info_ids:
@@ -177,11 +182,14 @@ class D4BCEStateModel:
                 seen[info_id]=sentinel
         for info in self.protected:
             iid=info["id"]
+            target_active=self.active[info["target"]]
             if iid not in seen:
-                raise AssertionError("protected record has no watch "+str(iid))
+                if target_active:
+                    raise AssertionError("active protected target has no watch "+str(iid))
+                continue
             if seen[iid]!=info["candidate_clauses"][0]:
                 raise AssertionError("watch sentinel/candidate order mismatch "+str(iid))
-            if self.active[info["target"]] and abs(info["blocker"]) not in self.assignment:
+            if target_active and abs(info["blocker"]) not in self.assignment:
                 if not self.active[seen[iid]]:
                     raise AssertionError("active target has inactive sentinel "+str(iid))
 
