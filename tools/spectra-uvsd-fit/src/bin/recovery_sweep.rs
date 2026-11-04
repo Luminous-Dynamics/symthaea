@@ -68,7 +68,7 @@ fn simulate_table(mu: f64, sigma: f64, seed: u64) -> CategoryTable {
 
 fn main() {
     println!(
-        "seed,mu_true,sigma_true,status,mu_hat,sigma_hat,d_a_hat,nll,gradient_norm,iterations,starts_converged,starts_non_finite,objective_spread,parameter_spread,diagonal_curvature"
+        "seed,mu_true,sigma_true,status,mu_hat,sigma_hat,d_a_hat,nll,gradient_norm,iterations,starts_converged,starts_non_finite,fim_rank,fim_dimension,fim_condition,fim_relative_min_eigenvalue,mu_se,sigma_se,sigma_ci_low,sigma_ci_high,da_se,da_ci_low,da_ci_high,objective_spread,parameter_spread,diagonal_curvature"
     );
 
     for (mu_index, &mu) in MU_GRID.iter().enumerate() {
@@ -98,6 +98,47 @@ fn main() {
                     .gradient_norm
                     .map(|value| value.to_string())
                     .unwrap_or_default();
+                let (
+                    fim_rank,
+                    fim_dimension,
+                    fim_condition,
+                    fim_relative_min_eigenvalue,
+                    mu_se,
+                    sigma_se,
+                    sigma_ci_low,
+                    sigma_ci_high,
+                    da_se,
+                    da_ci_low,
+                    da_ci_high,
+                ) = if let Some(info) = result.diagnostics.expected_fisher_information.as_ref() {
+                    let (sigma_low, sigma_high) = info
+                        .sigma_wald_95
+                        .map(|values| (values[0].to_string(), values[1].to_string()))
+                        .unwrap_or_default();
+                    let (da_low, da_high) = info
+                        .d_a_wald_95
+                        .map(|values| (values[0].to_string(), values[1].to_string()))
+                        .unwrap_or_default();
+                    (
+                        info.effective_rank.to_string(),
+                        info.parameter_dimension.to_string(),
+                        info.condition_number.map(|value| value.to_string()).unwrap_or_default(),
+                        info.relative_minimum_eigenvalue.map(|value| value.to_string()).unwrap_or_default(),
+                        info.mu_standard_error.map(|value| value.to_string()).unwrap_or_default(),
+                        info.sigma_standard_error.map(|value| value.to_string()).unwrap_or_default(),
+                        sigma_low,
+                        sigma_high,
+                        info.d_a_standard_error.map(|value| value.to_string()).unwrap_or_default(),
+                        da_low,
+                        da_high,
+                    )
+                } else {
+                    (
+                        String::new(), String::new(), String::new(), String::new(),
+                        String::new(), String::new(), String::new(), String::new(),
+                        String::new(), String::new(), String::new(),
+                    )
+                };
                 let objective_spread = result
                     .diagnostics
                     .solution_objective_spread
@@ -118,11 +159,22 @@ fn main() {
                     .map(|value| format!(r#""{value}""#))
                     .unwrap_or_default();
                 println!(
-                    "{campaign_seed},{mu},{sigma},{:?},{mu_hat},{sigma_hat},{d_a_hat},{nll},{gradient},{},{},{},{objective_spread},{parameter_spread},{curvature}",
+                    "{campaign_seed},{mu},{sigma},{:?},{mu_hat},{sigma_hat},{d_a_hat},{nll},{gradient},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{objective_spread},{parameter_spread},{curvature}",
                     result.status,
                     result.diagnostics.iterations,
                     result.diagnostics.starts_converged,
-                    result.diagnostics.starts_non_finite
+                    result.diagnostics.starts_non_finite,
+                    fim_rank,
+                    fim_dimension,
+                    fim_condition,
+                    fim_relative_min_eigenvalue,
+                    mu_se,
+                    sigma_se,
+                    sigma_ci_low,
+                    sigma_ci_high,
+                    da_se,
+                    da_ci_low,
+                    da_ci_high
                 );
             }
         }
