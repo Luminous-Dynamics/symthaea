@@ -1,0 +1,12 @@
+[package]
+name = "project-underwriting-oracle"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Deterministic semantic gate evaluator for the Symthaea project-underwriting synthetic corpus"
+
+[dependencies]
+serde_json = "1"
+
+[workspace]
