@@ -50,6 +50,9 @@ The production known-answer fixture is also checked independently. Its reconstru
 
 ## Run locally
 
+    cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml \
+      --bin connectome_query_ensemble_audit
+
     cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
       --bin connectome_query_ensemble_audit -- \
       --input docs/neuroscience/examples/CONNECTOME_QUERY_ENSEMBLE_AUDIT.example.json \
