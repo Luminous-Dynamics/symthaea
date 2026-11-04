@@ -194,7 +194,7 @@
               ]
             },
             "execution_authorized": {
-              "const": false
+              "type": "boolean"
             }
           }
         },
@@ -271,7 +271,65 @@
             }
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "metadata_only",
+                  "access_gated",
+                  "adapter_in_progress",
+                  "retired"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "execution": {
+                "properties": {
+                  "execution_authorized": {
+                    "const": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "runnable",
+                  "qualified"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "execution": {
+                "properties": {
+                  "execution_authorized": {
+                    "const": true
+                  },
+                  "runner_revision": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "dataset_revision": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "split": {
       "type": "object",
