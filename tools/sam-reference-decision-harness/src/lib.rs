@@ -270,21 +270,22 @@ pub fn evaluate_pair(
     let mut expected = BTreeSet::new();
     for reference_id in &context.expected_reference_ids {
         validate_nonempty(reference_id, "expected_reference_id")?;
-        if !expected.insert(reference_id.as_str()) {
+        if !expected.insert(reference_id.clone()) {
             return Err(EvaluationError::DuplicateReferenceId(reference_id.clone()));
         }
     }
-    let provided: BTreeSet<&str> = ordered_rows.iter().map(|row| row.reference_id.as_str()).collect();
+    let provided: BTreeSet<String> =
+        ordered_rows.iter().map(|row| row.reference_id.clone()).collect();
     if let Some(missing) = expected.difference(&provided).next() {
         return Ok(empty_envelope(
             DecisionClass::Incomplete,
-            Some(IncompleteReason::MissingExpectedReference((*missing).to_owned())),
+            Some(IncompleteReason::MissingExpectedReference(missing.clone())),
         ));
     }
     if let Some(unexpected) = provided.difference(&expected).next() {
         return Ok(empty_envelope(
             DecisionClass::Incomplete,
-            Some(IncompleteReason::UnexpectedReference((*unexpected).to_owned())),
+            Some(IncompleteReason::UnexpectedReference(unexpected.clone())),
         ));
     }
 
@@ -313,6 +314,7 @@ pub fn evaluate_pair(
     let mut applicable_count = 0usize;
     let mut inapplicable_count = 0usize;
     let mut common_semantics: Option<IntervalSemantics> = None;
+    let mut common_action_payloads = std::collections::BTreeMap::new();
     let mut evidence_kind: Option<EvidenceKind> = None;
     let mut mixed_evidence = false;
     let mut incompatible_semantics = false;
@@ -393,6 +395,21 @@ pub fn evaluate_pair(
 
         validate_action_identity(context, row, &context.action_a_id, action_a)?;
         validate_action_identity(context, row, &context.action_b_id, action_b)?;
+        for (action_id, action) in [
+            (context.action_a_id.as_str(), action_a),
+            (context.action_b_id.as_str(), action_b),
+        ] {
+            if let Some(existing) = common_action_payloads.get(action_id) {
+                if existing != &action.action_payload_digest {
+                    return Err(EvaluationError::ContextMismatch {
+                        reference_id: row.reference_id.clone(),
+                        action_id: action_id.to_owned(),
+                    });
+                }
+            } else {
+                common_action_payloads.insert(action_id.to_owned(), action.action_payload_digest.clone());
+            }
+        }
         if action_a.execution_context_digest != action_b.execution_context_digest {
             return Err(EvaluationError::ContextMismatch {
                 reference_id: row.reference_id.clone(),
@@ -497,22 +514,32 @@ pub fn evaluate_pair(
                     favorable_interval(*a_lower, *a_upper, context.metric.direction);
                 let (b_lower, b_upper) =
                     favorable_interval(*b_lower, *b_upper, context.metric.direction);
-                let difference = DifferenceInterval {
-                    lower: a_lower - b_upper,
-                    upper: a_upper - b_lower,
-                };
-                if !difference.lower.is_finite() || !difference.upper.is_finite() {
-                    return Err(EvaluationError::NonFiniteDifference {
+                if a_semantics == b_semantics {
+                    let difference = DifferenceInterval {
+                        lower: a_lower - b_upper,
+                        upper: a_upper - b_lower,
+                    };
+                    if !difference.lower.is_finite() || !difference.upper.is_finite() {
+                        return Err(EvaluationError::NonFiniteDifference {
+                            reference_id: row.reference_id.clone(),
+                        });
+                    }
+                    comparisons.push(ReferenceComparison {
                         reference_id: row.reference_id.clone(),
+                        dependency_family_id: row.dependency_family_id.clone(),
+                        applicability: row.applicability,
+                        difference: Some(difference),
+                        point_preference: None,
+                    });
+                } else {
+                    comparisons.push(ReferenceComparison {
+                        reference_id: row.reference_id.clone(),
+                        dependency_family_id: row.dependency_family_id.clone(),
+                        applicability: row.applicability,
+                        difference: None,
+                        point_preference: None,
                     });
                 }
-                comparisons.push(ReferenceComparison {
-                    reference_id: row.reference_id.clone(),
-                    dependency_family_id: row.dependency_family_id.clone(),
-                    applicability: row.applicability,
-                    difference: Some(difference),
-                    point_preference: None,
-                });
                 mark_evidence_kind(&mut evidence_kind, EvidenceKind::Interval, &mut mixed_evidence);
             }
             (
@@ -548,6 +575,13 @@ pub fn evaluate_pair(
             _ => {
                 mixed_evidence = true;
                 mark_evidence_kind(&mut evidence_kind, EvidenceKind::Mixed, &mut mixed_evidence);
+                comparisons.push(ReferenceComparison {
+                    reference_id: row.reference_id.clone(),
+                    dependency_family_id: row.dependency_family_id.clone(),
+                    applicability: row.applicability,
+                    difference: None,
+                    point_preference: None,
+                });
             }
         }
     }
@@ -894,7 +928,16 @@ mod tests {
             unit: "m".into(),
             execution_context_digest: "d".repeat(64),
             action_payload_digest: action_payload_digest.repeat(64),
-            output_digest: format!("{:0<64}", receipt_id),
+            output_digest: format!(
+                "{}{}",
+                reference_id
+                    .bytes()
+                    .find(u8::is_ascii_hexdigit)
+                    .map(char::from)
+                    .unwrap_or('a')
+                    .to_ascii_lowercase(),
+                if action_id == "continue" { "e" } else { "f" }.repeat(63)
+            ),
             feasibility: Feasibility::Feasible,
             outcome,
         }
@@ -1165,6 +1208,20 @@ mod tests {
         bad.action_a.as_mut().unwrap().action_set_id = "other-actions".into();
         assert!(matches!(
             evaluate(&context(Direction::HigherIsBetter, 0.1), &[bad]),
+            Err(EvaluationError::ContextMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn different_action_payloads_across_references_reject_pairing() {
+        let mut second = row("r1", "family-b", interval(2.0, 2.2), interval(1.0, 1.2));
+        second.action_a.as_mut().unwrap().action_payload_digest = "9".repeat(64);
+        let rows = vec![
+            row("r0", "family-a", interval(2.0, 2.2), interval(1.0, 1.2)),
+            second,
+        ];
+        assert!(matches!(
+            evaluate(&context(Direction::HigherIsBetter, 0.1), &rows),
             Err(EvaluationError::ContextMismatch { .. })
         ));
     }
