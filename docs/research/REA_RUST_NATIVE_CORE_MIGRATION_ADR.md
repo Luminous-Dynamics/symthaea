@@ -1054,3 +1054,45 @@ The run used rustc `1.101.0-nightly (1c3a65069 2026-11-02)`, nightly `2026-11-03
 
 No crash was reported in the run. This is a second 181-second smoke campaign, not sustained fuzz qualification, coverage saturation, multi-platform assurance, or a proof of absence of bugs. The two runs are recorded separately in the machine-readable manifest; their executions/corpora/counters are not summed into a quality score.
 
+## 25. 2026-11-04 — exact-head qualification results
+
+Three dedicated exact-head workflows now provide initial executable evidence:
+
+### ZIP content verifier
+
+- PR: [#10368](https://github.com/Luminous-Dynamics/symthaea/pull/10368)
+- Source head: `241b42feae94937bb1b0716841abcf77def2e1d1`
+- Workflow: [run 41901339358](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41901339358)
+- Result: success; all 41 unit/adversarial tests passed (0 failed/ignored), formatting passed, Clippy with warnings denied passed.
+- ZIP64-with-prepended-stub passed through the bounded ZIP-relative `ArchiveSlice`.
+- Unique-name zip-rs parity passed; duplicate-name occurrence collapse is preserved as a separate parser disagreement.
+- Independent zlib-rs Deflate comparison, bitwise incremental CRC, concurrent independent cursor test and slice-boundary controls passed.
+
+This is a single Linux x86-64 exact-head qualification. It does not establish non-Unix content verification, whole APK/IPA semantics, archive completeness, producer authenticity or field performance.
+
+### Coverage-guided fuzz smoke
+
+- PR: [#10451](https://github.com/Luminous-Dynamics/symthaea/pull/10451)
+- Last successful fuzzed source head: `d8d54f6e918838eabf9cb110db79d4f23986fede`
+- Workflow: [run 41904482693](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41904482693)
+- Artifact: [`rea-zip-fuzz-run`](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41904482693/artifacts/13358294215), SHA-256 `2566b473d92a223886c9461d581494b6a3479118077a14838115bba785e154d9`.
+- 3,371,635 executions in 181 seconds; mean 18,627 executions/s; peak RSS 283 MiB.
+- libFuzzer reported 1,065 coverage edges, 1,475 features and a 204-entry / 22 KiB corpus at completion.
+- Zero crashes/timeouts were reported in that bounded run.
+
+This is a smoke campaign, not sustained fuzz qualification. The next workflow-only change at `c7e9969363d94a46f0156a188c6343b0080a6883` captures the raw fuzzer log and final statistics in uploaded artifacts; those new outputs require a rerun before they can be claimed as present.
+
+### Evidence receipt validator
+
+- PR: [#10477](https://github.com/Luminous-Dynamics/symthaea/pull/10477)
+- Source head: `667e26121c371eadbfab6a8cd68729f5efb839c5`
+- Workflow: [run 41906164694](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41906164694)
+- Result: success; 15 tests passed, 0 failed/ignored; formatting and Clippy with warnings denied passed.
+- The run validates schema meta-validation, receipt semantics, duplicate-key rejection, exact-u64 decimal strings, RFC 8785 number/string behavior and UTF-16 property sorting.
+
+This is a validator/canonicalizer harness, not a production receipt producer, replay executable or producer-attestation implementation. Its transitive Cargo.lock was generated and uploaded by the workflow but is not yet committed; dependency graph locking remains a promotion gate.
+
+### Qualification interpretation
+
+Do not combine these outcomes into one composite security score. The reader tests establish deterministic fixture behavior at one exact head, the fuzz smoke explores a bounded mutated-input distribution, and the receipt harness verifies a different serialization/claim-validation contract. Their evidence is complementary but not interchangeable.
+
