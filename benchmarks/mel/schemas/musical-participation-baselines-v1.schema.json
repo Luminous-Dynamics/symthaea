@@ -86,6 +86,8 @@
             "valid_decision_support_count",
             "paired_correct_count",
             "false_entry_count",
+            "unauthorized_yield_count",
+            "withhold_violation_count",
             "missed_invitation_count",
             "intentional_wait_count",
             "epistemic_abstain_count",
@@ -125,6 +127,14 @@
               "type": "number",
               "minimum": 0,
               "maximum": 1
+            },
+            "unauthorized_yield_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "withhold_violation_count": {
+              "type": "integer",
+              "minimum": 0
             }
           }
         }
