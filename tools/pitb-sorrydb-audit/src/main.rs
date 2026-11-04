@@ -170,7 +170,8 @@ struct Report {
     evaluation_split_raw_sha256: String,
     run_input_sha256: Option<String>,
     run_count: usize,
-    verified_success_count: usize,
+    verified_success_run_count: usize,
+    unique_successful_task_count: usize,
     strategy_summaries: Vec<StrategySummary>,
     full_task_count: usize,
     evaluation_task_count: usize,
@@ -534,6 +535,7 @@ fn summarize_proof_runs(
     let mut run_ids = BTreeSet::new();
     let mut groups = BTreeMap::<(String, String, Option<String>, Option<String>), Vec<&ProofRun>>::new();
     let mut verified_success_count = 0usize;
+    let mut successful_task_ids = BTreeSet::<&str>::new();
     for (index, run) in runs.iter().enumerate() {
         validate_proof_run(run, index + 1, &evaluation_by_id)?;
         if !run_ids.insert(run.run_id.as_str()) {
@@ -541,6 +543,7 @@ fn summarize_proof_runs(
         }
         if run.outcome == "verified_success" {
             verified_success_count += 1;
+            successful_task_ids.insert(run.task_id.as_str());
         }
         groups.entry((
             run.strategy.name.clone(),
@@ -581,7 +584,7 @@ fn summarize_proof_runs(
             total_cost_usd: total_cost as f64 / 1_000_000.0,
         });
     }
-    Ok((verified_success_count, summaries))
+    Ok((verified_success_count, successful_task_ids.len(), summaries))
 }
 
 fn audit(
@@ -656,7 +659,7 @@ fn audit(
     if exact_matches != evaluation.sorries.len() {
         return Err("evaluation split is not an exact subset of full snapshot".into());
     }
-    let (verified_success_count, strategy_summaries) =
+    let (verified_success_run_count, unique_successful_task_count, strategy_summaries) =
         summarize_proof_runs(proof_runs, evaluation)?;
 
     let documentation_drift = full.sorries.len() != DOCUMENTED_FULL_COUNT;
@@ -693,7 +696,8 @@ fn audit(
         evaluation_split_raw_sha256: sha256(evaluation_bytes),
         run_input_sha256,
         run_count: proof_runs.len(),
-        verified_success_count,
+        verified_success_run_count,
+        unique_successful_task_count,
         strategy_summaries,
         full_task_count: full.sorries.len(),
         evaluation_task_count: evaluation.sorries.len(),
@@ -951,8 +955,8 @@ fn run_self_tests() -> Result<(), String> {
         valid_run,
         synthetic_proof_run(&evaluation.sorries[0], false, "self-test-non-solve"),
     ];
-    let (successes, summaries) = summarize_proof_runs(&runs, &evaluation)?;
-    if successes != 1 || summaries.len() != 1
+    let (success_runs, unique_successes, summaries) = summarize_proof_runs(&runs, &evaluation)?;
+    if success_runs != 1 || unique_successes != 1 || summaries.len() != 1
         || summaries[0].attempts != 2
         || summaries[0].verified_successes != 1
         || summaries[0].non_solves != 1
@@ -1005,7 +1009,8 @@ fn synthetic_report() -> Result<Value, String> {
         "evaluation_split_raw_sha256": sha256(&evaluation_bytes),
         "run_input_sha256": run_input_sha256,
         "run_count": proof_runs.len(),
-        "verified_success_count": verified_success_count,
+        "verified_success_run_count": verified_success_run_count,
+        "unique_successful_task_count": unique_successful_task_count,
         "strategy_summaries": strategy_summaries,
         "full_task_count": 3,
         "evaluation_task_count": 2,
