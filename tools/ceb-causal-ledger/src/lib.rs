@@ -307,7 +307,7 @@ pub struct OutcomeRecord {
 }
 
 /// Causal-ablation role for matched policy comparisons.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum AblationArm {
     /// Full mechanism is active.
     Intact,
