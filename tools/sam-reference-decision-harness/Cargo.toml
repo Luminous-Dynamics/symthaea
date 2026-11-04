@@ -1,0 +1,12 @@
+[workspace]
+resolver = "2"
+
+[package]
+name = "sam-reference-decision-harness"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Standalone, dependency-free evaluator for reference-set counterfactual decision envelopes."
+
+[lib]
+path = "src/lib.rs"
