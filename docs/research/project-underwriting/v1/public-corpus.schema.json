@@ -78,7 +78,8 @@
         "subject_id",
         "boundary_id",
         "issuer_id",
-        "issuer_role"
+        "issuer_role",
+        "authenticity_status"
       ],
       "properties": {
         "evidence_id": {
@@ -191,6 +192,14 @@
             "epc_contractor",
             "central_bank",
             "other"
+          ]
+        },
+        "authenticity_status": {
+          "enum": [
+            "not_applicable",
+            "unverified",
+            "verified",
+            "failed"
           ]
         }
       }
