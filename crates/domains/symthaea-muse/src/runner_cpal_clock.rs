@@ -1015,4 +1015,191 @@ mod tests {
             Err(RunnerCpalClockFitErrorV1::InvalidDescriptor)
         ));
     }
+
+    #[test]
+    fn runner_to_playback_to_output_frame_composes_for_exact_matching_stream() {
+        use crate::output_clock::{
+            fit_output_clock_bundle_v1, OutputClockAnchorSchemaV1,
+            OutputClockAnchorSourceV1, OutputClockAnchorV1,
+            OutputClockFitPolicyV1, OutputClockStreamDescriptorV1,
+        };
+
+        let output_descriptor = OutputClockStreamDescriptorV1::from_cpal_device_id(
+            7,
+            "runner-cpal-composition-device",
+            48_000,
+            2,
+        )
+        .unwrap();
+        let runner_descriptor = RunnerCpalClockDescriptorV1 {
+            schema_version: RUNNER_CLOCK_BRIDGE_DESCRIPTOR_SCHEMA_V1.to_owned(),
+            session_id: "composition-session".to_owned(),
+            runner_clock_domain_id: "runner-monotonic-v1".to_owned(),
+            runner_origin_id: "composition-origin".to_owned(),
+            stream_instance_id: 7,
+            cpal_stream_descriptor_sha256: output_descriptor
+                .configuration_digest_sha256
+                .clone(),
+        };
+        let identity = runner_descriptor.identity_sha256().unwrap();
+        let pairs = vec![
+            RunnerCpalClockPairV1::from_observation(7, identity, 0, 0, 5_000_000, 100_000_000, 100_000_100).unwrap(),
+            RunnerCpalClockPairV1::from_observation(7, identity, 1, 10_000_000, 15_000_000, 110_000_000, 110_000_100).unwrap(),
+            RunnerCpalClockPairV1::from_observation(7, identity, 2, 20_000_000, 25_000_000, 120_000_000, 120_000_100).unwrap(),
+            RunnerCpalClockPairV1::from_observation(7, identity, 3, 30_000_000, 35_000_000, 130_000_000, 130_000_100).unwrap(),
+        ];
+        let runner_fit = fit_runner_cpal_clock_v1(
+            &runner_descriptor,
+            &pairs,
+            policy(),
+        )
+        .unwrap();
+
+        let playback_times = [5_000_000_u64, 15_000_000, 25_000_000, 35_000_000];
+        let frame_positions = [0_u64, 480, 960, 1440];
+        let output_anchors = playback_times
+            .iter()
+            .zip(frame_positions)
+            .enumerate()
+            .map(|(index, (playback_ns, frame_index))| OutputClockAnchorV1 {
+                schema_version: OutputClockAnchorSchemaV1::V1,
+                source: OutputClockAnchorSourceV1::SyntheticFixtureV1,
+                stream_instance_id: 7,
+                anchor_index: index as u64,
+                first_output_frame_index: frame_index,
+                frame_count: 480,
+                sample_rate_hz: 48_000,
+                channel_count: 2,
+                callback_stream_time_ns: playback_ns.saturating_sub(5_000_000),
+                playback_stream_time_ns: *playback_ns,
+                callback_to_playback_ns: 5_000_000,
+                timestamp_uncertainty_ns: None,
+            })
+            .collect::<Vec<_>>();
+        let output_bundle = fit_output_clock_bundle_v1(
+            &output_descriptor,
+            &output_anchors,
+            OutputClockFitPolicyV1::default(),
+        )
+        .unwrap();
+
+        let estimate = estimate_output_frame_at_runner_time_v1(
+            &runner_fit,
+            &output_bundle,
+            120_000_000,
+        )
+        .unwrap();
+
+        assert!((estimate.estimated_cpal_playback_stream_time_ns - 25_000_000.0).abs() < 1e-6);
+        assert_eq!(estimate.rounded_cpal_playback_stream_time_ns, 25_000_000);
+        assert!((estimate.output_frame_estimate.frame_position - 960.0).abs() < 1e-6);
+        assert_eq!(estimate.accuracy_status, RunnerCpalClockAccuracyStatusV1::PointEstimateOnly);
+        assert_eq!(
+            estimate.output_frame_estimate.accuracy_status,
+            OutputClockAccuracyStatusV1::PointEstimateOnly
+        );
+        assert!(estimate.output_frame_estimate.reported_uncertainty_frames.is_none());
+    }
+
+    #[test]
+    fn runner_output_frame_composition_rejects_stream_identity_mismatch() {
+        use crate::output_clock::{
+            fit_output_clock_bundle_v1, OutputClockAnchorSchemaV1,
+            OutputClockAnchorSourceV1, OutputClockAnchorV1,
+            OutputClockFitPolicyV1, OutputClockStreamDescriptorV1,
+        };
+
+        let output_descriptor = OutputClockStreamDescriptorV1::from_cpal_device_id(
+            8,
+            "another-output-device",
+            48_000,
+            2,
+        )
+        .unwrap();
+        let runner_descriptor = RunnerCpalClockDescriptorV1 {
+            schema_version: RUNNER_CLOCK_BRIDGE_DESCRIPTOR_SCHEMA_V1.to_owned(),
+            session_id: "composition-session".to_owned(),
+            runner_clock_domain_id: "runner-monotonic-v1".to_owned(),
+            runner_origin_id: "composition-origin".to_owned(),
+            stream_instance_id: 7,
+            cpal_stream_descriptor_sha256: "a".repeat(64),
+        };
+        let runner_fit = fit_runner_cpal_clock_v1(
+            &runner_descriptor,
+            &exact_pairs(),
+            policy(),
+        )
+        .unwrap();
+        let anchors = vec![
+            OutputClockAnchorV1 {
+                schema_version: OutputClockAnchorSchemaV1::V1,
+                source: OutputClockAnchorSourceV1::SyntheticFixtureV1,
+                stream_instance_id: 8,
+                anchor_index: 0,
+                first_output_frame_index: 0,
+                frame_count: 480,
+                sample_rate_hz: 48_000,
+                channel_count: 2,
+                callback_stream_time_ns: 0,
+                playback_stream_time_ns: 5_000_000,
+                callback_to_playback_ns: 5_000_000,
+                timestamp_uncertainty_ns: None,
+            },
+            OutputClockAnchorV1 {
+                schema_version: OutputClockAnchorSchemaV1::V1,
+                source: OutputClockAnchorSourceV1::SyntheticFixtureV1,
+                stream_instance_id: 8,
+                anchor_index: 1,
+                first_output_frame_index: 480,
+                frame_count: 480,
+                sample_rate_hz: 48_000,
+                channel_count: 2,
+                callback_stream_time_ns: 10_000_000,
+                playback_stream_time_ns: 15_000_000,
+                callback_to_playback_ns: 5_000_000,
+                timestamp_uncertainty_ns: None,
+            },
+            OutputClockAnchorV1 {
+                schema_version: OutputClockAnchorSchemaV1::V1,
+                source: OutputClockAnchorSourceV1::SyntheticFixtureV1,
+                stream_instance_id: 8,
+                anchor_index: 2,
+                first_output_frame_index: 960,
+                frame_count: 480,
+                sample_rate_hz: 48_000,
+                channel_count: 2,
+                callback_stream_time_ns: 20_000_000,
+                playback_stream_time_ns: 25_000_000,
+                callback_to_playback_ns: 5_000_000,
+                timestamp_uncertainty_ns: None,
+            },
+            OutputClockAnchorV1 {
+                schema_version: OutputClockAnchorSchemaV1::V1,
+                source: OutputClockAnchorSourceV1::SyntheticFixtureV1,
+                stream_instance_id: 8,
+                anchor_index: 3,
+                first_output_frame_index: 1440,
+                frame_count: 480,
+                sample_rate_hz: 48_000,
+                channel_count: 2,
+                callback_stream_time_ns: 30_000_000,
+                playback_stream_time_ns: 35_000_000,
+                callback_to_playback_ns: 5_000_000,
+                timestamp_uncertainty_ns: None,
+            },
+        ];
+        let output_bundle = fit_output_clock_bundle_v1(
+            &output_descriptor,
+            &anchors,
+            OutputClockFitPolicyV1::default(),
+        )
+        .unwrap();
+
+        assert!(matches!(
+            estimate_output_frame_at_runner_time_v1(&runner_fit, &output_bundle, 120_000_000),
+            Err(RunnerOutputFrameCompositionErrorV1::StreamInstanceMismatch)
+                | Err(RunnerOutputFrameCompositionErrorV1::StreamDescriptorDigestMismatch)
+        ));
+    }
+
 }
