@@ -20,6 +20,29 @@
   "certificate_git_blob_sha1": "747732281992d62929aad686632a3705749e8fdf",
   "checker_git_blob_sha1": "8bf663a393e89f07ff4b7e2bef31015c4d419824",
   "local_reference_variant_check": "passed",
-  "uploaded_checker_execution": "not_run",
-  "execution_note": "The locally executed reference variant is semantically equivalent but not byte-identical to the compact checker blob identified below. Re-run the uploaded checker before treating it as executed evidence."
+  "uploaded_checker_execution": "passed",
+  "execution_note": "Exact uploaded checker bytes were reconstructed locally and their Git blob SHA-1 matched the fetched GitHub blob. Executed with Python 3.13.5. Valid receipt accepted; source/target oracle matched 2->3 full models with unchanged projected support [0,1] and PWMC 1/1; all 9 negative controls rejected.",
+  "certificate_sha256": "sha256:fb6ea66db3ddd76e3a211e2b02b46a9afcc37f3d8392dbdef0b598bd429d25d3",
+  "checker_sha256": "sha256:a1f8e7a047a39635eed2c130183191d7b74eee7d4ac466c09df51ce2f04947e7",
+  "execution_environment": {
+    "python": "3.13.5",
+    "execution_date": "2026-11-04",
+    "method": "exact GitHub blob reconstruction; Git blob SHA-1 verified before execution"
+  },
+  "execution_summary": {
+    "valid_receipt": "accepted",
+    "source_full_models": 2,
+    "target_full_models": 3,
+    "source_projected_support": [
+      "0",
+      "1"
+    ],
+    "target_projected_support": [
+      "0",
+      "1"
+    ],
+    "pwmc": "1/1",
+    "negative_controls": 9,
+    "negative_controls_rejected": 9
+  }
 }
