@@ -306,7 +306,9 @@
         "selected_path_replacement_during_content_read",
         "decoder_output_exceeds_forged_declared_uncompressed_size",
         "caller_buffer_limit_and_declared_size_budget",
-        "cross_parser_disagreement_preserved_as_evidence_not_majority_vote"
+        "cross_parser_disagreement_preserved_as_evidence_not_majority_vote",
+        "concurrent_member_verification_independent_file_cursor",
+        "same_reader_parallel_verification_deterministic_result"
       ],
       "metrics": [
         "entry_occurrence_precision_recall",
@@ -328,7 +330,9 @@
         "source_mutation_false_accept_rate",
         "buffer_and_peak_rss_bound_vs_member_size",
         "verified_mib_per_second_by_compression_method",
-        "energy_per_verified_mib"
+        "energy_per_verified_mib",
+        "concurrent_verification_cross_talk_false_failure_rate",
+        "concurrent_results_digest_consistency"
       ],
       "target": "100_percent supported-subset parity against pinned upstream REA and separately pinned decoder oracles; zero false accepts for CRC/size corruption, partial streams, metadata disagreement, source mutation or actual-output limit violations; bounded memory independent of member size; performance scored only after correctness gates pass.",
       "boundaries": {
@@ -358,7 +362,8 @@
         "run custom parser, secondary decoder and pinned upstream REA as separate arms",
         "preserve decoder disagreement; require human or independent semantic adjudication for unresolved cases",
         "report false accepts and false rejects by fault family with all skipped, unsupported and abstained cases retained in denominators",
-        "run correctness and resource-safety gates before any throughput leaderboard"
+        "run correctness and resource-safety gates before any throughput leaderboard",
+        "run parallel verification on one reader instance and verify independent file-cursor isolation; include duplicate and distinct entry occurrences in a multi-thread schedule"
       ]
     },
     {
