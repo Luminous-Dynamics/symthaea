@@ -7,7 +7,7 @@
 //! external evidence bytes, signer identity, statistical model assumptions,
 //! biological truth or causal identification.
 
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
@@ -20,10 +20,6 @@ const VERSION: &str = "0.1.0";
 struct ClaimInfo {
     relation_type: String,
     claim_status: String,
-    source_kind: String,
-    target_kind: String,
-    source_world: String,
-    target_world: String,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -55,12 +51,6 @@ fn valid_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-fn object<'a>(value: &'a Value, context: &str) -> Result<&'a Map<String, Value>, String> {
-    value
-        .as_object()
-        .ok_or_else(|| format!("{context}: expected object"))
-}
-
 fn array<'a>(value: &'a Value, context: &str) -> Result<&'a Vec<Value>, String> {
     value
         .as_array()
@@ -74,14 +64,6 @@ fn string_field(value: &Value, key: &str, context: &str) -> Result<String, Strin
         .filter(|text| !text.trim().is_empty())
         .map(ToOwned::to_owned)
         .ok_or_else(|| format!("{context}.{key}: expected non-empty string"))
-}
-
-fn optional_string_field(value: &Value, key: &str, context: &str) -> Result<Option<String>, String> {
-    match value.get(key) {
-        Some(Value::Null) => Ok(None),
-        Some(Value::String(text)) if !text.trim().is_empty() => Ok(Some(text.clone())),
-        _ => Err(format!("{context}.{key}: expected non-empty string or null")),
-    }
 }
 
 fn digest_field(value: &Value, key: &str, context: &str) -> Result<String, String> {
@@ -282,10 +264,6 @@ fn parse_claims(bundle: &Value) -> Result<ClaimIndex, String> {
         let info = ClaimInfo {
             relation_type,
             claim_status,
-            source_kind,
-            target_kind,
-            source_world,
-            target_world,
         };
         if claims.insert(claim_id.clone(), info).is_some() {
             return Err(format!("duplicate claim_id {claim_id}"));
@@ -314,7 +292,24 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
         digest_field(query, "query_definition_sha256", &context)?;
         digest_field(query, "analysis_code_sha256", &context)?;
         let query_mode = string_field(query, "query_mode", &context)?;
+        if !matches!(query_mode.as_str(), "SINGLE_RELATION_LAYER" | "DECLARED_MIXED_LAYERS") {
+            return Err(format!("{context}.query_mode invalid"));
+        }
         let requested_type = string_field(query, "requested_claim_type", &context)?;
+        if !matches!(
+            requested_type.as_str(),
+            "ANATOMICAL_PATH" | "CORRESPONDENCE_PATH" | "STATISTICAL_PATH"
+                | "FUNCTIONAL_PATH" | "CAUSAL_EFFECT" | "MIXED_EVIDENCE_PATH"
+        ) {
+            return Err(format!("{context}.requested_claim_type invalid"));
+        }
+        let result_status = string_field(query, "result_status", &context)?;
+        if !matches!(
+            result_status.as_str(),
+            "CLAIMED_SUPPORTED" | "CLAIMED_CONDITIONAL" | "CLAIMED_NOT_ESTIMABLE" | "CLAIMED_REJECTED"
+        ) {
+            return Err(format!("{context}.result_status invalid"));
+        }
         let allowed_rows = array(
             query.get("allowed_relation_type_paths").ok_or_else(|| format!("{context}.allowed_relation_type_paths missing"))?,
             &format!("{context}.allowed_relation_type_paths"),
@@ -425,10 +420,7 @@ fn validate_queries(bundle: &Value, index: &ClaimIndex) -> Result<Vec<Value>, St
                     disposition = "NOT_ESTIMABLE";
                 }
             } else {
-                let digest = digest_field(query, "result_sha256", &context)?;
-                if !valid_sha256(&digest) {
-                    return Err(format!("{context}: invalid result digest"));
-                }
+                digest_field(query, "result_sha256", &context)?;
             }
             outputs.push(json!({
                 "query_id": query_id,
@@ -462,11 +454,10 @@ fn verify_bundle(bytes: &[u8]) -> Result<Value, String> {
 
     let summary = bundle.get("summary").ok_or_else(|| "summary missing".to_owned())?;
     let expected_claims = index.claims.len() as u64;
-    let expected_queries = query_results
-        .iter()
-        .map(|row| row["query_id"].as_str().expect("query ID"))
-        .collect::<BTreeSet<_>>()
-        .len() as u64;
+    let expected_queries = array(
+        bundle.get("queries").ok_or_else(|| "queries missing".to_owned())?,
+        "queries",
+    )?.len() as u64;
     if summary.get("claim_count").and_then(Value::as_u64) != Some(expected_claims) {
         return Err("summary.claim_count does not match recomputed claim count".to_owned());
     }
