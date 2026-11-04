@@ -935,3 +935,13 @@ The committed harness Cargo.lock from the exact workflow resolution shows both `
 
 The exact lockfile's SHA-256 is `7a53900c9ceb9882f3e5428d5a6712d68b09a32d3e6c8df2943d6e792c68e323`; its Git blob SHA in the branch is `5e493882c5df0d7ba1d8c991f031d3025a54844d`. This pins the dependency graph inspected here. The next independent-codec lane should use a genuinely different decoder implementation and report that lineage explicitly.
 
+### Coverage-guided fuzz implementation opened
+
+The standalone fuzz lane is now drafted as [#10451](https://github.com/Luminous-Dynamics/symthaea/pull/10451), stacked on the ZIP content verifier. It defines `zip_inventory_and_content` using `libfuzzer-sys 0.4.13`, invoked by `cargo-fuzz 0.13.2` on Linux x86-64/nightly.
+
+The target exercises archive admission and, when admitted, bounded verification of up to eight eligible Stored/Deflate entries. Per-input ceilings are 1 MiB archive bytes, 256 central-directory entries, 256 KiB per-member output, 4 MiB aggregate declared output, 4 KiB read buffer, and 512 MiB runner RSS. The PR workflow includes a 180-second smoke campaign. Temporary input files are created with `create_new` (refuse pre-existing path/symlink), never extracted, and removed through an RAII guard.
+
+The first seed is a deterministic 141-byte ZIP with payload SHA-256 `dd8a2bd8c16d808363a1d1e7560a4cc86494393c1a202a478db00f00ae53d099`. The workflow materializes the seed from tracked base64, prints both source and decoded hashes, and archives the fuzz corpus and run artifacts.
+
+This PR is draft and queued. No build or fuzz execution is claimed. The workflow-generated fuzz `Cargo.lock` must be committed after resolution; all discovered crashes must be minimized and promoted to permanent regressions. A clean 180-second smoke run is not a security certification.
+
