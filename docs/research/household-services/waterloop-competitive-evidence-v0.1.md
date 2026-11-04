@@ -178,7 +178,30 @@ Require actual local-market quotes and service evidence for:
 
 Do not infer price or market availability from a global product page. Do not assume every household can purchase private backup or reuse equipment. WaterLoop should complement reliable public/municipal water service and must not normalize tanker delivery or transfer public accountability to individual households.
 
-## 7. South African source-stream and jurisdiction guardrails
+## 7. Operational independence and connectivity-loss challenge
+
+Hydraloop's January 2026 H300 V2.1 technical sheet says an internet connection is required via Ethernet or internal Wi-Fi. That is a material competitive and lifecycle dependency, but the sentence alone does not identify which functions stop when connectivity is lost.
+
+Do not label H300 "cloud-dependent" or "offline-capable" until a controlled fault-injection test separates these conditions:
+
+| Challenge | Fault injected | Record independently |
+|---|---|---|
+| NET-001 | WAN/internet disconnected; local router and LAN remain powered | treatment cycle, pumps/valves, local control, alarms, storage/delivery, service log |
+| NET-002 | Local Wi-Fi disabled; Ethernet retained where hardware supports it | which functions survive over wired connection |
+| NET-003 | Ethernet disconnected; local Wi-Fi retained where configured | whether Wi-Fi path is enough for basic service and diagnostics |
+| NET-004 | LAN/router/DNS unavailable; local device power retained | local controls, safe state, interlocks, manual operation, service recovery |
+| NET-005 | Vendor account/authentication or remote API unavailable while WAN/LAN remain | whether essential service, local diagnostics, user override or reset is blocked |
+| NET-006 | Vendor update/support endpoint unavailable | firmware recovery, local fault handling, update deferral and safe rollback semantics |
+| NET-007 | Power interruption to router/network equipment only | whether the appliance unnecessarily halts a physically available service |
+| NET-008 | Complete appliance power interruption then restoration | safe restart, valve/pump default state, stale evidence and required requalification |
+
+For each challenge, record exact model/hardware/firmware revision, configured network mode, whether the failure is detected, which functions continue, which stop, local user-visible reason, retained evidence, safe/manual fallback, time to recover and whether recovery requires vendor credentials or a remote service. Repeat with each source stream/end-use profile and during an active service cycle where safe and manufacturer-approved.
+
+The independent comparator should include the actual JoJo-style installation (pump/control topology may be local or mains-dependent) and Moen Flo (connectivity and automatic shutoff behavior). Do not assume competitors are cloud-dependent or local-first from feature pages; test the exact SKU and firmware too.
+
+**Non-negotiable design target for WaterLoop:** essential local manual controls, safe isolation, transparent fault state and permitted basic service should not depend on vendor-cloud availability where the physical system and local safety envelope permit continued operation. A vendor network may supply optional analytics or remote notifications, but loss of those services must be explicitly distinguished from physical service loss. Do not bypass any safety interlock to meet an offline target.
+
+## 8. South African source-stream and jurisdiction guardrails
 
 Greywater is not one homogeneous feedstock, and local rules must be checked for the actual municipality and installation.
 
@@ -201,7 +224,7 @@ Before any Gauteng/Johannesburg installation:
 
 Neither a vendor certification listing nor a generic national reference automatically supplies site-specific plumbing permission or local authority approval. Obtain written review from the competent local authority and qualified installation professional.
 
-## 8. Prospective qualification gates
+## 9. Prospective qualification gates
 
 These are proposed research gates, not standards or achieved results:
 - every published capacity datum binds the exact model/revision, source document, unit, denominator, end-use class and declaration type;
@@ -213,6 +236,6 @@ These are proposed research gates, not standards or achieved results:
 - all cost, energy, consumable and maintenance overhead is allocated once and charged to the same functional unit as the benefit;
 - any combined WaterLoop claim reports the marginal contribution of continuity, reuse and leak containment separately.
 
-## 9. Claim ceiling
+## 10. Claim ceiling
 
 This comparator file does not establish a Hydraloop defect or certification failure, WaterLoop performance/superiority, water savings, potable safety, treatment efficacy, installation legality, local market availability, affordability or household demand. It establishes a source-bound acquisition and matched-test plan only.
