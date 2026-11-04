@@ -159,7 +159,7 @@ fn main() {
                     .map(|value| format!(r#""{value}""#))
                     .unwrap_or_default();
                 println!(
-                    "{campaign_seed},{mu},{sigma},{:?},{mu_hat},{sigma_hat},{d_a_hat},{nll},{gradient},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{objective_spread},{parameter_spread},{curvature}",
+                    "{campaign_seed},{mu},{sigma},{:?},{mu_hat},{sigma_hat},{d_a_hat},{nll},{gradient},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{objective_spread},{parameter_spread},{curvature}",
                     result.status,
                     result.diagnostics.iterations,
                     result.diagnostics.starts_converged,
