@@ -464,8 +464,10 @@ pub enum ValidationError {
     EvidenceParentOutOfOrder,
     /// A hypothesis double-counts evidence with the same origin.
     DuplicateEvidenceOrigin,
-    /// A causal status is claimed without intervention evidence.
+    /// A causal status is claimed without the required intervention evidence.
     CausalStatusWithoutIntervention,
+    /// An identification-under-assumptions claim lacks explicit assumptions or adequate support.
+    IdentificationAssumptionsOrEvidenceMissing,
     /// A correlational status lacks runtime-observation support.
     CorrelationalStatusWithoutRuntimeEvidence,
     /// A hypothesis revision does not link to the preceding revision correctly.
@@ -704,6 +706,7 @@ impl Ledger {
             let mut origins = HashSet::new();
             let mut has_intervention_support = false;
             let mut has_runtime_observation_support = false;
+            let mut has_identification_quality_support = false;
             for evidence_id in &hypothesis.supporting_evidence_ids {
                 let evidence = evidence_by_id
                     .get(evidence_id.as_str())
@@ -719,6 +722,12 @@ impl Ledger {
                 has_runtime_observation_support |= matches!(
                     evidence.authority,
                     EvidenceAuthority::RuntimeObserved | EvidenceAuthority::InterventionObserved
+                );
+                has_identification_quality_support |= matches!(
+                    evidence.authority,
+                    EvidenceAuthority::CompilerResolved
+                        | EvidenceAuthority::RuntimeObserved
+                        | EvidenceAuthority::InterventionObserved
                 );
             }
             for evidence_id in &hypothesis.contradicting_evidence_ids {
@@ -775,18 +784,17 @@ impl Ledger {
             {
                 return Err(ValidationError::CorrelationalStatusWithoutRuntimeEvidence);
             }
-            if matches!(
-                hypothesis.status,
-                HypothesisStatus::InterventionSupported
-                    | HypothesisStatus::IdentifiedUnderAssumptions
-            ) && !has_intervention_support
+            if hypothesis.status == HypothesisStatus::InterventionSupported
+                && !has_intervention_support
             {
                 return Err(ValidationError::CausalStatusWithoutIntervention);
             }
             if hypothesis.status == HypothesisStatus::IdentifiedUnderAssumptions
-                && hypothesis.identification_assumptions.is_empty()
+                && (hypothesis.identification_assumptions.is_empty()
+                    || hypothesis.supporting_evidence_ids.is_empty()
+                    || !has_identification_quality_support)
             {
-                return Err(ValidationError::CausalStatusWithoutIntervention);
+                return Err(ValidationError::IdentificationAssumptionsOrEvidenceMissing);
             }
         }
 
@@ -1106,7 +1114,7 @@ mod tests {
         ledger.hypotheses[0].status = HypothesisStatus::IdentifiedUnderAssumptions;
         assert_eq!(
             ledger.validate(),
-            Err(ValidationError::CausalStatusWithoutIntervention)
+            Err(ValidationError::IdentificationAssumptionsOrEvidenceMissing)
         );
     }
 
