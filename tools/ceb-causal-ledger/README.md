@@ -11,6 +11,9 @@ It validates inert records for:
 - prospective forecast → action → outcome ordering;
 - typed action categories and explicit authorization for side-effecting/test actions;
 - action-kind-specific evidence authority (source/compiler facts are not runtime outcomes; tests require runtime observations; interventions require intervention observations); 
+- nonblank task, record, evidence-origin, evaluator and hypothesis identities; 
+- unique evidence/hypothesis reference lists and rejection when one evidence item is assigned both supporting and contradicting roles;
+- nonblank identification assumptions and abstention/escalation requirements;
 - explicit decision-evidence linkage to considered hypotheses and fail-closed rejection of any unqualified evidence cited by a repair decision;
 - matched ablation-group validation requiring an intact arm and comparator with identical policy and budget digests;
 - explicit missingness rather than converting unobserved outcomes to numeric zero;
@@ -38,7 +41,7 @@ From the repository root:
 cargo test --manifest-path tools/ceb-causal-ledger/Cargo.toml --locked
 ```
 
-The crate has its own `[workspace]` boundary and is intentionally not a member or dependency of the production workspace. Forty-one unit tests are authored in the current source revision (41 `#[test]` attributes counted by static source inspection). The six newest tests cover mixed qualified/unqualified decision evidence, outcome authority by action kind, hypothesis/evidence linkage, matched-arm completeness, and policy/budget drift. Integrate it only after exact-head compilation, independent review, and reconciliation with the existing CEB/general receipt and DSSE work.
+The crate has its own `[workspace]` boundary and is intentionally not a member or dependency of the production workspace. Forty-eight unit tests are authored in the current source revision (48 `#[test]` attributes counted by static source inspection). The latest seven adversarial tests cover blank identities, blank evidence origins, blank assumptions, mixed blank/nonblank abstention requirements, conflicting support/contradiction roles, and blank evaluator revisions. Integrate it only after exact-head compilation, independent review, and reconciliation with the existing CEB/general receipt and DSSE work.
 
 ## Status
 
