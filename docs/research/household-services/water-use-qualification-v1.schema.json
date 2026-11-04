@@ -348,7 +348,9 @@
           "sample_point_id",
           "collected_at",
           "method_id",
-          "parameter_results"
+          "parameter_results",
+          "source_id",
+          "stream_id"
         ],
         "properties": {
           "sample_id": {
@@ -475,6 +477,14 @@
                 }
               ]
             }
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "stream_id": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
