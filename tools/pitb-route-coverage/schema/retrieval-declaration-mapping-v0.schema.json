@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/retrieval-declaration-mapping-v0.schema.json",
+  "title": "PITB retrieval candidate to declaration mapping v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "graph_manifest_sha256",
+    "node_id",
+    "mapping_status",
+    "declaration_id",
+    "mapping_method",
+    "mapping_evidence_sha256",
+    "reviewer_attestation_sha256",
+    "source_locator",
+    "statement_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.retrieval-declaration-mapping.v0"
+    },
+    "graph_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "node_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mapping_status": {
+      "enum": [
+        "exact",
+        "unresolved",
+        "ambiguous"
+      ]
+    },
+    "declaration_id": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "minLength": 1
+        }
+      ]
+    },
+    "mapping_method": {
+      "enum": [
+        "exact_formal_name",
+        "exact_source_identity",
+        "human_reviewed"
+      ]
+    },
+    "mapping_evidence_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "reviewer_attestation_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "source_locator": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "minLength": 1
+        }
+      ]
+    },
+    "statement_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mapping_method": {
+            "const": "exact_formal_name"
+          }
+        },
+        "required": [
+          "mapping_method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source_locator": {
+            "type": "null"
+          },
+          "statement_sha256": {
+            "type": "null"
+          },
+          "reviewer_attestation_sha256": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mapping_method": {
+            "const": "exact_source_identity"
+          }
+        },
+        "required": [
+          "mapping_method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source_locator": {
+            "type": "string",
+            "minLength": 1
+          },
+          "statement_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "reviewer_attestation_sha256": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mapping_method": {
+            "const": "human_reviewed"
+          }
+        },
+        "required": [
+          "mapping_method"
+        ]
+      },
+      "then": {
+        "properties": {
+          "reviewer_attestation_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mapping_status": {
+            "enum": [
+              "unresolved",
+              "ambiguous"
+            ]
+          }
+        },
+        "required": [
+          "mapping_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "declaration_id": {
+            "type": "null"
+          },
+          "source_locator": {
+            "type": "null"
+          },
+          "statement_sha256": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ]
+}
