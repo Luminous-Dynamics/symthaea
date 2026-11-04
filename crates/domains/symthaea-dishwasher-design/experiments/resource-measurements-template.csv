@@ -1,1 +1,1 @@
-measurement_id,source_run_id,resource_kind,value,unit,start_utc_s,end_utc_s,instrument_id,calibration_id,method_id,evidence_uri,evidence_sha256
+measurement_id,source_run_id,resource_kind,measurement_boundary_id,value,unit,start_utc_s,end_utc_s,instrument_id,calibration_id,method_id,evidence_uri,evidence_sha256

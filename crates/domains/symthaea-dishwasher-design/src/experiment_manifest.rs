@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use crate::quality::{Endpoint, OutcomeObservation};
 use crate::validation::{RunPartitionRecord, ValidationPartition};
 
-pub const EVIDENCE_BUNDLE_SCHEMA_VERSION: u16 = 1;
+pub const EVIDENCE_BUNDLE_SCHEMA_VERSION: u16 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ResourceKind {
@@ -77,6 +77,8 @@ pub struct ResourceMeasurement {
     /// Physical wash run whose resource increment this row measures.
     pub source_run_id: String,
     pub measurement_id: String,
+    /// Declared physical scope of this resource increment (not proof of disjointness).
+    pub measurement_boundary_id: String,
     pub kind: ResourceKind,
     pub value: f64,
     pub unit: String,
@@ -149,6 +151,7 @@ pub enum EvidenceBundleError {
     InvalidTraceInterval(String),
     TraceOutsideRun(String),
     InvalidTraceSampling(String),
+    TraceSamplingWindowMismatch(String),
     TraceRunMismatch { artifact_id: String, observed_run_id: String },
     InvalidAssayRun { record_id: String, observed_run_id: String },
     InvalidResourceRun { measurement_id: String, observed_run_id: String },
@@ -168,9 +171,9 @@ pub enum EvidenceBundleError {
     ManualResourceNotAllowed(ResourceKind),
     ResourceEvidenceMissing(String),
     ResourceTotalOverflow(ResourceKind),
-    OverlappingResourceIntervals {
+    OverlappingResourceBoundaryIntervals {
         kind: ResourceKind,
-        instrument_id: String,
+        measurement_boundary_id: String,
         first_measurement_id: String,
         second_measurement_id: String,
     },
@@ -387,8 +390,19 @@ pub fn validate_physical_run_bundle(
         if trace.start_utc_s < bundle.start_utc_s || trace.end_utc_s > bundle.end_utc_s {
             return Err(EvidenceBundleError::TraceOutsideRun(trace.artifact_id.clone()));
         }
-        if trace.sample_count == 0 || !trace.sample_rate_hz.is_finite() || trace.sample_rate_hz <= 0.0 {
+        // A regular time series needs at least two samples to establish a temporal span.
+        // Single observations belong in a point-observation representation, not this trace type.
+        if trace.sample_count < 2 || !trace.sample_rate_hz.is_finite() || trace.sample_rate_hz <= 0.0 {
             return Err(EvidenceBundleError::InvalidTraceSampling(trace.artifact_id.clone()));
+        }
+        // The schema stores interval endpoints at one-second resolution.
+        // For a regularly sampled trace with inclusive first/last samples,
+        // N samples span (N - 1) / f seconds; allow one second of timestamp
+        // quantization but reject internally contradictory metadata.
+        let expected_span_s = (trace.sample_count - 1) as f64 / trace.sample_rate_hz;
+        let observed_span_s = (trace.end_utc_s - trace.start_utc_s) as f64;
+        if !expected_span_s.is_finite() || (expected_span_s - observed_span_s).abs() > 1.0 {
+            return Err(EvidenceBundleError::TraceSamplingWindowMismatch(trace.artifact_id.clone()));
         }
         validate_calibration(&calibrations, &trace.calibration_id, &trace.instrument_id, trace.start_utc_s)?;
         validate_calibration(&calibrations, &trace.calibration_id, &trace.instrument_id, trace.end_utc_s)?;
@@ -482,7 +496,7 @@ pub fn validate_physical_run_bundle(
     let mut resource_ids = HashSet::new();
     let mut present_resources = BTreeSet::new();
     let mut resource_totals: BTreeMap<ResourceKind, f64> = BTreeMap::new();
-    let mut instrument_intervals: BTreeMap<(ResourceKind, String), Vec<(u64, u64, String)>> =
+    let mut boundary_intervals: BTreeMap<(ResourceKind, String), Vec<(u64, u64, String)>> =
         BTreeMap::new();
     for resource in &bundle.resources {
         if resource.source_run_id != bundle.run.run_id {
@@ -493,6 +507,9 @@ pub fn validate_physical_run_bundle(
         }
         if !non_empty(&resource.measurement_id) {
             return Err(EvidenceBundleError::InvalidIdentity("resource_measurement_id"));
+        }
+        if !non_empty(&resource.measurement_boundary_id) {
+            return Err(EvidenceBundleError::InvalidIdentity("resource_measurement_boundary_id"));
         }
         if !resource_ids.insert(resource.measurement_id.as_str())
             || !artifact_ids.insert(resource.measurement_id.as_str())
@@ -519,6 +536,27 @@ pub fn validate_physical_run_bundle(
         if !non_empty(&resource.method_id) || !non_empty(&resource.evidence_uri) || !valid_digest(&resource.evidence_sha256) {
             return Err(EvidenceBundleError::ResourceEvidenceMissing(resource.measurement_id.clone()));
         }
+        // Overlap is checked by declared physical boundary rather than
+        // instrument identity, so meter replacement or redundant instruments
+        // cannot bypass the duplicate-increment guard.
+        let boundary_key = (resource.kind, resource.measurement_boundary_id.clone());
+        let intervals = boundary_intervals.entry(boundary_key).or_default();
+        if let Some((_, _, first_id)) = intervals.iter().find(|(start, end, _)| {
+            resource.start_utc_s < *end && *start < resource.end_utc_s
+        }) {
+            return Err(EvidenceBundleError::OverlappingResourceBoundaryIntervals {
+                kind: resource.kind,
+                measurement_boundary_id: resource.measurement_boundary_id.clone(),
+                first_measurement_id: first_id.clone(),
+                second_measurement_id: resource.measurement_id.clone(),
+            });
+        }
+        intervals.push((
+            resource.start_utc_s,
+            resource.end_utc_s,
+            resource.measurement_id.clone(),
+        ));
+
         match (&resource.instrument_id, &resource.calibration_id) {
             (Some(instrument), Some(calibration_id)) if non_empty(instrument) && non_empty(calibration_id) => {
                 validate_calibration(&calibrations, calibration_id, instrument, resource.start_utc_s)
@@ -526,26 +564,6 @@ pub fn validate_physical_run_bundle(
                 validate_calibration(&calibrations, calibration_id, instrument, resource.end_utc_s)
                     .map_err(|_| EvidenceBundleError::ResourceInstrumentCalibrationMismatch(resource.measurement_id.clone()))?;
 
-                // A single meter cannot contribute overlapping intervals to the
-                // same resource total. Separate instruments/branches may be
-                // combined, but each stream must be non-overlapping.
-                let key = (resource.kind, instrument.clone());
-                let intervals = instrument_intervals.entry(key).or_default();
-                if let Some((_, _, first_id)) = intervals.iter().find(|(start, end, _)| {
-                    resource.start_utc_s < *end && *start < resource.end_utc_s
-                }) {
-                    return Err(EvidenceBundleError::OverlappingResourceIntervals {
-                        kind: resource.kind,
-                        instrument_id: instrument.clone(),
-                        first_measurement_id: first_id.clone(),
-                        second_measurement_id: resource.measurement_id.clone(),
-                    });
-                }
-                intervals.push((
-                    resource.start_utc_s,
-                    resource.end_utc_s,
-                    resource.measurement_id.clone(),
-                ));
             }
             (None, None) if resource.kind == ResourceKind::ActiveOperatorTime => {}
             (None, None) => return Err(EvidenceBundleError::ManualResourceNotAllowed(resource.kind)),
@@ -680,6 +698,7 @@ mod tests {
                 calibration("pressure-cal-01", "pressure-01", &digest('b')),
                 calibration("assay-cal-01", "assay-meter-01", &digest('a')),
                 calibration("power-cal-01", "power-01", &digest('e')),
+                calibration("power-cal-02", "power-02", &digest('e')),
                 calibration("water-cal-01", "water-meter-01", &digest('6')),
             ],
             sensor_traces: vec![SensorTraceArtifact {
@@ -706,6 +725,7 @@ mod tests {
                 ResourceMeasurement {
                     source_run_id: "run-001".to_owned(),
                     measurement_id: "wall-kwh-01".to_owned(),
+                    measurement_boundary_id: "appliance-main-feed".to_owned(),
                     kind: ResourceKind::ApplianceWallElectricity,
                     value: 0.05,
                     unit: "kWh".to_owned(),
@@ -720,6 +740,7 @@ mod tests {
                 ResourceMeasurement {
                     source_run_id: "run-001".to_owned(),
                     measurement_id: "water-l-01".to_owned(),
+                    measurement_boundary_id: "fresh-water-inlet".to_owned(),
                     kind: ResourceKind::FreshWater,
                     value: 0.6,
                     unit: "L".to_owned(),
@@ -734,6 +755,7 @@ mod tests {
                 ResourceMeasurement {
                     source_run_id: "run-001".to_owned(),
                     measurement_id: "operator-s-01".to_owned(),
+                    measurement_boundary_id: "operator-activity-log".to_owned(),
                     kind: ResourceKind::ActiveOperatorTime,
                     value: 30.0,
                     unit: "s".to_owned(),
@@ -929,7 +951,7 @@ mod tests {
         bundle.resources.push(duplicate_interval);
         assert!(matches!(
             validate_physical_run_bundle(&bundle, &[ResourceKind::ApplianceWallElectricity]),
-            Err(EvidenceBundleError::OverlappingResourceIntervals {
+            Err(EvidenceBundleError::OverlappingResourceBoundaryIntervals {
                 kind: ResourceKind::ApplianceWallElectricity,
                 ..
             })
@@ -949,6 +971,78 @@ mod tests {
             &bundle,
             &[ResourceKind::ApplianceWallElectricity],
         ).is_ok());
+    }
+
+    #[test]
+    fn rejects_trace_sampling_window_that_disagrees_with_sample_count_and_rate() {
+        let mut bundle = valid_bundle();
+        bundle.sensor_traces[0].sample_count = 40_000;
+        assert!(matches!(
+            validate_physical_run_bundle(&bundle, &[ResourceKind::FreshWater]),
+            Err(EvidenceBundleError::TraceSamplingWindowMismatch(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_single_sample_trace_without_a_temporal_span() {
+        let mut bundle = valid_bundle();
+        bundle.sensor_traces[0].sample_count = 1;
+        bundle.sensor_traces[0].sample_rate_hz = 100.0;
+        bundle.sensor_traces[0].end_utc_s = bundle.sensor_traces[0].start_utc_s;
+        assert!(matches!(
+            validate_physical_run_bundle(&bundle, &[ResourceKind::FreshWater]),
+            Err(EvidenceBundleError::InvalidTraceSampling(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_overlapping_resource_boundary_intervals_from_different_meters() {
+        let mut bundle = valid_bundle();
+        let mut second_meter = bundle.resources[0].clone();
+        second_meter.measurement_id = "wall-kwh-overlap-secondary".to_owned();
+        second_meter.start_utc_s = 1_500;
+        second_meter.end_utc_s = 1_700;
+        second_meter.value = 0.01;
+        second_meter.instrument_id = Some("power-02".to_owned());
+        second_meter.calibration_id = Some("power-cal-02".to_owned());
+        second_meter.evidence_uri = "evidence://resource/wall-kwh-overlap-secondary".to_owned();
+        second_meter.evidence_sha256 = digest('5');
+        bundle.resources.push(second_meter);
+        assert!(matches!(
+            validate_physical_run_bundle(&bundle, &[ResourceKind::ApplianceWallElectricity]),
+            Err(EvidenceBundleError::OverlappingResourceBoundaryIntervals {
+                kind: ResourceKind::ApplianceWallElectricity,
+                measurement_boundary_id,
+                ..
+            }) if measurement_boundary_id == "appliance-main-feed"
+        ));
+    }
+
+    #[test]
+    fn allows_overlapping_intervals_for_distinct_declared_resource_boundaries() {
+        let mut bundle = valid_bundle();
+        let mut branch_meter = bundle.resources[0].clone();
+        branch_meter.measurement_id = "wall-kwh-subcircuit".to_owned();
+        branch_meter.measurement_boundary_id = "preheat-subcircuit".to_owned();
+        branch_meter.instrument_id = Some("power-02".to_owned());
+        branch_meter.calibration_id = Some("power-cal-02".to_owned());
+        branch_meter.evidence_uri = "evidence://resource/wall-kwh-subcircuit".to_owned();
+        branch_meter.evidence_sha256 = digest('5');
+        bundle.resources.push(branch_meter);
+        assert!(validate_physical_run_bundle(
+            &bundle,
+            &[ResourceKind::ApplianceWallElectricity],
+        ).is_ok());
+    }
+
+    #[test]
+    fn rejects_resource_measurement_with_empty_boundary_identity() {
+        let mut bundle = valid_bundle();
+        bundle.resources[0].measurement_boundary_id.clear();
+        assert!(matches!(
+            validate_physical_run_bundle(&bundle, &[ResourceKind::ApplianceWallElectricity]),
+            Err(EvidenceBundleError::InvalidIdentity("resource_measurement_boundary_id"))
+        ));
     }
 
     #[test]
