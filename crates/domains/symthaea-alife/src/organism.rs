@@ -539,8 +539,8 @@ impl Organism {
         let gated_obs = self.boundary.gate_observation(&raw_obs, &self.agent.belief);
 
         // 3. Perceive: update belief from the gated observation. Consumed via belief_resource
-        //    below, and via belief_change feeding Phase 3's real Landauer bit-count (not
-        //    discarded).
+        //    below, and via belief_change feeding Phase 3's modeled information-cost input
+        //    (not discarded).
         let perception = self.agent.perceive(&gated_obs);
 
         // 4. Select action (always run for real; forced_action only overrides which one is
