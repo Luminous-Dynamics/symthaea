@@ -1,0 +1,104 @@
+{
+  "schema_version": 0,
+  "manifest_kind": "ceb-agent-view-v1",
+  "task_id": "CEB-REPO-001",
+  "package_id": "repository-twin-synthetic-public-development-v0",
+  "status": "public_development_only_not_sealed",
+  "source_repository": "Luminous-Dynamics/symthaea",
+  "source_revision": "7a563cd61f4bda3347119ea39169a2e2d1c4f30b",
+  "tree_digest_algorithm": "ceb-tree-v1",
+  "tree_sha256": "1e8cfe4c7a7653764e37e4b4a9eaa083804a6614db03ed56dee822395b762e3e",
+  "entry_count": 15,
+  "entries": [
+    {
+      "path": "Cargo.toml",
+      "mode": "100644",
+      "size_bytes": 428,
+      "sha256": "e94590f967a50adda9a8079ebdadda092a7cdf3e3a06ee47ca2c6cfc06cf29ba"
+    },
+    {
+      "path": "crates/api/Cargo.toml",
+      "mode": "100644",
+      "size_bytes": 475,
+      "sha256": "e5edfff7dc37805c75dea5cd217ca51bfe74c1d77dd6237b2e13bccd0c37a14c"
+    },
+    {
+      "path": "crates/api/src/audit.rs",
+      "mode": "100644",
+      "size_bytes": 343,
+      "sha256": "78a5e9ae2983cdcddb9e52e1e7b5fb0ebcf84d2916363a3f08015082bead6fc7"
+    },
+    {
+      "path": "crates/api/src/lib.rs",
+      "mode": "100644",
+      "size_bytes": 328,
+      "sha256": "9da4f2d1e96a48fc0277ddc2d0703fd665626b4c0f33c7d66dbe8428b00796ac"
+    },
+    {
+      "path": "crates/api/src/profile_api.rs",
+      "mode": "100644",
+      "size_bytes": 413,
+      "sha256": "c8c4d8d34a2fe618bebfe4db167c70fc36e388a23f80934c2021608982cf0f88"
+    },
+    {
+      "path": "crates/api/src/windows_native.rs",
+      "mode": "100644",
+      "size_bytes": 263,
+      "sha256": "3c350d4317c6e2bd841e67eb598566ecc3d6c5fb86930ba38906377ff6a0c798"
+    },
+    {
+      "path": "crates/api/tests/profile.rs",
+      "mode": "100644",
+      "size_bytes": 1086,
+      "sha256": "3d275bfcf111326e83645c0a5c9237e6392442ac2b475bdfa2fb0abc30301e2a"
+    },
+    {
+      "path": "crates/cli/Cargo.toml",
+      "mode": "100644",
+      "size_bytes": 161,
+      "sha256": "3db88ffc3e8ca100dc389ca73c3bdd41d56e62bddfba1b03421e8ca5fc10dc8a"
+    },
+    {
+      "path": "crates/cli/src/main.rs",
+      "mode": "100644",
+      "size_bytes": 105,
+      "sha256": "dd5d6d3d537093cf287c5ceed6a08b885deb75be709b5128d21c022c6e44767f"
+    },
+    {
+      "path": "crates/domain/Cargo.toml",
+      "mode": "100644",
+      "size_bytes": 114,
+      "sha256": "2fc2442e308ee8082472fa9e8fa6d8d70dfe9e733216229cbcbeb385bd0ccbe2"
+    },
+    {
+      "path": "crates/domain/src/lib.rs",
+      "mode": "100644",
+      "size_bytes": 513,
+      "sha256": "07c07655ea0c4107a66b06fa8fe823682e31ae1048ae638dfc835dd268f25bb5"
+    },
+    {
+      "path": "crates/service/Cargo.toml",
+      "mode": "100644",
+      "size_bytes": 204,
+      "sha256": "4f9a825eef05c633eef41f914d260efe6990fee7177e522766b1d4e7b08750bf"
+    },
+    {
+      "path": "crates/service/src/lib.rs",
+      "mode": "100644",
+      "size_bytes": 585,
+      "sha256": "acd35eea16b3124ccef0d14bda52054358cf5ab7369f05e181e1ef0f0ebae3a7"
+    },
+    {
+      "path": "crates/store/Cargo.toml",
+      "mode": "100644",
+      "size_bytes": 166,
+      "sha256": "17e06bc06f5b2226d8d4226f7039a3a8d8892a7735b87cd460fdccbd076383cb"
+    },
+    {
+      "path": "crates/store/src/lib.rs",
+      "mode": "100644",
+      "size_bytes": 552,
+      "sha256": "44cfdcc9a8eb853318e8e707e3259aa74d15228a5a344af88fca665082cdbe0f"
+    }
+  ]
+}
