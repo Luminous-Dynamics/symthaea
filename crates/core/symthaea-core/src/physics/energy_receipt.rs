@@ -250,9 +250,7 @@ fn validate_context(context: &EnergyRunContext) -> Result<(), EnergyReceiptError
             field: "source_commit",
         });
     }
-    if !matches!(context.source_commit.len(), 40 | 64)
-        || !is_hex(&context.source_commit)
-    {
+    if !matches!(context.source_commit.len(), 40 | 64) || !is_hex(&context.source_commit) {
         return Err(EnergyReceiptError::InvalidSourceCommit);
     }
     if let Some(digest) = context.source_tree_digest.as_deref() {
@@ -523,12 +521,7 @@ mod tests {
         let mut end = reading(1_100, 2_000_000_000);
         end.counter_epoch = 2;
         assert_eq!(
-            EnergyRunReceipt::new(
-                context(),
-                quality_gate(0.97),
-                reading(1_000, 1_000),
-                end
-            ),
+            EnergyRunReceipt::new(context(), quality_gate(0.97), reading(1_000, 1_000), end),
             Err(EnergyReceiptError::InvalidCounterInterval {
                 reason: EnergyDeltaError::CounterEpochChanged
             })
