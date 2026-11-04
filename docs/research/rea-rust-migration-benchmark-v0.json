@@ -1642,10 +1642,10 @@
     },
     {
       "id": "artifact_member_receipt_reproducibility",
-      "status": "schema_drafted",
+      "status": "draft_validator_and_jcs_harness_exact_head_pass",
       "schema": "docs/research/rea-zip-content-verification-receipt-v0.schema.json",
       "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10477",
-      "implementation_pr": null,
+      "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10477",
       "objective": "Bind a member-integrity statement to the exact archive source/occurrence, verifier and codec lineage, observed bytes, limits and explicit claim ceiling in a versioned receipt that an independent replay tool can check.",
       "cases": [
         "verified_member_receipt_replays_against_frozen_archive_bytes",
@@ -1684,7 +1684,9 @@
         "keep unsupported/rejected/source-changed/limit-exceeded/abstained cases in denominators",
         "treat producer attestation as a separate in-toto/DSSE reference and separate trust policy",
         "do not add signer identity or authentication claims to REA Evidence ID or payload digest",
-        "pin canonical serialization only after deterministic RFC 8785 behavior and independent conformance vectors are qualified"
+        "pin canonical serialization only after deterministic RFC 8785 behavior and independent conformance vectors are qualified",
+        "for PR-triggered validation record both the pull-request head SHA and the GITHUB_SHA tested revision (which may be a synthetic merge commit); do not conflate them",
+        "the first exact receipt harness workflow run 41906164694 passed rustfmt, schema metadata, all 15 tests, and Clippy with warnings denied; its lockfile was uploaded with digest e0a22bf2e0a798aeb7134bf37d5f63ca3f0e23334274782495e09edd824b21e0 and remains to be committed or otherwise immutably bound for --locked reruns"
       ],
       "claim_boundaries": {
         "receipt_integrity": "A receipt is an auditable record of the verifier's claim and inputs. Its own digest or signature does not increase the strength of the underlying observation.",
@@ -1692,6 +1694,27 @@
         "completeness": "A verified member does not establish that all archive content, APK Signing Block records or package semantics were inspected.",
         "semantics": "A byte digest does not establish installability, runtime behavior, maliciousness/benignness or MASVS control pass.",
         "identity": "A source file identity tuple is distinct from a whole-archive digest and distinct from an immutable content snapshot."
+      },
+      "validation": {
+        "workflow_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/41906164694",
+        "workflow_run_id": "41906164694",
+        "pr_head_sha": "667e26121c371eadbfab6a8cd68729f5efb839c5",
+        "workflow_tested_revision": "4336113e762fc0faf426a4a23a8260c7dfbd81b2",
+        "outcome": "success",
+        "rust_toolchain": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+        "tests_passed": 15,
+        "tests_failed": 0,
+        "rustfmt": "pass",
+        "schema_meta_validation": "pass",
+        "schema_instance_validation": "pass",
+        "jcs_vectors": "pass",
+        "clippy_warnings_denied": "pass",
+        "schema_sha256": "e331801ccd830ffec64954cd9cd801f322feb1cc54e6350b695ee1d90e034e79",
+        "cargo_lock_sha256": "e0a22bf2e0a798aeb7134bf37d5f63ca3f0e23334274782495e09edd824b21e0",
+        "cargo_lock_artifact_id": "13358934906",
+        "workflow_artifact_zip_sha256": "aed9e804a20d8f70913d89c386fe0036ee2d1ecf76b28ce630f925f4abdc15a6",
+        "run_context_sha256": "f557b2c92870ec6c09fbc36ed75d1eff895e4a7435d3b551d2bba55ea64c9893",
+        "lock_status": "generated and uploaded from exact workflow run; not yet committed to the PR branch; subsequent validation must either commit and use --locked or bind the generated lock digest in the run receipt"
       }
     }
   ],
