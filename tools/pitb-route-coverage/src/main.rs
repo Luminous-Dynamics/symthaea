@@ -501,12 +501,143 @@ fn validate_mapping(mapping: &Mapping, index: usize) -> Result<(), String> {
         }
         _ => unreachable!(),
     }
-    if mapping.mapping_method == "human_reviewed" {
-        let reviewer = mapping.reviewer_attestation_sha256.as_ref()
-            .ok_or_else(|| format!("{label} human mapping lacks reviewer attestation"))?;
-        digest(reviewer, &format!("{label}.reviewer_attestation_sha256"))?;
-    } else if mapping.reviewer_attestation_sha256.is_some() {
-        return Err(format!("{label} non-human mapping cannot carry reviewer attestation"));
+    match mapping.mapping_method.as_str() {
+        "exact_formal_name" => {
+            if mapping.reviewer_attestation_sha256.is_some()
+                || mapping.source_locator.is_some()
+                || mapping.statement_sha256.is_some()
+            {
+                return Err(format!("{label} exact_formal_name mapping carries unrelated attestation/source fields"));
+            }
+        }
+        "exact_source_identity" => {
+            if mapping.reviewer_attestation_sha256.is_some() {
+                return Err(format!("{label} exact_source_identity cannot carry reviewer attestation"));
+            }
+            let locator = mapping.source_locator.as_ref()
+                .ok_or_else(|| format!("{label} exact_source_identity mapping lacks source_locator"))?;
+            non_empty(locator, &format!("{label}.source_locator"))?;
+            let statement = mapping.statement_sha256.as_ref()
+                .ok_or_else(|| format!("{label} exact_source_identity mapping lacks statement_sha256"))?;
+            digest(statement, &format!("{label}.statement_sha256"))?;
+        }
+        "human_reviewed" => {
+            let reviewer = mapping.reviewer_attestation_sha256.as_ref()
+                .ok_or_else(|| format!("{label} human mapping lacks reviewer attestation"))?;
+            digest(reviewer, &format!("{label}.reviewer_attestation_sha256"))?;
+        }
+        _ => return Err(format!("{label} has unsupported mapping method")),
+    }
+    if mapping.mapping_status != "exact"
+        && (mapping.source_locator.is_some() || mapping.statement_sha256.is_some())
+    {
+        return Err(format!("{label} non-exact mapping cannot carry exact source identity fields"));
+    }
+    Ok(())
+}
+
+fn load_graph_manifest(bytes: &[u8]) -> Result<GraphManifest, String> {
+    let value: Value = serde_json::from_slice(bytes)
+        .map_err(|e| format!("parse graph manifest: {e}"))?;
+    if value.get("schema_version").and_then(Value::as_str)
+        != Some("pitb.proof-graph-evidence.v0")
+    {
+        return Err("unsupported typed graph manifest schema".into());
+    }
+    let snapshot = value.get("snapshot").ok_or("graph snapshot missing")?;
+    let snapshot_id = snapshot.get("snapshot_id").and_then(Value::as_str)
+        .filter(|s| !s.trim().is_empty()).ok_or("graph snapshot_id missing")?.to_owned();
+    let repository_commit = snapshot.get("repository_commit").and_then(Value::as_str)
+        .ok_or("graph repository_commit missing")?.to_owned();
+    commit(&repository_commit, "graph repository commit")?;
+    let environment_sha256 = snapshot.get("environment_sha256").and_then(Value::as_str)
+        .ok_or("graph environment_sha256 missing")?.to_owned();
+    digest(&environment_sha256, "graph environment_sha256")?;
+    let raw_nodes = value.get("nodes").and_then(Value::as_array)
+        .ok_or("graph nodes must be an array")?;
+    if raw_nodes.is_empty() {
+        return Err("graph manifest contains no nodes".into());
+    }
+    let mut nodes = BTreeMap::<String, GraphNode>::new();
+    for (index, node) in raw_nodes.iter().enumerate() {
+        let node_id = node.get("node_id").and_then(Value::as_str)
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| format!("graph node {} has no node_id", index + 1))?.to_owned();
+        let kind = node.get("kind").and_then(Value::as_str)
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| format!("graph node {node_id} has no kind"))?.to_owned();
+        let formal_name = node.get("formal_name").and_then(Value::as_str).map(str::to_owned);
+        let source_locator = node.get("source_locator").and_then(Value::as_str)
+            .ok_or_else(|| format!("graph node {node_id} has no source_locator"))?.to_owned();
+        let statement_sha256 = node.get("statement_sha256").and_then(Value::as_str)
+            .ok_or_else(|| format!("graph node {node_id} has no statement_sha256"))?.to_owned();
+        digest(&statement_sha256, &format!("graph node {node_id} statement_sha256"))?;
+        if nodes.insert(node_id.clone(), GraphNode {
+            node_id: node_id.clone(),
+            kind,
+            formal_name,
+            source_locator,
+            statement_sha256,
+        }).is_some() {
+            return Err(format!("duplicate graph node ID {node_id}"));
+        }
+    }
+    Ok(GraphManifest {
+        manifest_sha256: sha256(bytes),
+        snapshot_id,
+        repository_commit,
+        environment_sha256,
+        nodes,
+    })
+}
+
+fn validate_mapping_against_graph(
+    mapping: &Mapping,
+    graph: &GraphManifest,
+) -> Result<(), String> {
+    if mapping.graph_manifest_sha256 != graph.manifest_sha256 {
+        return Err(format!(
+            "mapping {} graph digest does not match supplied graph manifest",
+            mapping.node_id
+        ));
+    }
+    let node = graph.nodes.get(&mapping.node_id)
+        .ok_or_else(|| format!("mapping {} references unknown graph node", mapping.node_id))?;
+    if node.node_id != mapping.node_id {
+        return Err(format!("mapping {} resolved to inconsistent graph node", mapping.node_id));
+    }
+    if mapping.mapping_status != "exact" {
+        return Ok(());
+    }
+    if node.kind != "formal_declaration" {
+        return Err(format!("mapping {} cannot resolve a non-formal graph node to a Lean declaration", mapping.node_id));
+    }
+    let declaration = mapping.declaration_id.as_ref().ok_or("exact mapping lost declaration ID")?;
+    match mapping.mapping_method.as_str() {
+        "exact_formal_name" => {
+            if node.formal_name.as_deref() != Some(declaration.as_str()) {
+                return Err(format!(
+                    "mapping {} claims exact formal name {}, but graph node stores {:?}",
+                    mapping.node_id, declaration, node.formal_name
+                ));
+            }
+        }
+        "exact_source_identity" => {
+            if mapping.source_locator.as_deref() != Some(node.source_locator.as_str())
+                || mapping.statement_sha256.as_deref() != Some(node.statement_sha256.as_str())
+            {
+                return Err(format!(
+                    "mapping {} source locator/statement digest differs from graph node",
+                    mapping.node_id
+                ));
+            }
+        }
+        "human_reviewed" => {
+            // Human review is still an explicit trust boundary. The graph identity
+            // and formal-node kind are checked here; reviewer bytes are authenticated
+            // by the external attestation verifier, not by this join.
+        }
+        _ => return Err("unsupported mapping method".into()),
     }
     Ok(())
 }
