@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-source-binding-receipt-v1.schema.json",
+  "title": "PITB SorryDB source-binding receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "task_id",
+    "repo_commit",
+    "lean_version",
+    "source_path",
+    "start_line",
+    "start_column",
+    "end_line",
+    "end_column",
+    "source_file_sha256",
+    "goal_sha256",
+    "source_span_sha256",
+    "source_span",
+    "source_span_verified_as_sorry",
+    "target_goal_reproduced",
+    "lake_manifest_sha256",
+    "repository_tree_sha256",
+    "reproduction_log_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-source-binding.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "repo_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "lean_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "start_line": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "start_column": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "end_line": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "end_column": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "source_file_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "goal_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_span_sha256": {
+      "const": "e4b0f7a7c99f3a6c12c3c9d80f5b2b4beecb3c3f"
+    },
+    "source_span": {
+      "const": "sorry"
+    },
+    "source_span_verified_as_sorry": {
+      "const": true
+    },
+    "target_goal_reproduced": {
+      "type": "boolean"
+    },
+    "lake_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "repository_tree_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "reproduction_log_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}
