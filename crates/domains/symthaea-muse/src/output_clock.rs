@@ -192,10 +192,11 @@ pub fn fit_output_clock_v1(
     anchors: &[OutputClockAnchorV1],
     policy: OutputClockFitPolicyV1,
 ) -> Result<OutputClockFitV1, OutputClockFitErrorV1> {
-    if anchors.len() < policy.minimum_anchor_count {
+    let required_anchors = policy.minimum_anchor_count.max(2);
+    if anchors.len() < required_anchors {
         return Err(OutputClockFitErrorV1::TooFewAnchors {
             actual: anchors.len(),
-            required: policy.minimum_anchor_count,
+            required: required_anchors,
         });
     }
     if !policy.maximum_abs_drift_ppm.is_finite()
@@ -272,9 +273,12 @@ pub fn fit_output_clock_v1(
 
     let frames_per_ns = covariance / variance;
     let reference_delta_ns = mean_x;
-    let reference_frame_position = f0 + mean_y;
     let reference_playback_stream_time_ns =
         t0.saturating_add(reference_delta_ns.max(0.0).round() as u64);
+    let rounded_reference_delta_ns =
+        reference_playback_stream_time_ns.saturating_sub(t0) as f64;
+    let reference_frame_position =
+        f0 + mean_y + frames_per_ns * (rounded_reference_delta_ns - reference_delta_ns);
     if !frames_per_ns.is_finite() || frames_per_ns <= 0.0 {
         return Err(OutputClockFitErrorV1::NonFiniteFit);
     }
@@ -311,7 +315,12 @@ pub fn fit_output_clock_v1(
             maximum_abs_frames: policy.maximum_abs_residual_frames,
         });
     }
-    let median_abs_residual_frames = residuals[(residuals.len() - 1) / 2];
+    let middle = residuals.len() / 2;
+    let median_abs_residual_frames = if residuals.len() % 2 == 0 {
+        (residuals[middle - 1] + residuals[middle]) * 0.5
+    } else {
+        residuals[middle]
+    };
     let p95_index = ((residuals.len() as f64 * 0.95).ceil() as usize)
         .saturating_sub(1)
         .min(residuals.len() - 1);
@@ -479,6 +488,53 @@ mod tests {
             OutputClockAccuracyStatusV1::BoundedByDeclaredAnchorUncertainty
         );
         assert!(fit.reported_uncertainty_frames.unwrap() >= 0.5);
+    }
+
+
+    #[test]
+    fn positive_clock_drift_is_estimated_separately() {
+        let anchors = vec![
+            anchor(0, 0, 5_000_000),
+            anchor(1, 480, 14_999_750),
+            anchor(2, 960, 24_999_500),
+            anchor(3, 1440, 34_999_250),
+        ];
+        let fit = fit_output_clock_v1(&anchors, policy()).unwrap();
+
+        assert!((fit.estimated_drift_ppm - 25.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn fewer_than_two_anchors_is_rejected_even_if_policy_is_misconfigured() {
+        let anchors = vec![anchor(0, 0, 5_000_000)];
+        let loose_policy = OutputClockFitPolicyV1 {
+            minimum_anchor_count: 0,
+            ..policy()
+        };
+
+        assert!(matches!(
+            fit_output_clock_v1(&anchors, loose_policy),
+            Err(OutputClockFitErrorV1::TooFewAnchors {
+                actual: 1,
+                required: 2
+            })
+        ));
+    }
+
+    #[test]
+    fn callback_playback_delta_must_match_the_two_stream_timestamps() {
+        let mut anchors = vec![
+            anchor(0, 0, 5_000_000),
+            anchor(1, 480, 15_000_000),
+            anchor(2, 960, 25_000_000),
+            anchor(3, 1440, 35_000_000),
+        ];
+        anchors[2].callback_to_playback_ns += 1;
+
+        assert!(matches!(
+            fit_output_clock_v1(&anchors, policy()),
+            Err(OutputClockFitErrorV1::CallbackPlaybackMismatch { index: 2 })
+        ));
     }
 
     #[test]
