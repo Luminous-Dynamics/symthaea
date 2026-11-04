@@ -818,18 +818,27 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
             BatchDisposition::RepairNotExecuted
         }
         "REPAIR-002" => {
-            metrics.insert(
-                "access_fasteners".to_owned(),
+            insert_quantity(
+                &mut metrics,
+                "access_fasteners",
                 required_number(baseline, "access_fasteners")?,
-            );
-            metrics.insert(
-                "disassembly_steps".to_owned(),
+                "count",
+                "synthetic count of access fasteners",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "disassembly_steps",
                 required_number(baseline, "disassembly_steps")?,
-            );
-            metrics.insert(
-                "synthetic_part_lead_time_days".to_owned(),
+                "count",
+                "synthetic count of disassembly steps; not measured repair time",
+            )?;
+            insert_quantity(
+                &mut metrics,
+                "synthetic_part_lead_time_days",
                 required_number(baseline, "part_lead_time_days")?,
-            );
+                "d",
+                "synthetic part lead-time assumption",
+            )?;
             notes.push(
                 "This is a trained-technician pump-module task; fixture counts describe access complexity, not measured repair time."
                     .to_owned(),
@@ -1391,7 +1400,7 @@ mod tests {
             "L/min"
         );
         assert!(matches!(
-            report.receipts[8].derived_metrics["commanded_refill"],
+            &report.receipts[8].derived_metrics["commanded_refill"],
             DerivedMetric::Boolean { value: true, .. }
         ));
     }
