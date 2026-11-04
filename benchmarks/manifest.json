@@ -1,0 +1,85 @@
+{
+  "schema_version": "0.1",
+  "updated_at": "2026-11-04",
+  "entries": [
+    {
+      "id": "ple-2026-10",
+      "name": "Physical-Engineering's Last Exam (PLE)",
+      "status": "access_gated",
+      "publisher": "Google Research with Mercor; expert-reviewed professional engineering tasks",
+      "official_url": "https://ple-bench.com/",
+      "repository_url": "https://github.com/google-research/ple",
+      "dataset_url": "https://huggingface.co/datasets/google/physical-engineerings-last-exam",
+      "paper_url": "https://arxiv.org/abs/2610.30537",
+      "paper_revision": "arXiv v2, revised 2026-10-30",
+      "task_count": 85,
+      "splits": {
+        "development": {
+          "count": 29,
+          "access": "access_gated",
+          "score_scope": "Public development split; request access and follow dataset terms. Use official dev leaderboard and exact dataset revision for comparisons."
+        },
+        "hidden_test": {
+          "count": 56,
+          "access": "official_competition_only",
+          "score_scope": "Do not request, copy, infer, or store hidden task data or graders. Scores only through the official competition route."
+        }
+      },
+      "disciplines": {
+        "structural": {
+          "total_tasks": 10,
+          "development_tasks": 4
+        },
+        "civil": {
+          "total_tasks": 18,
+          "development_tasks": 9
+        },
+        "electrical": {
+          "total_tasks": 27,
+          "development_tasks": 9
+        },
+        "mechanical": {
+          "total_tasks": 30,
+          "development_tasks": 7
+        }
+      },
+      "licensing": {
+        "runner_code": "Apache-2.0",
+        "development_dataset": "CC-BY-4.0",
+        "access_gated": true
+      },
+      "execution": {
+        "official_runner": "google-research/ple eval/run.py",
+        "harbor_version": "0.20.0",
+        "per_task_time_limit_seconds": 21600,
+        "official_repeat_count": 3,
+        "runner_revision": null,
+        "dataset_revision": null,
+        "execution_authorized": false
+      },
+      "baseline_context": {
+        "hidden_test_leaderboard_score": 0.483,
+        "paper_abstract_mean_score": 0.506,
+        "all_hard_checks_clearance": 0.41,
+        "notes": [
+          "The official site reports 48.3% for Claude Opus 5.5 on the 56-task hidden test set; the paper abstract separately reports a 50.6% strongest-configuration mean. These are distinct reported evaluation summaries and must not be compared as if they were the same split or run aggregation.",
+          "The official site reports that the leading system satisfied 91% of individual constraints on average but only 41% of designs passed every hard check.",
+          "The paper abstract reports an average of 27 million tokens and 63 minutes per task for its strongest configuration.",
+          "Do not use hidden-test scores as a baseline for a development-set result. Pin and compare against the official public development leaderboard on the same task revision."
+        ]
+      },
+      "ceb_integration": {
+        "task_contract_owner": "CEB v0 task schema and catalog in PR #10115; external registry/reproduction owner #10117",
+        "receipt_owner": "CEB receipts and evidence convergence #10370 / #10115 / #10167",
+        "custody_owner": "CEB task custody #10436",
+        "isolation_blocker": "Symthaea #10064",
+        "notes": [
+          "This registry entry records metadata only. It does not define a second CEB task schema or receipt format.",
+          "Official PLE verifiers remain the scoring authority; CEB binds the Luminous harness/run provenance and external score artifacts.",
+          "No task execution is authorized until the isolation and evaluator-custody gates have been independently qualified.",
+          "The official dataset access gate must be satisfied through the authorized Hugging Face account. No access token belongs in source control or public logs."
+        ]
+      }
+    }
+  ]
+}
