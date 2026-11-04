@@ -945,3 +945,15 @@ The first seed is a deterministic 141-byte ZIP with payload SHA-256 `dd8a2bd8c16
 
 This PR is draft and queued. No build or fuzz execution is claimed. The workflow-generated fuzz `Cargo.lock` must be committed after resolution; all discovered crashes must be minimized and promoted to permanent regressions. A clean 180-second smoke run is not a security certification.
 
+## 20. 2026-11-04 — source-identity platform qualification
+
+A platform audit found that the current `SourceIdentity` is materially stronger on Unix than on non-Unix. Unix binds device, inode, size, mode, modification time and change time. The current non-Unix fallback binds only size, modified time and readonly state; it is not sufficient to reject every same-size replacement or timestamp-preserving rewrite.
+
+The content-verification API in the draft #10368 is now explicitly gated:
+- Unix: the Stored/Deflate content verifier is compiled and available, subject to exact-head qualification.
+- Non-Unix: metadata inventory remains available, but content verification returns explicit `Unsupported` after source admission. It does not claim equivalent source-stability assurance.
+
+The new [#10452 — handle-bound source identity across Windows/non-Unix](https://github.com/Luminous-Dynamics/symthaea/issues/10452) owns a safe, platform-specific identity adapter for both the admitted handle and selected path, including same-size rewrite, timestamp-restoration, rename-and-replace and reparse-point controls. Do not add unsafe handle code to the artifact-reader crate. If a platform cannot provide the required identity, retain the explicit Unsupported result until a content-snapshot design is reviewed.
+
+This changes the supported-platform claim, not the REA Evidence identity contract. A file identity is not proof of immutable contents, producer authenticity or absence of a malicious writer. Content hash, file identity and producer attestation remain distinct claims.
+
