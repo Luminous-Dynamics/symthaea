@@ -20,6 +20,8 @@ The governing principle is:
 
 ## Current research specifications under review
 
+- [#10500 — source-to-use water qualification](https://github.com/Luminous-Dynamics/symthaea/issues/10500) and its draft contract/schema: [water-use-qualification-contract-v0.1.md](water-use-qualification-contract-v0.1.md) / [water-use-qualification-v1.schema.json](water-use-qualification-v1.schema.json). Binds quality evidence to source, batch, treatment, sample point, intended use, delivery boundary and monitoring-programme revision; design-only, no water quality test claimed.
+
 - [PR #10386 — household services charter, physical validation protocols and competitive frontier](https://github.com/Luminous-Dynamics/symthaea/pull/10386). Those research files are on the PR branch and should not be assumed present on main until merged.
 - [PR #10432 — repair recurrence and post-repair durability contract](https://github.com/Luminous-Dynamics/symthaea/pull/10432). Defines repair episode identity, independent restoration, use exposure, competing events, recurrent burden and censoring.
 - [PR #10446 — household service continuity and recovery benchmark](https://github.com/Luminous-Dynamics/symthaea/pull/10446). Defines service envelopes, matched outage comparators, recovery trajectories and service-deficit metrics.
