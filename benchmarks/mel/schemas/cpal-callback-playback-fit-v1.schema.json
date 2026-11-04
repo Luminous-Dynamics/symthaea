@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/cpal-callback-playback-fit-v1.schema.json",
+  "title": "Melothaea CPAL callback-to-predicted-playback fit v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "stream_instance_id",
+    "cpal_stream_configuration_digest_sha256",
+    "sample_rate_hz",
+    "channel_count",
+    "playback_ns_per_callback_ns",
+    "reference_callback_stream_time_ns",
+    "reference_playback_stream_time_ns",
+    "valid_from_callback_stream_time_ns",
+    "valid_until_callback_stream_time_ns",
+    "maximum_extrapolation_ns",
+    "minimum_required_anchor_count",
+    "anchor_set_sha256",
+    "fit_policy_sha256",
+    "anchor_count",
+    "maximum_abs_drift_ppm",
+    "maximum_allowed_abs_residual_ns",
+    "estimated_drift_ppm",
+    "median_abs_residual_ns",
+    "p95_abs_residual_ns",
+    "maximum_abs_residual_ns",
+    "accuracy_status",
+    "reported_uncertainty_ns"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-cpal-callback-playback-fit-v1"
+    },
+    "stream_instance_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "cpal_stream_configuration_digest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sample_rate_hz": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 768000
+    },
+    "channel_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 256
+    },
+    "playback_ns_per_callback_ns": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "reference_callback_stream_time_ns": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "reference_playback_stream_time_ns": {
+      "type": "number",
+      "minimum": 0
+    },
+    "valid_from_callback_stream_time_ns": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "valid_until_callback_stream_time_ns": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "maximum_extrapolation_ns": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "minimum_required_anchor_count": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "anchor_set_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "fit_policy_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "anchor_count": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "maximum_abs_drift_ppm": {
+      "type": "number",
+      "minimum": 0
+    },
+    "maximum_allowed_abs_residual_ns": {
+      "type": "number",
+      "minimum": 0
+    },
+    "estimated_drift_ppm": {
+      "type": "number"
+    },
+    "median_abs_residual_ns": {
+      "type": "number",
+      "minimum": 0
+    },
+    "p95_abs_residual_ns": {
+      "type": "number",
+      "minimum": 0
+    },
+    "maximum_abs_residual_ns": {
+      "type": "number",
+      "minimum": 0
+    },
+    "accuracy_status": {
+      "const": "point_estimate_only"
+    },
+    "reported_uncertainty_ns": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    }
+  }
+}
