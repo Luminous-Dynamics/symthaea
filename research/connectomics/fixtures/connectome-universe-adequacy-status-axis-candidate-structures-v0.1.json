@@ -1,0 +1,30 @@
+{
+  "schema_version": "0.1.0",
+  "worlds": [
+    {
+      "world_id": "candidate-one",
+      "structure": {
+        "nodes": [
+          {
+            "node_id": "n1",
+            "attributes": {}
+          },
+          {
+            "node_id": "n2",
+            "attributes": {}
+          }
+        ],
+        "edges": [
+          {
+            "edge_id": "e1",
+            "source": "n1",
+            "target": "n2",
+            "attributes": {
+              "kind": "synapse"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

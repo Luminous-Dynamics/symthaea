@@ -1,0 +1,468 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/connectomics/connectome-universe-adequacy-report-v0.1.schema.json",
+  "title": "Connectome structural-universe adequacy report v0.1",
+  "description": "Evaluator-side report that keeps exact enumeration closure separate from adequacy against an independently frozen reference challenge set. It is not policy-visible model input.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evaluation_id",
+    "query",
+    "candidate_universe",
+    "reference_challenge",
+    "candidate_worlds",
+    "reference_worlds",
+    "summary",
+    "family_summaries",
+    "dispositions",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "evaluation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "definition_sha256",
+        "decision_rule_sha256",
+        "metric",
+        "unit",
+        "baseline_decision"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "definition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "decision_rule_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "metric": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseline_decision": {
+          "$ref": "#/$defs/decision"
+        }
+      }
+    },
+    "candidate_universe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "universe_id",
+        "manifest_sha256",
+        "generator_sha256",
+        "closure_disposition",
+        "world_ids"
+      ],
+      "properties": {
+        "universe_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "generator_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "closure_disposition": {
+          "enum": [
+            "CLOSED_VERIFIED",
+            "NOT_CLOSED",
+            "NOT_AUDITABLE"
+          ]
+        },
+        "world_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "reference_challenge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "challenge_id",
+        "manifest_sha256",
+        "generator_sha256",
+        "freeze_receipt_sha256",
+        "oracle_boundary",
+        "required_error_families"
+      ],
+      "properties": {
+        "challenge_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "generator_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "freeze_receipt_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "oracle_boundary": {
+          "enum": [
+            "EVALUATOR_ONLY_VERIFIED",
+            "NOT_VERIFIED",
+            "NOT_AUDITABLE"
+          ]
+        },
+        "required_error_families": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Predeclared challenge families whose support is required for the adequacy disposition."
+        }
+      }
+    },
+    "candidate_worlds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "world_id",
+          "query_state",
+          "canonical_structural_sha256",
+          "error_family"
+        ],
+        "properties": {
+          "world_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "query_state": {
+            "$ref": "#/$defs/decision"
+          },
+          "canonical_structural_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "error_family": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "reference_worlds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "world_id",
+          "error_family",
+          "evidence_compatibility",
+          "query_state",
+          "canonical_structural_sha256"
+        ],
+        "properties": {
+          "world_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "error_family": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_compatibility": {
+            "enum": [
+              "COMPATIBLE",
+              "INCOMPATIBLE",
+              "INDETERMINATE"
+            ]
+          },
+          "query_state": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/decision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canonical_structural_sha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_world_count",
+        "reference_world_count",
+        "compatible_reference_count",
+        "incompatible_reference_count",
+        "indeterminate_reference_count",
+        "structurally_included_count",
+        "query_state_covered_count",
+        "query_flipping_reference_count",
+        "omitted_query_flipping_count",
+        "false_invariance_count",
+        "false_ambiguity_count",
+        "candidate_duplicate_structure_group_count",
+        "reference_duplicate_structure_group_count",
+        "candidate_not_estimable_count",
+        "compatible_estimable_reference_count",
+        "compatible_query_not_estimable_reference_count"
+      ],
+      "properties": {
+        "candidate_world_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reference_world_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "compatible_reference_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "incompatible_reference_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "indeterminate_reference_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "structurally_included_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "query_state_covered_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "query_flipping_reference_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "omitted_query_flipping_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_invariance_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_ambiguity_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidate_duplicate_structure_group_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reference_duplicate_structure_group_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidate_not_estimable_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "compatible_estimable_reference_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "compatible_query_not_estimable_reference_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "family_summaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "error_family",
+          "compatible_reference_count",
+          "structurally_included_count",
+          "query_flipping_reference_count",
+          "omitted_query_flipping_count",
+          "false_invariance_count",
+          "false_ambiguity_count",
+          "candidate_not_estimable_count",
+          "incompatible_reference_count",
+          "indeterminate_reference_count",
+          "compatible_estimable_reference_count",
+          "compatible_query_not_estimable_reference_count"
+        ],
+        "properties": {
+          "error_family": {
+            "type": "string",
+            "minLength": 1
+          },
+          "compatible_reference_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "structurally_included_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "query_flipping_reference_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "omitted_query_flipping_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "false_invariance_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "false_ambiguity_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "candidate_not_estimable_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "incompatible_reference_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "indeterminate_reference_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "compatible_estimable_reference_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "compatible_query_not_estimable_reference_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "dispositions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enumeration_closure",
+        "universe_adequacy"
+      ],
+      "properties": {
+        "enumeration_closure": {
+          "enum": [
+            "CLOSED_VERIFIED",
+            "NOT_CLOSED",
+            "NOT_AUDITABLE"
+          ]
+        },
+        "universe_adequacy": {
+          "enum": [
+            "ADEQUACY_SUPPORTED_WITHIN_TESTED_CHALLENGES",
+            "ADEQUACY_FAILED",
+            "ADEQUACY_NOT_ESTIMABLE"
+          ]
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluator_protocol_sha256",
+        "rules_sha256",
+        "truth_separation_verified",
+        "canonicalizer_sha256",
+        "candidate_structure_manifest_sha256",
+        "reference_structure_manifest_sha256",
+        "report_schema_sha256",
+        "structure_schema_sha256"
+      ],
+      "properties": {
+        "rules_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "truth_separation_verified": {
+          "type": "boolean"
+        },
+        "canonicalizer_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_structure_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reference_structure_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evaluator_protocol_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "report_schema_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "SHA-256 of exact report JSON Schema bytes under the pinned v0.1 file."
+        },
+        "structure_schema_sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "SHA-256 of exact evaluator-only structure sidecar JSON Schema bytes under the pinned v0.1 file."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision": {
+      "enum": [
+        "BELOW_THRESHOLD",
+        "AT_OR_ABOVE_THRESHOLD",
+        "NOT_ESTIMABLE"
+      ]
+    }
+  }
+}
