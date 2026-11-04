@@ -1,0 +1,710 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/connectomics/connectome-typed-claim-bundle-v0.1.schema.json",
+  "title": "Typed connectome claim bundle v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "bundle_id",
+    "scope",
+    "claims",
+    "queries",
+    "summary",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "bundle_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "$ref": "#/$defs/scope"
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/claim"
+      }
+    },
+    "queries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/query"
+      }
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "provenance": {
+      "$ref": "#/$defs/provenance"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "source_volume_id",
+        "release_id",
+        "source_manifest_sha256"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_volume_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "release_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "object_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "object_id",
+        "object_kind",
+        "world_id"
+      ],
+      "properties": {
+        "object_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "object_kind": {
+          "enum": [
+            "SEGMENT",
+            "NEURON",
+            "SYNAPSE",
+            "COMPARTMENT",
+            "VARIABLE",
+            "REGION",
+            "DATASET_RELEASE",
+            "INTERVENTION",
+            "RECORDING"
+          ]
+        },
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "anatomical_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_type",
+        "artifact_sha256",
+        "image_manifest_sha256",
+        "synapse_candidate_id",
+        "presence",
+        "polarity",
+        "pre_partner",
+        "post_partner",
+        "coordinate_frame_id"
+      ],
+      "properties": {
+        "evidence_type": {
+          "const": "ANATOMICAL_SYNAPSE_EVIDENCE"
+        },
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "image_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "synapse_candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "presence": {
+          "enum": [
+            "CLAIMED_PRESENT",
+            "CLAIMED_ABSENT",
+            "AMBIGUOUS",
+            "NOT_ESTIMABLE"
+          ]
+        },
+        "polarity": {
+          "enum": [
+            "CLAIMED_PRE_TO_POST",
+            "CLAIMED_REVERSED",
+            "AMBIGUOUS",
+            "NOT_ESTIMABLE"
+          ]
+        },
+        "pre_partner": {
+          "enum": [
+            "CLAIMED_MATCH",
+            "CLAIMED_MISMATCH",
+            "AMBIGUOUS",
+            "NOT_ESTIMABLE"
+          ]
+        },
+        "post_partner": {
+          "enum": [
+            "CLAIMED_MATCH",
+            "CLAIMED_MISMATCH",
+            "AMBIGUOUS",
+            "NOT_ESTIMABLE"
+          ]
+        },
+        "coordinate_frame_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "correspondence_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_type",
+        "mapping_receipt_sha256",
+        "mapping_id",
+        "source_world_id",
+        "target_world_id",
+        "correspondence_relation"
+      ],
+      "properties": {
+        "evidence_type": {
+          "const": "RECONSTRUCTION_CORRESPONDENCE_EVIDENCE"
+        },
+        "mapping_receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mapping_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "correspondence_relation": {
+          "enum": [
+            "ARTIFACT_IDENTITY",
+            "SEGMENT_LINEAGE",
+            "NEURON_CORRESPONDENCE",
+            "SYNAPSE_CORRESPONDENCE"
+          ]
+        }
+      }
+    },
+    "statistical_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_type",
+        "model_sha256",
+        "sample_frame_sha256",
+        "conditioning_set_sha256",
+        "hypothesis_id",
+        "hypothesis_family_id",
+        "multiplicity_procedure_sha256",
+        "sampling_design_sha256",
+        "effect_estimate",
+        "standard_error",
+        "p_value",
+        "q_value",
+        "effective_sample_size"
+      ],
+      "properties": {
+        "evidence_type": {
+          "const": "STATISTICAL_DEPENDENCE_EVIDENCE"
+        },
+        "model_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sample_frame_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "conditioning_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "hypothesis_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hypothesis_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "multiplicity_procedure_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sampling_design_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "effect_estimate": {
+          "type": "number"
+        },
+        "standard_error": {
+          "type": "number",
+          "minimum": 0
+        },
+        "p_value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "q_value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "effective_sample_size": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "functional_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_type",
+        "recording_manifest_sha256",
+        "acquisition_protocol_sha256",
+        "signal_pipeline_sha256",
+        "state_context_sha256",
+        "window_start_ms",
+        "window_end_ms"
+      ],
+      "properties": {
+        "evidence_type": {
+          "const": "FUNCTIONAL_ASSOCIATION_EVIDENCE"
+        },
+        "recording_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "acquisition_protocol_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "signal_pipeline_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "state_context_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "window_start_ms": {
+          "type": "number"
+        },
+        "window_end_ms": {
+          "type": "number"
+        }
+      }
+    },
+    "causal_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_type",
+        "intervention_protocol_sha256",
+        "assignment_mechanism_sha256",
+        "target_population_sha256",
+        "outcome_definition_sha256",
+        "estimand",
+        "identification_strategy_sha256",
+        "assumption_bundle_sha256",
+        "positivity_status",
+        "selection_status"
+      ],
+      "properties": {
+        "evidence_type": {
+          "const": "CAUSAL_EFFECT_EVIDENCE"
+        },
+        "intervention_protocol_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "assignment_mechanism_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "target_population_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "outcome_definition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "estimand": {
+          "enum": [
+            "ITT",
+            "PER_PROTOCOL",
+            "EXCURSION_EFFECT",
+            "DYNAMIC_REGIME_VALUE",
+            "OTHER_DECLARED"
+          ]
+        },
+        "identification_strategy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "assumption_bundle_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "positivity_status": {
+          "enum": [
+            "CLAIMED_ADEQUATE",
+            "VIOLATION",
+            "NOT_ESTIMABLE"
+          ]
+        },
+        "selection_status": {
+          "enum": [
+            "CLAIMED_HANDLED",
+            "UNRESOLVED",
+            "NOT_ESTIMABLE"
+          ]
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id",
+        "relation_type",
+        "source",
+        "target",
+        "claim_status",
+        "evidence"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relation_type": {
+          "enum": [
+            "ANATOMICAL_SYNAPSE_EDGE",
+            "RECONSTRUCTION_CORRESPONDENCE",
+            "STATISTICAL_DEPENDENCE_EDGE",
+            "FUNCTIONAL_ASSOCIATION_EDGE",
+            "CAUSAL_EFFECT_CLAIM"
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/object_ref"
+        },
+        "target": {
+          "$ref": "#/$defs/object_ref"
+        },
+        "claim_status": {
+          "enum": [
+            "CLAIMED_SUPPORTED",
+            "CLAIMED_AMBIGUOUS",
+            "CLAIMED_NOT_ESTIMABLE",
+            "CLAIMED_REJECTED"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/anatomical_evidence"
+              },
+              {
+                "$ref": "#/$defs/correspondence_evidence"
+              },
+              {
+                "$ref": "#/$defs/statistical_evidence"
+              },
+              {
+                "$ref": "#/$defs/functional_evidence"
+              },
+              {
+                "$ref": "#/$defs/causal_evidence"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "relation_path": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path_id",
+        "relation_types"
+      ],
+      "properties": {
+        "path_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relation_types": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "ANATOMICAL_SYNAPSE_EDGE",
+              "RECONSTRUCTION_CORRESPONDENCE",
+              "STATISTICAL_DEPENDENCE_EDGE",
+              "FUNCTIONAL_ASSOCIATION_EDGE",
+              "CAUSAL_EFFECT_CLAIM"
+            ]
+          }
+        }
+      }
+    },
+    "path_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path_id",
+        "ordered_claim_ids",
+        "asserted_claim_type",
+        "result_status"
+      ],
+      "properties": {
+        "path_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ordered_claim_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "asserted_claim_type": {
+          "enum": [
+            "ANATOMICAL_PATH",
+            "CORRESPONDENCE_PATH",
+            "STATISTICAL_PATH",
+            "FUNCTIONAL_PATH",
+            "CAUSAL_EFFECT",
+            "MIXED_EVIDENCE_PATH"
+          ]
+        },
+        "result_status": {
+          "enum": [
+            "CLAIMED_SUPPORTED",
+            "CLAIMED_CONDITIONAL",
+            "CLAIMED_NOT_ESTIMABLE",
+            "CLAIMED_REJECTED"
+          ]
+        }
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "query_definition_sha256",
+        "analysis_code_sha256",
+        "query_mode",
+        "requested_claim_type",
+        "allowed_relation_type_paths",
+        "path_results",
+        "result_sha256",
+        "result_status"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_definition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "analysis_code_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "query_mode": {
+          "enum": [
+            "SINGLE_RELATION_LAYER",
+            "DECLARED_MIXED_LAYERS"
+          ]
+        },
+        "requested_claim_type": {
+          "enum": [
+            "ANATOMICAL_PATH",
+            "CORRESPONDENCE_PATH",
+            "STATISTICAL_PATH",
+            "FUNCTIONAL_PATH",
+            "CAUSAL_EFFECT",
+            "MIXED_EVIDENCE_PATH"
+          ]
+        },
+        "allowed_relation_type_paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/relation_path"
+          }
+        },
+        "path_results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/path_result"
+          }
+        },
+        "result_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "result_status": {
+          "enum": [
+            "CLAIMED_SUPPORTED",
+            "CLAIMED_CONDITIONAL",
+            "CLAIMED_NOT_ESTIMABLE",
+            "CLAIMED_REJECTED"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "result_status": {
+                "const": "CLAIMED_NOT_ESTIMABLE"
+              }
+            },
+            "required": [
+              "result_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result_sha256": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "result_status": {
+                "enum": [
+                  "CLAIMED_SUPPORTED",
+                  "CLAIMED_CONDITIONAL",
+                  "CLAIMED_REJECTED"
+                ]
+              }
+            },
+            "required": [
+              "result_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_count",
+        "query_count",
+        "claim_type_counts"
+      ],
+      "properties": {
+        "claim_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "query_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "claim_type_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ANATOMICAL_SYNAPSE_EDGE",
+            "RECONSTRUCTION_CORRESPONDENCE",
+            "STATISTICAL_DEPENDENCE_EDGE",
+            "FUNCTIONAL_ASSOCIATION_EDGE",
+            "CAUSAL_EFFECT_CLAIM"
+          ],
+          "properties": {
+            "ANATOMICAL_SYNAPSE_EDGE": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "RECONSTRUCTION_CORRESPONDENCE": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "STATISTICAL_DEPENDENCE_EDGE": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "FUNCTIONAL_ASSOCIATION_EDGE": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "CAUSAL_EFFECT_CLAIM": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_policy_sha256",
+        "query_grammar_sha256",
+        "producer_sha256"
+      ],
+      "properties": {
+        "claim_policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "query_grammar_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "producer_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  },
+  "$comment": "JSON Schema validates record shape. A semantic verifier must validate evidence type matches relation_type, unique IDs, query path composition, relation grammar, evidence authority, status promotion, hypothesis-family completeness and result digest binding. CLAIMED_* fields are producer assertions until independently authenticated."
+}
