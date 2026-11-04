@@ -112,3 +112,10 @@ These are exact synthetic fixture expectations, not biological measurements.
 ## Non-claims
 
 V1 does not prove biological correctness, complete scenario coverage, calibration, posterior probability, or query truth. A graph digest proves identity of the serialized graph under this canonicalization, not that the graph is the correct biological reconstruction. The tool does not authorize edits to source annotations or production connectome data.
+
+
+## Minimum-cost query-flipping witnesses
+
+The separate \`connectome-query-flipping-witness-audit\` tool searches a finite, evidence-bound edit universe for the minimum-effort compatible set that reverses a frozen scientific-query decision. It enforces same-baseline edit preconditions, prerequisite closure, symmetric conflicts, explicit same-edge alternatives, and a declared effort budget. See [CONNECTOME_QUERY_FLIPPING_WITNESS_V1.md](CONNECTOME_QUERY_FLIPPING_WITNESS_V1.md).
+
+A witness result is a targeted review lead, not a posterior probability or permission to apply a correction. \`NO_WITNESS_WITHIN_DECLARED_EDIT_UNIVERSE_AND_BUDGET\` is strictly bounded by the supplied edit universe and must not be described as proof that no biological counterexample exists. The witness audit remains downstream of execution-route observability, evidence-frame closure, provenance completeness and dependence verification; it does not replace those gates.

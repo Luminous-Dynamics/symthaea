@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "analysis_id": "synthetic-minimum-query-flipping-witness-v1",
+  "dataset_revision_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "edit_universe_scope": "exhaustive_declared_edit_universe",
+  "baseline_graph_sha256": "c24fb5455ca674c7aa8bf229bdb6904bc0000949a94efa8a2a571c7c6e164f59",
+  "baseline_graph": [
+    { "source": 1, "target": 2, "weight": 0.6 },
+    { "source": 1, "target": 3, "weight": 0.6 },
+    { "source": 1, "target": 4, "weight": 0.6 }
+  ],
+  "query": {
+    "query_id": "neuron-1-minimum-outgoing-connectivity",
+    "metric": { "kind": "out_degree", "node": 1 },
+    "decision": { "kind": "greater_or_equal", "threshold": 1.0 }
+  },
+  "effort_unit": "review_minute_micro_units",
+  "max_total_effort_units": 5,
+  "edits": [
+    {
+      "edit_id": "adjudication-gate",
+      "kind": "evidence_gate",
+      "effort_units": 1,
+      "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "requires": [],
+      "conflicts_with": [],
+      "changes": []
+    },
+    {
+      "edit_id": "remove-12",
+      "kind": "graph_edit",
+      "effort_units": 2,
+      "evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "requires": ["adjudication-gate"],
+      "conflicts_with": ["replace-12-small"],
+      "changes": [
+        { "source": 1, "target": 2, "expected_weight": 0.6, "replacement_weight": 0.0 }
+      ]
+    },
+    {
+      "edit_id": "remove-13-a",
+      "kind": "graph_edit",
+      "effort_units": 2,
+      "evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "requires": ["adjudication-gate"],
+      "conflicts_with": ["remove-13-b"],
+      "changes": [
+        { "source": 1, "target": 3, "expected_weight": 0.6, "replacement_weight": 0.0 }
+      ]
+    },
+    {
+      "edit_id": "remove-13-b",
+      "kind": "graph_edit",
+      "effort_units": 2,
+      "evidence_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "requires": ["adjudication-gate"],
+      "conflicts_with": ["remove-13-a"],
+      "changes": [
+        { "source": 1, "target": 3, "expected_weight": 0.6, "replacement_weight": 0.0 }
+      ]
+    },
+    {
+      "edit_id": "remove-14",
+      "kind": "graph_edit",
+      "effort_units": 2,
+      "evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "requires": ["adjudication-gate"],
+      "conflicts_with": [],
+      "changes": [
+        { "source": 1, "target": 4, "expected_weight": 0.6, "replacement_weight": 0.0 }
+      ]
+    },
+    {
+      "edit_id": "replace-12-small",
+      "kind": "graph_edit",
+      "effort_units": 4,
+      "evidence_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "requires": ["adjudication-gate"],
+      "conflicts_with": ["remove-12"],
+      "changes": [
+        { "source": 1, "target": 2, "expected_weight": 0.6, "replacement_weight": 0.55 }
+      ]
+    },
+    {
+      "edit_id": "unrelated-decoy",
+      "kind": "graph_edit",
+      "effort_units": 1,
+      "evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "requires": [],
+      "conflicts_with": [],
+      "changes": [
+        { "source": 9, "target": 10, "expected_weight": 0.0, "replacement_weight": 0.5 }
+      ]
+    }
+  ]
+}
