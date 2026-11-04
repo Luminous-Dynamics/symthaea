@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/runner-cpal-clock-fit-bundle-v1.schema.json",
+  "title": "Melothaea runner/CPAL clock fit bundle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "descriptor",
+    "fit"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-runner-cpal-clock-fit-bundle-v1"
+    },
+    "descriptor": {
+      "$ref": "#/$defs/descriptor"
+    },
+    "fit": {
+      "$ref": "#/$defs/fit"
+    }
+  },
+  "$defs": {
+    "descriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "session_id",
+        "runner_clock_domain_id",
+        "runner_origin_id",
+        "stream_instance_id",
+        "cpal_stream_descriptor_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mel-runner-cpal-clock-descriptor-v1"
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runner_clock_domain_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runner_origin_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stream_instance_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cpal_stream_descriptor_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "fit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "session_id",
+        "runner_clock_domain_id",
+        "runner_origin_id",
+        "stream_instance_id",
+        "cpal_stream_descriptor_sha256",
+        "runner_ns_per_cpal_ns",
+        "reference_runner_time_ns",
+        "reference_cpal_callback_stream_time_ns",
+        "valid_from_cpal_callback_stream_time_ns",
+        "valid_until_cpal_callback_stream_time_ns",
+        "valid_from_runner_time_ns",
+        "valid_until_runner_time_ns",
+        "maximum_extrapolation_ns",
+        "minimum_required_pair_count",
+        "pair_set_sha256",
+        "fit_policy_sha256",
+        "pair_count",
+        "missing_pair_records_before_or_between_observations",
+        "maximum_abs_drift_ppm",
+        "maximum_allowed_abs_residual_ns",
+        "estimated_drift_ppm",
+        "median_abs_residual_ns",
+        "p95_abs_residual_ns",
+        "maximum_abs_residual_ns",
+        "maximum_capture_bracket_ns",
+        "p95_capture_bracket_ns",
+        "accuracy_status",
+        "reported_uncertainty_ns"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mel-runner-cpal-clock-fit-v1"
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runner_clock_domain_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runner_origin_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stream_instance_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cpal_stream_descriptor_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "runner_ns_per_cpal_ns": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "reference_runner_time_ns": {
+          "type": "number"
+        },
+        "reference_cpal_callback_stream_time_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_from_cpal_callback_stream_time_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_until_cpal_callback_stream_time_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_from_runner_time_ns": {
+          "type": "number"
+        },
+        "valid_until_runner_time_ns": {
+          "type": "number"
+        },
+        "maximum_extrapolation_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minimum_required_pair_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "pair_set_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "fit_policy_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "pair_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "missing_pair_records_before_or_between_observations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximum_abs_drift_ppm": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_allowed_abs_residual_ns": {
+          "type": "number",
+          "minimum": 0
+        },
+        "estimated_drift_ppm": {
+          "type": "number"
+        },
+        "median_abs_residual_ns": {
+          "type": "number",
+          "minimum": 0
+        },
+        "p95_abs_residual_ns": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_abs_residual_ns": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_capture_bracket_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "p95_capture_bracket_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "accuracy_status": {
+          "const": "point_estimate_only"
+        },
+        "reported_uncertainty_ns": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
