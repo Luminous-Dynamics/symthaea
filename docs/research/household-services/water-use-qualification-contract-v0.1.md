@@ -212,3 +212,10 @@ For each incumbent function, match the same source, use class, delivery boundary
 The target is to exceed the best matched operational baseline on a declared decision-relevant outcome without violating any service, quality, safety, access or maintenance gate. An improvement on one function cannot compensate for failure in another. Do not produce a scalar "WaterLoop score."
 
 **External comparison references:** JoJo municipal backup https://www.jojo.co.za/water-storage-solutions/municipal-backup-water-storage-solutions/ ; Moen Flo https://flo.moen.com/pages/flo-smart-water-monitor ; Phyn https://www.phyn.com/ ; Hydraloop H300 https://www.hydraloop.com/products/h300 ; NSF/ANSI 350 listings https://info.nsf.org/Certified/Wastewater/Listings.asp?Company=C0427542&Standard=350 ; INTEWA AQUALOOP https://www.intewa.com/en/greywater-recycling/.
+
+
+### Timestamp normalization for deterministic evaluation
+
+The current Rust adapter requires every timestamp used in temporal comparisons to be normalized to UTC RFC3339 with a trailing Z. Offset-bearing values (for example +02:00) must be converted by the producer before evaluation; the adapter rejects ambiguous/non-normalized offsets rather than comparing timestamp strings lexicographically. This is an adapter constraint, not a claim that the source system's original timezone metadata should be discarded: retain the original timestamp and timezone in the upstream receipt when present.
+
+The boundary record includes both boundary_id and sample_point_id. They identify different concepts: the service outlet and the exact sampling location. same_physical_point requires them to denote the same physical point; validated_transfer requires an explicit transfer-validation reference.
