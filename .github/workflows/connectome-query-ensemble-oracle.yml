@@ -39,6 +39,11 @@ jobs:
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Run Rust query-ensemble unit tests
+        run: |
+          cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml \
+            --bin connectome_query_ensemble_audit
+
       - name: Evaluate checked-in known-answer fixture
         run: |
           cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
