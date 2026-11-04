@@ -9,7 +9,7 @@ This slice defines the persisted anchor and deterministic fit contract. It maps 
 Each callback anchor binds:
 - exact output frame index and frame count represented by the callback buffer;
 - channel count and negotiated sample rate;
-- stream-instance ID, joined to a stream descriptor containing a privacy-preserving CPAL device-ID SHA-256 fingerprint and negotiated configuration digest;
+- stream-instance ID, joined to a stream descriptor containing a pseudonymous CPAL device-ID SHA-256 fingerprint and negotiated configuration digest;
 - CPAL callback timestamp;
 - CPAL predicted playback timestamp;
 - callback-to-predicted-playback interval;
@@ -55,7 +55,7 @@ Electrical/acoustic output latency still requires independent loopback observati
 
 ## CPAL runtime capture
 
-The optional `muse-live` path captures callback/playback timestamp pairs and cumulative output frame indices. It uses CPAL's stable `DeviceTrait::id` outside the callback, hashes it, and stores a stream descriptor (device fingerprint, sample rate, channel count, F32 format and configuration digest) separately from per-callback anchors. The raw host/device identifier is not persisted.
+The optional `muse-live` path captures callback/playback timestamp pairs and cumulative output frame indices. It uses CPAL's stable `DeviceTrait::id` outside the callback, hashes it, and stores a stream descriptor (device fingerprint, sample rate, channel count, F32 format and configuration digest) separately from per-callback anchors. The raw host/device identifier is not persisted. The deterministic fingerprint remains linkable across runs and is not anonymization; device-specific bundles should be treated as potentially sensitive and should not be published without appropriate consent or an explicit publication policy.
 
 The callback writes fixed-size `Copy` anchors to a 1,024-entry SPSC ring; it never takes the consumer mutex or formats/allocates strings. Callers retrieve up to a bounded number of records with `LiveMuseOutput::drain_output_clock_anchors` on a non-real-time thread and obtain the corresponding descriptor from `LiveMuseOutput::clock_stream_descriptor`. Dropped anchor callbacks are counted separately from audio underruns.
 
