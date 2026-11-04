@@ -309,8 +309,18 @@ fn scale_interval(
         ));
     }
 
-    let outward_lower = next_down_nonnegative(scaled_lower);
-    let outward_upper = next_up_nonnegative(scaled_upper);
+    // Exact zero products remain exactly zero; widening them would turn a
+    // known-failed end-use gate into a fictitious positive delivery interval.
+    let outward_lower = if scaled_lower == 0.0 {
+        0.0
+    } else {
+        next_down_nonnegative(scaled_lower)
+    };
+    let outward_upper = if scaled_upper == 0.0 {
+        0.0
+    } else {
+        next_up_nonnegative(scaled_upper)
+    };
 
     if !outward_lower.is_finite() || !outward_upper.is_finite() {
         return Err(EvaluationError::new(
