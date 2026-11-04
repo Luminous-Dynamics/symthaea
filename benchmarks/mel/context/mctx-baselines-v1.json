@@ -1,0 +1,74 @@
+{
+  "schema_version": "mel-musical-context-baselines-v1",
+  "baselines": [
+    {
+      "baseline_id": "LOCAL-CUE-ONLY-001",
+      "description": "Negative control: same local cue signature maps to the same action, ignoring collaborator intent, performer context and longer musical history.",
+      "predictions_by_family": [
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "WAIT"
+        ]
+      ],
+      "expected": {
+        "member_action_accuracy": 0.8,
+        "context_sensitivity_rate": 0,
+        "surface_invariance_rate": 1,
+        "ambiguous_valid_action_rate": 1
+      }
+    },
+    {
+      "baseline_id": "INSTRUMENT-SURFACE-ONLY-001",
+      "description": "Negative control: piano maps to RESPOND and guitar to WAIT, ignoring that the instrumental surface is an irrelevant change to the same invitation.",
+      "predictions_by_family": [
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "RESPOND",
+          "WAIT"
+        ],
+        [
+          "WAIT"
+        ]
+      ],
+      "expected": {
+        "member_action_accuracy": 0.6,
+        "context_sensitivity_rate": 0,
+        "surface_invariance_rate": 0,
+        "ambiguous_valid_action_rate": 1
+      }
+    },
+    {
+      "baseline_id": "EXPLICIT-CONTEXT-RULE-SANITY-001",
+      "description": "Hand-written symbolic rule sanity check: respond to an explicit invitation, wait when the collaborator retains the floor, preserve response across instrument changes, and choose one member of the declared ambiguous valid-action set. This is not a learned model or SOTA result.",
+      "predictions_by_family": [
+        [
+          "RESPOND",
+          "WAIT"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "WAIT"
+        ]
+      ],
+      "expected": {
+        "member_action_accuracy": 1,
+        "context_sensitivity_rate": 1,
+        "surface_invariance_rate": 1,
+        "ambiguous_valid_action_rate": 1
+      }
+    }
+  ]
+}
