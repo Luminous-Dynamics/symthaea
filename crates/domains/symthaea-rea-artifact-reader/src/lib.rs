@@ -2318,7 +2318,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn fails_closed_when_secondary_decoder_rejects_prefixed_zip64() {
+    fn verifies_zip64_member_with_prepended_stub_through_relative_view() {
         let archive = build_zip64(
             &[TestEntry {
                 name: b"Payload/App",
@@ -2334,16 +2334,15 @@ mod tests {
         let path = write_temp(&bytes);
         let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
 
-        // The custom inventory understands the prefixed ZIP64 structure, but the pinned
-        // secondary decoder currently rejects this ZIP64 EOCD locator layout. Do not turn
-        // metadata admission into a content-verification claim.
         assert!(reader.inventory().regions.zip64);
         assert_eq!(reader.inventory().regions.leading_bytes, 11);
-        let error = reader
+        let verified = reader
             .verify_entry_content(0, ContentVerificationLimits::default())
-            .unwrap_err();
-        assert_eq!(error.kind, ReaderErrorKind::InvalidArchive);
-        assert!(error.message.contains("bad ZIP64 EOCD signature"));
+            .unwrap();
+        assert_eq!(verified.sha256, format!("{:x}", Sha256::digest(b"zip64 payload")));
+        assert_eq!(verified.observed_uncompressed_bytes, 13);
+        assert_eq!(verified.observed_crc32, crc32(b"zip64 payload"));
+        assert!(verified.verified_crc32);
         fs::remove_file(path).unwrap();
     }
 
@@ -2555,6 +2554,25 @@ mod tests {
         // duplicate condition but its indexed view is unique-name-oriented. Preserve this
         // disagreement and never use zip-rs indexes as the authoritative occurrence map.
         fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn archive_slice_translates_seeks_and_never_escapes_its_range() {
+        let bytes = b"prefixPAYLOADsuffix".to_vec();
+        let mut view = ArchiveSlice::new(std::io::Cursor::new(bytes), 6, 7).unwrap();
+
+        let mut observed = Vec::new();
+        view.read_to_end(&mut observed).unwrap();
+        assert_eq!(observed, b"PAYLOAD");
+        assert_eq!(view.seek(SeekFrom::Start(0)).unwrap(), 0);
+        let mut first = [0u8; 2];
+        assert_eq!(view.read(&mut first).unwrap(), 2);
+        assert_eq!(&first, b"PA");
+        assert!(view.seek(SeekFrom::Current(-3)).is_err());
+        assert!(view.seek(SeekFrom::Start(8)).is_err());
+        assert!(view.seek(SeekFrom::End(1)).is_err());
+        assert_eq!(view.seek(SeekFrom::End(0)).unwrap(), 7);
+        assert_eq!(view.read(&mut first).unwrap(), 0);
     }
 
     #[test]
