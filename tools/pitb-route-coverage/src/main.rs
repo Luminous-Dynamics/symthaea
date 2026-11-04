@@ -625,9 +625,10 @@ fn validate_mapping_against_graph(
         "exact_source_identity" => {
             if mapping.source_locator.as_deref() != Some(node.source_locator.as_str())
                 || mapping.statement_sha256.as_deref() != Some(node.statement_sha256.as_str())
+                || node.formal_name.as_deref() != Some(declaration.as_str())
             {
                 return Err(format!(
-                    "mapping {} source locator/statement digest differs from graph node",
+                    "mapping {} declaration/source locator/statement digest differs from graph node",
                     mapping.node_id
                 ));
             }
@@ -1425,6 +1426,21 @@ fn run_self_tests() -> Result<(), String> {
         return Err("exact source identity crosswalk that disagrees with graph node was accepted".into());
     }
     println!("SELF_TEST_PASS exact source crosswalk must match graph locator and statement digest");
+
+    let mut mislabeled_source = mappings[1].clone();
+    mislabeled_source.mapping_method = "exact_source_identity".into();
+    mislabeled_source.source_locator = Some("Demo.lean:2-2".into());
+    mislabeled_source.statement_sha256 = Some(sha256(b"statement h2"));
+    mislabeled_source.declaration_id = Some("h3".into());
+    let mislabeled_bytes = [
+        serde_json::to_vec(&mappings[0]).map_err(|e| e.to_string())?, b"\n".to_vec(),
+        serde_json::to_vec(&mislabeled_source).map_err(|e| e.to_string())?, b"\n".to_vec(),
+        serde_json::to_vec(&mappings[2]).map_err(|e| e.to_string())?, b"\n".to_vec()
+    ].concat();
+    if analyze(&graph_bytes, &support_bytes, &receipts_bytes, &mislabeled_bytes).is_ok() {
+        return Err("source-exact mapping that relabels a different formal name was accepted".into());
+    }
+    println!("SELF_TEST_PASS source identity cannot relabel a node as another formal declaration");
 
     let mut outside_receipt = receipt.clone();
     outside_receipt.ranking.candidates.retain(|candidate| candidate.node_id != "node-h2");
