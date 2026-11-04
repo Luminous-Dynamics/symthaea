@@ -90,6 +90,8 @@ SWE Atlas QnA shows that repository understanding is a separate bottleneck from 
 
 The review problem is not the inverse of coding. A reviewer must identify a real defect, localize it, establish why it matters, and avoid noisy speculative comments. CRBugBench's top-5 bug coverage at 71.9% shows why comment volume is not enough. CEB-REVIEW should report Recall@1/3/5, actionable precision, severity-weighted recall, non-local dependency coverage and human review minutes per confirmed defect. A finding without a reproduced or source-grounded violation should not be counted as a true positive.
 
+**Human–agent complementarity experiment:** do not assume that the winning architecture is an autonomous “lights-off” reviewer. Compare human-only, agent-only and human+agent review under blinded, paired tasks and a fixed total effort budget. The assisted arm should measure incremental confirmed-defect recall, severity-weighted recall, false-positive review minutes, reviewer override rate, time-to-detection and total cost. A prospective success condition is either at least +5 percentage points of confirmed-defect recall over the better single-agent arm at equivalent total effort, or non-inferior recall with at least 20% lower human review time; both require a separate high-severity false-negative ceiling. These are CEB goals, not CRBugBench-reported outcomes.
+
 ### 3.7 From functional correctness to secure correctness
 
 The Agent Security League's different functional and secure maxima (91.6% versus 36.9%) expose a major evaluation gap. CEB must never combine “works” and “is safe” into one undifferentiated pass. Require security-negative controls, CWE-stratified outcomes, authorization/data-flow invariants and a separate high-severity false-accept ceiling. Preserve functional pass as a separate outcome so a defensive patch that simply disables functionality cannot win.
@@ -161,6 +163,7 @@ Prospective internal targets only; not achieved results or industry standards.
 | Published evidence receipts | 100% | 100% |
 | Pristine independent regrade | 100% of scored tasks | 100% of scored tasks |
 | Code review defect recall@5 | >=0.80 | >=0.85 |
+| Human+agent review complementarity | +5 pp confirmed-defect recall or non-inferior recall with >=20% less human time | replicate on sealed reviewers/repos without increased high-severity false negatives |
 | Secure task pass | >=0.55 with functional non-inferiority | >=0.65 with functional non-inferiority |
 | Context retrieval Recall@10 | >=0.85 | >=0.90 |
 | Context retrieval F1 | >=0.45 | >=0.50 |
