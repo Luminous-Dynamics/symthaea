@@ -629,7 +629,7 @@ const bundleManifest = {
 };
 
 const targetBundle = evidenceBundleForTarget(parsedUpstreamBundle, scopeDigest);
-const targetBundleBytes = Buffer.from(JSON.stringify(targetBundle, null, 2) + "\\n");
+const targetBundleBytes = Buffer.from(JSON.stringify(targetBundle, null, 2) + "\n");
 const targetBundleCanonicalBytes = Buffer.from(serializeEvidenceBundle(targetBundle));
 const targetBundleFile = "evidence-bundle-target-v1.json";
 await writeFile(resolve(outputDirectory, targetBundleFile), targetBundleBytes, {
@@ -650,18 +650,22 @@ const targetBundleManifest = {
 const otherTargetSha = "b".repeat(64);
 const otherTargetBundle = evidenceBundleForTarget(parsedUpstreamBundle, otherTargetSha);
 const otherTargetBundleBytes = Buffer.from(
-  JSON.stringify(otherTargetBundle, null, 2) + "\\n",
+  JSON.stringify(otherTargetBundle, null, 2) + "\n",
 );
 const otherTargetBundleFile = "evidence-bundle-other-target-v1.json";
 await writeFile(resolve(outputDirectory, otherTargetBundleFile), otherTargetBundleBytes, {
   flag: "wx",
   mode: 0o600,
 });
+const otherTargetBundleCanonicalBytes = Buffer.from(
+  serializeEvidenceBundle(otherTargetBundle),
+);
 const otherTargetBundleManifest = {
   file: otherTargetBundleFile,
   target_sha256: otherTargetSha,
   bytes: otherTargetBundleBytes.length,
   raw_file_sha256: digest(otherTargetBundleBytes),
+  canonical_sha256: digest(otherTargetBundleCanonicalBytes),
   record_count: otherTargetBundle.records.length,
   unknown_revision_count: otherTargetBundle.unknowns.length,
 };
@@ -883,6 +887,7 @@ await writeFile(
       evidence_bundle_target_raw_sha256: targetBundleManifest.raw_file_sha256,
       evidence_bundle_target_canonical_sha256: targetBundleManifest.canonical_sha256,
       evidence_bundle_other_target_raw_sha256: otherTargetBundleManifest.raw_file_sha256,
+      evidence_bundle_other_target_canonical_sha256: otherTargetBundleManifest.canonical_sha256,
       bundle_negative_control_count: bundleNegativeControls.length,
       producer: manifest.producer,
       generator: manifest.generator,
