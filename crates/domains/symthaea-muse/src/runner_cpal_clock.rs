@@ -34,6 +34,8 @@ pub const RUNNER_CPAL_CLOCK_PAIR_SCHEMA_V1: &str = "mel-runner-cpal-clock-pair-v
 pub const RUNNER_CPAL_CLOCK_FIT_SCHEMA_V1: &str = "mel-runner-cpal-clock-fit-v1";
 pub const RUNNER_CPAL_CLOCK_BUNDLE_SCHEMA_V1: &str =
     "mel-runner-cpal-clock-fit-bundle-v1";
+pub const CPAL_CALLBACK_PLAYBACK_FIT_SCHEMA_V1: &str =
+    "mel-cpal-callback-playback-fit-v1";
 
 fn is_lower_hex_digest(value: &str) -> bool {
     value.len() == 64
@@ -703,6 +705,7 @@ pub fn estimate_output_frame_at_runner_time_v1(
 ) -> Result<RunnerOutputFrameEstimateV1, RunnerOutputFrameCompositionErrorV1> {
     if output_bundle.schema_version != OUTPUT_CLOCK_FIT_BUNDLE_SCHEMA_V1
         || output_bundle.fit.schema_version != OUTPUT_CLOCK_FIT_SCHEMA_V1
+        || callback_playback_fit.schema_version != CPAL_CALLBACK_PLAYBACK_FIT_SCHEMA_V1
         || !output_bundle.stream_descriptor.is_valid()
     {
         return Err(RunnerOutputFrameCompositionErrorV1::InvalidOutputClockBundle);
@@ -729,10 +732,15 @@ pub fn estimate_output_frame_at_runner_time_v1(
     let callback_estimate = runner_fit
         .callback_time_at_runner_time(runner_time_ns)
         .map_err(RunnerOutputFrameCompositionErrorV1::RunnerClock)?;
+    let rounded_callback_time = callback_estimate.cpal_callback_stream_time_ns.round();
+    if !rounded_callback_time.is_finite()
+        || rounded_callback_time < 0.0
+        || rounded_callback_time >= u64::MAX as f64
+    {
+        return Err(RunnerOutputFrameCompositionErrorV1::PlaybackTimeOutOfRange);
+    }
     let playback_estimate = callback_playback_fit
-        .playback_time_at_callback_time(
-            callback_estimate.cpal_callback_stream_time_ns.round() as u64,
-        )
+        .playback_time_at_callback_time(rounded_callback_time as u64)
         .map_err(RunnerOutputFrameCompositionErrorV1::CallbackPlayback)?;
     let rounded_playback_time = playback_estimate.playback_stream_time_ns.round();
     if !rounded_playback_time.is_finite()
