@@ -262,6 +262,183 @@ pub fn canonical_evidence_bundle_bytes(bundle: &Value) -> Result<Vec<u8>, Bundle
     canonical_jcs_bytes(&verified.bundle).map_err(BundleError::from)
 }
 
+/// Select the evidence and complete residual-unknown histories for one artifact.
+///
+/// This mirrors upstream REA's `evidenceBundleForTarget` projection: every
+/// revision in a retained history must be scoped to `sha256`, and every
+/// referenced Evidence record must either belong to that artifact or be a
+/// mutation record explicitly listed in `mutation_evidence_ids`. Relationship
+/// closure is preserved by removing histories whose related histories are not
+/// retained, then recursively removing their dependents.
+pub fn evidence_bundle_for_target(
+    bundle: &Value,
+    sha256: &str,
+) -> Result<Value, BundleError> {
+    let verified = verify_evidence_bundle_value(bundle)?;
+    let bundle = verified.bundle;
+    let root = as_object(&bundle, "EvidenceBundle")?;
+    let records = require_array(field(root, "records", "EvidenceBundle")?, "records")?;
+    let unknowns = require_array(field(root, "unknowns", "EvidenceBundle")?, "unknowns")?;
+
+    let records_by_id: HashMap<&str, &Value> = records
+        .iter()
+        .filter_map(|record| {
+            record
+                .get("evidence_id")
+                .and_then(Value::as_str)
+                .map(|id| (id, record))
+        })
+        .collect();
+
+    let mut histories = HashMap::<String, Vec<&Value>>::new();
+    for unknown in unknowns {
+        let id = string_field(unknown, "unknown_id")
+            .ok_or_else(|| schema_error("unknown_id is required"))?;
+        histories.entry(id.to_owned()).or_default().push(unknown);
+    }
+
+    let mut retained = HashSet::<String>::new();
+    let mut dependents = HashMap::<String, HashSet<String>>::new();
+    let mut relationships = HashMap::<String, HashSet<String>>::new();
+
+    for (id, history) in &histories {
+        let eligible = history.iter().all(|unknown| {
+            if unknown.get("scope_digest").and_then(Value::as_str) != Some(sha256) {
+                return false;
+            }
+            let mutation_ids: HashSet<&str> = unknown
+                .get("mutation_evidence_ids")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .collect();
+            let mut referenced = Vec::<&str>::new();
+            for key in [
+                "supporting_evidence_ids",
+                "contradicting_evidence_ids",
+                "mutation_evidence_ids",
+            ] {
+                referenced.extend(
+                    unknown
+                        .get(key)
+                        .and_then(Value::as_array)
+                        .into_iter()
+                        .flatten()
+                        .filter_map(Value::as_str),
+                );
+            }
+            referenced.extend(
+                unknown
+                    .get("resolution")
+                    .and_then(|resolution| resolution.get("evidence_ids"))
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str),
+            );
+            referenced.into_iter().all(|evidence_id| {
+                let Some(record) = records_by_id.get(evidence_id) else {
+                    return false;
+                };
+                let subject_matches = record
+                    .get("subject")
+                    .and_then(|subject| subject.get("digest"))
+                    .and_then(|digest| digest.get("sha256"))
+                    .and_then(Value::as_str)
+                    == Some(sha256);
+                let is_target_mutation = mutation_ids.contains(evidence_id)
+                    && record.get("predicate_type").and_then(Value::as_str)
+                        == Some("rea.residual-unknown-mutation");
+                subject_matches || is_target_mutation
+            })
+        });
+        if !eligible {
+            continue;
+        }
+
+        retained.insert(id.clone());
+        let related_ids: HashSet<String> = history
+            .iter()
+            .flat_map(|unknown| {
+                unknown
+                    .get("relationships")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+            })
+            .filter_map(|relationship| string_field(relationship, "unknown_id"))
+            .map(str::to_owned)
+            .collect();
+        relationships.insert(id.clone(), related_ids.clone());
+        for related_id in related_ids {
+            dependents
+                .entry(related_id)
+                .or_default()
+                .insert(id.clone());
+        }
+    }
+
+    let mut pending = Vec::<String>::new();
+    for (id, related_ids) in &relationships {
+        if related_ids.iter().any(|related_id| !retained.contains(related_id)) {
+            pending.push(id.clone());
+        }
+    }
+    let mut index = 0;
+    while index < pending.len() {
+        let id = pending[index].clone();
+        index += 1;
+        if !retained.remove(&id) {
+            continue;
+        }
+        if let Some(children) = dependents.get(&id) {
+            pending.extend(children.iter().cloned());
+        }
+    }
+
+    let selected_unknowns: Vec<Value> = unknowns
+        .iter()
+        .filter(|unknown| {
+            string_field(unknown, "unknown_id")
+                .is_some_and(|id| retained.contains(id))
+        })
+        .cloned()
+        .collect();
+    let mutation_ids: HashSet<String> = selected_unknowns
+        .iter()
+        .flat_map(|unknown| {
+            unknown
+                .get("mutation_evidence_ids")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+        })
+        .filter_map(Value::as_str)
+        .map(str::to_owned)
+        .collect();
+
+    let selected_records: Vec<Value> = records
+        .iter()
+        .filter(|record| {
+            let subject_matches = record
+                .get("subject")
+                .and_then(|subject| subject.get("digest"))
+                .and_then(|digest| digest.get("sha256"))
+                .and_then(Value::as_str)
+                == Some(sha256);
+            let is_mutation = record
+                .get("evidence_id")
+                .and_then(Value::as_str)
+                .is_some_and(|id| mutation_ids.contains(id));
+            subject_matches || is_mutation
+        })
+        .cloned()
+        .collect();
+
+    create_evidence_bundle(&selected_records, &selected_unknowns)
+}
+
 /// Upstream REA bundle authentication does not reject Evidence links pointing
 /// outside the bundle. This separate stricter audit reports them without
 /// changing compatibility parser disposition.
