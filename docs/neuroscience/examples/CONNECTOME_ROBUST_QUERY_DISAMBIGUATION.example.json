@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "analysis_id": "synthetic-robust-query-disambiguation-v1",
+  "dataset_revision_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "query_id": "directed-circuit-decision-is-supported",
+  "query_spec_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "scenario_set_scope": "exhaustive_declared_scenario_space",
+  "scenario_set_sha256": "e00a946ef8caeb2180fde69297e9705bc392f043bd85b35f7742b3a1e629be92",
+  "effort_unit": "expert_review_minutes",
+  "max_total_effort_units": 4,
+  "scenarios": [
+    { "scenario_id": "world-alpha", "graph_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "decision_met": true },
+    { "scenario_id": "world-beta", "graph_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "decision_met": false },
+    { "scenario_id": "world-gamma", "graph_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "decision_met": false }
+  ],
+  "actions": [
+    {
+      "action_id": "inspect-synapse",
+      "action_kind": "synapse_adjudication",
+      "effort_units": 2,
+      "source_evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "observation_model_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "dependence_groups": ["raw-em-volume-001", "adjudication-family-A"],
+      "outcomes": [
+        { "scenario_id": "world-alpha", "possible_outcomes": ["pre-pattern-A", "pre-pattern-A-alt"] },
+        { "scenario_id": "world-beta", "possible_outcomes": ["post-pattern-B"] },
+        { "scenario_id": "world-gamma", "possible_outcomes": ["pre-pattern-A", "post-pattern-B"] }
+      ]
+    },
+    {
+      "action_id": "inspect-synapse-alternative",
+      "action_kind": "synapse_adjudication",
+      "effort_units": 2,
+      "source_evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "observation_model_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "dependence_groups": ["raw-em-volume-001", "adjudication-family-B"],
+      "outcomes": [
+        { "scenario_id": "world-alpha", "possible_outcomes": ["axon-a"] },
+        { "scenario_id": "world-beta", "possible_outcomes": ["axon-b"] },
+        { "scenario_id": "world-gamma", "possible_outcomes": ["axon-a", "axon-b"] }
+      ]
+    },
+    {
+      "action_id": "inspect-morphology",
+      "action_kind": "morphology_review",
+      "effort_units": 2,
+      "source_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "observation_model_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "dependence_groups": ["raw-em-volume-001", "morphology-review-family"],
+      "outcomes": [
+        { "scenario_id": "world-alpha", "possible_outcomes": ["morph-a", "morph-b"] },
+        { "scenario_id": "world-beta", "possible_outcomes": ["morph-a"] },
+        { "scenario_id": "world-gamma", "possible_outcomes": ["morph-c"] }
+      ]
+    },
+    {
+      "action_id": "orthogonal-measurement",
+      "action_kind": "orthogonal_measurement",
+      "effort_units": 5,
+      "source_evidence_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "observation_model_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "dependence_groups": ["orthogonal-acquisition-01"],
+      "outcomes": [
+        { "scenario_id": "world-alpha", "possible_outcomes": ["orthogonal-A"] },
+        { "scenario_id": "world-beta", "possible_outcomes": ["orthogonal-B"] },
+        { "scenario_id": "world-gamma", "possible_outcomes": ["orthogonal-C"] }
+      ]
+    },
+    {
+      "action_id": "low-resolution-decoy",
+      "action_kind": "image_inspection",
+      "effort_units": 1,
+      "source_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "observation_model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "dependence_groups": ["raw-em-volume-001"],
+      "outcomes": [
+        { "scenario_id": "world-alpha", "possible_outcomes": ["same", "ambiguous"] },
+        { "scenario_id": "world-beta", "possible_outcomes": ["same", "ambiguous"] },
+        { "scenario_id": "world-gamma", "possible_outcomes": ["same", "ambiguous"] }
+      ]
+    }
+  ]
+}
