@@ -24,7 +24,9 @@
       "enum": [
         "fit",
         "reject_capture_bracket",
-        "reject_descriptor_mismatch"
+        "reject_descriptor_mismatch",
+        "reject_drift",
+        "reject_residual"
       ]
     },
     "descriptor": {
