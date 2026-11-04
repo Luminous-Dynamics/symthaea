@@ -458,9 +458,10 @@ pub fn validate_grounded_decision_v1(
         }
     }
 
-    if decision.cited_claim_ids.is_empty()
-        && decision.action.requires_grounded_event()
-    {
+    let decision_requires_grounded_event = decision.action.is_active_intervention()
+        || (decision.action == GroundedMusicalActionV1::Wait
+            && policy.require_grounded_claims_for_wait);
+    if decision.cited_claim_ids.is_empty() && decision_requires_grounded_event {
         issues.push(GroundedParticipationIssueV1::DecisionEvidenceSetEmpty);
     }
     if decision.session_id != bundle.session_id {
@@ -520,7 +521,8 @@ pub fn validate_grounded_decision_v1(
             }),
             Some(claim) => {
                 let requires_grounded_claim = decision.action.is_active_intervention()
-                    || decision.action == GroundedMusicalActionV1::Wait;
+                    || (decision.action == GroundedMusicalActionV1::Wait
+                        && policy.require_grounded_claims_for_wait);
                 if requires_grounded_claim && claim.status != GroundedClaimStatusV1::Grounded {
                     issues.push(GroundedParticipationIssueV1::DecisionClaimNotGrounded {
                         claim_id: claim_id.clone(),
@@ -945,6 +947,25 @@ mod tests {
             effect(),
         );
         assert!(validate_grounded_decision_v1(&evidence, &receipt, &policy()).is_empty());
+    }
+
+    #[test]
+    fn wait_evidence_requirement_flag_changes_the_policy_as_declared() {
+        let mut evidence = bundle();
+        let receipt = decision(
+            &evidence,
+            GroundedMusicalActionV1::Wait,
+            Vec::new(),
+            None,
+        );
+        assert!(validate_grounded_decision_v1(&evidence, &receipt, &policy())
+            .contains(&GroundedParticipationIssueV1::DecisionEvidenceSetEmpty));
+
+        let permissive = GroundedParticipationPolicyV1 {
+            require_grounded_claims_for_wait: false,
+            ..policy()
+        };
+        assert!(validate_grounded_decision_v1(&evidence, &receipt, &permissive).is_empty());
     }
 
     #[test]
