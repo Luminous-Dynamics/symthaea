@@ -20,14 +20,14 @@ const EXPECTED_EVALUATION_COUNT: usize = 1000;
 const EXPECTED_REPOSITORY_COUNT: usize = 78;
 const REPORT_SCHEMA: &str = "pitb.sorrydb-snapshot-audit.v0";
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 struct Dataset {
     documentation: String,
     sorries: Vec<SorryRecord>,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 struct SorryRecord {
     id: String,
@@ -37,7 +37,7 @@ struct SorryRecord {
     metadata: Metadata,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 struct RepoInfo {
     remote: String,
@@ -46,7 +46,7 @@ struct RepoInfo {
     lean_version: String,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 struct Location {
     path: String,
@@ -56,14 +56,14 @@ struct Location {
     end_column: u64,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 struct DebugInfo {
     goal: String,
     url: String,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 struct Metadata {
     blame_email_hash: String,
