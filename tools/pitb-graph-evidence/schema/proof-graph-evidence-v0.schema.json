@@ -297,6 +297,102 @@
         {
           "if": {
             "properties": {
+              "status": {
+                "const": "candidate"
+              },
+              "relation": {
+                "const": "daps_membership_candidate"
+              }
+            },
+            "required": [
+              "status",
+              "relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_class": {
+                "const": "daps_graph_export"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "review_artifact_id": {
+                "type": "null"
+              },
+              "reviewer_key_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "candidate"
+              },
+              "relation": {
+                "const": "daps_import_candidate"
+              }
+            },
+            "required": [
+              "status",
+              "relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_class": {
+                "const": "daps_graph_export"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "review_artifact_id": {
+                "type": "null"
+              },
+              "reviewer_key_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "candidate"
+              },
+              "relation": {
+                "const": "daps_dependency_candidate"
+              }
+            },
+            "required": [
+              "status",
+              "relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_class": {
+                "const": "daps_graph_export"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "review_artifact_id": {
+                "type": "null"
+              },
+              "reviewer_key_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
               "relation": {
                 "const": "daps_membership_candidate"
               }
@@ -641,9 +737,16 @@
                 ]
               },
               "confidence": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 1
+                "oneOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "review_artifact_id": {
                 "type": "null"
