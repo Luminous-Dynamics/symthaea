@@ -1,0 +1,67 @@
+# PITB retrieved support-route coverage analyzer
+
+Standalone Rust analyzer joining per-query ranked retrieval receipts to independently measured exact-target support antichains.
+
+## What it measures
+
+Traditional premise retrieval metrics (Recall@K, MRR, nDCG) treat retrieved declarations as independent hits. Many Lean proofs require a *joint bundle*. This analyzer measures whether the ranked candidates cover at least one complete minimal sufficient support route from an exhaustive support-ablation experiment.
+
+For each matched retrieval query and support group, it reports:
+
+- **complete-route coverage**: whether the retrieved declaration set contains every member of at least one minimal sufficient route;
+- **minimal-route coverage**: fraction of the observed antichain's routes covered;
+- **route completion rank**: the highest rank needed to complete the earliest route;
+- **partial-route fraction**: mean fraction of each route present in the retrieved set;
+- **useful-novel-premise rate**: fraction of exact-mapped mutable candidates appearing in at least one minimal route;
+- **necessary-declaration recall**: recall of the intersection of all observed minimal routes (null if the intersection is empty);
+- **exact minimal route recovery**: whether the entire exact-mapped mutable candidate set equals a minimal route;
+- **coverage at K** for K = 1, 5, 10, 32, 64, 100;
+- retrieval time, tokens and cost, reported once per unique receipt in system summaries.
+
+The retrieval query binds to support groups using exact target-statement SHA-256 and environment SHA-256. If the same exact target/environment has multiple support groups (e.g., different fixed contexts or prover budgets), the query is evaluated separately against each group. This is a diagnostic comparison; it does not imply the proof budget used for retrieval equals the downstream ablation budget.
+
+## Required inputs
+
+1. **Support-antichain report JSON** from `pitb-support-antichain`, schema `pitb.support-antichain-report.v0`.
+2. **Retrieval receipt JSONL** from `pitb-retrieval-evidence`, one record per query/retriever run. Query rows must include exact target statement and target environment digests.
+3. **Candidate declaration mapping JSONL**. Every ranked graph node must have exactly one mapping row keyed by graph-manifest SHA-256 and node ID.
+
+Mapping row:
+
+```json
+{
+  "schema_version": "pitb.retrieval-declaration-mapping.v0",
+  "graph_manifest_sha256": "<64 lowercase hex>",
+  "node_id": "graph-node-id",
+  "mapping_status": "exact",
+  "declaration_id": "Mathlib.Algebra.Group.Defs.mul_assoc",
+  "mapping_method": "exact_formal_name",
+  "mapping_evidence_sha256": "<64 lowercase hex>",
+  "reviewer_attestation_sha256": null
+}
+```
+
+`mapping_status` is `exact`, `unresolved`, or `ambiguous`. Non-exact rows must have a null `declaration_id`, and cannot contribute to route coverage. Mapping methods are `exact_formal_name`, `exact_source_identity`, or `human_reviewed`. Human-reviewed mappings require a reviewer-attestation digest. The analyzer checks the digest syntax and graph binding; it does not open/authenticate the evidence bytes.
+
+## Run
+
+```sh
+cargo fmt --check --manifest-path tools/pitb-route-coverage/Cargo.toml
+cargo test --locked --manifest-path tools/pitb-route-coverage/Cargo.toml
+cargo run --locked --manifest-path tools/pitb-route-coverage/Cargo.toml -- --self-test
+
+cargo run --locked --manifest-path tools/pitb-route-coverage/Cargo.toml -- \
+  --analyze \
+  support-antichain-report.json \
+  retrieval-runs.jsonl \
+  declaration-mappings.jsonl \
+  retrieval-route-coverage.json
+```
+
+## Interpretation boundaries
+
+A complete route is sufficient only in the frozen experiment that generated the support antichain: exact target, fixed context, Lean environment/toolchain, prover policy and resource budget. It is not a theorem-level logical-necessity result.
+
+This analyzer does not establish that a node-to-declaration crosswalk is semantically correct simply because it is labelled exact; it requires a provenance digest but does not authenticate the referenced bytes. It does not replay proofs, prove that a model used the candidates, or make external candidates scheduler-admissible. The output is retrieval-to-route coverage evidence, **not proof completion**.
+
+For a fair comparison, run BM25, LeanSearch v2, Lean Finder V2, LeanGraphSearch, DAPS and a PITB union/reranker on the same query, graph snapshot, hidden split, candidate-pool policy and downstream budgets. Compare complete-route coverage and cost first; then run every arm through the same prover and independent verifier to measure unique assurance-adjusted target completion. Do not compare raw retriever scores across systems or treat candidate-route coverage as a solved theorem.
