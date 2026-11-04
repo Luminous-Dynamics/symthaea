@@ -25,6 +25,8 @@ base64 --decode fuzz/seeds/empty-stored.zip.b64 > fuzz/corpus/zip_inventory_and_
 Run:
 cargo +nightly fuzz run zip_inventory_and_content -- -max_total_time=180 -max_len=1048576 -rss_limit_mb=512 -print_final_stats=1
 
+The starter ZIP payload SHA-256 is `dd8a2bd8c16d808363a1d1e7560a4cc86494393c1a202a478db00f00ae53d099`. The weekly/manual workflow prints both the source base64 digest and decoded ZIP digest before fuzzing.
+
 The weekly/manual workflow runs a bounded 180-second smoke campaign. It is not a security certification. Every crash must be minimized, checked into the permanent regression corpus and assigned an exact source/toolchain/lockfile receipt. Fuzz-clean means only that no crash was found in the exercised build, seed corpus and time budget.
 
 Follow-on targets should separate archive admission, local/central mismatch handling, occurrence mapping, decompression/CRC verification and cross-parser differential behavior. Keep zipcore, zip, rawzip and pinned REA provenance separate; do not treat parser-name diversity as independent codec or checksum evidence.
