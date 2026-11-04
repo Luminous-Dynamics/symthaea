@@ -128,14 +128,14 @@ pub fn evaluate_batch(
     let claim_ceiling = [water_corpus, repair_corpus]
         .into_iter()
         .flat_map(|corpus| {
-        corpus["claim_ceiling"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(Value::as_str)
-            .map(str::to_owned)
-    })
-    .collect();
+            corpus["claim_ceiling"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+        })
+        .collect();
 
     Ok(BatchReport {
         report_schema_version: "0.1".to_owned(),
