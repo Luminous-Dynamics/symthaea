@@ -34,9 +34,11 @@ const importFromRea = async (relativePath) =>
 const [
   { createEvidence, withEvidenceCallerInputPath, parseEvidence },
   { createAnalysisProfile },
+  { TOOL_EFFECTS, toolReturnsTargetContent, annotationsFromEffects },
 ] = await Promise.all([
   importFromRea("domain/evidence.ts"),
   importFromRea("domain/analysisProfile.ts"),
+  importFromRea("contracts/toolEffects.ts"),
 ]);
 
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -427,6 +429,64 @@ await writeFile(resolve(outputDirectory, surrogateFile), surrogateBytes, {
   mode: 0o600,
 });
 
+const mobileToolEffectNames = [
+  "inspect_android_jni_bindings",
+  "trace_android_references",
+  "inspect_android_package",
+  "search_android_classes",
+  "inspect_android_class",
+  "inspect_android_method",
+  "inspect_adb_client",
+  "list_adb_devices",
+  "inspect_adb_device",
+  "list_adb_packages",
+  "pull_adb_package",
+  "read_adb_logcat",
+  "inspect_adb_package",
+  "pull_adb_file",
+  "push_adb_file",
+  "capture_adb_screen",
+  "list_adb_processes",
+  "list_adb_directory",
+  "list_adb_features",
+  "list_adb_services",
+  "inspect_adb_display",
+  "inspect_adb_window",
+  "read_adb_setting",
+  "collect_adb_bugreport",
+  "resolve_adb_packages",
+  "install_adb_package",
+  "uninstall_adb_package",
+  "start_adb_app",
+  "start_adb_activity",
+  "stop_adb_app",
+];
+
+const mobileToolEffects = {};
+for (const name of mobileToolEffectNames) {
+  if (!Object.hasOwn(TOOL_EFFECTS, name)) {
+    throw new Error("Pinned upstream REA is missing audited tool effects for " + name);
+  }
+  mobileToolEffects[name] = {
+    effects: TOOL_EFFECTS[name],
+    annotations: annotationsFromEffects(TOOL_EFFECTS[name]),
+    returns_target_content: toolReturnsTargetContent(name),
+  };
+}
+const mobileToolEffectBytes = Buffer.from(
+  JSON.stringify(mobileToolEffects, null, 2) + "\n",
+);
+const mobileToolEffectFile = "mobile-tool-effects-v1.json";
+await writeFile(resolve(outputDirectory, mobileToolEffectFile), mobileToolEffectBytes, {
+  flag: "wx",
+  mode: 0o600,
+});
+const mobileToolEffectManifest = {
+  file: mobileToolEffectFile,
+  tool_count: mobileToolEffectNames.length,
+  raw_file_sha256: digest(mobileToolEffectBytes),
+};
+
 const manifest = {
   schema: "luminous.rea-upstream-evidence-corpus.v1",
   producer: {
@@ -459,6 +519,7 @@ const manifest = {
       policy: "Rust String cannot represent isolated UTF-16 surrogate code units; raw importer rejects rather than normalizes or replaces them.",
     },
   ],
+  mobile_tool_effects: mobileToolEffectManifest,
 };
 const manifestBytes = Buffer.from(JSON.stringify(manifest, null, 2) + "\n");
 await writeFile(resolve(outputDirectory, "manifest.json"), manifestBytes, {
@@ -476,6 +537,7 @@ await writeFile(
       key_order_mutation_count: keyOrderMutations.length,
       negative_control_count: invalidCases.length,
       stricter_importer_count: 1,
+      mobile_tool_effects: mobileToolEffectManifest,
       producer: manifest.producer,
       generator: manifest.generator,
     },
