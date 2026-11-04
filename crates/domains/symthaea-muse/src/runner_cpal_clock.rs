@@ -19,6 +19,10 @@
 //! match. Since uncertainty propagation is not yet qualified, such a
 //! composition remains non-qualified.
 
+use crate::output_clock::{
+    OutputClockAccuracyStatusV1, OutputClockFitBundleV1, OutputClockFitErrorV1,
+    OutputFrameEstimateV1, OUTPUT_CLOCK_FIT_BUNDLE_SCHEMA_V1, OUTPUT_CLOCK_FIT_SCHEMA_V1,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::time::Instant;
@@ -233,7 +237,7 @@ pub struct RunnerCpalClockFitV1 {
     pub stream_instance_id: u64,
     pub cpal_stream_descriptor_sha256: String,
     /// Runner nanoseconds per CPAL predicted-playback-stream nanosecond.
-    pub runner_ns_per_cpal_ns: f64,
+    pub runner_ns_per_cpal_playback_ns: f64,
     /// Runner time at the reference CPAL timestamp. Retained as f64 because
     /// the OLS centroid need not fall on an integer nanosecond.
     pub reference_runner_time_ns: f64,
@@ -320,7 +324,7 @@ impl RunnerCpalClockFitV1 {
 
         let cpal_time = self.reference_cpal_playback_stream_time_ns as f64
             + (runner_time_ns as f64 - self.reference_runner_time_ns)
-                / self.runner_ns_per_cpal_ns;
+                / self.runner_ns_per_cpal_playback_ns;
         if !cpal_time.is_finite() || cpal_time < 0.0 {
             return Err(RunnerCpalClockFitErrorV1::NonFiniteFit);
         }
@@ -332,6 +336,104 @@ impl RunnerCpalClockFitV1 {
             reported_uncertainty_ns: self.reported_uncertainty_ns,
         })
     }
+}
+
+
+/// Result of composing runner time -> CPAL predicted playback time ->
+/// cumulative output frame. Both component fits remain point-estimate-only
+/// until their uncertainty terms are qualified and propagated.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RunnerOutputFrameEstimateV1 {
+    pub runner_time_ns: u64,
+    pub estimated_cpal_playback_stream_time_ns: f64,
+    pub rounded_cpal_playback_stream_time_ns: u64,
+    /// Signed quantization introduced when converting the sub-nanosecond
+    /// floating point playback estimate to the integer API used by the
+    /// output-frame fit. This is not physical clock uncertainty.
+    pub playback_time_quantization_error_ns: f64,
+    pub output_frame_estimate: OutputFrameEstimateV1,
+    pub accuracy_status: RunnerCpalClockAccuracyStatusV1,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum RunnerOutputFrameCompositionErrorV1 {
+    InvalidOutputClockBundle,
+    StreamInstanceMismatch,
+    StreamDescriptorDigestMismatch,
+    PlaybackTimeOutOfRange,
+    RunnerClock(RunnerCpalClockFitErrorV1),
+    OutputClock(OutputClockFitErrorV1),
+}
+
+impl std::fmt::Display for RunnerOutputFrameCompositionErrorV1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl std::error::Error for RunnerOutputFrameCompositionErrorV1 {}
+
+/// Compose runner time -> CPAL predicted playback time -> output frame.
+///
+/// The runner fit is explicitly against CPAL's predicted playback timestamp,
+/// not its callback-invocation timestamp. This matches the clock consumed by
+/// MEL-CLOCK-001's output-frame fit and avoids an undocumented callback-to-
+/// playback conversion.
+///
+/// Both receipts must bind the same stream instance and the runner descriptor's
+/// CPAL configuration digest must equal the output bundle descriptor's
+/// configuration digest. The returned mapping is still point-estimate-only;
+/// it is not DAC/acoustic observation or a qualified latency measurement.
+pub fn estimate_output_frame_at_runner_time_v1(
+    runner_fit: &RunnerCpalClockFitV1,
+    output_bundle: &OutputClockFitBundleV1,
+    runner_time_ns: u64,
+) -> Result<RunnerOutputFrameEstimateV1, RunnerOutputFrameCompositionErrorV1> {
+    if output_bundle.schema_version != OUTPUT_CLOCK_FIT_BUNDLE_SCHEMA_V1
+        || output_bundle.fit.schema_version != OUTPUT_CLOCK_FIT_SCHEMA_V1
+        || !output_bundle.stream_descriptor.is_valid()
+    {
+        return Err(RunnerOutputFrameCompositionErrorV1::InvalidOutputClockBundle);
+    }
+    if runner_fit.stream_instance_id != output_bundle.stream_descriptor.stream_instance_id
+        || output_bundle.fit.stream_instance_id != output_bundle.stream_descriptor.stream_instance_id
+    {
+        return Err(RunnerOutputFrameCompositionErrorV1::StreamInstanceMismatch);
+    }
+    if runner_fit.cpal_stream_descriptor_sha256
+        != output_bundle.stream_descriptor.configuration_digest_sha256
+        || output_bundle.fit.sample_rate_hz != output_bundle.stream_descriptor.sample_rate_hz
+        || output_bundle.fit.channel_count != output_bundle.stream_descriptor.channel_count
+    {
+        return Err(RunnerOutputFrameCompositionErrorV1::StreamDescriptorDigestMismatch);
+    }
+
+    let playback_estimate = runner_fit
+        .playback_time_at_runner_time(runner_time_ns)
+        .map_err(RunnerOutputFrameCompositionErrorV1::RunnerClock)?;
+    let rounded_playback_time = playback_estimate.cpal_playback_stream_time_ns.round();
+    if !rounded_playback_time.is_finite()
+        || rounded_playback_time < 0.0
+        || rounded_playback_time >= u64::MAX as f64
+    {
+        return Err(RunnerOutputFrameCompositionErrorV1::PlaybackTimeOutOfRange);
+    }
+    let rounded_playback_time_ns = rounded_playback_time as u64;
+    let output_frame_estimate = output_bundle
+        .fit
+        .frame_at_playback_time(rounded_playback_time_ns)
+        .map_err(RunnerOutputFrameCompositionErrorV1::OutputClock)?;
+
+    Ok(RunnerOutputFrameEstimateV1 {
+        runner_time_ns,
+        estimated_cpal_playback_stream_time_ns: playback_estimate
+            .cpal_playback_stream_time_ns,
+        rounded_cpal_playback_stream_time_ns: rounded_playback_time_ns,
+        playback_time_quantization_error_ns: rounded_playback_time
+            - playback_estimate.cpal_playback_stream_time_ns,
+        output_frame_estimate,
+        accuracy_status: RunnerCpalClockAccuracyStatusV1::PointEstimateOnly,
+    })
 }
 
 /// Fit a deterministic affine mapping for one continuous runner/CPAL clock
@@ -536,7 +638,7 @@ pub fn fit_runner_cpal_clock_v1(
         runner_origin_id: descriptor.runner_origin_id.clone(),
         stream_instance_id: descriptor.stream_instance_id,
         cpal_stream_descriptor_sha256: descriptor.cpal_stream_descriptor_sha256.clone(),
-        runner_ns_per_cpal_ns: slope,
+        runner_ns_per_cpal_playback_ns: slope,
         reference_runner_time_ns,
         reference_cpal_playback_stream_time_ns,
         valid_from_cpal_playback_stream_time_ns: valid_from_cpal,
