@@ -61,7 +61,7 @@ The callback writes fixed-size `Copy` anchors to a 1,024-entry SPSC ring; it nev
 
 The existing stereo renderer is explicitly mapped to the negotiated output channels: mono receives a two-channel arithmetic downmix, stereo preserves left/right, and channels three through eight receive zero-fill. Device configurations with zero or more than eight channels fail closed rather than creating a misleading frame clock or misaligned sample stream.
 
-A malformed callback frame shape invalidates further anchors for that stream instance rather than silently resuming with a guessed frame offset. A full anchor ring drops the evidence record but preserves the cumulative frame cursor and increments the anchor index, allowing a later fit to recognize missing evidence records. The fit artifact is persisted as an `OutputClockFitBundleV1`, binding the stream descriptor to the fitted clock.
+A malformed callback frame shape invalidates further anchors for that stream instance rather than silently resuming with a guessed frame offset. A full anchor ring drops the evidence record but preserves the cumulative frame cursor and increments the anchor index, allowing a later fit to recognize missing evidence records. The fit artifact is persisted as an `OutputClockFitBundleV1`, binding the stream descriptor, SHA-256 of the exact serialized anchor vector, and SHA-256 of the normalized fit policy to the fitted clock. The fit report records the minimum anchor count and residual/drift thresholds used. The companion `output-clock-fit-bundle-v1.schema.json` defines the external receipt shape.
 
 This integration has not been compiled or exercised against a device in this environment. It does not provide a runner-monotonic clock mapping or physical loopback observation.
 
