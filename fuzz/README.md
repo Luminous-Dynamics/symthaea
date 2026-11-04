@@ -20,7 +20,7 @@ Run on Linux x86-64 with Rust nightly dated 2026-11-03 and cargo-fuzz 0.13.2. In
 
 Prepare the initial corpus with:
 mkdir -p fuzz/corpus/zip_inventory_and_content fuzz/artifacts
-base64 --decode fuzz/seeds/empty-stored.zip.b64 > fuzz/corpus/zip_inventory_and_content/empty-stored.zip
+base64 --decode fuzz/seeds/minimal-stored-entry.zip.b64 > fuzz/corpus/zip_inventory_and_content/minimal-stored-entry.zip
 
 Run:
 cargo fuzz run zip_inventory_and_content -- -max_total_time=180 -max_len=1048576 -rss_limit_mb=512 -print_final_stats=1
