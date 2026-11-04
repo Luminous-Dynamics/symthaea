@@ -2,5 +2,78 @@
   "format": "symthaea.d4v2.dynamic-bce-exhaustive-model-results",
   "version": 1,
   "claim_ceiling": "local_independent_source_derived_state_model_plus_exhaustive_exact_projected_oracle_not_D4_binary_differential_or_formal_proof",
-  "uploaded_corpus_execution": "not_run"
+  "upstream": {
+    "repository": "crillab/d4v2",
+    "branch": "main",
+    "source_blob_sha1": {
+      "src/formulaManager/cnf/CnfManagerDynBlockedCl.cpp": "303817529debd95735a32ca9200791c3a854d992",
+      "src/formulaManager/cnf/CnfManagerDynBlockedCl.hpp": "d92fe5e5d25b26f981ff657230ff0a9cb8ad04bf",
+      "src/formulaManager/cnf/CnfManagerDyn.cpp": "3f19bc0664ff90d167ee00b1b6321a0015fe1ff8",
+      "src/formulaManager/cnf/CnfManagerDyn.hpp": "8c014829c7ccae545b1afb98c10d21b425e1b4b7",
+      "src/formulaManager/cnf/ClauseInfo.hpp": "c8d0718fdad78aba0c87701e2e19b5fd2acd7f75",
+      "src/formulaManager/cnf/DataOccurrence.hpp": "0a74b2c9db6c8eb0863d4d43d1b13f9c0df5bc29",
+      "src/problem/ProblemManager.hpp": "f5c2bbfd3a0951685a7055d1a9b4153395563bc1"
+    }
+  },
+  "artifacts": {
+    "verify_d4v2_dynamic_bce_trace.py_git_blob_sha1": "0f1379ead24d6f58248165af8006ac4b0d1bf7d7",
+    "d4v2_dynamic_bce_trace_certificate.v1.json_git_blob_sha1": "4646ee4088f3290f944834ac469724142445d1b8",
+    "d4v2_dynamic_bce_exhaustive_model.py_git_blob_sha1": "d0832b02358b4a748617e8898c47efa5e79b0f46"
+  },
+  "invariant_correction": {
+    "active_target_requires_exactly_one_valid_watch": true,
+    "initially_inactive_target_may_have_no_watch_after_constructor_cleanup": true,
+    "dynamically_blocked_target_keeps_parked_watch": true,
+    "postUpdate_restores_clause_and_assignment_state_without_reverting_watch_moves": true
+  },
+  "local_in_memory_reference_execution": {
+    "status": "passed",
+    "execution_date": "2026-11-04",
+    "python": "3.13.5",
+    "platform": "linux",
+    "weights": "per-case exact positive rational literal weights; Fraction arithmetic",
+    "total_cases": 2518,
+    "total_decision_nodes": 14578,
+    "total_leaf_branches": 8548,
+    "total_backtracks": 12060,
+    "total_root_and_leaf_projected_support_pwmc_comparisons": 11066,
+    "all_projected_support_checks_passed": true,
+    "all_exact_pwmc_checks_passed": true,
+    "all_branch_support_unions_match_root": true,
+    "full_model_count_changed_cases": 364,
+    "initial_deletions": 1280,
+    "persistent_watch_relocations": 6759,
+    "dynamic_deletions": 712,
+    "exhaustive_2var": {
+      "formulas": 256,
+      "selected_partitions": 3,
+      "cases": 768,
+      "decision_nodes": 3328,
+      "leaf_branches": 2048,
+      "backtracks": 2560,
+      "initial_deletions": 320,
+      "watch_relocations": 128,
+      "dynamic_deletions": 128,
+      "full_model_count_changed_cases": 104
+    },
+    "seeded_3var": {
+      "seed": 946224,
+      "formulas": 250,
+      "selected_partitions": 7,
+      "cases": 1750,
+      "decision_nodes": 11250,
+      "leaf_branches": 6500,
+      "backtracks": 9500,
+      "initial_deletions": 960,
+      "watch_relocations": 6631,
+      "dynamic_deletions": 584,
+      "full_model_count_changed_cases": 260
+    },
+    "method": "Executed independent in-memory source-derived state model and exhaustive projected oracle. This was not execution of the uploaded Python files."
+  },
+  "uploaded_checker_execution": "not_run",
+  "uploaded_corpus_runner_execution": "not_run",
+  "d4_binary_differential": "not_run",
+  "hol4_formal_proof": "not_started",
+  "performance_benchmark": "not_run"
 }
