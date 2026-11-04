@@ -217,6 +217,33 @@ struct ComparisonSummary {
 }
 
 #[derive(Debug, Clone, Serialize)]
+struct PairedComparison {
+    reference_kind: String,
+    reference_name: String,
+    reference_version: String,
+    challenger_kind: String,
+    challenger_name: String,
+    challenger_version: String,
+    matched_assessment_count: usize,
+    matched_query_count: usize,
+    reference_only_route_count: usize,
+    challenger_only_route_count: usize,
+    both_route_count: usize,
+    neither_route_count: usize,
+    reference_complete_route_coverage: f64,
+    challenger_complete_route_coverage: f64,
+    complete_route_coverage_delta: f64,
+    mean_minimal_route_coverage_delta: f64,
+    component_cluster_count: usize,
+    cluster_bootstrap_replicates: usize,
+    cluster_bootstrap_ci_low: Option<f64>,
+    cluster_bootstrap_ci_high: Option<f64>,
+    exact_mcnemar_p_value: f64,
+    holm_adjusted_mcnemar_p_value: Option<f64>,
+    interpretation_boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
 struct Report {
     schema_version: String,
     support_report_sha256: String,
@@ -230,6 +257,7 @@ struct Report {
     unmapped_candidate_count: usize,
     route_assessments: Vec<RouteAssessment>,
     comparison_summaries: Vec<ComparisonSummary>,
+    paired_comparisons: Vec<PairedComparison>,
     admission_boundary: String,
     interpretation_boundary: String,
 }
@@ -690,6 +718,198 @@ fn summarize(assessments: &[RouteAssessment]) -> Vec<ComparisonSummary> {
     }).collect()
 }
 
+type RetrieverKey = (String, String, String);
+type AssessmentKey = (String, String, String, String, String);
+
+fn retriever_key(row: &RouteAssessment) -> RetrieverKey {
+    (row.retriever_kind.clone(), row.retriever_name.clone(), row.retriever_version.clone())
+}
+
+fn assessment_key(row: &RouteAssessment) -> AssessmentKey {
+    (
+        row.benchmark_id.clone(),
+        row.benchmark_version.clone(),
+        row.split_id.clone(),
+        row.query_id.clone(),
+        row.group_id.clone(),
+    )
+}
+
+fn xorshift_next(state: &mut u64) -> u64 {
+    let mut x = *state;
+    x ^= x << 13;
+    x ^= x >> 7;
+    x ^= x << 17;
+    *state = x;
+    x
+}
+
+fn deterministic_seed(reference: &RetrieverKey, challenger: &RetrieverKey) -> u64 {
+    let label = format!(
+        "{}|{}|{}||{}|{}|{}",
+        reference.0, reference.1, reference.2,
+        challenger.0, challenger.1, challenger.2
+    );
+    let hash = sha256(label.as_bytes());
+    u64::from_str_radix(&hash[..16], 16).unwrap_or(0x9e3779b97f4a7c15).max(1)
+}
+
+fn percentile(sorted: &[f64], probability: f64) -> Option<f64> {
+    if sorted.is_empty() { return None; }
+    let position = probability.clamp(0.0, 1.0) * (sorted.len() - 1) as f64;
+    let low = position.floor() as usize;
+    let high = position.ceil() as usize;
+    if low == high {
+        Some(sorted[low])
+    } else {
+        let fraction = position - low as f64;
+        Some(sorted[low] * (1.0 - fraction) + sorted[high] * fraction)
+    }
+}
+
+fn cluster_bootstrap_interval(
+    cluster_deltas: &BTreeMap<String, Vec<f64>>,
+    seed: u64,
+    replicates: usize,
+) -> (Option<f64>, Option<f64>) {
+    if cluster_deltas.len() < 2 || replicates == 0 {
+        return (None, None);
+    }
+    let clusters: Vec<&Vec<f64>> = cluster_deltas.values().collect();
+    let mut state = seed.max(1);
+    let mut values = Vec::with_capacity(replicates);
+    for _ in 0..replicates {
+        let mut sum = 0.0;
+        let mut count = 0usize;
+        for _ in 0..clusters.len() {
+            let index = (xorshift_next(&mut state) as usize) % clusters.len();
+            for delta in clusters[index] {
+                sum += delta;
+                count += 1;
+            }
+        }
+        if count > 0 {
+            values.push(sum / count as f64);
+        }
+    }
+    values.sort_by(f64::total_cmp);
+    (percentile(&values, 0.025), percentile(&values, 0.975))
+}
+
+fn exact_mcnemar_p_value(challenger_only: usize, reference_only: usize) -> f64 {
+    let n = challenger_only + reference_only;
+    if n == 0 {
+        return 1.0;
+    }
+    let k = challenger_only.min(reference_only);
+    let mut probability = 2.0_f64.powi(-(n as i32));
+    let mut lower_tail = probability;
+    for i in 1..=k {
+        probability *= (n - i + 1) as f64 / i as f64;
+        lower_tail += probability;
+    }
+    (2.0 * lower_tail).min(1.0)
+}
+
+fn build_paired_comparisons(assessments: &[RouteAssessment]) -> Vec<PairedComparison> {
+    let mut systems = BTreeMap::<RetrieverKey, BTreeMap<AssessmentKey, &RouteAssessment>>::new();
+    for row in assessments {
+        systems.entry(retriever_key(row)).or_default().insert(assessment_key(row), row);
+    }
+    let keys: Vec<RetrieverKey> = systems.keys().cloned().collect();
+    let mut comparisons = Vec::new();
+    for reference_index in 0..keys.len() {
+        for challenger_index in (reference_index + 1)..keys.len() {
+            let reference_key = &keys[reference_index];
+            let challenger_key = &keys[challenger_index];
+            let reference_rows = &systems[reference_key];
+            let challenger_rows = &systems[challenger_key];
+            let mut matched = Vec::<(&RouteAssessment, &RouteAssessment)>::new();
+            for (key, reference) in reference_rows {
+                if let Some(challenger) = challenger_rows.get(key) {
+                    if reference.graph_manifest_sha256 != challenger.graph_manifest_sha256
+                        || reference.target_statement_sha256 != challenger.target_statement_sha256
+                        || reference.environment_sha256 != challenger.environment_sha256
+                        || reference.component_id != challenger.component_id
+                    {
+                        // Same query/group identity but different graph or target is not a matched trial.
+                        continue;
+                    }
+                    matched.push((reference, *challenger));
+                }
+            }
+            if matched.is_empty() { continue; }
+            let mut reference_only = 0usize;
+            let mut challenger_only = 0usize;
+            let mut both = 0usize;
+            let mut neither = 0usize;
+            let mut route_delta_sum = 0.0;
+            let mut clusters = BTreeMap::<String, Vec<f64>>::new();
+            let mut matched_queries = BTreeSet::<String>::new();
+            for (reference, challenger) in &matched {
+                let r = reference.any_complete_route_covered_at_returned_k;
+                let c = challenger.any_complete_route_covered_at_returned_k;
+                match (r, c) {
+                    (true, true) => both += 1,
+                    (true, false) => reference_only += 1,
+                    (false, true) => challenger_only += 1,
+                    (false, false) => neither += 1,
+                }
+                let delta = challenger.minimal_route_coverage_at_returned_k
+                    - reference.minimal_route_coverage_at_returned_k;
+                route_delta_sum += delta;
+                clusters.entry(reference.component_id.clone()).or_default().push(delta);
+                matched_queries.insert(reference.query_id.clone());
+            }
+            let n = matched.len();
+            let reference_coverage = (reference_only + both) as f64 / n as f64;
+            let challenger_coverage = (challenger_only + both) as f64 / n as f64;
+            let (ci_low, ci_high) = cluster_bootstrap_interval(
+                &clusters,
+                deterministic_seed(reference_key, challenger_key),
+                2000,
+            );
+            comparisons.push(PairedComparison {
+                reference_kind: reference_key.0.clone(),
+                reference_name: reference_key.1.clone(),
+                reference_version: reference_key.2.clone(),
+                challenger_kind: challenger_key.0.clone(),
+                challenger_name: challenger_key.1.clone(),
+                challenger_version: challenger_key.2.clone(),
+                matched_assessment_count: n,
+                matched_query_count: matched_queries.len(),
+                reference_only_route_count: reference_only,
+                challenger_only_route_count: challenger_only,
+                both_route_count: both,
+                neither_route_count: neither,
+                reference_complete_route_coverage: reference_coverage,
+                challenger_complete_route_coverage: challenger_coverage,
+                complete_route_coverage_delta: challenger_coverage - reference_coverage,
+                mean_minimal_route_coverage_delta: route_delta_sum / n as f64,
+                component_cluster_count: clusters.len(),
+                cluster_bootstrap_replicates: if clusters.len() >= 2 { 2000 } else { 0 },
+                cluster_bootstrap_ci_low: ci_low,
+                cluster_bootstrap_ci_high: ci_high,
+                exact_mcnemar_p_value: exact_mcnemar_p_value(challenger_only, reference_only),
+                holm_adjusted_mcnemar_p_value: None,
+                interpretation_boundary: "Paired descriptive comparison on identical query/support-group keys and graph/target/environment identity. Confidence intervals resample component clusters, not individual rows. P-values are exact two-sided McNemar tests and must be corrected for multiplicity across the comparison family.".into(),
+            });
+        }
+    }
+    let mut order: Vec<usize> = (0..comparisons.len()).collect();
+    order.sort_by(|a, b| comparisons[*a].exact_mcnemar_p_value.total_cmp(&comparisons[*b].exact_mcnemar_p_value));
+    let family_size = order.len();
+    let mut adjusted_floor = 0.0_f64;
+    for (rank, index) in order.into_iter().enumerate() {
+        let multiplier = (family_size - rank) as f64;
+        adjusted_floor = adjusted_floor.max(
+            (comparisons[index].exact_mcnemar_p_value * multiplier).min(1.0)
+        );
+        comparisons[index].holm_adjusted_mcnemar_p_value = Some(adjusted_floor);
+    }
+    comparisons
+}
+
 fn analyze(
     support_bytes: &[u8],
     retrieval_bytes: &[u8],
@@ -782,6 +1002,7 @@ fn analyze(
         matched_assessment_count: assessments.len(),
         unmatched_receipt_count: unmatched,
         unmapped_candidate_count: total_unmapped,
+        paired_comparisons: build_paired_comparisons(&assessments),
         route_assessments: assessments,
         comparison_summaries: summaries,
         admission_boundary: "All graph nodes remain retrieval candidates. The join never promotes external candidates to typed observed dependencies or scheduler-admissible proof context.".into(),
