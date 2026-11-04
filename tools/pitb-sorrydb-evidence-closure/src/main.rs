@@ -825,7 +825,104 @@ fn verify_all(
     })
 }
 
-fn make_synthetic_bundle(root: &Path) -> Result<(Vec<u8>, Vec<u8>), String> {
+
+fn encode_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(HEX[(byte >> 4) as usize] as char);
+        output.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    output
+}
+
+fn run_openssl(args: &[&str], label: &str) -> Result<Vec<u8>, String> {
+    let output = Command::new("openssl")
+        .args(args)
+        .output()
+        .map_err(|e| format!("run OpenSSL {label}: {e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "OpenSSL {label} failed: {}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    Ok(output.stdout)
+}
+
+fn create_synthetic_reviewer_identity(root: &Path) -> Result<(Vec<u8>, String, PathBuf), String> {
+    let key_dir = root.join("synthetic-reviewer-keygen");
+    fs::create_dir_all(&key_dir).map_err(|e| format!("create synthetic reviewer key directory: {e}"))?;
+    let private_key_path = key_dir.join("private-key.pem");
+    let public_key_path = key_dir.join("public-key.pem");
+    let private_key = private_key_path.to_str().ok_or("synthetic private-key path is not UTF-8")?;
+    let public_key = public_key_path.to_str().ok_or("synthetic public-key path is not UTF-8")?;
+
+    let output = Command::new("openssl")
+        .args(["genpkey", "-algorithm", "ED25519", "-out", private_key])
+        .output()
+        .map_err(|e| format!("generate synthetic Ed25519 test key: {e}"))?;
+    if !output.status.success() {
+        return Err(format!("generate synthetic Ed25519 key failed: {}", String::from_utf8_lossy(&output.stderr)));
+    }
+    let output = Command::new("openssl")
+        .args(["pkey", "-in", private_key, "-pubout", "-out", public_key])
+        .output()
+        .map_err(|e| format!("derive synthetic reviewer public key: {e}"))?;
+    if !output.status.success() {
+        return Err(format!("derive synthetic reviewer public key failed: {}", String::from_utf8_lossy(&output.stderr)));
+    }
+    let public_pem = fs::read(&public_key_path).map_err(|e| format!("read synthetic public key: {e}"))?;
+    let public_pem_text = String::from_utf8(public_pem)
+        .map_err(|e| format!("synthetic reviewer public key is not UTF-8: {e}"))?;
+    let registry = json!({
+        "schema_version": "pitb.sorrydb-reviewer-key-registry.v1",
+        "registry_id": "synthetic-registry-test-only",
+        "keys": [{
+            "key_id": "synthetic-reviewer-key-v1",
+            "reviewer_id": "synthetic-reviewer",
+            "public_key_pem": public_pem_text,
+            "status": "active"
+        }]
+    });
+    let registry_bytes = serde_json::to_vec(&registry)
+        .map_err(|e| format!("serialize synthetic reviewer registry: {e}"))?;
+    let registry_sha256 = sha256(&registry_bytes);
+    fs::write(root.join("reviewer-key-registry.json"), &registry_bytes)
+        .map_err(|e| format!("write synthetic reviewer registry: {e}"))?;
+    Ok((registry_bytes, registry_sha256, private_key_path))
+}
+
+fn sign_synthetic_attestation(
+    attestation_without_signature: &Value,
+    private_key_path: &Path,
+    temp_dir: &Path,
+) -> Result<String, String> {
+    fs::create_dir_all(temp_dir).map_err(|e| format!("create synthetic signing directory: {e}"))?;
+    let payload_path = temp_dir.join("reviewer-attestation-payload.json");
+    let signature_path = temp_dir.join("reviewer-attestation-signature.bin");
+    let payload = serde_json::to_vec(attestation_without_signature)
+        .map_err(|e| format!("serialize synthetic signed reviewer payload: {e}"))?;
+    fs::write(&payload_path, &payload).map_err(|e| format!("write synthetic reviewer payload: {e}"))?;
+    let private_key = private_key_path.to_str().ok_or("synthetic private-key path is not UTF-8")?;
+    let payload_file = payload_path.to_str().ok_or("synthetic reviewer payload path is not UTF-8")?;
+    let signature_file = signature_path.to_str().ok_or("synthetic reviewer signature path is not UTF-8")?;
+    let output = Command::new("openssl")
+        .args(["pkeyutl", "-sign", "-inkey", private_key, "-rawin", "-in", payload_file, "-out", signature_file])
+        .output()
+        .map_err(|e| format!("sign synthetic reviewer attestation: {e}"))?;
+    if !output.status.success() {
+        return Err(format!("sign synthetic reviewer attestation failed: {}", String::from_utf8_lossy(&output.stderr)));
+    }
+    let signature = fs::read(&signature_path).map_err(|e| format!("read synthetic reviewer signature: {e}"))?;
+    if signature.len() != 64 {
+        return Err("synthetic Ed25519 signature is not 64 bytes".into());
+    }
+    Ok(encode_hex(&signature))
+}
+
+fn make_synthetic_bundle(root: &Path) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>, String), String> {
     let run_id = "synthetic-run";
     let dir = root.join(run_id);
     fs::create_dir_all(&dir).map_err(|e| format!("create synthetic bundle: {e}"))?;
