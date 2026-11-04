@@ -103,6 +103,68 @@ def validate_input(source: dict[str, Any]) -> None:
             fail(f"action {action['action_id']} has an empty outcome label")
 
 
+def greedy_plan(
+    actions: list[dict[str, Any]],
+    action_coverage: dict[str, set[tuple[str, str]]],
+    conflict_pairs: set[tuple[str, str]],
+    exact_minimum_cost: int | None,
+) -> dict[str, Any]:
+    uncovered = set(conflict_pairs)
+    selected: list[str] = []
+    effort = 0
+    while uncovered:
+        candidates = []
+        for action in actions:
+            action_id = action["action_id"]
+            if action_id in selected:
+                continue
+            marginal = len(uncovered & action_coverage[action_id])
+            if marginal == 0:
+                continue
+            candidates.append((action, marginal))
+        if not candidates:
+            break
+        best_action, best_marginal = candidates[0]
+        for action, marginal in candidates[1:]:
+            left = marginal * best_action["effort_units"]
+            right = best_marginal * action["effort_units"]
+            if (
+                left > right
+                or (
+                    left == right
+                    and (
+                        marginal > best_marginal
+                        or (
+                            marginal == best_marginal
+                            and action["action_id"] < best_action["action_id"]
+                        )
+                    )
+                )
+            ):
+                best_action, best_marginal = action, marginal
+        selected.append(best_action["action_id"])
+        effort += best_action["effort_units"]
+        uncovered -= action_coverage[best_action["action_id"]]
+
+    selected.sort()
+    complete = not uncovered
+    return {
+        "action_ids": selected,
+        "effort_units": effort,
+        "separated_decision_conflict_pair_count": len(conflict_pairs) - len(uncovered),
+        "remaining_pairs": [
+            {"world_a": left, "world_b": right}
+            for left, right in sorted(uncovered)
+        ],
+        "complete": complete,
+        "regret_to_exact_minimum_effort_units": (
+            None
+            if not complete or exact_minimum_cost is None
+            else max(0, effort - exact_minimum_cost)
+        ),
+    }
+
+
 def expected_result(source: dict[str, Any]) -> dict[str, Any]:
     validate_input(source)
     scenarios = sorted(source["scenarios"], key=lambda row: row["scenario_id"])
@@ -191,9 +253,11 @@ def expected_result(source: dict[str, Any]) -> dict[str, Any]:
     undiscriminable_rows = [
         {"world_a": left, "world_b": right} for left, right in undiscriminable
     ]
+    greedy = greedy_plan(actions, action_coverage, set(conflict_pairs), minimum_cost)
     return {
         "scenario_count": len(scenarios),
         "observation_action_count": len(actions),
+        "greedy_comparator": greedy,
         "decision_conflict_pair_count": len(conflict_pairs),
         "individually_discriminable_pair_count": len(conflict_pairs) - len(undiscriminable),
         "undiscriminable_pairs": undiscriminable_rows,
