@@ -1400,6 +1400,12 @@ mod tests {
     fn proceed_decision_cannot_rely_only_on_inferred_or_dream_evidence() {
         let mut ledger = base_ledger();
         ledger.evidence[0].authority = EvidenceAuthority::DreamDerived;
+        ledger.evidence[0].source_action_id = None;
+        ledger.outcomes[0].status = OutcomeStatus::NotMeasurable;
+        ledger.outcomes[0].observation_evidence_id = None;
+        ledger.outcomes[0].realized_utility = MetricValue::NotMeasurable;
+        ledger.hypotheses[0].status = HypothesisStatus::Unresolved;
+        ledger.hypotheses[0].supporting_evidence_ids.clear();
         assert_eq!(
             ledger.validate(),
             Err(ValidationError::InvalidDecisionRecord)
