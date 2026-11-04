@@ -125,12 +125,9 @@ pub fn evaluate_batch(
             .or_insert(0) += 1;
     }
 
-    let claim_ceiling = [
-        water_corpus,
-        repair_corpus,
-    ]
-    .into_iter()
-    .flat_map(|corpus| {
+    let claim_ceiling = [water_corpus, repair_corpus]
+        .into_iter()
+        .flat_map(|corpus| {
         corpus["claim_ceiling"]
             .as_array()
             .into_iter()
@@ -197,9 +194,9 @@ fn validate_corpus_header(
             format!("unexpected corpus identifier: {corpus_id}"),
         ));
     }
-    let claim_ceiling = corpus["claim_ceiling"]
-        .as_array()
-        .ok_or_else(|| EvaluationError::new("corpus.claim_ceiling", "claim ceiling must be an array"))?;
+    let claim_ceiling = corpus["claim_ceiling"].as_array().ok_or_else(|| {
+        EvaluationError::new("corpus.claim_ceiling", "claim ceiling must be an array")
+    })?;
     if claim_ceiling.is_empty() {
         return Err(EvaluationError::new(
             "corpus.claim_ceiling",
@@ -214,9 +211,9 @@ fn validate_scenarios<'a>(
     collection_name: &'static str,
     expected_ids: &[&str],
 ) -> Result<Vec<&'a Value>, EvaluationError> {
-    let scenarios = corpus[collection_name]
-        .as_array()
-        .ok_or_else(|| EvaluationError::new(collection_name, "scenario collection must be an array"))?;
+    let scenarios = corpus[collection_name].as_array().ok_or_else(|| {
+        EvaluationError::new(collection_name, "scenario collection must be an array")
+    })?;
 
     if scenarios.len() != expected_ids.len() {
         return Err(EvaluationError::new(
@@ -339,7 +336,10 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
             let reference = required_number(input, "independent_reference_tank_level_l")?;
             metrics.insert("tank_sensor_l".to_owned(), sensor);
             metrics.insert("independent_reference_l".to_owned(), reference);
-            metrics.insert("absolute_sensor_disagreement_l".to_owned(), (sensor - reference).abs());
+            metrics.insert(
+                "absolute_sensor_disagreement_l".to_owned(),
+                (sensor - reference).abs(),
+            );
             notes.push(
                 "The sensor and independent reference remain separate observations; neither is silently selected as truth."
                     .to_owned(),
@@ -617,8 +617,7 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
                 bool_as_f64(required_bool(baseline, "calibration_required")?),
             );
             notes.push(
-                "Calibration is explicitly required by the synthetic task profile."
-                    .to_owned(),
+                "Calibration is explicitly required by the synthetic task profile.".to_owned(),
             );
             unresolved.push(
                 "No sensor-serial/revision-bound calibration artifact or independent reference check is supplied."
@@ -628,9 +627,11 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
         }
         "REPAIR-005" => {
             let signed_image = required_bool(baseline, "signed_image_available")?;
-            let previous_image =
-                required_bool(baseline, "previous_known_good_image_available")?;
-            metrics.insert("signed_image_available".to_owned(), bool_as_f64(signed_image));
+            let previous_image = required_bool(baseline, "previous_known_good_image_available")?;
+            metrics.insert(
+                "signed_image_available".to_owned(),
+                bool_as_f64(signed_image),
+            );
             metrics.insert(
                 "previous_known_good_image_available".to_owned(),
                 bool_as_f64(previous_image),
@@ -695,7 +696,9 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
                 replacement_compatibility_qualified: required_bool(
                     baseline,
                     "material_grade_known",
-                )? && baseline["firmware_compatibility"].as_str() == Some("qualified"),
+                )? && baseline["firmware_compatibility"]
+                    .as_str()
+                    == Some("qualified"),
                 offline_service_required: false,
                 offline_service_available: true,
                 affected_calibration_requalified: false,
@@ -750,10 +753,7 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
                 safety_check_required: true,
                 post_repair_safety_check_passed: true,
                 follow_up_days_observed: 30,
-                recurrence_observed: required_bool(
-                    baseline,
-                    "recurrence_observed_after_30_days",
-                )?,
+                recurrence_observed: required_bool(baseline, "recurrence_observed_after_30_days")?,
             };
             let result = evaluate_repair_attempt(&attempt, 30)?;
             metrics.insert("follow_up_days_observed".to_owned(), 30.0);
@@ -836,10 +836,7 @@ fn evaluate_repair_scenario(scenario: &Value) -> Result<BatchReceipt, Evaluation
                     baseline,
                     "critical_interface_changed",
                 )?,
-                post_repair_function_passed: required_bool(
-                    baseline,
-                    "post_repair_test_available",
-                )?,
+                post_repair_function_passed: required_bool(baseline, "post_repair_test_available")?,
                 safety_check_required: true,
                 post_repair_safety_check_passed: required_bool(
                     baseline,
@@ -903,13 +900,13 @@ fn required_str<'a>(
     })
 }
 
-fn required_number(
-    object: &Value,
-    key: &'static str,
-) -> Result<f64, EvaluationError> {
-    let value = object[key]
-        .as_f64()
-        .ok_or_else(|| EvaluationError::new("scenario.input", format!("required number {key} is missing")))?;
+fn required_number(object: &Value, key: &'static str) -> Result<f64, EvaluationError> {
+    let value = object[key].as_f64().ok_or_else(|| {
+        EvaluationError::new(
+            "scenario.input",
+            format!("required number {key} is missing"),
+        )
+    })?;
     if !value.is_finite() {
         return Err(EvaluationError::new(
             "scenario.input",
@@ -919,13 +916,13 @@ fn required_number(
     Ok(value)
 }
 
-fn required_bool(
-    object: &Value,
-    key: &'static str,
-) -> Result<bool, EvaluationError> {
-    object[key]
-        .as_bool()
-        .ok_or_else(|| EvaluationError::new("scenario.input", format!("required boolean {key} is missing")))
+fn required_bool(object: &Value, key: &'static str) -> Result<bool, EvaluationError> {
+    object[key].as_bool().ok_or_else(|| {
+        EvaluationError::new(
+            "scenario.input",
+            format!("required boolean {key} is missing"),
+        )
+    })
 }
 
 fn bool_as_f64(value: bool) -> f64 {
