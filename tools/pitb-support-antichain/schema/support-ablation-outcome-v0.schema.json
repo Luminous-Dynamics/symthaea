@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/support-ablation-outcome-v0.schema.json",
+  "title": "PITB support ablation outcome v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "study_id",
+    "component_id",
+    "target_id",
+    "analysis_endpoint",
+    "target_statement_sha256",
+    "environment_sha256",
+    "toolchain_sha256",
+    "fixed_context_sha256",
+    "budget_sha256",
+    "solver_policy_sha256",
+    "mutable_declarations",
+    "available_declarations",
+    "local_context_sha256",
+    "outcome",
+    "kernel_passed",
+    "semantic_gate_passed",
+    "state_receipt_sha256",
+    "run_receipt_sha256",
+    "checker_receipt_sha256",
+    "semantic_gate_receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.support-ablation-outcome.v0"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "component_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "analysis_endpoint": {
+      "const": "exact_target_replan"
+    },
+    "target_statement_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "environment_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "toolchain_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "fixed_context_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "budget_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "solver_policy_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "mutable_declarations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "available_declarations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "local_context_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "outcome": {
+      "enum": [
+        "verified_success",
+        "non_solve"
+      ]
+    },
+    "kernel_passed": {
+      "type": "boolean"
+    },
+    "semantic_gate_passed": {
+      "type": "boolean"
+    },
+    "state_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "run_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "checker_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "semantic_gate_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}
