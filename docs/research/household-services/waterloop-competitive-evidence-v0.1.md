@@ -244,3 +244,63 @@ These are proposed research gates, not standards or achieved results:
 ## 10. Claim ceiling
 
 This comparator file does not establish a Hydraloop defect or certification failure, WaterLoop performance/superiority, water savings, potable safety, treatment efficacy, installation legality, local market availability, affordability or household demand. It establishes a source-bound acquisition and matched-test plan only.
+
+
+## 10. Pre-registered competitive target ladder
+
+These are **proposed engineering targets**, not observed WaterLoop results, certified thresholds, or claims about incumbent performance. Freeze the exact comparator SKU, configuration, firmware, use profile, functional unit, demand trace, source, pressure boundary, and cost basis before collecting any comparative result. Public product-page figures are acquisition leads, not independent SOTA measurements.
+
+### 10.1 Outage continuity — JoJo-style backup is the minimum serious comparator
+
+**Primary metric:** interval-valued cumulative qualified-service deficit at the actual fixture boundary over matched outage traces, subject to the household's declared critical-service floor.
+
+Target ladder:
+- **Functional floor:** never count stored inventory unless it is physically deliverable at the declared fixture pressure/flow floor and the water is qualified for the declared use.
+- **Baseline challenger:** at least 25% more time above the declared critical-service floor than an unbuffered municipal-only baseline under the same outage/demand traces.
+- **Incumbent challenger:** at least 10% lower worst-case cumulative service deficit than the strongest matched conventional tank + pump + automatic-switching configuration, without worsening any critical fixture floor, safety condition, or recovery criterion.
+- Report uncertainty intervals, outage duration, source pressure, initial reserve, demand profile, installation topology, pump/control energy, service burden, and recovery time separately.
+
+The 25% target is against an unbuffered reference only. The harder 10% target is against a best-matched operational storage baseline. Passing the first does not imply passing the second.
+
+### 10.2 Greywater substitution — Hydraloop/AQUALOOP are reuse comparators, not backup comparators
+
+**Primary metric:** directly metered net mains litres displaced for the same declared non-potable end-use demand, with output quality and service continuity as hard gates.
+
+Target ladder:
+- **Functional floor:** zero credit for gross treated volume, rejected volume, unused output, or output that does not displace measured mains demand.
+- **Incumbent challenger:** preregister one primary route: (a) at least 10% more net mains displacement at equal or lower lifecycle cost and energy per qualified displaced litre, or (b) equal net mains displacement with at least 10% lower lifecycle cost per qualified displaced litre. Do not switch routes after results are seen.
+- Report source stream, incoming load, treatment state, rejected/purged volume, qualified output by end use, storage loss, actual mains meter change, electrical energy, consumables, maintenance time, installed footprint and lifecycle cost.
+- Compare against the strongest independently tested exact configuration within the same reuse class and end-use scope, not against H300's manufacturer-declared 360 L/day cleaning capacity or a certification listing's differently scoped rated capacity.
+
+Do not treat non-potable reuse volume as drinking-water or emergency-supply volume.
+
+### 10.3 Leak observability and containment — Moen Flo / Phyn are incumbents
+
+**Primary metrics:** missed consequential-leak volume, detection/isolation latency, successful containment, and false autonomous isolation burden.
+
+Target ladder:
+- **Challenge recall:** at least 99% detection across preregistered consequential leak classes and declared flow/pressure operating envelopes.
+- **False-isolation control:** zero autonomous false isolations in at least 299 independent no-leak challenge episodes as an initial statistical target (approximate one-sided 95% upper bound of 1% under IID assumptions). This is not a field false-shutoff rate; household exposure hours and clustered use must be separately measured.
+- **Incumbent challenger:** at least 10% lower missed-leak volume or at least 10% shorter detection-to-isolation latency than the best exact-SKU incumbent, while not increasing false isolation beyond the predeclared bound. Choose the primary comparative endpoint before the bake-off.
+- Report leak class, event rate/flow, pressure, pipe geometry, onset profile, detection latency, valve closure latency, total escaped volume, service interruption, manual override, and recovery.
+
+A vendor diagnostic sensitivity figure (for example, a GPM increment) is not the same as independent event-class recall or false-isolation performance.
+
+### 10.4 Cross-cutting evidence and offline-resilience targets
+
+- **Source-to-use lineage:** 100% of credited potable litres must be bound to exact source, stream/batch, treatment state, sample ID and sample point, delivery boundary, declared use, SANS 241 edition, and current risk/monitoring-programme revision. Unknown or mismatched quality evidence receives no confirmed potable credit.
+- **Adversarial quality acceptance:** zero wrong-source, wrong-batch, wrong-outlet, stale-monitoring or non-potable-to-potable false acceptances in the frozen negative-control suite; all valid positive controls must be accepted when complete evidence is supplied.
+- **Independent false-acceptance target:** stretch goal of zero false potable acceptances across at least 299 independent externally adjudicated trials, with clustering adjustments across source, batch, site, lab, operator and instrument. Synthetic cases do not count.
+- **Offline operation:** all declared essential local/manual controls, safe isolation, fault state and local evidence access remain available across applicable NET-001…NET-008 failures when local power and physical conditions permit. Optional remote analytics may degrade; essential safety functions must not.
+- **Repairability:** track verified restored-service episodes, recurrence, parts wait, operator hours and lifecycle cost. The existing proposed target is at least 20% more independently verified durable repairs per operator-hour than the matched baseline, with no increase in repeat failures or unsafe work.
+
+### 10.5 Benchmarking protocol — how to make a SOTA claim credible
+
+1. Freeze comparator model, hardware/firmware, installation, service profile and all source documents. Acquire an exact local-market SKU and support/parts quote where deployment is intended.
+2. Run a matched baseline with the best conventional operational configuration, not an unconfigured product brochure.
+3. Use randomized/counterbalanced order where practical; independent instrumentation; calibrated meters/pressure sensors; frozen demand traces; blinded outcome adjudication; and preregistered acceptance criteria.
+4. Report per-track raw observations and uncertainty, including failures and missingness. Do not pool continuity, reuse and leak metrics or compress them into one weighted score.
+5. Progress E1 repeatability, E2 independent laboratory reproducibility, E3 production/source variation and E4 real household validity. Repeated trials on one device/site are not independent population evidence.
+6. Treat regulatory, water-quality, electrical, plumbing, pressure and human-safety requirements as hard gates. A good average cannot compensate for a critical safety or quality failure.
+
+**Competitive claim rule:** WaterLoop can claim superiority only on a named functional unit, against a named exact comparator, with matched conditions and independent evidence. A stronger integrated evidence and recovery model is a differentiation hypothesis until this protocol demonstrates an advantage over the strongest matched incumbents.
