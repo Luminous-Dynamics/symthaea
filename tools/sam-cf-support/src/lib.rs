@@ -136,14 +136,32 @@ pub fn parse_cases(input: &str) -> Result<Vec<Case>, String> {
                 line_index + 1
             ));
         }
-        if !matches!(case.support.as_str(), "SUPPORTED" | "UNSUPPORTED" | "GLOBAL_ONLY" | "UNKNOWN") {
-            return Err(format!("line {}: invalid support disposition", line_index + 1));
+        if !matches!(
+            case.support.as_str(),
+            "SUPPORTED" | "UNSUPPORTED" | "GLOBAL_ONLY" | "UNKNOWN"
+        ) {
+            return Err(format!(
+                "line {}: invalid support disposition",
+                line_index + 1
+            ));
         }
-        if !matches!(case.abduction.as_str(), "IDENTIFIED" | "PARTIAL" | "MISSING" | "NA") {
-            return Err(format!("line {}: invalid abduction disposition", line_index + 1));
+        if !matches!(
+            case.abduction.as_str(),
+            "IDENTIFIED" | "PARTIAL" | "MISSING" | "NA"
+        ) {
+            return Err(format!(
+                "line {}: invalid abduction disposition",
+                line_index + 1
+            ));
         }
-        if !matches!(case.factual_tail.as_str(), "PRESENT" | "MISSING" | "NA") {
-            return Err(format!("line {}: invalid factual_tail disposition", line_index + 1));
+        if !matches!(
+            case.factual_tail.as_str(),
+            "PRESENT" | "MISSING" | "NA"
+        ) {
+            return Err(format!(
+                "line {}: invalid factual_tail disposition",
+                line_index + 1
+            ));
         }
         if !matches!(case.mechanism.as_str(), "IN_SCOPE" | "OUT_OF_SCOPE") {
             return Err(format!("line {}: invalid mechanism scope", line_index + 1));
