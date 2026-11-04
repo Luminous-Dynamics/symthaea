@@ -114,6 +114,10 @@ pub struct GroundedMusicalEvidenceBundleV1 {
     pub artifact: GroundedAudioArtifactV1,
     pub temporal_grounding_evaluator_version: String,
     pub annotation_policy_version: String,
+    /// Shared process/session monotonic clock domain used by decision/effect receipts.
+    pub runner_clock_domain_id: String,
+    /// Exact origin identity for the runner monotonic timestamps below.
+    pub runner_origin_id: String,
     /// The permitted input prefix end; the end frame itself is not included.
     pub permitted_prefix_end_frame: u64,
     pub committed_at_ns: u64,
@@ -132,6 +136,8 @@ struct GroundedEvidenceBundleCommitmentPayloadV1<'a> {
     artifact: &'a GroundedAudioArtifactV1,
     temporal_grounding_evaluator_version: &'a str,
     annotation_policy_version: &'a str,
+    runner_clock_domain_id: &'a str,
+    runner_origin_id: &'a str,
     permitted_prefix_end_frame: u64,
     committed_at_ns: u64,
     claims: &'a [GroundedMusicalClaimV1],
@@ -151,6 +157,8 @@ impl GroundedMusicalEvidenceBundleV1 {
             artifact: &self.artifact,
             temporal_grounding_evaluator_version: &self.temporal_grounding_evaluator_version,
             annotation_policy_version: &self.annotation_policy_version,
+            runner_clock_domain_id: &self.runner_clock_domain_id,
+            runner_origin_id: &self.runner_origin_id,
             permitted_prefix_end_frame: self.permitted_prefix_end_frame,
             committed_at_ns: self.committed_at_ns,
             claims: &self.claims,
@@ -194,7 +202,10 @@ impl GroundedMusicalActionV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GroundedParticipationEffectWindowV1 {
-    pub interval: GroundedFrameIntervalV1,
+    /// Runner-monotonic not-before timestamp, measured from runner_origin_id.
+    pub not_before_runner_time_ns: u64,
+    /// Expiry timestamp in the same runner clock origin.
+    pub expires_at_runner_time_ns: u64,
     pub authorization_id: String,
 }
 
@@ -207,6 +218,8 @@ pub struct GroundedMusicalDecisionReceiptV1 {
     pub decision_id: String,
     pub sequence: u64,
     pub artifact: GroundedAudioArtifactV1,
+    pub runner_clock_domain_id: String,
+    pub runner_origin_id: String,
     /// Exact claim-set digest from the evidence bundle used by the decision.
     pub evidence_claim_set_sha256: String,
     /// Exact commitment to the full evidence metadata and claim set.
@@ -231,7 +244,8 @@ pub struct GroundedParticipationPolicyV1 {
     pub policy_version: String,
     pub require_grounded_claims_for_wait: bool,
     pub maximum_evidence_age_ns: u64,
-    pub minimum_effect_lead_frames: u64,
+    pub minimum_effect_lead_ns: u64,
+    pub maximum_effect_window_ns: u64,
 }
 
 impl Default for GroundedParticipationPolicyV1 {
@@ -241,7 +255,8 @@ impl Default for GroundedParticipationPolicyV1 {
             policy_version: "mel-grounded-participation-policy-v1".to_owned(),
             require_grounded_claims_for_wait: true,
             maximum_evidence_age_ns: 2_000_000_000,
-            minimum_effect_lead_frames: 1,
+            minimum_effect_lead_ns: 10_000_000,
+            maximum_effect_window_ns: 2_000_000_000,
         }
     }
 }
@@ -281,8 +296,10 @@ pub enum GroundedParticipationIssueV1 {
     EffectWindowMissing { action: GroundedMusicalActionV1 },
     EffectWindowUnexpected { action: GroundedMusicalActionV1 },
     InvalidEffectWindow,
-    EffectWindowBeforeObservedPrefix,
+    EffectWindowBeforeDecision,
+    EffectWindowDurationOutsidePolicy,
     EffectAuthorizationIdEmpty,
+    RunnerClockMismatch,
     SessionMismatch,
     TurnMismatch,
     ArtifactMismatch { field: String },
@@ -340,6 +357,8 @@ pub fn validate_grounded_evidence_bundle_v1(
         ("turn_id", bundle.turn_id.as_str()),
         ("temporal_grounding_evaluator_version", bundle.temporal_grounding_evaluator_version.as_str()),
         ("annotation_policy_version", bundle.annotation_policy_version.as_str()),
+        ("runner_clock_domain_id", bundle.runner_clock_domain_id.as_str()),
+        ("runner_origin_id", bundle.runner_origin_id.as_str()),
     ] {
         if value.trim().is_empty() {
             issues.push(GroundedParticipationIssueV1::EmptyIdentity {
@@ -430,6 +449,8 @@ pub fn validate_grounded_decision_v1(
         ("decision.turn_id", decision.turn_id.as_str()),
         ("decision.decision_id", decision.decision_id.as_str()),
         ("decision.policy_version", decision.policy_version.as_str()),
+        ("decision.runner_clock_domain_id", decision.runner_clock_domain_id.as_str()),
+        ("decision.runner_origin_id", decision.runner_origin_id.as_str()),
     ] {
         if value.trim().is_empty() {
             issues.push(GroundedParticipationIssueV1::EmptyIdentity {
@@ -448,6 +469,11 @@ pub fn validate_grounded_decision_v1(
     }
     if decision.turn_id != bundle.turn_id {
         issues.push(GroundedParticipationIssueV1::TurnMismatch);
+    }
+    if decision.runner_clock_domain_id != bundle.runner_clock_domain_id
+        || decision.runner_origin_id != bundle.runner_origin_id
+    {
+        issues.push(GroundedParticipationIssueV1::RunnerClockMismatch);
     }
     if decision.artifact != bundle.artifact {
         issues.push(GroundedParticipationIssueV1::ArtifactMismatch {
@@ -614,16 +640,19 @@ pub fn validate_grounded_decision_v1(
                 });
                 return issues;
             };
-            if !effect.interval.is_valid() {
+            if effect.not_before_runner_time_ns >= effect.expires_at_runner_time_ns {
                 issues.push(GroundedParticipationIssueV1::InvalidEffectWindow);
             }
-            if effect.interval.start_frame
-                < decision.observed_through_frame.saturating_add(policy.minimum_effect_lead_frames)
+            if effect.not_before_runner_time_ns
+                < decision.decision_at_ns.saturating_add(policy.minimum_effect_lead_ns)
             {
-                issues.push(GroundedParticipationIssueV1::EffectWindowBeforeObservedPrefix);
+                issues.push(GroundedParticipationIssueV1::EffectWindowBeforeDecision);
             }
-            if effect.interval.end_frame > decision.artifact.total_frames {
-                issues.push(GroundedParticipationIssueV1::EffectWindowBeyondArtifact);
+            if effect.expires_at_runner_time_ns
+                .saturating_sub(effect.not_before_runner_time_ns)
+                > policy.maximum_effect_window_ns
+            {
+                issues.push(GroundedParticipationIssueV1::EffectWindowDurationOutsidePolicy);
             }
             if effect.authorization_id.trim().is_empty() {
                 issues.push(GroundedParticipationIssueV1::EffectAuthorizationIdEmpty);
