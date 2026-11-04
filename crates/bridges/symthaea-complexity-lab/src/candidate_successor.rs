@@ -579,9 +579,10 @@ mod tests {
         assert_eq!((candidate, position), (size - 1, size - 1));
         let stats = index.stats();
         assert_eq!(stats.successor_queries, 1);
-        // A three-level hierarchy touches at most one word per level, plus
-        // the final selected word. This skips 65,535 inactive positions.
-        assert!(stats.bitmap_words_read <= 4);
+        // A three-level hierarchy reads at most one search word per level
+        // and one selected child word on each return. This skips 65,535
+        // inactive positions.
+        assert!(stats.bitmap_words_read <= 5);
         assert_eq!(stats.promotions, 0);
     }
 
