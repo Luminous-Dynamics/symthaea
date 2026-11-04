@@ -25,25 +25,49 @@ const WATER_SCENARIOS: [(&str, &str); 10] = [
     ("WCONT-002", "reserve_estimate_with_uncertainty"),
     ("WCONT-003", "degraded_service_and_recovery_tracking"),
     ("WCONT-004", "sensor_disagreement_unresolved"),
-    ("WCONT-005", "suspected_leak_human_review_or_qualified_isolation"),
+    (
+        "WCONT-005",
+        "suspected_leak_human_review_or_qualified_isolation",
+    ),
     ("WCONT-006", "delivery_unavailable_pump_dependent_service"),
-    ("WCONT-007", "quality_unresolved_isolate_or_human_assessment"),
+    (
+        "WCONT-007",
+        "quality_unresolved_isolate_or_human_assessment",
+    ),
     ("WCONT-008", "mass_balance_failure_unresolved"),
     ("WCONT-009", "command_observation_disagreement"),
     ("WCONT-010", "recovery_monitored_with_pressure_constraints"),
 ];
 
 const REPAIR_TASKS: [(&str, &str); 10] = [
-    ("REPAIR-001", "repairable_if_exact_part_and_post_service_leak_check_pass"),
-    ("REPAIR-002", "repairable_only_after_hydraulic_electrical_and_functional_requalification"),
+    (
+        "REPAIR-001",
+        "repairable_if_exact_part_and_post_service_leak_check_pass",
+    ),
+    (
+        "REPAIR-002",
+        "repairable_only_after_hydraulic_electrical_and_functional_requalification",
+    ),
     ("REPAIR-003", "repairable_if_seal_and_integrity_checks_pass"),
-    ("REPAIR-004", "unqualified_until_calibration_and_independent_check_pass"),
+    (
+        "REPAIR-004",
+        "unqualified_until_calibration_and_independent_check_pass",
+    ),
     ("REPAIR-005", "safe_local_recovery_without_cloud_dependency"),
     ("REPAIR-006", "repair_blocked_parts_unavailable"),
-    ("REPAIR-007", "substitution_rejected_or_held_for_qualification"),
-    ("REPAIR-008", "initial_function_restored_durable_repair_failed"),
+    (
+        "REPAIR-007",
+        "substitution_rejected_or_held_for_qualification",
+    ),
+    (
+        "REPAIR-008",
+        "initial_function_restored_durable_repair_failed",
+    ),
     ("REPAIR-009", "service_access_blocked_and_reported"),
-    ("REPAIR-010", "not_released_until_product_specific_requalification"),
+    (
+        "REPAIR-010",
+        "not_released_until_product_specific_requalification",
+    ),
 ];
 
 /// A deterministic validation failure with a JSON-path-like location.
@@ -263,9 +287,7 @@ pub fn validate_water_continuity_corpus(
 /// Passing means that synthetic repair tasks retain their fail-closed
 /// constraints. It does not establish that a real part is available, a repair
 /// is safe, a device is repairable or post-repair qualification has passed.
-pub fn validate_repairability_corpus(
-    input: &str,
-) -> Result<RepairCorpusSummary, ValidationError> {
+pub fn validate_repairability_corpus(input: &str) -> Result<RepairCorpusSummary, ValidationError> {
     let corpus: RepairCorpus = serde_json::from_str(input)
         .map_err(|error| ValidationError::new("$", format!("invalid JSON: {error}")))?;
 
@@ -308,13 +330,7 @@ pub fn validate_repairability_corpus(
     let mut ids = Vec::with_capacity(corpus.task_profiles.len());
     for (index, task) in corpus.task_profiles.iter().enumerate() {
         let base = format!("$.task_profiles[{index}]");
-        validate_record(
-            &task.id,
-            &task.title,
-            &task.invariants,
-            &base,
-            &mut seen,
-        )?;
+        validate_record(&task.id, &task.title, &task.invariants, &base, &mut seen)?;
         let expected = expected_disposition(&task.id, &REPAIR_TASKS, &base)?;
         if task.expected_disposition != expected {
             return Err(ValidationError::new(
@@ -511,10 +527,7 @@ fn require_invariant(
     }
 }
 
-fn validate_water_semantics(
-    scenario: &WaterScenario,
-    path: &str,
-) -> Result<(), ValidationError> {
+fn validate_water_semantics(scenario: &WaterScenario, path: &str) -> Result<(), ValidationError> {
     let input = &scenario.input;
     match scenario.id.as_str() {
         "WCONT-001" => {
@@ -571,7 +584,12 @@ fn validate_water_semantics(
                     "stuck-sensor challenge must disagree with the independent reference",
                 ));
             }
-            require_string(input, "sensor_fault", "stuck_value", &format!("{path}.input"))?;
+            require_string(
+                input,
+                "sensor_fault",
+                "stuck_value",
+                &format!("{path}.input"),
+            )?;
         }
         "WCONT-005" => {
             if required_number(input, "measured_unexplained_flow_l_min", path)? <= 0.0 {
@@ -580,12 +598,22 @@ fn validate_water_semantics(
                     "leak challenge requires positive unexplained flow",
                 ));
             }
-            require_string(input, "leak_detected", "candidate_alarm", &format!("{path}.input"))?;
+            require_string(
+                input,
+                "leak_detected",
+                "candidate_alarm",
+                &format!("{path}.input"),
+            )?;
         }
         "WCONT-006" => {
             require_bool(input, "grid_available", false, &format!("{path}.input"))?;
             require_bool(input, "pump_available", false, &format!("{path}.input"))?;
-            require_bool(input, "backup_power_available", false, &format!("{path}.input"))?;
+            require_bool(
+                input,
+                "backup_power_available",
+                false,
+                &format!("{path}.input"),
+            )?;
             require_invariant(
                 &scenario.invariants,
                 "stored_volume_is_not_misreported_as_deliverable_service",
@@ -678,8 +706,18 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
     let baseline = &task.synthetic_baseline;
     match task.id.as_str() {
         "REPAIR-001" => {
-            require_bool(baseline, "repair_instruction_available", true, &format!("{path}.synthetic_baseline"))?;
-            require_bool(baseline, "offline_access", true, &format!("{path}.synthetic_baseline"))?;
+            require_bool(
+                baseline,
+                "repair_instruction_available",
+                true,
+                &format!("{path}.synthetic_baseline"),
+            )?;
+            require_bool(
+                baseline,
+                "offline_access",
+                true,
+                &format!("{path}.synthetic_baseline"),
+            )?;
             require_invariant(
                 &task.invariants,
                 "part_identity_and_compatibility_are_verified",
@@ -687,7 +725,12 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
             )?;
         }
         "REPAIR-002" => {
-            require_bool(baseline, "calibration_required", true, &format!("{path}.synthetic_baseline"))?;
+            require_bool(
+                baseline,
+                "calibration_required",
+                true,
+                &format!("{path}.synthetic_baseline"),
+            )?;
             require_invariant(
                 &task.invariants,
                 "pressure_flow_leak_and_protection_checks_are_repeated",
@@ -708,7 +751,12 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
             )?;
         }
         "REPAIR-004" => {
-            require_bool(baseline, "calibration_required", true, &format!("{path}.synthetic_baseline"))?;
+            require_bool(
+                baseline,
+                "calibration_required",
+                true,
+                &format!("{path}.synthetic_baseline"),
+            )?;
             require_invariant(
                 &task.invariants,
                 "old_calibration_is_not_inherited",
@@ -716,8 +764,18 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
             )?;
         }
         "REPAIR-005" => {
-            require_bool(baseline, "internet_available", false, &format!("{path}.synthetic_baseline"))?;
-            require_bool(baseline, "signed_image_available", true, &format!("{path}.synthetic_baseline"))?;
+            require_bool(
+                baseline,
+                "internet_available",
+                false,
+                &format!("{path}.synthetic_baseline"),
+            )?;
+            require_bool(
+                baseline,
+                "signed_image_available",
+                true,
+                &format!("{path}.synthetic_baseline"),
+            )?;
             require_bool(
                 baseline,
                 "previous_known_good_image_available",
@@ -731,10 +789,31 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
             )?;
         }
         "REPAIR-006" => {
-            require_bool(baseline, "catalog_part_exists", true, &format!("{path}.synthetic_baseline"))?;
-            require_bool(baseline, "local_stock", false, &format!("{path}.synthetic_baseline"))?;
-            require_bool(baseline, "approved_substitute", false, &format!("{path}.synthetic_baseline"))?;
-            if !required_value(baseline, "quoted_lead_time_days", &format!("{path}.synthetic_baseline"))?.is_null() {
+            require_bool(
+                baseline,
+                "catalog_part_exists",
+                true,
+                &format!("{path}.synthetic_baseline"),
+            )?;
+            require_bool(
+                baseline,
+                "local_stock",
+                false,
+                &format!("{path}.synthetic_baseline"),
+            )?;
+            require_bool(
+                baseline,
+                "approved_substitute",
+                false,
+                &format!("{path}.synthetic_baseline"),
+            )?;
+            if !required_value(
+                baseline,
+                "quoted_lead_time_days",
+                &format!("{path}.synthetic_baseline"),
+            )?
+            .is_null()
+            {
                 return Err(ValidationError::new(
                     format!("{path}.synthetic_baseline.quoted_lead_time_days"),
                     "unknown lead time must remain null, not an invented value",
@@ -742,8 +821,18 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
             }
         }
         "REPAIR-007" => {
-            require_bool(baseline, "physical_fit", true, &format!("{path}.synthetic_baseline"))?;
-            require_bool(baseline, "material_grade_known", false, &format!("{path}.synthetic_baseline"))?;
+            require_bool(
+                baseline,
+                "physical_fit",
+                true,
+                &format!("{path}.synthetic_baseline"),
+            )?;
+            require_bool(
+                baseline,
+                "material_grade_known",
+                false,
+                &format!("{path}.synthetic_baseline"),
+            )?;
             require_string(
                 baseline,
                 "qualification_state",
@@ -776,8 +865,18 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
             )?;
         }
         "REPAIR-009" => {
-            require_bool(baseline, "vendor_cloud_available", false, &format!("{path}.synthetic_baseline"))?;
-            require_bool(baseline, "offline_diagnostics_available", false, &format!("{path}.synthetic_baseline"))?;
+            require_bool(
+                baseline,
+                "vendor_cloud_available",
+                false,
+                &format!("{path}.synthetic_baseline"),
+            )?;
+            require_bool(
+                baseline,
+                "offline_diagnostics_available",
+                false,
+                &format!("{path}.synthetic_baseline"),
+            )?;
             require_invariant(
                 &task.invariants,
                 "cloud_dependency_is_reported_as_a_repairability_failure",
@@ -785,8 +884,18 @@ fn validate_repair_semantics(task: &RepairTask, path: &str) -> Result<(), Valida
             )?;
         }
         "REPAIR-010" => {
-            require_bool(baseline, "critical_interface_changed", true, &format!("{path}.synthetic_baseline"))?;
-            require_bool(baseline, "post_repair_test_available", false, &format!("{path}.synthetic_baseline"))?;
+            require_bool(
+                baseline,
+                "critical_interface_changed",
+                true,
+                &format!("{path}.synthetic_baseline"),
+            )?;
+            require_bool(
+                baseline,
+                "post_repair_test_available",
+                false,
+                &format!("{path}.synthetic_baseline"),
+            )?;
             require_invariant(
                 &task.invariants,
                 "repair_completion_does_not_equal_safe_release",
@@ -808,17 +917,20 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    const WATER_FIXTURE: &str =
-        include_str!("../../../docs/research/household-services/fixtures/water-continuity-scenarios-v0.1.json");
-    const REPAIR_FIXTURE: &str =
-        include_str!("../../../docs/research/household-services/fixtures/repairability-scenarios-v0.1.json");
+    const WATER_FIXTURE: &str = include_str!(
+        "../../../docs/research/household-services/fixtures/water-continuity-scenarios-v0.1.json"
+    );
+    const REPAIR_FIXTURE: &str = include_str!(
+        "../../../docs/research/household-services/fixtures/repairability-scenarios-v0.1.json"
+    );
 
     fn water_value() -> Value {
         serde_json::from_str(WATER_FIXTURE).expect("frozen water fixture must be valid JSON")
     }
 
     fn repair_value() -> Value {
-        serde_json::from_str(REPAIR_FIXTURE).expect("frozen repairability fixture must be valid JSON")
+        serde_json::from_str(REPAIR_FIXTURE)
+            .expect("frozen repairability fixture must be valid JSON")
     }
 
     #[test]
@@ -826,8 +938,14 @@ mod tests {
         let summary = validate_water_continuity_corpus(WATER_FIXTURE).unwrap();
         assert_eq!(summary.corpus_id, WATER_CORPUS_ID);
         assert_eq!(summary.scenario_count, 10);
-        assert_eq!(summary.scenario_ids.first().map(String::as_str), Some("WCONT-001"));
-        assert_eq!(summary.scenario_ids.last().map(String::as_str), Some("WCONT-010"));
+        assert_eq!(
+            summary.scenario_ids.first().map(String::as_str),
+            Some("WCONT-001")
+        );
+        assert_eq!(
+            summary.scenario_ids.last().map(String::as_str),
+            Some("WCONT-010")
+        );
     }
 
     #[test]
@@ -835,8 +953,14 @@ mod tests {
         let summary = validate_repairability_corpus(REPAIR_FIXTURE).unwrap();
         assert_eq!(summary.corpus_id, REPAIR_CORPUS_ID);
         assert_eq!(summary.task_count, 10);
-        assert_eq!(summary.task_ids.first().map(String::as_str), Some("REPAIR-001"));
-        assert_eq!(summary.task_ids.last().map(String::as_str), Some("REPAIR-010"));
+        assert_eq!(
+            summary.task_ids.first().map(String::as_str),
+            Some("REPAIR-001")
+        );
+        assert_eq!(
+            summary.task_ids.last().map(String::as_str),
+            Some("REPAIR-010")
+        );
     }
 
     #[test]
@@ -892,7 +1016,8 @@ mod tests {
     #[test]
     fn repair_recurrence_remains_a_durable_failure() {
         let mut value = repair_value();
-        value["task_profiles"][7]["synthetic_baseline"]["recurrence_observed_after_30_days"] = json!(false);
+        value["task_profiles"][7]["synthetic_baseline"]["recurrence_observed_after_30_days"] =
+            json!(false);
         let encoded = serde_json::to_string(&value).unwrap();
         assert!(validate_repairability_corpus(&encoded).is_err());
     }
@@ -912,7 +1037,10 @@ mod tests {
     fn duplicate_repair_task_is_rejected() {
         let mut value = repair_value();
         let duplicate = value["task_profiles"][0].clone();
-        value["task_profiles"].as_array_mut().unwrap().push(duplicate);
+        value["task_profiles"]
+            .as_array_mut()
+            .unwrap()
+            .push(duplicate);
         let encoded = serde_json::to_string(&value).unwrap();
         assert!(validate_repairability_corpus(&encoded).is_err());
     }
