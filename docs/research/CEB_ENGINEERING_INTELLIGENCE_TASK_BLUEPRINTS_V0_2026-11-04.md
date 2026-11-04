@@ -71,6 +71,20 @@ All tasks remain `design_only`. No repository-controlled task, candidate patch, 
 
 **Adversarial requirement:** duplicating one claim into N files must not increase independent-evidence count.
 
+### CEB-CTX-003 — incremental context invalidation after repository changes
+
+**Question:** Can the repository twin update only what changed while preventing stale evidence from surviving a move, rename, feature change or contract edit?
+
+**Task idea:** Begin with a pinned source graph and a sequence of controlled repository mutations. At each mutation, the agent predicts which evidence spans, claims, graph nodes, call edges and retrieved context become stale, which remain valid, and which new paths/symbols are created.
+
+**Gold labels:** per-mutation changed paths, created/deleted/moved symbols, invalidated claim IDs, still-valid claims, affected reverse dependencies, expected context retrieval after the edit and known cache-invalidation counterexamples.
+
+**Negative controls:** edit a comment without changing semantics; rename a public type but leave one stale reference; move a declaration to a new file while preserving a re-export; change only a Cargo feature default; change a target predicate; introduce a new call path without modifying the previously retrieved file.
+
+**Metrics:** stale-fact recall, false-invalidation rate, impact precision/recall, path-lifecycle accuracy (created versus invalidated), context freshness, incremental update cost and downstream claim accuracy.
+
+**Paradigm test:** compare full re-indexing with incremental AST invalidation, dependency-graph invalidation and the Symthaea repository twin. The target is not simply fewer re-indexed files; it is exact freshness with no stale claims and lower cost. This composes directly with #10173 and the mutation audit already performed on its synthetic fixture.
+
 ### CEB-CONTEXT evaluation targets
 
 Prospective goals, not achieved values:
@@ -111,6 +125,22 @@ Prospective goals, not achieved values:
 **Negative controls:** same API name with different authority flow; unreachable-looking code; validation performed in a shared helper; test fixture that does not exercise the claimed path.
 
 **Metrics:** security bug recall, actionable precision, severity-weighted precision, false-positive review burden, unsupported-claim rate and correct abstention when exploitability is underdetermined.
+
+### CEB-REV-003 — human–agent review complementarity under a fixed time budget
+
+**Question:** Does Symthaea improve the quality and throughput of human code review, or does it merely add comments and cognitive load?
+
+**Task idea:** Use human-adjudicated PR review tasks with realistic defect and no-defect cases. Compare three blinded conditions: human-only review, agent-only review, and human review assisted by agent findings. Fix the overall review time budget or measure total human minutes plus agent cost under a preregistered budget model. The assisted reviewer may accept, reject, merge, or request evidence for each agent finding.
+
+**Gold labels:** defect identity, severity, exact evidence and trigger conditions; each human/agent finding mapped to a defect or false positive; adjudicated reviewer action; time/effort record and post-review defect recall.
+
+**Negative controls:** injected but valid refactors; duplicate comments; speculative findings that cannot be tied to a violating path; a high-severity bug that the agent ranks below several low-value comments; an agent finding that is wrong but phrased confidently.
+
+**Metrics:** defect Recall@k before assistance, incremental defect recall from assistance, severity-weighted recall, actionable precision, false-positive review minutes, human override rate, review time per confirmed defect, time-to-detection and total cost per accepted review outcome.
+
+**Design:** randomize task order and reviewer assignment; blind human reviewers to system identity; preserve an independent human-only control; report inter-reviewer variance. Do not let the same reviewer adjudicate the gold labels and participate in the treatment. Report agent-only, human-only and combined results separately.
+
+**Paradigm test:** optimize for *complementarity*, not full autonomy. A system that catches defects humans miss while reducing total review effort may be more useful and safer than a system that attempts to replace all human judgment.
 
 ### CEB-REVIEW evaluation targets
 
@@ -251,7 +281,7 @@ No omnibus engineering score should hide a regression in any one dimension.
 
 ## 10. Status
 
-- New authoring blueprints: **8**.
+- New authoring blueprints: **10**.
 - Families: **4**.
 - Cross-family compositions: **6**.
 - Executable fixtures: **0**.
