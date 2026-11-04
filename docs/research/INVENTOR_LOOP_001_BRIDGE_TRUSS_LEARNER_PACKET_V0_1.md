@@ -139,16 +139,16 @@ Do not apply a formula outside its declared assumptions.
 
 The intended digital integration target is Symtropy PHYS-TRUSS core solver PR [#2363](https://github.com/Luminous-Dynamics/symtropy/pull/2363) and its follow-on work. At the time of this draft, #2363 is open/unmerged; the cited receipt, sweep, energy, asymmetric, conditioning and bounded-interval follow-ons are open/draft, not a merged mainline API. Until the Symtropy owner confirms an exact reviewed head, supported request interface and qualification status, this activity remains paper/hand-calculation-only: do not call the unmerged branch and do not claim the digital integration is implemented.
 
-The current model family is intentionally narrow: static, small-displacement, linear-elastic, 2D pin-jointed axial bars. It does not model member bending, buckling, geometric nonlinearity, contact, fracture, material plasticity, dynamics, connection failure, fabrication defects or real-world structural safety.
+The proposed PHYS-TRUSS model family described by the open Symtropy work is intentionally narrow: static, small-displacement, linear-elastic, 2D pin-jointed axial bars. This describes the target scope of an unmerged workstream, not an available mainline API. It does not model member bending, buckling, geometric nonlinearity, contact, fracture, material plasticity, dynamics, connection failure, fabrication defects or real-world structural safety.
 
-Review:
+From your hand derivation, review:
 - displacements and their directions;
 - signed member axial forces and stresses;
 - support reactions;
-- force and moment balance residuals;
-- energy/work consistency where the selected model reports it;
-- exact input/model/solver identity;
-- unresolved, unsupported or invalid conditions.
+- force and moment balance;
+- strain-energy / external-work consistency.
+
+For a future owner-approved digital phase, additionally record exact input/model/solver identity and unresolved, unsupported or invalid conditions. No digital solver call is part of this packet version.
 
 A PASS from a mathematical oracle or software test only applies to the case and model it actually checks. It is not a physical test result.
 
