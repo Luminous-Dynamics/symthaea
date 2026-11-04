@@ -1,0 +1,1031 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/benchmark-run-receipt-v1.schema.json",
+  "title": "Luminous Benchmark Run Receipt v1",
+  "description": "Language-neutral receipt binding benchmark scores to denominator, task outcomes, system, grader, budgets, environment and provenance. A self-hash is integrity only, not authenticity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "run_id",
+    "created_at",
+    "benchmark",
+    "system_under_test",
+    "arm",
+    "dataset",
+    "grader",
+    "environment",
+    "budget_caps",
+    "actual_usage",
+    "task_accounting",
+    "task_outcomes",
+    "official_scores",
+    "derived_metrics",
+    "exclusions",
+    "matched_comparison",
+    "artifacts",
+    "integrity"
+  ],
+  "properties": {
+    "schema": {
+      "const": "luminous.benchmark-run-receipt.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^run_[a-f0-9]{64}$"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "benchmark_id",
+        "version",
+        "revision",
+        "protocol_sha256",
+        "access_class",
+        "official_metric_name"
+      ],
+      "properties": {
+        "benchmark_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "protocol_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "access_class": {
+          "enum": [
+            "public",
+            "authorized_private",
+            "synthetic",
+            "internal"
+          ]
+        },
+        "official_metric_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner_result_url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        }
+      }
+    },
+    "system_under_test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system_id",
+        "system_revision",
+        "executable_sha256",
+        "configuration_sha256",
+        "model"
+      ],
+      "properties": {
+        "system_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "system_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executable_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "model": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "provider",
+            "model_id",
+            "revision"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "minLength": 1
+            },
+            "model_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "endpoint_class": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "prompts_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "tool_catalog_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "arm": {
+      "enum": [
+        "rea_only",
+        "symthaea_only",
+        "rea_plus_symthaea",
+        "specialist",
+        "human",
+        "other"
+      ]
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "split_id",
+        "eligible_task_set_sha256",
+        "manifest_sha256",
+        "synthetic"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "eligible_task_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "synthetic": {
+          "type": "boolean"
+        },
+        "license_or_access_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_snapshot": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        }
+      }
+    },
+    "grader": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grader_id",
+        "revision",
+        "executable_sha256",
+        "scoring_formula_sha256",
+        "deterministic"
+      ],
+      "properties": {
+        "grader_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executable_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "scoring_formula_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "deterministic": {
+          "type": "boolean"
+        },
+        "official_grader": {
+          "type": "boolean"
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host_os",
+        "host_architecture",
+        "runtime",
+        "container_image_sha256",
+        "network_policy",
+        "instrumentation_sha256"
+      ],
+      "properties": {
+        "host_os": {
+          "type": "string",
+          "minLength": 1
+        },
+        "host_architecture": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_os": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target_architecture": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runtime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "container_image_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "network_policy": {
+          "enum": [
+            "offline",
+            "allowlisted",
+            "benchmark_managed",
+            "unrestricted",
+            "unknown"
+          ]
+        },
+        "instrumentation_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "device_cohort": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "budget_caps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wall_time_ms",
+        "cpu_time_ms",
+        "memory_bytes",
+        "tool_calls",
+        "model_tokens",
+        "cost_microusd",
+        "energy_mwh"
+      ],
+      "properties": {
+        "wall_time_ms": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "cpu_time_ms": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "memory_bytes": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "tool_calls": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "model_tokens": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "cost_microusd": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "energy_mwh": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        }
+      }
+    },
+    "actual_usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wall_time_ms",
+        "cpu_time_ms",
+        "peak_memory_bytes",
+        "tool_calls",
+        "model_tokens",
+        "cost_microusd",
+        "energy_mwh"
+      ],
+      "properties": {
+        "wall_time_ms": {
+          "$ref": "#/$defs/measurement"
+        },
+        "cpu_time_ms": {
+          "$ref": "#/$defs/measurement"
+        },
+        "peak_memory_bytes": {
+          "$ref": "#/$defs/measurement"
+        },
+        "tool_calls": {
+          "$ref": "#/$defs/measurement"
+        },
+        "model_tokens": {
+          "$ref": "#/$defs/measurement"
+        },
+        "cost_microusd": {
+          "$ref": "#/$defs/measurement"
+        },
+        "energy_mwh": {
+          "$ref": "#/$defs/measurement"
+        }
+      }
+    },
+    "task_accounting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eligible",
+        "attempted",
+        "not_attempted",
+        "graded",
+        "disposition_counts"
+      ],
+      "properties": {
+        "eligible": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "attempted": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "not_attempted": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "graded": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "disposition_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "passed",
+            "failed",
+            "refused",
+            "abstained",
+            "unsupported",
+            "timed_out",
+            "tool_failed",
+            "ungraded"
+          ],
+          "properties": {
+            "passed": {
+              "$ref": "#/$defs/nonnegativeInteger"
+            },
+            "failed": {
+              "$ref": "#/$defs/nonnegativeInteger"
+            },
+            "refused": {
+              "$ref": "#/$defs/nonnegativeInteger"
+            },
+            "abstained": {
+              "$ref": "#/$defs/nonnegativeInteger"
+            },
+            "unsupported": {
+              "$ref": "#/$defs/nonnegativeInteger"
+            },
+            "timed_out": {
+              "$ref": "#/$defs/nonnegativeInteger"
+            },
+            "tool_failed": {
+              "$ref": "#/$defs/nonnegativeInteger"
+            },
+            "ungraded": {
+              "$ref": "#/$defs/nonnegativeInteger"
+            }
+          }
+        }
+      }
+    },
+    "task_outcomes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/taskOutcome"
+      }
+    },
+    "official_scores": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/officialScore"
+      }
+    },
+    "derived_metrics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/derivedMetric"
+      }
+    },
+    "exclusions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "reason",
+          "preregistered",
+          "approval_reference"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "preregistered": {
+            "type": "boolean"
+          },
+          "approval_reference": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "matched_comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "matched",
+        "comparison_group_id",
+        "eligible_task_set_sha256",
+        "budget_profile_sha256",
+        "cohort_sha256",
+        "scoring_revision"
+      ],
+      "properties": {
+        "matched": {
+          "type": "boolean"
+        },
+        "comparison_group_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "eligible_task_set_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "budget_profile_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cohort_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scoring_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "sha256",
+          "bytes"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "bytes": {
+            "$ref": "#/$defs/nonnegativeInteger"
+          },
+          "media_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_sha256",
+        "signature_status"
+      ],
+      "properties": {
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "signature_status": {
+          "enum": [
+            "unsigned",
+            "detached_signature_present",
+            "independently_verified"
+          ]
+        },
+        "signature_artifact_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "signer_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "nonnegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "measurement": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value"
+          ],
+          "properties": {
+            "status": {
+              "const": "measured"
+            },
+            "value": {
+              "type": "number",
+              "minimum": 0
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reason"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "unavailable",
+                "not_measured"
+              ]
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "unit": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "taskOutcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "input_sha256",
+        "attempted",
+        "disposition",
+        "graded",
+        "grader_result",
+        "terminal_reason"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "input_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "attempted": {
+          "type": "boolean"
+        },
+        "disposition": {
+          "enum": [
+            "passed",
+            "failed",
+            "refused",
+            "abstained",
+            "unsupported",
+            "timed_out",
+            "tool_failed",
+            "ungraded",
+            "not_attempted"
+          ]
+        },
+        "graded": {
+          "type": "boolean"
+        },
+        "grader_result": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "result_sha256",
+            "grade"
+          ],
+          "properties": {
+            "result_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "grade": {
+              "type": "number"
+            }
+          }
+        },
+        "terminal_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "not_attempted"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "attempted": {
+                "const": false
+              },
+              "graded": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "enum": [
+                  "passed",
+                  "failed"
+                ]
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "attempted": {
+                "const": true
+              },
+              "graded": {
+                "const": true
+              },
+              "grader_result": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "graded": {
+                "const": true
+              }
+            },
+            "required": [
+              "graded"
+            ]
+          },
+          "then": {
+            "required": [
+              "grader_result"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "graded": {
+                "const": false
+              }
+            },
+            "required": [
+              "graded"
+            ]
+          },
+          "then": {
+            "properties": {
+              "grader_result": {
+                "type": [
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "officialScore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_id",
+        "is_official",
+        "value",
+        "unit",
+        "numerator",
+        "denominator",
+        "formula",
+        "scoring_revision",
+        "grader_output_sha256"
+      ],
+      "properties": {
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "is_official": {
+          "const": true
+        },
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "numerator": {
+          "type": "number"
+        },
+        "denominator": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "formula": {
+          "const": "numerator_divided_by_denominator"
+        },
+        "scoring_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "grader_output_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "derivedMetric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_id",
+        "is_official",
+        "value",
+        "unit",
+        "derivation"
+      ],
+      "properties": {
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "is_official": {
+          "const": false
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "derivation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "null_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "matched_comparison": {
+            "properties": {
+              "matched": {
+                "const": true
+              }
+            },
+            "required": [
+              "matched"
+            ]
+          }
+        },
+        "required": [
+          "matched_comparison"
+        ]
+      },
+      "then": {
+        "properties": {
+          "matched_comparison": {
+            "properties": {
+              "comparison_group_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "eligible_task_set_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "budget_profile_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "cohort_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "scoring_revision": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "dataset": {
+            "properties": {
+              "synthetic": {
+                "const": true
+              }
+            },
+            "required": [
+              "synthetic"
+            ]
+          }
+        },
+        "required": [
+          "dataset"
+        ]
+      },
+      "then": {
+        "properties": {
+          "benchmark": {
+            "properties": {
+              "access_class": {
+                "const": "synthetic"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "integrity": {
+            "properties": {
+              "signature_status": {
+                "const": "independently_verified"
+              }
+            },
+            "required": [
+              "signature_status"
+            ]
+          }
+        },
+        "required": [
+          "integrity"
+        ]
+      },
+      "then": {
+        "properties": {
+          "integrity": {
+            "required": [
+              "signature_artifact_sha256",
+              "signer_id"
+            ],
+            "properties": {
+              "signature_artifact_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "signer_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

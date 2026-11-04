@@ -1,0 +1,79 @@
+name: Benchmark Run Receipt Contract
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "schemas/benchmark-run-receipt-v1.schema.json"
+      - "examples/benchmark-run-receipt-v1.synthetic.json"
+      - "docs/research/BENCHMARK_RUN_RECEIPT_V1.md"
+      - "tools/benchmark-receipt-harness/**"
+      - ".github/workflows/benchmark-run-receipt.yml"
+  push:
+    branches: [main]
+    paths:
+      - "schemas/benchmark-run-receipt-v1.schema.json"
+      - "examples/benchmark-run-receipt-v1.synthetic.json"
+      - "tools/benchmark-receipt-harness/**"
+      - ".github/workflows/benchmark-run-receipt.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: benchmark-run-receipt-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  receipt-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CARGO_BUILD_JOBS: 2
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Set up pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Set up isolated schema-audit environment
+        run: |
+          python3 -m venv "$RUNNER_TEMP/receipt-schema-venv"
+          "$RUNNER_TEMP/receipt-schema-venv/bin/python" -m pip install --disable-pip-version-check -r tools/benchmark-receipt-harness/requirements-ci.txt
+
+      - name: Validate Draft 2020-12 schema and synthetic fixture
+        run: |
+          "$RUNNER_TEMP/receipt-schema-venv/bin/python" tools/benchmark-receipt-harness/validate_schema.py \
+            --schema schemas/benchmark-run-receipt-v1.schema.json \
+            --instance examples/benchmark-run-receipt-v1.synthetic.json
+
+      - name: Validate locked harness metadata
+        run: cargo metadata --manifest-path tools/benchmark-receipt-harness/Cargo.toml --locked --no-deps --format-version 1 > "$RUNNER_TEMP/receipt-harness-metadata.json"
+
+      - name: Format check
+        run: cargo fmt --manifest-path tools/benchmark-receipt-harness/Cargo.toml -- --check
+
+      - name: Run semantic accounting and anti-laundering tests
+        run: cargo test --manifest-path tools/benchmark-receipt-harness/Cargo.toml --locked
+
+      - name: Validate synthetic receipt and emit report
+        run: |
+          cargo run --manifest-path tools/benchmark-receipt-harness/Cargo.toml --locked --bin benchmark_receipt_validate -- \
+            --receipt examples/benchmark-run-receipt-v1.synthetic.json \
+            --out "$RUNNER_TEMP/benchmark-receipt-validation.json"
+          cat "$RUNNER_TEMP/benchmark-receipt-validation.json"
+
+      - name: Upload exact validation report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: benchmark-run-receipt-validation
+          path: "$RUNNER_TEMP/benchmark-receipt-validation.json"
+          if-no-files-found: error
+          retention-days: 14

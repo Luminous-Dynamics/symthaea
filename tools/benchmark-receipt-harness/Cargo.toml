@@ -1,0 +1,24 @@
+[workspace]
+members = ["."]
+resolver = "2"
+
+[package]
+name = "benchmark-run-receipt-harness"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Standalone semantic validator for denominator- and provenance-bound benchmark run receipts"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "benchmark_receipt_validate"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = { version = "=1.0.150", features = ["preserve_order"] }
+serde_json_canonicalizer = "=0.3.2"
+sha2 = "=0.10.9"

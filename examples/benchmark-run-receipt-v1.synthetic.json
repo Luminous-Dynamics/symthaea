@@ -1,0 +1,224 @@
+{
+  "schema": "luminous.benchmark-run-receipt.v1",
+  "run_id": "run_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "created_at": "2026-11-03T18:00:00Z",
+  "benchmark": {
+    "benchmark_id": "synthetic-receipt-accounting-smoke",
+    "version": "1.0.0",
+    "revision": "fixture-2026-11-03",
+    "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "access_class": "synthetic",
+    "official_metric_name": "not_applicable_synthetic_fixture",
+    "owner_result_url": null
+  },
+  "system_under_test": {
+    "system_id": "symthaea-rea-receipt-fixture",
+    "system_revision": "fixture-only",
+    "executable_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "configuration_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "model": null,
+    "prompts_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "policy_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "tool_catalog_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+  },
+  "arm": "rea_plus_symthaea",
+  "dataset": {
+    "dataset_id": "synthetic-five-task-fixture",
+    "split_id": "synthetic-smoke",
+    "eligible_task_set_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "manifest_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+    "synthetic": true,
+    "license_or_access_note": "Generated synthetic fixture; not an external benchmark result.",
+    "source_snapshot": null
+  },
+  "grader": {
+    "grader_id": "synthetic-binary-grader",
+    "revision": "fixture-v1",
+    "executable_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+    "scoring_formula_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "deterministic": true,
+    "official_grader": false
+  },
+  "environment": {
+    "host_os": "ubuntu-24.04",
+    "host_architecture": "x86_64",
+    "target_os": null,
+    "target_architecture": null,
+    "runtime": "fixture-only",
+    "container_image_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "network_policy": "offline",
+    "instrumentation_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "device_cohort": null
+  },
+  "budget_caps": {
+    "wall_time_ms": 60000,
+    "cpu_time_ms": 30000,
+    "memory_bytes": 1073741824,
+    "tool_calls": 25,
+    "model_tokens": 10000,
+    "cost_microusd": 1000000,
+    "energy_mwh": 1000
+  },
+  "actual_usage": {
+    "wall_time_ms": {
+      "status": "measured",
+      "value": 12000,
+      "unit": "ms"
+    },
+    "cpu_time_ms": {
+      "status": "measured",
+      "value": 4500,
+      "unit": "ms"
+    },
+    "peak_memory_bytes": {
+      "status": "measured",
+      "value": 134217728,
+      "unit": "bytes"
+    },
+    "tool_calls": {
+      "status": "measured",
+      "value": 8,
+      "unit": "calls"
+    },
+    "model_tokens": {
+      "status": "measured",
+      "value": 1200,
+      "unit": "tokens"
+    },
+    "cost_microusd": {
+      "status": "measured",
+      "value": 0,
+      "unit": "microUSD"
+    },
+    "energy_mwh": {
+      "status": "unavailable",
+      "reason": "Synthetic fixture does not measure energy.",
+      "unit": "mWh"
+    }
+  },
+  "task_accounting": {
+    "eligible": 5,
+    "attempted": 4,
+    "not_attempted": 1,
+    "graded": 2,
+    "disposition_counts": {
+      "passed": 2,
+      "failed": 0,
+      "refused": 1,
+      "abstained": 0,
+      "unsupported": 1,
+      "timed_out": 0,
+      "tool_failed": 0,
+      "ungraded": 0
+    }
+  },
+  "task_outcomes": [
+    {
+      "task_id": "task-001",
+      "input_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "attempted": true,
+      "disposition": "passed",
+      "graded": true,
+      "grader_result": {
+        "result_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "grade": 1
+      },
+      "terminal_reason": null
+    },
+    {
+      "task_id": "task-002",
+      "input_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "attempted": true,
+      "disposition": "passed",
+      "graded": true,
+      "grader_result": {
+        "result_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "grade": 1
+      },
+      "terminal_reason": null
+    },
+    {
+      "task_id": "task-003",
+      "input_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "attempted": true,
+      "disposition": "refused",
+      "graded": false,
+      "grader_result": null,
+      "terminal_reason": "Safety policy refusal retained in denominator."
+    },
+    {
+      "task_id": "task-004",
+      "input_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "attempted": true,
+      "disposition": "unsupported",
+      "graded": false,
+      "grader_result": null,
+      "terminal_reason": "Required provider unavailable."
+    },
+    {
+      "task_id": "task-005",
+      "input_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "attempted": false,
+      "disposition": "not_attempted",
+      "graded": false,
+      "grader_result": null,
+      "terminal_reason": "No budget remained after preregistered cap."
+    }
+  ],
+  "official_scores": [],
+  "derived_metrics": [
+    {
+      "metric_id": "eligible_coverage",
+      "is_official": false,
+      "value": 0.8,
+      "unit": "ratio",
+      "derivation": "attempted / eligible",
+      "null_reason": null
+    },
+    {
+      "metric_id": "graded_coverage",
+      "is_official": false,
+      "value": 0.4,
+      "unit": "ratio",
+      "derivation": "graded / eligible",
+      "null_reason": null
+    },
+    {
+      "metric_id": "coverage_adjusted_task_yield",
+      "is_official": false,
+      "value": 0.4,
+      "unit": "ratio",
+      "derivation": "passed / eligible",
+      "null_reason": null
+    }
+  ],
+  "exclusions": [],
+  "matched_comparison": {
+    "matched": false,
+    "comparison_group_id": null,
+    "eligible_task_set_sha256": null,
+    "budget_profile_sha256": null,
+    "cohort_sha256": null,
+    "scoring_revision": null
+  },
+  "artifacts": [
+    {
+      "role": "eligible-task-manifest",
+      "sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "bytes": 128,
+      "media_type": "application/json"
+    },
+    {
+      "role": "synthetic-transcript",
+      "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "bytes": 4096,
+      "media_type": "application/json"
+    }
+  ],
+  "integrity": {
+    "receipt_sha256": "1aab376bf1516d7daed89fb4867f0144d01e96cefd9e292ca6163ed098cccb7b",
+    "signature_status": "unsigned",
+    "signature_artifact_sha256": null,
+    "signer_id": null
+  }
+}
