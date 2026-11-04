@@ -119,3 +119,6 @@ Every derived numeric quantity is serialized with a numeric value, explicit unit
 The CLI wraps the report in an envelope. report_sha256 is the digest of compact deterministic JSON serialization of the report body only; report_byte_length records that body's byte length. The serialization identifier declares Serde struct field order and BTreeMap key order. The envelope is excluded from its own hash.
 
 A source digest establishes byte identity only. It does not authenticate a publisher, source author, Git signature, calibration certificate, topology auditor, measurement boundary or physical truth. A successful software run retains the synthetic-only evidence class and cannot assign E1/E2/E3/E4.
+
+
+Each source manifest records a separate SHA-256 digest and revision for the canonicalized scenario array. This distinguishes a changed scenario set from a schema version that remains unchanged. The exact corpus-byte digest still binds the original JSON file representation; the scenario-array digest binds its parsed challenge content. Neither digest authenticates authorship or truth.
