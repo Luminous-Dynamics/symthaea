@@ -3,7 +3,8 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 use symthaea_rea_compat::bundle::{
-    BundleErrorKind, audit_evidence_link_closure, verify_evidence_bundle_json,
+    BundleErrorKind, audit_evidence_link_closure, evidence_bundle_for_target,
+    verify_evidence_bundle_json,
 };
 use symthaea_rea_compat::{
     EvidenceErrorKind, analysis_profile_digest, sha256_hex, verify_evidence_json,
@@ -321,6 +322,64 @@ fn matches_pinned_upstream_rea_evidence_bundle_and_unknown_graph() {
             .expect("strict link-closure audit")
             .is_empty(),
         "upstream fixture should have internally closed Evidence links"
+    );
+
+    let target_meta = &manifest["evidence_bundle_target"];
+    let target_bytes = fixture_file(&directory, target_meta["file"].as_str().unwrap());
+    assert_eq!(
+        sha256_hex(&target_bytes),
+        target_meta["raw_file_sha256"].as_str().unwrap()
+    );
+    let target_upstream: Value = serde_json::from_slice(&target_bytes).unwrap();
+    let projected = evidence_bundle_for_target(
+        &upstream,
+        target_meta["target_sha256"].as_str().unwrap(),
+    )
+    .unwrap();
+    assert_eq!(projected, target_upstream);
+    let target_verified = verify_evidence_bundle_json(&target_bytes).unwrap();
+    assert_eq!(target_verified.bundle, projected);
+    assert_eq!(
+        target_verified.canonical_sha256,
+        target_meta["canonical_sha256"].as_str().unwrap()
+    );
+    assert_eq!(
+        target_verified.record_count as u64,
+        target_meta["record_count"].as_u64().unwrap()
+    );
+    assert_eq!(
+        target_verified.unknown_revision_count as u64,
+        target_meta["unknown_revision_count"].as_u64().unwrap()
+    );
+
+    let other_target_meta = &manifest["evidence_bundle_other_target"];
+    let other_target_bytes =
+        fixture_file(&directory, other_target_meta["file"].as_str().unwrap());
+    assert_eq!(
+        sha256_hex(&other_target_bytes),
+        other_target_meta["raw_file_sha256"].as_str().unwrap()
+    );
+    let other_target_upstream: Value =
+        serde_json::from_slice(&other_target_bytes).unwrap();
+    let other_projected = evidence_bundle_for_target(
+        &upstream,
+        other_target_meta["target_sha256"].as_str().unwrap(),
+    )
+    .unwrap();
+    assert_eq!(other_projected, other_target_upstream);
+    assert!(
+        other_projected["records"].as_array().unwrap().is_empty(),
+        "other artifact projection must not leak records from the original target"
+    );
+    assert!(
+        other_projected["unknowns"].as_array().unwrap().is_empty(),
+        "other artifact projection must not leak residual-unknown histories"
+    );
+    let other_verified = verify_evidence_bundle_json(&other_target_bytes).unwrap();
+    assert_eq!(other_verified.bundle, other_projected);
+    assert_eq!(
+        other_verified.canonical_sha256,
+        other_target_meta["canonical_sha256"].as_str().unwrap()
     );
 
     let negative_controls = manifest["bundle_negative_controls"]
