@@ -132,6 +132,13 @@ samples/joule, and GPU joules are not comparable to whole-system joules.
   samples/joule and tokens/joule metrics. It reports 1,841 reproducible
   submissions across 60 systems. Use its measurement principles and public
   results to calibrate reporting and identify comparable systems.
+- **MLPerf Endpoints (2026 submission rules)**: a related serving-quality
+  protocol now treats accuracy as a hard acceptance gate at multiple operating
+  points. The current non-agentic path requires five points (four mandatory
+  region points plus Offline); the exact count is ruleset/version-sensitive.
+  Use this as a model for quality-gated energy frontiers: energy or throughput
+  is only comparable when every required quality point passes. It is not itself
+  an energy benchmark.
 - **MuJoCo 3.17.0**: batch API results are documented as bit-identical to the
   sequential loop across thread counts. Treat deterministic multi-run replay as
   a comparator target, alongside contact, stiffness and work-precision tests.
