@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "audit_id": "synthetic-provenance-audit-small-finite-population-v0.1",
-  "dependence_bundle_sha256": "f9f4c7cf8f02f15d8f8e5f81f126cb03be0f9b5e35b2adad2e7c945a8a2b98a5",
+  "dependence_bundle_sha256": "f6de7dd7c7972c62e04b1e58a94ff7b038168dbad5b8e22d6847baedc6e0074b",
   "frame": {
     "frame_sha256": "ab9e86b36aa2a9bf2beb9960ae9ff736cfb049b017f9ed557fdf4f6127392a6d",
     "frozen_at": "2026-11-04T14:40:00Z",
