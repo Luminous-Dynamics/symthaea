@@ -136,12 +136,12 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["source", "target", "expected_weight", "replacement_weight"],
+      "description": "Zero means absent edge / deletion. Every change precondition is evaluated against the same frozen baseline graph.",
       "properties": {
         "source": { "type": "integer", "minimum": 0 },
         "target": { "type": "integer", "minimum": 0 },
         "expected_weight": { "type": "number", "minimum": 0 },
-        "replacement_weight": { "type": "number", "minimum": 0 },
-        "description": "Zero means absent edge / deletion. Every change precondition is evaluated against the same frozen baseline graph."
+        "replacement_weight": { "type": "number", "minimum": 0 }
       }
     },
     "edit_atom": {
