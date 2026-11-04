@@ -11,7 +11,7 @@ The module is a **music benchmark registry and adapter contract**. The included 
 ## Profile contract
 
 A `MusicBenchmarkProfileV1` pins:
-- benchmark ID/title/family and immutable release/version;
+- benchmark ID/title/family and immutable release/version. The family taxonomy includes a distinct `music_editing` value for MMAE/SMEBench rather than forcing editing tasks into `other`;
 - the native task/track ID and protocol reference;
 - exact source manifest, split manifest and task-protocol SHA-256;
 - native scorer ID/version/SHA-256 and the exact metric IDs it emits;
