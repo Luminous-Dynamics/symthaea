@@ -261,7 +261,7 @@
     },
     {
       "id": "archive_reader_contract",
-      "status": "planned",
+      "status": "planned_with_draft_implementation",
       "upstream_reference": {
         "repository": "morluto/rea",
         "commit": "8250bf2320ea57aab4e664db4b4d44b8abd2004e",
@@ -295,7 +295,18 @@
         "source_mutation_between_admission_and_open",
         "cancellation_during_scan_stream_and_cleanup",
         "declared_and_actual_expansion_budget",
-        "case_and_unicode_normalization_collisions"
+        "case_and_unicode_normalization_collisions",
+        "stored_and_deflate_stream_to_verified_eof",
+        "empty_member_sha256_and_crc",
+        "data_descriptor_stream_to_eof",
+        "cross_parser_archive_count_mismatch",
+        "secondary_decoder_raw_name_offset_flag_method_size_crc_mismatch",
+        "secondary_parser_duplicate_occurrence_order",
+        "same_size_rewrite_during_content_read",
+        "selected_path_replacement_during_content_read",
+        "decoder_output_exceeds_forged_declared_uncompressed_size",
+        "caller_buffer_limit_and_declared_size_budget",
+        "cross_parser_disagreement_preserved_as_evidence_not_majority_vote"
       ],
       "metrics": [
         "entry_occurrence_precision_recall",
@@ -309,19 +320,46 @@
         "peak_memory_bytes",
         "p50_latency_ms",
         "p95_latency_ms",
-        "cleanup_retry_failures"
+        "cleanup_retry_failures",
+        "per_occurrence_content_sha256_parity",
+        "crc_mismatch_detection_recall",
+        "declared_vs_observed_size_mismatch_detection_recall",
+        "secondary_decoder_metadata_disagreement_rate",
+        "source_mutation_false_accept_rate",
+        "buffer_and_peak_rss_bound_vs_member_size",
+        "verified_mib_per_second_by_compression_method",
+        "energy_per_verified_mib"
       ],
-      "target": "100_percent_supported_behavior_parity_against_pinned_REA_oracles; zero_false_accepts_on_malformed_or_racy_source_fixtures",
+      "target": "100_percent supported-subset parity against pinned upstream REA and separately pinned decoder oracles; zero false accepts for CRC/size corruption, partial streams, metadata disagreement, source mutation or actual-output limit violations; bounded memory independent of member size; performance scored only after correctness gates pass.",
       "boundaries": {
-        "first_lane": "metadata_only_and_bounded_streamed_member_hashes; no extraction or decryption",
+        "first_lane": "metadata inventory plus per-occurrence Stored/Deflate streamed SHA-256; no extraction, password handling, decryption or execution",
         "non_entry_regions": "leading_stub_APK_signing_block_and_trailing_comment_are_not_inventory_occurrences",
         "archive_mutation": "must_reject_or_report_explicit_partial_unknown_if_source_identity_changes",
-        "resource_lifecycle": "failed_close_retains_owned_resource_for_retry"
+        "resource_lifecycle": "failed_close_retains_owned_resource_for_retry",
+        "verification_semantics": "a member result requires EOF, observed-size agreement and decoder CRC success; declared compressed size is never reported as observed bytes",
+        "whole_archive_coverage": "one verified member does not upgrade archive traversal from partial to complete",
+        "cross_parser_disagreement": "preserve each parser's versioned result and dependency lineage; never majority-vote away disagreement",
+        "source_race": "a changed held descriptor or selected path suppresses any would-be content result",
+        "resource_bound": "read buffer 1..=1 MiB; decoder state measured separately; never claim constant memory without peak RSS evidence"
       },
       "library_candidates": {
-        "zip_rs": "zip 8.6.0 candidate parser or differential oracle; compare already-locked versions and feature trees before adding another version",
-        "executable_formats": "defer object/goblin until a separate ELF_MachO_PE semantic analyzer"
-      }
+        "zipcore": "zipcore 0.10.2 pinned candidate for bounded streaming, CRC/size verification and by-index duplicate occurrence access; audit source and dependency graph before promotion",
+        "zip_rs": "zip 9.3.0 candidate independent differential oracle; compare exact source, features and dependency lineage before counting independence",
+        "upstream": "pinned REA TypeScript ArtifactReader/ZipArtifactReader at upstream SHA 8250bf2320ea57aab4e664db4b4d44b8abd2004e remains the behavioral oracle",
+        "note": "An oracle disagreement is retained with provenance and minimized fixture; it is not resolved by selecting the majority implementation."
+      },
+      "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10368",
+      "related_owners": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10410"
+      ],
+      "protocol": [
+        "freeze archive fixture bytes and hashes before runs; preserve per-occurrence central-directory identity",
+        "record exact decoder crate versions, feature flags, Cargo.lock digest, compiler and host",
+        "run custom parser, secondary decoder and pinned upstream REA as separate arms",
+        "preserve decoder disagreement; require human or independent semantic adjudication for unresolved cases",
+        "report false accepts and false rejects by fault family with all skipped, unsupported and abstained cases retained in denominators",
+        "run correctness and resource-safety gates before any throughput leaderboard"
+      ]
     },
     {
       "id": "causal_diagnosis_and_next_experiment",
