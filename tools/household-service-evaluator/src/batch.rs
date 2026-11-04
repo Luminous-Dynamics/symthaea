@@ -425,10 +425,10 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
                     "uncertainty must be nonnegative",
                 ));
             }
-            let aggregate_bound = 4.0 * per_term_bound;
             let end_ms = (required_number(input, "duration_h")? * 3_600_000.0) as i64;
             let make_meter = |value_l: f64, stream: &str, boundary: &str| MeterMeasurement {
                 value_l,
+                absolute_error_bound_l: per_term_bound,
                 stream_id: stream.to_owned(),
                 measurement_boundary_id: boundary.to_owned(),
                 window_start_unix_ms: 0,
@@ -453,7 +453,6 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
                     "synthetic-purge",
                     "synthetic-purge-boundary",
                 ),
-                residual_absolute_error_bound_l: aggregate_bound,
                 topology_audit: None::<TopologyAuditReference>,
             })?;
             metrics.insert("mass_balance_residual_l".to_owned(), balance.residual_l);
@@ -471,7 +470,7 @@ fn evaluate_water_scenario(scenario: &Value) -> Result<BatchReceipt, EvaluationE
             );
             metrics.insert(
                 "conservative_aggregate_absolute_error_bound_l".to_owned(),
-                aggregate_bound,
+                balance.aggregate_absolute_error_bound_l,
             );
             notes.push(
                 "meter_uncertainty_l has ambiguous scope; the software-only negative control conservatively sums four per-term absolute bounds."
