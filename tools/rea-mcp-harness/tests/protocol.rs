@@ -26,10 +26,7 @@ async fn start_server() -> (
             .await
             .expect("MCP server shuts down cleanly");
     });
-    let client = ()
-        .serve(client_transport)
-        .await
-        .expect("connect in-memory MCP client");
+    let client = ().serve(client_transport).await.expect("connect in-memory MCP client");
     (client, task)
 }
 
@@ -95,7 +92,10 @@ async fn evidence_tool_verifies_semantic_identity_and_redacts_payloads() {
     let value = structured(&response);
     assert_eq!(value["status"], "verified_semantic_consistency");
     assert_eq!(value["evidence_id"], fixture["evidence_id"]);
-    assert_eq!(value["claim_ceiling"]["producer_authenticity_verified"], false);
+    assert_eq!(
+        value["claim_ceiling"]["producer_authenticity_verified"],
+        false
+    );
     assert_eq!(value["claim_ceiling"]["observation_truth_verified"], false);
 
     let serialized = value.to_string();
