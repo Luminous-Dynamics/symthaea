@@ -208,7 +208,7 @@ For each matched configuration, report separately:
 - energy, water, consumables, filters and replacement parts;
 - maintenance labour, service travel, downtime and disposal;
 - total annualized and lifecycle cost under declared usage/outage profiles;
-- cost per qualified service-hour and cost per delivered qualified litre/useful kWh where those functional units apply;
+- cost per delivered qualified litre, useful kWh or accepted service request, plus separately reported continuity hours where relevant;
 - voluntary, privacy-preserving affordability bands (e.g. share of disposable household resources), not exact income or identity data;
 - sensitivity to tariffs, interest rates, parts availability and outage frequency.
 
@@ -239,7 +239,7 @@ Benchmark:
 Keep public-system restoration metrics and household-appliance metrics separate. A household buffer may reduce a bounded service interruption; it cannot claim that the municipal service has been restored.
 
 
-## 8. Policy and architecture experiments
+## 9. Policy and architecture experiments
 
 Test these hypotheses against deterministic and later physically measured scenarios:
 - **Service trajectory > reserve inventory:** optimize delivered capability through onset, degraded operation, recovery and post-restoration stability.
@@ -251,7 +251,7 @@ Test these hypotheses against deterministic and later physically measured scenar
 - **Local autonomy + compositional planning:** coordinator proposes allocations; appliance-local safety, manual override and safe fallback remain authoritative.
 - **Household/city interoperability without centralization:** share read-only service and outage evidence where authorized; do not create a municipal command interface or imply authority.
 
-## 9. Adversarial controls
+## 10. Adversarial controls
 
 At minimum:
 - same tank litres, different elevation/pump curve/fixture pressure;
@@ -271,7 +271,7 @@ At minimum:
 
 No sensitive demographic labels are needed for this synthetic corpus. Report service shortfalls by declared service class and demand window; do not infer protected traits.
 
-## 10. Proposed acceptance gates
+## 11. Proposed acceptance gates
 
 These are research hypotheses, not standards or achieved results:
 - Every synthetic hard safety/quality violation is either detected or left explicitly unresolved; none is silently accepted.
@@ -281,7 +281,7 @@ These are research hypotheses, not standards or achieved results:
 - Report the distinct #10342 hypothesis of at least 25% longer verified critical-water service versus the unbuffered reference; do not confuse that easier comparison with beating conventional tank + pump.
 - Determine physical sample sizes only after pilot variance and clustering are measured. Scenario count is not household sample size.
 
-## 11. No-runner tranche and physical gate
+## 12. No-runner tranche and physical gate
 
 Before executing any candidate logic:
 1. freeze scenario, demand, disturbance and initial-state contracts;
@@ -293,7 +293,7 @@ Before executing any candidate logic:
 
 No candidate pump/valve/actuator logic is executed on live household plumbing or mains-connected equipment in this tranche. Physical work requires qualified design/install review, pressure/electrical protections, isolation and containment, manual fallback and independent observation.
 
-## 12. Evidence strata and claim ceiling
+## 13. Evidence strata and claim ceiling
 
 - E1: within-rig repeatability under a frozen configuration and disturbance profile.
 - E2: independent operator/lab reproducibility of the same profile.
