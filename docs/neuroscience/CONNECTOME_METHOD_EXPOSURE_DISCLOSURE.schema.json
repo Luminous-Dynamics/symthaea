@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-method-exposure-disclosure-v1.schema.json",
+  "title": "Method training and pretraining exposure disclosure",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "method_id",
+    "method_version",
+    "code_digest",
+    "artifact_digest",
+    "pretraining_exposure_status",
+    "training_sources",
+    "family_support",
+    "attestation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "connectome-method-exposure-disclosure-v1"
+    },
+    "method_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "method_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "code_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "artifact_digest": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "pretrained_weights_digest": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "pretraining_cutoff": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "pretraining_exposure_status": {
+      "enum": [
+        "disclosed_complete",
+        "disclosed_partial",
+        "unknown",
+        "not_applicable"
+      ]
+    },
+    "training_sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/training_source"
+      }
+    },
+    "family_support": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/family_support"
+      }
+    },
+    "attestation": {
+      "$ref": "#/$defs/attestation"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "training_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "source_kind",
+        "exposure",
+        "date_range",
+        "digest_or_reference"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_kind": {
+          "enum": [
+            "public_benchmark",
+            "scientific_dataset",
+            "synthetic_generator",
+            "web_corpus",
+            "code_corpus",
+            "internal_data",
+            "unknown"
+          ]
+        },
+        "exposure": {
+          "enum": [
+            "direct",
+            "derived",
+            "family_level",
+            "possible",
+            "none_known",
+            "unknown"
+          ]
+        },
+        "date_range": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "digest_or_reference": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "family_support": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pool_id",
+        "support_status",
+        "evidence"
+      ],
+      "properties": {
+        "pool_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "support_status": {
+          "enum": [
+            "in_support",
+            "partial_support",
+            "out_of_support",
+            "unknown"
+          ]
+        },
+        "evidence": {
+          "enum": [
+            "documented_training_source",
+            "documented_holdout",
+            "audited_overlap",
+            "self_report",
+            "not_available"
+          ]
+        }
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "declaration_complete",
+        "signed_attestation_digest"
+      ],
+      "properties": {
+        "declaration_complete": {
+          "type": "boolean"
+        },
+        "signed_attestation_digest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

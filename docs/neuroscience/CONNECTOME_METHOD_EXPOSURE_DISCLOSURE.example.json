@@ -1,0 +1,35 @@
+{
+  "schema_version": "connectome-method-exposure-disclosure-v1",
+  "method_id": "reference-method-example",
+  "method_version": "0.1.0",
+  "code_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "artifact_digest": null,
+  "pretrained_weights_digest": null,
+  "pretraining_cutoff": null,
+  "pretraining_exposure_status": "unknown",
+  "training_sources": [
+    {
+      "source_id": "training-corpus-not-yet-disclosed",
+      "source_kind": "unknown",
+      "exposure": "unknown",
+      "date_range": null,
+      "digest_or_reference": null
+    }
+  ],
+  "family_support": [
+    {
+      "pool_id": "synthetic-scm-core",
+      "support_status": "unknown",
+      "evidence": "not_available"
+    },
+    {
+      "pool_id": "formula-grounded-reserved",
+      "support_status": "unknown",
+      "evidence": "not_available"
+    }
+  ],
+  "attestation": {
+    "declaration_complete": false,
+    "signed_attestation_digest": null
+  }
+}
