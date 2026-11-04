@@ -1111,7 +1111,7 @@ fn hash_agent_view_snapshot(
     let mut seen_casefolded_prefixes: BTreeMap<String, String> = BTreeMap::new();
     let mut manifest_entries = Vec::with_capacity(entries.len());
     let mut tree_hasher = Sha256::new();
-    tree_hasher.update(b"CEB-TREE-V1\\0");
+    tree_hasher.update(b"CEB-TREE-V1\0");
     tree_hasher.update((entries.len() as u64).to_be_bytes());
 
     for entry in entries {
@@ -1187,7 +1187,8 @@ fn hash_agent_view_snapshot(
                 entry.relative_path
             )));
         }
-        let content_sha256 = format!("{:x}", content_hasher.finalize());
+        let content_digest = content_hasher.finalize();
+        let content_sha256 = format!("{content_digest:x}");
 
         let path_bytes = entry.relative_path.as_bytes();
         tree_hasher.update((path_bytes.len() as u64).to_be_bytes());
@@ -1195,9 +1196,6 @@ fn hash_agent_view_snapshot(
         tree_hasher.update(entry.size.to_be_bytes());
         tree_hasher.update([b'F']);
         tree_hasher.update([u8::from(entry.executable)]);
-        let content_digest = Sha256::digest(
-            hex_to_bytes(&content_sha256).as_slice()
-        );
         // The CEB-TREE-V1 entry commits to the SHA-256 digest of the file bytes.
         tree_hasher.update(content_digest);
 
@@ -1210,17 +1208,6 @@ fn hash_agent_view_snapshot(
     }
 
     Ok((format!("{:x}", tree_hasher.finalize()), manifest_entries))
-}
-
-fn hex_to_bytes(value: &str) -> Vec<u8> {
-    let bytes = value.as_bytes();
-    let mut output = Vec::with_capacity(bytes.len() / 2);
-    for pair in bytes.chunks_exact(2) {
-        let high = (pair[0] as char).to_digit(16).unwrap_or(0);
-        let low = (pair[1] as char).to_digit(16).unwrap_or(0);
-        output.push(((high << 4) | low) as u8);
-    }
-    output
 }
 
 fn verify_agent_view_inner(inputs: &AgentViewInputs) -> Result<AgentViewReport, Failure> {
