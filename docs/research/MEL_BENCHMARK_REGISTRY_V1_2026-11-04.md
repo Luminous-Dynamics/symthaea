@@ -1,6 +1,6 @@
 # MEL-BENCH-001 — Reproducible music benchmark registry v1
 
-**Status:** typed Rust profile/run manifest, rights and failure-accounting validator, direct-comparability classifier, two strict JSON schemas, one synthetic profile fixture, a CLI profile-check example and 15 authored Rust tests are committed. No external model run, SOTA reproduction, Rust compilation or CI result is claimed.
+**Status:** typed Rust profile/run manifest, rights and failure-accounting validator, direct-comparability classifier, two strict JSON schemas, one synthetic profile fixture, a CLI profile-check example and 16 authored Rust tests are committed. No external model run, SOTA reproduction, Rust compilation or CI result is claimed.
 
 ## Purpose
 
