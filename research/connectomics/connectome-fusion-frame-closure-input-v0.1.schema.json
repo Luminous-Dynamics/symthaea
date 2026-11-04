@@ -205,6 +205,8 @@
       "required": [
         "event_id",
         "sequence",
+        "event_at",
+        "ingested_at",
         "canonical_use_key",
         "operation_id",
         "claim_id",
@@ -267,6 +269,14 @@
             "CANCELLED",
             "RETRY_OF_PRIOR_EVENT"
           ]
+        },
+        "event_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "ingested_at": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
