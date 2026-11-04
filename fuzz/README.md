@@ -27,6 +27,6 @@ cargo +nightly-2026-11-03 fuzz run zip_inventory_and_content -- -max_total_time=
 
 The starter ZIP payload SHA-256 is `dd8a2bd8c16d808363a1d1e7560a4cc86494393c1a202a478db00f00ae53d099`. The workflow verifies this decoded digest with `sha256sum --check` and writes a `run-context.txt` artifact containing the exact source commit, pinned toolchain version, cargo-fuzz version, runner OS, Cargo.lock digest and seed digests.
 
-The weekly/manual workflow runs a bounded 180-second smoke campaign. It is not a security certification. Every crash must be minimized, checked into the permanent regression corpus and assigned an exact source/toolchain/lockfile receipt. Fuzz-clean means only that no crash was found in the exercised build, seed corpus and time budget.
+The workflow uses the committed `fuzz/Cargo.lock` with `--locked`, records the lock SHA-256, and runs a bounded 180-second smoke campaign. It is not a security certification. Every crash must be minimized, checked into the permanent regression corpus and assigned an exact source/toolchain/lockfile receipt. Fuzz-clean means only that no crash was found in the exercised build, seed corpus and time budget.
 
 Follow-on targets should separate archive admission, local/central mismatch handling, occurrence mapping, decompression/CRC verification and cross-parser differential behavior. Keep zipcore, zip, rawzip and pinned REA provenance separate; do not treat parser-name diversity as independent codec or checksum evidence.
