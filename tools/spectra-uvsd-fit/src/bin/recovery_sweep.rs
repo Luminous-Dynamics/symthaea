@@ -71,14 +71,13 @@ fn main() {
         "seed,mu_true,sigma_true,status,mu_hat,sigma_hat,d_a_hat,nll,gradient_norm,iterations,objective_spread,parameter_spread,diagonal_curvature"
     );
 
-    for &mu in &MU_GRID {
-        for &sigma in &SIGMA_GRID {
+    for (mu_index, &mu) in MU_GRID.iter().enumerate() {
+        for (sigma_index, &sigma) in SIGMA_GRID.iter().enumerate() {
             for seed in 0..SEEDS {
-                let campaign_seed = seed
-                    .wrapping_add(1)
-                    .wrapping_mul(0xD6E8_FEB8_6659_FD93)
-                    ^ mu.to_bits()
-                    ^ sigma.to_bits();
+                let cell_index = mu_index as u64 * SIGMA_GRID.len() as u64 + sigma_index as u64;
+                let campaign_seed = 0x5350_4543_5452_4100u64
+                    .wrapping_add(cell_index * SEEDS)
+                    .wrapping_add(seed);
                 let table = simulate_table(mu, sigma, campaign_seed);
                 let result = fit(&table, FitOptions::default());
                 let (mu_hat, sigma_hat, d_a_hat) = match result.estimate {
