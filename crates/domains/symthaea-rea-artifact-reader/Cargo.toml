@@ -7,3 +7,7 @@ description = "Bounded, read-only ZIP metadata inventory preserving REA artifact
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+sha2 = "=0.10.9"
+zipcore = { version = "=0.10.2", default-features = false }
