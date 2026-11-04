@@ -31,6 +31,14 @@ struct Mapping {
     evidence_ids: BTreeSet<String>,
 }
 
+#[derive(Debug, Clone)]
+struct CorrespondenceMappings {
+    world_id: String,
+    release_id: String,
+    mappings: BTreeMap<String, Mapping>,
+    alternative_groups: BTreeMap<String, Vec<String>>,
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 struct Counts {
     mapped: u64,
@@ -167,17 +175,7 @@ fn parse_target_inventory(
     Ok((world_id, release_id, inventory))
 }
 
-fn parse_mappings(
-    correspondence: &Value,
-) -> Result<
-    (
-        String,
-        String,
-        BTreeMap<String, Mapping>,
-        BTreeMap<String, Vec<String>>,
-    ),
-    String,
-> {
+fn parse_mappings(correspondence: &Value) -> Result<CorrespondenceMappings, String> {
     let world = correspondence
         .get("target_world")
         .ok_or_else(|| "correspondence.target_world missing".to_owned())?;
@@ -271,7 +269,12 @@ fn parse_mappings(
             return Err(format!("duplicate mapping_id {id}"));
         }
     }
-    Ok((world_id, release_id, mappings, alternative_groups))
+    Ok(CorrespondenceMappings {
+        world_id,
+        release_id,
+        mappings,
+        alternative_groups,
+    })
 }
 
 fn verify(
@@ -347,12 +350,11 @@ fn verify(
     if required_string(&correspondence, "schema_version", "correspondence")? != VERSION {
         return Err("unsupported correspondence schema version".to_owned());
     }
-    let (correspondence_world_id, correspondence_release_id, mappings, alternative_groups) =
-        parse_mappings(&correspondence)?;
+    let correspondence_mappings = parse_mappings(&correspondence)?;
 
     // Cross-check every mapping target against the exact target inventory, including
     // mapping rows that have no fate record due to a malformed or incomplete receipt.
-    for (mapping_id, mapping) in &mappings {
+    for (mapping_id, mapping) in &correspondence_mappings.mappings {
         let expected_type = match mapping.relation_type.as_str() {
             "ARTIFACT_IDENTITY" => "ARTIFACT",
             "SEGMENT_LINEAGE" => "SEGMENT",
@@ -381,31 +383,31 @@ fn verify(
 
     for (name, value) in [
         ("manifest", &manifest_world_id),
-        ("correspondence", &correspondence_world_id),
+        ("correspondence", &correspondence_mappings.world_id),
     ] {
         if value != &fate_world_id {
             return Err(format!("{name} world_id disagrees with fate receipt"));
         }
     }
-    if manifest_release_id != fate_release_id || correspondence_release_id != fate_release_id {
+    if manifest_release_id != fate_release_id || correspondence_mappings.release_id != fate_release_id {
         return Err(
             "target release_id disagrees across fate receipt, manifest and correspondence"
                 .to_owned(),
         );
     }
 
-    for (group_id, mapping_ids) in &alternative_groups {
+    for (group_id, mapping_ids) in &correspondence_mappings.alternative_groups {
         if mapping_ids.len() < 2 {
             return Err(format!(
                 "alternative set {group_id} must contain at least two mapping rows"
             ));
         }
-        let first = mappings
+        let first = correspondence_mappings.mappings
             .get(&mapping_ids[0])
             .ok_or_else(|| format!("alternative set {group_id}: missing mapping row"))?;
         let mut seen_targets = BTreeSet::new();
         for mapping_id in mapping_ids {
-            let mapping = mappings.get(mapping_id).ok_or_else(|| {
+            let mapping = correspondence_mappings.mappings.get(mapping_id).ok_or_else(|| {
                 format!("alternative set {group_id}: missing mapping {mapping_id}")
             })?;
             if mapping.relation_type != first.relation_type
