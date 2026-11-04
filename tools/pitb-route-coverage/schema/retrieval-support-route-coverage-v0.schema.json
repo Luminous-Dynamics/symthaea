@@ -1,0 +1,442 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/retrieval-support-route-coverage-v0.schema.json",
+  "title": "PITB retrieval to support route coverage report v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "support_report_sha256",
+    "retrieval_receipts_jsonl_sha256",
+    "declaration_mappings_jsonl_sha256",
+    "support_group_count",
+    "retrieval_receipt_count",
+    "declaration_mapping_count",
+    "matched_assessment_count",
+    "unmatched_receipt_count",
+    "unmapped_candidate_count",
+    "route_assessments",
+    "comparison_summaries",
+    "admission_boundary",
+    "interpretation_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.retrieval-support-route-coverage.v0"
+    },
+    "support_report_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "retrieval_receipts_jsonl_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "declaration_mappings_jsonl_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "support_group_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "retrieval_receipt_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "declaration_mapping_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "matched_assessment_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "unmatched_receipt_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unmapped_candidate_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "route_assessments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "query_id",
+          "group_id",
+          "study_id",
+          "component_id",
+          "target_id",
+          "target_statement_sha256",
+          "environment_sha256",
+          "toolchain_sha256",
+          "benchmark_id",
+          "benchmark_version",
+          "split_id",
+          "retriever_kind",
+          "retriever_name",
+          "retriever_version",
+          "receipt_sha256",
+          "graph_manifest_sha256",
+          "requested_top_k",
+          "returned_candidate_count",
+          "mapped_mutable_candidate_count",
+          "mapped_out_of_universe_count",
+          "unresolved_or_ambiguous_candidate_count",
+          "useful_route_candidate_count",
+          "useful_novel_premise_rate",
+          "necessary_declaration_count",
+          "necessary_declaration_recall",
+          "minimal_route_count",
+          "minimal_routes_covered_at_returned_k",
+          "minimal_route_coverage_at_returned_k",
+          "any_complete_route_covered_at_returned_k",
+          "any_exact_minimal_route_recovered",
+          "mean_partial_route_fraction",
+          "best_route_completion_rank",
+          "cost_microusd",
+          "retrieval_wall_ms",
+          "retrieval_cpu_ms",
+          "retrieval_gpu_ms",
+          "tokens",
+          "coverage_at_k",
+          "interpretation_boundary"
+        ],
+        "properties": {
+          "query_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "group_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "study_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "component_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target_statement_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "environment_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "toolchain_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "benchmark_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "benchmark_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "split_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "retriever_kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "retriever_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "retriever_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "receipt_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "graph_manifest_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "requested_top_k": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "returned_candidate_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "mapped_mutable_candidate_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "mapped_out_of_universe_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unresolved_or_ambiguous_candidate_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "useful_route_candidate_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "useful_novel_premise_rate": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            ]
+          },
+          "necessary_declaration_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "necessary_declaration_recall": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            ]
+          },
+          "minimal_route_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minimal_routes_covered_at_returned_k": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "minimal_route_coverage_at_returned_k": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "any_complete_route_covered_at_returned_k": {
+            "type": "boolean"
+          },
+          "any_exact_minimal_route_recovered": {
+            "type": "boolean"
+          },
+          "mean_partial_route_fraction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "best_route_completion_rank": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "integer",
+                "minimum": 1
+              }
+            ]
+          },
+          "cost_microusd": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "retrieval_wall_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "retrieval_cpu_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "retrieval_gpu_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "coverage_at_k": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "k",
+                "effective_k",
+                "complete_route_covered",
+                "minimal_routes_covered",
+                "minimal_route_coverage",
+                "best_route_completion_rank"
+              ],
+              "properties": {
+                "k": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "effective_k": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "complete_route_covered": {
+                  "type": "boolean"
+                },
+                "minimal_routes_covered": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "minimal_route_coverage": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "best_route_completion_rank": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "interpretation_boundary": {
+            "type": "string",
+            "minLength": 40
+          }
+        }
+      }
+    },
+    "comparison_summaries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "retriever_kind",
+          "retriever_name",
+          "retriever_version",
+          "matched_query_count",
+          "matched_group_count",
+          "any_complete_route_covered_count",
+          "any_complete_route_coverage",
+          "mean_minimal_route_coverage",
+          "mean_useful_novel_premise_rate",
+          "mean_necessary_declaration_recall",
+          "total_cost_microusd",
+          "total_retrieval_wall_ms",
+          "total_tokens"
+        ],
+        "properties": {
+          "retriever_kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "retriever_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "retriever_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "matched_query_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "matched_group_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "any_complete_route_covered_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "any_complete_route_coverage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "mean_minimal_route_coverage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "mean_useful_novel_premise_rate": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            ]
+          },
+          "mean_necessary_declaration_recall": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            ]
+          },
+          "total_cost_microusd": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_retrieval_wall_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_tokens": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "admission_boundary": {
+      "type": "string",
+      "minLength": 40
+    },
+    "interpretation_boundary": {
+      "type": "string",
+      "minLength": 80
+    }
+  }
+}
