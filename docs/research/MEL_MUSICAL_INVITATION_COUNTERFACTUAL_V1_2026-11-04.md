@@ -6,11 +6,12 @@
 
 Can a policy use collaborator intent and musical context to distinguish an invitation to take the floor from an acoustically similar pause, while remaining invariant to irrelevant changes such as instrument timbre?
 
-## Three test types
+## Four test types
 
-1. Context change must change action: keep the local cue, phrase function, performer role and instrument fixed; change collaborator intent. Example: the same cadential rest invites a response in one condition but retains the floor in the other.
-2. Surface change must preserve action: keep cue, phrase function, collaborator intent and performer role fixed; change only the surface instrument.
-3. Ambiguous valid-action set: preserve a set of musically defensible actions, rather than forcing one canonical response.
+1. Explicit-intent change must change action: keep the local cue, preceding harmonic context, phrase function, performer role and instrument fixed; change collaborator intent. Example: the same cadential rest invites a response in one condition but retains the floor in the other.
+2. Preceding-harmonic-context change must change action: keep the local cue, phrase function, explicit collaborator-intent label, performer role and instrument fixed; change only the preceding harmonic progression/context. Example: an otherwise identical cadential rest follows a resolved dominant-to-tonic cadence in one member and an open half-cadence in the other. The annotation must specify why the valid next action differs.
+3. Surface change must preserve action: keep cue, preceding harmonic context, phrase function, collaborator intent and performer role fixed; change only the surface instrument. Two families cover lead-invitation and phrase-internal-breath cases.
+4. Ambiguous valid-action set: preserve a set of musically defensible actions, rather than forcing one canonical response.
 
 ## Evaluator
 
@@ -46,9 +47,9 @@ The Rust evaluator exposes `score_musical_context_counterfactual_set_v1`, with s
 - per-family scores and exact denominators.
 
 There is deliberately no composite score. The checked-in `mctx-baselines-v1.json` includes:
-1. `LOCAL-CUE-ONLY-001`: repeats the action for a matching local cue and therefore fails the intent-changing pair.
-2. `INSTRUMENT-SURFACE-ONLY-001`: changes action based on piano/guitar surface and therefore fails the irrelevant-surface invariance pair.
-3. `EXPLICIT-CONTEXT-RULE-SANITY-001`: a hand-written symbolic rule sanity check that satisfies the toy fixture. This is not a learned model, an audio system, or a competitive result.
+1. `LOCAL-CUE-ONLY-001`: maps each local cue to one action and therefore fails both intent-changing and harmonic-context-changing pairs.
+2. `INSTRUMENT-SURFACE-ONLY-001`: changes action from the instrument surface and therefore fails both irrelevant-surface invariance pairs.
+3. `EXPLICIT-CONTEXT-RULE-SANITY-001`: a hand-written symbolic rule sanity check that uses explicit intent and preceding harmonic context and satisfies the toy fixture. This is not a learned model, an audio system, or a competitive result.
 
 These controls demonstrate that the paired fixture design distinguishes the behaviours it claims to measure. They do not establish real-world model performance.
 
