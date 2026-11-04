@@ -1,0 +1,72 @@
+name: Connectome query-ensemble independent oracle
+
+on:
+  pull_request:
+    paths:
+      - "tools/connectomics-intake-audit/src/bin/connectome_query_ensemble_audit.rs"
+      - "tools/connectomics-intake-audit/reference/**"
+      - "docs/neuroscience/CONNECTOME_QUERY_ENSEMBLE_AUDIT.schema.json"
+      - "docs/neuroscience/CONNECTOME_QUERY_ENSEMBLE_AUDIT_PROTOCOL_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_ENSEMBLE_AUDIT.example.json"
+      - "docs/neuroscience/CONNECTOME_QUERY_ENSEMBLE_ORACLE_V1.md"
+      - ".github/workflows/connectome-query-ensemble-oracle.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/connectomics-intake-audit/src/bin/connectome_query_ensemble_audit.rs"
+      - "tools/connectomics-intake-audit/reference/**"
+      - "docs/neuroscience/CONNECTOME_QUERY_ENSEMBLE_AUDIT.schema.json"
+      - "docs/neuroscience/CONNECTOME_QUERY_ENSEMBLE_AUDIT_PROTOCOL_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_ENSEMBLE_AUDIT.example.json"
+      - "docs/neuroscience/CONNECTOME_QUERY_ENSEMBLE_ORACLE_V1.md"
+      - ".github/workflows/connectome-query-ensemble-oracle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  independent-query-oracle:
+    name: Differential query semantics and exhaustive four-node universe
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CARGO_TERM_COLOR: never
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Evaluate checked-in known-answer fixture
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
+            --bin connectome-query-ensemble-audit -- \
+            --input docs/neuroscience/examples/CONNECTOME_QUERY_ENSEMBLE_AUDIT.example.json \
+            --output "$RUNNER_TEMP/query-ensemble-fixture-report.json"
+
+      - name: Independently verify known-answer fixture
+        run: |
+          python3 tools/connectomics-intake-audit/reference/verify_query_ensemble_oracle.py \
+            --input docs/neuroscience/examples/CONNECTOME_QUERY_ENSEMBLE_AUDIT.example.json \
+            --report "$RUNNER_TEMP/query-ensemble-fixture-report.json"
+
+      - name: Generate all four-node directed graph topologies
+        run: |
+          python3 tools/connectomics-intake-audit/reference/generate_exhaustive_query_ensemble_input.py \
+            "$RUNNER_TEMP/query-ensemble-exhaustive-input.json"
+
+      - name: Evaluate the exhaustive finite graph universe in Rust
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml \
+            --bin connectome-query-ensemble-audit -- \
+            --input "$RUNNER_TEMP/query-ensemble-exhaustive-input.json" \
+            --output "$RUNNER_TEMP/query-ensemble-exhaustive-report.json"
+
+      - name: Differentially verify every query against independent oracle
+        run: |
+          python3 tools/connectomics-intake-audit/reference/verify_query_ensemble_oracle.py \
+            --input "$RUNNER_TEMP/query-ensemble-exhaustive-input.json" \
+            --report "$RUNNER_TEMP/query-ensemble-exhaustive-report.json" \
+            --exhaustive
