@@ -438,6 +438,11 @@ pub fn validate_grounded_decision_v1(
         }
     }
 
+    if decision.cited_claim_ids.is_empty()
+        && decision.action.requires_grounded_event()
+    {
+        issues.push(GroundedParticipationIssueV1::DecisionEvidenceSetEmpty);
+    }
     if decision.session_id != bundle.session_id {
         issues.push(GroundedParticipationIssueV1::SessionMismatch);
     }
@@ -465,7 +470,13 @@ pub fn validate_grounded_decision_v1(
     if decision.decision_at_ns < bundle.committed_at_ns {
         issues.push(GroundedParticipationIssueV1::DecisionBeforeEvidenceBundle);
     }
-    if decision.collaborator_veto_active && decision.action.is_active_intervention() {
+    let evidence_veto_active = bundle.claims.iter().any(|claim| {
+        claim.kind == GroundedMusicalClaimKindV1::CollaboratorVeto
+            && claim.status == GroundedClaimStatusV1::Grounded
+    });
+    if (decision.collaborator_veto_active || evidence_veto_active)
+        && decision.action.is_active_intervention()
+    {
         issues.push(GroundedParticipationIssueV1::VetoBlocksActiveIntervention);
     }
 
@@ -704,6 +715,7 @@ mod tests {
             claim_set_sha256: String::new(),
         };
         evidence.claim_set_sha256 = evidence.expected_claim_set_sha256().unwrap();
+        evidence.evidence_bundle_sha256 = evidence.expected_evidence_bundle_sha256().unwrap();
         evidence
     }
 
@@ -725,6 +737,7 @@ mod tests {
             sequence: 1,
             artifact: evidence.artifact.clone(),
             evidence_claim_set_sha256: evidence.claim_set_sha256.clone(),
+            evidence_bundle_sha256: evidence.evidence_bundle_sha256.clone(),
             observed_through_frame: evidence.permitted_prefix_end_frame,
             decision_at_ns: 120,
             action,
@@ -789,6 +802,7 @@ mod tests {
         evidence.claims[0].status = GroundedClaimStatusV1::Ambiguous;
         evidence.claims[0].reason = Some("two plausible event interpretations".to_owned());
         evidence.claim_set_sha256 = evidence.expected_claim_set_sha256().unwrap();
+        evidence.evidence_bundle_sha256 = evidence.expected_evidence_bundle_sha256().unwrap();
         let receipt = decision(
             &evidence,
             GroundedMusicalActionV1::Respond,
@@ -803,6 +817,94 @@ mod tests {
         assert!(issues.contains(&GroundedParticipationIssueV1::RequiredEvidenceKindMissing {
             action: GroundedMusicalActionV1::Respond
         }));
+    }
+
+    #[test]
+    fn ask_can_cite_ambiguous_grounding_without_authorizing_an_effect() {
+        let mut evidence = bundle();
+        evidence.claims[0].status = GroundedClaimStatusV1::Ambiguous;
+        evidence.claims[0].reason = Some("two plausible handoff interpretations".to_owned());
+        evidence.claim_set_sha256 = evidence.expected_claim_set_sha256().unwrap();
+        evidence.evidence_bundle_sha256 = evidence.expected_evidence_bundle_sha256().unwrap();
+        let receipt = decision(
+            &evidence,
+            GroundedMusicalActionV1::Ask,
+            vec!["invitation-001"],
+            None,
+        );
+        assert!(validate_grounded_decision_v1(&evidence, &receipt, &policy()).is_empty());
+    }
+
+    #[test]
+    fn abstain_can_cite_unavailable_grounding_as_a_reason_to_withhold() {
+        let mut evidence = bundle();
+        evidence.claims[0].kind = GroundedMusicalClaimKindV1::StreamUnavailable;
+        evidence.claims[0].status = GroundedClaimStatusV1::Unavailable;
+        evidence.claims[0].reason = Some("input chunk was unavailable".to_owned());
+        evidence.claim_set_sha256 = evidence.expected_claim_set_sha256().unwrap();
+        evidence.evidence_bundle_sha256 = evidence.expected_evidence_bundle_sha256().unwrap();
+        let receipt = decision(
+            &evidence,
+            GroundedMusicalActionV1::Abstain,
+            vec!["invitation-001"],
+            None,
+        );
+        assert!(validate_grounded_decision_v1(&evidence, &receipt, &policy()).is_empty());
+    }
+
+    #[test]
+    fn grounded_stream_unavailability_cannot_be_relabelled_as_wait() {
+        let mut evidence = bundle();
+        evidence.claims.push(claim(
+            "stream-unavailable-001",
+            GroundedMusicalClaimKindV1::StreamUnavailable,
+            GroundedClaimStatusV1::Grounded,
+            9_600,
+        ));
+        evidence.claim_set_sha256 = evidence.expected_claim_set_sha256().unwrap();
+        evidence.evidence_bundle_sha256 = evidence.expected_evidence_bundle_sha256().unwrap();
+        let receipt = decision(
+            &evidence,
+            GroundedMusicalActionV1::Wait,
+            vec!["retains-floor-001"],
+            None,
+        );
+        assert!(validate_grounded_decision_v1(&evidence, &receipt, &policy())
+            .contains(&GroundedParticipationIssueV1::StreamUnavailableRequiresAbstain));
+    }
+
+    #[test]
+    fn full_evidence_bundle_commitment_detects_metadata_tampering() {
+        let evidence = bundle();
+        let mut changed = evidence.clone();
+        changed.permitted_prefix_end_frame -= 1;
+        let receipt = decision(
+            &changed,
+            GroundedMusicalActionV1::Respond,
+            vec!["invitation-001"],
+            effect(),
+        );
+        assert!(validate_grounded_decision_v1(&changed, &receipt, &policy())
+            .contains(&GroundedParticipationIssueV1::InvalidClaimSetDigest));
+    }
+
+    #[test]
+    fn effect_window_must_remain_inside_the_exact_audio_artifact() {
+        let evidence = bundle();
+        let receipt = decision(
+            &evidence,
+            GroundedMusicalActionV1::Respond,
+            vec!["invitation-001"],
+            Some(GroundedParticipationEffectWindowV1 {
+                interval: GroundedFrameIntervalV1 {
+                    start_frame: 47_900,
+                    end_frame: 48_100,
+                },
+                authorization_id: "auth-001".to_owned(),
+            }),
+        );
+        assert!(validate_grounded_decision_v1(&evidence, &receipt, &policy())
+            .contains(&GroundedParticipationIssueV1::EffectWindowBeyondArtifact));
     }
 
     #[test]
@@ -828,6 +930,7 @@ mod tests {
         evidence.claims[0].source_interval.end_frame = 9_600;
         evidence.claims[0].observed_through_frame = 9_600;
         evidence.claim_set_sha256 = evidence.expected_claim_set_sha256().unwrap();
+        evidence.evidence_bundle_sha256 = evidence.expected_evidence_bundle_sha256().unwrap();
         let receipt = decision(
             &evidence,
             GroundedMusicalActionV1::Respond,
