@@ -76,6 +76,7 @@ fn evidence_usable(
     decision_time: &str,
     permitted_classes: &[&str],
     expected_subject: &str,
+    expected_boundary: &str,
     expected_issuer_role: &str,
     require_valid_at_decision: bool,
 ) -> bool {
@@ -86,6 +87,7 @@ fn evidence_usable(
     if string(evidence, "claim_id") != Some(claim_id)
         || string(evidence, "record_state") != Some("current")
         || string(evidence, "subject_id") != Some(expected_subject)
+        || string(evidence, "boundary_id") != Some(expected_boundary)
         || string(evidence, "issuer_role") != Some(expected_issuer_role)
     {
         return false;
@@ -139,6 +141,7 @@ fn claim_has_evidence(
                 decision_time,
                 permitted_classes,
                 expected_subject,
+                expected_boundary,
                 expected_issuer_role,
                 require_valid_at_decision,
             )
@@ -273,6 +276,7 @@ fn model_has_independent_calibration(case: &Value, decision_time: &str) -> bool 
                 decision_time,
                 &["independently_reconciled_measurement"],
                 site_id,
+                "plant-metering-boundary-v1",
                 "independent_verifier",
                 false,
             )
@@ -344,6 +348,7 @@ fn has_fx_evidence(case: &Value, decision_time: &str) -> bool {
                 case.get("site")
                     .and_then(|site| string(site, "site_id"))
                     .unwrap_or_default(),
+                "fx-observation-boundary-v1",
                 "central_bank",
                 true,
             )
@@ -385,12 +390,14 @@ pub fn evaluate_case(case: &Value) -> Disposition {
     let allocated = grid
         .and_then(|value| string(value, "allocated_capacity_mw"))
         .and_then(|value| value.parse::<f64>().ok());
+    let grid_boundary = format!("grid-poc-{grid_subject}");
     let grid_evidence = claim_has_evidence(
         case,
         "grid_right",
         decision_time,
         &["issuer_signed"],
         grid_subject,
+        &grid_boundary,
         "system_operator",
         true,
     );
@@ -413,6 +420,7 @@ pub fn evaluate_case(case: &Value) -> Disposition {
             decision_time,
             &["validated_model_output"],
             site_id,
+            "plant-ac-boundary-v1",
             "model_registry",
             false,
         )
@@ -427,6 +435,7 @@ pub fn evaluate_case(case: &Value) -> Disposition {
         decision_time,
         &["independently_reconciled_measurement"],
         site_id,
+        "plant-metering-boundary-v1",
         "independent_verifier",
         false,
     ) {
@@ -439,6 +448,7 @@ pub fn evaluate_case(case: &Value) -> Disposition {
         decision_time,
         &["issuer_signed"],
         site_id,
+        "project-offtake-boundary-v1",
         "offtaker",
         true,
     ) {
@@ -462,6 +472,7 @@ pub fn evaluate_case(case: &Value) -> Disposition {
         decision_time,
         &["issuer_signed"],
         site_id,
+        "project-epc-cost-boundary-v1",
         "epc_contractor",
         true,
     ) {
