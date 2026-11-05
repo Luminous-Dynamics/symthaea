@@ -573,3 +573,68 @@ A useful ladder-retention statistic is a vector, not a scalar:
 The target is not merely to outperform SelfImprove-Bench's game results. The target is to demonstrate that improvements discovered in one software/science family remain beneficial on fresh instances, harder conditions, sibling tasks and cross-capability tasks—under equal budgets, independent evaluation and full-loop replications. The first benchmark release should include at least two independently held-out task families per level and enough independent clusters for the uncertainty analysis; exact sample size must be set by a pre-study power/precision analysis, not an arbitrary task count.
 
 Source: Xu et al., *SelfImprove-Bench: Evaluating Generalization in Self-Improving Agents*, arXiv:2611.02797 (2026-11-02): https://arxiv.org/abs/2611.02797
+
+
+## 17. Matched-protocol SOTA scoreboard and challenge targets
+
+The RSI landscape now has several strong comparators, but each measures a different intervention surface. Symthaea must reproduce each under its original protocol before claiming to exceed it. Do not average these scores into one leaderboard.
+
+| Comparator | Published result (authors' report) | What it identifies | Symthaea challenge target |
+|---|---|---|---|
+| RSIGym (arXiv:2610.10310) | RSI-Index 0.4809 for Opus 5 in independent Joint runs; $500 platform-service budget per benchmark run; five task domains | End-to-end Data / Harness / Joint improvement under shared services and budget | Reproduce on the same base model, task set, budget and controller; then target RSI-Index > 0.4809 with positive audited gains on every benchmark and G1–G4 transfer reported separately |
+| AI4AI-Bench (arXiv:2608.20318) | Best system 0.250, mean 0.166 across 10 frozen algorithm families; algorithm-changing submissions averaged 0.226 vs 0.126 for submissions that did not change the learning algorithm | Whether an agent changes the training algorithm itself, not merely data or harness | First reproduce the 0.250 best score and the algorithm-change vs non-algorithm-change gap; then target a mean > 0.250 across the same 10 tasks under the same compute/training limits, with task-level wins and regressions disclosed |
+| AIRA₂ / MLE-bench-30 (Meta publication, 2026-04-16) | Mean percentile rank 81.5% at 24h and 83.1% at 72h; strongest reported baseline 72.7%; exceeds human SOTA on 6/20 AIRS-Bench tasks | Research-agent throughput, evaluation noise control and multi-agent/interactive experimentation | Under the same benchmark subset, backbone, 24h/72h budgets and scoring protocol, target >83.1% at 72h and >6/20 AIRS-Bench tasks above the named human reference; report compute and worker parallelism separately |
+| SelfImprove-Bench (arXiv:2611.02797) | G0–G4 generalization ladder; authors report inconsistent gains across levels | Whether improvements transfer beyond seen scenarios and difficulty | Positive independently audited improvement at G1–G4; no G0-only success counts as generalization. Report the complete per-domain transfer vector, not only endpoint score |
+| REUSE (arXiv:2609.33180) | Simultaneous error control across adaptive promotion histories; authors report 0 false promotions in their Covertype experiments, versus up to 20.7% false promotions in comparators | Whether the improvement procedure can reuse a finite audit set without adaptive false promotion, given independence and decision-only feedback | Match the theorem's assumptions and implement the full service/certificate; demonstrate empirical family-wise error control across null adaptive histories and report Monte Carlo confidence bounds, power and cost—not just observed zero |
+| RSI process audit (arXiv:2610.27610) | In 90 RSI-labelled studies, only 22% audit ≥2 full-loop reruns; only 4/26 improver-gain claims use the same-start, matched-budget swap test | Whether a better final product is evidence of a repeatable or improved improver | At least 3 independent full-loop replications for exploratory screening; preregister confirmatory run count by power/precision analysis; require the same-start old-vs-new improver swap test for R4 |
+
+These are *challenge targets*, not claims that the current Symthaea branch has achieved them. The published results are paper-reported and protocol-specific. A target becomes a valid comparison only after reproducing the same benchmark revisions, task splits, model identities, budgets, evaluator and scoring procedures.
+
+### Primary productivity metric
+
+The primary programme-level productivity metric should be:
+
+`independent generalized improvements / all-in resource budget`
+
+An improvement counts in the numerator only if it:
+1. is supported by the correct evidence layer and independent evaluator;
+2. survives the preregistered audit and source/build identity checks;
+3. exceeds the preregistered practical-improvement threshold;
+4. does not violate protected capability non-inferiority floors; and
+5. transfers at least to G2, with G3/G4 reported as separate stronger transfer achievements.
+
+The denominator includes proposer inference, data generation, training, sandbox execution, evaluator calls, retries, failed candidates, audit compute, service fees and human review. Report GPU-hours, wall-clock, dollars, CPU time, energy, tokens and tool calls separately; do not hide one resource in another.
+
+### Pareto objectives, not one composite score
+
+Maintain a vector of objectives:
+- independently confirmed capability gain;
+- G1/G2/G3/G4 transfer retention;
+- protected-capability regressions;
+- false-promotion risk and evidence coverage;
+- cost per independently confirmed generalized improvement;
+- time to first independently confirmed generalized improvement;
+- repeated-run variance and improvement survival after a clean rerun.
+
+Do not scalarize this vector for scientific claims. A budget allocator may use a preregistered utility function for scheduling, but the raw vector and Pareto frontier remain the reportable outcome.
+
+### Factorial attribution
+
+Run the following intervention arms under an identical external controller and matched all-in budgets:
+- Frozen: no changes.
+- Data-only.
+- Harness-only.
+- Algorithm-only (the R5-critical arm).
+- Meta-improvement-only (the R4-critical arm).
+- Joint: allow all declared edit surfaces.
+- Negative controls: shuffled feedback, placebo edits, and candidates that cannot affect the measured capability.
+
+Cross each arm with the G0–G4 transfer ladder and at least two task families. Keep development, selection, confirmation and final population audit disjoint at the independent-cluster level. Use common random numbers / matched task inputs only where the benchmark contract allows paired comparisons; do not equate different tasks by matching their IDs.
+
+Sources:
+- Meng et al., *RSIGym: A Flexible Environment for Recursive Self-Improvement*, arXiv:2610.10310 (2026-10-07): https://arxiv.org/abs/2610.10310
+- Chi et al., *AI4AI-Bench: Benchmarking LLM Agents in Algorithmic Design for Recursive Self-Improvement*, arXiv:2608.20318 (2026-08-20): https://arxiv.org/abs/2608.20318
+- Meta, *AIRA₂: Overcoming Bottlenecks in AI Research Agents* (2026-04-16): https://ai.meta.com/research/publications/aira-overcoming-bottlenecks-in-ai-research-agents/
+- Xu et al., *SelfImprove-Bench: Evaluating Generalization in Self-Improving Agents*, arXiv:2611.02797 (2026-11-02): https://arxiv.org/abs/2611.02797
+- Sun et al., *Which Self-Improvements Should We Trust?*, arXiv:2609.33180 (2026-09-27): https://arxiv.org/abs/2609.33180
+- Chen et al., *Auditing the Product, Not the Recursion*, arXiv:2610.27610 (2026-10-20): https://arxiv.org/abs/2610.27610
