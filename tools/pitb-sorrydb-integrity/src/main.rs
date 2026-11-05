@@ -1210,4 +1210,29 @@ mod tests {
         assert_eq!(receipt.vacuity_audit_status, "not_run");
         assert_eq!(receipt.assumption_audit_status, "not_run");
     }
+
+    #[test]
+    fn python_json_canonicalization_uses_ascii_escaped_sorted_keys_and_python_spacing() {
+        let value = serde_json::json!({"z": "😀", "a": "λ"});
+        let mut encoded = String::new();
+        python_json_dumps_sorted(&value, &mut encoded).unwrap();
+        assert_eq!(encoded, r#"{"a": "\u03bb", "z": "\ud83d\ude00"}"#);
+        assert_eq!(sha256(encoded.as_bytes()).len(), 64);
+    }
+
+    #[test]
+    fn frozen_sorrydb_objects_reject_unknown_root_and_metadata_fields() {
+        let record = upstream_reference_record();
+        let mut database = Database {
+            documentation: "deduplicated".into(),
+            sorries: vec![record.clone()],
+        };
+        let mut root = serde_json::to_value(&database).unwrap();
+        root.as_object_mut().unwrap().insert("unexpected".into(), Value::Bool(true));
+        let root_bytes = serde_json::to_vec(&root).unwrap();
+        assert!(parse_json::<Database>(&root_bytes, "mutated database").is_err());
+
+        database.sorries[0].metadata["unexpected"] = Value::String("new field".into());
+        assert!(validate_record(&database.sorries[0], "mutated metadata").is_err());
+    }
 }
