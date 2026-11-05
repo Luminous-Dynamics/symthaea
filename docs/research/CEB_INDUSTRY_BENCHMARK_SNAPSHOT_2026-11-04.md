@@ -244,5 +244,7 @@ The immediate route is runner-independent authoring, static source/manifest chec
 - Agent Security League: Endor Labs, live benchmark page: https://www.endorlabs.com/research/ai-code-security-benchmark
 - Rust-SWE-bench / RUSTFORGER: Xiang et al., ICSE 2026: https://arxiv.org/abs/2602.22764
 - ContextBench: Li et al., 2026, leaderboard updated October 23: https://contextbench.github.io/
+- Terminal-Bench 4.0 maintainer release notes and 4.1 verifier roadmap: https://www.tbench.ai/news/terminal-bench-4-0
+- Epoch AI independent review of Terminal-Bench 4.0.0 (2026-09-04): https://epoch.ai/benchmarks/terminal-bench-4/review
 
 **Snapshot limitation:** this is a dated source audit. Re-read the cited pages before future claims; live score tables, model identities, harness settings and benchmark revisions can change.
