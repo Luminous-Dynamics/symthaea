@@ -3,7 +3,7 @@
 **Registry:** [`manifest.json`](manifest.json)  
 **Schema:** [`manifest.schema.json`](manifest.schema.json)  
 **Status:** metadata-only registry; no external suite is currently qualified for execution from this checkout.  
-**Last updated:** 2026-11-04
+**Last updated:** 2026-11-05
 
 ## Rules
 
@@ -90,3 +90,20 @@ For CEB comparisons, first reproduce the official public dev leaderboard using t
 ### Current claim ceiling
 
 The PLE registry entry is **access_gated / metadata-only**. No PLE task has been downloaded, run, independently regraded or scored by Luminous in this work. No runner adapter is qualified. No SOTA, engineering competence, licensure, code-compliance, safety or physical-validation claim follows from the registry record.
+
+### Live leaderboard snapshot (retrieved 2026-11-05)
+
+The official Mercor page currently reports the following means on its 56-task hidden test set:
+
+| Model | Native harness | Mean score | Displayed ± |
+|---|---|---:|---:|
+| Claude Opus 5.5 | Claude Code | 48.3% | ±1.4% |
+| GPT-6 Astra | Codex | 45.8% | ±0.6% |
+| Claude Sonnet 5.5 | Claude Code | 43.5% | ±1.4% |
+| Gemini 4 Argon | Antigravity | 40.6% | ±1.3% |
+| Claude Opus 5 | Claude Code | 40.0% | ±1.6% |
+
+The page describes highest reasoning effort in each model's native harness, three runs per task, an isolated container without internet access, and a six-hour per-task limit. The page does not define the meaning of the displayed ± value. It is preserved verbatim in the manifest and must not be interpreted as a confidence interval, standard deviation or standard error without a source definition.
+
+This dated hidden-set snapshot is descriptive context only. It is not a Luminous baseline, is not the public 29-task development leaderboard mean, and is not the separate competition-entry development score based on committed artifacts plus a live sample check. Reproduce the exact official public development protocol before making matched claims. Never use hidden-test scores as a target for tuning or claim a local improvement from a different split/harness.
+
