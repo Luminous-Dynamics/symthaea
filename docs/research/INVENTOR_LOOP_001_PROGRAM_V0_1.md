@@ -267,3 +267,41 @@ Use explicit status labels: **PROPOSED**, **DESIGN_ONLY**, **SIMULATED**, **MEAS
 - SimScale State of Engineering AI 2026: https://explore.simscale.com/hubfs/resources/reports/state-of-engineering-ai-2026.pdf
 - GenAI mathematics meta-analysis: https://www.mdpi.com/2227-7102/16/1/140
 - Educational robotics meta-analysis: https://www.sciencedirect.com/science/article/pii/S000169182600377X
+
+
+---
+
+## 2026-11-05 research update: external baselines and parametric-history frontier
+
+This addendum records a dated snapshot. It does not retroactively change the scoring pathway, reproduce an external benchmark, or qualify a Luminous system.
+
+### PLE hidden leaderboard snapshot
+
+The official Mercor page retrieved 2026-11-05 reports means on its 56-task hidden test set:
+
+| Model | Native harness | Mean | Displayed ± |
+|---|---|---:|---:|
+| Claude Opus 5.5 | Claude Code | 48.3% | ±1.4% |
+| GPT-6 Astra | Codex | 45.8% | ±0.6% |
+| Claude Sonnet 5.5 | Claude Code | 43.5% | ±1.4% |
+| Gemini 4 Argon | Antigravity | 40.6% | ±1.3% |
+| Claude Opus 5 | Claude Code | 40.0% | ±1.6% |
+
+The stated protocol is each model at highest reasoning effort in its native harness, three runs per task, isolated container without internet, and six hours per task. The leaderboard page does not define the statistical meaning of its displayed ± values; preserve them as displayed, not as confidence intervals or standard deviations. This is hidden-test context only—not a Luminous baseline, not the public 29-task dev mean, and not the separate committed-artifact competition dev score. See the [dated leaderboard](https://www.mercor.com/apex/partner-benchmarks/ple-bench-leaderboard/) and [metadata registry snapshot PR #10458](https://github.com/Luminous-Dynamics/symthaea/pull/10458).
+
+### Parametric CAD Bench V3
+
+The publisher's 2026-09-24 V3 snapshot reports 100 tasks, with overall mean continuous reward and failed/unscored outputs counted as zero. Its top rows include Opus 5.5 + Claude Code at 61.03% (95% CI ±7.53), Opus 5.5 + mini-swe-agent at 57.96% (±7.82), and GPT-6 Astra + Codex at 56.87% (±6.85). The page states that the first four confidence intervals overlap. In a paired same-model comparison, Claude Code leads mini-swe-agent by 3.08 points, but the paired 95% interval ranges from −1.15 to +7.31; this is not decisive evidence of an agent ranking. See the [publisher's V3 analysis](https://cadbench.ai/news/cad-bench-v3-opus-5-5).
+
+These values are not STEP/BREP geometric-equivalence rates and must not be pooled with PLE, CADGenBench or CADBench. Benchmark task, scorer, model/harness and cost definitions differ.
+
+### AutoTimeline and the next CAD paradigm
+
+Autodesk Research's [AutoTimeline work (2026-11-03)](https://www.research.autodesk.com/blog/rebuilding-design-history-with-autotimeline/) reconstructs multiple candidate editable feature timelines from a history-less solid, rebuilds each candidate and checks its geometry against the source. The key research implication is that an original feature sequence is generally not identifiable from final geometry alone.
+
+The next frontier is therefore not exact original-history recovery. It is **edit-preserving parametric equivalence**: can a candidate history rebuild within a declared geometry tolerance, expose meaningful editable parameters, preserve required interfaces under specified edits, and represent ambiguity honestly? This programme now tracks that question in [CAD-HISTORY-001 #10510](https://github.com/Luminous-Dynamics/symthaea/issues/10510), composing existing [FAB-GEOM-001 #4927](https://github.com/Luminous-Dynamics/symthaea/issues/4927) rather than adding a new geometry authority or CAD kernel.
+
+### Numerical assurance feedback from PHYS-TRUSS
+
+An independent review of Symtropy's latest advertised solver head found a scale-invariance defect in force/moment residual normalization: fixed 1 N and 1 N·m denominator floors can make a 100% imbalance appear numerically tiny for sub-unit problems. The reviewer independently recomputed the published load-case displacement vectors (maximum discrepancy below (5.5\times10^{-20}\,m)); this checks those fixture values only, not Rust execution. The issue and inline review are tracked in [Symtropy #3676](https://github.com/Luminous-Dynamics/symtropy/issues/3676) and [solver PR #2363](https://github.com/Luminous-Dynamics/symtropy/pull/2363). This illustrates why benchmark gates themselves need dimensional and scale-invariance audits.
+
