@@ -606,11 +606,20 @@ pub fn run_trial(
         &interventions.sham,
         &interventions.unrelated,
     ];
-    let mut actions = Vec::with_capacity(4);
-    for observation in observations {
-        actions.push(policy.act(observation, &task)?);
+    let mut actions_by_condition: [Option<AgentAction>; 4] = std::array::from_fn(|_| None);
+    for condition in interventions.condition_order {
+        let index = match condition {
+            Condition::Control => 0,
+            Condition::Targeted => 1,
+            Condition::Sham => 2,
+            Condition::Unrelated => 3,
+        };
+        actions_by_condition[index] = Some(policy.act(observations[index], &task)?);
     }
-    let actions: [AgentAction; 4] = actions
+    let actions: [AgentAction; 4] = actions_by_condition
+        .into_iter()
+        .collect::<Option<Vec<_>>>()
+        .ok_or(HarnessError::InvalidPolicy)?
         .try_into()
         .map_err(|_| HarnessError::InvalidPolicy)?;
 
@@ -1042,6 +1051,8 @@ pub struct PartnerCausalContrast {
     pub input_sensitive: bool,
     /// Whether sham and unrelated conditions leave the partner target stable.
     pub target_specific: bool,
+    /// Whether every partner action follows the fixture's declared response rule.
+    pub oracle_rule_match: bool,
 }
 
 /// Measure the reverse causal direction under all four paired conditions.
@@ -1076,6 +1087,10 @@ pub fn measure_partner_contrast(
     let targeted_delta = rule.distance(next[0].value, next[1].value)?;
     let sham_delta = rule.distance(next[0].value, next[2].value)?;
     let unrelated_delta = rule.distance(next[0].value, next[3].value)?;
+    let oracle_rule_match = (0..4).all(|index| {
+        rule.apply(actions[index].feature.value)
+            .is_ok_and(|expected| expected == next[index].value)
+    });
 
     Ok(PartnerCausalContrast {
         control_next: next[0],
@@ -1087,6 +1102,7 @@ pub fn measure_partner_contrast(
         unrelated_delta,
         input_sensitive: targeted_delta > 0,
         target_specific: sham_delta == 0 && unrelated_delta == 0,
+        oracle_rule_match,
     })
 }
 
@@ -1122,7 +1138,8 @@ pub fn run_reciprocal_trial(
     )?;
     let qualified_synthetic_reciprocity = agent.contrast.qualified_synthetic_contingency
         && partner.input_sensitive
-        && partner.target_specific;
+        && partner.target_specific
+        && partner.oracle_rule_match;
     Ok(ReciprocalTrialRecordV1 {
         agent,
         partner,
@@ -1563,6 +1580,54 @@ mod tests {
         assert_eq!(first, second);
     }
 
+    struct OrderRecordingPolicy {
+        seen: std::sync::Mutex<Vec<String>>,
+    }
+
+    impl AgentPolicy for OrderRecordingPolicy {
+        fn policy_id(&self) -> &str {
+            "order-recording"
+        }
+
+        fn act(
+            &self,
+            observation: &Observation,
+            task: &TaskSpec,
+        ) -> Result<AgentAction, HarnessError> {
+            self.seen
+                .lock()
+                .map_err(|_| HarnessError::InvalidPolicy)?
+                .push(observation.event_id.clone());
+            make_action(
+                observation,
+                self.policy_id(),
+                task,
+                observation.current_partner_feature.value,
+                ActionMechanism::Imitation,
+            )
+        }
+    }
+
+    #[test]
+    fn policy_invocations_follow_the_recorded_seeded_condition_order() {
+        let (task, interventions) = fixture();
+        let policy = OrderRecordingPolicy {
+            seen: std::sync::Mutex::new(Vec::new()),
+        };
+        run_trial(task, interventions.clone(), &policy, config()).unwrap();
+        let expected: Vec<String> = interventions
+            .condition_order
+            .iter()
+            .map(|condition| match condition {
+                Condition::Control => interventions.control.event_id.clone(),
+                Condition::Targeted => interventions.targeted.event_id.clone(),
+                Condition::Sham => interventions.sham.event_id.clone(),
+                Condition::Unrelated => interventions.unrelated.event_id.clone(),
+            })
+            .collect();
+        assert_eq!(*policy.seen.lock().unwrap(), expected);
+    }
+
     #[test]
     fn condition_order_is_reproducible_and_bound_to_assignment_seed() {
         assert_eq!(condition_order_for_seed(991), condition_order_for_seed(991));
@@ -1825,6 +1890,7 @@ mod tests {
         assert_eq!(responsive.unrelated_delta, 0);
         assert!(responsive.input_sensitive);
         assert!(responsive.target_specific);
+        assert!(responsive.oracle_rule_match);
 
         let fixed = measure_partner_contrast(
             &FixedPartnerPolicy {
@@ -1840,6 +1906,59 @@ mod tests {
         assert_eq!(fixed.targeted_delta, 0);
         assert!(!fixed.input_sensitive);
         assert!(fixed.target_specific);
+        assert!(!fixed.oracle_rule_match);
+    }
+
+    struct NonRuleResponsivePartner;
+
+    impl ControlledPartner for NonRuleResponsivePartner {
+        fn policy_id(&self) -> &str {
+            "non-rule-responsive"
+        }
+
+        fn respond(
+            &self,
+            prior_partner_feature: Feature,
+            agent_action: &AgentAction,
+            target_dimension: Dimension,
+            rule: ResponseRule,
+        ) -> Result<Feature, HarnessError> {
+            if prior_partner_feature.dimension != target_dimension
+                || agent_action.feature.dimension != target_dimension
+            {
+                return Err(HarnessError::InvalidPolicy);
+            }
+            let value = (rule.apply(agent_action.feature.value)? + 1).rem_euclid(rule.modulus);
+            Ok(Feature {
+                dimension: target_dimension,
+                value,
+            })
+        }
+    }
+
+    #[test]
+    fn arbitrary_input_sensitive_partner_does_not_pass_reciprocity_oracle() {
+        let (task, interventions) = fixture();
+        let record = run_trial(
+            task.clone(),
+            interventions.clone(),
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
+            config(),
+        )
+        .unwrap();
+        let contrast = measure_partner_contrast(
+            &NonRuleResponsivePartner,
+            interventions.control.initial_partner_feature,
+            &record.actions,
+            &task,
+            &interventions,
+        )
+        .unwrap();
+        assert!(contrast.input_sensitive);
+        assert!(contrast.target_specific);
+        assert!(!contrast.oracle_rule_match);
     }
 
     #[test]
