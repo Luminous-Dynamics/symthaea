@@ -1,0 +1,974 @@
+{
+  "schema_version": 0,
+  "crosswalk_id": "CEB-METRIC-CORRESPONDENCE-V0",
+  "status": "design_only_no_matched_comparisons",
+  "snapshot_date": "2026-11-05",
+  "policy": {
+    "purpose": "Map every CEB primary metric to external observations without confusing metric resemblance with protocol equivalence.",
+    "classes": "exact_semantics means operational metric meaning aligns; close_semantics means same broad construct with specific definitional differences; related_but_distinct means useful contextual relation but not the same metric; not_comparable means no defensible numeric correspondence is registered.",
+    "claim_rule": "No direct superiority claim is allowed by this crosswalk. Even exact metric semantics is only eligibility for a matched test; separate preregistration must still match benchmark revision, tasks, instructions, source snapshots, model/harness, budgets, environment, adjudication and independent regrade.",
+    "denominator_rule": "Denominators and task units are attached to observations; a mapping never authorizes pooling separate splits or system configurations.",
+    "empty_mapping_rule": "An empty observation list with not_comparable is an explicit absence of an external comparator, not a missing validation record."
+  },
+  "metric_mappings": [
+    {
+      "lane_id": "CEB-RESOLUTION",
+      "ceb_metric_id": "resolve_rate",
+      "ceb_metric_definition": "Fraction of qualified tasks satisfying issue-specific fail-to-pass and existing pass-to-pass requirements.",
+      "target_statement": "Directly exceed the best matched same-version baseline with paired uncertainty; no universal numeric target inferred from public saturation.",
+      "target_intent": "quality_goal",
+      "correspondence_class": "close_semantics",
+      "comparison_use": "replication_candidate",
+      "external_observation_ids": [
+        "swepro-full-opus-resolve",
+        "swepro-full-gemini-resolve",
+        "swepro-full-fable-resolve",
+        "swepro-hard-opus-resolve",
+        "swepro-hard-fable-resolve",
+        "swepro-hard-gemini-resolve"
+      ],
+      "rationale": "Both are issue-resolution rates, but task sets, harnesses, models, split semantics and graders are not matched.",
+      "blockers": [
+        "task set and split differ",
+        "model/harness budgets differ",
+        "grader and environment are not matched"
+      ],
+      "normalization_requirements": [
+        "replicate the exact external split",
+        "pin source, harness and budget",
+        "preregister paired task-level comparison",
+        "pristine independently regrade both arms"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-RESOLUTION",
+      "ceb_metric_id": "cost_per_accepted_repair",
+      "ceb_metric_definition": "Total inference, tool, execution and review cost divided by independently accepted repairs.",
+      "target_statement": "At least 20% lower cost with no more than 1 percentage point correctness regression, preregistered.",
+      "target_intent": "efficiency_goal",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation in the current CEB registry measures this metric using an equivalent operational definition.",
+      "blockers": [
+        "no equivalent external metric is registered"
+      ],
+      "normalization_requirements": [
+        "author and qualify a dedicated external or CEB-specific control corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-RESOLUTION",
+      "ceb_metric_id": "regression_rate",
+      "ceb_metric_definition": "Fraction of accepted candidate patches that regress pre-existing behavior under qualified pass-to-pass checks.",
+      "target_statement": "Zero critical regression classes in the declared control set.",
+      "target_intent": "hard_gate",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation in the current CEB registry measures this metric using an equivalent operational definition.",
+      "blockers": [
+        "no equivalent external metric is registered"
+      ],
+      "normalization_requirements": [
+        "author and qualify a dedicated external or CEB-specific control corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-REPO",
+      "ceb_metric_id": "source_supported_claim_precision",
+      "ceb_metric_definition": "Supported factual claims divided by all factual claims, judged against exact source anchors and authority labels.",
+      "target_statement": "At least 0.95 on public replication and 0.98 on sealed holdout.",
+      "target_intent": "sealed_holdout_goal",
+      "correspondence_class": "related_but_distinct",
+      "comparison_use": "context_only",
+      "external_observation_ids": [
+        "atlas-qna-opus-score"
+      ],
+      "rationale": "Codebase QnA is relevant to comprehension but does not directly measure source-anchor claim precision.",
+      "blockers": [
+        "different scoring rubric",
+        "no equivalent claim-level denominator"
+      ],
+      "normalization_requirements": [
+        "construct a shared source-anchored claim corpus",
+        "blindly adjudicate each factual claim"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-REPO",
+      "ceb_metric_id": "claim_recall",
+      "ceb_metric_definition": "Required supported claims correctly recovered, including explicit abstention where evidence is missing.",
+      "target_statement": "At least 0.90 public and 0.95 sealed.",
+      "target_intent": "sealed_holdout_goal",
+      "correspondence_class": "related_but_distinct",
+      "comparison_use": "context_only",
+      "external_observation_ids": [
+        "atlas-qna-opus-score"
+      ],
+      "rationale": "Codebase QnA is relevant to repository comprehension but does not isolate required-claim recall.",
+      "blockers": [
+        "different task unit and rubric"
+      ],
+      "normalization_requirements": [
+        "construct matched required-fact questions",
+        "preregister missing-fact and abstention scoring"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-REPO",
+      "ceb_metric_id": "unsupported_authority_rate",
+      "ceb_metric_definition": "Claims presented as compiler/runtime verified without corresponding independent authority evidence.",
+      "target_statement": "0.",
+      "target_intent": "hard_gate",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation in the current CEB registry measures this metric using an equivalent operational definition.",
+      "blockers": [
+        "no equivalent external metric is registered"
+      ],
+      "normalization_requirements": [
+        "author and qualify a dedicated external or CEB-specific control corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-CONTEXT",
+      "ceb_metric_id": "recall_at_10",
+      "ceb_metric_definition": "Fraction of gold-relevant context units retrieved in the top ten.",
+      "target_statement": "At least 0.90 on sealed holdout.",
+      "target_intent": "sealed_holdout_goal",
+      "correspondence_class": "related_but_distinct",
+      "comparison_use": "context_only",
+      "external_observation_ids": [
+        "contextbench-codenib-recall"
+      ],
+      "rationale": "Both measure retrieval recall, but CEB fixes top-10 gold context units while the external leaderboard's aggregate recall semantics and system adaptation differ.",
+      "blockers": [
+        "retrieval cutoff and relevance unit not proven equivalent",
+        "different corpus and aggregation"
+      ],
+      "normalization_requirements": [
+        "align top-k and relevance-unit definitions",
+        "rerun both systems on the same tasks"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-CONTEXT",
+      "ceb_metric_id": "context_f1",
+      "ceb_metric_definition": "Harmonic mean of context precision and recall under the benchmark's exact relevance rubric.",
+      "target_statement": "At least 0.50 on sealed holdout.",
+      "target_intent": "sealed_holdout_goal",
+      "correspondence_class": "related_but_distinct",
+      "comparison_use": "context_only",
+      "external_observation_ids": [
+        "contextbench-codenib-f1",
+        "contextbench-openjiuwen-f1"
+      ],
+      "rationale": "Both are context F1 labels, but the relevance rubric, corpus, aggregation and system rows are benchmark-specific.",
+      "blockers": [
+        "metric rubric and task corpus differ",
+        "best ContextBench F1 and Recall are from different systems"
+      ],
+      "normalization_requirements": [
+        "adopt the same gold context unit and aggregation",
+        "preserve each system-specific observation"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-CONTEXT",
+      "ceb_metric_id": "downstream_task_success",
+      "ceb_metric_definition": "Qualified task success after retrieval under fixed downstream agent, prompt and budget.",
+      "target_statement": "Improve against matched retrieval baselines without reducing answer quality.",
+      "target_intent": "quality_goal",
+      "correspondence_class": "related_but_distinct",
+      "comparison_use": "context_only",
+      "external_observation_ids": [
+        "contextbench-codenib-pass1"
+      ],
+      "rationale": "Pass@1 is related to downstream success, but trial count, task success rubric and retrieval/agent stack differ.",
+      "blockers": [
+        "Pass@1 protocol and downstream agent differ"
+      ],
+      "normalization_requirements": [
+        "match downstream agent and task split",
+        "pin attempts and success criteria"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-CONTEXT",
+      "ceb_metric_id": "context_cost",
+      "ceb_metric_definition": "Tokens and monetary inference/retrieval cost attributable to context acquisition.",
+      "target_statement": "At least 20% reduction at non-inferior downstream success.",
+      "target_intent": "efficiency_goal",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation in the current CEB registry measures this metric using an equivalent operational definition.",
+      "blockers": [
+        "no equivalent external metric is registered"
+      ],
+      "normalization_requirements": [
+        "author and qualify a dedicated external or CEB-specific control corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-TEST",
+      "ceb_metric_id": "mutation_kill_rate",
+      "ceb_metric_definition": "Fraction of preregistered behavior-preserving and behavior-breaking mutations correctly distinguished by the test suite.",
+      "target_statement": "At least 0.80 on sealed mutation families.",
+      "target_intent": "quality_goal",
+      "correspondence_class": "related_but_distinct",
+      "comparison_use": "context_only",
+      "external_observation_ids": [
+        "atlas-test-fable-score",
+        "atlas-test-opus-score"
+      ],
+      "rationale": "Test-writing benchmark score is not mutation kill rate.",
+      "blockers": [
+        "different rubric",
+        "no matched mutation set"
+      ],
+      "normalization_requirements": [
+        "run both systems on the same independently authored mutation corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-TEST",
+      "ceb_metric_id": "oracle_false_positive_rate",
+      "ceb_metric_definition": "Valid implementations incorrectly rejected by generated tests.",
+      "target_statement": "Below 0.02 with one-sided 95% upper bound reported.",
+      "target_intent": "quality_goal",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation in the current CEB registry measures this metric using an equivalent operational definition.",
+      "blockers": [
+        "no equivalent external metric is registered"
+      ],
+      "normalization_requirements": [
+        "author and qualify a dedicated external or CEB-specific control corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-TEST",
+      "ceb_metric_id": "behavioral_coverage",
+      "ceb_metric_definition": "Distinct preregistered behavior partitions exercised by tests.",
+      "target_statement": "At least 0.90 on task-level contract partitions.",
+      "target_intent": "coverage_goal",
+      "correspondence_class": "related_but_distinct",
+      "comparison_use": "context_only",
+      "external_observation_ids": [
+        "atlas-test-fable-score",
+        "atlas-test-opus-score"
+      ],
+      "rationale": "Test-writing quality is related to coverage, but does not expose the same contract-partition denominator.",
+      "blockers": [
+        "coverage unit and rubric differ"
+      ],
+      "normalization_requirements": [
+        "use common task-level contract partitions"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-REFACTOR",
+      "ceb_metric_id": "semantic_preservation",
+      "ceb_metric_definition": "Fraction of qualified behavioral contracts preserved after refactoring.",
+      "target_statement": "At least 0.99 for critical contracts.",
+      "target_intent": "sealed_holdout_goal",
+      "correspondence_class": "related_but_distinct",
+      "comparison_use": "context_only",
+      "external_observation_ids": [
+        "atlas-refactor-gpt-score",
+        "atlas-refactor-fable-score"
+      ],
+      "rationale": "SWE Atlas refactoring is relevant, but its aggregate rubric is not CEB critical-contract preservation rate.",
+      "blockers": [
+        "different rubric and task population"
+      ],
+      "normalization_requirements": [
+        "evaluate the same refactoring tasks with identical semantic contracts"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-REFACTOR",
+      "ceb_metric_id": "maintainability_delta",
+      "ceb_metric_definition": "Preregistered expert rubric delta for cohesion, duplication, API clarity and code ownership.",
+      "target_statement": "Positive paired improvement with no semantic regression.",
+      "target_intent": "quality_goal",
+      "correspondence_class": "related_but_distinct",
+      "comparison_use": "context_only",
+      "external_observation_ids": [
+        "atlas-refactor-gpt-score",
+        "atlas-refactor-fable-score"
+      ],
+      "rationale": "The benchmark covers maintainability within a broader rubric, not a separately normalized paired maintainability delta.",
+      "blockers": [
+        "maintainability subscore is not separately supplied"
+      ],
+      "normalization_requirements": [
+        "obtain or define a comparable blinded maintainability subscore"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-REFACTOR",
+      "ceb_metric_id": "collateral_change_ratio",
+      "ceb_metric_definition": "Unnecessary changed files or lines divided by all changed files or lines under an independently reviewed diff rubric.",
+      "target_statement": "At least 20% lower than matched baseline.",
+      "target_intent": "efficiency_goal",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation in the current CEB registry measures this metric using an equivalent operational definition.",
+      "blockers": [
+        "no equivalent external metric is registered"
+      ],
+      "normalization_requirements": [
+        "author and qualify a dedicated external or CEB-specific control corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-DEBUG",
+      "ceb_metric_id": "bug_recall_at_k",
+      "ceb_metric_definition": "Fraction of verified defects found within the top K diagnostic findings.",
+      "target_statement": "At least 0.90 Recall@5 on sealed holdout.",
+      "target_intent": "sealed_holdout_goal",
+      "correspondence_class": "related_but_distinct",
+      "comparison_use": "context_only",
+      "external_observation_ids": [
+        "pdb-single-opus-recall",
+        "pdb-wild-opus-recall"
+      ],
+      "rationale": "PDB reports bug-level recall, not the share of verified defects found within the top K diagnostic findings.",
+      "blockers": [
+        "top-K ranking is absent",
+        "PDB task populations differ"
+      ],
+      "normalization_requirements": [
+        "require ranked findings",
+        "compute Recall@5 on a shared holdout"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-DEBUG",
+      "ceb_metric_id": "edit_precision",
+      "ceb_metric_definition": "Necessary correct edit units divided by all edit units under preregistered epsilon and semantic matching.",
+      "target_statement": "At least 0.85 on qualified holdout.",
+      "target_intent": "sealed_holdout_goal",
+      "correspondence_class": "close_semantics",
+      "comparison_use": "replication_candidate",
+      "external_observation_ids": [
+        "pdb-single-opus-precision",
+        "pdb-wild-opus-precision"
+      ],
+      "rationale": "Both measure edit-level precision, but PDB uses epsilon-relaxed matching (ε=2 for Single Hard and ε=1 for Wild).",
+      "blockers": [
+        "edit unit and epsilon tolerance must be matched",
+        "task populations differ"
+      ],
+      "normalization_requirements": [
+        "replicate exact PDB version and epsilon",
+        "pin the same edit unit and adjudication"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-DEBUG",
+      "ceb_metric_id": "regression_free_rate",
+      "ceb_metric_definition": "Fraction of repairs with no newly introduced regression.",
+      "target_statement": "At least 0.99 on critical contract set.",
+      "target_intent": "hard_gate",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation in the current CEB registry measures this metric using an equivalent operational definition.",
+      "blockers": [
+        "no equivalent external metric is registered"
+      ],
+      "normalization_requirements": [
+        "author and qualify a dedicated external or CEB-specific control corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-REVIEW",
+      "ceb_metric_id": "defect_recall_at_5",
+      "ceb_metric_definition": "Fraction of human-verified introduced defects present in the top five findings.",
+      "target_statement": "At least 0.85 on sealed holdout.",
+      "target_intent": "sealed_holdout_goal",
+      "correspondence_class": "close_semantics",
+      "comparison_use": "replication_candidate",
+      "external_observation_ids": [
+        "crbug-opus-recall5"
+      ],
+      "rationale": "CRBugBench top-five-comment bug detection is close to top-five defect finding, but its review comment protocol and task population differ.",
+      "blockers": [
+        "review comment ranking differs from CEB finding ranking",
+        "repository/task sets differ"
+      ],
+      "normalization_requirements": [
+        "same changes and adjudicated defects",
+        "same top-five output format and blinded review"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-REVIEW",
+      "ceb_metric_id": "actionable_precision",
+      "ceb_metric_definition": "Fraction of submitted findings confirmed as actionable defects by blinded reviewers.",
+      "target_statement": "At least 0.80 on sealed holdout.",
+      "target_intent": "sealed_holdout_goal",
+      "correspondence_class": "related_but_distinct",
+      "comparison_use": "context_only",
+      "external_observation_ids": [
+        "crbug-opus-recall5"
+      ],
+      "rationale": "CRBugBench top-five recall is not actionable finding precision.",
+      "blockers": [
+        "no precision observation for the same output set"
+      ],
+      "normalization_requirements": [
+        "retain false-positive and actionable-positive review labels"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-REVIEW",
+      "ceb_metric_id": "reviewer_burden",
+      "ceb_metric_definition": "Human minutes required to adjudicate findings per reviewed change.",
+      "target_statement": "At least 20% lower burden at non-inferior recall.",
+      "target_intent": "efficiency_goal",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation in the current CEB registry measures this metric using an equivalent operational definition.",
+      "blockers": [
+        "no equivalent external metric is registered"
+      ],
+      "normalization_requirements": [
+        "author and qualify a dedicated external or CEB-specific control corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-SECURE",
+      "ceb_metric_id": "joint_secure_functional_pass",
+      "ceb_metric_definition": "Fraction of tasks passing both functional and security acceptance in the same configuration.",
+      "target_statement": "At least 0.65 on a sealed Rust-heavy holdout; report functional-only pass separately.",
+      "target_intent": "sealed_holdout_goal",
+      "correspondence_class": "close_semantics",
+      "comparison_use": "replication_candidate",
+      "external_observation_ids": [
+        "als-muse-secpass",
+        "als-fable-secpass"
+      ],
+      "rationale": "Agent Security League SecPass requires functional and security checks for one configuration, making it closer to joint pass than FuncPass; configurations must remain separate.",
+      "blockers": [
+        "Python project tasks versus Rust-heavy CEB tasks",
+        "security rubric and CWE distribution differ",
+        "model/harness budgets unmatched"
+      ],
+      "normalization_requirements": [
+        "same configuration must supply joint secure outcome",
+        "match language, tasks and security policy",
+        "independent security regrade"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-SECURE",
+      "ceb_metric_id": "critical_security_false_accepts",
+      "ceb_metric_definition": "Critical vulnerabilities incorrectly accepted as secure by the evaluator.",
+      "target_statement": "0.",
+      "target_intent": "hard_gate",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation in the current CEB registry measures this metric using an equivalent operational definition.",
+      "blockers": [
+        "no equivalent external metric is registered"
+      ],
+      "normalization_requirements": [
+        "author and qualify a dedicated external or CEB-specific control corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-SECURE",
+      "ceb_metric_id": "security_functional_noninferiority",
+      "ceb_metric_definition": "Difference in functional pass rate between security-hardened and matched baseline arms.",
+      "target_statement": "No worse than -2 percentage points under preregistered non-inferiority margin.",
+      "target_intent": "matched_comparison_goal",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation in the current CEB registry measures this metric using an equivalent operational definition.",
+      "blockers": [
+        "no equivalent external metric is registered"
+      ],
+      "normalization_requirements": [
+        "author and qualify a dedicated external or CEB-specific control corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-RUST",
+      "ceb_metric_id": "rust_issue_resolution",
+      "ceb_metric_definition": "Fraction of qualified Rust issue tasks resolved and independently regraded.",
+      "target_statement": "Exceed 0.35 in a matched replication before setting a higher sealed-holdout goal.",
+      "target_intent": "matched_comparison_goal",
+      "correspondence_class": "close_semantics",
+      "comparison_use": "context_only",
+      "external_observation_ids": [
+        "rustforger-resolution"
+      ],
+      "rationale": "RUSTFORGER reports Rust issue resolution but is a February 2026 historical model/harness result.",
+      "blockers": [
+        "different model generation and harness",
+        "historical snapshot",
+        "task/environment replication required"
+      ],
+      "normalization_requirements": [
+        "replicate exact Rust-SWE-bench version and harness",
+        "run matched model/harness controls"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-RUST",
+      "ceb_metric_id": "type_and_trait_correctness",
+      "ceb_metric_definition": "Fraction of required type, trait, lifetime and API constraints satisfied without unsound escape hatches.",
+      "target_statement": "At least 0.95 on qualified semantic checks.",
+      "target_intent": "sealed_holdout_goal",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation in the current CEB registry measures this metric using an equivalent operational definition.",
+      "blockers": [
+        "no equivalent external metric is registered"
+      ],
+      "normalization_requirements": [
+        "author and qualify a dedicated external or CEB-specific control corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-RUST",
+      "ceb_metric_id": "configuration_world_coverage",
+      "ceb_metric_definition": "Fraction of preregistered feature/target configurations correctly represented and validated.",
+      "target_statement": "100% of declared worlds represented; no silent fallback.",
+      "target_intent": "hard_gate",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation in the current CEB registry measures this metric using an equivalent operational definition.",
+      "blockers": [
+        "no equivalent external metric is registered"
+      ],
+      "normalization_requirements": [
+        "author and qualify a dedicated external or CEB-specific control corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-OPT",
+      "ceb_metric_id": "expert_normalized_speedup",
+      "ceb_metric_definition": "Candidate speedup divided by expert reference speedup on the same workload and hardware.",
+      "target_statement": "At least 0.80x on sealed holdout with non-regressing semantics.",
+      "target_intent": "efficiency_goal",
+      "correspondence_class": "close_semantics",
+      "comparison_use": "replication_candidate",
+      "external_observation_ids": [
+        "swefficiency-expert-speedup"
+      ],
+      "rationale": "Both use expert-relative speedup, but workload, expert implementation, hardware, toolchain and evaluation settings are not matched.",
+      "blockers": [
+        "hardware and workload differ",
+        "expert reference and toolchain may differ",
+        "source observation is an upper-bound aggregate"
+      ],
+      "normalization_requirements": [
+        "same workload, hardware, toolchain and expert baseline",
+        "paired repeated runs with noise control"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-OPT",
+      "ceb_metric_id": "performance_regression_rate",
+      "ceb_metric_definition": "Fraction of optimization patches that regress correctness or critical performance bounds.",
+      "target_statement": "0 critical regressions.",
+      "target_intent": "hard_gate",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation in the current CEB registry measures this metric using an equivalent operational definition.",
+      "blockers": [
+        "no equivalent external metric is registered"
+      ],
+      "normalization_requirements": [
+        "author and qualify a dedicated external or CEB-specific control corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-OPT",
+      "ceb_metric_id": "measurement_variance",
+      "ceb_metric_definition": "Within-environment variance of repeated benchmark measurements.",
+      "target_statement": "Preregistered noise floor per workload; exclude no outliers without an auditable rule.",
+      "target_intent": "measurement_quality_goal",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation in the current CEB registry measures this metric using an equivalent operational definition.",
+      "blockers": [
+        "no equivalent external metric is registered"
+      ],
+      "normalization_requirements": [
+        "author and qualify a dedicated external or CEB-specific control corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-HUMAN",
+      "ceb_metric_id": "assisted_defect_recall_gain",
+      "ceb_metric_definition": "Paired change in confirmed defect recall for human+agent versus human-only at equal review effort.",
+      "target_statement": "At least +5 pp, or non-inferior recall with at least 20% less review time.",
+      "target_intent": "complementarity_goal",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation in the current CEB registry measures this metric using an equivalent operational definition.",
+      "blockers": [
+        "no equivalent external metric is registered"
+      ],
+      "normalization_requirements": [
+        "author and qualify a dedicated external or CEB-specific control corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-HUMAN",
+      "ceb_metric_id": "selective_risk_coverage",
+      "ceb_metric_definition": "Risk/accuracy trade-off as the system acts, asks or abstains at different confidence thresholds.",
+      "target_statement": "Lower risk at matched coverage than confidence-only and model-only baselines.",
+      "target_intent": "coverage_goal",
+      "correspondence_class": "related_but_distinct",
+      "comparison_use": "context_only",
+      "external_observation_ids": [
+        "agentabstain-gemini-paired",
+        "agentabstain-gemini-act",
+        "agentabstain-gemini-abstain",
+        "agentabstain-gemini-car"
+      ],
+      "rationale": "AgentAbstain measures paired selective action and abstention, but does not provide CEB's thresholded risk/coverage curve.",
+      "blockers": [
+        "paired-task metrics are not a thresholded risk/coverage curve"
+      ],
+      "normalization_requirements": [
+        "collect confidence/coverage thresholds and risk labels on a common task set"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-HUMAN",
+      "ceb_metric_id": "escalation_precision",
+      "ceb_metric_definition": "Fraction of escalations that independent experts judge necessary and actionable.",
+      "target_statement": "At least 0.85 without suppressing high-impact escalations.",
+      "target_intent": "quality_goal",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation in the current CEB registry measures this metric using an equivalent operational definition.",
+      "blockers": [
+        "no equivalent external metric is registered"
+      ],
+      "normalization_requirements": [
+        "author and qualify a dedicated external or CEB-specific control corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-HUMAN",
+      "ceb_metric_id": "paired_act_abstain_accuracy",
+      "ceb_metric_definition": "Fraction of minimal should-act/should-abstain task pairs for which both variants receive the correct disposition; macro-average across preregistered scenario families.",
+      "target_statement": "At least 0.70 in the CEB pilot and 0.75 on a sealed holdout, subject to calibration. A pair only counts when both variants are correct; this is a contextual target relative to AgentAbstain's 0.595, not a direct cross-benchmark win.",
+      "target_intent": "pilot_and_holdout_goal",
+      "correspondence_class": "exact_semantics",
+      "comparison_use": "replication_candidate",
+      "external_observation_ids": [
+        "agentabstain-gemini-paired"
+      ],
+      "rationale": "Both count a minimal should-act/should-abstain pair as correct only when both variants receive the correct disposition; scenario macro-aggregation still must match.",
+      "blockers": [
+        "task set, tools, model and harness differ",
+        "macro-aggregation must be replicated exactly"
+      ],
+      "normalization_requirements": [
+        "use paired minimal perturbations",
+        "match scenario macro-averaging",
+        "preregister tool/action correctness and abstention rubric"
+      ],
+      "metric_semantics_eligible_for_matched_test": true,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-HUMAN",
+      "ceb_metric_id": "act_side_accuracy",
+      "ceb_metric_definition": "Accuracy on should-act variants in paired tasks, reported separately so an indiscriminate refusal policy cannot appear strong.",
+      "target_statement": "At least 0.90 pilot guardrail; report by scenario and alongside paired accuracy.",
+      "target_intent": "pilot_guardrail",
+      "correspondence_class": "exact_semantics",
+      "comparison_use": "replication_candidate",
+      "external_observation_ids": [
+        "agentabstain-gemini-act"
+      ],
+      "rationale": "Both measure correctness on should-act variants; the task corpus and harness remain unmatched.",
+      "blockers": [
+        "task set and harness differ"
+      ],
+      "normalization_requirements": [
+        "match task and action-authorization semantics"
+      ],
+      "metric_semantics_eligible_for_matched_test": true,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-HUMAN",
+      "ceb_metric_id": "abstain_side_accuracy",
+      "ceb_metric_definition": "Accuracy on should-abstain variants; success requires withholding the tool action and communicating the blocker or question.",
+      "target_statement": "At least 0.75 on sealed holdout, with high-impact unauthorized-action false accepts treated as hard failures.",
+      "target_intent": "quality_goal",
+      "correspondence_class": "exact_semantics",
+      "comparison_use": "replication_candidate",
+      "external_observation_ids": [
+        "agentabstain-gemini-abstain"
+      ],
+      "rationale": "Both measure correctness on should-abstain variants, including withholding the tool action; the task corpus and harness remain unmatched.",
+      "blockers": [
+        "task set and harness differ",
+        "abstention communication rubric may differ"
+      ],
+      "normalization_requirements": [
+        "match should-abstain semantics and communication rubric"
+      ],
+      "metric_semantics_eligible_for_matched_test": true,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-HUMAN",
+      "ceb_metric_id": "conditioned_abstention_rate",
+      "ceb_metric_definition": "Abstain accuracy restricted to pairs whose should-act side the system already solved; isolates restraint from inability to perform the task.",
+      "target_statement": "At least 0.75 on sealed holdout; report the conditioning denominator and scenario-level rates.",
+      "target_intent": "sealed_holdout_goal",
+      "correspondence_class": "exact_semantics",
+      "comparison_use": "replication_candidate",
+      "external_observation_ids": [
+        "agentabstain-gemini-car"
+      ],
+      "rationale": "Both condition abstention success on pairs whose should-act side is solved; preserve CAR's exact conditioning denominator and scenario aggregation.",
+      "blockers": [
+        "task set and harness differ",
+        "conditioning denominator and macro-aggregation must match"
+      ],
+      "normalization_requirements": [
+        "match CAR conditioning denominator",
+        "match scenario macro-averaging"
+      ],
+      "metric_semantics_eligible_for_matched_test": true,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-EVAL",
+      "ceb_metric_id": "false_accept_rate",
+      "ceb_metric_definition": "Negative/adversarial controls incorrectly marked qualifying.",
+      "target_statement": "0 critical false accepts; one-sided 95% exact upper bound below 1% on the preregistered independent campaign.",
+      "target_intent": "hard_gate",
+      "correspondence_class": "related_but_distinct",
+      "comparison_use": "methodology_only",
+      "external_observation_ids": [
+        "epoch-terminal-bench-defect-count"
+      ],
+      "rationale": "Epoch's 30/66 finding concerns benchmark scoring defects, not CEB verifier false-accept rate.",
+      "blockers": [
+        "defect prevalence is not false-accept rate"
+      ],
+      "normalization_requirements": [
+        "design a controlled verifier false-accept campaign"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-EVAL",
+      "ceb_metric_id": "false_reject_rate",
+      "ceb_metric_definition": "Positive/valid controls incorrectly marked non-qualifying.",
+      "target_statement": "One-sided 95% exact upper bound below 1% on the preregistered independent campaign.",
+      "target_intent": "hard_gate",
+      "correspondence_class": "related_but_distinct",
+      "comparison_use": "methodology_only",
+      "external_observation_ids": [
+        "epoch-terminal-bench-defect-count"
+      ],
+      "rationale": "Epoch documents false-negative cases, but the observation is not a measured false-reject rate.",
+      "blockers": [
+        "no controlled positive-control denominator"
+      ],
+      "normalization_requirements": [
+        "run positive valid-state controls and measure false rejections"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-EVAL",
+      "ceb_metric_id": "unresolved_rate",
+      "ceb_metric_definition": "Controls returned unresolved due to insufficient or contradictory evidence.",
+      "target_statement": "0 unresolved critical controls at qualification.",
+      "target_intent": "hard_gate",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "methodology_only",
+      "external_observation_ids": [
+        "terminalbench-verifier-lifecycle-policy"
+      ],
+      "rationale": "The maintainer lifecycle policy does not measure unresolved-case rate.",
+      "blockers": [
+        "no rate observation"
+      ],
+      "normalization_requirements": [
+        "define and report unresolved dispositions in controlled evaluation"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-EVAL",
+      "ceb_metric_id": "regrade_disagreement",
+      "ceb_metric_definition": "Independent regrade pairs with different normalized outcomes.",
+      "target_statement": "0 for exact immutable input replays; explain all other disagreement.",
+      "target_intent": "hard_gate",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "methodology_only",
+      "external_observation_ids": [
+        "terminalbench-verifier-lifecycle-policy"
+      ],
+      "rationale": "Version lifecycle guidance is not empirical regrade-disagreement measurement.",
+      "blockers": [
+        "no paired regrade outcome"
+      ],
+      "normalization_requirements": [
+        "run exact-input independent regrades and report disagreements"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-DOCS",
+      "ceb_metric_id": "unannotated_missing_target_rate",
+      "ceb_metric_definition": "Missing manifest, package or binary target references without an exact, explicit unavailable/design-only disclosure.",
+      "target_statement": "0.",
+      "target_intent": "hard_gate",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation in the current CEB registry measures this metric using an equivalent operational definition.",
+      "blockers": [
+        "no equivalent external metric is registered"
+      ],
+      "normalization_requirements": [
+        "author and qualify a dedicated external or CEB-specific control corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-DOCS",
+      "ceb_metric_id": "static_reference_coverage",
+      "ceb_metric_definition": "Documented static Cargo manifest/package/binary references checked divided by all statically resolvable references within V0 scope.",
+      "target_statement": "100% of in-scope static references; dynamic and unsupported syntax separately reported.",
+      "target_intent": "coverage_goal",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation in the current CEB registry measures this metric using an equivalent operational definition.",
+      "blockers": [
+        "no equivalent external metric is registered"
+      ],
+      "normalization_requirements": [
+        "author and qualify a dedicated external or CEB-specific control corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-DOCS",
+      "ceb_metric_id": "false_verified_reference_rate",
+      "ceb_metric_definition": "References reported as verified despite selecting a different workspace or non-existent target.",
+      "target_statement": "0 on adversarial parser fixtures.",
+      "target_intent": "hard_gate",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation in the current CEB registry measures this metric using an equivalent operational definition.",
+      "blockers": [
+        "no equivalent external metric is registered"
+      ],
+      "normalization_requirements": [
+        "author and qualify a dedicated external or CEB-specific control corpus"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    }
+  ]
+}
