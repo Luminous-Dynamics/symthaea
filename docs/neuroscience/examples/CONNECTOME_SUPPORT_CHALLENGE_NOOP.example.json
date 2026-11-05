@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "analysis_id": "synthetic-robust-query-disambiguation-v1",
+  "dataset_revision_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "query_id": "directed-circuit-decision-is-supported",
+  "query_spec_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "scenario_set_sha256": "e00a946ef8caeb2180fde69297e9705bc392f043bd85b35f7742b3a1e629be92",
+  "baseline_action_set_sha256": "523fbba88ddc92808525546072a8ea320496c6f655d3e39b7a3006b44d71d753",
+  "challenger_protocol_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+  "records": []
+}
