@@ -2,6 +2,7 @@ name: Connectome query-critical discovery Rust audit
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - "tools/connectomics-intake-audit/src/bin/connectome_query_critical_discovery_audit.rs"
       - "tools/connectomics-intake-audit/reference/verify_query_critical_discovery_oracle.py"
