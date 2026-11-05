@@ -900,7 +900,8 @@
         "Credit Cover Increase Notice deadline and timezone",
         "planned collateral deposit and early invoice payment cash requirements",
         "explicit IANA timezone for local event minute interpretation",
-        "unique source receipt references for each cash event"
+        "unique source receipt references for each cash event",
+        "unique event source references to prevent duplicated cash movements"
       ],
       "stress_tags": [
         "liquidity-waterfall",
@@ -916,7 +917,7 @@
       "case_id": "FORECAST-VINTAGE-ASOF-001",
       "track": "forecast_and_decision_replay",
       "title": "Leakage-free as-of forecast vintage reconstruction",
-      "scenario": "For each price/forecast target period and model identity, reconstruct only the forecast vintages and realized observations that were available to the decision workflow at the frozen decision timestamp. Select the latest eligible forecast by issue time, let a realized observation supersede only after the target interval ended and the observation became available, exclude future-known records, report missing coverage, and reject ambiguous latest vintages. Forecast issue time, target valid time and source available-at time are separate. A target without a model identity must not silently choose among different forecasting engines; the caller must explicitly scope the target by model.",
+      "scenario": "For each price/forecast target period and model identity, reconstruct only the forecast vintages and realized observations that were available to the decision workflow at the frozen decision timestamp. Select the latest eligible forecast by issue time, let a realized observation supersede only after the target interval ended and the observation became available, exclude future-known records, report missing coverage, and reject ambiguous latest vintages. Forecast issue time, target valid time and source available-at time are separate. A target without a model identity must not silently choose among different forecasting engines; the caller must explicitly scope the target by model. Source availability is distinct from issue time: a forecast issued before decision time but published after the decision is excluded. A known realized observation is model-independent, so it may supersede competing forecast engines without requiring a model identity.",
       "owner": "Symthaea",
       "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
@@ -945,7 +946,10 @@
         "sealed project/time holdout membership and decision-time evidence frontier",
         "separate source availability timestamp even when forecast issue time is earlier",
         "model identity and digest for each competing forecast engine",
-        "known realized observation takes precedence only after target interval end and source availability"
+        "known realized observation takes precedence only after target interval end and source availability",
+        "separate source available-at timestamp distinct from issue time",
+        "forecast model identity and digest for every forecast-engine vintage",
+        "realized observation interval end, observed-at and available-at timestamps"
       ],
       "stress_tags": [
         "forecast-vintage",
