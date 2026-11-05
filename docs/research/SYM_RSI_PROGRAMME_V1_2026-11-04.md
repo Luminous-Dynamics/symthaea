@@ -482,24 +482,30 @@ A new failure mode remains even after receipt verification, exact task accountin
 
 Sun et al., *Which Self-Improvements Should We Trust? Reliable Self-Improvement When Agents Reuse Their Benchmarks*, arXiv:2609.33180 (2026-09-27), formalizes this as adaptive overfitting. REUSE allocates a global error budget over round t and prior promotion count p, and requires the proposer to receive only the promotion decision. It reports zero false promotions in its Covertype experiments versus 75 / 71 for empirical best-of-K at evaluation pool sizes 2,000 / 10,000, while retaining comparable final population performance. These are author-reported results for one tabular binary-classification setting, with 30 seeds, 200 rounds and up to eight proposals per round; they are not proof that the exact procedure transfers to coding, scientific research, multi-metric capability retention or every benchmark distribution.
 
-### New Rust allocation and decision-only gate
+### New Rust allocation and round-level decision kernel
 
-The branch adds `reuse_error_budget.rs` with `allocate_reuse_error_budget` and `reuse_sign_test_decision`. It implements the per-round/per-promotion allocation
+The branch adds \`reuse_error_budget.rs\` with \`allocate_reuse_error_budget\` and \`evaluate_reuse_round\`. It implements the per-round/per-promotion allocation
 
-[
+\[
 \delta_{t,p} =
 \frac{\alpha w_t v_p}
 {\binom{t-1}{p} K^{p+1}},
 \qquad
 w_t=\frac{1}{t(t+1)},\quad
 v_p=\frac{1}{(p+1)(p+2)}.
-]
+\]
 
-It computes the binomial term and candidate factor in log space, then splits the allocation into a paired-test budget `rho * delta` and a cumulative lower-bound budget `(1-rho) * delta`. It rejects invalid parameters, impossible promotion histories, histories beyond the reviewed maximum, and binary64 underflow; zero is never silently treated as a valid error allowance. The exact one-sided paired sign test is shared in `paired_sign_test.rs` and reused by both `paired_evaluation.rs` and the REUSE gate; the new `reuse_sign_test_decision` returns only `Promote` or `Reject` and never returns a p-value. It treats an all-tie comparison as p=1 / reject and uses an inclusive comparison at the allocated threshold. Ten REUSE allocation/decision tests plus two direct exact-sign-test fixtures are authored (12 focused tests total), covering hand-calculated allocations, monotonicity, invalid histories, history bounds, underflow, small binomial coefficients, decision thresholds, all-tie rejection and count overflow.
+It computes the binomial term and candidate factor in log space, then splits the allocation into a paired-test budget \`rho * delta\` and a cumulative lower-bound budget \`(1-rho) * delta\`. It rejects invalid parameters, impossible promotion histories, histories beyond the reviewed maximum, and binary64 underflow; zero is never silently treated as a valid error allowance.
 
-The branch also adds `tools/sym-rsi-reuse-gate`, a nested standalone Cargo workspace that compiles the same production source files by path. It avoids the unrelated root-workspace member-resolution failure on this feature stack; it validates only these two statistical modules, not the full root crate integration.
+The exact one-sided paired sign test is shared in \`paired_sign_test.rs\` and reused by both \`paired_evaluation.rs\` and the REUSE selector. The round-level \`evaluate_reuse_round\` requires exactly K candidate summaries, checks each candidate against the shared sign test at \`rho * delta[t,p]\`, and selects the highest preregistered empirical paired improvement among all candidates that pass. Stable proposal order breaks exact ties. Its outward result is the paper's single \`y_t \in {0,\ldots,K}\`: \`RejectAll\` represents 0, while \`PromoteCandidate { candidate_number }\` is one-based in \`1..=K\`. It does not expose individual pass/fail results, p-values or candidate scores to the proposer.
 
-This remains a **decision-kernel primitive**, not a qualified REUSE service. It does **not** persist or authenticate promotion history, enforce decision-only access, compute the cumulative lower confidence bound, prove the simultaneous guarantee, protect a holdout, or authorize promotion. The REUSE paper requires the paired sign test to consume `rho * delta` and a separate confidence-bound certificate at `(1-rho) * delta`; only the decision is returned to the proposer. The exact cumulative certificate is deliberately deferred until its Clopper–Pearson/Bernstein implementation is independently reviewed and tested.
+The caller must supply independent paired-unit wins/losses. If task rows are clustered by repository, project, task family or run, they must first be aggregated to the preregistered independent cluster unit; case-level sign-test counts would be pseudo-replication. The empirical improvement used to select among passing candidates must cover the full eligible evaluation population under the frozen scoring rule, including ties and missingness as specified in the protocol.
+
+Twelve REUSE allocation/round-selection tests plus two direct exact-sign-test fixtures are authored (14 focused tests total): hand-calculated allocations, monotonicity, invalid histories and parameters, history bound, underflow, small binomial coefficients, selection among passing candidates, all-tie/all-fail behavior, deterministic ties, candidate-count mismatch, invalid empirical gains and count overflow.
+
+The branch also adds \`tools/sym-rsi-reuse-gate\`, a nested standalone Cargo workspace that compiles the same production source files by path. It avoids the unrelated root-workspace member-resolution failure on this feature stack; it validates only these two statistical modules, not the full root crate integration.
+
+This remains a **decision-kernel primitive**, not a qualified REUSE service. It does **not** persist or authenticate promotion history, enforce decision-only access, compute the cumulative lower confidence bound, prove the simultaneous guarantee, protect a holdout, or authorize promotion. The REUSE paper also requires a separate cumulative confidence-bound certificate at \`(1-rho) * delta\`; only after that bound is verified may the independent service return the single round decision. The cumulative certificate is deliberately deferred until its Clopper–Pearson/Bernstein derivation and code are independently reviewed and tested.
 
 ### Required external evaluation boundary
 
