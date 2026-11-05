@@ -30,6 +30,8 @@
 
 pub mod absorbing;
 pub mod chain;
+pub mod distribution;
 
 pub use absorbing::{Absorbing, absorption_probabilities, classify, expected_steps_to_absorption};
-pub use chain::MarkovChain;
+pub use chain::{MarkovChain, MarkovError, DEFAULT_PROBABILITY_TOLERANCE};
+pub use distribution::{DistributionError, FiniteDistribution};
