@@ -306,6 +306,11 @@ jobs:
       - name: Build symthaea-music-theory examples (the examples blind spot)
         run: cargo build -p symthaea-music-theory --examples
 
+      # This example has unit tests for its fixed-seed, one-factor control grid.
+      # Building examples alone would compile it without executing those guards.
+      - name: Test routed style-control response curve protocol
+        run: cargo test -p symthaea-music-theory --example style_control_response_curves
+
       # The check that would have caught the orphaned Research views: this crate
       # only ever builds for wasm32, so a native-only job cannot cover it.
       - name: Compile-check the wasm UI
