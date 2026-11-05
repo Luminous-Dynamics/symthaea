@@ -62,6 +62,7 @@ The raw source digest is intentionally null and the source freeze state is not_f
 - [Comparator run-manifest schema](sawem-bess-comparator-manifest-v1.schema.json)
 - [Synthetic comparator roster](sawem-bess-comparator-manifest-v1.synthetic.json)
 - [Matched-engine benchmark protocol](COMPARATOR_PROTOCOL_V1.md)
+- [Reserve economics and collateral liquidity crosswalk](RESERVE_ECONOMICS_AND_COLLATERAL_V1.md)
 - [Machine-readable 30-case benchmark corpus](sawem-bess-benchmark-corpus-v1.json)
 - [Benchmark corpus JSON Schema](sawem-bess-benchmark-corpus-v1.schema.json)
 
