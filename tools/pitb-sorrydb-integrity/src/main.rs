@@ -622,6 +622,104 @@ fn status_counts<I: IntoIterator<Item = String>>(values: I) -> BTreeMap<String, 
     out
 }
 
+fn audit_snapshot(
+    database_bytes: &[u8],
+    split_bytes: &[u8],
+    provenance_bytes: &[u8],
+) -> Result<SnapshotAuditReport, String> {
+    let database: Database = parse_json(database_bytes, "full SorryDB database")?;
+    let split: Database = parse_json(split_bytes, "SorryDB evaluation split")?;
+    let provenance: Provenance = parse_json(provenance_bytes, "SorryDB provenance")?;
+    validate_provenance(&provenance, database_bytes, split_bytes, &database, &split)?;
+
+    let mut full_by_id = BTreeMap::<String, &SorryRecord>::new();
+    let mut full_goals = BTreeSet::<String>::new();
+    let mut full_repositories = BTreeSet::<String>::new();
+    let mut full_pairs = BTreeSet::<(String, String)>::new();
+    let mut full_zero_columns = 0usize;
+    for (index, record) in database.sorries.iter().enumerate() {
+        validate_record(record, &format!("database.sorries[{index}]"))?;
+        if full_by_id.insert(record.id.clone(), record).is_some() {
+            return Err(format!("duplicate task ID {} in full SorryDB database", record.id));
+        }
+        if !full_goals.insert(record.debug_info.goal.clone()) {
+            return Err("full SorryDB snapshot violates its documented unique-goal deduplication rule".into());
+        }
+        full_repositories.insert(record.repo.remote.clone());
+        full_pairs.insert((record.repo.remote.clone(), record.repo.commit.clone()));
+        if record.location.start_column == 0 {
+            full_zero_columns += 1;
+        }
+    }
+
+    let mut split_ids = BTreeSet::<String>::new();
+    let mut split_repositories = BTreeSet::<String>::new();
+    let mut split_pairs = BTreeSet::<(String, String)>::new();
+    let mut split_files = BTreeSet::<(String, String)>::new();
+    let mut split_versions = BTreeSet::<String>::new();
+    let mut tasks_per_repo = BTreeMap::<String, usize>::new();
+    let mut tasks_per_file = BTreeMap::<(String, String), usize>::new();
+    let mut split_zero_columns = 0usize;
+    for (index, record) in split.sorries.iter().enumerate() {
+        validate_record(record, &format!("evaluation_split.sorries[{index}]"))?;
+        if !split_ids.insert(record.id.clone()) {
+            return Err(format!("duplicate task ID {} in evaluation split", record.id));
+        }
+        let original = full_by_id.get(&record.id)
+            .ok_or_else(|| format!("evaluation task {} is absent from the full snapshot", record.id))?;
+        if **original != *record {
+            return Err(format!("evaluation task {} differs from its full-snapshot record", record.id));
+        }
+        split_repositories.insert(record.repo.remote.clone());
+        split_pairs.insert((record.repo.remote.clone(), record.repo.commit.clone()));
+        split_files.insert((record.repo.remote.clone(), record.location.path.clone()));
+        split_versions.insert(record.repo.lean_version.clone());
+        *tasks_per_repo.entry(record.repo.remote.clone()).or_default() += 1;
+        *tasks_per_file.entry((record.repo.remote.clone(), record.location.path.clone())).or_default() += 1;
+        if record.location.start_column == 0 {
+            split_zero_columns += 1;
+        }
+    }
+
+    let project_overlap = full_repositories.intersection(&split_repositories).count();
+    let max_repo = tasks_per_repo.values().copied().max().unwrap_or(0);
+    let max_file = tasks_per_file.values().copied().max().unwrap_or(0);
+    Ok(SnapshotAuditReport {
+        schema_version: SNAPSHOT_REPORT_SCHEMA.into(),
+        snapshot_id: provenance.snapshot_id,
+        upstream_repository: provenance.upstream_repository,
+        upstream_repository_commit: provenance.upstream_repository_commit,
+        database_git_blob_sha1: provenance.database_git_blob_sha1,
+        evaluation_split_git_blob_sha1: provenance.evaluation_split_git_blob_sha1,
+        database_raw_sha256: sha256(database_bytes),
+        evaluation_split_raw_sha256: sha256(split_bytes),
+        documented_database_task_count: provenance.documented_database_task_count,
+        database_task_count: database.sorries.len(),
+        evaluation_task_count: split.sorries.len(),
+        full_unique_task_ids: full_by_id.len(),
+        full_unique_goal_strings: full_goals.len(),
+        full_unique_repositories: full_repositories.len(),
+        full_unique_repository_commit_pairs: full_pairs.len(),
+        evaluation_unique_repositories: split_repositories.len(),
+        evaluation_unique_repository_commit_pairs: split_pairs.len(),
+        evaluation_repository_file_clusters: split_files.len(),
+        evaluation_repository_overlap_count: project_overlap,
+        project_disjoint_evaluation_split: project_overlap == 0,
+        max_tasks_per_evaluation_repository: max_repo,
+        max_tasks_per_evaluation_repository_file: max_file,
+        evaluation_unique_lean_versions: split_versions.len(),
+        full_zero_based_start_column_count: full_zero_columns,
+        evaluation_zero_based_start_column_count: split_zero_columns,
+        full_task_ids_recomputed: full_by_id.len(),
+        evaluation_task_ids_recomputed: split_ids.len(),
+        evaluation_ids_subset_of_full: true,
+        evaluation_records_identical_to_full: true,
+        license: provenance.license,
+        scheduler_admission: false,
+        interpretation_boundary: "This report audits the frozen dataset bytes, source coordinates, repository commits, goal-derived task IDs and evaluation-split membership. It does not clone/build the 78 source projects, reproduce Lean goals, prove translation fidelity, or report any theorem-proving pass rate. Every task still requires a separate clean-checkout reproduction and semantic-assurance receipt.".into(),
+    })
+}
+
 fn verify(
     database_bytes: &[u8],
     split_bytes: &[u8],
