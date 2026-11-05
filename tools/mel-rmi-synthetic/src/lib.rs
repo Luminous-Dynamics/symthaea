@@ -1569,6 +1569,12 @@ pub trait ControlledPartner {
     /// Stable policy identifier.
     fn policy_id(&self) -> &str;
 
+    /// Create a fresh partner instance restored from the same frozen
+    /// pre-intervention checkpoint. Every counterfactual arm receives the same
+    /// common-random-number seed and must not inherit mutable state from a
+    /// previous arm.
+    fn fork_from_frozen_state(&self, common_random_seed: u64) -> Box<dyn ControlledPartner>;
+
     /// Produce the partner's next feature from the fixed prior state and
     /// current agent action.
     fn respond(
@@ -1591,6 +1597,13 @@ pub struct FixedPartnerPolicy {
 impl ControlledPartner for FixedPartnerPolicy {
     fn policy_id(&self) -> &str {
         &self.id
+    }
+
+    fn fork_from_frozen_state(&self, _common_random_seed: u64) -> Box<dyn ControlledPartner> {
+        Box::new(Self {
+            id: self.id.clone(),
+            value: self.value,
+        })
     }
 
     fn respond(
@@ -1619,6 +1632,10 @@ pub struct ResponsivePartnerPolicy {
 impl ControlledPartner for ResponsivePartnerPolicy {
     fn policy_id(&self) -> &str {
         &self.id
+    }
+
+    fn fork_from_frozen_state(&self, _common_random_seed: u64) -> Box<dyn ControlledPartner> {
+        Box::new(Self { id: self.id.clone() })
     }
 
     fn respond(
@@ -1668,13 +1685,21 @@ pub fn measure_partner_influence(
     {
         return Err(HarnessError::InvalidPolicy);
     }
-    let control_next = partner.respond(
+    let control_partner = partner.fork_from_frozen_state(0);
+    let treated_partner = partner.fork_from_frozen_state(0);
+    if partner.policy_id().trim().is_empty()
+        || control_partner.policy_id() != partner.policy_id()
+        || treated_partner.policy_id() != partner.policy_id()
+    {
+        return Err(HarnessError::InvalidPolicy);
+    }
+    let control_next = control_partner.respond(
         prior_partner_feature,
         control_agent_action,
         task.target_dimension,
         task.expected_response,
     )?;
-    let treated_next = partner.respond(
+    let treated_next = treated_partner.respond(
         prior_partner_feature,
         treated_agent_action,
         task.target_dimension,
@@ -1735,20 +1760,39 @@ pub fn measure_partner_contrast(
         return Err(HarnessError::InvalidPolicy);
     }
 
-    let mut next = Vec::with_capacity(4);
-    for action in actions {
-        let result = partner.respond(
+    if partner.policy_id().trim().is_empty() {
+        return Err(HarnessError::InvalidPolicy);
+    }
+    let common_random_seed = interventions.control.seed;
+    let mut next_by_condition: [Option<Feature>; 4] = std::array::from_fn(|_| None);
+    for condition in interventions.condition_order {
+        let index = match condition {
+            Condition::Control => 0,
+            Condition::Targeted => 1,
+            Condition::Sham => 2,
+            Condition::Unrelated => 3,
+        };
+        let isolated_partner = partner.fork_from_frozen_state(common_random_seed);
+        if isolated_partner.policy_id() != partner.policy_id() {
+            return Err(HarnessError::InvalidPolicy);
+        }
+        let result = isolated_partner.respond(
             prior_partner_feature,
-            action,
+            &actions[index],
             task.target_dimension,
             task.expected_response,
         )?;
         if result.dimension != task.target_dimension {
             return Err(HarnessError::InvalidPolicy);
         }
-        next.push(result);
+        next_by_condition[index] = Some(result);
     }
-    let next: [Feature; 4] = next.try_into().map_err(|_| HarnessError::InvalidPolicy)?;
+    let next: [Feature; 4] = next_by_condition
+        .into_iter()
+        .collect::<Option<Vec<_>>>()
+        .ok_or(HarnessError::InvalidPolicy)?
+        .try_into()
+        .map_err(|_| HarnessError::InvalidPolicy)?;
     let rule = task.expected_response;
     let targeted_delta = rule.distance(next[0].value, next[1].value)?;
     let sham_delta = rule.distance(next[0].value, next[2].value)?;
@@ -3715,6 +3759,10 @@ mod tests {
             "wrong-dimension"
         }
 
+        fn fork_from_frozen_state(&self, _common_random_seed: u64) -> Box<dyn ControlledPartner> {
+            Box::new(Self)
+        }
+
         fn respond(
             &self,
             _prior_partner_feature: Feature,
@@ -3754,6 +3802,110 @@ mod tests {
                 &task
             ),
             Err(HarnessError::InvalidPolicy)
+        );
+    }
+
+    struct StatefulForkPartner {
+        seed: u64,
+        local_calls: std::sync::Arc<std::sync::Mutex<usize>>,
+        fork_seeds: std::sync::Arc<std::sync::Mutex<Vec<u64>>>,
+        calls: std::sync::Arc<std::sync::Mutex<Vec<(u64, usize, String)>>>,
+    }
+
+    impl StatefulForkPartner {
+        fn new() -> Self {
+            Self {
+                seed: 0,
+                local_calls: std::sync::Arc::new(std::sync::Mutex::new(0)),
+                fork_seeds: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
+                calls: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
+            }
+        }
+    }
+
+    impl ControlledPartner for StatefulForkPartner {
+        fn policy_id(&self) -> &str {
+            "stateful-fork-partner"
+        }
+
+        fn fork_from_frozen_state(&self, common_random_seed: u64) -> Box<dyn ControlledPartner> {
+            self.fork_seeds.lock().unwrap().push(common_random_seed);
+            Box::new(Self {
+                seed: common_random_seed,
+                local_calls: std::sync::Arc::new(std::sync::Mutex::new(0)),
+                fork_seeds: self.fork_seeds.clone(),
+                calls: self.calls.clone(),
+            })
+        }
+
+        fn respond(
+            &self,
+            _prior_partner_feature: Feature,
+            agent_action: &AgentAction,
+            target_dimension: Dimension,
+            rule: ResponseRule,
+        ) -> Result<Feature, HarnessError> {
+            let mut local_calls = self.local_calls.lock().unwrap();
+            *local_calls += 1;
+            let ordinal = *local_calls;
+            self.calls.lock().unwrap().push((
+                self.seed,
+                ordinal,
+                agent_action.source_event_id.clone(),
+            ));
+            Ok(Feature {
+                dimension: target_dimension,
+                value: rule.apply(agent_action.feature.value)?,
+            })
+        }
+    }
+
+    #[test]
+    fn partner_conditions_use_independent_frozen_forks_in_recorded_order() {
+        let (task, interventions) = fixture();
+        let agent = run_trial(
+            task.clone(),
+            interventions.clone(),
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
+            config(),
+        )
+        .unwrap();
+        let partner = StatefulForkPartner::new();
+        let contrast = measure_partner_contrast(
+            &partner,
+            interventions.control.initial_partner_feature,
+            &agent.actions,
+            &task,
+            &interventions,
+        )
+        .unwrap();
+
+        assert!(contrast.input_sensitive);
+        assert!(contrast.target_specific);
+        assert!(contrast.oracle_rule_match);
+        assert_eq!(
+            *partner.fork_seeds.lock().unwrap(),
+            vec![interventions.control.seed; 4]
+        );
+
+        let observed = partner.calls.lock().unwrap().clone();
+        assert_eq!(observed.len(), 4);
+        assert!(observed.iter().all(|(_, ordinal, _)| *ordinal == 1));
+        let expected: Vec<String> = interventions
+            .condition_order
+            .iter()
+            .map(|condition| match condition {
+                Condition::Control => interventions.control.event_id.clone(),
+                Condition::Targeted => interventions.targeted.event_id.clone(),
+                Condition::Sham => interventions.sham.event_id.clone(),
+                Condition::Unrelated => interventions.unrelated.event_id.clone(),
+            })
+            .collect();
+        assert_eq!(
+            observed.into_iter().map(|(_, _, event_id)| event_id).collect::<Vec<_>>(),
+            expected
         );
     }
 
@@ -3813,6 +3965,10 @@ mod tests {
     impl ControlledPartner for NonRuleResponsivePartner {
         fn policy_id(&self) -> &str {
             "non-rule-responsive"
+        }
+
+        fn fork_from_frozen_state(&self, _common_random_seed: u64) -> Box<dyn ControlledPartner> {
+            Box::new(Self)
         }
 
         fn respond(
