@@ -517,7 +517,7 @@
         "artifact_sha256": "9cfb88ccf477fc9a983d93343b7258316927ee56853adf9c62048a147c45c578",
         "artifact_id": "13358996504",
         "claim_ceiling": "One 181-second bounded libFuzzer run, exact source commit, toolchain, seed and resource envelope. No crash was reported by this run; this is not a security certification, sustained fuzz qualification, broad platform coverage or proof of absence of bugs.",
-        "status": "bounded_180_second_fuzz_smoke_passed_on_exact_head; next revision adds durable raw log artifact",
+        "status": "two-bounded-production-reader-smoke-campaigns-passed; durable-raw-log-artifact-verified; differential-arm-pending",
         "current_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/41904482693",
         "current_source_commit": "361be1d1f2989a3b98f81ad326806c03e85aabac",
         "runs": [
@@ -563,24 +563,39 @@
         ],
         "note": "Both runs are short bounded Linux x86-64 campaigns on exact commits and the same pinned toolchain/lock/seed; they are not sustained fuzz qualification or proof of bug absence. The latest run uses the committed fuzz/Cargo.lock with --locked.",
         "last_successful_run": {
-          "source_commit": "d8d54f6e918838eabf9cb110db79d4f23986fede",
-          "workflow_run": 41904482693,
-          "artifact_id": 13358294215,
-          "artifact_digest": "sha256:2566b473d92a223886c9461d581494b6a3479118077a14838115bba785e154d9",
+          "source_commit": "6e788a3eb6430bb8827c01555bf412592e021484",
+          "workflow_run": 41923233406,
+          "artifact_id": 13368057623,
+          "artifact_digest": "sha256:c5629ad1b87e183400e39e8a80f3aaf6f3b77a578c5a6e8c556734a47ec8c11d",
           "duration_seconds": 181,
-          "executions": 3371635,
-          "average_executions_per_second": 18627,
-          "peak_rss_mib": 283,
-          "libfuzzer_coverage_edges": 1065,
-          "libfuzzer_features": 1475,
-          "corpus_entries": 204,
-          "corpus_bytes": 22528,
+          "executions": 2067019,
+          "average_executions_per_second": 11419,
+          "new_units_added": 566,
+          "peak_rss_mib": 264,
           "crash_count": 0,
           "timeout_count": 0,
-          "result": "no crash found in this bounded run; not security certification"
+          "raw_log_sha256": "12a06689d769c26cbb637f7387521984de79d14d80e24f0b762c107853cdc875",
+          "retained_artifacts": [
+            "run-context.txt",
+            "production-fuzz-output.txt",
+            "production-fuzz-summary.txt",
+            "fuzz/Cargo.lock",
+            "corpus"
+          ],
+          "result": "no crash found in bounded production-reader smoke; durable raw output uploaded; not sustained fuzz qualification"
         },
         "current_working_head": "c7e9969363d94a46f0156a188c6343b0080a6883",
-        "raw_log_capture": "Added to c7e9969; exact-head fuzz rerun is required before claiming log-artifact capture succeeded."
+        "raw_log_capture": "Added to c7e9969; exact-head fuzz rerun is required before claiming log-artifact capture succeeded.",
+        "differential_arm": {
+          "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10520",
+          "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10520",
+          "status": "running_exact_head_workflow",
+          "source_commit": "a4ee09f1c27883c251208104368afc4738d6763a",
+          "workflow_run": 41944499722,
+          "target": "zip_differential",
+          "oracle": "zip 9.3.0 / flate2-zlib-rs",
+          "scope": "complete unique-name unprefixed non-ZIP64 ordinary ZIPs; metadata plus bounded Stored/Deflate content"
+        }
       },
       "validation": {
         "exact_head": "241b42feae94937bb1b0716841abcf77def2e1d1",
@@ -1758,13 +1773,13 @@
         "clippy_warnings_denied": "passed",
         "schema_draft": "JSON Schema Draft 2020-12",
         "canonicalization": "RFC 8785 JCS via pinned serde_json_canonicalizer 0.4.1",
-        "semantic_claim": "schema/semantic validator and canonicalizer harness only; no production receipt writer or replay CLI yet"
+        "semantic_claim": "schema/semantic validator and canonicalizer harness only; independent replay is separate"
       },
       "independent_replay_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10507"
     },
     {
       "id": "independent_member_receipt_replay",
-      "status": "draft_independent_replayer",
+      "status": "exact_head_harness_tests_passed; sealed_source_snapshot_remains_open",
       "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10507",
       "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10507",
       "oracle": {
@@ -1810,14 +1825,34 @@
         "zip-rs duplicate-name view is unique-name-oriented; abstain when has_duplicate_names is true",
         "compare raw filename bytes and absolute offsets; never use decoded names as occurrence identity",
         "recompute independent CRC and SHA-256; require exact observed size and decoder EOF",
-        "report exact zip version, zlib-rs backend, Cargo.lock digest, source commit and runtime platform"
+        "report exact zip version, zlib-rs backend, Cargo.lock digest, source commit and runtime platform",
+        "same-open-file pre/post hashing prevents path replacement and detects persistent mutation but does not establish immutability against a concurrent mutate-and-restore writer",
+        "before promotion, either replay a sealed immutable snapshot bound by the archive digest or keep the concurrent mutation claim explicitly outside the supported guarantee; see issue #10526"
       ],
       "boundaries": {
         "supported_subset": "Unique raw filenames, unencrypted regular files, Stored and Deflate, single-disk conventional ZIP layouts accepted by zip-rs.",
         "duplicate_names": "Unsupported because zip-rs's indexed view collapses duplicate raw names; do not claim occurrence replay.",
         "zip64_and_prefix": "May be Unsupported in this first independent replay slice; do not relax source-offset bounds or heuristically remap.",
         "authenticity": "Replay verifies observed bytes against a receipt, not the producer's identity or truthfulness.",
-        "checksum_commonality": "zipcore/zip use crc32fast in ZIP parsing; the replay custom CRC path is required as a second calculation."
+        "checksum_commonality": "zipcore/zip use crc32fast in ZIP parsing; the replay custom CRC path is required as a second calculation.",
+        "snapshot": "Current same-open-file pre/post hashing detects ordinary persistent changes, but does not prove immutable bytes under adversarial concurrent mutate-and-restore. Exact immutable snapshot capture is a separate gate tracked by #10526."
+      },
+      "validation": {
+        "exact_head": "08818dd4162a37b980c27a7b6c56a57950855b1c",
+        "workflow_run": 41944635509,
+        "workflow_name": "REA Member Receipt",
+        "result": "success",
+        "tests": {
+          "passed": 20,
+          "failed": 0,
+          "ignored": 0,
+          "elapsed_seconds": 0.07
+        },
+        "formatting": "passed",
+        "clippy_warnings_denied": "passed",
+        "executable": "rea-receipt-replay compiled as an all-target Clippy target; no production corpus run yet",
+        "claim": "synthetic Stored/Deflate receipts independently replayed with zip-rs/zlib-rs; duplicate-name abstention and negative controls passed",
+        "remaining": "replay still hashes/streams/re-hashes the same opened source file; adversarial mutate-and-restore race requires immutable snapshot work tracked by #10526"
       }
     },
     {
@@ -1903,6 +1938,108 @@
         "https://support.apple.com/guide/security/app-code-signing-process-in-ios-ipados-tvos-visionos-and-watchos-sec7c917bf14/web"
       ],
       "schema": "docs/research/rea-package-signature-evaluation-v0.schema.json"
+    },
+    {
+      "id": "differential_zip_parser_decoder_consistency",
+      "status": "exact_head_workflow_running",
+      "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10520",
+      "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10520",
+      "target": "Zero silent mismatch acceptance; 100_percent explicit abstention outside declared shared subset; every confirmed mismatch minimized and retained as a deterministic regression fixture.",
+      "source_commit": "a4ee09f1c27883c251208104368afc4738d6763a",
+      "workflow_run": 41944499722,
+      "production": "symthaea-rea-artifact-reader / zipcore 0.10.2 / miniz_oxide",
+      "oracle": {
+        "crate": "zip",
+        "version": "9.3.0",
+        "deflate_backend": "flate2 / zlib-rs 0.6.8",
+        "crc_commonality": "zip and zipcore both use crc32fast internally; differential target also computes bitwise CRC-32 independently"
+      },
+      "objective": "Find silent metadata and member-content disagreements between the production reader and a separately versioned parser/Deflate path over a bounded shared subset.",
+      "shared_subset": "Complete traversal, no duplicate raw names, no leading bytes/prefix, non-ZIP64, single-disk ordinary ZIP, within fuzz entry/size limits.",
+      "cases": [
+        "differential_raw_filename_bytes_and_occurrence_order",
+        "differential_general_purpose_flags_and_compression_method",
+        "differential_declared_compressed_uncompressed_size_and_crc",
+        "differential_local_header_and_data_offsets",
+        "differential_stored_payload_sha256_size_and_crc",
+        "differential_deflate_payload_sha256_size_and_crc",
+        "differential_one_sided_acceptance_is_preserved",
+        "duplicate_zip64_prefix_partial_traversal_abstains",
+        "malformed_stream_crc_and_declared_size_faults"
+      ],
+      "metrics": [
+        "shared_subset_differential_agreement_rate",
+        "metadata_disagreement_rate_by_field_and_mutation_family",
+        "one_sided_content_acceptance_rate",
+        "abstention_rate_by_layout_reason",
+        "libfuzzer_executions_per_second_by_arm",
+        "coverage_features_by_parser_arm",
+        "false_positive_disagreement_rate",
+        "minimized_regression_fixture_retention_rate",
+        "peak_rss_and_timeout_rate"
+      ],
+      "protocol": [
+        "feed identical raw archive bytes to the production inventory/content path and independent zip-rs/zlib-rs oracle",
+        "compare occurrence order, raw name bytes, flags, compression method, declared sizes, CRC, local header offset and data offset",
+        "stream eligible Stored/Deflate content through fixed buffers, recompute SHA-256 and bitwise CRC-32, compare observed size",
+        "classify parser rejection inside the shared supported subset as a differential finding; duplicate/ZIP64/prefix/partial cases are outside the initial scope",
+        "keep each arm's run context, dependency versions and raw logs separate",
+        "do not majority-vote implementations or normalize disagreements away; preserve reason, input digest and exact revisions"
+      ],
+      "workflow": {
+        "run_id": 41944499722,
+        "source_commit": "a4ee09f1c27883c251208104368afc4738d6763a",
+        "status": "in_progress",
+        "arms": [
+          "zip_inventory_and_content",
+          "zip_differential"
+        ],
+        "per_arm_budget_seconds": 180,
+        "runner": "Ubuntu 24.04 Linux x86_64",
+        "toolchain": "nightly-2026-11-03",
+        "cargo_fuzz": "0.13.2"
+      }
+    },
+    {
+      "id": "sealed_immutable_replay_snapshot",
+      "status": "research_issue_opened",
+      "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10526",
+      "objective": "Replay the exact content-addressed archive byte sequence from a stable private immutable snapshot rather than trusting path identity and pre/post hashing over a concurrently mutable source.",
+      "cases": [
+        "snapshot_memfd_seal_write_grow_shrink_and_seal",
+        "source_mutates_after_initial_hash_before_parser_read",
+        "source_mutates_and_restores_between_digest_windows",
+        "source_path_replaced_after_open",
+        "source_truncated_or_grown_during_copy",
+        "post_seal_source_mutation_does_not_change_snapshot",
+        "write_grow_shrink_and_unseal_attempts_fail",
+        "snapshot_exact_archive_limit_and_one_byte_over",
+        "snapshot_partial_copy_io_memory_and_seal_failures_never_verify"
+      ],
+      "metrics": [
+        "source_bytes_read_and_snapshot_bytes_written",
+        "snapshot_creation_throughput_and_p50_p95_latency",
+        "snapshot_peak_rss_and_kernel_memory",
+        "post_seal_mutation_rejection_rate",
+        "archive_digest_parser_input_binding_accuracy",
+        "source_change_detection_rate",
+        "unsupported_snapshot_platform_rate"
+      ],
+      "protocol": [
+        "create a private anonymous snapshot, bounded by configured archive limit, while hashing exact copied bytes",
+        "on Linux prefer memfd_create with sealing enabled and verify F_SEAL_WRITE, F_SEAL_GROW, F_SEAL_SHRINK and F_SEAL_SEAL before parser input",
+        "hash the bytes in the snapshot and parse only that same sealed handle",
+        "record source identity observations before/after copy separately from the snapshot digest",
+        "do not claim source-copy acquisition is atomic unless an OS snapshot primitive proves point-in-time semantics",
+        "return Unsupported when the required immutable snapshot guarantee is unavailable; no silent fallback to mutable pathname",
+        "no Verified receipt on partial copy, seal failure, allocation failure or size-bound breach"
+      ],
+      "target": "The replay parser consumes only a sealed immutable snapshot whose SHA-256 is the exact digest reported in the replay result; all post-seal mutation controls fail closed.",
+      "claim_boundaries": {
+        "stable_snapshot": "Sealing ensures parser input bytes remain unchanged after seal.",
+        "source_consistency": "Sealed snapshot does not prove the source copy was an atomic point-in-time view if source changed during copying.",
+        "authenticity": "Snapshot hash does not identify or authenticate producer."
+      }
     }
   ],
   "promotion_policy": {
