@@ -134,7 +134,10 @@ fn validate_civil_date_calendar(
 ) -> Result<(), CreditCoverExposureError> {
     if calendar.source_digest.trim().is_empty()
         || calendar.day_ordinals.is_empty()
-        || calendar.day_ordinals.iter().any(|day| *day > calendar.complete_through_day)
+        || calendar
+            .day_ordinals
+            .iter()
+            .any(|day| *day > calendar.complete_through_day)
         || calendar
             .day_ordinals
             .windows(2)
