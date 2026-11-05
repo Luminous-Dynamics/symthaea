@@ -569,6 +569,83 @@ pub struct GenealogyManifest {
     pub created_at_unix_ms: u64,
 }
 
+/// Reference from one RMI interaction edge to the exact keeper artifacts that
+/// were independently re-read and matched against a stored genealogy manifest.
+///
+/// This is a provenance reference, not a signature or an authorization token.
+/// Consumers must resolve the genealogy manifest by audio_key in the trusted
+/// GenealogyStore and call its bundle verifier before treating bytes as
+/// current. Hashes do not establish authorship, rights, consent, or quality.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RmiArtifactBindingV1 {
+    /// Wire schema version.
+    pub schema_version: u32,
+    /// Exact source/input event in the RMI trial ledger.
+    pub source_event_id: String,
+    /// Exact resulting action/output event in the RMI trial ledger.
+    pub action_event_id: String,
+    /// Existing compositional genealogy record for the kept bundle.
+    pub genealogy: GenealogyManifest,
+    /// Byte length of the persisted recipe.json.
+    pub recipe_bytes_len: u64,
+    /// Byte length of persisted score.json, absent only for legacy scoreless bundles.
+    pub score_bytes_len: Option<u64>,
+    /// Byte length of the persisted audio.wav.
+    pub audio_bytes_len: u64,
+}
+
+impl RmiArtifactBindingV1 {
+    /// Validate the binding's internal reference shape and digest encoding.
+    ///
+    /// This does not authenticate the manifest or re-read files; use the
+    /// production GenealogyStore verifier for that operation.
+    pub fn validate_reference(&self) -> Result<(), &'static str> {
+        fn is_sha256_hex(value: &str) -> bool {
+            value.len() == 64
+                && value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        }
+
+        if self.schema_version != 1 {
+            return Err("unsupported RMI artifact binding schema");
+        }
+        if self.source_event_id.trim().is_empty()
+            || self.action_event_id.trim().is_empty()
+            || self.source_event_id == self.action_event_id
+        {
+            return Err("RMI source/action event IDs must be distinct and non-empty");
+        }
+        if self.genealogy.id <= 0 || self.genealogy.family_id <= 0 {
+            return Err("genealogy manifest IDs must be positive");
+        }
+        if self.genealogy.audio_key.trim().is_empty() {
+            return Err("genealogy audio key is empty");
+        }
+        if !is_sha256_hex(&self.genealogy.manifest_sha256)
+            || !is_sha256_hex(&self.genealogy.recipe_sha256)
+            || !is_sha256_hex(&self.genealogy.audio_sha256)
+            || self
+                .genealogy
+                .score_sha256
+                .as_deref()
+                .is_some_and(|digest| !is_sha256_hex(digest))
+        {
+            return Err("genealogy manifest contains a malformed SHA-256 digest");
+        }
+        if self.genealogy.score_sha256.is_some() != self.score_bytes_len.is_some() {
+            return Err("score digest and score byte length presence differ");
+        }
+        if self.recipe_bytes_len == 0 || self.audio_bytes_len == 0 {
+            return Err("recipe and audio byte lengths must be non-zero");
+        }
+        if self.score_bytes_len == Some(0) {
+            return Err("score byte length must be non-zero when present");
+        }
+        Ok(())
+    }
+}
+
 /// A non-fatal limitation attached to a versioned bundle.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BundleWarning {
