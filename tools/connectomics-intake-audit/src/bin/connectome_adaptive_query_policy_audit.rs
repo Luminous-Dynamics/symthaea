@@ -1217,7 +1217,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
             challenge_id: challenge.challenge_id.clone(),
             challenge_sha256,
             expanded_joint_support_sha256: expanded_sha256,
-            added_joint_tuple_count,
+            added_joint_tuple_count: added_tuple_count,
             adaptive_worst_case_effort_before: adaptive_before,
             adaptive_worst_case_effort_after: adaptive_after,
             adaptive_status_before: adaptive_status(&solution).to_string(),
