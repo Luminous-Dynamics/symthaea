@@ -96,6 +96,24 @@ Use the known-truth observer DGP and observed-only fitting path. Include:
 
 Keep oracle parameters and truth labels evaluator-only.
 
+## 6A. Model-dissociation benchmark (separate from function estimation)
+
+Add a dedicated task in which the experimenter must distinguish competing perceptual / observer models, rather than only estimate one threshold or response surface.
+
+A relevant comparator is the Bayesian adaptive stimulus-selection method for dissociating models of psychophysical data (2018), which extends the Psi algorithm from parameter estimation to model comparison and uses adaptive stimuli to separate sensory-noise models. See [the study record](https://pubmed.ncbi.nlm.nih.gov/30372761/).
+
+For each preregistered model set:
+- define the scientific estimand and distinguishable alternatives before sampling;
+- include nested and near-nested models (for example equal-variance UVSD vs unequal-variance UVSD, lapse vs no-lapse, criterion drift vs stationary criterion, Gaussian vs heavy-tailed evidence);
+- include non-Gaussian mixtures and measurement-channel alternatives where they imply different observable predictions;
+- identify stimulus/action regions where predicted response distributions differ, and where that difference could change the scientific decision;
+- compare posterior model-entropy reduction / Psi-style model discrimination, expected log Bayes factor, pairwise predictive disagreement, NEST, GP-based alternatives and SPECTRA's declared model-discrimination score;
+- retain randomized audit/sentinel actions and an untouched held-out check so the policy cannot confirm its own fitted model solely by repeatedly sampling its preferred regions.
+
+Report correct model-selection probability, false model-selection rate under ties / observational equivalence, power against near alternatives, time to decisive evidence, held-out predictive log score, calibration, parameter-recovery conditional on correct model, and confidence amplification under misspecification. If two models are observationally indistinguishable on the operational action set, report non-identifiability rather than forcing a winner.
+
+Bayesian posterior model probability, frequentist test error, and Monte Carlo score uncertainty are distinct quantities. Calibrate the entire adaptive policy and stopping rule; do not treat repeated fixed-look model-selection p-values as valid after data-dependent sampling.
+
 ## 7. Metrics
 
 Report full trial-budget learning curves and failure-inclusive outcomes.
