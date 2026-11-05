@@ -1156,12 +1156,12 @@ impl CfCNetwork {
             for tensor in &cell.backbone_weights {
                 expected = expected
                     .checked_add(tensor.len())
-                    .ok_or_else(|| "CfC weight count overflow".to_string())?;
+                    .ok_or(CfCWeightLoadError::ParameterCountOverflow)?;
             }
             for tensor in &cell.backbone_biases {
                 expected = expected
                     .checked_add(tensor.len())
-                    .ok_or_else(|| "CfC weight count overflow".to_string())?;
+                    .ok_or(CfCWeightLoadError::ParameterCountOverflow)?;
             }
         }
 
@@ -1172,7 +1172,7 @@ impl CfCNetwork {
             });
         }
 
-        if let Some((index, value)) = weights
+        if let Some((index, _value)) = weights
             .iter()
             .copied()
             .enumerate()
@@ -1186,7 +1186,7 @@ impl CfCNetwork {
         let mut offset = 0usize;
         for (cell_index, cell) in self.cells.iter().enumerate() {
             offset += cell.w_in.len() + cell.w_h.len() + cell.b_h.len();
-            for (neuron_index, tau) in weights[offset..offset + cell.tau.len()]
+            for (neuron_index, _tau) in weights[offset..offset + cell.tau.len()]
                 .iter()
                 .copied()
                 .enumerate()
