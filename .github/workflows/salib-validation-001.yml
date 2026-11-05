@@ -1,0 +1,44 @@
+name: SALib Analytic Validation 001
+
+on:
+  pull_request:
+    paths:
+      - "research/salib-validation-001/**"
+      - ".github/workflows/salib-validation-001.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: salib-validation-001-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analytic-reference:
+    name: Rust SALib 0.3.0 Ishigami reference and strict Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust quality tools
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Generate isolated lockfile
+        run: cargo generate-lockfile --manifest-path research/salib-validation-001/Cargo.toml
+
+      - name: Format harness
+        run: cargo fmt --manifest-path research/salib-validation-001/Cargo.toml -- --check
+
+      - name: Run analytic sensitivity references
+        run: cargo test --manifest-path research/salib-validation-001/Cargo.toml
+
+      - name: Record selected dependency graph
+        run: cargo tree --manifest-path research/salib-validation-001/Cargo.toml --depth 2
+
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path research/salib-validation-001/Cargo.toml --all-targets -- -D warnings
