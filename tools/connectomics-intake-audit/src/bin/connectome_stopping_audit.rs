@@ -56,6 +56,9 @@ struct Snapshot {
     /// Explicit numerator/denominator evidence; never inferred from graph invariants.
     #[serde(default)]
     synaptic_completeness: Option<SynapticCompletenessEvidence>,
+    /// Exact joint-support planner receipt bound to this graph/query snapshot.
+    #[serde(default)]
+    joint_support_evidence: Option<JointSupportEvidence>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -143,6 +146,34 @@ impl SynapticCompletenessEvidence {
     }
 }
 
+/// Receipt from connectome_joint_support_audit, copied into the immutable snapshot.
+/// This binds hashes and statuses; it does not independently re-run or authenticate
+/// the upstream planner. The exact input/report artifacts must remain available.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct JointSupportEvidence {
+    receipt_schema_version: u32,
+    tool: String,
+    analysis_id: String,
+    dataset_revision_commit_sha: String,
+    snapshot_graph_sha256: String,
+    query_id: String,
+    query_spec_sha256: String,
+    scenario_set_sha256: String,
+    action_set_sha256: String,
+    joint_support_set_sha256: String,
+    input_sha256: String,
+    report_sha256: String,
+    joint_support_scope: String,
+    effort_unit: String,
+    max_total_effort_units: u64,
+    minimum_joint_disambiguation_effort_units: Option<u64>,
+    minimum_joint_plan_within_budget: Option<bool>,
+    search_complete: bool,
+    status: String,
+    probability_claim: String,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 struct Provenance {
@@ -168,6 +199,8 @@ struct AuditReport {
     query_metric_tail: BTreeMap<String, MetricStability>,
     /// Separate biological completeness observation; never inferred from graph invariants.
     synaptic_completeness: SynapticCompletenessTail,
+    /// Per-snapshot query-support receipts; never folded into a composite stopping score.
+    joint_support_evidence: JointSupportTail,
     graph_invariants_stable_in_tail: Option<bool>,
     query_metrics_stable_in_tail: Option<bool>,
     forecast_min_training_snapshots: usize,
@@ -191,6 +224,26 @@ struct SynapticCompletenessTail {
     latest_fully_proofread_partner_synapse_count: Option<u64>,
     latest_fraction: Option<f64>,
     stability: MetricStability,
+    scope_note: &'static str,
+}
+
+#[derive(Debug, Serialize)]
+struct JointSupportTail {
+    status: &'static str,
+    observed_snapshot_count: usize,
+    tail_window_snapshot_count: usize,
+    tail_receipt_count: usize,
+    latest_status: Option<String>,
+    latest_joint_support_set_sha256: Option<String>,
+    latest_minimum_effort_units: Option<u64>,
+    latest_plan_within_budget: Option<bool>,
+    search_complete_for_all_tail_receipts: Option<bool>,
+    status_stable_in_tail: Option<bool>,
+    support_identity_stable_in_tail: Option<bool>,
+    over_budget_snapshot_count: usize,
+    no_plan_snapshot_count: usize,
+    incomplete_search_snapshot_count: usize,
+    tail_status_counts: BTreeMap<String, usize>,
     scope_note: &'static str,
 }
 
@@ -395,6 +448,10 @@ fn validate_snapshot(snapshot: &Snapshot, position: usize) -> Vec<String> {
             errors.push(format!("{prefix}: fully-proofread-partner synapse count exceeds the declared synapse population"));
         }
     }
+
+    if let Some(evidence) = &snapshot.joint_support_evidence {
+        errors.extend(validate_joint_support_evidence(snapshot, evidence, &prefix));
+    }
     if let Some(previous_digest) = snapshot.snapshot.previous_graph_sha256.as_deref() {
         if !is_lower_hex(previous_digest, 64) {
             errors.push(format!("{prefix}: previous_graph_sha256 must be 64 lowercase hexadecimal characters"));
@@ -411,6 +468,108 @@ fn validate_snapshot(snapshot: &Snapshot, position: usize) -> Vec<String> {
     }
     if snapshot.snapshot.sequence_index == 0 && snapshot.edits.edits_since_previous_snapshot.is_some() {
         errors.push(format!("{prefix}: initial snapshot must not declare edits_since_previous_snapshot"));
+    }
+    errors
+}
+
+
+fn validate_joint_support_evidence(
+    snapshot: &Snapshot,
+    evidence: &JointSupportEvidence,
+    prefix: &str,
+) -> Vec<String> {
+    let mut errors = Vec::new();
+    if evidence.receipt_schema_version != 1 {
+        errors.push(format!("{prefix}: joint-support receipt_schema_version must be 1"));
+    }
+    if evidence.tool != "connectome-joint-support-audit" {
+        errors.push(format!("{prefix}: joint-support receipt tool must be connectome-joint-support-audit"));
+    }
+    if !nonempty(&evidence.analysis_id) || !nonempty(&evidence.effort_unit) {
+        errors.push(format!("{prefix}: joint-support analysis_id and effort_unit must be non-empty"));
+    }
+    for (field, value, length) in [
+        ("dataset_revision_commit_sha", evidence.dataset_revision_commit_sha.as_str(), 40),
+        ("snapshot_graph_sha256", evidence.snapshot_graph_sha256.as_str(), 64),
+        ("query_spec_sha256", evidence.query_spec_sha256.as_str(), 64),
+        ("scenario_set_sha256", evidence.scenario_set_sha256.as_str(), 64),
+        ("action_set_sha256", evidence.action_set_sha256.as_str(), 64),
+        ("joint_support_set_sha256", evidence.joint_support_set_sha256.as_str(), 64),
+        ("input_sha256", evidence.input_sha256.as_str(), 64),
+        ("report_sha256", evidence.report_sha256.as_str(), 64),
+    ] {
+        if !is_lower_hex(value, length) {
+            errors.push(format!(
+                "{prefix}: joint-support {field} must be {length} lowercase hexadecimal characters"
+            ));
+        }
+    }
+    if evidence.dataset_revision_commit_sha != snapshot.dataset.dataset_revision_commit_sha {
+        errors.push(format!("{prefix}: joint-support receipt dataset revision does not match snapshot"));
+    }
+    if evidence.snapshot_graph_sha256 != snapshot.snapshot.graph_sha256 {
+        errors.push(format!("{prefix}: joint-support receipt graph digest does not match snapshot"));
+    }
+    if evidence.query_id != snapshot.query_evidence.query_id
+        || evidence.query_spec_sha256 != snapshot.query_evidence.query_definition_sha256
+    {
+        errors.push(format!("{prefix}: joint-support receipt query binding does not match snapshot"));
+    }
+    if !matches!(
+        evidence.joint_support_scope.as_str(),
+        "exhaustive_declared_joint_support" | "sampled_joint_sensitivity_set"
+    ) {
+        errors.push(format!("{prefix}: joint-support scope is invalid"));
+    }
+    if evidence.max_total_effort_units == 0 {
+        errors.push(format!("{prefix}: joint-support effort budget must be positive"));
+    }
+    if evidence.probability_claim != "NONE_JOINT_SET_VALUED_DISCRIMINATION_ONLY" {
+        errors.push(format!("{prefix}: joint-support probability_claim is not the required no-probability declaration"));
+    }
+
+    match evidence.status.as_str() {
+        "MINIMUM_COST_JOINT_ROBUST_PLAN" => {
+            if !evidence.search_complete
+                || evidence.minimum_joint_disambiguation_effort_units.is_none()
+                || evidence.minimum_joint_plan_within_budget != Some(true)
+            {
+                errors.push(format!("{prefix}: feasible joint-support status has inconsistent search/minimum/budget fields"));
+            }
+        }
+        "MINIMUM_COST_JOINT_ROBUST_PLAN_EXCEEDS_BUDGET" => {
+            if !evidence.search_complete
+                || evidence.minimum_joint_disambiguation_effort_units.is_none()
+                || evidence.minimum_joint_plan_within_budget != Some(false)
+            {
+                errors.push(format!("{prefix}: over-budget joint-support status has inconsistent search/minimum/budget fields"));
+            }
+        }
+        "NO_JOINT_SUPPORT_PLAN_WITHIN_DECLARED_RELATIONS" => {
+            if !evidence.search_complete
+                || evidence.minimum_joint_disambiguation_effort_units.is_some()
+                || evidence.minimum_joint_plan_within_budget.is_some()
+            {
+                errors.push(format!("{prefix}: joint-support no-plan status has inconsistent search/minimum/budget fields"));
+            }
+        }
+        "NO_DECISION_DISAGREEMENT_WITHIN_DECLARED_SCENARIOS" => {
+            if !evidence.search_complete
+                || evidence.minimum_joint_disambiguation_effort_units != Some(0)
+                || evidence.minimum_joint_plan_within_budget != Some(true)
+            {
+                errors.push(format!("{prefix}: no-decision-disagreement status has inconsistent search/minimum/budget fields"));
+            }
+        }
+        "JOINT_SUPPORT_SEARCH_LIMIT_REACHED" => {
+            if evidence.search_complete
+                || evidence.minimum_joint_disambiguation_effort_units.is_some()
+                || evidence.minimum_joint_plan_within_budget.is_some()
+            {
+                errors.push(format!("{prefix}: incomplete joint-support search has inconsistent fields"));
+            }
+        }
+        _ => errors.push(format!("{prefix}: joint-support receipt status is unknown")),
     }
     errors
 }
@@ -797,6 +956,102 @@ fn synaptic_completeness_tail(
     }
 }
 
+
+fn joint_support_tail(snapshots: &[Snapshot], tail_window: usize) -> JointSupportTail {
+    let observed = snapshots
+        .iter()
+        .filter_map(|snapshot| snapshot.joint_support_evidence.as_ref())
+        .collect::<Vec<_>>();
+    let latest = snapshots
+        .last()
+        .and_then(|snapshot| snapshot.joint_support_evidence.as_ref());
+    let tail_count = snapshots.len().min(tail_window);
+    let tail_snapshots = if tail_count == 0 {
+        &[][..]
+    } else {
+        &snapshots[snapshots.len() - tail_count..]
+    };
+    let tail_receipts = tail_snapshots
+        .iter()
+        .filter_map(|snapshot| snapshot.joint_support_evidence.as_ref())
+        .collect::<Vec<_>>();
+    let tail_complete = snapshots.len() >= tail_window
+        && tail_receipts.len() == tail_window;
+    let all_search_complete = if tail_complete {
+        Some(tail_receipts.iter().all(|receipt| receipt.search_complete))
+    } else {
+        None
+    };
+    let status_stable = if tail_complete {
+        tail_receipts
+            .first()
+            .map(|first| tail_receipts.iter().all(|receipt| receipt.status == first.status))
+    } else {
+        None
+    };
+    let support_identity_stable = if tail_complete {
+        tail_receipts.first().map(|first| {
+            tail_receipts
+                .iter()
+                .all(|receipt| receipt.joint_support_set_sha256 == first.joint_support_set_sha256)
+        })
+    } else {
+        None
+    };
+    let mut status_counts = BTreeMap::new();
+    for receipt in &tail_receipts {
+        *status_counts.entry(receipt.status.clone()).or_insert(0) += 1;
+    }
+    let over_budget = tail_receipts
+        .iter()
+        .filter(|receipt| receipt.status == "MINIMUM_COST_JOINT_ROBUST_PLAN_EXCEEDS_BUDGET")
+        .count();
+    let no_plan = tail_receipts
+        .iter()
+        .filter(|receipt| receipt.status == "NO_JOINT_SUPPORT_PLAN_WITHIN_DECLARED_RELATIONS")
+        .count();
+    let incomplete_search = tail_receipts
+        .iter()
+        .filter(|receipt| receipt.status == "JOINT_SUPPORT_SEARCH_LIMIT_REACHED")
+        .count();
+    let status = if observed.is_empty() {
+        "NOT_PROVIDED"
+    } else if snapshots.len() < tail_window {
+        "INSUFFICIENT_TAIL_HISTORY"
+    } else if !tail_complete {
+        "INCOMPLETE_TAIL"
+    } else if incomplete_search > 0 {
+        "SEARCH_INCOMPLETE_IN_TAIL"
+    } else if no_plan > 0 {
+        "NO_ROBUST_PLAN_IN_TAIL"
+    } else if over_budget > 0 {
+        "PLAN_EXCEEDS_BUDGET_IN_TAIL"
+    } else if status_stable != Some(true) {
+        "STATUS_TRANSITION_IN_TAIL"
+    } else {
+        "RECEIPTS_COMPLETE_NOT_A_STOP_AUTHORIZATION"
+    };
+    JointSupportTail {
+        status,
+        observed_snapshot_count: observed.len(),
+        tail_window_snapshot_count: tail_count,
+        tail_receipt_count: tail_receipts.len(),
+        latest_status: latest.map(|receipt| receipt.status.clone()),
+        latest_joint_support_set_sha256: latest.map(|receipt| receipt.joint_support_set_sha256.clone()),
+        latest_minimum_effort_units: latest
+            .and_then(|receipt| receipt.minimum_joint_disambiguation_effort_units),
+        latest_plan_within_budget: latest.and_then(|receipt| receipt.minimum_joint_plan_within_budget),
+        search_complete_for_all_tail_receipts: all_search_complete,
+        status_stable_in_tail: status_stable,
+        support_identity_stable_in_tail: support_identity_stable,
+        over_budget_snapshot_count: over_budget,
+        no_plan_snapshot_count: no_plan,
+        incomplete_search_snapshot_count: incomplete_search,
+        tail_status_counts: status_counts,
+        scope_note: "Each receipt binds an external joint-support planner result to this snapshot's exact dataset revision, graph digest and query definition. This audit validates receipt-field consistency and longitudinal status presence only; it does not re-run or authenticate the planner, establish support completeness, or authorize stopping. Missing, over-budget, no-plan, and incomplete-search states remain explicit. The global graph and query-metric stability summaries are independent signals and are never combined into a stopping score.",
+    }
+}
+
 fn build_report(bytes: &[u8], snapshots: &[Snapshot], args: &Args) -> AuditReport {
     let errors = validate_series(snapshots);
     let (walk_forward_forecasts, forecast_summaries) = if errors.is_empty() {
@@ -855,6 +1110,7 @@ fn build_report(bytes: &[u8], snapshots: &[Snapshot], args: &Args) -> AuditRepor
             args.relative_tolerance,
             args.absolute_tolerance,
         ),
+        joint_support_evidence: joint_support_tail(snapshots, args.tail_window),
         forecast_min_training_snapshots: args.forecast_min_training_snapshots,
         walk_forward_forecast_status: forecast_status,
         walk_forward_forecasts,
@@ -959,6 +1215,7 @@ mod tests {
                 query_evaluation_profile_sha256: "d".repeat(64),
             },
             synaptic_completeness: None,
+            joint_support_evidence: None,
         }
     }
 
