@@ -787,3 +787,55 @@ The African evaluation portfolio now has four distinct capability lanes:
 - MzansiBench / Uhura / AFROBENCH: broader language/task and scientific knowledge coverage.
 
 Do not merge their labels or aggregate metrics. A lower jailbreak rate can be caused by comprehension failure; a high hallucination detector AUROC does not prove evidence retrieval; a successful retrieval hit does not establish that the source supports the claim. Competitive quality means improving the complete chain while retaining stage-level measurements and non-compensatory rights/safety gates.
+
+
+## 17. Process-based evaluation, multilingual reranking and African open-weight baselines
+
+### 17.1 PROBE — diagnose the verification chain
+
+[PROBE (Findings ACL 2026)](https://aclanthology.org/2026.findings-acl.2099/) evaluates four separate stages: claim decomposition, evidence finding, evidence evaluation and hallucination localization. It contains 12,000 cases across summarization, question answering and style transfer; its experiments identify evidence finding as a particular weakness in current systems.
+
+Apply the same decomposition to AfrIFact and future evidence-grounded runs. Report claim atomization/scope, retrieval recall, exact span/locator extraction, support/contradiction/qualification relations, localization and final decision separately. A correct or incorrect final verdict alone does not diagnose where a model failed.
+
+### 17.2 TRIVIA+ — long-context RAG and label noise
+
+[TRIVIA+ (ACL 2026)](https://aclanthology.org/2026.acl-long.680/) fills two gaps: long-context RAG-grounded hallucination examples and sample-dependent label noise. Its authors report contexts up to 94K characters, sentence-level human labels and three noisy-label schemes. The repository describes 3,224 examples across train/validation/test. Confirm exact revision, license, source provenance and annotation protocol before admission.
+
+Use it as a long-context detector stress test, not an African-language benchmark. Score clean labels and each noise condition separately; report detector degradation as noise and context length increase. Preserve adjudicator disagreement rather than treating weak labels as ground truth.
+
+### 17.3 All Languages Matter / LAURA — language-neutral evidence utility
+
+[All Languages Matter (ACL 2026)](https://aclanthology.org/2026.acl-long.338/) finds multilingual RAG rerankers systematically favour English and the query's native language, suppressing answer-critical evidence in other languages. It proposes LAURA, Language-Agnostic Utility-driven Reranker Alignment.
+
+Our retrieval target should be **evidence utility for the claim and scope**, not surface-language match or popularity. Run paired controls:
+- same claim, but evidence language changes;
+- decisive evidence exists only in a non-query language;
+- high-similarity same-language distractor is irrelevant;
+- two supporting sources split across languages;
+- translation/transliteration/code-switch changes while native reviewers confirm meaning.
+
+Compare BM25, multilingual dense, hybrid, conventional rerankers, language-neutral utility reranking/LAURA where reproducible, and Mycelix evidence-plane + Symthaea. Report answer-critical Recall@k, nDCG/MRR, source-language distribution and downstream fact-check quality under equal evidence-token budgets.
+
+### 17.4 AfriqueLLM — open-weight South African language baselines
+
+[AfriqueLLM (ACL 2026)](https://arxiv.org/abs/2601.06395) releases continued-pretrained models adapted to 20 African languages using about 26B tokens. The authors find data composition is a major driver of adaptation gains; architecture can matter more than scale across model families.
+
+The current [AfriqueQwen-4B model card](https://huggingface.co/McGill-NLP/AfriqueQwen-4B) explicitly lists Afrikaans, Zulu, Xhosa, Southern Sotho and Tswana among its supported languages; the reviewed language table does not list Sepedi. Use this suite as a strong local open-weight comparison only for languages/models actually listed. Pin model revision, tokenizer, license and inference configuration. Run a base-vs-adapted × zero-shot-vs-evidence-grounded experiment; do not claim coverage of all South African languages from the suite's 20-language total.
+
+### 17.5 Multicultural safety is not one scalar
+
+[XL-SafetyBench (May 2026 preprint)](https://arxiv.org/abs/2605.05662) separates jailbreak resistance and cultural sensitivity across ten country-language pairs using Attack Success Rate (ASR), Neutral-Safe Rate (NSR) and Cultural Sensitivity Rate (CSR). Its current manifest covers France, Germany, India, Indonesia, Japan, South Korea, Spain, Turkey, UAE and US—not South Africa—so it is a global methods comparator only.
+
+The [GSMA/Zindi African Trust & Safety benchmark](https://www.gsma.com/newsroom/blog/african-trust-safety-llm-benchmark-stress-testing-ai-safety-across-africas-languages-and-contexts/) reports 4,216 verified, reproducible African-language, multilingual and code-switch stress tests. Top represented languages include Swahili, Hausa, Yoruba, Igbo, Zulu, Afrikaans, Amharic and Akan. The [Zindi challenge page](https://zindi.world/competitions/the-african-trust-safety-llm-challenge) lists CC BY-SA 4.0 data-sharing terms; verify the actual downloadable asset, attribution and split before use.
+
+Use these alongside TukaBench but keep harmful compliance, benign helpfulness/over-refusal, comprehension/deflection and cultural sensitivity separate. Refusal caused by language misunderstanding is not safety.
+
+### 17.6 Multimodal knowledge is a separate later track
+
+[M4-RAG (CVPR 2026)](https://openaccess.thecvf.com/content/CVPR2026/html/Anugraha_M4-RAG_A_Massive-Scale_Multilingual_Multi-Cultural_Multimodal_RAG_CVPR_2026_paper.html) spans 42 languages, 56 dialects/registers, 189 countries and more than 80,000 image-question pairs. Its authors report that RAG can help smaller VLMs but fail to help or even degrade larger models; multilingual prompts or retrieved context also lower performance. This motivates a later visual-evidence track with image-correct/text-wrong, text-correct/image-wrong, both-wrong and both-aligned controls. It is not part of the initial text-only Multi-Hall-SA scorer.
+
+### 17.7 Resulting paradigm shift
+
+Build a **process-auditable evidence system**: language-neutral retrieval of answer-critical evidence; source-family and rights verification; exact evidence localization; typed support/contradiction/qualification relations; uncertainty for noisy/disputed labels; and a reasoned final decision with abstention. Internal HDC/CfC or hidden-state signals can diagnose risk, but cannot act as a truth oracle.
+
+The competitive target is not one universal intelligence number. It is fewer missed evidence items, more accurate multilingual localization, better calibrated abstention, rights-safe source handling and reliable performance under equal budgets.
