@@ -330,14 +330,52 @@ fn validate_run(run: &ProofRun, task: &Task) -> Result<(), String> {
             return Err(format!("run {} has malformed {name}", run.run_id));
         }
     }
-    if run.strategy.name.trim().is_empty() || run.strategy.version.trim().is_empty() {
-        return Err(format!("run {} has empty strategy identity", run.run_id));
+    if run.goal_sha256 != sha256(task.debug_info.goal.as_bytes()) {
+        return Err(format!("run {} goal digest differs from the exact SorryDB task", run.run_id));
+    }
+    if run.declaration_signature_before_sha256 != run.declaration_signature_after_sha256 {
+        return Err(format!("run {} changes the exact target declaration signature", run.run_id));
+    }
+    for (label, value) in [
+        ("strategy.name", &run.strategy.name),
+        ("strategy.version", &run.strategy.version),
+    ] {
+        if value.trim().is_empty() {
+            return Err(format!("run {} has empty {label}", run.run_id));
+        }
+    }
+    if run.strategy.model_id.as_ref().is_some_and(|x| x.trim().is_empty())
+        || run.strategy.model_version.as_ref().is_some_and(|x| x.trim().is_empty())
+    {
+        return Err(format!("run {} has an empty optional model identity", run.run_id));
     }
     if !matches!(run.outcome.as_str(), "verified_success" | "non_solve" | "infrastructure_failure" | "invalid_target") {
         return Err(format!("run {} has unknown outcome", run.run_id));
     }
-    if run.outcome == "verified_success" && !proof_qualified(run) {
+    let all_gates = [
+        run.proof_inserted,
+        run.exact_sorry_replaced,
+        run.sorry_absent_after_replacement,
+        run.target_sorry_ax_absent,
+        run.target_is_prop,
+        run.build_passed,
+        run.kernel_passed,
+        run.semantic_gate_passed,
+        run.source_binding_passed,
+        run.vacuity_gate_passed,
+        run.axiom_delta_zero,
+        run.new_sorry_delta_zero,
+    ];
+    if run.outcome == "verified_success" && all_gates.iter().any(|passed| !passed) {
         return Err(format!("run {} claims verified_success without all assurance gates", run.run_id));
+    }
+    if run.outcome != "verified_success" && all_gates.iter().all(|passed| *passed) {
+        return Err(format!("run {} passes every success gate but is labeled non-success", run.run_id));
+    }
+    if run.outcome == "infrastructure_failure"
+        && run.failure_type.as_deref().unwrap_or("").trim().is_empty()
+    {
+        return Err(format!("run {} infrastructure failure requires failure_type", run.run_id));
     }
     Ok(())
 }
@@ -677,6 +715,10 @@ fn run_self_tests() -> Result<(), String> {
             total_output_tokens: 0, total_cost_microusd: 0,
         });
         entry.attempt_count += 1;
+        entry.total_wall_time_ms = entry.total_wall_time_ms.saturating_add(run.wall_time_ms);
+        entry.total_input_tokens = entry.total_input_tokens.saturating_add(run.input_tokens);
+        entry.total_output_tokens = entry.total_output_tokens.saturating_add(run.output_tokens);
+        entry.total_cost_microusd = entry.total_cost_microusd.saturating_add(run.cost_microusd);
         let outcome = entry.outcomes.entry(run.task_id.clone()).or_insert(TaskOutcome {
             solved: false, wall_time_ms: 0, input_tokens: 0, output_tokens: 0, cost_microusd: 0,
         });
@@ -768,7 +810,7 @@ fn execute() -> Result<(), String> {
         println!("{}", list_strategies(&strategies)?);
         return Ok(());
     }
-    if args.len() != 8 || args[1] != "--compare" {
+    if args.len() != 9 || args[1] != "--compare" {
         return Err(format!(
             "usage: {} --compare <evaluation-split.json> <proof-runs.jsonl> <left-strategy-id> <right-strategy-id> <report.json> <replicates> <seed>; OR --list-strategies <split> <runs>; OR --self-test",
             args.first().map(String::as_str).unwrap_or("pitb-clustered-benchmark-stats")
@@ -778,7 +820,7 @@ fn execute() -> Result<(), String> {
     let runs_path = PathBuf::from(&args[3]);
     let report_path = PathBuf::from(&args[6]);
     let replicates: usize = args[7].parse().map_err(|_| "replicates must be an integer")?;
-    let seed: u64 = args[7].parse().map_err(|_| "seed must be an integer")?;
+    let seed: u64 = args[8].parse().map_err(|_| "seed must be an integer")?;
     let split_bytes = fs::read(&split_path).map_err(|e| format!("read evaluation split: {e}"))?;
     let tasks = parse_split(&split_bytes)?;
     let runs_bytes = fs::read(&runs_path).map_err(|e| format!("read proof runs: {e}"))?;
