@@ -119,7 +119,7 @@ fn solve_adaptive(
     }
 
     let mut best: Option<u64> = None;
-    for action_index in 0..ACTION_COUNT {
+    for (action_index, action_cost) in ACTION_COSTS.iter().copied().enumerate() {
         let action_bit = 1_u8 << action_index;
         if state.remaining_actions & action_bit == 0 {
             continue;
@@ -152,7 +152,7 @@ fn solve_adaptive(
             worst_child = worst_child.max(child_cost);
         }
         if action_valid {
-            let cost = ACTION_COSTS[action_index]
+            let cost = action_cost
                 .checked_add(worst_child)
                 .expect("bounded lattice action cost cannot overflow");
             if best.is_none_or(|known| cost < known) {
@@ -198,9 +198,9 @@ fn fixed_cost(world_support_masks: [u8; 2]) -> Option<u64> {
         let right = projection(world_support_masks[1], selected_actions);
         if !left.iter().any(|value| right.binary_search(value).is_ok()) {
             let mut effort = 0_u64;
-            for action_index in 0..ACTION_COUNT {
+            for (action_index, action_cost) in ACTION_COSTS.iter().copied().enumerate() {
                 if selected_actions & (1_u8 << action_index) != 0 {
-                    effort += ACTION_COSTS[action_index];
+                    effort += action_cost;
                 }
             }
             if best.is_none_or(|known| effort < known) {
