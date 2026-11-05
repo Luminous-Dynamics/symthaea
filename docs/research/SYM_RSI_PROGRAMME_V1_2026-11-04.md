@@ -281,3 +281,196 @@ No queued workflow is a pass. No source-authored receipt proves the evaluator wa
 The programme's target is simple to state and difficult to fake:
 
 > A successor must independently outperform its parent, preserve the capabilities we require, generalize beyond the selection tasks, and become demonstrably better at finding the next improvement.
+
+
+## 10. Cluster-aware statistical qualification — issue #10513
+
+The original paired adapter retains per-case wins/losses/ties and its exact sign test, but that test assumes independent non-tied case-pair signs. Cases from one repository, project, task family, or run are often correlated; treating them as independent can create pseudo-replication.
+
+The additive `ClusteredPairedComparison` view addresses this without changing the shared receipt format:
+
+- The caller supplies a case-ID → cluster-ID map that must cover exactly the matched case set.
+- Cluster IDs are validated for non-empty, non-control-character identifiers.
+- Paired deltas are averaged within each cluster before directional wins/losses/ties are counted.
+- Both pooled case-weighted mean delta and equal-cluster-weighted mean delta are reported. These are different estimands and must not be conflated.
+- The exact one-sided sign-test diagnostic operates on non-tied cluster means. It is withheld when fewer than two non-tied clusters remain. This adapter reports point estimates and a directional exact-sign diagnostic; it does **not** yet produce cluster-bootstrap confidence intervals, uncertainty for Pareto frontier membership, or practical-effect/non-inferiority decisions. Those are owned by the existing paired uncertainty issue #8438, while broader task-population and crossed-family uncertainty belongs to #9433. Do not duplicate those statistical backends in the RSI module.
+- Holm step-down family-wise adjustment uses the full predeclared metric-schema size for this one comparison. Metrics without enough independent clusters to produce a p-value have no reported adjusted p-value, but still count conservatively as p=1 in the family size. This does **not** correct across candidates, adaptive search, generations, repeated runs, or a broader preregistered family.
+
+The cluster mapping must originate in the frozen task-family/corpus manifest and be covered by the shared receipt/corpus identity. The in-memory adapter validates mapping shape; it cannot authenticate mapping provenance or prove that clusters are genuinely independent. The independent unit must be chosen before confirmation, not after inspecting outcomes.
+
+This does not replace the original per-case results. It exposes a second analysis at a defensible independent unit, reducing the risk that many correlated cases from one project dominate the evidence. Small numbers of independent clusters remain low-power; cluster-aware analysis does not manufacture sample size. Until #8438 supplies qualified cluster-level intervals and #9433 supplies defensible target-population inference where appropriate, G3/G4 claims remain descriptive/directional and cannot be upgraded to population-generalization claims.
+
+### Exact evidence boundary
+
+- This is analysis code, not a new persisted receipt schema.
+- The input rows and cluster map still require upstream validation through #10314 / #10167 / #10370.
+- Holm adjustment is local to one metric family and one comparison. Sequential candidate selection and generation-level inference remain a separate preregistered confirmation problem.
+- No p-value is a practical-effect threshold, non-inferiority result, or promotion authorization.
+- Tests are authored in the PR but remain unexecuted until exact-head Rust qualification is available.
+
+
+## 11. Newest field comparator: RSI-Env (arXiv:2611.01736, 2026-11-01)
+
+RSI-Env is the newest directly relevant public comparator located for this research pass. It models a system as model parameters, executable harness, and persistent research state, with resources managed by an external Host Controller. The evolving target system itself becomes the Improver in subsequent rounds. It varies research autonomy across Open-General, Capability-Directed, and Benchmark-Guided settings, and keeps controller-side validity, versioning, and final capability evaluation outside the editable environment.
+
+The paper reports seven tasks from Qwen3.8-27B with a 30-hour allocation split into ten three-hour rounds. Self's Open-General run changes GPQA Diamond from 65.2% to 73.2% and AIME 2026 from 53.3% to 56.7%, but also changes SimpleQA from 82.0% to 77.2% and Terminal-Bench 2.1 pass@3 from 12.4% to 9.0%. The Capability-Directed Knowledge run raises SimpleQA from 82.0% to 88.0% while GPQA Diamond falls from 65.2% to 53.0%. The paper's Knowledge Self case study reports successive SimpleQA versions at 82.0%, 85.0%, and 88.0%.
+
+These are author-reported preprint results, not independently reproduced measurements. The authors explicitly report uneven cross-capability retention. The Self runs use roughly 25–29 hours in the Open-General and Capability-Directed cases, while the external Teacher runs use roughly 1–7 hours under the same 30-hour allocation; the improvers are also different models. Therefore the paper is a strong architecture/evaluation comparator, but its Self-vs-Teacher scores are not a clean compute-matched leaderboard. Its three-trial avg@3/pass@3 summaries also do not substitute for clustered, multi-seed uncertainty estimates. The reported H1/M1 Knowledge continuation shows a successor doing further work and being followed by a further gain; it is not a controlled no-recursion ablation proving recursion caused the second gain.
+
+### RSI evaluation should be a matrix, not a single ladder
+
+Keep the R0–R5 claim ladder for claim discipline, but organize experiments across orthogonal axes:
+
+1. **Editable system surface:** harness/scaffold; memory and tool policy; model weights; training objective/update algorithm; experiment-selection and meta-improvement procedure.
+2. **Research autonomy:** Benchmark-Guided; Capability-Directed; Open-General. Freeze the autonomy condition independently of the task domain.
+3. **Inheritance depth:** one accepted update; successive inherited updates; inherited changes to the improvement process; changes to the algorithm that trains successor models.
+4. **Evidence sovereignty:** external controller; exact candidate/source/evaluator identities; access-controlled confirmation; independent regrade; matched total resource accounting.
+
+This prevents conflating harness improvement with algorithmic RSI and prevents a benchmark-specific gain from being called general RSI. It also makes direct comparison to RSI-Env, HyperAgents, AIDE², and AI4AI-Bench more precise: each should be compared only on the overlapping system surface, autonomy condition, inheritance depth, and budget regime.
+
+### Symthaea's differentiating target
+
+Do not try to beat RSI-Env by maximizing one headline benchmark. Target **capability-preserving open-ended research autonomy**: an evolving model/harness/meta-process that can formulate goals, propose falsifiable interventions, retain failed and successful research state, and independently transfer gains while keeping every protected capability above its pre-registered floor. Report the full vector, worst regression, best-so-far and final checkpoint, per-generation cost, and independently confirmed discoveries per matched total budget.
+
+Immediate implications:
+
+- Add the three autonomy settings to the R4 meta-RSI protocol, with identical infrastructure and controlled evaluation permissions.
+- Treat model-weight updates and harness edits as separate treatments and as a coupled treatment; do not attribute a gain to the wrong edit surface.
+- Preserve a frozen external Host Controller for candidate registration, source identity, resource limits, sealed evaluation, and rollback. The candidate must not modify that controller.
+- Evaluate full capability retention on independent units and fresh task families. Use the cluster-aware view from issue #10513 as an analysis adapter, not as authentication.
+- Compare against the existing deterministic SYM-RSI-001 replay substrate as a low-cost mechanism baseline, then test transfer into real R&D/coding domains. The old replay stack remains a separate draft lineage and is not integrated into `main`.
+
+Source: Qu et al., *RSI-Env: An Open-Ended Environment for Recursive Self-Improvement of Agents*, arXiv:2611.01736v1, 2026-11-01. https://arxiv.org/abs/2611.01736
+
+
+## 12. Generalization ladder and external RSI benchmark matrix
+
+SelfImprove-Bench (Xu et al., arXiv:2611.02797v1, 2026-11-02) gives a useful explicit transfer ladder. Symthaea should preserve its R0–R5 claim ladder but score each system update on the following generalization levels:
+
+- **G0 — Replay:** improvement on the same replayed task instances.
+- **G1 — Same-task transfer:** held-out instances from the same task/game at the training difficulty.
+- **G2 — Difficulty transfer:** harder held-out instances of the same task/game.
+- **G3 — Within-capability transfer:** different tasks in the same capability category.
+- **G4 — Cross-capability transfer:** tasks in a different capability category.
+
+SelfImprove-Bench reports that these levels do not move monotonically: G1 improvement may fail on harder G2 instances; within-category transfer can be directional; and rankings between methods can reverse across transfer sets. Its HCI (Headroom-Closed Index) is HCI = (successor mean − baseline mean) / (reference mean − baseline mean). Always publish raw baseline/successor/reference scores and per-task results alongside HCI. HCI is normalized headroom closed, not an effect size or confidence interval; it can exceed 100% where successor performance surpasses the declared reference. The benchmark's controllable games support causal/mechanism analysis, but do not substitute for engineering or scientific transfer.
+
+### External benchmark tracks — separate scorecards
+
+| Track | What it tests | Use in Symthaea RSI |
+|---|---|---|
+| SelfImprove-Bench G0–G4 | Replay, same-task holdout, harder tasks, within-capability and cross-capability transfer | Primary generalization mechanism track; preserve all G-level results |
+| RSI-Env | Open-General, Capability-Directed and Benchmark-Guided model/harness self-improvement under an external controller | Autonomy-mode and capability-retention comparison |
+| AIDE² selection + held-out R&D tasks | Repeated research-agent rewrites across ML engineering, heuristic algorithms and harness engineering | R3 repeated improvement and independent transfer |
+| AIRS-Bench | 20 research-science tasks from ML papers across language modelling, mathematics, bioinformatics and time series; idea→experiment→analysis→refinement | Broad scientific-research lifecycle track |
+| FIRE-Bench | Rediscovery of established ML research findings through independently designed experiments and evidence-backed conclusions | Scientific correctness/replicability track, not prose-quality judging |
+| AI4AI-Bench | Actual training-algorithm redesign in 10 frozen research repositories under a four-hour design window and clean-start training evaluation | R5 algorithmic RSI; separate algorithm changes from harness, data and hyperparameter changes |
+| Coding Agent Index v2.0 components | FrontierCode v1.1, Terminal-Bench 4.0 and SWE-Atlas-QnA-AA | External software-engineering transfer; report each suite plus cost/reliability, not only index |
+
+### Prospective qualification targets (not measured results)
+
+These are research acceptance targets to preregister before any confirmatory run; they are not claims about current Symthaea performance:
+
+1. **R3 repeated improvement:** at least five successive independently accepted improvements, each evaluated under the same fixed total per-candidate budget; retain all rejected proposals and best-so-far checkpoints.
+2. **Transfer:** positive raw held-out delta at G1 and G2; positive aggregate G3 and G4 with a cluster-aware lower confidence bound above zero across a preregistered minimum of five independent task families/categories. Publish the full distribution; do not claim success from a single aggregate or one lucky domain.
+3. **Capability retention:** every protected metric stays above a pre-registered non-inferiority floor and per-metric regression margin. Example margins must be justified per metric and frozen before selection; do not universalize a 2-point margin across incomparable scales.
+4. **R4 meta-improvement:** more independent, transfer-confirmed improvements per total resource budget than frozen-meta, champion-only, fixed-meta archive, and matched random/human-search baselines. Resource accounting includes failed proposals, evaluations, training, inference, data access and retries.
+5. **R5 algorithmic improvement:** the patch must alter the learning objective, supervision, update rule or another declared learning mechanism; a harness, checkpointing, data-budget or hyperparameter-only change is a separate treatment. Train from a clean start and evaluate with a fixed hidden grader. The initial external aim is to exceed AI4AI-Bench's reported best normalized score of 0.250 under its exact frozen protocol, but no comparison is valid unless tasks, base models, B300-hour budgets and evaluation procedure match.
+6. **Research reliability:** on FIRE-Bench/AIRS-Bench, report experiment validity, independent evidence correctness, replication, uncertainty, unsupported claims and run variance—not only final score or LLM-judge writing quality.
+7. **Engineering transfer:** compare the same foundation model across a frozen baseline harness and Symthaea-enabled harness on FrontierCode, Terminal-Bench 4.0 and SWE-Atlas-QnA-AA, holding model version, reasoning setting, attempts, tools, budget and environment constant. Report per-suite pass@1 and pass@3 as appropriate, cost, tokens, wall-clock, refusals, reward-hack flags and verified patch quality.
+
+### Paradigm shift
+
+Treat improvement as a **causal research process with an audited transfer frontier**, not a chain of increasingly high scores. Each proposal must declare the mechanism it changes, predicted effects and possible regressions before evaluation; retain the complete trajectory, resource use and negative findings; and attribute observed changes to model, harness, memory, algorithm and meta-policy edits using matched ablations. The external controller—not the evolving agent—owns candidate identity, task release, resource caps, evaluator, independent regrade, holdout access and rollback.
+
+Sources:
+- Xu et al., *SelfImprove-Bench: Evaluating Generalization in Self-Improving Agents*, arXiv:2611.02797v1 (2026-11-02): https://arxiv.org/abs/2611.02797
+- Meta AI, *AIRS-Bench* (2026-02-10): https://ai.meta.com/research/publications/airs-bench-a-suite-of-tasks-for-frontier-ai-research-science-agents/
+- Wang et al., *FIRE-Bench*, PMLR 306 (2026): https://proceedings.mlr.press/v306/wang26d.html
+- Chi et al., *AI4AI-Bench*, arXiv:2608.20318 (2026-08-20): https://arxiv.org/abs/2608.20318
+- Artificial Analysis Coding Agent Index v2.0 methodology (2026-10): https://artificialanalysis.ai/methodology/coding-agents-benchmarking/
+
+
+## 13. Research-agent throughput and evaluation-noise controls: AIRA₂
+
+Meta AI's AIRA₂ (published 2026-04-16) is an important industry comparator for the R3/R4 research-agent substrate. Its authors identify three bottlenecks: synchronous single-GPU execution, noisy validation-based selection over long search horizons, and fixed single-turn operators. Their architecture combines an asynchronous multi-GPU worker pool, Hidden Consistent Evaluation (HCE), and ReAct agents that dynamically scope actions and debug interactively. The Meta publication reports MLE-bench-30 mean Percentile Rank of 81.5% at 24 hours and 83.1% at 72 hours, versus 72.7% for the strongest baseline; on AIRS-Bench it exceeds human state-of-the-art on 6 of 20 tasks. These are the paper's own results on its own protocol, not Symthaea measurements or directly transferable scores. [Source: Meta AI publication, 2026-04-16](https://ai.meta.com/research/publications/aira-overcoming-bottlenecks-in-ai-research-agents/).
+
+### What Symthaea should test rather than merely imitate
+
+1. **Asynchronous experiment orchestration:** submit independent candidate/probe jobs without serially blocking on the slowest evaluation. Preserve exact candidate and experiment identities, bounded queues, cancellation, retry lineage, resource attribution, and deterministic collection order. Workers may propose and execute only within the external controller's permission; they cannot edit the evaluator or trust roots.
+2. **Hidden-consistent evaluation:** distinguish cheap/public development feedback from a frozen, independently controlled confirmation signal. Repeat or aggregate noisy evaluations with a predeclared estimator; retain every replicate and its resource use. A score used for candidate selection must not also be presented as independent confirmation. Measure selection regret and false-winner rate over long search horizons, not just evaluator repeatability.
+3. **Interactive research operators:** compare fixed single-turn edit/score operators with ReAct-style diagnose → formulate a falsifiable hypothesis → choose a bounded probe → inspect evidence → debug/refine. Each step should emit a trace with the hypothesis, predicted observation, selected probe, actual result, and whether the hypothesis was falsified.
+4. **Joint ablation:** test async pool only, HCE only, interactive operator only, all three, and frozen baseline. Use the same foundation model, accessible data, total GPU/CPU hours, candidate-generation budget, evaluator calls, and allowed toolset. A second operational comparison may fix wall-clock instead, but must report the extra compute/energy consumed. Never compare equal wall-clock with unequal compute as if it were a compute-matched result.
+
+### RSI-specific measurements
+
+- Independently confirmed, held-out improvements per total compute-hour and per wall-clock hour (separate scorecards).
+- Best-so-far trajectory, final checkpoint, number of candidates proposed/evaluated/retained/rejected, and improvement survival after fresh evaluation.
+- Worker utilization, queue delay, GPU/CPU hours, peak memory, total tokens, energy and cost; retries and failed proposals remain in the denominator.
+- Evaluation noise, replicate variance, HCE repeatability, false-winner rate, selection regret and post-selection reversal rate.
+- Interactive operator's hypothesis falsification rate, useful-probe rate, debugging iterations, patch collateral and independently verified outcome.
+- Transfer across SelfImprove-Bench G0–G4 and AIRS-Bench task families, without using final confirmation items during search.
+
+### Hardware-aware execution strategy
+
+The local Symthaea development target includes a single RTX 2070 Laptop GPU (~8 GB VRAM). It should not claim AIRA₂'s multi-GPU throughput scaling from asynchronous scheduling alone. An honest first implementation can overlap CPU-side static analysis, repository indexing, fixture generation, scoring and artifact checks while keeping GPU inference/training concurrency bounded by measured VRAM. For any remote/multi-GPU experiment, charge all workers and queue retries to the same all-in budget. Publish quality-versus-compute and quality-versus-wall-clock curves separately.
+
+### Proposed target
+
+Under a frozen, repeated-run research task suite, the combined system should yield more **independently confirmed generalizing improvements per fixed total compute budget** than both a synchronous interactive baseline and an asynchronous fixed-operator baseline, with no protected capability regression. In the equal-wall-clock track it should improve time-to-first-confirmed-gain without hiding increased compute, energy or cost. No numeric superiority threshold should be frozen until the baseline variance and practical effect are measured on a development set; the confirmatory threshold and power plan must then be preregistered.
+
+This complements #10497 (meta-RSI comparison), #8438 (paired/cluster uncertainty), #9433 (population generalization), and #10521/#10533 (validated receipt composition). It does not create a second scheduler, receipt format, evaluator or runner-isolation boundary.
+
+
+
+
+**Versioned AIRA₂ score note:** Meta's April 16, 2026 publication page reports 81.5% mean percentile rank on MLE-bench-30 at 24 hours and 83.1% at 72 hours, with the strongest baseline at 72.7%. The earlier arXiv v1 record (March 27, 2026) reports 71.8% at 24 hours and 76.0% at 72 hours versus a 69.9% prior best. Do not combine these numbers as though they came from one unchanged result table. Pin the publication/preprint version, benchmark subset, run protocol and scoring definition for any comparison; use the latest publication-page numbers only when explicitly citing that publication version.
+
+## 14. Claim-indexed RSI evidence and same-start improver identification
+
+Chen, Zhu and Zheng, *Auditing the Product, Not the Recursion: The Evaluation Evidence Behind Recursive Self-Improvement Claims*, arXiv:2610.27610 (2026-10-20), provides a useful empirical audit of RSI evaluation practice. In an October 2026 search frame of 114 eligible studies, including 90 RSI-labelled studies, 60% reported evaluation on tasks unused for selection, but only 22% audited at least two independent reruns of the full loop. Of 26 studies claiming a better improver, only four compared earlier and later improvers from identical starting artifacts at a matched budget. The study distinguishes the resulting system's performance (a product claim) from repeatability/accumulation and a better improvement procedure (process claims). These are meta-research findings for its defined search frame, not universal estimates of all RSI work.
+
+### Claim-indexed qualification ladder
+
+Do not use one RSI label to cover all forms of evidence. Each claim must point to its identifying experiment:
+
+| Claim | Required evidence | What it does not establish |
+|---|---|---|
+| Product gain (R1/R2) | Final successor vs initial system on tasks never used for candidate selection; independent audit grader; exact denominators and full protected capability vector | That the process repeats or that the improver improved |
+| Accumulation (R3) | Audited retained checkpoints across each round; development and independent audit outcomes reported for the same rounds; at least two independent full-loop reruns | That a later improver is intrinsically better at a common starting state |
+| Improver gain (R4) | Same-start swap test: clone identical solver, corpus/research state, data access and checkpoint; apply earlier vs later improver under matched all-in compute and evaluator budgets; independently audit both | Algorithmic RSI or model-training improvement |
+| Algorithmic gain (R5) | Freeze base model, data, harness, training budget and evaluation; change the declared learning objective/update algorithm; clean-start train successors; independent held-out audit | Improvement caused only by harness/data/search changes |
+
+### Required R4 experiment
+
+At each meta-improver generation k, freeze the current solver artifacts, research memory, task corpus, tools, prompts, evaluator interface and resource policy. Create two byte-identical starting states:
+
+- **A — prior improver:** generation k-1's improvement procedure;
+- **B — evolved improver:** generation k's improvement procedure.
+
+Both arms receive the same total compute-hours, accelerator type, wall-clock cap (report separately), data and network permissions, candidate proposal budget, evaluation calls, retries and toolset. Randomize independent paired run IDs and repeat the full loop across multiple seeds and task-family blocks. Every proposal, rejected candidate, retry, model call, tool call, training step, resource unit and checkpoint is retained. A fixed-improver and matched random/human-search control remain additional arms; they do not replace the same-start swap test.
+
+Primary R4 estimand: paired difference in independently confirmed, generalizing improvements per matched all-in resource budget. Secondary outcomes: time-to-first-confirmed-gain; best-so-far and final capability vector; survival of each selected change after fresh audit; proposal/acceptance/reversal rates; cost per accepted improvement; G0–G4 transfer; and protected-capability regression. A final candidate score selected from the same development signal is not an independent audit.
+
+### Full-loop repeatability
+
+A single successful chain of five sequential improvements is not five independent demonstrations of the loop. Report (1) within-run accumulation across retained checkpoints and (2) independent full-loop reruns from frozen starting artifacts as separate quantities. Run at least three independent full-loop replications for exploratory screening, then preregister the confirmatory run count by power/precision analysis; the two-rerun threshold in the meta-research paper is a minimum reporting indicator, not an adequate sample-size prescription. Report run-level distributions and failure trajectories, not only the best run.
+
+### Selection and evaluator controls
+
+- Separate cheap development feedback from the independent audit. Do not tune on the audit set or repeatedly reveal its results to the improver.
+- Use the frozen candidate archive to retain every proposal and evaluation; never keep only the champion or overwrite rejected attempts.
+- Add noise-aware selection and a preregistered correction/holdout policy for adaptive reuse. The audit paper cites REUSE's reported reduction of false promotions from up to 20.7% to zero in its own live experiments; this is a published result to evaluate as a comparator, not a Symthaea result.
+- Include a null loop (shuffled feedback or proposals that cannot improve the target) to estimate apparent gain from search/selection noise.
+- Audit grader independence and error correlation with the development judge. A held-out task set does not cure shared grader bias by itself.
+- Keep exact candidate/source identity, full budget, task universe, cluster unit, checkpoint lineage and verifier identity in every evidence record.
+
+### RSI-Index comparison: RSIGym
+
+RSIGym (Meng et al., arXiv:2610.10310, 2026-10-07) is an additional external comparator for the R4 programme. It offers reusable training, inference, rollout, evaluation and sandbox services with shared budget and permission controls. Its Data, Harness and Joint tracks distinguish data changes from execution-harness changes and their combination. It reports a best RSI-Index of 0.4809 for Opus 5 in independent Joint runs under a $500 platform-service budget per benchmark run, and selected-system gains on SWE-bench Verified (17.67% to 50.33%) and AIME (31.67% to 97.78%). Those are author-reported preprint results on RSIGym's protocol; they are not directly comparable to AI4AI-Bench's algorithm-only score, RSI-Env's experiments or SelfImprove-Bench's G0–G4 transfer levels.
+
+For Symthaea, reproduce the Data-only, Harness-only and Joint tracks, add an explicit Algorithm-only track, and include a frozen baseline. Keep all-in compute, service cost and wall-clock as distinct budgets. Report each benchmark lane, capability retention, independent audit and repeated-loop variance; do not optimize only for RSI-Index.
+
+Sources:
+- Chen, Zhu & Zheng, *Auditing the Product, Not the Recursion*, arXiv:2610.27610 (2026-10-20): https://arxiv.org/abs/2610.27610
+- Meng et al., *RSIGym: A Flexible Environment for Recursive Self-Improvement*, arXiv:2610.10310 (2026-10-07): https://arxiv.org/abs/2610.10310
