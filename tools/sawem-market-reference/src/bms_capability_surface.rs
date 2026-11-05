@@ -156,9 +156,7 @@ fn expected_cell_count(
         .ok_or(CapabilitySurfaceError::ArithmeticOverflow)
 }
 
-fn validate_surface(
-    surface: BatteryCapabilitySurface<'_>,
-) -> Result<(), CapabilitySurfaceError> {
+fn validate_surface(surface: BatteryCapabilitySurface<'_>) -> Result<(), CapabilitySurfaceError> {
     if !nonempty(surface.battery_unit_id) || !nonempty(surface.surface_source_ref) {
         return Err(CapabilitySurfaceError::InvalidEvidenceReference);
     }
@@ -364,7 +362,9 @@ mod tests {
             } else {
                 None
             },
-            minimum_cell_sample_count: if basis == CapabilityEvidenceBasis::FieldMeasuredConservative {
+            minimum_cell_sample_count: if basis
+                == CapabilityEvidenceBasis::FieldMeasuredConservative
+            {
                 20
             } else {
                 0
@@ -387,7 +387,10 @@ mod tests {
         .unwrap();
         assert_eq!(result.selected_cell, (1, 1, 1));
         assert_eq!(result.maximum_supported_power_w, 1_500);
-        assert_eq!(result.disposition, crate::bms_capability::CapabilityDisposition::WithinEnvelope);
+        assert_eq!(
+            result.disposition,
+            crate::bms_capability::CapabilityDisposition::WithinEnvelope
+        );
         assert_eq!(result.lower_quantile_bps, Some(500));
         assert!(result.evidence_basis_is_non_synthetic);
     }
@@ -406,7 +409,10 @@ mod tests {
         .unwrap();
         assert_eq!(result.selected_cell, (1, 1, 1));
         assert_eq!(result.maximum_supported_power_w, 2_000);
-        assert_eq!(result.disposition, crate::bms_capability::CapabilityDisposition::DerateRequired);
+        assert_eq!(
+            result.disposition,
+            crate::bms_capability::CapabilityDisposition::DerateRequired
+        );
     }
 
     #[test]
@@ -449,7 +455,10 @@ mod tests {
 
     #[test]
     fn incomplete_or_duplicated_cells_fail_closed() {
-        let profile = surface(CapabilityEvidenceBasis::FieldMeasuredConservative, &CELLS[..7]);
+        let profile = surface(
+            CapabilityEvidenceBasis::FieldMeasuredConservative,
+            &CELLS[..7],
+        );
         assert_eq!(
             assess_capability_surface(
                 profile,
@@ -464,7 +473,10 @@ mod tests {
 
         let mut duplicate = CELLS;
         duplicate[7] = cell("cell-duplicate", 0, 0, 0, 1_000, 1_000, 40);
-        let profile = surface(CapabilityEvidenceBasis::FieldMeasuredConservative, &duplicate);
+        let profile = surface(
+            CapabilityEvidenceBasis::FieldMeasuredConservative,
+            &duplicate,
+        );
         assert_eq!(
             assess_capability_surface(
                 profile,
@@ -500,7 +512,10 @@ mod tests {
             source_sha256: "invalid",
             ..cell("bad-digest-cell", 1, 1, 1, 1_500, 2_000, 40)
         };
-        let profile = surface(CapabilityEvidenceBasis::FieldMeasuredConservative, &bad_digest);
+        let profile = surface(
+            CapabilityEvidenceBasis::FieldMeasuredConservative,
+            &bad_digest,
+        );
         assert_eq!(
             assess_capability_surface(
                 profile,
