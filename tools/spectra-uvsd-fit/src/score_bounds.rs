@@ -493,7 +493,25 @@ pub fn verify_score_bounds_receipt(
         &config,
         schedule,
     )?;
-    if &reproduced != receipt {
+    if reproduced.method_id != receipt.method_id
+        || reproduced.time_uniform != receipt.time_uniform
+        || reproduced.alpha_spending_rule != receipt.alpha_spending_rule
+        || reproduced.action_set_digest != receipt.action_set_digest
+        || reproduced.action_snapshot != receipt.action_snapshot
+        || reproduced.scenario_set_digest != receipt.scenario_set_digest
+        || reproduced.familywise_alpha != receipt.familywise_alpha
+        || reproduced.per_claim_alpha != receipt.per_claim_alpha
+        || reproduced.familywise_confidence != receipt.familywise_confidence
+        || reproduced.claim_count != receipt.claim_count
+        || reproduced.minimum_replicates != receipt.minimum_replicates
+        || reproduced.ranges != receipt.ranges
+        || reproduced.score_contract_digest != receipt.score_contract_digest
+        || reproduced.source_digest != receipt.source_digest
+        || reproduced.root_seed != receipt.root_seed
+        || reproduced.samples != receipt.samples
+        || reproduced.metrics != receipt.metrics
+        || reproduced.scenario_outcomes != receipt.scenario_outcomes
+    {
         return Err(ScoreBoundError::ReceiptRecomputationMismatch);
     }
     Ok(())
