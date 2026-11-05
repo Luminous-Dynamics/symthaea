@@ -264,3 +264,43 @@ We should not try to beat frontier models by making one pooled accuracy number h
 6. **Governance:** rights, authority, consent, update/retraction and auditable evidence lineage are hard gates, not tradeable score weights.
 
 The initial industry-facing comparison should pin one current frontier API baseline, one open-weight multilingual baseline and one locally relevant South African baseline per task where possible. We must match data split, evidence budget, prompt exposure, context, decoding and tool access, and publish per-case outputs plus confidence intervals. A claim of superiority is allowed only for the exact task, split, language and budget tested.
+
+
+| **Poly-FEVER** (Findings EMNLP 2026) | 11 languages: English, Chinese, Hindi, Arabic, Bengali, Japanese, Korean, Tamil, Thai, Georgian and Amharic; no isiZulu, isiXhosa, Sepedi or Sesotho in the released language list | 77,973 aligned Supported/Refuted claims; 22-topic metadata; prompt families, rephrasing robustness and DPR/Wikipedia retrieval | Strong global multilingual factuality comparator. Its translations are Google Cloud Translation with targeted human audit, GEMBA and COMETKiwi. Pin release revision and verify exact data license before admission. | Large-scale cross-lingual method control, not South African coverage |
+
+## 2.1 Additional cross-lingual comparator: Poly-FEVER
+
+[Poly-FEVER (Findings EMNLP 2026)](https://aclanthology.org/2026.findings-emnlp.540/) extends FEVER, Climate-FEVER and SciFact to 77,973 aligned claims across 11 languages. The current dataset card reports 46,808 Supported and 31,165 Refuted claims, and translation-quality metadata for each target language.
+
+Use it as a global comparator for:
+- language-aligned claim verification;
+- topic-stratified analysis;
+- translation-quality covariates;
+- prompt/rephrasing robustness;
+- retrieval-augmented factuality comparisons.
+
+It does **not** include the four South African languages in Multi-Hall-SA. Its alignment is translation-based, whereas Multi-Hall-SA extracts facts from parallel government document pairs and generates controlled factual/hallucinated statement pairs in parallel. These datasets test different sources of cross-language failure; never pool their scores or treat either as a replacement for the other.
+
+- Paper: https://aclanthology.org/2026.findings-emnlp.540/
+- Dataset card: https://huggingface.co/datasets/HanzhiZhang/Poly-FEVER
+
+The currently visible card does not provide a license field in the retrieved summary. Verify the dataset repository's exact license, source licensing, and data-use conditions before downloading, copying, fine-tuning, or including it in commercial fixtures. No license is inferred from public availability.
+
+## 2.2 Multi-Hall-SA design limits to preserve in evaluation reports
+
+The current [Multi-Hall-SA card](https://huggingface.co/datasets/sello-ralethe/Multi-Hall-SA) states:
+- Each row has the English factual statement, English hallucinated counterpart, target factual statement and target hallucinated counterpart.
+- Facts are extracted from aligned document pairs in parallel rather than translating the English hallucination, specifically to avoid translation artefacts that a detector could exploit.
+- Hallucinations are synthetically perturbed across four error types and balanced by construction.
+- The benchmark's stated purpose is to measure the **cross-lingual detection gap**; its English condition is intentionally not difficult.
+- A `prompts/` configuration includes recovered fact-extraction and hallucination-generation templates, model/decoding details and wording artefacts. The dataset card says detection prompts were not recorded with the generation pipeline.
+
+Consequences:
+1. Report absolute accuracy and per-class metrics, but do not interpret this resource as a comprehensive real-world hallucination-difficulty benchmark.
+2. Add a separate source-grounded factuality evaluation using independently authored/adjudicated claims and realistic evidence packs; do not treat synthetic perturbation detection as full fact verification.
+3. Reproduce the published detection setup only where the paper specifies enough detail. A generic detection prompt found in a construction repository is not proof of exact reproduction.
+4. Keep source text external/read-only; verify source and benchmark rights, revision, original government-source metadata, and human validation documentation before use.
+5. Audit perturbation-generator artefacts and near-duplicate leakage; use source-family/document splits and separately report synthetic vs independently authored cases.
+
+Dataset card: https://huggingface.co/datasets/sello-ralethe/Multi-Hall-SA  
+Paper: https://aclanthology.org/2026.findings-eacl.330/
