@@ -14,12 +14,12 @@ const PROVENANCE_SCHEMA: &str = "pitb.sorrydb-snapshot-provenance.v0";
 const RECEIPT_SCHEMA: &str = "pitb.sorrydb-task-reproduction.v0";
 const REPORT_SCHEMA: &str = "pitb.sorrydb-integrity-report.v0";
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct Database {
     sorries: Vec<SorryRecord>,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
 struct SorryRecord {
     repo: RepoInfo,
     location: Location,
@@ -28,7 +28,7 @@ struct SorryRecord {
     id: String,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
 struct RepoInfo {
     remote: String,
     branch: String,
@@ -36,7 +36,7 @@ struct RepoInfo {
     lean_version: String,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
 struct Location {
     path: String,
     start_line: u64,
@@ -45,13 +45,13 @@ struct Location {
     end_column: u64,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
 struct DebugInfo {
     goal: String,
     url: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Provenance {
     schema_version: String,
@@ -67,7 +67,7 @@ struct Provenance {
     paper_url: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct TaskReceipt {
     schema_version: String,
