@@ -379,7 +379,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         },
         &config,
     )?;
-    for mut record in reciprocal {
+    for record in &mut reciprocal {
         bind_and_verify_synthetic_artifacts(&mut record.agent)?;
         artifact_bindings_verified += 1;
         artifact_report_rows +=
