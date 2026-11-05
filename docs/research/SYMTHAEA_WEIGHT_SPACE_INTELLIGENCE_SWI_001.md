@@ -135,7 +135,7 @@ The network has analytic gradient / Adam paths. This gives SWI an unusually usef
 - routes asynchronous cognitive-loop weight swaps through try_set_weights() and rejects invalid updates without panicking;
 - preserves the legacy set_weights() signature as a compatibility wrapper.
 
-Ten tests were added: one for manifest/layout agreement, one for architecture-versus-parameter fingerprint identity, two for typed-group replacement, four for malformed/valid parameter loading, and two for asynchronous cognitive-loop weight swap acceptance/rejection. The new tests have not been executed here; do not describe them as passing until run on the exact branch head.
+Thirteen tests were added across the CfC and async training modules: manifest/layout; architecture-versus-parameter fingerprint identity; typed-group replacement; stale model-digest rejection; duplicate batch rejection; atomic multi-group replacement; malformed/valid parameter loading; and valid/invalid asynchronous weight-swap handling. The new tests have not been executed here; do not describe them as passing until run on the exact branch head.
 
 ### 4.2 HDC-LTC: novel representation-space target
 
@@ -161,7 +161,7 @@ Relevant file:
 
 Broca's projection layer contains down/up and backward projection weights, optional deeper bottlenecks, expert-specific weights, and gradient diagnostics. It also has a metamorphic update function that targets named projection groups through a string selector.
 
-SWI should eventually replace stringly typed edit targets at the integration boundary with a typed parameter-group identifier. Diagnostics already track gradient norms, clipping, bottleneck norms, and variance; those are useful evidence signals, but they must not substitute for held-out language and semantic evaluations.
+CfC now exposes typed parameter-group IDs at the SWI boundary. Broca's existing metamorphic API still uses string selectors; a later Broca adapter should replace those at the SWI boundary with typed projection/expert identifiers. Diagnostics already track gradient norms, clipping, bottleneck norms, and variance; those are useful evidence signals, but they must not substitute for held-out language and semantic evaluations.
 
 ### 4.4 Existing interventions and source rewriting are adjacent, not equivalent
 
