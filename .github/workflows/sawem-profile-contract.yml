@@ -14,7 +14,6 @@ on:
       - "tools/sawem-profile-conformance/**"
       - "tools/sawem-market-reference/**"
       - ".github/workflows/sawem-profile-contract.yml"
-      - ".github/workflows/sawem-profile-contract.yml"
   workflow_dispatch:
 
 permissions:
