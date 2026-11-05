@@ -1704,7 +1704,8 @@ mod tests {
                 b
             );
         }
-    
+    }
+
     // ---------------------------------------------------------------
     // 15. try_set_weights() rejects malformed payloads transactionally
     // ---------------------------------------------------------------
@@ -1754,6 +1755,5 @@ mod tests {
 
         assert!(net.try_set_weights(&weights).is_ok());
         assert_eq!(net.get_weights(), weights);
-    }
     }
 }
