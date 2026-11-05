@@ -1218,3 +1218,31 @@ The current chain now has five separate executable claims:
 
 None of these claims establishes producer identity, APK/IPA signature validity, trust policy, package authorization, archive completeness, installability or runtime safety. Those remain separate child workstreams in #10508 and #10537–#10540.
 
+
+## 29. 2026-11-05 — typed claim entailment and falsification benchmark
+
+A new benchmark owner, [#10629 — REA-RUST-035](https://github.com/Luminous-Dynamics/symthaea/issues/10629), covers the layer between verified evidence and investigator conclusions. The machine-readable manifest now contains 33 benchmark families; this addition is a claim-evaluation family, not another archive parser, evidence graph, receipt or fuzz owner.
+
+### Research question
+
+Can a system demonstrate that a technical conclusion is entailed by exact, scoped, dependency-aware evidence, and reliably abstain when the evidence does not establish the proposition?
+
+A valid member receipt may establish integrity of one occurrence's observed decompressed bytes. It does not establish whole-archive completeness, producer authenticity, signature validity, signer trust, package authorization, installability, benignness or safe runtime behavior. Likewise, agreement among provider names does not establish independence when providers share parsers, acquisition channels, rules, models or upstream reports.
+
+### Proposed contract
+
+The evaluator consumes existing Evidence, EvidenceBundle, receipt and provider-lineage objects without changing REA semantic Evidence IDs. It emits a typed outcome: supported_within_scope, refuted_within_scope, underdetermined, conflicted, inapplicable or unverified. Every supported conclusion binds exact premise references, claim predicate, artifact/build/platform/time scope, assumptions, rule-set version, contradictions and limitations. There is no global trust scalar and no majority-vote adjudication.
+
+The initial non-implication corpus explicitly separates member integrity, archive identity, producer authenticity, signature mathematics, signer identity, signer trust, package authorization, platform acceptance, archive completeness, causal claims and security-control evaluation. Missing, unsupported, stale, unknown-lineage and out-of-scope observations remain visible.
+
+### Benchmark and ablations
+
+The corpus includes repackaged archives with the same member digest but different whole-archive digests; verified-member versus whole-archive-completeness confusion; CRC recomputation; unsigned or unauthorized receipt attestations; valid-but-unexpected signers; trusted signers with malicious content; shared-root provider agreement on a false fact; unknown provider ancestry; source mutation during capture; partial streams; SDK/build/time scope substitution; malformed APK v3.2 structures; stale EvidenceBundle histories; and probes with high information gain but no decision value.
+
+Compare three matched agent conditions: (A) raw report synthesis, (B) synthesis with receipt and lineage context, and (C) synthesis gated by the typed Claim Evaluator. Use a frozen held-out set, independent expected dispositions and blinded adjudication. Report false entailment/refutation, scope leakage, correct abstention, evidence-reference completeness, deterministic derivation replay, investigator time/calls to expose an overclaim, and selective risk versus coverage. Do not combine these into a single score.
+
+Prospective targets—not results—are 100% disposition accuracy on the finite adversarial suite, zero false entailments on seeded non-implication controls, zero independence uplift from duplicate/relayed/unknown-lineage providers, and deterministic replay of every supported derivation. Decision-aware probe selection remains separately measured under [#9911](https://github.com/Luminous-Dynamics/symthaea/issues/9911).
+
+### Claim ceiling
+
+Passing this benchmark qualifies only the named predicates, rules, source corpus, dependency knowledge and scopes. It does not show that evidence is complete, that undisclosed dependencies are absent, that an issuer is honest or that software is safe.
