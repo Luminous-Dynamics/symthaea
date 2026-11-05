@@ -1745,3 +1745,5 @@ mod tests {
 
 /// Operational sequential action-selection primitives for SPECTRA.
 pub mod sequential;
+/// Failure-preserving scenario aggregation for adaptive candidate assessments.
+pub mod scenario;
