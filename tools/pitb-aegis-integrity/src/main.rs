@@ -38,6 +38,7 @@ struct Snapshot {
     paper_version: String,
     paper_submitted_date: String,
     snapshot_id: String,
+    sample_protocol: String,
     dataset_artifact_status: String,
     dataset_artifact_url: Option<String>,
     dataset_archive_sha256: Option<String>,
@@ -262,6 +263,9 @@ fn validate_snapshot(snapshot: &Snapshot, allow_synthetic: bool) -> Result<(), S
     non_empty(&snapshot.paper_version, "snapshot.paper_version")?;
     non_empty(&snapshot.paper_submitted_date, "snapshot.paper_submitted_date")?;
     non_empty(&snapshot.snapshot_id, "snapshot.snapshot_id")?;
+    if !matches!(snapshot.sample_protocol.as_str(), "paper_v1_hold_only" | "custom_polarity_balanced") {
+        return Err("unsupported Aegis sample_protocol".into());
+    }
     if snapshot.paper_reference.attempted_source_problems != 2356
         || snapshot.paper_reference.validated_rust_lean_program_pairs != 2045
         || snapshot.paper_reference.candidate_specifications != 11533
@@ -430,7 +434,7 @@ fn validate_specification(spec: &Specification, index: usize) -> Result<(), Stri
     Ok(())
 }
 
-fn validate_sample(entry: &SampleEntry, spec: &Specification, index: usize) -> Result<(), String> {
+fn validate_sample(entry: &SampleEntry, spec: &Specification, sample_protocol: &str, index: usize) -> Result<(), String> {
     let label = format!("sample entry row {index}");
     if entry.schema_version != SAMPLE_SCHEMA {
         return Err(format!("{label} has unsupported schema"));
@@ -449,8 +453,12 @@ fn validate_sample(entry: &SampleEntry, spec: &Specification, index: usize) -> R
         if spec.specification_status != "retained" {
             return Err(format!("{label} selected a specification that was filtered upstream"));
         }
-        if spec.requested_polarity != "hold" {
-            return Err(format!("{label} selected a requested-to-fail specification; published Aegis sample excludes that category"));
+        match sample_protocol {
+            "paper_v1_hold_only" if spec.requested_polarity != "hold" => {
+                return Err(format!("{label} selected a requested-to-fail specification; paper-v1 sample excludes that category"));
+            }
+            "paper_v1_hold_only" | "custom_polarity_balanced" => {}
+            _ => return Err(format!("{label} has unsupported sample protocol")),
         }
         if spec.plausible_screen_status == "counterexample_found" {
             return Err(format!("{label} selected a statement already refuted by the Plausible screen"));
@@ -649,7 +657,7 @@ fn validate_all(
     let mut sample_map = BTreeMap::<String, &SampleEntry>::new();
     for (i, entry) in sample.iter().enumerate() {
         let spec = spec_map.get(&entry.specification_id).ok_or_else(|| format!("sample row {} references unknown spec", i + 1))?;
-        validate_sample(entry, spec, i + 1)?;
+        validate_sample(entry, spec, &snapshot.sample_protocol, i + 1)?;
         if sample_map.insert(entry.specification_id.clone(), entry).is_some() {
             return Err(format!("duplicate sample entry for spec {}", entry.specification_id));
         }
@@ -849,6 +857,7 @@ fn fixture_snapshot() -> Snapshot {
         paper_version: "v1".into(),
         paper_submitted_date: "2026-10-28".into(),
         snapshot_id: "synthetic-aegis-contract-v0".into(),
+        sample_protocol: "paper_v1_hold_only".into(),
         dataset_artifact_status: "synthetic_fixture".into(),
         dataset_artifact_url: None,
         dataset_archive_sha256: None,
@@ -1076,6 +1085,25 @@ fn run_self_tests() -> Result<(), String> {
         return Err("requested-to-fail spec was admitted to the paper's proof-only sample".into());
     }
     println!("SELF_TEST_PASS requested-to-fail sample exclusion is enforced");
+
+    let mut balanced_snapshot = snapshot.clone();
+    balanced_snapshot.sample_protocol = "custom_polarity_balanced".into();
+    let mut balanced_sample = sample.clone();
+    balanced_sample[2].selected = true;
+    balanced_sample[2].exclusion_reason = "none".into();
+    let balanced_report = validate_all(
+        &balanced_snapshot,
+        &programs,
+        &specs,
+        &balanced_sample,
+        &attempts,
+        digests.clone(),
+        true,
+    )?;
+    if balanced_report.outcome_summary.selected_specification_count != 3 {
+        return Err("custom polarity-balanced protocol did not admit both requested polarities".into());
+    }
+    println!("SELF_TEST_PASS custom polarity-balanced protocol admits requested-to-fail tasks");
 
     let mut bad_sample = sample.clone();
     bad_sample[3].selected = true;
