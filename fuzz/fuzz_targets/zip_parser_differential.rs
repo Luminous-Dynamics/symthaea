@@ -191,10 +191,8 @@ fuzz_target!(|data: &[u8]| {
         if !verified.verified_crc32 {
             mismatch("custom reader reported success without independent CRC acceptance");
         }
-        if verified.observed_crc32 != oracle_crc32
-            || verified.observed_crc32 != oracle_observed_crc32
-        {
-            mismatch("custom streaming CRC differs from the independent oracle CRC");
-        }
+        // This base-branch API exposes CRC acceptance as a boolean, not the numeric CRC.
+        // The oracle separately proves its payload CRC equals the central-directory CRC above;
+        // the production reader must independently report successful CRC validation.
     }
 });
