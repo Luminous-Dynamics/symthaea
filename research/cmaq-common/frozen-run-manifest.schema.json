@@ -1,0 +1,925 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-frozen-run-manifest-v0.1.json",
+  "title": "CMAQ Frozen Pre-Run Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "manifest_kind",
+    "run_id",
+    "frozen_at_utc",
+    "track",
+    "repository",
+    "candidate",
+    "generator",
+    "evaluator",
+    "data_sources",
+    "task_contract",
+    "sample",
+    "budgets",
+    "baseline_registry",
+    "comparisons",
+    "metrics",
+    "statistics",
+    "qualification",
+    "claim_boundary"
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "git_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "nonempty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nullable_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullable_git_commit": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/git_commit"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "relative_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$"
+    },
+    "sha256_path": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-frozen-run-manifest-v0.1"
+    },
+    "manifest_kind": {
+      "const": "pre_run_freeze"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{5,127}$"
+    },
+    "frozen_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "track": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "protocol_version",
+        "scientific_claim",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^cmaq-[0-9]{3}$"
+        },
+        "protocol_version": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "scientific_claim": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "status": {
+          "enum": [
+            "development",
+            "calibration",
+            "qualification",
+            "reproduction"
+          ]
+        }
+      }
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url",
+        "commit",
+        "dirty_tree",
+        "source_tree_sha256"
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "commit": {
+          "$ref": "#/$defs/git_commit"
+        },
+        "dirty_tree": {
+          "const": false
+        },
+        "source_tree_sha256": {
+          "$ref": "#/$defs/nullable_sha256"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "kind",
+        "source_commit",
+        "artifact_sha256",
+        "config_sha256",
+        "weights_sha256",
+        "adapter_sha256",
+        "build_status",
+        "config_path"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "kind": {
+          "enum": [
+            "learned_world_model",
+            "model_free_policy",
+            "synthetic_reference_arms",
+            "hybrid_controller",
+            "external_baseline"
+          ]
+        },
+        "source_commit": {
+          "$ref": "#/$defs/git_commit"
+        },
+        "artifact_sha256": {
+          "$ref": "#/$defs/nullable_sha256"
+        },
+        "config_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "weights_sha256": {
+          "$ref": "#/$defs/nullable_sha256"
+        },
+        "adapter_sha256": {
+          "$ref": "#/$defs/nullable_sha256"
+        },
+        "build_status": {
+          "enum": [
+            "built_and_hashed",
+            "source_only_not_compiled",
+            "external_frozen_artifact"
+          ]
+        },
+        "config_path": {
+          "$ref": "#/$defs/relative_path"
+        }
+      }
+    },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "source_commit",
+        "config_sha256",
+        "config_path"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "source_commit": {
+          "$ref": "#/$defs/git_commit"
+        },
+        "config_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "config_path": {
+          "$ref": "#/$defs/relative_path"
+        }
+      }
+    },
+    "evaluator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "source_commit",
+        "metric_bundle_sha256",
+        "version",
+        "metric_bundle_path"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "source_commit": {
+          "$ref": "#/$defs/git_commit"
+        },
+        "metric_bundle_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "version": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "external_judge": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "provider",
+                "model",
+                "endpoint_version"
+              ],
+              "properties": {
+                "provider": {
+                  "$ref": "#/$defs/nonempty"
+                },
+                "model": {
+                  "$ref": "#/$defs/nonempty"
+                },
+                "endpoint_version": {
+                  "$ref": "#/$defs/nonempty"
+                }
+              }
+            }
+          ]
+        },
+        "metric_bundle_path": {
+          "$ref": "#/$defs/relative_path"
+        }
+      }
+    },
+    "data_sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "revision",
+          "split",
+          "manifest_sha256",
+          "license",
+          "visibility",
+          "candidate_access",
+          "manifest_path"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/nonempty"
+          },
+          "kind": {
+            "enum": [
+              "synthetic",
+              "public_dataset",
+              "licensed_dataset",
+              "external_benchmark"
+            ]
+          },
+          "name": {
+            "$ref": "#/$defs/nonempty"
+          },
+          "revision": {
+            "$ref": "#/$defs/nonempty"
+          },
+          "split": {
+            "$ref": "#/$defs/nonempty"
+          },
+          "manifest_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "license": {
+            "$ref": "#/$defs/nonempty"
+          },
+          "visibility": {
+            "enum": [
+              "candidate_visible",
+              "evaluator_only",
+              "mixed_with_explicit_partition"
+            ]
+          },
+          "candidate_access": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/nonempty"
+            },
+            "uniqueItems": true
+          },
+          "manifest_path": {
+            "$ref": "#/$defs/relative_path"
+          }
+        }
+      }
+    },
+    "task_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suite",
+        "environment_id",
+        "environment_revision",
+        "observation_schema_sha256",
+        "action_schema_sha256",
+        "reward_definition_sha256",
+        "wrapper_stack",
+        "wrapper_stack_sha256",
+        "action_repeat",
+        "simulator_steps_per_action",
+        "controller_horizon",
+        "base_simulator_horizon",
+        "reward_aggregation",
+        "termination_semantics",
+        "observation_schema_path",
+        "action_schema_path",
+        "reward_definition_path",
+        "wrapper_stack_path"
+      ],
+      "properties": {
+        "suite": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "environment_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "environment_revision": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "observation_schema_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "action_schema_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reward_definition_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "wrapper_stack": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonempty"
+          }
+        },
+        "wrapper_stack_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "action_repeat": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "simulator_steps_per_action": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "controller_horizon": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "base_simulator_horizon": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reward_aggregation": {
+          "enum": [
+            "single_step",
+            "sum",
+            "discounted_sum",
+            "mean",
+            "custom_digest_pinned"
+          ]
+        },
+        "termination_semantics": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "observation_schema_path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "action_schema_path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "reward_definition_path": {
+          "$ref": "#/$defs/relative_path"
+        },
+        "wrapper_stack_path": {
+          "$ref": "#/$defs/relative_path"
+        }
+      }
+    },
+    "sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_count",
+        "episode_seed_commitment_sha256",
+        "seed_derivation",
+        "unit_of_analysis",
+        "paired_seed_design",
+        "mechanism_family_split",
+        "episode_count_scope"
+      ],
+      "properties": {
+        "episode_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "episode_seed_commitment_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "seed_derivation": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "unit_of_analysis": {
+          "enum": [
+            "episode",
+            "episode_history",
+            "task_cluster",
+            "physical_run"
+          ]
+        },
+        "paired_seed_design": {
+          "type": "boolean"
+        },
+        "mechanism_family_split": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "development",
+            "calibration",
+            "qualification",
+            "family_disjoint"
+          ],
+          "properties": {
+            "development": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "calibration": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "qualification": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "family_disjoint": {
+              "type": "boolean"
+            }
+          }
+        },
+        "episode_count_scope": {
+          "enum": [
+            "per_scenario_model_condition",
+            "per_task_stratum",
+            "total_run"
+          ]
+        }
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_limit",
+        "action_interventions_per_episode",
+        "candidate_sequences_per_decision",
+        "model_forward_calls_limit",
+        "model_transition_evaluations_limit",
+        "wallclock_ms_limit",
+        "peak_memory_mb_limit",
+        "energy_mwh_limit",
+        "measurement_status",
+        "matching_method",
+        "matching_tolerance"
+      ],
+      "properties": {
+        "episode_limit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "action_interventions_per_episode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "candidate_sequences_per_decision": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "model_forward_calls_limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "model_transition_evaluations_limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "wallclock_ms_limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "peak_memory_mb_limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "energy_mwh_limit": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "measurement_status": {
+          "enum": [
+            "not_measured",
+            "instrumented_operation_counts",
+            "measured_hardware_costs",
+            "mixed"
+          ]
+        },
+        "matching_method": {
+          "enum": [
+            "none",
+            "candidate_budget_only",
+            "estimated_compute_proxy",
+            "measured_flops",
+            "measured_wallclock",
+            "matched_multi_resource"
+          ]
+        },
+        "matching_tolerance": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "baseline_registry": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "role",
+          "kind",
+          "source_commit",
+          "config_sha256",
+          "eligibility",
+          "cost_accounting"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/nonempty"
+          },
+          "role": {
+            "enum": [
+              "primary",
+              "direct_control",
+              "model_free_control",
+              "world_model_control",
+              "negative_control",
+              "oracle_ceiling",
+              "external_reference"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "direct_policy",
+              "model_free_critic",
+              "world_model",
+              "ensemble_world_model",
+              "negative_control",
+              "oracle",
+              "external_reference"
+            ]
+          },
+          "source_commit": {
+            "$ref": "#/$defs/nullable_git_commit"
+          },
+          "config_sha256": {
+            "$ref": "#/$defs/nullable_sha256"
+          },
+          "eligibility": {
+            "enum": [
+              "eligible_for_primary_contrast",
+              "diagnostic_only",
+              "oracle_only",
+              "ineligible_with_reason"
+            ]
+          },
+          "ineligibility_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cost_accounting": {
+            "enum": [
+              "measured",
+              "instrumented",
+              "estimated",
+              "candidate_count_only",
+              "not_measured"
+            ]
+          }
+        }
+      }
+    },
+    "comparisons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "treatment_id",
+          "control_id",
+          "status",
+          "matched_dimensions",
+          "claim"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/nonempty"
+          },
+          "treatment_id": {
+            "$ref": "#/$defs/nonempty"
+          },
+          "control_id": {
+            "$ref": "#/$defs/nonempty"
+          },
+          "status": {
+            "enum": [
+              "planned",
+              "qualified",
+              "diagnostic_only",
+              "ineligible"
+            ]
+          },
+          "matched_dimensions": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "episodes",
+                "seeds",
+                "observations",
+                "actions",
+                "horizon",
+                "wrappers",
+                "reward",
+                "simulator_steps",
+                "compute",
+                "latency",
+                "hardware",
+                "data_split"
+              ]
+            },
+            "uniqueItems": true
+          },
+          "claim": {
+            "$ref": "#/$defs/nonempty"
+          },
+          "limitation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bundle_id",
+        "bundle_sha256",
+        "required_metrics",
+        "cross_track_pooling"
+      ],
+      "properties": {
+        "bundle_id": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "bundle_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "required_metrics": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/nonempty"
+          },
+          "uniqueItems": true
+        },
+        "cross_track_pooling": {
+          "const": false
+        }
+      }
+    },
+    "statistics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "uncertainty_method",
+        "confidence_level",
+        "bootstrap_resamples",
+        "cluster_unit",
+        "paired_analysis",
+        "multiple_looks_policy"
+      ],
+      "properties": {
+        "uncertainty_method": {
+          "enum": [
+            "none_for_smoke",
+            "normal_approximation",
+            "percentile_bootstrap",
+            "studentized_bootstrap",
+            "anytime_valid_e_process",
+            "custom_preregistered"
+          ]
+        },
+        "confidence_level": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "bootstrap_resamples": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cluster_unit": {
+          "enum": [
+            "episode",
+            "episode_history",
+            "task",
+            "mechanism_family",
+            "physical_run",
+            "not_applicable"
+          ]
+        },
+        "paired_analysis": {
+          "type": "boolean"
+        },
+        "multiple_looks_policy": {
+          "enum": [
+            "fixed_sample",
+            "alpha_spending",
+            "anytime_valid",
+            "descriptive_only"
+          ]
+        }
+      }
+    },
+    "qualification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "candidate_frozen",
+        "evaluator_frozen",
+        "thresholds_frozen",
+        "qualification_data_sealed",
+        "candidate_truth_access",
+        "freeze_order"
+      ],
+      "properties": {
+        "stage": {
+          "enum": [
+            "development",
+            "calibration",
+            "qualification",
+            "reproduction"
+          ]
+        },
+        "candidate_frozen": {
+          "type": "boolean"
+        },
+        "evaluator_frozen": {
+          "type": "boolean"
+        },
+        "thresholds_frozen": {
+          "type": "boolean"
+        },
+        "qualification_data_sealed": {
+          "type": "boolean"
+        },
+        "candidate_truth_access": {
+          "const": false
+        },
+        "freeze_order": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "enum": [
+              "candidate",
+              "config",
+              "adapter",
+              "data_split",
+              "seeds",
+              "metrics",
+              "thresholds",
+              "evaluator",
+              "freeze",
+              "candidate_run",
+              "evaluator_truth",
+              "report"
+            ]
+          }
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maximum_claim",
+        "prohibited_claims",
+        "performance_result_present"
+      ],
+      "properties": {
+        "maximum_claim": {
+          "$ref": "#/$defs/nonempty"
+        },
+        "prohibited_claims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonempty"
+          },
+          "minItems": 1
+        },
+        "performance_result_present": {
+          "const": false
+        }
+      }
+    }
+  }
+}
