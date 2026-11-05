@@ -186,7 +186,7 @@ Targets are stretch acceptance criteria. The comparison is only meaningful after
 
 **Paradigm shift:** do not optimize a theoretical battery and patch the result after execution. Optimize an *execution-qualified asset* whose deliverable envelope is learned from synchronized measurements and bounded by meter evidence. The loop is: immutable forecast vintage -> dispatch optimization -> component/BMS capability envelope -> signed schedule -> metered execution -> booked settlement -> residual calibration -> next schedule. This links the forecast-vintage replay, exact calibration scorer, physical constraints and execution reconciliation already present in the research profile.
 
-The first new synthetic case is `DISPATCH-EXECUTION-FIDELITY-001`. It does not replace the M5BAT replay. The dataset is publicly indexed, but the actual ZIP has not yet been staged into this branch and no field-data metrics have been computed. The field replay, load-dependent inverter/transformer parametrization, SOC-dependent power derating, and any revenue comparison remain `not_run`.
+The first new synthetic case is `DISPATCH-EXECUTION-FIDELITY-001`. It does not replace the M5BAT replay. The public dataset source, licence, benchmark claims, Test 1 → Test 2 split, intake requirements and stretch gates are frozen in [`m5bat-field-benchmark-v1.json`](m5bat-field-benchmark-v1.json). The actual ZIP has not yet been staged into this branch and no field-data metrics have been computed. The field replay, load-dependent inverter/transformer parametrization, SOC-dependent power derating, and any revenue comparison remain `not_run`.
 
 References:
 - Article: https://doi.org/10.1016/j.apenergy.2025.127340
