@@ -51,6 +51,12 @@ The RMI harness now includes a distinct symbolic interaction contract admitting 
 
 The executable report now includes nine synthetic negotiation cases with five expected qualified outcomes and four expected rejections. This is a finite conformance suite for interaction/authority semantics, not a human preference test or perceptual-equivalence result. It composes with #9307 / PR #9325 for event/score-level edit validity; the RMI module does not duplicate score-event matching.
 
+## Negotiated response authority
+
+The RMI harness now includes a separate interaction contract for tasks admitting multiple valid symbolic response values. Partner authority is modeled separately through an explicit selection and a veto set. The evaluator distinguishes contract validity from preference compliance and checks whether unresolved ambiguity is preserved by branching the complete available set or asking for clarification. A valid-but-unselected alternative fails when a partner preference has already been made explicit; a veto cannot be overridden; if no option remains, abstention is the qualified disposition.
+
+Ten unit tests exercise the contract, and the canonical runner emits nine negotiation cases. The dedicated workflow gates five expected qualified dispositions and four expected rejections. These are finite, synthetic authority checks, not human judgments or perceptual-equivalence results. This module composes with #9307 / PR #9325 for Score/event-level edit validity and does not duplicate event matching.
+
 ## Qualification and claim ceiling
 
 Passing the finite oracle suite qualifies only the harness's ability to distinguish the declared synthetic policies and reject malformed fixtures. It does not establish actual Melothaea contingency, reciprocal collaboration, musician-valued outcomes, low latency, or commercial competitiveness.
