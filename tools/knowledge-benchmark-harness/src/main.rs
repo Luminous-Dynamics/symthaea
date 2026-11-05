@@ -557,6 +557,14 @@ fn validate_pair_contract(pair: &Value) -> Vec<String> {
                         .into(),
                 );
             }
+            if string_field(mutated, "access_decision") == Some("deny")
+                && mutated_evidence_count > 0
+            {
+                errors.push(
+                    "rights_revocation must remove the evidence pack when access_decision is deny"
+                        .into(),
+                );
+            }
         }
         "alias_equivalence" => {
             if string_field(baseline, "source_id") != string_field(mutated, "source_id") {
@@ -1875,12 +1883,13 @@ mod tests {
         let pair = json!({
             "split":"synthetic",
             "synthetic_only":true,
+            "source_family_ids":["SYN-FAMILY-SYN-RESTRICTED-RECORD"],
             "dimension": "rights_revocation",
             "expected_relation": "deny_access",
             "baseline": {
                 "rights_status":"synthetic_only",
                 "access_decision":"allow",
-                "evidence_pack":[]
+                "evidence_pack":[{"evidence_id":"e1","source_id":"SYN-RESTRICTED-RECORD","statement":"Synthetic control evidence.","kind":"synthetic_control"}]
             },
             "mutated": {
                 "rights_status":"synthetic_only",
@@ -1895,6 +1904,31 @@ mod tests {
             "acceptance": {"must_change":["access is denied"]}
         });
         assert!(validate_pair_contract(&pair).is_empty());
+    }
+
+    #[test]
+    fn rights_revocation_pair_rejects_evidence_after_deny() {
+        let pair = json!({
+            "split":"synthetic",
+            "synthetic_only":true,
+            "source_family_ids":["SYN-FAMILY-SYN-RESTRICTED-RECORD"],
+            "dimension":"rights_revocation",
+            "expected_relation":"deny_access",
+            "baseline":{
+                "rights_status":"synthetic_only",
+                "access_decision":"allow",
+                "evidence_pack":[{"evidence_id":"e1","source_id":"SYN-RESTRICTED-RECORD","statement":"Synthetic control evidence.","kind":"synthetic_control"}]
+            },
+            "mutated":{
+                "rights_status":"synthetic_only",
+                "access_decision":"deny",
+                "evidence_pack":[{"evidence_id":"e1","source_id":"SYN-RESTRICTED-RECORD","statement":"Synthetic control evidence.","kind":"synthetic_control"}]
+            },
+            "intervention":{"field":"access_decision","before_value":"allow","after_value":"deny"},
+            "acceptance":{"must_change":["cached evidence is removed after denial"]}
+        });
+        let errors = validate_pair_contract(&pair);
+        assert!(errors.iter().any(|error| error.contains("must remove the evidence pack")));
     }
 
     #[test]
