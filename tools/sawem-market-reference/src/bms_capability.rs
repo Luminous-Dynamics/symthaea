@@ -342,7 +342,7 @@ mod tests {
 
     #[test]
     fn invalid_and_unsorted_curves_fail_closed() {
-        const UNSORTED: [CapabilityPoint; 3] = [
+        const UNSORTED: [CapabilityPoint; 4] = [
             CapabilityPoint {
                 soc_bps: 1_000,
                 maximum_power_w: 2_000,
@@ -354,6 +354,10 @@ mod tests {
             CapabilityPoint {
                 soc_bps: 5_000,
                 maximum_power_w: 4_000,
+            },
+            CapabilityPoint {
+                soc_bps: 9_000,
+                maximum_power_w: 1_000,
             },
         ];
         let bad = envelope(
