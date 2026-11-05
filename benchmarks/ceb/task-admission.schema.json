@@ -76,7 +76,9 @@
             "spdx_expression",
             "license_file_path",
             "license_file_sha256",
-            "review_status"
+            "review_status",
+            "license_review_record_sha256",
+            "license_reviewer_id"
           ],
           "properties": {
             "spdx_expression": {
@@ -98,6 +100,14 @@
                 "incompatible",
                 "unknown"
               ]
+            },
+            "license_review_record_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "license_reviewer_id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9_-]+$"
             }
           }
         }
@@ -329,7 +339,9 @@
         "pass_to_pass_check_ids",
         "critical_invariants",
         "security_review_status",
-        "destructive_side_effects"
+        "destructive_side_effects",
+        "security_review_record_sha256",
+        "security_reviewer_id"
       ],
       "properties": {
         "contract_sha256": {
@@ -372,6 +384,20 @@
         },
         "destructive_side_effects": {
           "type": "boolean"
+        },
+        "security_review_record_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "security_reviewer_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z0-9][a-z0-9_-]+$"
         }
       }
     },
@@ -499,7 +525,8 @@
         "custody_manifest_sha256",
         "holdout_material_outside_agent_workspace",
         "agent_access_before_freeze",
-        "public_fix_exposure_accepted"
+        "public_fix_exposure_accepted",
+        "custodian_id"
       ],
       "properties": {
         "partition": {
@@ -524,6 +551,10 @@
         },
         "public_fix_exposure_accepted": {
           "type": "boolean"
+        },
+        "custodian_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]+$"
         }
       }
     },
