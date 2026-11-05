@@ -25,7 +25,9 @@
     "unqualified_task_ids",
     "scheduler_admission",
     "receipt_authentication_boundary",
-    "semantic_integrity_boundary"
+    "semantic_integrity_boundary",
+    "documented_database_task_count",
+    "full_count_documentation_drift"
   ],
   "properties": {
     "schema_version": {
@@ -125,6 +127,13 @@
     "semantic_integrity_boundary": {
       "type": "string",
       "minLength": 30
+    },
+    "documented_database_task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "full_count_documentation_drift": {
+      "type": "boolean"
     }
   }
 }
