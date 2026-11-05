@@ -263,6 +263,16 @@
                   "type": "string"
                 }
               }
+            },
+            "task6_scoring_revision": {
+              "type": "string"
+            },
+            "custom_harness_wall_clock_limit_seconds": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
             }
           }
         },
@@ -499,6 +509,20 @@
                         "maximum": 1
                       }
                     }
+                  },
+                  "board": {
+                    "enum": [
+                      "standard_2.1",
+                      "v2.0_core",
+                      "other"
+                    ]
+                  },
+                  "displayed_uncertainty_95": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
                   }
                 }
               }
@@ -595,6 +619,182 @@
                       "type": "string"
                     }
                   }
+                }
+              }
+            },
+            "custom_harness_results": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "publisher",
+                  "model",
+                  "agent",
+                  "effort",
+                  "score",
+                  "scorer_version",
+                  "source_url",
+                  "comparability"
+                ],
+                "properties": {
+                  "publisher": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "agent": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "effort": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "scorer_version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "repeat_count": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1
+                  },
+                  "cost_per_case_usd": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "cost_estimate": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "displayed_uncertainty_95": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "source_url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "comparability": {
+                    "type": "string",
+                    "minLength": 20
+                  },
+                  "notes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "development_leaderboard_snapshot": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "captured_at",
+                "source_url",
+                "scope",
+                "task_count",
+                "run_protocol",
+                "entries",
+                "comparability_warning"
+              ],
+              "properties": {
+                "captured_at": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "source_url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "scope": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "task_count": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "run_protocol": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "entries": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "model",
+                      "agent_harness",
+                      "score",
+                      "run_count"
+                    ],
+                    "properties": {
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "agent_harness": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "score": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "run_count": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "cost_per_task_usd": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "median_duration_minutes": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "notes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                },
+                "comparability_warning": {
+                  "type": "string",
+                  "minLength": 1
                 }
               }
             }
