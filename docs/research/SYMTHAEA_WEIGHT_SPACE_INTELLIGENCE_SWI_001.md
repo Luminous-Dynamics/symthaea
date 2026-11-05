@@ -135,7 +135,7 @@ The network has analytic gradient / Adam paths. This gives SWI an unusually usef
 - routes asynchronous cognitive-loop weight swaps through try_set_weights() and rejects invalid updates without panicking;
 - preserves the legacy set_weights() signature as a compatibility wrapper.
 
-Eight tests were added: one for manifest/layout agreement, one for architecture-versus-parameter fingerprint identity, two for typed-group replacement, and four for short/overlong vectors, non-finite values, invalid time constants, and valid round-trip replacement. The new tests have not been executed here; do not describe them as passing until run on the exact branch head.
+Ten tests were added: one for manifest/layout agreement, one for architecture-versus-parameter fingerprint identity, two for typed-group replacement, four for malformed/valid parameter loading, and two for asynchronous cognitive-loop weight swap acceptance/rejection. The new tests have not been executed here; do not describe them as passing until run on the exact branch head.
 
 ### 4.2 HDC-LTC: novel representation-space target
 
@@ -498,7 +498,7 @@ H1–H6 are the initial programme. H7 is a later WSL research track and should n
 - Add a versioned named parameter manifest matching the flat serialization layout.
 - Add bounded typed named-group replacement through the validated loader.
 - Add content-addressed architecture, manifest, parameter, and combined model fingerprints.
-- Route asynchronous weight swaps through the fallible API.
+- Route asynchronous weight swaps through the fallible API and test both valid and malformed updates.
 - Add regression tests.
 - Next: execute targeted unit tests and full relevant crate checks on the exact branch head.
 
