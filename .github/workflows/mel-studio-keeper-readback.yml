@@ -33,5 +33,44 @@ jobs:
           components: rustfmt
       - name: Format Muse Studio binary source
         run: rustfmt +1.96.0 --edition 2024 --check crates/domains/symthaea-muse/src/bin/muse_studio.rs
-      - name: Test committed keeper read-back
-        run: cargo +1.96.0 test --locked -p symthaea-muse --features studio --bin muse_studio keeper_readback_tests
+      - name: Parse workspace and test keeper read-back with a temporary orphan-member exclusion
+        shell: bash
+        run: |
+          set -euo pipefail
+          backup="$(mktemp)"
+          cp Cargo.toml "$backup"
+          cleanup() {
+            cp "$backup" Cargo.toml
+            rm -f "$backup"
+          }
+          trap cleanup EXIT
+          python3 - <<'PY'
+          from pathlib import Path
+
+          manifest = Path("Cargo.toml")
+          content = manifest.read_text()
+          candidates = (
+              "crates/core/symthaea",
+              "crates/core/symthaea-observation-attestation",
+              "crates/domains/symthaea-rea-evidence-verifier",
+          )
+          missing = []
+          for candidate in candidates:
+              path = Path(candidate)
+              if path.exists() and not (path / "Cargo.toml").is_file():
+                  missing.append(candidate)
+          if missing:
+              marker = "exclude = [\n"
+              if content.count(marker) != 1:
+                  raise SystemExit("expected exactly one workspace exclude array")
+              additions = "".join(
+                  f'    # Temporary CI exclusion: known orphan workspace path tracked in #8674.\n    "{item}",\n'
+                  for item in missing
+                  if f'"{item}"' not in content
+              )
+              content = content.replace(marker, marker + additions, 1)
+              manifest.write_text(content)
+          print("Temporary workspace-only exclusions:", ", ".join(missing) or "none")
+          PY
+          cargo +1.96.0 metadata --locked --no-deps --format-version 1 >/dev/null
+          cargo +1.96.0 test --locked -p symthaea-muse --features studio --bin muse_studio keeper_readback_tests
