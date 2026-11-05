@@ -478,9 +478,9 @@ mod tests {
             wheelbase_m: 0.0,
             ..VehicleConfig::default()
         };
-        assert_eq!(
+        assert!(matches!(
             AnalyticVehicle::new(config),
             Err(VehicleError::InvalidConfiguration)
-        );
+        ));
     }
 }
