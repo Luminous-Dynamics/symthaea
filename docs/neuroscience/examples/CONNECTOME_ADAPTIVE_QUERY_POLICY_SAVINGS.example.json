@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "analysis_id": "synthetic-adaptive-query-policy-v1",
+  "dataset_revision_commit_sha": "9999999999999999999999999999999999999999",
+  "query_id": "adaptive-query-decision",
+  "query_spec_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "scenario_set_scope": "exhaustive_declared_scenario_space",
+  "scenario_set_sha256": "f617895108b57aa7aa22de5ce663ca285567363bdc4e385fa51873acae3b7f21",
+  "action_set_sha256": "d7a28966c938eafec9653f640f5ae1403887b25fec001e87548975c2133afbbf",
+  "joint_support_scope": "exhaustive_declared_joint_support",
+  "effort_unit": "expert_review_minutes",
+  "max_total_effort_units": 4,
+  "scenarios": [
+    {
+      "scenario_id": "world-a",
+      "graph_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision_met": true
+    },
+    {
+      "scenario_id": "world-b",
+      "graph_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "decision_met": false
+    },
+    {
+      "scenario_id": "world-c",
+      "graph_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "decision_met": true
+    },
+    {
+      "scenario_id": "world-d",
+      "graph_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "decision_met": false
+    },
+    {
+      "scenario_id": "world-e",
+      "graph_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "decision_met": true
+    }
+  ],
+  "actions": [
+    {
+      "action_id": "inspect-x",
+      "action_kind": "image_inspection",
+      "effort_units": 1,
+      "source_evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "observation_model_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "dependence_groups": [
+        "volume-x"
+      ]
+    },
+    {
+      "action_id": "inspect-y",
+      "action_kind": "morphology_review",
+      "effort_units": 2,
+      "source_evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "observation_model_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "dependence_groups": [
+        "morph-y"
+      ]
+    },
+    {
+      "action_id": "inspect-z",
+      "action_kind": "synapse_adjudication",
+      "effort_units": 3,
+      "source_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "observation_model_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "dependence_groups": [
+        "synapse-z"
+      ]
+    }
+  ],
+  "joint_support_sha256": "fd91ee10b6fa993af5fc371f869d90631cfc2a71c11501e8593b10b6e4a611b9",
+  "joint_world_supports": [
+    {
+      "scenario_id": "world-a",
+      "source_evidence_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "joint_observation_model_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "dependence_groups": [
+        "shared-imaging-acquisition"
+      ],
+      "possible_joint_outcomes": [
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-x",
+              "outcome": "x-left"
+            },
+            {
+              "action_id": "inspect-y",
+              "outcome": "y-a"
+            },
+            {
+              "action_id": "inspect-z",
+              "outcome": "z-same"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "scenario_id": "world-b",
+      "source_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "joint_observation_model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "dependence_groups": [
+        "shared-imaging-acquisition"
+      ],
+      "possible_joint_outcomes": [
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-x",
+              "outcome": "x-left"
+            },
+            {
+              "action_id": "inspect-y",
+              "outcome": "y-b"
+            },
+            {
+              "action_id": "inspect-z",
+              "outcome": "z-same"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "scenario_id": "world-c",
+      "source_evidence_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "joint_observation_model_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "dependence_groups": [
+        "shared-imaging-acquisition"
+      ],
+      "possible_joint_outcomes": [
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-x",
+              "outcome": "x-right"
+            },
+            {
+              "action_id": "inspect-y",
+              "outcome": "y-same"
+            },
+            {
+              "action_id": "inspect-z",
+              "outcome": "z-c"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "scenario_id": "world-d",
+      "source_evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "joint_observation_model_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "dependence_groups": [
+        "shared-imaging-acquisition"
+      ],
+      "possible_joint_outcomes": [
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-x",
+              "outcome": "x-right"
+            },
+            {
+              "action_id": "inspect-y",
+              "outcome": "y-same"
+            },
+            {
+              "action_id": "inspect-z",
+              "outcome": "z-d"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "scenario_id": "world-e",
+      "source_evidence_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "joint_observation_model_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "dependence_groups": [
+        "shared-imaging-acquisition"
+      ],
+      "possible_joint_outcomes": [
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-x",
+              "outcome": "x-right"
+            },
+            {
+              "action_id": "inspect-y",
+              "outcome": "y-other"
+            },
+            {
+              "action_id": "inspect-z",
+              "outcome": "z-c"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
