@@ -113,10 +113,7 @@ fn valid_sha256(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
-fn in_cell(
-    bounds: CapabilityCellBounds,
-    observation: CapabilityMeasurement<'_>,
-) -> bool {
+fn in_cell(bounds: CapabilityCellBounds, observation: CapabilityMeasurement<'_>) -> bool {
     observation.soc_bps >= bounds.soc_lower_bps
         && observation.soc_bps < bounds.soc_upper_bps
         && observation.temperature_deci_c >= bounds.temperature_lower_deci_c
@@ -216,8 +213,8 @@ pub fn fit_capability_cell<'a>(
         power_record_ids.push(observation.record_id);
     }
 
-    let sample_count = u32::try_from(powers.len())
-        .map_err(|_| CapabilityCellFitError::ArithmeticOverflow)?;
+    let sample_count =
+        u32::try_from(powers.len()).map_err(|_| CapabilityCellFitError::ArithmeticOverflow)?;
     if sample_count < inputs.minimum_sample_count {
         return Err(CapabilityCellFitError::InsufficientSamples);
     }
@@ -228,7 +225,8 @@ pub fn fit_capability_cell<'a>(
         .checked_mul(u128::from(sample_count.saturating_sub(1)))
         .ok_or(CapabilityCellFitError::ArithmeticOverflow)?;
     let rank = rank_numerator / BASIS_POINTS;
-    let rank_usize = usize::try_from(rank).map_err(|_| CapabilityCellFitError::ArithmeticOverflow)?;
+    let rank_usize =
+        usize::try_from(rank).map_err(|_| CapabilityCellFitError::ArithmeticOverflow)?;
     let selected_index = *order
         .get(rank_usize)
         .ok_or(CapabilityCellFitError::ArithmeticOverflow)?;
@@ -287,9 +285,7 @@ mod tests {
         }
     }
 
-    fn inputs<'a>(
-        observations: &'a [CapabilityMeasurement<'a>],
-    ) -> CapabilityCellFitInputs<'a> {
+    fn inputs<'a>(observations: &'a [CapabilityMeasurement<'a>]) -> CapabilityCellFitInputs<'a> {
         CapabilityCellFitInputs {
             battery_unit_id: "LMO-01",
             cell_source_ref: "manifest/campaign-test-1/cell-000",
@@ -308,11 +304,31 @@ mod tests {
     #[test]
     fn lower_empirical_quantile_uses_exact_floor_rank() {
         let observations = [
-            observation("sample-1", 1_000, CapabilityMeasurementKind::BmsReportedAvailablePower),
-            observation("sample-2", 1_200, CapabilityMeasurementKind::BmsReportedAvailablePower),
-            observation("sample-3", 1_400, CapabilityMeasurementKind::BmsReportedAvailablePower),
-            observation("sample-4", 1_600, CapabilityMeasurementKind::BmsReportedAvailablePower),
-            observation("sample-5", 1_800, CapabilityMeasurementKind::BmsReportedAvailablePower),
+            observation(
+                "sample-1",
+                1_000,
+                CapabilityMeasurementKind::BmsReportedAvailablePower,
+            ),
+            observation(
+                "sample-2",
+                1_200,
+                CapabilityMeasurementKind::BmsReportedAvailablePower,
+            ),
+            observation(
+                "sample-3",
+                1_400,
+                CapabilityMeasurementKind::BmsReportedAvailablePower,
+            ),
+            observation(
+                "sample-4",
+                1_600,
+                CapabilityMeasurementKind::BmsReportedAvailablePower,
+            ),
+            observation(
+                "sample-5",
+                1_800,
+                CapabilityMeasurementKind::BmsReportedAvailablePower,
+            ),
         ];
         let result = fit_capability_cell(inputs(&observations)).unwrap();
         // floor(0.20 * (5 - 1)) = rank 0, so this conservative limit is 1,000 W.
@@ -326,11 +342,31 @@ mod tests {
     #[test]
     fn higher_quantile_uses_deterministic_order_statistic() {
         let observations = [
-            observation("sample-1", 1_000, CapabilityMeasurementKind::CapabilityLimitTest),
-            observation("sample-2", 1_200, CapabilityMeasurementKind::CapabilityLimitTest),
-            observation("sample-3", 1_400, CapabilityMeasurementKind::CapabilityLimitTest),
-            observation("sample-4", 1_600, CapabilityMeasurementKind::CapabilityLimitTest),
-            observation("sample-5", 1_800, CapabilityMeasurementKind::CapabilityLimitTest),
+            observation(
+                "sample-1",
+                1_000,
+                CapabilityMeasurementKind::CapabilityLimitTest,
+            ),
+            observation(
+                "sample-2",
+                1_200,
+                CapabilityMeasurementKind::CapabilityLimitTest,
+            ),
+            observation(
+                "sample-3",
+                1_400,
+                CapabilityMeasurementKind::CapabilityLimitTest,
+            ),
+            observation(
+                "sample-4",
+                1_600,
+                CapabilityMeasurementKind::CapabilityLimitTest,
+            ),
+            observation(
+                "sample-5",
+                1_800,
+                CapabilityMeasurementKind::CapabilityLimitTest,
+            ),
         ];
         let inputs = CapabilityCellFitInputs {
             lower_quantile_bps: 5_000,
@@ -345,11 +381,31 @@ mod tests {
     #[test]
     fn ordinary_delivered_power_is_not_a_capability_observation() {
         let observations = [
-            observation("sample-1", 1_000, CapabilityMeasurementKind::OrdinaryDeliveredPower),
-            observation("sample-2", 1_200, CapabilityMeasurementKind::BmsReportedAvailablePower),
-            observation("sample-3", 1_400, CapabilityMeasurementKind::BmsReportedAvailablePower),
-            observation("sample-4", 1_600, CapabilityMeasurementKind::BmsReportedAvailablePower),
-            observation("sample-5", 1_800, CapabilityMeasurementKind::BmsReportedAvailablePower),
+            observation(
+                "sample-1",
+                1_000,
+                CapabilityMeasurementKind::OrdinaryDeliveredPower,
+            ),
+            observation(
+                "sample-2",
+                1_200,
+                CapabilityMeasurementKind::BmsReportedAvailablePower,
+            ),
+            observation(
+                "sample-3",
+                1_400,
+                CapabilityMeasurementKind::BmsReportedAvailablePower,
+            ),
+            observation(
+                "sample-4",
+                1_600,
+                CapabilityMeasurementKind::BmsReportedAvailablePower,
+            ),
+            observation(
+                "sample-5",
+                1_800,
+                CapabilityMeasurementKind::BmsReportedAvailablePower,
+            ),
         ];
         assert_eq!(
             fit_capability_cell(inputs(&observations)),
@@ -360,8 +416,16 @@ mod tests {
     #[test]
     fn sample_count_campaign_direction_and_cell_bounds_are_enforced() {
         let observations = [
-            observation("sample-1", 1_000, CapabilityMeasurementKind::CapabilityLimitTest),
-            observation("sample-2", 1_200, CapabilityMeasurementKind::CapabilityLimitTest),
+            observation(
+                "sample-1",
+                1_000,
+                CapabilityMeasurementKind::CapabilityLimitTest,
+            ),
+            observation(
+                "sample-2",
+                1_200,
+                CapabilityMeasurementKind::CapabilityLimitTest,
+            ),
         ];
         assert_eq!(
             fit_capability_cell(inputs(&observations)),
@@ -370,7 +434,11 @@ mod tests {
 
         let wrong_campaign = [CapabilityMeasurement {
             campaign_id: "campaign/test-2",
-            ..observation("wrong-campaign", 1_000, CapabilityMeasurementKind::CapabilityLimitTest)
+            ..observation(
+                "wrong-campaign",
+                1_000,
+                CapabilityMeasurementKind::CapabilityLimitTest,
+                )
         }];
         assert_eq!(
             fit_capability_cell(inputs(&wrong_campaign)),
@@ -379,7 +447,11 @@ mod tests {
 
         let wrong_direction = [CapabilityMeasurement {
             direction: PowerDirection::Charge,
-            ..observation("wrong-direction", 1_000, CapabilityMeasurementKind::CapabilityLimitTest)
+            ..observation(
+                "wrong-direction",
+                1_000,
+                CapabilityMeasurementKind::CapabilityLimitTest,
+                )
         }];
         assert_eq!(
             fit_capability_cell(inputs(&wrong_direction)),
@@ -388,7 +460,11 @@ mod tests {
 
         let outside = [CapabilityMeasurement {
             soc_bps: 5_000,
-            ..observation("outside-cell", 1_000, CapabilityMeasurementKind::CapabilityLimitTest)
+            ..observation(
+                "outside-cell",
+                1_000,
+                CapabilityMeasurementKind::CapabilityLimitTest,
+                )
         }];
         assert_eq!(
             fit_capability_cell(inputs(&outside)),
@@ -400,7 +476,11 @@ mod tests {
     fn future_known_duplicate_and_bad_digest_samples_fail_closed() {
         let future = [CapabilityMeasurement {
             available_at_utc: 101,
-            ..observation("future", 1_000, CapabilityMeasurementKind::CapabilityLimitTest)
+            ..observation(
+                "future",
+                1_000,
+                CapabilityMeasurementKind::CapabilityLimitTest,
+                )
         }];
         assert_eq!(
             fit_capability_cell(inputs(&future)),
@@ -408,10 +488,18 @@ mod tests {
         );
 
         let duplicate = [
-            observation("same", 1_000, CapabilityMeasurementKind::CapabilityLimitTest),
+            observation(
+                "same",
+                1_000,
+                CapabilityMeasurementKind::CapabilityLimitTest,
+            ),
             CapabilityMeasurement {
                 source_ref: "duplicate-source",
-                ..observation("same", 1_200, CapabilityMeasurementKind::CapabilityLimitTest)
+                ..observation(
+                    "same",
+                    1_200,
+                    CapabilityMeasurementKind::CapabilityLimitTest,
+                    )
             },
         ];
         assert_eq!(
@@ -421,7 +509,11 @@ mod tests {
 
         let bad_digest = [CapabilityMeasurement {
             source_sha256: "invalid",
-            ..observation("bad-digest", 1_000, CapabilityMeasurementKind::CapabilityLimitTest)
+            ..observation(
+                "bad-digest",
+                1_000,
+                CapabilityMeasurementKind::CapabilityLimitTest,
+                )
         }];
         assert_eq!(
             fit_capability_cell(inputs(&bad_digest)),
