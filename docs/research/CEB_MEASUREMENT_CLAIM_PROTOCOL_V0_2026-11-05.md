@@ -27,7 +27,7 @@ These results are not directly rankable. Their exact sources, metrics, task scop
 
 The machine-readable matrix defines 13 lanes: repository resolution, repository comprehension, context retrieval, test generation, refactoring, precise debugging, pre-merge review, secure correctness, Rust engineering, optimization, human-agent complementarity, evaluator integrity and documentation executability.
 
-Each lane records its decision question, primary metrics, external comparators, baseline arms, evidence artifacts, independent authority, hard gates and holdout design. It contains 41 primary metrics, 16 comparator records and 16 registered source URLs. The registry includes 15 external benchmark/methodology sources plus one internal documentation-audit implementation reference; the normalized external-observation registry records the 15 external sources separately. The matrix is design-only and contains no CEB performance score.
+Each lane records its decision question, primary metrics, external comparators, baseline arms, evidence artifacts, independent authority, hard gates and holdout design. It contains 45 primary metrics, 16 comparator records and 16 registered source URLs. The registry includes 15 external benchmark/methodology sources plus one internal documentation-audit implementation reference; the normalized external-observation registry records the 15 external sources separately. The matrix is design-only and contains no CEB performance score.
 
 ### Selective autonomy comparator — AgentAbstain
 
@@ -57,6 +57,10 @@ For each applicable lane compare:
 7. human-only, agent-only and human+agent for complementarity claims.
 
 If a baseline cannot be matched, classify the result as contextual. Do not infer causal contribution.
+
+## Selective-autonomy measurement within CEB-HUMAN
+
+The CEB-HUMAN lane now covers both human-agent complementarity and selective autonomy. In addition to assisted defect recall, risk/coverage and escalation precision, it explicitly measures paired should-act/should-abstain accuracy, act-side accuracy, abstain-side accuracy and conditioned abstention (CAR). The paired endpoint requires both counterfactual variants to be correct. AgentAbstain's 59.5% paired score, 90.5% act-side score, 65.4% abstain-side score and 65.7% CAR are stored as separate contextual observations. CEB's prospective targets are not direct cross-benchmark superiority claims.
 
 ## 5. First qualification targets
 
