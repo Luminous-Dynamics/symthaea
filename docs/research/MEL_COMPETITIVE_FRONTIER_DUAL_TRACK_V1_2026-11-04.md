@@ -66,7 +66,7 @@ Treat these as dated snapshots, not timeless targets. Re-fetch the leaderboard a
 
 The dedicated challenge website snapshot retrieved on 5 November 2026 lists:
 
-- 16 November 2026: development leaderboard opens.
+- 11 November 2026: development leaderboard opens.
 - 27 November: team/resource declarations freeze.
 - 11 December: development leaderboard closes.
 - 18 December: final container submission.
@@ -217,7 +217,7 @@ Pin benchmark release, split, scorer, model/API/weights, prompt, renderer, asset
 1. **MMAE public-set reproduction:** freeze available model versions/weights, official baseline, prompt and budget; verify rights and track eligibility; retain all 2,000 public-set attempts and exact rubrics/outputs where permitted.
 2. **AA v1.1 baseline capture:** build a dated, matched prompt set for instrumental and vocal tracks; record the top models' exact snapshots; use blind randomization, level normalization and pairwise confidence intervals.
 3. **SMEBench adapter:** map all 12 operations into separate target-agreement, preservation and text-compatibility metrics; record CC BY-NC-SA 4.0 and any third-party restrictions before use.
-4. **HEARTBEAT protocol reproduction:** obtain the released data/baselines, separate speech and music adaptation, implement current-prefix-only trace accounting, and seek organizer clarification on the schedule discrepancy.
+4. **HEARTBEAT protocol reproduction:** obtain the released data/baselines, separate speech and music adaptation, implement current-prefix-only trace accounting, and re-check the dedicated challenge site immediately before each milestone.
 5. **Veto race reducer:** run the new dependency-free reference reducer and its exact-head workflow; then integrate its event semantics with #10382 and the live epoch/clock branch only after branch reconciliation.
 6. **Waveform counterfactuals:** render #10393 fixtures through two pinned renderers, hash exact local-cue crops, and obtain independent musician labels.
 7. **Human pilot design:** preregister authority, agency, interruption cost, recovery, preservation and cultural cohort measures before recruiting or collecting recordings.
