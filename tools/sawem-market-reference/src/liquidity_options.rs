@@ -51,9 +51,7 @@ pub struct LiquidityOptionAssessment {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LiquidityOptionResult {
     Determined(LiquidityOptionAssessment),
-    Indeterminate {
-        reason: &'static str,
-    },
+    Indeterminate { reason: &'static str },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -291,7 +289,9 @@ pub enum LiquidityOptionComparison {
         lower_cost_option: LowerCostOption,
         compared_cover_relief_minor_units: u64,
     },
-    Indeterminate { reason: &'static str },
+    Indeterminate {
+        reason: &'static str,
+    },
 }
 
 /// Compare two determined scenarios only when they provide the same amount of
