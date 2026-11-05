@@ -27,6 +27,7 @@ jobs:
           actual="$(git rev-parse HEAD)"
           expected="${{ github.event.pull_request.head.sha || github.sha }}"
           test "$actual" = "$expected"
+          echo "MEL_RMI_CODE_REVISION=$actual" >> "$GITHUB_ENV"
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -36,12 +37,28 @@ jobs:
         run: |
           set -euo pipefail
           staged="$RUNNER_TEMP/mel-rmi-synthetic"
-          mkdir -p "$staged/src"
+          mkdir -p "$staged/src" "$staged/examples"
           cp tools/mel-rmi-synthetic/Cargo.toml "$staged/Cargo.toml"
           cp tools/mel-rmi-synthetic/Cargo.lock "$staged/Cargo.lock"
           cp tools/mel-rmi-synthetic/src/lib.rs "$staged/src/lib.rs"
+          cp tools/mel-rmi-synthetic/examples/canonical_suite.rs "$staged/examples/canonical_suite.rs"
           echo "MEL_RMI_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
       - name: Format isolated crate
         run: cargo fmt --check --manifest-path "$MEL_RMI_MANIFEST"
       - name: Test deterministic RMI oracle
         run: cargo test --locked --manifest-path "$MEL_RMI_MANIFEST"
+      - name: Run canonical five-dimension suite and verify control separation
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/mel-rmi-canonical-suite.csv"
+          cargo run --locked --manifest-path "$MEL_RMI_MANIFEST" --example canonical_suite > "$report"
+          cat "$report"
+          rule_count="$(awk -F, '$1 == "trial" && $3 == "rule-positive" && $11 == "true" { count++ } END { print count + 0 }' "$report")"
+          fixed_passes="$(awk -F, '$1 == "trial" && $3 == "fixed" && $11 == "true" { count++ } END { print count + 0 }' "$report")"
+          imitation_passes="$(awk -F, '$1 == "trial" && $3 == "imitation" && $11 == "true" { count++ } END { print count + 0 }' "$report")"
+          reciprocal_count="$(awk -F, '$1 == "reciprocal" && $17 == "true" { count++ } END { print count + 0 }' "$report")"
+          test "$rule_count" -eq 5
+          test "$fixed_passes" -eq 0
+          test "$imitation_passes" -eq 0
+          test "$reciprocal_count" -eq 5
