@@ -71,9 +71,9 @@ The dedicated challenge website snapshot retrieved on 5 November 2026 lists:
 - 11 December: development leaderboard closes.
 - 18 December: final container submission.
 
-The official site describes 132,571 samples (127,371 train / 5,200 development) across 3,103 hours, with reciprocal audio turn-taking and streaming proactive-understanding tracks. Offline Track I asks for WAIT/RESPOND/CONTINUE/YIELD; Online Track I requires generated audio plus timestamped interaction logs. The online protocol requires current/past input only and logs every chunk, including no-response chunks, without backdating.
+The official site describes 132,571 samples (127,371 train / 5,200 development) across approximately 3,103 hours, with reciprocal audio turn-taking and streaming proactive-understanding tracks. Offline Track I asks for WAIT/RESPOND/CONTINUE/YIELD; Online Track I requires generated audio plus timestamped interaction logs. The online protocol requires current/past input only and logs every chunk, including no-response chunks, without backdating.
 
-A prior 4 November repository snapshot recorded 11 November for the opening; the current official site has since changed it to 16 November. Treat the live dedicated challenge site as authoritative and re-check before each milestone. Keep speech challenge results separate from music-adapted results; HEARTBEAT is an adjacent evaluation source, not a music leaderboard.
+The official dedicated site is the schedule authority. Re-check it before each milestone; do not substitute third-party summaries or stale snapshots. Keep speech challenge results separate from music-adapted results; HEARTBEAT is an adjacent evaluation source, not a music leaderboard.
 
 ### MMAE
 
