@@ -314,7 +314,7 @@ mod tests {
     const TEMPERATURE: [i16; 3] = [-100, 250, 450];
     const SOH: [u16; 3] = [7_000, 8_500, 10_000];
 
-    fn cell(
+    const fn cell(
         id: &'static str,
         soc: u16,
         temperature: u16,
