@@ -170,6 +170,10 @@ The first corpus should be public and fully inspectable. Later family-held-out v
 
 Critical false passes are non-compensatory. A high mean score cannot hide a lost critical tolerance, wrong assembly transform, or inspection result attached to the wrong physical article.
 
+## Semantic mapping matrix
+
+`mapping-matrix.csv` provides the first 24-row conceptual mapping register. It names the canonical owner, criticality, fail/Unknown behavior, and an independent check for each semantic contract. These are conceptual mappings, not literal AP242/QIF/MTConnect XML/EXPRESS element paths. Bind each row to exact schema paths and tool-specific representations only after pinning the implementation/profile and independently reviewing the mapping.
+
 ## Initial acceptance gates (provisional, not frozen)
 
 - Zero false passes on authored critical negative controls.
