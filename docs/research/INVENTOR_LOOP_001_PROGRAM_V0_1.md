@@ -315,3 +315,22 @@ The corpus is deliberately an extension to, not a replacement for, Parametric CA
 
 The PHYS-TRUSS follow-up [Symtropy #3676](https://github.com/Luminous-Dynamics/symtropy/issues/3676) now includes explicit dimensionless force, moment and normwise free-DOF residual formulas, zero-denominator disposition, and scale-metamorphic test requirements. The original inline review remains unresolved; the formulas are implementation guidance, not a code fix or numerical qualification.
 
+
+
+### 2026-11-05 update: BenchCAD frontier and buildability gap
+
+OpenAI's November 3 report gives two useful but different evidence signals:
+- It reports a mean BenchCAD 2.0 score of **0.875** for a newer *unnamed internal model*, compared with **0.594** for GPT-6 Astra at its highest reasoning setting. The post does not disclose the model ID, harness version, repetition count, task-level results, uncertainty or resource budget. This is a vendor-reported observation, not a reproducible v2.0/v2.1 leaderboard row; the external registry PR #10458 stores it separately as a vendor-reported result.
+- It reports that an Astra-generated device prototype required several manufacturing review/iteration rounds because production limits, tolerances and assembly details were not consistently accounted for. This is a different failure class from the BenchCAD reconstruction score.
+
+The industry target should therefore be a three-gate chain, not a single benchmark:
+1. **Reconstruction:** exact components, geometry, assembly pose and electrical connectivity recoverable from the permitted inputs.
+2. **Manufacturing feasibility:** exact materials, process/machine capability, tolerance stack, tooling access, fastener/connector assembly, approved substitutions and inspection plan all have evidence or return NOT_EVALUATED/INFEASIBLE.
+3. **Realized article:** exact as-built configuration, metrology, inspection and bounded functional evidence support the physical claim.
+
+This new separation is connected to [HARDWARE-TOPOLOGY-001 #10530](https://github.com/Luminous-Dynamics/symthaea/issues/10530) and its [synthetic assembly/ECAD/buildability fixtures draft PR #10532](https://github.com/Luminous-Dynamics/symthaea/pull/10532). It composes the existing manufacturing value benchmark [#7608](https://github.com/Luminous-Dynamics/symthaea/issues/7608), PCB capability [#8223](https://github.com/Luminous-Dynamics/symthaea/issues/8223), tolerance/as-built conformance [#4883](https://github.com/Luminous-Dynamics/symthaea/issues/4883), exact part identity [#4877](https://github.com/Luminous-Dynamics/symthaea/issues/4877), realization/metrology [#4859](https://github.com/Luminous-Dynamics/symthaea/issues/4859) and integrated workcell [#6040](https://github.com/Luminous-Dynamics/symthaea/issues/6040). It adds no parallel CAD kernel, BOM, manufacturing ontology, inspection ledger, or authority layer.
+
+The competitive wedge is now clearer: do not merely beat a CAD leaderboard. Aim to reduce the **cost per independently accepted, conforming, serviceable article** at fixed quality/critical-risk bounds, and demonstrate the improvement against a conventional production baseline. MFG-VALUE-001 #7608 already owns that production-value comparison; the invention loop should consume it.
+
+No Luminous physical article, CAD/ECAD kernel, BenchCAD task, manufacturing route, or production campaign was run for this update. The new fixture PRs remain design-only and the OpenAI score remains vendor-reported with an undisclosed protocol.
+
