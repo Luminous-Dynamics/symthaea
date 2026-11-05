@@ -1,13 +1,13 @@
 use mel_rmi_synthetic::{
-    ActionMechanism, AgentAction, AgentPolicy, ArtifactFormatV1, ArtifactPayloadSetV1, Condition,
-    ArtifactPayloadV1, ArtifactSetEvidenceV1, Dimension, Feature, FixedResponsePolicy,
+    ActionMechanism, AgentAction, AgentPolicy, ArtifactFormatV1, ArtifactPayloadSetV1,
+    ArtifactPayloadV1, ArtifactSetEvidenceV1, Condition, Dimension, Feature, FixedResponsePolicy,
     HarnessError, ImitationOnlyPolicy, NegotiatedResponseContractV1, NegotiationChoiceV1,
     Observation, OneWayPromptPolicy, PartnerAuthorityEventV1, PartnerAuthorityV1,
-    PartnerCausalContrast, ReciprocalTrialRecordV1, ResponsivePartnerPolicy, RuleBasedPolicy, TaskSpec,
-    TrialRecordV1,
-    TrialRunConfig, UnrelatedFeatureShortcutPolicy, assess_negotiation, assess_scoped_negotiation,
-    bind_verified_artifacts, canonical_fixture_replicates_v1, run_policy_suite_v1,
-    run_reciprocal_suite_v1, validate_partner_authority_event, verify_trial_artifact_bindings,
+    PartnerCausalContrast, ReciprocalTrialRecordV1, ResponsivePartnerPolicy, RuleBasedPolicy,
+    TaskSpec, TrialRecordV1, TrialRunConfig, UnrelatedFeatureShortcutPolicy, assess_negotiation,
+    assess_scoped_negotiation, bind_verified_artifacts, canonical_fixture_replicates_v1,
+    run_policy_suite_v1, run_reciprocal_suite_v1, validate_partner_authority_event,
+    verify_trial_artifact_bindings,
 };
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -220,12 +220,24 @@ fn write_trial_event_rows<W: Write>(
             partner_output
                 .map(|feature| feature.value.to_string())
                 .unwrap_or_default(),
-            partner.map(|value| value.targeted_delta.to_string()).unwrap_or_default(),
-            partner.map(|value| value.sham_delta.to_string()).unwrap_or_default(),
-            partner.map(|value| value.unrelated_delta.to_string()).unwrap_or_default(),
-            partner.map(|value| value.input_sensitive.to_string()).unwrap_or_default(),
-            partner.map(|value| value.target_specific.to_string()).unwrap_or_default(),
-            partner.map(|value| value.oracle_rule_match.to_string()).unwrap_or_default(),
+            partner
+                .map(|value| value.targeted_delta.to_string())
+                .unwrap_or_default(),
+            partner
+                .map(|value| value.sham_delta.to_string())
+                .unwrap_or_default(),
+            partner
+                .map(|value| value.unrelated_delta.to_string())
+                .unwrap_or_default(),
+            partner
+                .map(|value| value.input_sensitive.to_string())
+                .unwrap_or_default(),
+            partner
+                .map(|value| value.target_specific.to_string())
+                .unwrap_or_default(),
+            partner
+                .map(|value| value.oracle_rule_match.to_string())
+                .unwrap_or_default(),
             reciprocal_qualified
                 .map(|value| value.to_string())
                 .unwrap_or_default(),
@@ -834,13 +846,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             bind_and_verify_synthetic_artifacts(record)?;
             artifact_bindings_verified += 1;
             artifact_report_rows += write_record_artifact_evidence(&mut artifact_report, record)?;
-            trial_event_rows += write_trial_event_rows(
-                &mut trial_event_report,
-                "trial",
-                record,
-                None,
-                None,
-            )?;
+            trial_event_rows +=
+                write_trial_event_rows(&mut trial_event_report, "trial", record, None, None)?;
             let contrast = record.contrast;
             println!(
                 "trial,{},{},{},{},{},{},{},{},{},{},,,,,,,",
