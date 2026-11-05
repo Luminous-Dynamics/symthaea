@@ -2209,8 +2209,109 @@ mod tests {
                         );
                     }
                 }
+                let errors = validate_case_catalog_refs(&case);
+                assert!(
+                    errors.is_empty(),
+                    "case {} failed runtime catalog validation: {}",
+                    string_field(&case, "id").unwrap_or("<unknown>"),
+                    errors.join("; ")
+                );
             }
         }
+    }
+
+    #[test]
+    fn case_catalog_allows_metadata_pointer_with_synthetic_fixture_only() {
+        let case = json!({
+            "id": "case-metadata-pointer",
+            "split": "development",
+            "source_refs": [{
+                "source_id": "met-divine-egypt",
+                "uri": "https://www.metmuseum.org/exhibitions/divine-egypt/inside-the-exhibition",
+                "role": "scholarly_context",
+                "rights_status": "unknown"
+            }],
+            "evidence_pack": [{
+                "evidence_id": "synthetic-e1",
+                "statement": "synthetic control input",
+                "kind": "synthetic_control"
+            }]
+        });
+        assert!(validate_case_catalog_refs(&case).is_empty());
+    }
+
+    #[test]
+    fn case_catalog_rejects_source_family_split_mismatch() {
+        let case = json!({
+            "id": "case-leaked-source",
+            "split": "test",
+            "source_refs": [{
+                "source_id": "met-divine-egypt",
+                "uri": "https://www.metmuseum.org/exhibitions/divine-egypt/inside-the-exhibition",
+                "role": "scholarly_context",
+                "rights_status": "unknown"
+            }],
+            "evidence_pack": []
+        });
+        let errors = validate_case_catalog_refs(&case);
+        assert!(errors.iter().any(|error| error.contains("catalog split")));
+    }
+
+    #[test]
+    fn case_catalog_rejects_source_metadata_mismatch() {
+        let case = json!({
+            "id": "case-source-metadata-mismatch",
+            "split": "development",
+            "source_refs": [{
+                "source_id": "met-divine-egypt",
+                "uri": "https://example.invalid/replaced",
+                "role": "scholarly_context",
+                "rights_status": "public_domain_verified"
+            }],
+            "evidence_pack": []
+        });
+        let errors = validate_case_catalog_refs(&case);
+        assert!(errors.iter().any(|error| error.contains("URI differs from catalog")));
+        assert!(errors.iter().any(|error| error.contains("rights_status differs from catalog")));
+    }
+
+    #[test]
+    fn non_synthetic_case_evidence_requires_source_and_approved_rights() {
+        let case = json!({
+            "id": "case-metadata-is-not-evidence",
+            "split": "development",
+            "source_refs": [{
+                "source_id": "met-divine-egypt",
+                "uri": "https://www.metmuseum.org/exhibitions/divine-egypt/inside-the-exhibition",
+                "role": "scholarly_context",
+                "rights_status": "unknown"
+            }],
+            "evidence_pack": [{
+                "evidence_id": "e1",
+                "statement": "unreviewed content",
+                "kind": "source_excerpt",
+                "source_ids": ["met-divine-egypt"]
+            }]
+        });
+        let errors = validate_case_catalog_refs(&case);
+        assert!(errors.iter().any(|error| error.contains("metadata-only")));
+        assert!(errors.iter().any(|error| error.contains("lacks approved rights review")));
+    }
+
+    #[test]
+    fn non_synthetic_case_evidence_requires_explicit_source_ids() {
+        let case = json!({
+            "id": "case-unbound-evidence",
+            "split": "development",
+            "source_refs": [],
+            "evidence_pack": [{
+                "evidence_id": "e1",
+                "statement": "unbound source excerpt",
+                "kind": "source_excerpt"
+            }]
+        });
+        let errors = validate_case_catalog_refs(&case);
+        assert!(errors.iter().any(|error| error.contains("must declare source_ids")));
     }
 
     #[test]
