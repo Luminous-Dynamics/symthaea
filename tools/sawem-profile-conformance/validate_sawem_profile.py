@@ -265,6 +265,7 @@ def main() -> None:
     benchmark_corpus_path = root / "docs/research/sawem/v1/sawem-bess-benchmark-corpus-v1.json"
     kernel_path = root / "tools/sawem-market-reference/src/lib.rs"
     credit_cover_kernel_path = root / "tools/sawem-market-reference/src/credit_cover.rs"
+    liquidity_options_kernel_path = root / "tools/sawem-market-reference/src/liquidity_options.rs"
 
     try:
         schema_bytes = schema_path.read_bytes()
@@ -275,13 +276,16 @@ def main() -> None:
         benchmark_corpus_bytes = benchmark_corpus_path.read_bytes()
         kernel_bytes = kernel_path.read_bytes()
         credit_cover_kernel_bytes = credit_cover_kernel_path.read_bytes()
+        liquidity_options_kernel_bytes = liquidity_options_kernel_path.read_bytes()
         schema = json.loads(schema_bytes)
         fixture = json.loads(fixture_bytes)
         comparator_schema = json.loads(comparator_schema_bytes)
         comparator_fixture = json.loads(comparator_fixture_bytes)
         benchmark_schema = json.loads(benchmark_schema_bytes)
         benchmark_corpus = json.loads(benchmark_corpus_bytes)
-        kernel_source = (kernel_bytes + b"\n" + credit_cover_kernel_bytes).decode("utf-8")
+        kernel_source = (
+            kernel_bytes + b"\n" + credit_cover_kernel_bytes + b"\n" + liquidity_options_kernel_bytes
+        ).decode("utf-8")
     except (OSError, json.JSONDecodeError) as exc:
         fail(f"cannot load schema or fixture: {exc}")
 
