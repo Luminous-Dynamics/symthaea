@@ -1,0 +1,38 @@
+diff --git a/src/web_research/mod.rs b/src/web_research/mod.rs
+--- a/src/web_research/mod.rs
++++ b/src/web_research/mod.rs
+@@ -144,26 +144,13 @@ impl EpistemicConsciousness {
+     pub async fn research(&mut self, query: &str) -> anyhow::Result<WebResearchResult> {
+         let result = self.researcher.research_and_verify(query).await?;
+ 
+-        // Integrate the result
+-        let integration = self.integrator.integrate(result.clone()).await?;
+-
+-        // Update last Phi
+-        self.last_phi = integration.phi_after;
+-
+-        // Record outcomes for meta-learning
+-        for claim in &result.claims {
+-            // For now, assume high-confidence claims are correct
+-            // In a real system, this would be based on user feedback
+-            let outcome = VerificationOutcome {
+-                claim: claim.text.clone(),
+-                source_domain: self.extract_domain(&result.url),
+-                source_type: result.source_type,
+-                was_correct: claim.confidence > 0.7,
+-                predicted_confidence: claim.confidence,
+-                domain: self.detect_domain(query),
+-            };
+-            self.learner.record_outcome(outcome)?;
+-        }
++        // External research remains a candidate until a separately qualified
++        // admission path establishes internal-knowledge and learning authority.
++        tracing::warn!(
++            target: "symthaea::web_research",
++            result_url = %result.url,
++            claim_count = result.claims.len(),
++            "External web research produced a candidate; automatic knowledge and meta-learning admission are quarantined"
++        );
+ 
+         Ok(result)
+     }
