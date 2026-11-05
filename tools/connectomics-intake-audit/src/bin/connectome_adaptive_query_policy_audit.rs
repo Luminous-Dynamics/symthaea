@@ -674,6 +674,20 @@ impl<'a> Solver<'a> {
     }
 }
 
+fn resolve_policy_branch<'a>(
+    node: &'a PolicyNode,
+    observed_outcome: &str,
+) -> Result<&'a PolicyNode, &'static str> {
+    if node.action_id.is_none() {
+        return Err("POLICY_ALREADY_TERMINAL");
+    }
+    node.branches
+        .iter()
+        .find(|branch| branch.observed_outcome == observed_outcome)
+        .map(|branch| branch.child.as_ref())
+        .ok_or("OUT_OF_MODEL_OBSERVATION")
+}
+
 fn count_policy_nodes(node: &PolicyNode) -> (usize, usize) {
     let mut nodes = 1_usize;
     let mut branches = node.branches.len();
@@ -859,9 +873,20 @@ mod tests {
         let root = report.policy.unwrap();
         assert_eq!(root.action_id.as_deref(), Some("inspect-x"));
         assert_eq!(root.branches.len(), 2);
-        assert!(root.branches.iter().any(|branch| branch.child.terminal_query_decision == Some(true)));
         assert!(root.branches.iter().any(|branch| branch.child.action_id.as_deref() == Some("inspect-y")));
         assert!(root.branches.iter().any(|branch| branch.child.action_id.as_deref() == Some("inspect-z")));
+        let x_right = root
+            .branches
+            .iter()
+            .find(|branch| branch.observed_outcome == "x-right")
+            .unwrap();
+        let shared_true_leaf = x_right
+            .child
+            .branches
+            .iter()
+            .find(|branch| branch.observed_outcome == "z-c")
+            .unwrap();
+        assert_eq!(shared_true_leaf.child.terminal_query_decision, Some(true));
     }
 
     #[test]
@@ -913,6 +938,17 @@ mod tests {
             .map(|(outcome, _)| outcome.clone())
             .collect::<BTreeSet<_>>();
         assert_eq!(y_after_x_left, BTreeSet::from(["y-a".to_string()]));
+    }
+
+    #[test]
+    fn observation_not_present_in_joint_support_fails_closed() {
+        let input = adaptive_fixture();
+        let report = evaluate(&input, &bytes(&input)).unwrap();
+        let root = report.policy.unwrap();
+        assert_eq!(
+            resolve_policy_branch(&root, "not-in-declared-support").unwrap_err(),
+            "OUT_OF_MODEL_OBSERVATION"
+        );
     }
 
     #[test]
