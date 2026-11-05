@@ -2371,7 +2371,10 @@ mod tests {
                 }
             }
         }
-        assert_eq!(explored, 3_464, "unexpected exhaustive negotiation state-space coverage");
+        assert_eq!(
+            explored, 3_464,
+            "unexpected exhaustive negotiation state-space coverage"
+        );
     }
 
     fn scoped_authority_event(observation: &Observation) -> PartnerAuthorityEventV1 {
@@ -2402,7 +2405,8 @@ mod tests {
             "runner-clock-session-a",
             150,
             &NegotiationChoiceV1::Branch(vec![5, 7, 9]),
-        ).unwrap();
+        )
+        .unwrap();
         assert!(result.qualified);
         assert_eq!(
             validate_partner_authority_event(
@@ -2423,17 +2427,13 @@ mod tests {
         let mut event = scoped_authority_event(observation);
         event.session_id = "other-session".to_owned();
         assert_eq!(
-            validate_partner_authority_event(
-                &event, observation, 7, "runner-clock-session-a", 150
-            ),
+            validate_partner_authority_event(&event, observation, 7, "runner-clock-session-a", 150),
             Err(HarnessError::InvalidAuthorityScope)
         );
         let mut event = scoped_authority_event(observation);
         event.task_id = "other-task".to_owned();
         assert_eq!(
-            validate_partner_authority_event(
-                &event, observation, 7, "runner-clock-session-a", 150
-            ),
+            validate_partner_authority_event(&event, observation, 7, "runner-clock-session-a", 150),
             Err(HarnessError::InvalidAuthorityScope)
         );
     }
@@ -2444,9 +2444,7 @@ mod tests {
         let observation = &interventions.control;
         let event = scoped_authority_event(observation);
         assert_eq!(
-            validate_partner_authority_event(
-                &event, observation, 8, "runner-clock-session-a", 150
-            ),
+            validate_partner_authority_event(&event, observation, 8, "runner-clock-session-a", 150),
             Err(HarnessError::InvalidAuthoritySequence)
         );
     }
@@ -2458,7 +2456,11 @@ mod tests {
         let event = scoped_authority_event(observation);
         assert_eq!(
             validate_partner_authority_event(
-                &event, observation, 7, "device-clock-other-session", 150
+                &event,
+                observation,
+                7,
+                "device-clock-other-session",
+                150
             ),
             Err(HarnessError::InvalidAuthorityClockOrigin)
         );
@@ -2470,22 +2472,22 @@ mod tests {
         let observation = &interventions.control;
         let event = scoped_authority_event(observation);
         assert_eq!(
-            validate_partner_authority_event(
-                &event, observation, 7, "runner-clock-session-a", 99
-            ),
+            validate_partner_authority_event(&event, observation, 7, "runner-clock-session-a", 99),
             Err(HarnessError::AuthorityNotYetEffective)
         );
         assert_eq!(
-            validate_partner_authority_event(
-                &event, observation, 7, "runner-clock-session-a", 200
-            ),
+            validate_partner_authority_event(&event, observation, 7, "runner-clock-session-a", 200),
             Err(HarnessError::AuthorityExpired)
         );
         let mut invalid_window = event;
         invalid_window.expires_at_ns = invalid_window.issued_at_ns;
         assert_eq!(
             validate_partner_authority_event(
-                &invalid_window, observation, 7, "runner-clock-session-a", 150
+                &invalid_window,
+                observation,
+                7,
+                "runner-clock-session-a",
+                150
             ),
             Err(HarnessError::InvalidAuthorityTimeWindow)
         );
@@ -2498,9 +2500,7 @@ mod tests {
         let mut event = scoped_authority_event(observation);
         event.authority_receipt_ref.clear();
         assert_eq!(
-            validate_partner_authority_event(
-                &event, observation, 7, "runner-clock-session-a", 150
-            ),
+            validate_partner_authority_event(&event, observation, 7, "runner-clock-session-a", 150),
             Err(HarnessError::InvalidAuthorityScope)
         );
     }
