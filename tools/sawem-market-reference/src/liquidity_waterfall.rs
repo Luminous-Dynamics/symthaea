@@ -31,7 +31,7 @@ pub enum LiquidityCashEventKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LiquidityCashEvent<'a> {
-    pub event_id: &'a str,
+    pub event_id: Option<&'a str>,
     pub source_ref: &'a str,
     pub day_ordinal: i32,
     pub minute_of_day: u16,
@@ -55,6 +55,7 @@ pub struct LiquidityWaterfallInputs<'a> {
     /// Civil date coverage and timezone interpretation are supplied outside
     /// this kernel; the ordinal list must cover the entire planning horizon.
     pub calendar_source_ref: &'a str,
+    pub calendar_timezone: &'a str,
     pub calendar_source_sha256: &'a str,
     pub calendar_day_ordinals: &'a [i32],
     pub opening_unrestricted_cash_minor_zar: u64,
@@ -79,6 +80,7 @@ pub enum LiquidityWaterfallError {
     InvalidEvent,
     EventsNotChronological,
     DuplicateEventId,
+    DuplicateEventSourceReference,
     ArithmeticOverflow,
 }
 
@@ -168,11 +170,13 @@ fn assess_path<'a>(
     let mut deadline_cover = inputs.market_required_credit_cover_minor_zar;
     let mut maximum_cover_shortfall: Option<u64> = deadline_cover
         .map(|required| required.saturating_sub(inputs.posted_credit_cover_minor_zar));
-    let mut first_breach = None;
+    let mut first_breach = (cash < floor).then_some(LiquidityBreachPoint {
+        day_ordinal: inputs.start_day_ordinal,
+        minute_of_day: inputs.start_minute_of_day,
+        event_id: None,
+        cash_balance_minor_zar: cash,
+    });
     let mut included = 0_u32;
-    let mut deadline_reached = inputs.start_day_ordinal > inputs.credit_cover_deadline_day_ordinal
-        || (inputs.start_day_ordinal == inputs.credit_cover_deadline_day_ordinal
-            && inputs.start_minute_of_day > inputs.credit_cover_deadline_minute_of_day);
 
     for event in inputs.events {
         if !event_in_path(event.class, path) {
@@ -206,7 +210,7 @@ fn assess_path<'a>(
                 first_breach = Some(LiquidityBreachPoint {
                     day_ordinal: event.day_ordinal,
                     minute_of_day: event.minute_of_day,
-                    event_id: event.event_id,
+                    event_id: Some(event.event_id),
                     cash_balance_minor_zar: cash,
                 });
             }
@@ -222,7 +226,6 @@ fn assess_path<'a>(
                 (None, None) => None,
             };
             cash_at_deadline = cash;
-            deadline_reached = true;
         } else {
             match event.kind {
                 LiquidityCashEventKind::RequiredCoverReassessment => {}
@@ -244,9 +247,6 @@ fn assess_path<'a>(
         }
     }
 
-    if !deadline_reached {
-        cash_at_deadline = cash;
-    }
     let headroom = (cash_at_deadline - floor).max(0);
     let headroom_u64 =
         u64::try_from(headroom).map_err(|_| LiquidityWaterfallError::ArithmeticOverflow)?;
@@ -281,6 +281,7 @@ pub fn evaluate_liquidity_waterfall<'a>(
 ) -> Result<LiquidityWaterfallResult<'a>, LiquidityWaterfallError> {
     if !nonempty(inputs.scenario_id)
         || !nonempty(inputs.calendar_source_ref)
+        || !nonempty(inputs.calendar_timezone)
         || !nonempty(inputs.opening_cash_source_ref)
         || !nonempty(inputs.operating_cash_floor_source_ref)
         || !nonempty(inputs.posted_cover_source_ref)
@@ -357,6 +358,12 @@ pub fn evaluate_liquidity_waterfall<'a>(
         {
             return Err(LiquidityWaterfallError::DuplicateEventId);
         }
+        if inputs.events[..index]
+            .iter()
+            .any(|previous_event| previous_event.source_ref == event.source_ref)
+        {
+            return Err(LiquidityWaterfallError::DuplicateEventSourceReference);
+        }
         let current = (event.day_ordinal, event.minute_of_day, event.sequence);
         if previous.is_some_and(|last| current <= last) {
             return Err(LiquidityWaterfallError::EventsNotChronological);
@@ -429,6 +436,7 @@ mod tests {
             credit_cover_deadline_day_ordinal: 3,
             credit_cover_deadline_minute_of_day: 17 * 60,
             calendar_source_ref: "calendar/sa/2026-v1",
+            calendar_timezone: "Africa/Johannesburg",
             calendar_source_sha256: CALENDAR_SHA,
             calendar_day_ordinals: &[1, 2, 3, 4, 5],
             opening_unrestricted_cash_minor_zar: 50_000_000,
@@ -655,7 +663,7 @@ mod tests {
                 .first_operating_floor_breach
                 .unwrap()
                 .event_id,
-            "outflow-1"
+            Some("outflow-1")
         );
         assert_eq!(
             result.forecast.first_operating_floor_breach,
@@ -663,7 +671,7 @@ mod tests {
         );
         assert_eq!(
             result.stress.first_operating_floor_breach.unwrap().event_id,
-            "outflow-1"
+            Some("outflow-1")
         );
     }
 
@@ -687,6 +695,76 @@ mod tests {
             50_000_000
         );
         assert_eq!(result.committed.end_cash_minor_zar, 75_000_000);
+    }
+
+    #[test]
+    fn post_deadline_only_event_does_not_change_deadline_cash() {
+        let events = [event(
+            "late-receipt",
+            4,
+            9 * 60,
+            0,
+            LiquidityEventClass::Committed,
+            LiquidityCashEventKind::OperatingReceipt,
+            25_000_000,
+        )];
+        let result = evaluate_liquidity_waterfall(base_inputs(&events)).unwrap();
+        let LiquidityWaterfallResult::Determined(result) = result else {
+            panic!("deadline is within the projection horizon");
+        };
+        assert_eq!(result.committed.cash_at_cover_deadline_minor_zar, 50_000_000);
+        assert_eq!(result.committed.end_cash_minor_zar, 75_000_000);
+    }
+
+    #[test]
+    fn opening_cash_below_operating_floor_is_a_breach_at_projection_start() {
+        let inputs = LiquidityWaterfallInputs {
+            opening_unrestricted_cash_minor_zar: 8_000_000,
+            ..base_inputs(&[])
+        };
+        let result = evaluate_liquidity_waterfall(inputs).unwrap();
+        let LiquidityWaterfallResult::Determined(result) = result else {
+            panic!("snapshot evidence is complete");
+        };
+        let breach = result.committed.first_operating_floor_breach.unwrap();
+        assert_eq!(breach.day_ordinal, 1);
+        assert_eq!(breach.minute_of_day, 0);
+        assert_eq!(breach.event_id, None);
+        assert_eq!(breach.cash_balance_minor_zar, 8_000_000);
+    }
+
+    #[test]
+    fn duplicate_source_reference_cannot_be_recounted_under_another_event_id() {
+        let duplicate_source = [
+            LiquidityCashEvent {
+                source_ref: "bank/receipt/same",
+                ..event(
+                    "receipt-event-1",
+                    2,
+                    9 * 60,
+                    0,
+                    LiquidityEventClass::Committed,
+                    LiquidityCashEventKind::OperatingReceipt,
+                    1_000_000,
+                )
+            },
+            LiquidityCashEvent {
+                source_ref: "bank/receipt/same",
+                ..event(
+                    "receipt-event-2",
+                    2,
+                    10 * 60,
+                    0,
+                    LiquidityEventClass::Committed,
+                    LiquidityCashEventKind::OperatingReceipt,
+                    1_000_000,
+                )
+            },
+        ];
+        assert_eq!(
+            evaluate_liquidity_waterfall(base_inputs(&duplicate_source)),
+            Err(LiquidityWaterfallError::DuplicateEventSourceReference)
+        );
     }
 
     #[test]
