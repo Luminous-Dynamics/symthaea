@@ -44,9 +44,10 @@ pub struct CreditCoverExposureInputs<'a> {
 pub struct CreditCoverPosition {
     pub actual_exposure_minor_units: u64,
     pub undefined_potential_exposure_minor_units: u64,
-    pub required_credit_cover_minor_units: u64,
+    /// Illustrative sum of exposure components only; not the MO's full §15.10.3 result.
+    pub synthetic_cover_requirement_minor_units: u64,
     pub posted_credit_cover_minor_units: u64,
-    pub additional_cover_required_minor_units: u64,
+    pub synthetic_additional_cover_minor_units: u64,
     pub surplus_minor_units: u64,
     pub warning_notice_due: Option<bool>,
 }
@@ -110,7 +111,7 @@ pub enum CreditCoverRemediationStatus {
 pub struct CreditCoverRemediationResult {
     pub status: CreditCoverRemediationStatus,
     pub actual_exposure_after_early_payments_minor_units: u64,
-    pub required_credit_cover_after_actions_minor_units: u64,
+    pub synthetic_cover_requirement_after_actions_minor_units: u64,
     pub posted_credit_cover_after_actions_minor_units: u64,
     pub confirmed_early_invoice_payments_minor_units: u64,
     pub confirmed_additional_collateral_minor_units: u64,
@@ -158,7 +159,12 @@ fn nonempty_reference(value: &str) -> bool {
     !value.trim().is_empty()
 }
 
-/// Reconcile §15.10 Actual Exposure and supplied Undefined Potential Exposure.
+/// Reconcile the §15.10(8) Actual Exposure components with externally supplied
+/// Undefined Potential Exposure for a bounded synthetic arithmetic check.
+/// This is NOT the full §15.10.3 Required Credit Cover / Actual Supplier Exposure
+/// calculation: the Market Operator's historical-activity method and approved
+/// UEF/other applicable parameters must be independently supplied and applied
+/// before a real participant's notified Required Credit Cover can be reproduced.
 /// An unpaid invoice and the same statement's no-invoice balance may never be
 /// counted simultaneously.
 pub fn calculate_credit_cover_exposure(
@@ -258,9 +264,9 @@ pub fn calculate_credit_cover_exposure(
     Ok(CreditCoverExposureResult::Determined(CreditCoverPosition {
         actual_exposure_minor_units: actual_exposure,
         undefined_potential_exposure_minor_units: undefined_potential,
-        required_credit_cover_minor_units: required,
+        synthetic_cover_requirement_minor_units: required,
         posted_credit_cover_minor_units: inputs.posted_credit_cover_minor_units,
-        additional_cover_required_minor_units: additional,
+        synthetic_additional_cover_minor_units: additional,
         surplus_minor_units: surplus,
         warning_notice_due,
     }))
@@ -421,7 +427,7 @@ pub fn evaluate_credit_cover_remediation(
         CreditCoverRemediationResult {
             status,
             actual_exposure_after_early_payments_minor_units: actual_after,
-            required_credit_cover_after_actions_minor_units: required_after,
+            synthetic_cover_requirement_after_actions_minor_units: required_after,
             posted_credit_cover_after_actions_minor_units: posted_after,
             confirmed_early_invoice_payments_minor_units: confirmed_invoice_payments,
             confirmed_additional_collateral_minor_units: confirmed_collateral,
@@ -476,9 +482,9 @@ mod tests {
             CreditCoverExposureResult::Determined(CreditCoverPosition {
                 actual_exposure_minor_units: 15_000,
                 undefined_potential_exposure_minor_units: 5_000,
-                required_credit_cover_minor_units: 20_000,
+                synthetic_cover_requirement_minor_units: 20_000,
                 posted_credit_cover_minor_units: 10_000,
-                additional_cover_required_minor_units: 10_000,
+                synthetic_additional_cover_minor_units: 10_000,
                 surplus_minor_units: 0,
                 warning_notice_due: Some(true),
             })
@@ -576,7 +582,7 @@ mod tests {
             CreditCoverRemediationEvaluation::Determined(CreditCoverRemediationResult {
                 status: CreditCoverRemediationStatus::Satisfied,
                 actual_exposure_after_early_payments_minor_units: 10_000,
-                required_credit_cover_after_actions_minor_units: 15_000,
+                synthetic_cover_requirement_after_actions_minor_units: 15_000,
                 posted_credit_cover_after_actions_minor_units: 15_000,
                 confirmed_early_invoice_payments_minor_units: 5_000,
                 confirmed_additional_collateral_minor_units: 5_000,
