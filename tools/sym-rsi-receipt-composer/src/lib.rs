@@ -599,6 +599,14 @@ pub fn compare_candidates(
     Ok(comparisons)
 }
 
+/// Frozen identity for metrics that declare the same pairing group.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PairingGroupContract {
+    eligible_task_ids: Vec<String>,
+    cluster_by_task: BTreeMap<String, String>,
+    input_digests: BTreeMap<String, String>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct ParsedRun {
     verified: VerifiedReceipt,
@@ -626,14 +634,8 @@ pub fn compose_candidate(
     let mut seen_receipt_digests = BTreeSet::new();
     let mut shared_candidate_identity: Option<Value> = None;
     // Only metrics that explicitly declare the same pairing group share task units.
-    let mut pairing_group_contracts: BTreeMap<
-        String,
-        (
-            Vec<String>,
-            BTreeMap<String, String>,
-            BTreeMap<String, String>,
-        ),
-    > = BTreeMap::new();
+    let mut pairing_group_contracts: BTreeMap<String, PairingGroupContract> =
+        BTreeMap::new();
 
     for (metric_id, projection) in &plan.metrics {
         let bytes = receipt_bytes_by_metric
@@ -658,19 +660,19 @@ pub fn compose_candidate(
                 .iter()
                 .map(|(task_id, outcome)| (task_id.clone(), outcome.input_sha256.clone()))
                 .collect::<BTreeMap<_, _>>();
-            let pairing_contract = (
-                parsed.eligible_task_ids.clone(),
-                parsed.projection.cluster_by_task.clone(),
+            let pairing_contract = PairingGroupContract {
+                eligible_task_ids: parsed.eligible_task_ids.clone(),
+                cluster_by_task: parsed.projection.cluster_by_task.clone(),
                 input_digests,
-            );
+            };
             match pairing_group_contracts.get(group_id) {
-                Some(expected) if expected.0 != pairing_contract.0 => {
+                Some(expected) if expected.eligible_task_ids != pairing_contract.eligible_task_ids => {
                     return Err(ComposerError::TaskUniverseMismatch);
                 }
-                Some(expected) if expected.1 != pairing_contract.1 => {
+                Some(expected) if expected.cluster_by_task != pairing_contract.cluster_by_task => {
                     return Err(ComposerError::ClusterMapMismatch);
                 }
-                Some(expected) if expected.2 != pairing_contract.2 => {
+                Some(expected) if expected.input_digests != pairing_contract.input_digests => {
                     return Err(ComposerError::TaskInputUniverseMismatch);
                 }
                 Some(_) => {}
