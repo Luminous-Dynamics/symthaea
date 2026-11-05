@@ -35,7 +35,7 @@ jobs:
       - name: Resolve and pin isolated receipt harness lock
         run: |
           cargo generate-lockfile --manifest-path tools/rea-receipt-harness/Cargo.toml
-          echo "3ee6650c71cec05aed87e36dc64f4c26713c5dc0ef60e1c95b1da02c2d686f59  tools/rea-receipt-harness/Cargo.lock" | sha256sum --check -
+          echo "3ee6650c71cec05aed87e36fab66734412b5043f8660b89afb17c16bbab14a75  tools/rea-receipt-harness/Cargo.lock" | sha256sum --check -
       - name: Record schema and dependency provenance
         run: |
           checked_out_commit="$(git rev-parse HEAD)"
