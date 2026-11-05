@@ -10,7 +10,7 @@ It consumes already-committed decision and downstream receipts. It does not run 
 - RESPOND must bind the exact authorized plan digest, commitment/forecast, output epoch, expiry, and musical response window. Its downstream artifact digest is then carried unchanged through evidence stages.
 - CONTINUE requires the active commitment and an exact before/after state equality check. Cursor, queued notes, pending application frames, and output epoch cannot change under a Continue receipt.
 - YIELD advances the application generation epoch once, preserves the already-emitted note cursor, and accounts exactly for discarded unconsumed notes and pending application-owned frames.
-- VETO validates an authority-bound control sequence and supersedes pending decisions from an older output epoch. The reducer checks the authority_valid result but does not authenticate the receipt itself.
+- VETO is unavailable through the ordinary reducer entry point. It can be applied only with an explicit `VetoAuthorityVerifier`, which receives the exact session, turn, participant, control sequence and opaque signed-receipt reference. The reducer does not implement signature/authentication itself; the production verifier must bind this to the trusted identity/consent system.
 
 ## Evidence ladder
 
