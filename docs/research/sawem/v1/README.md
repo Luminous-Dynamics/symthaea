@@ -73,7 +73,7 @@ Retain separate values for:
 - declared maximum discharging MW as a physical-feasibility extension (not an assertion that this is an additional mandatory Code registration field);
 - maximum and minimum stored energy MWh and the energy-basis convention;
 - charge-cycle efficiency and the boundary at which it is measured;
-- mode-transition times;
+- all six directed mode-transition times between standstill, charging and discharging;
 - registration / declaration / certification / measurement status.
 
 Do not collapse nameplate, vendor_target, registered_value, operator_certified and independently_measured into one capability field.
@@ -125,13 +125,14 @@ It currently implements and tests:
 - minimum-stable-charge deadband validation for reserve target setpoints;
 - SAWEM Rev 2.3 product-specific response requirements: regulating up/down starts within 10 s and fully activates within 10 min; instantaneous up responds within 10 s and sustains for at least 10 min; ten-minute reserve responds within 10 min;
 - separate asset response/sustain evidence from market-rule requirements; missing sustain duration for products where the Code definition is silent remains indeterminate;
+- compare a reserve's evidenced full-activation time against the registered directed mode-transition time; a faster asserted response is rejected as contradictory, and a mode transition longer than the product's market deadline is infeasible;
 - per-product reserve energy headroom/footroom, evaluated against the activation sustain duration supplied by the applicable operational contract/profile;
 - duplicate reserve product/direction detection and aggregation rather than silent double-counting;
 - network import/export caps;
 - seven-day declaration, next-six-days aggregate and seven-day energy caps;
 - checked integer arithmetic for credit cover and multiple signed balancing-payment components.
 
-The reserve mapping is grounded in NTCSA Market Code Rev 2.3 §§2.1(107), 2.1(167), 2.1(199), 9.1(4), 9.5(2)(b) and 7.4: https://www.ntcsa.co.za/wp-content/uploads/2026/02/Market-Code-v2.3.pdf. Regulating and Ten-Minute reserve definitions do not themselves specify a minimum sustain duration. The reference therefore requires an explicit contract/operator sustain profile for energy qualification and reports indeterminate when absent; it does not assume that all products need 10 minutes.\n\nThe kernel is a deterministic feasibility auditor, not a market optimizer. Its simplified symmetric efficiency assumption must be replaced by boundary-specific measured charge/discharge/auxiliary-loss models before engineering performance claims. It does not model temperature, electrochemical dynamics, degradation, warranty, power flow, market price formation, unit commitment, stochastic policies, SAWEM legal interpretation, authenticated dispatch/meter data or settlement integration.
+The reserve mapping is grounded in NTCSA Market Code Rev 2.3 §§2.1(107), 2.1(167), 2.1(199), 9.1(4), 9.5(2)(b) and 7.4: https://www.ntcsa.co.za/wp-content/uploads/2026/02/Market-Code-v2.3.pdf. Regulating and Ten-Minute reserve definitions do not themselves specify a minimum sustain duration. The reference therefore requires an explicit contract/operator sustain profile for energy qualification and reports indeterminate when absent; it does not assume that all products need 10 minutes. Section 7.4 records mode-change times in all directions; the reduced BESS abstraction now stores all six directed transitions among standstill, charging and discharging. The full Code's four-state SCO/pumping/generating vocabulary must be mapped separately before representing pumped-storage units.\n\nThe kernel is a deterministic feasibility auditor, not a market optimizer. Its simplified symmetric efficiency assumption must be replaced by boundary-specific measured charge/discharge/auxiliary-loss models before engineering performance claims. It does not model temperature, electrochemical dynamics, degradation, warranty, power flow, market price formation, unit commitment, stochastic policies, SAWEM legal interpretation, authenticated dispatch/meter data or settlement integration.
 
 The first CI run executes its formatting and dependency-locked unit tests in isolation from the repository root workspace. The open reference is intended to become the hand-auditable feasibility oracle for the 20-case benchmark corpus, not a replacement for PLEXOS, Chronos or EnCompass.
 
