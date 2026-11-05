@@ -1792,7 +1792,7 @@
     },
     {
       "id": "independent_member_receipt_replay",
-      "status": "independent replay passed synthetic corpus; sealed snapshot backend added and awaits exact-head workflow",
+      "status": "sealed_snapshot_exact_head_passed",
       "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10507",
       "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10507",
       "oracle": {
@@ -1855,29 +1855,34 @@
         "snapshot": "Current same-open-file pre/post hashing detects ordinary persistent changes, but does not prove immutable bytes under adversarial concurrent mutate-and-restore. Exact immutable snapshot capture is a separate gate tracked by #10526."
       },
       "validation": {
-        "exact_head": "08818dd4162a37b980c27a7b6c56a57950855b1c",
-        "workflow_run": 41944635509,
+        "exact_head": "520335e19963d6842da393080f335702d2470442",
+        "workflow_run": 41994293575,
         "workflow_name": "REA Member Receipt",
+        "tested_tree_commit": "d43bb7bfbaa28a65f555188dcf64d3180b0206a8",
         "result": "success",
         "tests": {
-          "passed": 20,
+          "passed": 21,
           "failed": 0,
           "ignored": 0,
-          "elapsed_seconds": 0.07
+          "elapsed_seconds": 0.08
         },
         "formatting": "passed",
         "clippy_warnings_denied": "passed",
-        "executable": "rea-receipt-replay compiled as an all-target Clippy target; no production corpus run yet",
-        "claim": "synthetic Stored/Deflate receipts independently replayed with zip-rs/zlib-rs; duplicate-name abstention and negative controls passed",
-        "remaining": "replay still hashes/streams/re-hashes the same opened source file; adversarial mutate-and-restore race requires immutable snapshot work tracked by #10526",
+        "executable": "rea-receipt-replay compiled as all-target target; synthetic Stored and Deflate receipts independently replayed",
         "immutable_snapshot": {
-          "status": "implementation_and_test_committed; exact-head workflow pending",
           "backend": "Linux memfd_create with F_SEAL_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL",
-          "source_snapshot": "stream-copy and SHA-256 in one pass; all parser/decoder/digest work uses the sealed snapshot; verifies seals with F_GET_SEALS",
-          "negative_control": "test replaces original source path and attempts write through a cloned snapshot descriptor; digest and content must remain unchanged",
-          "unsupported_platforms": "non-Linux returns Unsupported until platform-native immutable snapshot backend exists",
-          "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10526"
-        }
+          "seal_readback": "F_GET_SEALS verified all required flags",
+          "negative_control": "replaced source path and attempted writes through cloned snapshot descriptor; sealed bytes/digest unchanged",
+          "cross_platform": "non-Linux remains Unsupported until native immutable snapshot backend"
+        },
+        "cargo_lock": {
+          "lines": 922,
+          "sha256": "3ee6650c71cec05aed87e36fab66734412b5043f8660b89afb17c16bbab14a75",
+          "artifact_id": 13399069495,
+          "artifact_sha256": "sha256:1831e30bf51d6439a5ca35378ae3436f14a83e427c5ddf0fe4f358dac03ad8a0",
+          "status": "generated lock digest pinned in workflow at next revision; source-committing exact lock remains preferred before release"
+        },
+        "claim": "Linux sealed-snapshot, schema-validated independent zip-rs/zlib-rs replay of synthetic Stored/Deflate receipts; no production application corpus replay yet"
       }
     },
     {
