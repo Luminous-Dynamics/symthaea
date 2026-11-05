@@ -50,6 +50,8 @@ struct Input {
     scenarios: Vec<Scenario>,
     actions: Vec<ObservationAction>,
     joint_world_supports: Vec<JointWorldSupport>,
+    #[serde(default)]
+    support_challenges: Vec<SupportChallenge>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -96,6 +98,25 @@ struct ObservationAction {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct JointWorldSupport {
+    scenario_id: String,
+    source_evidence_sha256: String,
+    joint_observation_model_sha256: String,
+    dependence_groups: Vec<String>,
+    possible_joint_outcomes: Vec<JointOutcome>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct SupportChallenge {
+    challenge_id: String,
+    challenger_evidence_sha256: String,
+    challenger_model_sha256: String,
+    additions: Vec<JointSupportAddition>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct JointSupportAddition {
     scenario_id: String,
     source_evidence_sha256: String,
     joint_observation_model_sha256: String,
@@ -156,6 +177,25 @@ struct FixedPlanSummary {
 }
 
 #[derive(Debug, Serialize)]
+struct SupportChallengeResult {
+    challenge_id: String,
+    challenge_sha256: String,
+    expanded_joint_support_sha256: String,
+    added_joint_tuple_count: usize,
+    adaptive_worst_case_effort_before: Option<u64>,
+    adaptive_worst_case_effort_after: Option<u64>,
+    adaptive_status_before: String,
+    adaptive_status_after: String,
+    adaptive_effort_non_decreasing: bool,
+    fixed_minimum_effort_before: Option<u64>,
+    fixed_minimum_effort_after: Option<u64>,
+    fixed_status_before: String,
+    fixed_status_after: String,
+    fixed_effort_non_decreasing: bool,
+    monotonicity_passed: bool,
+}
+
+#[derive(Debug, Serialize)]
 struct Report {
     schema_version: u32,
     tool: &'static str,
@@ -181,6 +221,9 @@ struct Report {
     maximum_terminal_path_effort_units: Option<u64>,
     worst_case_policy_within_budget: Option<bool>,
     fixed_non_adaptive_optimum: FixedPlanSummary,
+    support_challenge_count: usize,
+    support_challenges: Vec<SupportChallengeResult>,
+    support_expansion_monotonicity_passed: bool,
     policy: Option<PolicyNode>,
     out_of_model_observation_disposition: &'static str,
     expected_cost_claim: &'static str,
@@ -752,6 +795,223 @@ fn validate_policy_tree(node: &PolicyNode) -> Result<(), String> {
     Ok(())
 }
 
+fn normalized_addition_rows(
+    addition: &JointSupportAddition,
+    action_ids: &[String],
+) -> Result<Vec<Vec<String>>, String> {
+    let support = JointWorldSupport {
+        scenario_id: addition.scenario_id.clone(),
+        source_evidence_sha256: addition.source_evidence_sha256.clone(),
+        joint_observation_model_sha256: addition.joint_observation_model_sha256.clone(),
+        dependence_groups: addition.dependence_groups.clone(),
+        possible_joint_outcomes: addition.possible_joint_outcomes.clone(),
+    };
+    normalized_joint_rows(&support, action_ids)
+}
+
+fn canonical_support_challenge_sha256(
+    base_support_sha256: &str,
+    challenge: &SupportChallenge,
+    action_ids: &[String],
+) -> Result<String, String> {
+    let mut additions = challenge.additions.iter().collect::<Vec<_>>();
+    additions.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
+    let mut hasher = Sha256::new();
+    hasher.update(b"connectome-adaptive-support-expansion-challenge-v1");
+    hasher.update(base_support_sha256.as_bytes());
+    hash_field(&mut hasher, &challenge.challenge_id);
+    hasher.update(challenge.challenger_evidence_sha256.as_bytes());
+    hasher.update(challenge.challenger_model_sha256.as_bytes());
+    hasher.update((additions.len() as u64).to_be_bytes());
+    for addition in additions {
+        hasher.update(b"WORLD-ADDITION");
+        hash_field(&mut hasher, &addition.scenario_id);
+        hasher.update(addition.source_evidence_sha256.as_bytes());
+        hasher.update(addition.joint_observation_model_sha256.as_bytes());
+        let mut groups = addition.dependence_groups.clone();
+        groups.sort();
+        hasher.update((groups.len() as u64).to_be_bytes());
+        for group in groups {
+            hasher.update(b"DEPENDENCE");
+            hash_field(&mut hasher, &group);
+        }
+        let rows = normalized_addition_rows(addition, action_ids)?;
+        hasher.update((rows.len() as u64).to_be_bytes());
+        for row in rows {
+            hasher.update(b"ADDED-JOINT-TUPLE");
+            for (action_id, outcome) in action_ids.iter().zip(row) {
+                hash_field(&mut hasher, action_id);
+                hash_field(&mut hasher, &outcome);
+            }
+        }
+    }
+    Ok(hex::encode(hasher.finalize()))
+}
+
+fn expand_joint_support(
+    base_sha256: &str,
+    challenge: &SupportChallenge,
+    action_ids: &[String],
+    scenarios: &[Scenario],
+    base_rows: &[Vec<Vec<String>>],
+) -> Result<(String, String, usize, TupleRowsByWorld), String> {
+    if !nonempty(&challenge.challenge_id) {
+        return Err("support challenge ID must be non-empty".into());
+    }
+    if !valid_hex(&challenge.challenger_evidence_sha256, 64)
+        || !valid_hex(&challenge.challenger_model_sha256, 64)
+    {
+        return Err(format!(
+            "support challenge {} challenger evidence/model digests must be SHA-256",
+            challenge.challenge_id
+        ));
+    }
+    if challenge.additions.is_empty() || challenge.additions.len() > scenarios.len() {
+        return Err(format!(
+            "support challenge {} must add tuples to 1..={} worlds",
+            challenge.challenge_id,
+            scenarios.len()
+        ));
+    }
+    let scenario_indices = scenarios
+        .iter()
+        .enumerate()
+        .map(|(index, world)| (world.scenario_id.as_str(), index))
+        .collect::<BTreeMap<_, _>>();
+    let mut seen_worlds = BTreeSet::new();
+    let mut expanded_rows = base_rows.to_vec();
+    let mut added_tuple_count = 0_usize;
+    for addition in &challenge.additions {
+        let Some(world_index) = scenario_indices.get(addition.scenario_id.as_str()).copied() else {
+            return Err(format!(
+                "support challenge {} references unknown world {}",
+                challenge.challenge_id, addition.scenario_id
+            ));
+        };
+        if !seen_worlds.insert(addition.scenario_id.as_str()) {
+            return Err(format!(
+                "support challenge {} repeats world {}",
+                challenge.challenge_id, addition.scenario_id
+            ));
+        }
+        if !valid_hex(&addition.source_evidence_sha256, 64)
+            || !valid_hex(&addition.joint_observation_model_sha256, 64)
+        {
+            return Err(format!(
+                "support challenge {} world {} has invalid source/model digest",
+                challenge.challenge_id, addition.scenario_id
+            ));
+        }
+        let mut groups = BTreeSet::new();
+        for group in &addition.dependence_groups {
+            if !nonempty(group) || !groups.insert(group) {
+                return Err(format!(
+                    "support challenge {} world {} has duplicate/empty dependence group",
+                    challenge.challenge_id, addition.scenario_id
+                ));
+            }
+        }
+        let rows = normalized_addition_rows(addition, action_ids)?;
+        if rows.is_empty() {
+            return Err(format!(
+                "support challenge {} world {} contains no added tuples",
+                challenge.challenge_id, addition.scenario_id
+            ));
+        }
+        let existing = expanded_rows[world_index].iter().collect::<BTreeSet<_>>();
+        if rows.iter().any(|row| existing.contains(row)) {
+            return Err(format!(
+                "support challenge {} world {} attempts to add a tuple already present",
+                challenge.challenge_id, addition.scenario_id
+            ));
+        }
+        let new_count = expanded_rows[world_index]
+            .len()
+            .checked_add(rows.len())
+            .ok_or_else(|| "expanded joint tuple count overflow".to_string())?;
+        if new_count > MAX_JOINT_TUPLES_PER_WORLD {
+            return Err(format!(
+                "support challenge {} world {} exceeds the {}-tuple expanded support cap",
+                challenge.challenge_id, addition.scenario_id, MAX_JOINT_TUPLES_PER_WORLD
+            ));
+        }
+        added_tuple_count = added_tuple_count
+            .checked_add(rows.len())
+            .ok_or_else(|| "added joint tuple count overflow".to_string())?;
+        expanded_rows[world_index].extend(rows);
+        expanded_rows[world_index].sort();
+    }
+    let challenge_sha256 = canonical_support_challenge_sha256(base_sha256, challenge, action_ids)?;
+    let mut expanded_hasher = Sha256::new();
+    expanded_hasher.update(b"connectome-adaptive-expanded-joint-support-v1");
+    expanded_hasher.update(base_sha256.as_bytes());
+    expanded_hasher.update(challenge_sha256.as_bytes());
+    let expanded_sha256 = hex::encode(expanded_hasher.finalize());
+    Ok((
+        challenge_sha256,
+        expanded_sha256,
+        added_tuple_count,
+        expanded_rows,
+    ))
+}
+
+fn effort_is_non_decreasing(before: Option<u64>, after: Option<u64>) -> bool {
+    match (before, after) {
+        (Some(before), Some(after)) => after >= before,
+        (Some(_), None) | (None, None) => true,
+        (None, Some(_)) => false,
+    }
+}
+
+fn solve_adaptive_policy(
+    action_ids: &[String],
+    action_effort: &[u64],
+    scenarios: &[Scenario],
+    tuples_by_world: &[Vec<Vec<String>>],
+) -> Result<(Option<PolicySolution>, usize), String> {
+    let full_world_masks = tuples_by_world
+        .iter()
+        .map(|tuples| {
+            if tuples.len() == 64 {
+                u64::MAX
+            } else {
+                (1_u64 << tuples.len()) - 1
+            }
+        })
+        .collect::<Vec<_>>();
+    let initial_state = PolicyState {
+        remaining_action_mask: (1_u16 << action_ids.len()) - 1,
+        world_row_masks: full_world_masks,
+    };
+    let outcome_masks = build_outcome_masks(action_ids, tuples_by_world);
+    let mut solver = Solver {
+        action_ids,
+        action_effort,
+        scenarios,
+        outcome_masks,
+        state_count: 0,
+        memo: BTreeMap::new(),
+    };
+    let solution = solver.solve(initial_state)?;
+    Ok((solution, solver.state_count))
+}
+
+fn adaptive_status(solution: &Option<PolicySolution>) -> &'static str {
+    if solution.is_some() {
+        "POLICY_EXISTS"
+    } else {
+        "NO_POLICY"
+    }
+}
+
+fn fixed_status(summary: &FixedPlanSummary) -> &'static str {
+    if summary.minimum_effort_units.is_some() {
+        "FIXED_PLAN_EXISTS"
+    } else {
+        "NO_FIXED_PLAN"
+    }
+}
+
 fn decision_conflict_pairs(scenarios: &[Scenario]) -> Vec<(usize, usize)> {
     let mut pairs = Vec::new();
     for left in 0..scenarios.len() {
@@ -912,34 +1172,66 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         &tuples_by_world,
         input.max_total_effort_units,
     )?;
-    let full_world_masks = tuples_by_world
-        .iter()
-        .map(|tuples| {
-            if tuples.len() == 64 {
-                u64::MAX
-            } else {
-                (1_u64 << tuples.len()) - 1
-            }
-        })
-        .collect::<Vec<_>>();
-    let initial_state = PolicyState {
-        remaining_action_mask: (1_u16 << action_ids.len()) - 1,
-        world_row_masks: full_world_masks,
-    };
-    let outcome_masks = build_outcome_masks(&action_ids, &tuples_by_world);
-    let mut solver = Solver {
-        action_ids: &action_ids,
-        action_effort: &action_effort,
-        scenarios: &scenarios,
-        outcome_masks,
-        state_count: 0,
-        memo: BTreeMap::new(),
-    };
-    let solution = solver.solve(initial_state)?;
+    let (solution, state_count) =
+        solve_adaptive_policy(&action_ids, &action_effort, &scenarios, &tuples_by_world)?;
     fixed_non_adaptive_optimum.adaptive_worst_case_savings_units = cost_delta(
         fixed_non_adaptive_optimum.minimum_effort_units,
         solution.as_ref().map(|policy| policy.worst_case_cost),
     );
+
+    let mut challenge_ids = BTreeSet::new();
+    let mut support_challenge_results = Vec::with_capacity(input.support_challenges.len());
+    for challenge in &input.support_challenges {
+        if !challenge_ids.insert(challenge.challenge_id.as_str()) {
+            return Err(format!(
+                "duplicate support challenge ID {}",
+                challenge.challenge_id
+            ));
+        }
+        let (challenge_sha256, expanded_sha256, added_tuple_count, expanded_rows) =
+            expand_joint_support(
+                &input.joint_support_sha256,
+                challenge,
+                &action_ids,
+                &scenarios,
+                &tuples_by_world,
+            )?;
+        let (expanded_solution, _expanded_state_count) =
+            solve_adaptive_policy(&action_ids, &action_effort, &scenarios, &expanded_rows)?;
+        let expanded_fixed = minimum_fixed_plan(
+            &action_ids,
+            &action_effort,
+            &scenarios,
+            &expanded_rows,
+            input.max_total_effort_units,
+        )?;
+        let adaptive_before = solution.as_ref().map(|policy| policy.worst_case_cost);
+        let adaptive_after = expanded_solution
+            .as_ref()
+            .map(|policy| policy.worst_case_cost);
+        let fixed_before = fixed_non_adaptive_optimum.minimum_effort_units;
+        let fixed_after = expanded_fixed.minimum_effort_units;
+        let adaptive_non_decreasing = effort_is_non_decreasing(adaptive_before, adaptive_after);
+        let fixed_non_decreasing = effort_is_non_decreasing(fixed_before, fixed_after);
+        support_challenge_results.push(SupportChallengeResult {
+            challenge_id: challenge.challenge_id.clone(),
+            challenge_sha256,
+            expanded_joint_support_sha256: expanded_sha256,
+            added_joint_tuple_count: added_tuple_count,
+            adaptive_worst_case_effort_before: adaptive_before,
+            adaptive_worst_case_effort_after: adaptive_after,
+            adaptive_status_before: adaptive_status(&solution).to_string(),
+            adaptive_status_after: adaptive_status(&expanded_solution).to_string(),
+            adaptive_effort_non_decreasing: adaptive_non_decreasing,
+            fixed_minimum_effort_before: fixed_before,
+            fixed_minimum_effort_after: fixed_after,
+            fixed_status_before: fixed_status(&fixed_non_adaptive_optimum).to_string(),
+            fixed_status_after: fixed_status(&expanded_fixed).to_string(),
+            fixed_effort_non_decreasing: fixed_non_decreasing,
+            monotonicity_passed: adaptive_non_decreasing && fixed_non_decreasing,
+        });
+    }
+
     let (
         worst_case,
         min_path,
@@ -950,7 +1242,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         policy_branches,
         optimal_policy_count,
         status,
-    ) = match solution {
+    ) = match solution.clone() {
         Some(solution) => {
             validate_policy_tree(&solution.node)?;
             let within = solution.worst_case_cost <= input.max_total_effort_units;
@@ -985,6 +1277,15 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         ),
     };
 
+    let support_expansion_monotonicity_passed = support_challenge_results
+        .iter()
+        .all(|challenge| challenge.monotonicity_passed);
+    let reported_status = if support_expansion_monotonicity_passed {
+        status
+    } else {
+        "SUPPORT_EXPANSION_MONOTONICITY_VIOLATION"
+    };
+
     Ok(Report {
         schema_version: 1,
         tool: "connectome-adaptive-query-policy-audit",
@@ -1001,7 +1302,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         scenario_count: input.scenarios.len(),
         observation_action_count: input.actions.len(),
         joint_support_tuple_count: tuple_count,
-        exact_policy_state_count: solver.state_count,
+        exact_policy_state_count: state_count,
         policy_node_count: policy_nodes,
         policy_branch_count: policy_branches,
         worst_case_effort_units: worst_case,
@@ -1010,13 +1311,16 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         maximum_terminal_path_effort_units: max_path,
         worst_case_policy_within_budget: within_budget,
         fixed_non_adaptive_optimum,
+        support_challenge_count: support_challenge_results.len(),
+        support_challenges: support_challenge_results,
+        support_expansion_monotonicity_passed,
         policy,
         out_of_model_observation_disposition: "FAIL_CLOSED_NO_QUERY_DECISION",
         expected_cost_claim: "NONE_NO_PRIOR_OR_EXPECTED_COST_COMPUTED",
         probability_claim: "NONE_FINITE_SET_VALUED_CORRELATED_SUPPORT_ONLY",
-        status,
+        status: reported_status,
         search_complete: true,
-        scope_note: "The policy conditions the original joint tuple relations after each observed action outcome. It stops only when all compatible worlds agree on the frozen query decision, not when the exact world is identified. It does not factorize marginals, infer independence, assign probabilities, prove joint-support completeness, validate measurement models, or establish biological truth. An observation category outside every declared compatible tuple is out-of-model and must fail closed.",
+        scope_note: "The policy conditions the original joint tuple relations after each observed action outcome. It stops only when all compatible worlds agree on the frozen query decision, not when the exact world is identified. It does not factorize marginals, infer independence, assign probabilities, prove joint-support completeness, validate measurement models, or establish biological truth. Optional support challenges are additive-only sensitivity checks; a monotonicity pass does not prove challenge completeness. An observation category outside every declared compatible tuple is out-of-model and must fail closed.",
     })
 }
 
@@ -1060,6 +1364,9 @@ fn main() -> ExitCode {
     } else {
         print!("{rendered}");
     }
+    if !report.support_expansion_monotonicity_passed {
+        return ExitCode::from(4);
+    }
     ExitCode::SUCCESS
 }
 
@@ -1079,6 +1386,20 @@ mod tests {
             "../../../../docs/neuroscience/examples/CONNECTOME_ADAPTIVE_QUERY_POLICY_NO_POLICY.example.json"
         ))
         .expect("adaptive no-policy fixture must parse")
+    }
+
+    fn support_expansion_fixture() -> Input {
+        serde_json::from_str(include_str!(
+            "../../../../docs/neuroscience/examples/CONNECTOME_ADAPTIVE_SUPPORT_EXPANSION.example.json"
+        ))
+        .expect("support-expansion fixture must parse")
+    }
+
+    fn no_policy_support_expansion_fixture() -> Input {
+        serde_json::from_str(include_str!(
+            "../../../../docs/neuroscience/examples/CONNECTOME_ADAPTIVE_SUPPORT_EXPANSION_NO_POLICY.example.json"
+        ))
+        .expect("no-policy support-expansion fixture must parse")
     }
 
     fn bytes(input: &Input) -> Vec<u8> {
@@ -1229,6 +1550,59 @@ mod tests {
         assert_eq!(report.worst_case_effort_units, Some(1));
         assert_eq!(report.optimal_policy_count, 2);
         assert!(report.policy.is_some());
+    }
+
+    #[test]
+    fn additive_support_expansion_cannot_lower_optimal_effort() {
+        let input = support_expansion_fixture();
+        let report = evaluate(&input, &bytes(&input)).unwrap();
+        assert_eq!(report.worst_case_effort_units, Some(4));
+        assert_eq!(
+            report.fixed_non_adaptive_optimum.minimum_effort_units,
+            Some(5)
+        );
+        assert_eq!(report.support_challenge_count, 1);
+        let challenge = &report.support_challenges[0];
+        assert_eq!(challenge.added_joint_tuple_count, 1);
+        assert_eq!(challenge.adaptive_worst_case_effort_before, Some(4));
+        assert_eq!(challenge.adaptive_worst_case_effort_after, Some(5));
+        assert_eq!(challenge.fixed_minimum_effort_before, Some(5));
+        assert_eq!(challenge.fixed_minimum_effort_after, Some(5));
+        assert!(challenge.adaptive_effort_non_decreasing);
+        assert!(challenge.fixed_effort_non_decreasing);
+        assert!(challenge.monotonicity_passed);
+    }
+
+    #[test]
+    fn additive_support_cannot_resurrect_a_previously_impossible_policy() {
+        let input = no_policy_support_expansion_fixture();
+        let report = evaluate(&input, &bytes(&input)).unwrap();
+        assert_eq!(report.worst_case_effort_units, None);
+        let challenge = &report.support_challenges[0];
+        assert_eq!(challenge.adaptive_worst_case_effort_before, None);
+        assert_eq!(challenge.adaptive_worst_case_effort_after, None);
+        assert_eq!(challenge.adaptive_status_before, "NO_POLICY");
+        assert_eq!(challenge.adaptive_status_after, "NO_POLICY");
+        assert!(challenge.adaptive_effort_non_decreasing);
+        assert!(challenge.monotonicity_passed);
+    }
+
+    #[test]
+    fn support_expansion_rejects_a_tuple_already_in_base_support() {
+        let mut input = support_expansion_fixture();
+        input.support_challenges[0].additions[0].possible_joint_outcomes[0].outcomes[1].outcome =
+            "y-same".into();
+        input.support_challenges[0].additions[0].possible_joint_outcomes[0].outcomes[2].outcome =
+            "z-d".into();
+        let error = evaluate(&input, &bytes(&input)).unwrap_err();
+        assert!(error.contains("already present"));
+    }
+
+    #[test]
+    fn no_policy_cannot_be_resurrected_by_adding_support() {
+        assert!(effort_is_non_decreasing(None, None));
+        assert!(!effort_is_non_decreasing(None, Some(1)));
+        assert!(effort_is_non_decreasing(Some(1), None));
     }
 
     #[test]

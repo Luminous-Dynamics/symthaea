@@ -174,31 +174,22 @@ def fixed_plan_summary(
     }
 
 
-def run(data: dict, input_bytes: bytes) -> dict:
-    assert scenario_digest(data["scenarios"]) == data["scenario_set_sha256"]
-    assert action_digest(data["actions"]) == data["action_set_sha256"]
-    assert joint_digest(data["scenarios"], data["actions"], data["joint_world_supports"]) == data["joint_support_sha256"]
-
-    scenarios = sorted(data["scenarios"], key=lambda row: row["scenario_id"])
-    actions = sorted(data["actions"], key=lambda row: row["action_id"])
+def adaptive_solution(
+    actions: list[dict],
+    scenarios: list[dict],
+    tuple_rows: list[list[tuple[str, ...]]],
+) -> tuple[dict | None, int]:
     action_ids = [row["action_id"] for row in actions]
     action_costs = [row["effort_units"] for row in actions]
-    support_by_world = {row["scenario_id"]: row for row in data["joint_world_supports"]}
-    tuple_rows = [
-        normalized_rows(support_by_world[world["scenario_id"]], action_ids)
-        for world in scenarios
-    ]
     outcome_masks = build_outcome_masks(action_ids, tuple_rows)
-
-    # State key: (remaining-action bitmask, per-world compatible joint-tuple bitmasks).
     memo: dict[tuple[int, tuple[int, ...]], dict | None] = {}
     state_counter = 0
 
-    def compatible_world_indices(row_masks: tuple[int, ...]) -> list[int]:
+    def active_worlds(row_masks: tuple[int, ...]) -> list[int]:
         return [index for index, mask in enumerate(row_masks) if mask != 0]
 
     def terminal_decision(row_masks: tuple[int, ...]) -> bool | None:
-        active = compatible_world_indices(row_masks)
+        active = active_worlds(row_masks)
         if not active:
             return None
         decision = scenarios[active[0]]["decision_met"]
@@ -210,9 +201,8 @@ def run(data: dict, input_bytes: bytes) -> dict:
         if key in memo:
             return memo[key]
         state_counter += 1
-
         decision = terminal_decision(row_masks)
-        active = compatible_world_indices(row_masks)
+        active = active_worlds(row_masks)
         world_ids = [scenarios[index]["scenario_id"] for index in active]
         if decision is not None:
             leaf = {
@@ -239,15 +229,11 @@ def run(data: dict, input_bytes: bytes) -> dict:
             bit = 1 << action_index
             if remaining_mask & bit == 0:
                 continue
-
             observed = set()
             for world_index in active:
                 for outcome, mask in outcome_masks[action_index][world_index].items():
                     if row_masks[world_index] & mask:
                         observed.add(outcome)
-            if not observed:
-                continue
-
             branches = []
             child_solutions = []
             valid_action = True
@@ -264,15 +250,11 @@ def run(data: dict, input_bytes: bytes) -> dict:
                 child_solutions.append(child)
             if not valid_action or not branches:
                 continue
-
-            child_worst = max(child["worst_case_cost"] for child in child_solutions)
-            child_min = min(child["minimum_path_cost"] for child in child_solutions)
-            child_max = max(child["maximum_path_cost"] for child in child_solutions)
             cost = action_costs[action_index]
             candidate = {
-                "worst_case_cost": cost + child_worst,
-                "minimum_path_cost": cost + child_min,
-                "maximum_path_cost": cost + child_max,
+                "worst_case_cost": cost + max(child["worst_case_cost"] for child in child_solutions),
+                "minimum_path_cost": cost + min(child["minimum_path_cost"] for child in child_solutions),
+                "maximum_path_cost": cost + max(child["maximum_path_cost"] for child in child_solutions),
                 "optimal_policy_count": math.prod(child["optimal_policy_count"] for child in child_solutions),
                 "node": {
                     "action_id": action_id,
@@ -282,25 +264,151 @@ def run(data: dict, input_bytes: bytes) -> dict:
                     "branches": branches,
                 },
             }
-            # Actions are iterated in lexical order. Keep the first exact tie,
-            # matching the Rust deterministic policy selection contract.
             if best is None or candidate["worst_case_cost"] < best["worst_case_cost"]:
                 best = candidate
             elif candidate["worst_case_cost"] == best["worst_case_cost"]:
                 best["optimal_policy_count"] += candidate["optimal_policy_count"]
-
         memo[key] = best
         return best
 
     initial_masks = tuple((1 << len(rows)) - 1 for rows in tuple_rows)
-    initial_remaining = (1 << len(action_ids)) - 1
-    solution = solve(initial_remaining, initial_masks)
+    solution = solve((1 << len(action_ids)) - 1, initial_masks)
+    return solution, state_counter
+
+
+def effort_non_decreasing(before: int | None, after: int | None) -> bool:
+    if before is None:
+        return after is None
+    return after is None or after >= before
+
+
+def support_challenge_digest(base_support_sha: str, challenge: dict, action_ids: list[str]) -> tuple[str, list[tuple[str, list[tuple[str, ...]]]]]:
+    additions = sorted(challenge["additions"], key=lambda row: row["scenario_id"])
+    h = hashlib.sha256()
+    h.update(b"connectome-adaptive-support-expansion-challenge-v1")
+    h.update(base_support_sha.encode("ascii"))
+    hash_field(h, challenge["challenge_id"])
+    h.update(challenge["challenger_evidence_sha256"].encode("ascii"))
+    h.update(challenge["challenger_model_sha256"].encode("ascii"))
+    h.update(len(additions).to_bytes(8, "big"))
+    normalized_additions = []
+    for addition in additions:
+        h.update(b"WORLD-ADDITION")
+        hash_field(h, addition["scenario_id"])
+        h.update(addition["source_evidence_sha256"].encode("ascii"))
+        h.update(addition["joint_observation_model_sha256"].encode("ascii"))
+        groups = sorted(addition["dependence_groups"])
+        h.update(len(groups).to_bytes(8, "big"))
+        for group in groups:
+            h.update(b"DEPENDENCE")
+            hash_field(h, group)
+        rows = normalized_rows(addition, action_ids)
+        h.update(len(rows).to_bytes(8, "big"))
+        for row in rows:
+            h.update(b"ADDED-JOINT-TUPLE")
+            for action_id, outcome in zip(action_ids, row):
+                hash_field(h, action_id)
+                hash_field(h, outcome)
+        normalized_additions.append((addition["scenario_id"], rows))
+    return h.hexdigest(), normalized_additions
+
+
+def build_support_challenges(
+    data: dict,
+    scenarios: list[dict],
+    actions: list[dict],
+    tuple_rows: list[list[tuple[str, ...]]],
+    baseline_solution: dict | None,
+    baseline_fixed: dict,
+) -> list[dict]:
+    action_ids = [row["action_id"] for row in actions]
+    world_index = {row["scenario_id"]: index for index, row in enumerate(scenarios)}
+    seen_challenges = set()
+    results = []
+    for challenge in data.get("support_challenges", []):
+        challenge_id = challenge["challenge_id"]
+        assert challenge_id not in seen_challenges, "duplicate support challenge ID"
+        seen_challenges.add(challenge_id)
+        assert challenge_id.strip(), "empty support challenge ID"
+        assert len(challenge["challenger_evidence_sha256"]) == 64
+        assert len(challenge["challenger_model_sha256"]) == 64
+        challenge_sha, additions = support_challenge_digest(
+            data["joint_support_sha256"], challenge, action_ids
+        )
+        expanded_rows = [list(rows) for rows in tuple_rows]
+        seen_worlds = set()
+        added_count = 0
+        for scenario_id, rows in additions:
+            assert scenario_id in world_index, "challenge references unknown world"
+            assert scenario_id not in seen_worlds, "challenge repeats world"
+            seen_worlds.add(scenario_id)
+            index = world_index[scenario_id]
+            existing = set(expanded_rows[index])
+            assert all(row not in existing for row in rows), "challenge adds tuple already in base support"
+            assert len(expanded_rows[index]) + len(rows) <= 64, "expanded world support exceeds tuple cap"
+            expanded_rows[index].extend(rows)
+            expanded_rows[index].sort()
+            added_count += len(rows)
+
+        expanded_hash = hashlib.sha256(
+            b"connectome-adaptive-expanded-joint-support-v1"
+            + data["joint_support_sha256"].encode("ascii")
+            + challenge_sha.encode("ascii")
+        ).hexdigest()
+        expanded_solution, _states = adaptive_solution(actions, scenarios, expanded_rows)
+        expanded_fixed = fixed_plan_summary(
+            actions, scenarios, expanded_rows, data["max_total_effort_units"]
+        )
+        adaptive_before = None if baseline_solution is None else baseline_solution["worst_case_cost"]
+        adaptive_after = None if expanded_solution is None else expanded_solution["worst_case_cost"]
+        fixed_before = baseline_fixed["minimum_effort_units"]
+        fixed_after = expanded_fixed["minimum_effort_units"]
+        adaptive_monotone = effort_non_decreasing(adaptive_before, adaptive_after)
+        fixed_monotone = effort_non_decreasing(fixed_before, fixed_after)
+        results.append({
+            "challenge_id": challenge_id,
+            "challenge_sha256": challenge_sha,
+            "expanded_joint_support_sha256": expanded_hash,
+            "added_joint_tuple_count": added_count,
+            "adaptive_worst_case_effort_before": adaptive_before,
+            "adaptive_worst_case_effort_after": adaptive_after,
+            "adaptive_status_before": "POLICY_EXISTS" if baseline_solution is not None else "NO_POLICY",
+            "adaptive_status_after": "POLICY_EXISTS" if expanded_solution is not None else "NO_POLICY",
+            "adaptive_effort_non_decreasing": adaptive_monotone,
+            "fixed_minimum_effort_before": fixed_before,
+            "fixed_minimum_effort_after": fixed_after,
+            "fixed_status_before": "FIXED_PLAN_EXISTS" if fixed_before is not None else "NO_FIXED_PLAN",
+            "fixed_status_after": "FIXED_PLAN_EXISTS" if fixed_after is not None else "NO_FIXED_PLAN",
+            "fixed_effort_non_decreasing": fixed_monotone,
+            "monotonicity_passed": adaptive_monotone and fixed_monotone,
+        })
+    return results
+
+
+def run(data: dict, input_bytes: bytes) -> dict:
+    assert scenario_digest(data["scenarios"]) == data["scenario_set_sha256"]
+    assert action_digest(data["actions"]) == data["action_set_sha256"]
+    assert joint_digest(data["scenarios"], data["actions"], data["joint_world_supports"]) == data["joint_support_sha256"]
+
+    scenarios = sorted(data["scenarios"], key=lambda row: row["scenario_id"])
+    actions = sorted(data["actions"], key=lambda row: row["action_id"])
+    action_ids = [row["action_id"] for row in actions]
+    action_costs = [row["effort_units"] for row in actions]
+    support_by_world = {row["scenario_id"]: row for row in data["joint_world_supports"]}
+    tuple_rows = [
+        normalized_rows(support_by_world[world["scenario_id"]], action_ids)
+        for world in scenarios
+    ]
+    solution, state_counter = adaptive_solution(actions, scenarios, tuple_rows)
     tuple_count = sum(len(rows) for rows in tuple_rows)
     fixed_summary = fixed_plan_summary(actions, scenarios, tuple_rows, data["max_total_effort_units"])
     if fixed_summary["minimum_effort_units"] is not None and solution is not None:
         fixed_summary["adaptive_worst_case_savings_units"] = (
             fixed_summary["minimum_effort_units"] - solution["worst_case_cost"]
         )
+    support_challenges = build_support_challenges(
+        data, scenarios, actions, tuple_rows, solution, fixed_summary
+    )
 
     def count_tree(node: dict) -> tuple[int, int]:
         nodes = 1
@@ -330,6 +438,11 @@ def run(data: dict, input_bytes: bytes) -> dict:
             else "MINIMUM_WORST_CASE_ADAPTIVE_POLICY_EXCEEDS_BUDGET"
         )
 
+    support_expansion_monotonicity_passed = all(
+        challenge["monotonicity_passed"] for challenge in support_challenges
+    )
+    reported_status = status if support_expansion_monotonicity_passed else "SUPPORT_EXPANSION_MONOTONICITY_VIOLATION"
+
     return {
         "schema_version": 1,
         "tool": "connectome-adaptive-query-policy-audit",
@@ -355,13 +468,16 @@ def run(data: dict, input_bytes: bytes) -> dict:
         "maximum_terminal_path_effort_units": maximum_path,
         "worst_case_policy_within_budget": within,
         "fixed_non_adaptive_optimum": fixed_summary,
+        "support_challenge_count": len(support_challenges),
+        "support_challenges": support_challenges,
+        "support_expansion_monotonicity_passed": support_expansion_monotonicity_passed,
         "policy": policy,
         "out_of_model_observation_disposition": "FAIL_CLOSED_NO_QUERY_DECISION",
         "expected_cost_claim": "NONE_NO_PRIOR_OR_EXPECTED_COST_COMPUTED",
         "probability_claim": "NONE_FINITE_SET_VALUED_CORRELATED_SUPPORT_ONLY",
-        "status": status,
+        "status": reported_status,
         "search_complete": True,
-        "scope_note": "The policy conditions the original joint tuple relations after each observed action outcome. It stops only when all compatible worlds agree on the frozen query decision, not when the exact world is identified. It does not factorize marginals, infer independence, assign probabilities, prove joint-support completeness, validate measurement models, or establish biological truth. An observation category outside every declared compatible tuple is out-of-model and must fail closed.",
+        "scope_note": "The policy conditions the original joint tuple relations after each observed action outcome. It stops only when all compatible worlds agree on the frozen query decision, not when the exact world is identified. It does not factorize marginals, infer independence, assign probabilities, prove joint-support completeness, validate measurement models, or establish biological truth. Optional support challenges are additive-only sensitivity checks; a monotonicity pass does not prove challenge completeness. An observation category outside every declared compatible tuple is out-of-model and must fail closed.",
     }
 
 
