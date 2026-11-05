@@ -139,7 +139,7 @@ pub fn reuse_sign_test_decision(
         return Ok(ReuseDecision::Reject);
     }
 
-    let p_value = super::paired_evaluation::exact_sign_test_upper_tail(wins, losses)
+    let p_value = super::paired_sign_test::exact_sign_test_upper_tail(wins, losses)
         .ok_or(ReuseBudgetError::ComparisonCountOverflow)?;
     if p_value <= allocation.paired_test_error_budget {
         Ok(ReuseDecision::Promote)
