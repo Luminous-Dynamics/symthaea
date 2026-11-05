@@ -16,7 +16,12 @@
     "file_id",
     "fact_index",
     "language",
-    "hallucination_type"
+    "hallucination_type",
+    "evidence_tokens",
+    "latency_ms",
+    "input_tokens",
+    "output_tokens",
+    "retrieval_calls"
   ],
   "properties": {
     "schema_version": {
@@ -106,6 +111,17 @@
         "numerical inaccuracy",
         "location mistake"
       ]
+    },
+    "evidence_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cost_microusd": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
     }
   }
 }
