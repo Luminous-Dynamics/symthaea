@@ -65,6 +65,7 @@ pub enum RevenueBridgeError {
     NoRequiredCategories,
     DuplicateRequiredCategory,
     DuplicateComponentId,
+    DuplicateComponentSourceReference,
     ArithmeticOverflow,
 }
 
@@ -139,6 +140,7 @@ pub fn evaluate_revenue_realization_bridge<'a>(
     }
 
     let mut component_ids = BTreeSet::new();
+    let mut component_source_refs = BTreeSet::new();
     let mut evidenced_categories = BTreeSet::new();
     let mut known_adjustments = 0_i128;
     for component in inputs.components.iter().copied() {
@@ -153,6 +155,9 @@ pub fn evaluate_revenue_realization_bridge<'a>(
         }
         if !component_ids.insert(component.component_id) {
             return Err(RevenueBridgeError::DuplicateComponentId);
+        }
+        if !component_source_refs.insert(component.source_ref) {
+            return Err(RevenueBridgeError::DuplicateComponentSourceReference);
         }
         evidenced_categories.insert(component.kind);
         known_adjustments = checked_add(
@@ -346,6 +351,21 @@ mod tests {
         assert_eq!(
             evaluate_revenue_realization_bridge(base_inputs(&duplicate_required, &[])),
             Err(RevenueBridgeError::DuplicateRequiredCategory)
+        );
+    }
+
+    #[test]
+    fn one_source_receipt_cannot_back_two_adjustment_components() {
+        let duplicate_sources = [
+            component("forecast-regret", RevenueComponentKind::ForecastRegret, -10_000),
+            RevenueBridgeComponent {
+                source_ref: "forecast-regret",
+                ..component("execution-loss", RevenueComponentKind::ExecutionDeviation, -5_000)
+            },
+        ];
+        assert_eq!(
+            evaluate_revenue_realization_bridge(base_inputs(&REQUIRED, &duplicate_sources)),
+            Err(RevenueBridgeError::DuplicateComponentSourceReference)
         );
     }
 
