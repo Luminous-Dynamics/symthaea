@@ -28,11 +28,13 @@ Do not expose hidden transforms, expected net partitions, evaluator mutation con
 
 ## 3. Mechanical assembly fixtures
 
-### ASM-P01 — six-part instrument support frame
+### ASM-P01 — six unique part definitions / seven-instance instrument support frame
 
 **Global frame:** right-handed XYZ; origin at the centre of the bottom face of the base plate; +Z upward; dimensions in mm.
 
-**Parts and nominal geometry:**
+**Part definitions and nominal geometry:**
+
+The fixture has six unique part definitions and seven physical component instances: one base, two instances of the POST part type, one beam, one tie bar, and two distinct left/right gusset variants. Count instances separately from unique part definitions.
 - **BASE-01:** 200 × 120 × 8 rectangular base plate; bottom face at z=0; centre at (0,0).
 - **POST-L:** 20 × 20 × 100 square post; centre at (-80,0,58); axis parallel +Z.
 - **POST-R:** same part variant; centre at (80,0,58); axis parallel +Z.
@@ -226,3 +228,16 @@ Compose [MFG-VALUE-001 #7608](https://github.com/Luminous-Dynamics/symthaea/issu
 
 OpenAI's 2026-11-03 report provides a current industry warning: its Astra-generated enclosure/PCB device required several review rounds before manufacturing because production limits, tolerances and assembly details were not consistently accounted for. Its reported 0.875 BenchCAD score for an unnamed internal model is recorded separately in the external registry; the report does not disclose the model ID, harness, run count, budget or task outcomes. These observations motivate the additional gate but do not establish Luminous capability or a reproducible competitor score. Source: https://openai.com/index/accelerating-engineering-for-the-physical-world/
 
+
+
+## 8. Runner-independent geometry materialization tranche (2026-11-05)
+
+A separate development fixture package is tracked in [ENGINEERING-FIXTURE-MATERIALIZATION-001 #10622](https://github.com/Luminous-Dynamics/symthaea/issues/10622).
+
+The support-frame prototype is materialized as a STEP compound with seven separately preserved solids, six unique part definitions, and an exact instance/transform manifest. Six individual part-definition STEP files are also provided. A pairwise volumetric intersection audit covered all 21 instance pairs; the observed positive-volume intersection was zero for every pair.
+
+The two gussets require explicit fixture-local assumptions because the original contract did not specify hole centres. The materialized profile records its 90 mm vertical leg, 30 mm horizontal leg, 6 mm thickness, rear-face placement, and authored hole centres. These are development fixture values, not inferred source truths.
+
+ECAD-P01 is materialized as a logical pin-to-net JSON graph for six component identities, 15 pins and five nets. It is **not** a routed PCB or EDA-native project.
+
+The STEP geometry was generated and read back using CadQuery 2.8.0 / OCP 7.9.3.1. This is a synthetic geometry-generation check, not AP242 conformance, native FreeCAD feature-history qualification, electrical routing validation, manufacturing approval, or physical testing. Candidate scoring and gold adjudication remain unstarted.
