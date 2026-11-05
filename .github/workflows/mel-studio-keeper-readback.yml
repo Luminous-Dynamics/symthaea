@@ -49,16 +49,21 @@ jobs:
 
           manifest = Path("Cargo.toml")
           content = manifest.read_text()
-          candidates = (
-              "crates/core/symthaea",
-              "crates/core/symthaea-observation-attestation",
-              "crates/domains/symthaea-rea-evidence-verifier",
+          # The root workspace uses exactly these direct-child globs.
+          # Temporarily exclude only directories that are not Cargo packages;
+          # a future crate is automatically included when its Cargo.toml lands.
+          glob_roots = (
+              Path("crates/core"),
+              Path("crates/domains"),
+              Path("crates/bridges"),
           )
           missing = []
-          for candidate in candidates:
-              path = Path(candidate)
-              if path.exists() and not (path / "Cargo.toml").is_file():
-                  missing.append(candidate)
+          for root in glob_roots:
+              if not root.is_dir():
+                  continue
+              for path in sorted(root.iterdir()):
+                  if path.is_dir() and not (path / "Cargo.toml").is_file():
+                      missing.append(path.as_posix())
           if missing:
               marker = "exclude = [\n"
               if content.count(marker) != 1:
