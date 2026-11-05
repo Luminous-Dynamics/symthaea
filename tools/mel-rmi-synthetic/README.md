@@ -13,7 +13,7 @@ It is a benchmark-integrity oracle, not a Melothaea evaluation. Its positive con
 - A task-specific synthetic response-relation check. Imitation can be input-sensitive while still failing this complementarity oracle.
 - A four-condition controlled-partner response path with separate targeted/sham/unrelated contrasts and a declared reverse-direction response-rule oracle.
 - Exact event-ID, seeded condition-order execution, policy-version and Git-revision binding.
-- SHA-256 binding of exact source/output bytes and exact Studio transaction-receipt bytes, with an independent re-read/re-hash verification function.
+- SHA-256 binding of exact supplied source/output bytes and serialized transaction-receipt bytes, plus a second-call digest comparison over caller-supplied payload sets. The helper itself does not fetch durable Studio storage or prove that a read-back occurred.
 - Pinned `sha2 = 0.10.9` dependency and minimal committed lockfile; all test/run commands use `--locked`.
 - A fresh policy fork restored from one frozen pre-intervention checkpoint for every condition; mutable policy state cannot leak between counterfactual arms. The same explicit common-random-number seed is passed to every arm so stochastic adapters can pair random draws.
 - Explicit NotApplicable metric state for unsupported modalities.
@@ -31,13 +31,26 @@ MEL_RMI_CODE_REVISION="$(git rev-parse HEAD)" \
   cargo run --locked --example canonical_suite
 ```
 
-The example emits a CSV over 160 paired fixtures (32 deterministic seeds per
+The example emits a CSV over 160 paired fixtures (32 deterministic variants per
 feature dimension) for fixed, imitation, one-way, yoked, unrelated-feature-
 shortcut and rule-based policies, followed by 160 four-condition reciprocal
 controlled-partner trials. Every one of the 960 policy trials and 160 reciprocal
-trials also receives four input and four output synthetic score/MIDI payload
-sets plus exact receipt bytes; the example hashes and re-verifies all 1,120
-trial records before reporting `artifact_verified,1120`. The example also emits dimension-specific agent and partner summaries to stderr: sample count, means, targeted-effect dispersion, sham/unrelated contrasts, and control/oracle qualification counts. It does not report a confidence interval or combine dimensions into a single score. The separately written artifact-digest CSV contains one row per input/output artifact, including event ID, session/task/assignment seeds, policy/version, code revision, metric version, verifier identity/version, transaction-receipt SHA-256, artifact SHA-256, format and byte length (17,920 rows for the canonical sweep).
+trials receives four input and four output synthetic Score JSON/MIDI payload
+sets plus synthetic receipt bytes. The example hashes and rechecks the supplied
+in-memory payload sets before reporting `artifact_verified,1120`; this is
+synthetic byte-equality evidence, not proof of a separate durable-storage
+read-back. A real Studio adapter must independently fetch committed bytes and
+authenticated transaction receipts before making a production claim. The
+example also emits dimension-specific agent and partner summaries to stderr:
+fixture count, means, targeted-effect dispersion, sham/unrelated contrasts,
+and control/oracle qualification counts. These are descriptive summaries over
+constructed fixtures, not statistical estimates from sampled musicians; no
+confidence interval or cross-dimension composite is reported. The separately
+written artifact-digest CSV contains one row per input/output artifact,
+including event ID, session/task/assignment seeds, policy/version, code
+revision, metric version, caller-supplied verifier identity/version,
+transaction-receipt SHA-256, artifact SHA-256, format and byte length
+(17,920 rows for the canonical sweep).
 
 The repository workflow stages this crate outside the root Cargo workspace, tests the exact pull-request head using pinned Rust 1.96.0 and a committed `--locked` dependency graph, gates all expected positive/negative-control counts, all five dimensions' summaries, and 1,120 successful artifact re-verifications, then uploads the raw trial CSV, per-dimension summaries and digest CSV as a 90-day workflow artifact.
 
