@@ -1,21 +1,25 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Fail-closed adapter from synthetic observed categories to the UVSD fitter.
+//! Fail-closed adapter from synthetic observed trials to the UVSD fitter.
 //!
-//! This module reads only observed category counts and action metadata. It
-//! never reads oracle evidence, true categories or lapse indicators. Fit cells
-//! are separated by condition, exact stimulus level and response-scale ID.
+//! The fit unit is participant × condition × stimulus level × response scale.
+//! The adapter reads only observed trial fields and experimenter action
+//! metadata. It does not read oracle evidence, true categories, lapse labels,
+//! participant effects or latent criterion values.
 
 use std::collections::BTreeMap;
 use std::fmt;
 
-use super::scenario_dgp::{ActionCategorySummary, SyntheticDataset};
+use super::scenario_dgp::{
+    ActionCategorySummary, RtStatus, SyntheticDataset, SyntheticTrial, TrialRequest,
+};
 use super::sequential::{OperationalActionSet, StimulusClass};
 use super::{CategoryCount, CategoryTable};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FitGroupKey {
+    pub participant_id: u32,
     pub condition_id: u16,
     /// Exact IEEE-754 bit pattern from the frozen experimenter action.
     pub stimulus_level_bits: u64,
@@ -38,7 +42,7 @@ pub enum FitDisposition {
     InvalidCategoryTable,
 }
 
-/// One condition/stimulus/scale cell and its explicit fit-eligibility result.
+/// One participant/session-level fit cell and its explicit fit disposition.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ObservationFitGroup {
     pub key: FitGroupKey,
@@ -57,8 +61,8 @@ pub struct ObservationFitGroup {
     pub rt_not_collected: u64,
 }
 
-/// Complete adapter receipt. Every action summary is accounted for by one
-/// fit group; non-ready groups preserve missingness and class counts.
+/// Complete adapter receipt. Each participant/condition/stimulus/scale cell is
+/// separate; no participant pooling is performed.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ObservationFitAdapterReceipt {
     pub scenario_id: u16,
@@ -70,6 +74,7 @@ pub struct ObservationFitAdapterReceipt {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObservationFitAdapterError {
     ActionSetDigestMismatch,
+    MissingScenarioDigest,
     SummaryCountMismatch,
     UnknownSummaryAction,
     DuplicateActionSummary,
@@ -77,6 +82,13 @@ pub enum ObservationFitAdapterError {
     SummaryClassMismatch,
     SummaryCategoryCountMismatch,
     InconsistentCategorySummary,
+    DuplicateParticipantTrial,
+    UnknownRequestedAction,
+    UnrequestedTrial,
+    DuplicateObservedTrial,
+    RequestTrialActionMismatch,
+    TrialActionMetadataMismatch,
+    CategoryResponseOutOfRange,
     CountOverflow,
 }
 
@@ -84,13 +96,21 @@ impl fmt::Display for ObservationFitAdapterError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
             Self::ActionSetDigestMismatch => "dataset action-set digest does not match the requested action set",
+            Self::MissingScenarioDigest => "dataset scenario digest must not be empty",
             Self::SummaryCountMismatch => "dataset must contain exactly one summary for every action",
             Self::UnknownSummaryAction => "dataset summary references an unknown action",
             Self::DuplicateActionSummary => "duplicate summary for an action ID",
             Self::MissingActionSummary => "an action has no dataset summary",
             Self::SummaryClassMismatch => "summary stimulus class differs from its frozen action",
-            Self::SummaryCategoryCountMismatch => "summary category vector differs from its response-scale profile",
+            Self::SummaryCategoryCountMismatch => "summary category vector differs from its response-scale presentation",
             Self::InconsistentCategorySummary => "summary class/category/missing/RT counts do not conserve requested trials",
+            Self::DuplicateParticipantTrial => "participant/trial identity is duplicated in the frozen request schedule",
+            Self::UnknownRequestedAction => "trial request references an unknown experimenter action",
+            Self::UnrequestedTrial => "observed trial has no matching request",
+            Self::DuplicateObservedTrial => "more than one observation exists for a participant/trial identity",
+            Self::RequestTrialActionMismatch => "observed trial action differs from the frozen request",
+            Self::TrialActionMetadataMismatch => "observed action metadata differs from the frozen action definition",
+            Self::CategoryResponseOutOfRange => "observed category is outside the presented response category vector",
             Self::CountOverflow => "category or trial count overflowed u64",
         };
         f.write_str(message)
@@ -136,18 +156,46 @@ impl GroupAccumulator {
     }
 }
 
-/// Convert observed category summaries into per-cell UVSD fitter tables.
+#[derive(Debug, Clone)]
+struct ActionObservedTotals {
+    category_counts: Vec<u64>,
+    requested_trials: u64,
+    missing_category: u64,
+    rt_observed: u64,
+    rt_timeouts: u64,
+    rt_out_of_range: u64,
+    rt_not_collected: u64,
+}
+
+impl ActionObservedTotals {
+    fn new(category_count: usize) -> Self {
+        Self {
+            category_counts: vec![0; category_count],
+            requested_trials: 0,
+            missing_category: 0,
+            rt_observed: 0,
+            rt_timeouts: 0,
+            rt_out_of_range: 0,
+            rt_not_collected: 0,
+        }
+    }
+}
+
+/// Convert a complete synthetic dataset into separate per-participant UVSD
+/// fitter tables. Grouping is by participant, condition, exact stimulus level
+/// and response-scale ID; signal/noise trials combine only inside that cell.
 ///
-/// Grouping is strictly by condition ID, exact stimulus-level bits and
-/// response-scale ID. Any missing category response makes that cell
-/// non-fit-eligible: the current fitter does not model missingness. No
-/// missing row is dropped and no missingness mechanism is assumed.
+/// The adapter reads only `observed_category`, RT status, request identity and
+/// frozen action metadata. It intentionally never accesses `oracle_*` fields.
 pub fn adapt_synthetic_dataset_for_uvsd(
     dataset: &SyntheticDataset,
     action_set: &OperationalActionSet,
 ) -> Result<ObservationFitAdapterReceipt, ObservationFitAdapterError> {
     if dataset.action_set_digest != action_set.digest() {
         return Err(ObservationFitAdapterError::ActionSetDigestMismatch);
+    }
+    if dataset.scenario_digest.trim().is_empty() {
+        return Err(ObservationFitAdapterError::MissingScenarioDigest);
     }
     if dataset.summaries.len() != action_set.actions().len() {
         return Err(ObservationFitAdapterError::SummaryCountMismatch);
@@ -159,85 +207,166 @@ pub fn adapt_synthetic_dataset_for_uvsd(
         .map(|action| (action.action_id, action))
         .collect();
     let mut summaries_by_id = BTreeMap::new();
+    let mut category_count_by_scale = BTreeMap::<u16, usize>::new();
+
     for summary in &dataset.summaries {
-        if !actions_by_id.contains_key(&summary.action_id) {
-            return Err(ObservationFitAdapterError::UnknownSummaryAction);
+        let action = actions_by_id
+            .get(&summary.action_id)
+            .copied()
+            .ok_or(ObservationFitAdapterError::UnknownSummaryAction)?;
+        if summary.stimulus_class != action.stimulus_class {
+            return Err(ObservationFitAdapterError::SummaryClassMismatch);
+        }
+        if summary.category_counts.len() < 3 {
+            return Err(ObservationFitAdapterError::SummaryCategoryCountMismatch);
+        }
+        match category_count_by_scale.get(&action.response_scale_id) {
+            Some(existing) if *existing != summary.category_counts.len() => {
+                return Err(ObservationFitAdapterError::SummaryCategoryCountMismatch);
+            }
+            Some(_) => {}
+            None => {
+                category_count_by_scale.insert(
+                    action.response_scale_id,
+                    summary.category_counts.len(),
+                );
+            }
         }
         validate_summary_conservation(summary)?;
         if summaries_by_id.insert(summary.action_id, summary).is_some() {
             return Err(ObservationFitAdapterError::DuplicateActionSummary);
         }
     }
-
-    let mut category_count_by_scale = BTreeMap::<u16, usize>::new();
-    let mut groups = BTreeMap::<FitGroupKey, GroupAccumulator>::new();
     for action in action_set.actions() {
-        let summary = summaries_by_id
-            .get(&action.action_id)
+        if !summaries_by_id.contains_key(&action.action_id) {
+            return Err(ObservationFitAdapterError::MissingActionSummary);
+        }
+    }
+
+    let mut request_by_identity = BTreeMap::new();
+    for request in &dataset.requests {
+        if !actions_by_id.contains_key(&request.action_id) {
+            return Err(ObservationFitAdapterError::UnknownRequestedAction);
+        }
+        let identity = (request.participant_id, request.within_participant_trial);
+        if request_by_identity.insert(identity, request.action_id).is_some() {
+            return Err(ObservationFitAdapterError::DuplicateParticipantTrial);
+        }
+    }
+    if dataset.requests.len() != dataset.trials.len() {
+        return Err(ObservationFitAdapterError::SummaryCountMismatch);
+    }
+
+    let mut observed_trial_identities = std::collections::BTreeSet::new();
+    let mut action_totals = BTreeMap::new();
+    for action in action_set.actions() {
+        let category_count = category_count_by_scale[&action.response_scale_id];
+        action_totals.insert(action.action_id, ActionObservedTotals::new(category_count));
+    }
+    let mut groups = BTreeMap::<FitGroupKey, GroupAccumulator>::new();
+
+    for trial in &dataset.trials {
+        let identity = (trial.participant_id, trial.within_participant_trial);
+        let requested_action_id = request_by_identity
+            .get(&identity)
             .copied()
-            .ok_or(ObservationFitAdapterError::MissingActionSummary)?;
-        if summary.stimulus_class != action.stimulus_class {
-            return Err(ObservationFitAdapterError::SummaryClassMismatch);
+            .ok_or(ObservationFitAdapterError::UnrequestedTrial)?;
+        if !observed_trial_identities.insert(identity) {
+            return Err(ObservationFitAdapterError::DuplicateObservedTrial);
         }
-        // The observed summary vector defines the presented category count;
-        // the adapter never consults the DGP's latent criterion values.
-        let category_count = summary.category_counts.len();
-        if category_count < 3 {
-            return Err(ObservationFitAdapterError::SummaryCategoryCountMismatch);
+        if requested_action_id != trial.action_id {
+            return Err(ObservationFitAdapterError::RequestTrialActionMismatch);
         }
-        match category_count_by_scale.get(&action.response_scale_id) {
-            Some(existing) if *existing != category_count => {
-                return Err(ObservationFitAdapterError::SummaryCategoryCountMismatch);
-            }
-            Some(_) => {}
-            None => {
-                category_count_by_scale.insert(action.response_scale_id, category_count);
-            }
+        let action = actions_by_id
+            .get(&trial.action_id)
+            .copied()
+            .ok_or(ObservationFitAdapterError::UnknownRequestedAction)?;
+        if trial.stimulus_class != action.stimulus_class
+            || trial.stimulus_level.to_bits() != action.stimulus_level.to_bits()
+            || trial.response_scale_id != action.response_scale_id
+        {
+            return Err(ObservationFitAdapterError::TrialActionMetadataMismatch);
         }
+        let category_count = category_count_by_scale[&action.response_scale_id];
+        if trial
+            .observed_category
+            .is_some_and(|category| category as usize >= category_count)
+        {
+            return Err(ObservationFitAdapterError::CategoryResponseOutOfRange);
+        }
+
+        let action_total = action_totals
+            .get_mut(&action.action_id)
+            .ok_or(ObservationFitAdapterError::UnknownRequestedAction)?;
+        action_total.requested_trials = checked_add(action_total.requested_trials, 1)?;
+        if let Some(category) = trial.observed_category {
+            let count = action_total
+                .category_counts
+                .get_mut(category as usize)
+                .ok_or(ObservationFitAdapterError::CategoryResponseOutOfRange)?;
+            *count = checked_add(*count, 1)?;
+        } else {
+            action_total.missing_category = checked_add(action_total.missing_category, 1)?;
+        }
+        update_rt_totals(action_total, trial.rt_status)?;
+
         let key = FitGroupKey {
+            participant_id: trial.participant_id,
             condition_id: action.condition_id,
             stimulus_level_bits: action.stimulus_level.to_bits(),
             response_scale_id: action.response_scale_id,
         };
-        let accumulator = groups
+        let group = groups
             .entry(key)
             .or_insert_with(|| GroupAccumulator::new(key, category_count));
-        if accumulator.category_count != category_count {
-            return Err(ObservationFitAdapterError::SummaryCategoryCountMismatch);
-        }
-        accumulator.source_action_ids.push(action.action_id);
+        group.source_action_ids.push(action.action_id);
         match action.stimulus_class {
             StimulusClass::Signal => {
-                accumulator.requested_signal_trials = checked_add(
-                    accumulator.requested_signal_trials,
-                    summary.requested_trials,
-                )?;
-                accumulator.missing_signal_categories = checked_add(
-                    accumulator.missing_signal_categories,
-                    summary.missing_category,
-                )?;
-                add_counts(&mut accumulator.signal_counts, &summary.category_counts)?;
+                group.requested_signal_trials = checked_add(group.requested_signal_trials, 1)?;
+                if let Some(category) = trial.observed_category {
+                    let count = group
+                        .signal_counts
+                        .get_mut(category as usize)
+                        .ok_or(ObservationFitAdapterError::CategoryResponseOutOfRange)?;
+                    *count = checked_add(*count, 1)?;
+                } else {
+                    group.missing_signal_categories =
+                        checked_add(group.missing_signal_categories, 1)?;
+                }
             }
             StimulusClass::Noise => {
-                accumulator.requested_noise_trials = checked_add(
-                    accumulator.requested_noise_trials,
-                    summary.requested_trials,
-                )?;
-                accumulator.missing_noise_categories = checked_add(
-                    accumulator.missing_noise_categories,
-                    summary.missing_category,
-                )?;
-                add_counts(&mut accumulator.noise_counts, &summary.category_counts)?;
+                group.requested_noise_trials = checked_add(group.requested_noise_trials, 1)?;
+                if let Some(category) = trial.observed_category {
+                    let count = group
+                        .noise_counts
+                        .get_mut(category as usize)
+                        .ok_or(ObservationFitAdapterError::CategoryResponseOutOfRange)?;
+                    *count = checked_add(*count, 1)?;
+                } else {
+                    group.missing_noise_categories =
+                        checked_add(group.missing_noise_categories, 1)?;
+                }
             }
         }
-        accumulator.rt_observed =
-            checked_add(accumulator.rt_observed, summary.rt_observed)?;
-        accumulator.rt_timeouts =
-            checked_add(accumulator.rt_timeouts, summary.rt_timeouts)?;
-        accumulator.rt_out_of_range =
-            checked_add(accumulator.rt_out_of_range, summary.rt_out_of_range)?;
-        accumulator.rt_not_collected =
-            checked_add(accumulator.rt_not_collected, summary.rt_not_collected)?;
+        update_rt_group(group, trial.rt_status)?;
+    }
+
+    if observed_trial_identities.len() != request_by_identity.len() {
+        return Err(ObservationFitAdapterError::SummaryCountMismatch);
+    }
+    for action in action_set.actions() {
+        let summary = summaries_by_id[&action.action_id];
+        let totals = &action_totals[&action.action_id];
+        if totals.requested_trials != summary.requested_trials
+            || totals.category_counts != summary.category_counts
+            || totals.missing_category != summary.missing_category
+            || totals.rt_observed != summary.rt_observed
+            || totals.rt_timeouts != summary.rt_timeouts
+            || totals.rt_out_of_range != summary.rt_out_of_range
+            || totals.rt_not_collected != summary.rt_not_collected
+        {
+            return Err(ObservationFitAdapterError::InconsistentCategorySummary);
+        }
     }
 
     let mut fit_groups = Vec::with_capacity(groups.len());
@@ -270,10 +399,7 @@ pub fn adapt_synthetic_dataset_for_uvsd(
                     noise: group.noise_counts[index],
                 });
             }
-            match CategoryTable::new(categories) {
-                Ok(table) => Some(table),
-                Err(_) => None,
-            }
+            CategoryTable::new(categories).ok()
         } else {
             None
         };
@@ -326,12 +452,36 @@ fn validate_summary_conservation(
     Ok(())
 }
 
-fn add_counts(target: &mut [u64], source: &[u64]) -> Result<(), ObservationFitAdapterError> {
-    if target.len() != source.len() {
-        return Err(ObservationFitAdapterError::SummaryCategoryCountMismatch);
+fn update_rt_totals(
+    totals: &mut ActionObservedTotals,
+    status: RtStatus,
+) -> Result<(), ObservationFitAdapterError> {
+    match status {
+        RtStatus::NotCollected => {
+            totals.rt_not_collected = checked_add(totals.rt_not_collected, 1)?
+        }
+        RtStatus::Observed => totals.rt_observed = checked_add(totals.rt_observed, 1)?,
+        RtStatus::TimedOut => totals.rt_timeouts = checked_add(totals.rt_timeouts, 1)?,
+        RtStatus::OutOfRange => {
+            totals.rt_out_of_range = checked_add(totals.rt_out_of_range, 1)?
+        }
     }
-    for (target_count, source_count) in target.iter_mut().zip(source) {
-        *target_count = checked_add(*target_count, *source_count)?;
+    Ok(())
+}
+
+fn update_rt_group(
+    group: &mut GroupAccumulator,
+    status: RtStatus,
+) -> Result<(), ObservationFitAdapterError> {
+    match status {
+        RtStatus::NotCollected => {
+            group.rt_not_collected = checked_add(group.rt_not_collected, 1)?
+        }
+        RtStatus::Observed => group.rt_observed = checked_add(group.rt_observed, 1)?,
+        RtStatus::TimedOut => group.rt_timeouts = checked_add(group.rt_timeouts, 1)?,
+        RtStatus::OutOfRange => {
+            group.rt_out_of_range = checked_add(group.rt_out_of_range, 1)?
+        }
     }
     Ok(())
 }
@@ -351,8 +501,8 @@ fn checked_add(left: u64, right: u64) -> Result<u64, ObservationFitAdapterError>
 mod tests {
     use super::*;
     use crate::scenario_dgp::{
-        EvidenceFamily, ObserverScenario, ResponseScaleSpec, TrialRequest,
-        generate_synthetic_dataset,
+        EvidenceFamily, ObserverScenario, ResponseScaleSpec, SyntheticDataset, SyntheticTrial,
+        TrialRequest, generate_synthetic_dataset,
     };
     use crate::sequential::{OperationalAction, OperationalActionSet, StimulusClass};
 
@@ -416,15 +566,46 @@ mod tests {
     fn requests(count: u32) -> Vec<TrialRequest> {
         (0..count)
             .map(|trial| TrialRequest {
-                action_id: if trial % 2 == 0 { 1 } else if trial % 4 == 1 { 2 } else { 3 },
+                action_id: if trial % 2 == 0 {
+                    1
+                } else if trial % 4 == 1 {
+                    2
+                } else {
+                    3
+                },
                 participant_id: 0,
                 within_participant_trial: trial,
             })
             .collect()
     }
 
+    fn synthetic_trial(
+        action: &super::super::sequential::OperationalAction,
+        participant_id: u32,
+        trial_index: u32,
+        observed_category: Option<u16>,
+    ) -> SyntheticTrial {
+        SyntheticTrial {
+            action_id: action.action_id,
+            participant_id,
+            within_participant_trial: trial_index,
+            stimulus_class: action.stimulus_class,
+            stimulus_level: action.stimulus_level,
+            response_scale_id: action.response_scale_id,
+            oracle_evidence: 0.0,
+            oracle_category: 0,
+            oracle_lapse: false,
+            oracle_signal_mean: 0.0,
+            oracle_signal_sigma: 1.0,
+            oracle_criterion_offset: 0.0,
+            observed_category,
+            rt_ms: None,
+            rt_status: RtStatus::NotCollected,
+        }
+    }
+
     #[test]
-    fn same_level_signal_noise_actions_form_one_ready_table() {
+    fn same_level_signal_noise_actions_form_one_table_per_participant() {
         let action_set = actions();
         let schedule = (0..2_000)
             .map(|trial| TrialRequest {
@@ -442,15 +623,42 @@ mod tests {
         )
         .unwrap();
         let receipt = adapt_synthetic_dataset_for_uvsd(&data, &action_set).unwrap();
-        assert_eq!(receipt.groups.len(), 2);
-        let ready = receipt.groups.iter()
-            .find(|group| group.key.stimulus_level() == 1.0)
-            .unwrap();
+        assert_eq!(receipt.groups.len(), 1);
+        let ready = &receipt.groups[0];
         assert_eq!(ready.disposition, FitDisposition::Ready);
         let table = ready.table.as_ref().unwrap();
         assert_eq!(table.signal_total(), 1_000);
         assert_eq!(table.noise_total(), 1_000);
         assert_eq!(ready.source_action_ids, vec![1, 2]);
+        assert_eq!(ready.key.participant_id, 0);
+    }
+
+    #[test]
+    fn participants_are_never_pooled_into_one_uvsd_fit() {
+        let action_set = actions();
+        let schedule = (0..1_000)
+            .map(|trial| TrialRequest {
+                action_id: if trial % 2 == 0 { 1 } else { 2 },
+                participant_id: trial % 2,
+                within_participant_trial: trial / 2,
+            })
+            .collect::<Vec<_>>();
+        let data = generate_synthetic_dataset(
+            &action_set,
+            &scenario(vec![-1.0, 0.0, 1.0]),
+            &schedule,
+            "sha256:scenario",
+            123,
+        )
+        .unwrap();
+        let receipt = adapt_synthetic_dataset_for_uvsd(&data, &action_set).unwrap();
+        assert_eq!(receipt.groups.len(), 2);
+        assert_ne!(receipt.groups[0].key.participant_id, receipt.groups[1].key.participant_id);
+        for group in &receipt.groups {
+            assert_eq!(group.disposition, FitDisposition::Ready);
+            assert_eq!(group.table.as_ref().unwrap().signal_total(), 250);
+            assert_eq!(group.table.as_ref().unwrap().noise_total(), 250);
+        }
     }
 
     #[test]
@@ -505,9 +713,7 @@ mod tests {
         )
         .unwrap();
         let receipt = adapt_synthetic_dataset_for_uvsd(&data, &action_set).unwrap();
-        let group = receipt.groups.iter()
-            .find(|group| group.key.stimulus_level() == 1.0)
-            .unwrap();
+        let group = &receipt.groups[0];
         assert_eq!(group.disposition, FitDisposition::MissingCategoryResponses);
         assert!(group.missing_signal_categories + group.missing_noise_categories > 0);
         assert_eq!(group.table, None);
@@ -594,14 +800,27 @@ mod tests {
         let mut overflow_scenario = scenario(vec![-1.0, 0.0, 1.0]);
         overflow_scenario.response_scales[0].latent_criteria =
             (0..category_counts.len() - 1).map(|index| index as f64).collect();
+        let mut trials = Vec::new();
+        let mut requests = Vec::new();
+        for (action_id, category) in [(1u32, 0u16), (2u32, 0u16)] {
+            let action = action_set.actions().iter()
+                .find(|action| action.action_id == action_id)
+                .unwrap();
+            requests.push(TrialRequest {
+                action_id,
+                participant_id: 0,
+                within_participant_trial: action_id - 1,
+            });
+            trials.push(synthetic_trial(action, 0, action_id - 1, Some(category)));
+        }
         let data = SyntheticDataset {
             scenario: overflow_scenario,
             scenario_digest: "sha256:scenario".to_owned(),
             action_set_digest: action_set.digest().to_owned(),
             root_seed: 1,
             prng_version: "splitmix64-v1",
-            requests: Vec::new(),
-            trials: Vec::new(),
+            requests,
+            trials,
             summaries: vec![
                 make_summary(1, StimulusClass::Noise, 1, noise_counts),
                 make_summary(2, StimulusClass::Signal, 1, signal_counts),
