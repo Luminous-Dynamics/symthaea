@@ -133,6 +133,8 @@ struct SliceMetrics {
     probability_count: usize,
     probability_coverage: Option<f64>,
     brier_score: Option<f64>,
+    roc_auc: Option<f64>,
+    average_precision: Option<f64>,
     expected_calibration_error_10_bins: Option<f64>,
     mean_latency_ms: Option<f64>,
     mean_input_tokens: Option<f64>,
@@ -591,6 +593,60 @@ fn calibration_metrics(rows: &[&Observed]) -> (usize, Option<f64>, Option<f64>, 
     (values.len(), Some(values.len() as f64 / rows.len() as f64), Some(brier), Some(ece))
 }
 
+fn probability_ranking_metrics(rows: &[&Observed]) -> (Option<f64>, Option<f64>) {
+    let mut values: Vec<(f64, bool)> = rows.iter()
+        .filter_map(|row| row.prediction.p_hallucinated.map(|probability| {
+            (probability, row.prediction.statement_kind == "hallucinated")
+        }))
+        .collect();
+    let positives = values.iter().filter(|row| row.1).count();
+    let negatives = values.len().saturating_sub(positives);
+    if positives == 0 || negatives == 0 {
+        return (None, None);
+    }
+
+    // Mann-Whitney rank formulation of ROC AUC with average ranks for ties.
+    values.sort_by(|left, right| left.0.total_cmp(&right.0));
+    let mut positive_rank_sum = 0.0;
+    let mut start = 0usize;
+    while start < values.len() {
+        let mut end = start + 1;
+        while end < values.len() && values[end].0 == values[start].0 {
+            end += 1;
+        }
+        let average_rank = ((start + 1 + end) as f64) / 2.0;
+        let group_positives = values[start..end].iter().filter(|row| row.1).count();
+        positive_rank_sum += average_rank * group_positives as f64;
+        start = end;
+    }
+    let roc_auc = Some(
+        (positive_rank_sum - (positives * (positives + 1) / 2) as f64)
+            / (positives as f64 * negatives as f64)
+    );
+
+    // Tie-grouped average precision; no arbitrary within-tie ordering.
+    values.sort_by(|left, right| right.0.total_cmp(&left.0));
+    let mut seen_positives = 0usize;
+    let mut seen_total = 0usize;
+    let mut average_precision = 0.0;
+    let mut cursor = 0usize;
+    while cursor < values.len() {
+        let mut end = cursor + 1;
+        while end < values.len() && values[end].0 == values[cursor].0 {
+            end += 1;
+        }
+        let group_positives = values[cursor..end].iter().filter(|row| row.1).count();
+        let group_size = end - cursor;
+        seen_positives += group_positives;
+        seen_total += group_size;
+        let precision = seen_positives as f64 / seen_total as f64;
+        average_precision += (group_positives as f64 / positives as f64) * precision;
+        cursor = end;
+    }
+
+    (roc_auc, Some(average_precision))
+}
+
 fn metric_slice(rows: &[&Observed], language: &str, hallucination_type: Option<String>) -> SliceMetrics {
     let mut tp = 0usize;
     let mut fp = 0usize;
@@ -637,6 +693,7 @@ fn metric_slice(rows: &[&Observed], language: &str, hallucination_type: Option<S
         _ => None,
     };
     let (probability_count, probability_coverage, brier, ece) = calibration_metrics(rows);
+    let (roc_auc, average_precision) = probability_ranking_metrics(rows);
 
     SliceMetrics {
         language: language.to_string(),
@@ -664,6 +721,8 @@ fn metric_slice(rows: &[&Observed], language: &str, hallucination_type: Option<S
         probability_count,
         probability_coverage,
         brier_score: brier,
+        roc_auc,
+        average_precision,
         expected_calibration_error_10_bins: ece,
         mean_latency_ms: safe_mean(&latency),
         mean_input_tokens: safe_mean(&input_tokens),
@@ -1296,6 +1355,61 @@ mod tests {
         assert_eq!(first.lower, second.lower);
         assert_eq!(first.upper, second.upper);
         assert_eq!(first.cluster_count, 30);
+    }
+
+    #[test]
+    fn probability_ranking_metrics_handle_perfect_predictions_and_ties() {
+        let make_row = |pair_id: &str, kind: &str, probability: f64| {
+            let pair = PairMeta {
+                schema_version: "multi-hall-sa-pair-v0".into(),
+                pair_id: pair_id.into(),
+                file_id: format!("document-{pair_id}"),
+                fact_index: 0,
+                language: "isiZulu".into(),
+                hallucination_type: "temporal shift".into(),
+            };
+            let prediction = Prediction {
+                schema_version: "multi-hall-sa-result-v0".into(),
+                result_id: format!("result-{pair_id}-{kind}"),
+                plan_id: "plan".into(),
+                system_id: "system".into(),
+                pair_id: pair_id.into(),
+                file_id: pair.file_id.clone(),
+                fact_index: pair.fact_index,
+                language: pair.language.clone(),
+                hallucination_type: pair.hallucination_type.clone(),
+                statement_language: "target".into(),
+                statement_kind: kind.into(),
+                predicted_label: "factual".into(),
+                p_hallucinated: Some(probability),
+                latency_ms: None,
+                input_tokens: None,
+                output_tokens: None,
+                retrieval_calls: None,
+            };
+            Observed { pair, prediction }
+        };
+        let perfect = vec![
+            make_row("1", "factual", 0.05),
+            make_row("2", "factual", 0.10),
+            make_row("3", "hallucinated", 0.90),
+            make_row("4", "hallucinated", 0.95),
+        ];
+        let perfect_refs: Vec<&Observed> = perfect.iter().collect();
+        let (roc, ap) = probability_ranking_metrics(&perfect_refs);
+        assert_eq!(roc, Some(1.0));
+        assert_eq!(ap, Some(1.0));
+
+        let tied = vec![
+            make_row("5", "factual", 0.5),
+            make_row("6", "factual", 0.5),
+            make_row("7", "hallucinated", 0.5),
+            make_row("8", "hallucinated", 0.5),
+        ];
+        let tied_refs: Vec<&Observed> = tied.iter().collect();
+        let (roc, ap) = probability_ranking_metrics(&tied_refs);
+        assert_eq!(roc, Some(0.5));
+        assert_eq!(ap, Some(0.5));
     }
 
     #[test]
