@@ -41,6 +41,8 @@ trial records before reporting `artifact_verified,1120`. The example also emits 
 
 The repository workflow stages this crate outside the root Cargo workspace, tests the exact pull-request head using pinned Rust 1.96.0 and a committed `--locked` dependency graph, gates all expected positive/negative-control counts, all five dimensions' summaries, and 1,120 successful artifact re-verifications, then uploads the raw trial CSV, per-dimension summaries and digest CSV as a 90-day workflow artifact.
 
+The same executable also emits nine `negotiation` rows. Its expected conformance counts are five qualified dispositions (complete branch, clarification, veto-compliant branch, following an explicit selection, and abstention after all options are vetoed) and four rejections (premature single choice under unresolved preference, including a vetoed branch value, committing after all options are removed, and an incomplete branch). The workflow gates these counts separately from causal-contingency and artifact-integrity outcomes.
+
 ## Interpretation boundary
 
 Passing these tests means only that this finite synthetic harness detects its known positive and negative controls. The manifest stores exact event identities and a caller-supplied code revision; it does not cryptographically hash arbitrary audio or MIDI payloads. Real artifact digests and Studio transaction receipts must be supplied by the MEL-013A adapter before external or human-session claims.
