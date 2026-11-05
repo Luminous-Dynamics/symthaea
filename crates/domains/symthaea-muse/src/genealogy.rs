@@ -67,7 +67,6 @@ pub struct GenealogyStore {
 }
 
 impl GenealogyStore {
-
     /// Allocate a root manifest from the exact bytes of each persisted artifact.
     ///
     /// Unlike allocate_root, this entry point does not accept caller-supplied
@@ -411,14 +410,7 @@ mod tests {
     fn allocate_root_from_bytes_preserves_absent_score_as_none() {
         let store = store();
         let manifest = store
-            .allocate_root_from_bytes(
-                &origin(),
-                "key-no-score",
-                b"recipe",
-                None,
-                b"audio",
-                1002,
-            )
+            .allocate_root_from_bytes(&origin(), "key-no-score", b"recipe", None, b"audio", 1002)
             .unwrap();
         assert_eq!(manifest.score_sha256, None);
     }
