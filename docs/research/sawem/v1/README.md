@@ -143,6 +143,17 @@ Every realized price carries the target interval, observation timestamp and sour
 
 This does not claim to improve Chronos or HOMER forecasting accuracy. It supplies a reconstructible information set for fair model comparison and historical underwriting replay. The initial case `FORECAST-VINTAGE-ASOF-001` contains synthetic timestamps and price values only; real-market calibration, rolling-origin backtests and realized value-capture comparisons remain `not_run`.
 
+### Non-anticipative scenario policies
+
+The new `non_anticipativity.rs` module audits a candidate stochastic/rolling-horizon policy against its scenario tree. At any decision timestamp, two scenario paths that share the same information-node ID, source-digested information set and available-at frontier must submit exactly the same:
+- signed net grid power;
+- reserve-up and reserve-down offers; and
+- target SOC.
+
+Actions can diverge after the scenario information nodes diverge. The evaluator rejects future-known input, inconsistent information-set digests/availability, duplicate decisions, undeclared scenario paths and different actions under a shared information set.
+
+This is intentionally a **policy audit**, not a stochastic optimizer. It does not prove that the policy is profitable or lower-regret; it prevents a perfect-foresight backtest from being mislabeled as implementable. Candidate policies still need matched scenario trees, common price/availability vintages, out-of-sample tests and regret/CVaR reporting. Benchmark case: `NON-ANTICIPATIVITY-POLICY-AUDIT-001`.
+
 ### Probabilistic forecast calibration with exact scoring
 
 The new `forecast_metrics.rs` module evaluates a single immutable model build against realized prices that became available by a later evaluation timestamp. It consumes q10/q50/q90 forecasts in minor ZAR/MWh, the frozen decision time, forecast issue/available-at times, target Trading Period, realized observation/available-at times, and exact model/source digests.
