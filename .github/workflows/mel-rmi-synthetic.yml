@@ -81,8 +81,8 @@ jobs:
           test "$distractor_passes" -eq 0
           test "$reciprocal_oracle_count" -eq 160
           test "$reciprocal_count" -eq 160
-          test "$negotiation_qualified" -eq 5
-          test "$negotiation_rejected" -eq 4
+          test "$negotiation_qualified" -eq 6
+          test "$negotiation_rejected" -eq 5
           test "$artifact_count" -eq 1120
           test "$artifact_digest_rows" -eq 17920
           test "$artifact_report_rows" -eq 17920
