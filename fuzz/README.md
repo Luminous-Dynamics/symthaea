@@ -30,6 +30,22 @@ The fuzz step captures combined stdout/stderr in `fuzz/artifacts/fuzz-output.txt
 
 The workflow uses the committed `fuzz/Cargo.lock` with `--locked`, records the lock SHA-256, and runs a bounded 180-second smoke campaign. It is not a security certification. Every crash must be minimized, checked into the permanent regression corpus and assigned an exact source/toolchain/lockfile receipt. Fuzz-clean means only that no crash was found in the exercised build, seed corpus and time budget.
 
+## Deterministic seed corpus
+
+Before either fuzz arm starts, the workflow runs the standalone Rust binary `zip_seed_corpus`. It uses the pinned `zip 9.3.0` writer with fixed default timestamps to produce a small set of reproducible valid fixtures in both corpus directories:
+
+- one Stored regular file;
+- one Deflate regular file with repeated content;
+- a mixed Stored + Deflate archive;
+- a zero-length Stored member;
+- a directory plus a nested Deflate child;
+- a UTF-8 member path;
+- a member whose payload contains the EOCD signature bytes without an EOCD record.
+
+The original minimal Stored seed is retained as an independent hand-authored fixture. The workflow computes SHA-256 for every generated corpus member, writes `fuzz/artifacts/seed-digests.sha256`, and binds the manifest digest into `run-context.txt`. The generator is only a valid-archive producer; it is not the correctness oracle and does not supply expected verifier results.
+
+This provides a more diverse starting corpus without pretending that the generated seeds are representative of real-world adversarial packages. Follow-on corpus work should add malformed local/central conflicts, descriptor signatures, ZIP64 edge cases, duplicate names and real APK/IPA samples as separate, licensed, content-addressed families. Unsupported cases must stay explicit abstentions until both verifier arms have a justified common subset.
+
 ## Differential oracle target
 
 The second target, `zip_differential`, compares the production `ZipArtifactReader` with `zip 9.3.0` and its `flate2 / zlib-rs` Deflate backend. It is intentionally scoped to complete, ordinary single-disk ZIPs with no ZIP64, no leading stub, no duplicate raw names and bounded entry count.
