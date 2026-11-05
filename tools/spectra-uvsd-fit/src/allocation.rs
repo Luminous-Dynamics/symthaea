@@ -270,11 +270,13 @@ pub fn allocate_next_score_batch(
         ));
     }
 
+    let replication_count = u32::try_from(requested_count)
+        .map_err(|_| AdaptiveAllocationError::SeedIndexOverflow)?;
     let next_batch = SimulationBatchRequest {
         action_id: selected_cell.action_id,
         scenario_id: selected_cell.scenario_id,
         first_replication_index: first_index,
-        replication_count: requested_count as u32,
+        replication_count,
         seeds,
         seed_mode: config.seed_mode,
     };
@@ -360,11 +362,6 @@ fn compute_cell_priorities(
             )
         })
         .collect();
-    let scenario_weights: BTreeMap<u16, f64> = receipt
-        .scenarios
-        .iter()
-        .map(|scenario| (scenario.scenario_id, scenario.weight))
-        .collect();
     let mut priorities = Vec::with_capacity(receipt.metrics.len());
 
     for action_interval in &certificate.action_intervals {
@@ -392,15 +389,10 @@ fn compute_cell_priorities(
                 .get(&metric.scenario_id)
                 .copied()
                 .unwrap_or(0.0);
-            let scenario_weight = scenario_weights
-                .get(&metric.scenario_id)
-                .copied()
-                .ok_or(AdaptiveAllocationError::InvalidScenarioWeights)?;
-                let priority = width * tail_mass;
+            let priority = width * tail_mass;
             if !priority.is_finite() || priority < 0.0 {
                 return Err(AdaptiveAllocationError::NonFinitePriority);
             }
-            let _ = scenario_weight;
             priorities.push(CellPriority {
                 action_id: metric.action_id,
                 scenario_id: metric.scenario_id,
