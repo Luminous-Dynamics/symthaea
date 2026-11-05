@@ -384,7 +384,7 @@ impl PairedComparison {
 /// cases require a group-level or cluster-aware confirmation outside this helper.
 /// The recurrence is evaluated relative to its boundary
 /// term, avoiding direct integer binomial coefficients and their overflow.
-fn exact_sign_test_upper_tail(wins: usize, losses: usize) -> Option<f64> {
+pub(crate) fn exact_sign_test_upper_tail(wins: usize, losses: usize) -> Option<f64> {
     let n = wins.checked_add(losses)?;
     if n == 0 {
         return None;
