@@ -1928,7 +1928,11 @@ mod tests {
             "acceptance":{"must_change":["cached evidence is removed after denial"]}
         });
         let errors = validate_pair_contract(&pair);
-        assert!(errors.iter().any(|error| error.contains("must remove the evidence pack")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("must remove the evidence pack"))
+        );
     }
 
     #[test]
