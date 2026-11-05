@@ -485,7 +485,7 @@ fn validate_joint_support_evidence(
     if evidence.tool != "connectome-joint-support-audit" {
         errors.push(format!("{prefix}: joint-support receipt tool must be connectome-joint-support-audit"));
     }
-    if !nonempty(&evidence.analysis_id) || !nonempty(&evidence.effort_unit) {
+    if evidence.analysis_id.trim().is_empty() || evidence.effort_unit.trim().is_empty() {
         errors.push(format!("{prefix}: joint-support analysis_id and effort_unit must be non-empty"));
     }
     for (field, value, length) in [
@@ -1219,6 +1219,47 @@ mod tests {
         }
     }
 
+
+    fn joint_receipt(snapshot: &Snapshot, status: &str) -> JointSupportEvidence {
+        let (minimum, within_budget, search_complete) = match status {
+            "MINIMUM_COST_JOINT_ROBUST_PLAN" => (Some(5), Some(true), true),
+            "MINIMUM_COST_JOINT_ROBUST_PLAN_EXCEEDS_BUDGET" => (Some(7), Some(false), true),
+            "NO_JOINT_SUPPORT_PLAN_WITHIN_DECLARED_RELATIONS" => (None, None, true),
+            "NO_DECISION_DISAGREEMENT_WITHIN_DECLARED_SCENARIOS" => (Some(0), Some(true), true),
+            "JOINT_SUPPORT_SEARCH_LIMIT_REACHED" => (None, None, false),
+            _ => panic!("unknown test receipt status"),
+        };
+        JointSupportEvidence {
+            receipt_schema_version: 1,
+            tool: "connectome-joint-support-audit".into(),
+            analysis_id: format!("analysis-{}", snapshot.snapshot.snapshot_id),
+            dataset_revision_commit_sha: snapshot.dataset.dataset_revision_commit_sha.clone(),
+            snapshot_graph_sha256: snapshot.snapshot.graph_sha256.clone(),
+            query_id: snapshot.query_evidence.query_id.clone(),
+            query_spec_sha256: snapshot.query_evidence.query_definition_sha256.clone(),
+            scenario_set_sha256: "1".repeat(64),
+            action_set_sha256: "2".repeat(64),
+            joint_support_set_sha256: format!("{:064x}", snapshot.snapshot.sequence_index + 10),
+            input_sha256: "3".repeat(64),
+            report_sha256: "4".repeat(64),
+            joint_support_scope: "exhaustive_declared_joint_support".into(),
+            effort_unit: "expert_review_minutes".into(),
+            max_total_effort_units: 5,
+            minimum_joint_disambiguation_effort_units: minimum,
+            minimum_joint_plan_within_budget: within_budget,
+            search_complete,
+            status: status.into(),
+            probability_claim: "NONE_JOINT_SET_VALUED_DISCRIMINATION_ONLY".into(),
+        }
+    }
+
+    fn attach_joint_receipts(snapshots: &mut [Snapshot], statuses: &[&str]) {
+        assert_eq!(snapshots.len(), statuses.len());
+        for (snapshot, status) in snapshots.iter_mut().zip(statuses) {
+            snapshot.joint_support_evidence = Some(joint_receipt(snapshot, status));
+        }
+    }
+
     fn completeness(
         index: u64,
         total_synapse_count: u64,
@@ -1364,6 +1405,148 @@ mod tests {
         b.synaptic_completeness = Some(second);
         let report = build_report(&jsonl(&[a.clone(), b.clone()]), &[a, b], &args(2));
         assert!(report.errors.iter().any(|error| error.contains("population identity/definition changed")));
+    }
+
+
+    #[test]
+    fn joint_support_receipt_status_transition_is_not_hidden_by_stable_global_metrics() {
+        let mut snapshots = vec![
+            snapshot(0, 0, &"1".repeat(64), None, 1.0, 12.0),
+            snapshot(1, 1, &"2".repeat(64), Some(&"1".repeat(64)), 1.0, 12.0),
+            snapshot(2, 2, &"3".repeat(64), Some(&"2".repeat(64)), 1.0, 12.0),
+        ];
+        attach_joint_receipts(
+            &mut snapshots,
+            &[
+                "MINIMUM_COST_JOINT_ROBUST_PLAN",
+                "MINIMUM_COST_JOINT_ROBUST_PLAN",
+                "NO_JOINT_SUPPORT_PLAN_WITHIN_DECLARED_RELATIONS",
+            ],
+        );
+        let report = build_report(&jsonl(&snapshots), &snapshots, &args(3));
+        assert_eq!(report.status, "VALIDATED_NOT_STOPPED");
+        assert_eq!(report.graph_invariants_stable_in_tail, Some(true));
+        assert_eq!(report.query_metrics_stable_in_tail, Some(true));
+        assert_eq!(report.joint_support_evidence.status, "NO_ROBUST_PLAN_IN_TAIL");
+        assert_eq!(report.joint_support_evidence.status_stable_in_tail, Some(false));
+        assert_eq!(report.joint_support_evidence.no_plan_snapshot_count, 1);
+        assert_eq!(report.recommendation, "CONTINUE_REVIEW");
+    }
+
+    #[test]
+    fn joint_support_receipts_are_available_but_never_authorize_stopping() {
+        let mut snapshots = vec![
+            snapshot(0, 0, &"1".repeat(64), None, 1.0, 12.0),
+            snapshot(1, 1, &"2".repeat(64), Some(&"1".repeat(64)), 1.0, 12.0),
+            snapshot(2, 2, &"3".repeat(64), Some(&"2".repeat(64)), 1.0, 12.0),
+        ];
+        attach_joint_receipts(
+            &mut snapshots,
+            &[
+                "MINIMUM_COST_JOINT_ROBUST_PLAN",
+                "MINIMUM_COST_JOINT_ROBUST_PLAN",
+                "MINIMUM_COST_JOINT_ROBUST_PLAN",
+            ],
+        );
+        let report = build_report(&jsonl(&snapshots), &snapshots, &args(3));
+        assert_eq!(
+            report.joint_support_evidence.status,
+            "RECEIPTS_COMPLETE_NOT_A_STOP_AUTHORIZATION"
+        );
+        assert_eq!(report.joint_support_evidence.status_stable_in_tail, Some(true));
+        assert_eq!(report.joint_support_evidence.support_identity_stable_in_tail, Some(false));
+        assert_eq!(report.joint_support_evidence.search_complete_for_all_tail_receipts, Some(true));
+        assert_eq!(report.recommendation, "CONTINUE_REVIEW");
+    }
+
+    #[test]
+    fn missing_joint_support_receipt_in_tail_is_not_silently_filtered() {
+        let mut snapshots = vec![
+            snapshot(0, 0, &"1".repeat(64), None, 1.0, 12.0),
+            snapshot(1, 1, &"2".repeat(64), Some(&"1".repeat(64)), 1.0, 12.0),
+            snapshot(2, 2, &"3".repeat(64), Some(&"2".repeat(64)), 1.0, 12.0),
+        ];
+        attach_joint_receipts(
+            &mut snapshots[..2],
+            &[
+                "MINIMUM_COST_JOINT_ROBUST_PLAN",
+                "MINIMUM_COST_JOINT_ROBUST_PLAN",
+            ],
+        );
+        let report = build_report(&jsonl(&snapshots), &snapshots, &args(3));
+        assert_eq!(report.joint_support_evidence.status, "INCOMPLETE_TAIL");
+        assert_eq!(report.joint_support_evidence.tail_receipt_count, 2);
+        assert_eq!(report.joint_support_evidence.search_complete_for_all_tail_receipts, None);
+        assert_eq!(report.recommendation, "CONTINUE_REVIEW");
+    }
+
+    #[test]
+    fn incomplete_joint_support_search_is_reported_as_unresolved() {
+        let mut snapshots = vec![
+            snapshot(0, 0, &"1".repeat(64), None, 1.0, 12.0),
+            snapshot(1, 1, &"2".repeat(64), Some(&"1".repeat(64)), 1.0, 12.0),
+            snapshot(2, 2, &"3".repeat(64), Some(&"2".repeat(64)), 1.0, 12.0),
+        ];
+        attach_joint_receipts(
+            &mut snapshots,
+            &[
+                "MINIMUM_COST_JOINT_ROBUST_PLAN",
+                "MINIMUM_COST_JOINT_ROBUST_PLAN",
+                "JOINT_SUPPORT_SEARCH_LIMIT_REACHED",
+            ],
+        );
+        let report = build_report(&jsonl(&snapshots), &snapshots, &args(3));
+        assert_eq!(report.joint_support_evidence.status, "SEARCH_INCOMPLETE_IN_TAIL");
+        assert_eq!(report.joint_support_evidence.incomplete_search_snapshot_count, 1);
+        assert_eq!(report.joint_support_evidence.search_complete_for_all_tail_receipts, Some(false));
+        assert_eq!(report.recommendation, "CONTINUE_REVIEW");
+    }
+
+    #[test]
+    fn over_budget_joint_support_plan_is_separate_from_no_plan() {
+        let mut snapshots = vec![
+            snapshot(0, 0, &"1".repeat(64), None, 1.0, 12.0),
+            snapshot(1, 1, &"2".repeat(64), Some(&"1".repeat(64)), 1.0, 12.0),
+            snapshot(2, 2, &"3".repeat(64), Some(&"2".repeat(64)), 1.0, 12.0),
+        ];
+        attach_joint_receipts(
+            &mut snapshots,
+            &[
+                "MINIMUM_COST_JOINT_ROBUST_PLAN_EXCEEDS_BUDGET",
+                "MINIMUM_COST_JOINT_ROBUST_PLAN_EXCEEDS_BUDGET",
+                "MINIMUM_COST_JOINT_ROBUST_PLAN_EXCEEDS_BUDGET",
+            ],
+        );
+        let report = build_report(&jsonl(&snapshots), &snapshots, &args(3));
+        assert_eq!(report.joint_support_evidence.status, "PLAN_EXCEEDS_BUDGET_IN_TAIL");
+        assert_eq!(report.joint_support_evidence.over_budget_snapshot_count, 3);
+        assert_eq!(report.joint_support_evidence.no_plan_snapshot_count, 0);
+        assert_eq!(report.recommendation, "CONTINUE_REVIEW");
+    }
+
+    #[test]
+    fn stale_joint_support_graph_and_query_bindings_fail_closed() {
+        let mut item = snapshot(0, 0, &"1".repeat(64), None, 1.0, 12.0);
+        let mut receipt = joint_receipt(&item, "MINIMUM_COST_JOINT_ROBUST_PLAN");
+        receipt.snapshot_graph_sha256 = "9".repeat(64);
+        receipt.query_spec_sha256 = "8".repeat(64);
+        item.joint_support_evidence = Some(receipt);
+        let report = build_report(&jsonl(&[item.clone()]), &[item], &args(2));
+        assert!(report.errors.iter().any(|error| error.contains("graph digest does not match snapshot")));
+        assert!(report.errors.iter().any(|error| error.contains("query binding does not match snapshot")));
+        assert_eq!(report.status, "FAIL");
+        assert_eq!(report.recommendation, "CONTINUE_REVIEW");
+    }
+
+    #[test]
+    fn inconsistent_joint_support_status_fields_fail_closed() {
+        let mut item = snapshot(0, 0, &"1".repeat(64), None, 1.0, 12.0);
+        let mut receipt = joint_receipt(&item, "MINIMUM_COST_JOINT_ROBUST_PLAN");
+        receipt.minimum_joint_plan_within_budget = Some(false);
+        item.joint_support_evidence = Some(receipt);
+        let report = build_report(&jsonl(&[item.clone()]), &[item], &args(2));
+        assert!(report.errors.iter().any(|error| error.contains("feasible joint-support status has inconsistent")));
+        assert_eq!(report.status, "FAIL");
     }
 
     #[test]
