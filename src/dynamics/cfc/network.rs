@@ -1413,7 +1413,7 @@ impl CfCNetwork {
             let group = manifest
                 .groups
                 .iter()
-                .find(|group| group.id == edit.id)
+                .find(|group| &group.id == &edit.id)
                 .ok_or_else(|| CfCWeightLoadError::UnknownParameterGroup {
                     name: format!("{:?}", edit.id),
                 })?;
@@ -2109,9 +2109,10 @@ mod tests {
             .unwrap()
             .clone();
         let replacement = vec![0.25; group.len];
+        let expected_digest = net.fingerprint().unwrap().model_digest;
 
         assert!(net
-            .try_replace_parameter_group(&net.fingerprint().unwrap().model_digest, &group.id, &replacement)
+            .try_replace_parameter_group(&expected_digest, &group.id, &replacement)
             .is_ok());
 
         let after = net.get_weights();
@@ -2130,8 +2131,9 @@ mod tests {
     fn test_typed_parameter_group_replacement_rejects_unknown_or_wrong_length() {
         let mut net = CfCNetwork::new(small_config());
         let before = net.get_weights();
+        let expected_digest = net.fingerprint().unwrap().model_digest;
         assert!(matches!(
-            net.try_replace_parameter_group(&net.fingerprint().unwrap().model_digest, &CfCParameterGroupId::CellRecurrentProjection { cell: 999 }, &[]),
+            net.try_replace_parameter_group(&expected_digest, &CfCParameterGroupId::CellRecurrentProjection { cell: 999 }, &[]),
             Err(CfCWeightLoadError::UnknownParameterGroup { .. })
         ));
 
@@ -2142,7 +2144,7 @@ mod tests {
             .find(|group| group.name == "cells.0.w_h")
             .unwrap();
         assert!(matches!(
-            net.try_replace_parameter_group(&net.fingerprint().unwrap().model_digest, &group.id, &[]),
+            net.try_replace_parameter_group(&expected_digest, &group.id, &[]),
             Err(CfCWeightLoadError::GroupLengthMismatch { .. })
         ));
         assert_eq!(net.get_weights(), before);
@@ -2240,7 +2242,7 @@ mod tests {
 
         let after = net.get_weights();
         for edit in &edits {
-            let group = manifest.groups.iter().find(|group| group.id == edit.id).unwrap();
+            let group = manifest.groups.iter().find(|group| &group.id == &edit.id).unwrap();
             assert_eq!(
                 &after[group.offset..group.offset + group.len],
                 edit.values.as_slice()
