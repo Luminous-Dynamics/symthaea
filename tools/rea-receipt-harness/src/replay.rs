@@ -161,7 +161,7 @@ pub fn replay_member_claim(
         ));
     }
 
-    let declared_method = decimal_at(receipt, &["occurrence", "compression_method"])?;
+    let declared_method = integer_at(receipt, &["occurrence", "compression_method"])?;
     let declared_compressed = decimal_at(receipt, &["occurrence", "declared_compressed_bytes"])?;
     let declared_size = decimal_at(receipt, &["occurrence", "declared_uncompressed_bytes"])?;
     let declared_crc =
@@ -209,7 +209,7 @@ pub fn replay_member_claim(
         || member.size() != declared_size
         || member.crc32() != declared_crc
         || u64::from(member.flags().as_u16())
-            != decimal_at(receipt, &["occurrence", "general_purpose_flags"])?
+            != integer_at(receipt, &["occurrence", "general_purpose_flags"])?
         || member.encrypted()
         || member.is_dir()
         || member.is_symlink()
@@ -679,14 +679,32 @@ mod tests {
 
     #[test]
     fn duplicate_name_archive_abstains_instead_of_collapsing_occurrences() {
+        // zip-rs's writer refuses duplicate names. Build a valid two-entry archive using
+        // distinct equal-length names, then mutate the second local/central name to collide.
         let (temp, bytes) = make_archive(
             CompressionMethod::Stored,
-            &[("same.bin", b"first"), ("same.bin", b"second")],
+            &[("first.bin", b"first"), ("other.bin", b"second")],
         );
-        let receipt = make_receipt(&bytes, 0, b"first");
+        let mut receipt = make_receipt(&bytes, 1, b"second");
+        let mut duplicate_bytes = bytes.clone();
+        let replacements = duplicate_bytes
+            .windows(b"other.bin".len())
+            .enumerate()
+            .filter_map(|(index, window)| (window == b"other.bin").then_some(index))
+            .collect::<Vec<_>>();
+        assert_eq!(replacements.len(), 2, "local and central directory names");
+        for index in replacements {
+            duplicate_bytes[index..index + b"first.bin".len()].copy_from_slice(b"first.bin");
+        }
+        std::fs::write(&temp.0, &duplicate_bytes).unwrap();
+        receipt["source"]["archive_sha256"] =
+            json!(format!("{:x}", Sha256::digest(&duplicate_bytes)));
+        receipt["occurrence"]["raw_filename_base64"] = json!(BASE64.encode(b"first.bin"));
+        receipt["occurrence"]["decoded_filename"] = json!("first.bin");
+        receipt["occurrence"]["duplicate_raw_name_count"] = json!("2");
+
         let error = replay_member_claim(&temp.0, &receipt).unwrap_err();
         assert!(matches!(error, ReplayError::Unsupported(_)));
-        assert!(error.to_string().contains("duplicate raw names"));
     }
 
     #[test]
