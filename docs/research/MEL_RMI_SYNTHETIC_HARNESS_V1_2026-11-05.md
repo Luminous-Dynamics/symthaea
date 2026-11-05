@@ -29,7 +29,11 @@ A second, controlled-partner path now runs all four matched agent-action conditi
 
 ## Evidence boundary and next integration seam
 
-The manifest binds task/session/seed, policy/version, code revision, condition order, and all input/output event identities. The contrast API and manifest independently reject output-event rebinding; the controlled-partner adapter validates input and output feature dimensions. The harness does not claim to cryptographically hash arbitrary symbolic or audio payloads. The next adapter must bind those artifacts to the verified Studio transaction and actual renderer/output receipts under MEL-013A.
+The manifest binds task/session/seed, policy/version, code revision, condition order, and all input/output event identities. The contrast API and manifest independently reject output-event rebinding; the controlled-partner adapter validates input and output feature dimensions.
+
+An optional content-evidence layer now hashes the exact bytes for each of the four input and four output event artifact sets (Score JSON, MIDI, WAV or little-endian f32 PCM) and the exact serialized Studio transaction-receipt bytes. The `sha2` implementation is pinned to 0.10.9 and the standalone lockfile is committed. A separate verification call re-reads the supplied payloads and receipt bytes, recomputes each digest/length and rejects any mismatch, event substitution, empty artifact set, duplicate representation or attempted rebinding. This is content-integrity evidence—not signer authentication, consent verification, rights, authorship, provenance of the original capture, or proof of musical quality. The verifier identity/version fields are caller-supplied and therefore are not a cryptographic attestation of the verifier binary.
+
+The next adapter must populate these payloads from Studio-owned artifact storage after a committed MEL-013A transaction and verify the transaction signature/actor/purpose under a trusted policy. Missing or unverifiable receipts must remain unqualified; a hash of an untrusted receipt is not a trusted transaction.
 
 The crate also represents unsupported modality metrics explicitly as NotApplicable; a PCM-only adapter cannot invent note-level MIDI evidence.
 
@@ -39,7 +43,7 @@ A frozen 160-case stress suite now exercises motif, rhythm, tempo, role and text
 
 ## Authored tests
 
-The crate authors 31 deterministic tests covering the positive oracle, fixed, imitation, one-way, yoked and distractor negative controls, sham and unrelated control integrity, intervention isolation, event identity, cross-session yoking, controlled partner influence, manifest validation, modality applicability, and exact replay equality. The earlier 30-test exact-head workflow on `22741b5614a5a399e1553ff97e4be039ef44bfe7` passed. The 31-test, 160-fixture revision is awaiting its own exact-head run; no pass is claimed for that expanded suite until it completes. Repository-wide CI/governance/benchmark/showroom checks were skipped, not passed.
+The crate authors 40 deterministic tests covering the positive oracle, fixed, imitation, one-way, yoked and distractor negative controls, sham and unrelated control integrity, intervention isolation, event identity, cross-session yoking, controlled partner influence, manifest validation, modality applicability, and exact replay equality. The 31-test, 160-fixture revision passed its exact-head run. The 40-test SHA-256 artifact-binding revision also passed its exact-head workflow (`4543e572a387c56a525efe566f74fe3eff818424`): 40 passed, 0 failed, plus the canonical 160-case five-dimension sweep and all positive/negative-control gates. The repository-wide CI, governance, benchmark and showroom workflows were skipped, not passed.
 
 ## Qualification and claim ceiling
 
