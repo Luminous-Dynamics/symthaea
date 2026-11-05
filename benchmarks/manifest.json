@@ -1,6 +1,6 @@
 {
   "schema_version": "0.1",
-  "updated_at": "2026-11-04",
+  "updated_at": "2026-11-05",
   "entries": [
     {
       "id": "ple-2026-10",
@@ -69,7 +69,48 @@
           "The paper abstract reports an average of 27 million tokens and 63 minutes per task for its strongest configuration.",
           "Do not use hidden-test scores as a baseline for a development-set result. Pin and compare against the official public development leaderboard on the same task revision.",
           "The official competition page's 2026-11-04 snapshot also shows committed-artifact development scores (for example, Claude Opus 5.5 / Claude Code 55.1% and GPT-6 Astra / Codex 53.0%). These are competition-entry artifact scores, not the three-run public development leaderboard mean described by the dataset card; do not compare them as the same evaluation mode."
-        ]
+        ],
+        "leaderboard_snapshot": {
+          "captured_at": "2026-11-05",
+          "source_url": "https://www.mercor.com/apex/partner-benchmarks/ple-bench-leaderboard/",
+          "scope": "mean_score_on_56_hidden_test_tasks",
+          "task_count": 56,
+          "run_protocol": "Each model is evaluated at highest reasoning effort in its native harness, three runs per task, isolated container without internet access, six-hour per-task limit.",
+          "displayed_uncertainty_semantics": "The official leaderboard displays a ± value for each score but the page does not define its statistical interpretation. Preserve it verbatim; do not label it a confidence interval, standard deviation, or standard error.",
+          "entries": [
+            {
+              "model": "Claude Opus 5.5",
+              "agent_harness": "Claude Code",
+              "score_percent": 48.3,
+              "displayed_pm": "±1.4%"
+            },
+            {
+              "model": "GPT-6 Astra",
+              "agent_harness": "Codex",
+              "score_percent": 45.8,
+              "displayed_pm": "±0.6%"
+            },
+            {
+              "model": "Claude Sonnet 5.5",
+              "agent_harness": "Claude Code",
+              "score_percent": 43.5,
+              "displayed_pm": "±1.4%"
+            },
+            {
+              "model": "Gemini 4 Argon",
+              "agent_harness": "Antigravity",
+              "score_percent": 40.6,
+              "displayed_pm": "±1.3%"
+            },
+            {
+              "model": "Claude Opus 5",
+              "agent_harness": "Claude Code",
+              "score_percent": 40,
+              "displayed_pm": "±1.6%"
+            }
+          ],
+          "comparability_warning": "This hidden-test snapshot is not the public development leaderboard mean and is not the competition-entry development committed-artifact score. Do not compare these evaluation pathways as one baseline."
+        }
       },
       "ceb_integration": {
         "task_contract_owner": "CEB v0 task schema and catalog in PR #10115; external registry/reproduction owner #10117",
