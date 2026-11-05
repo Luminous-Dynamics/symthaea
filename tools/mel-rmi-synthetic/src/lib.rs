@@ -85,6 +85,141 @@ impl ResponseRule {
     }
 }
 
+/// A symbolic response contract that admits a set of valid transformations.
+///
+/// The accepted offsets are alternatives, not a ranked list. This finite
+/// interaction oracle does not establish perceptual equivalence or preference.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NegotiatedResponseContractV1 {
+    /// Musical feature dimension governed by the contract.
+    pub target_dimension: Dimension,
+    /// Positive finite cyclic feature domain.
+    pub modulus: i32,
+    /// Distinct, nonzero offsets that satisfy the request.
+    pub accepted_offsets: BTreeSet<i32>,
+}
+
+impl NegotiatedResponseContractV1 {
+    /// Validate the finite response relation and reject no-op-only contracts.
+    pub fn validate(&self) -> Result<(), HarnessError> {
+        if self.modulus <= 1
+            || self.accepted_offsets.is_empty()
+            || self.accepted_offsets.iter().any(|offset| *offset <= 0 || *offset >= self.modulus)
+        {
+            return Err(HarnessError::InvalidResponseContract);
+        }
+        Ok(())
+    }
+
+    /// Enumerate every contract-valid response to one source feature.
+    pub fn valid_values(&self, input: Feature) -> Result<BTreeSet<i32>, HarnessError> {
+        self.validate()?;
+        if input.dimension != self.target_dimension {
+            return Err(HarnessError::InvalidResponseContract);
+        }
+        Ok(self.accepted_offsets.iter().map(|offset| {
+            (i64::from(input.value) + i64::from(*offset)).rem_euclid(i64::from(self.modulus)) as i32
+        }).collect())
+    }
+}
+
+/// Partner authority state for a negotiated response.
+/// `selected_value = None` means the partner has not resolved its preference.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PartnerAuthorityV1 {
+    /// Explicit partner-selected response, if one has been chosen.
+    pub selected_value: Option<i32>,
+    /// Explicitly vetoed response values.
+    pub vetoed_values: BTreeSet<i32>,
+}
+
+/// A candidate action in a negotiated response.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum NegotiationChoiceV1 {
+    /// Commit to one response value.
+    Commit(i32),
+    /// Preserve the complete set of still-viable alternatives as branches.
+    Branch(Vec<i32>),
+    /// Ask the partner to resolve an outstanding preference.
+    AskClarification,
+    /// Decline because no admissible response remains.
+    Abstain,
+}
+
+/// Separate diagnostics for response validity and partner-authority handling.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NegotiationAssessmentV1 {
+    /// Count of contract-valid responses remaining after partner vetoes.
+    pub available_option_count: usize,
+    /// Number of response values proposed by the agent.
+    pub proposed_option_count: usize,
+    /// Every proposed value belongs to the requested response contract.
+    pub contract_valid: bool,
+    /// Proposed values contain no partner-vetoed option.
+    pub veto_respected: bool,
+    /// An explicit partner selection is followed exactly.
+    pub preference_respected: bool,
+    /// Ambiguity is preserved by branching/asking rather than silently erased.
+    pub ambiguity_preserved: bool,
+    /// The disposition has valid structure (no duplicate/empty branch).
+    pub action_well_formed: bool,
+    /// All of the above independent predicates pass.
+    pub qualified: bool,
+}
+
+/// Assess a negotiated response without assuming that one output is uniquely
+/// correct. This is interaction/authority evidence, not a musical-quality
+/// score and not a replacement for score-level edit-contract verification.
+pub fn assess_negotiation(
+    contract: &NegotiatedResponseContractV1,
+    input: Feature,
+    authority: &PartnerAuthorityV1,
+    choice: &NegotiationChoiceV1,
+) -> Result<NegotiationAssessmentV1, HarnessError> {
+    let contract_values = contract.valid_values(input)?;
+    let available: BTreeSet<i32> = contract_values.difference(&authority.vetoed_values).copied().collect();
+    if let Some(selected) = authority.selected_value {
+        if !available.contains(&selected) {
+            return Err(HarnessError::InvalidPartnerAuthority);
+        }
+    }
+    let (proposed, action_well_formed) = match choice {
+        NegotiationChoiceV1::Commit(value) => (vec![*value], true),
+        NegotiationChoiceV1::Branch(values) => {
+            let unique: BTreeSet<i32> = values.iter().copied().collect();
+            (values.clone(), values.len() >= 2 && unique.len() == values.len())
+        }
+        NegotiationChoiceV1::AskClarification | NegotiationChoiceV1::Abstain => (Vec::new(), true),
+    };
+    let proposed_set: BTreeSet<i32> = proposed.iter().copied().collect();
+    let contract_valid = proposed.iter().all(|value| contract_values.contains(value));
+    let veto_respected = proposed.iter().all(|value| !authority.vetoed_values.contains(value));
+    let preference_respected = match authority.selected_value {
+        Some(selected) => matches!(choice, NegotiationChoiceV1::Commit(value) if *value == selected),
+        None => true,
+    };
+    let ambiguity_preserved = match (authority.selected_value, available.len(), choice) {
+        (None, count, NegotiationChoiceV1::AskClarification) if count > 1 => true,
+        (None, count, NegotiationChoiceV1::Branch(_)) if count > 1 => action_well_formed && proposed_set == available,
+        (None, 1, NegotiationChoiceV1::Commit(value)) => available.contains(value),
+        (None, 0, NegotiationChoiceV1::Abstain) => true,
+        (Some(selected), _, NegotiationChoiceV1::Commit(value)) => selected == *value,
+        _ => false,
+    };
+    let proposed_option_count = proposed.len();
+    let qualified = contract_valid && veto_respected && preference_respected && ambiguity_preserved && action_well_formed;
+    Ok(NegotiationAssessmentV1 {
+        available_option_count: available.len(),
+        proposed_option_count,
+        contract_valid,
+        veto_respected,
+        preference_respected,
+        ambiguity_preserved,
+        action_well_formed,
+        qualified,
+    })
+}
+
 /// Frozen task definition shared by all paired intervention conditions.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TaskSpec {
@@ -1556,6 +1691,10 @@ pub enum HarnessError {
     ArtifactDigestMismatch,
     /// Verifier identity or version is absent.
     InvalidArtifactVerifier,
+    /// The negotiated response contract is empty, malformed, or dimension-incompatible.
+    InvalidResponseContract,
+    /// Partner preference conflicts with the response contract or a partner veto.
+    InvalidPartnerAuthority,
     /// Artifact evidence has already been committed to this trial.
     ArtifactAlreadyBound,
 }
