@@ -41,7 +41,7 @@ Metrics:
 - charge/discharge efficiency and auxiliary load;
 - ramp, minimum stable charge and mode-transition violations;
 - reserve headroom/footroom from the scheduled net injection point, including both reducing charge and increasing discharge (up) and reducing discharge and increasing charge (down);
-- product-specific response and sustain checks for regulating, instantaneous and ten-minute reserve;
+- product-specific response and sustain checks for regulating, instantaneous and ten-minute reserve;\n- all six directed mode transitions and cross-checks between physical transition time, product deadline and asset response evidence;
 - temperature, state-of-health, throughput, cycle life and warranty-envelope violations;
 - network export/import and congestion-limit violations;
 - model-to-meter error once authenticated measurements exist.
