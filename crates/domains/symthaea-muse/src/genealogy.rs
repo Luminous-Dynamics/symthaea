@@ -67,6 +67,35 @@ pub struct GenealogyStore {
 }
 
 impl GenealogyStore {
+
+    /// Allocate a root manifest from the exact bytes of each persisted artifact.
+    ///
+    /// Unlike allocate_root, this entry point does not accept caller-supplied
+    /// digest strings. It recomputes SHA-256 from the recipe, optional score,
+    /// and audio byte slices immediately before persisting the manifest.
+    /// The storage locator remains separate from content identity.
+    pub fn allocate_root_from_bytes(
+        &self,
+        origin: &GenealogyOrigin,
+        audio_key: &str,
+        recipe_bytes: &[u8],
+        score_bytes: Option<&[u8]>,
+        audio_bytes: &[u8],
+        created_at_unix_ms: u64,
+    ) -> rusqlite::Result<GenealogyManifest> {
+        let recipe_sha256 = artifact_sha256_hex(recipe_bytes);
+        let score_sha256 = score_bytes.map(artifact_sha256_hex);
+        let audio_sha256 = artifact_sha256_hex(audio_bytes);
+        self.allocate_root(
+            origin,
+            audio_key,
+            &recipe_sha256,
+            score_sha256.as_deref(),
+            &audio_sha256,
+            created_at_unix_ms,
+        )
+    }
+
     /// Opens (creating if absent) the genealogy ledger at `path`, applying
     /// the schema. A fresh file gets the schema for free; re-opening an
     /// existing one is idempotent (`CREATE ... IF NOT EXISTS`).
@@ -269,6 +298,16 @@ const MANIFEST_HASH_DOMAIN: &str = "symthaea-muse-genealogy-manifest-v1";
 /// Each field is length-prefixed (`len:value`) rather than delimiter-
 /// joined, so no field's content (which may itself contain `|` from JSON)
 /// can shift a hash boundary.
+/// Compute the canonical lowercase SHA-256 content identity for exact bytes.
+///
+/// This identifies bytes, not authorship, rights, authenticity, or musical value.
+pub fn artifact_sha256_hex(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
 fn manifest_content_hash(
     namespace: &str,
     relation_json: &str,
@@ -320,6 +359,68 @@ mod tests {
             seed: 42,
             style_name: "Minimalism".into(),
         }
+    }
+
+    #[test]
+    fn artifact_sha256_matches_standard_known_vectors() {
+        assert_eq!(
+            artifact_sha256_hex(b""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_eq!(
+            artifact_sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn allocate_root_from_bytes_hashes_the_exact_recipe_score_and_audio_bytes() {
+        let store = store();
+        let recipe_bytes = br#"{
+  "name": "exact recipe"
+}
+"#;
+        let score_bytes = br#"{"notes":[60,64,67]}"#;
+        let audio_bytes = b"RIFF\x04\x00\x00\x00WAVE";
+
+        let manifest = store
+            .allocate_root_from_bytes(
+                &origin(),
+                "key-exact-bytes",
+                recipe_bytes,
+                Some(score_bytes),
+                audio_bytes,
+                1001,
+            )
+            .unwrap();
+
+        assert_eq!(manifest.recipe_sha256, artifact_sha256_hex(recipe_bytes));
+        assert_eq!(
+            manifest.score_sha256,
+            Some(artifact_sha256_hex(score_bytes))
+        );
+        assert_eq!(manifest.audio_sha256, artifact_sha256_hex(audio_bytes));
+        assert_ne!(
+            manifest.recipe_sha256,
+            artifact_sha256_hex(br#"{"name":"exact recipe"}"#),
+            "pretty-printed persisted bytes must not be hashed as compact re-serialization"
+        );
+    }
+
+    #[test]
+    fn allocate_root_from_bytes_preserves_absent_score_as_none() {
+        let store = store();
+        let manifest = store
+            .allocate_root_from_bytes(
+                &origin(),
+                "key-no-score",
+                b"recipe",
+                None,
+                b"audio",
+                1002,
+            )
+            .unwrap();
+        assert_eq!(manifest.score_sha256, None);
     }
 
     #[test]
