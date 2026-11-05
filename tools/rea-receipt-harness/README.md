@@ -65,3 +65,5 @@ Exit codes: `0` replayed, `1` rejected, `2` unsupported, `3` input/schema/I/O er
 
 The replay test suite uses generated Stored and Deflate packages, wrong-source-digest and metadata controls, and a duplicate-name abstention case. The second implementation is a valuable independent oracle, but it shares zip-rs's stated dependency graph and must still be version/lockfile-bound in every run receipt.
 
+The successful run `41944635509` generated a 921-line Cargo lockfile with SHA-256 `460f7e0b6f1091eaba14e9008a2b45402ca300f2abf505d323e6a77224c0bd8e`. Until that lockfile is checked into this branch, the workflow regenerates it and fails closed unless its digest matches this pinned value, then archives the exact lock and run context. This is a digest-pinned generated lock, not the same maintenance model as a committed Cargo.lock; committing the exact file remains a cleanup item before promotion from draft.
+
