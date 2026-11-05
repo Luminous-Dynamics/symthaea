@@ -47,16 +47,26 @@ pub struct AdaptiveAllocationConfig {
     pub next_batch_size: usize,
 }
 
-/// A deterministic request for additional simulations for one action × scenario cell.
+/// One action's part of a deterministic simulation batch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SimulationBatchRequest {
+pub struct SimulationCellRequest {
     pub action_id: u32,
-    pub scenario_id: u16,
     /// First zero-based per-cell replication index to generate.
     pub first_replication_index: u32,
     pub replication_count: u32,
     /// One deterministic seed per requested replication, in index order.
     pub seeds: Vec<u64>,
+}
+
+/// A deterministic request for one or more action × scenario cells.
+///
+/// Common-random-number mode requests every action within one scenario using
+/// the same replication indices and shared seed per index. Independent mode
+/// requests only the priority action cell.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SimulationBatchRequest {
+    pub scenario_id: u16,
+    pub cells: Vec<SimulationCellRequest>,
     pub seed_mode: ReplicationSeedMode,
 }
 
@@ -114,6 +124,8 @@ pub enum AdaptiveAllocationError {
     NoActionableCell,
     InvalidScenarioWeights,
     InvalidCvarTailMass,
+    CommonRandomNumberCountMismatch,
+    BudgetInsufficientForAtomicBatch,
     NonFinitePriority,
     SeedIndexOverflow,
 }
@@ -133,6 +145,8 @@ impl fmt::Display for AdaptiveAllocationError {
             Self::NoActionableCell => "no competitive action/scenario cell can receive another replication",
             Self::InvalidScenarioWeights => "scenario weights must be finite, positive and normalized",
             Self::InvalidCvarTailMass => "CVaR tail mass must be finite and in (0, 1]",
+            Self::CommonRandomNumberCountMismatch => "common-random-number mode requires equal replication counts across actions within the selected scenario",
+            Self::BudgetInsufficientForAtomicBatch => "remaining budget cannot fund one complete common-random-number batch",
             Self::NonFinitePriority => "adaptive allocation priority is not finite",
             Self::SeedIndexOverflow => "requested replication index exceeds u32 capacity",
         };
@@ -225,7 +239,6 @@ pub fn allocate_next_score_batch(
     }
 
     let remaining_budget = config.max_total_replications - current_total_replications;
-    let requested_count = remaining_budget.min(config.next_batch_size);
     let priorities = compute_cell_priorities(receipt, &certificate, config.robust_utility)?;
     let mut actionable = priorities
         .iter()
@@ -244,6 +257,41 @@ pub fn allocate_next_score_batch(
         .first()
         .ok_or(AdaptiveAllocationError::NoActionableCell)?;
 
+    let target_action_ids = match config.seed_mode {
+        ReplicationSeedMode::IndependentPerCell => vec![selected_cell.action_id],
+        ReplicationSeedMode::CommonRandomNumbersWithinScenario => {
+            let counts = receipt
+                .samples
+                .iter()
+                .filter(|cell| cell.scenario_id == selected_cell.scenario_id)
+                .map(|cell| common_cell_sample_count(cell).map(|count| (cell.action_id, count)))
+                .collect::<Result<BTreeMap<_, _>, _>>()?;
+            if counts.len() != receipt.action_snapshot.len()
+                || counts.values().any(|count| *count != selected_cell.sample_count)
+            {
+                return Err(AdaptiveAllocationError::CommonRandomNumberCountMismatch);
+            }
+            receipt
+                .action_snapshot
+                .iter()
+                .map(|action| action.action_id)
+                .collect()
+        }
+    };
+
+    let cost_per_replication = target_action_ids.len();
+    let affordable_count = remaining_budget / cost_per_replication;
+    if affordable_count == 0 {
+        return Ok(build_stop_receipt(
+            receipt,
+            config,
+            current_total_replications,
+            certificate,
+            competitive_action_ids,
+            AllocationDisposition::BudgetInsufficientForAtomicBatch,
+        ));
+    }
+    let requested_count = affordable_count.min(config.next_batch_size);
     let first_index = u32::try_from(selected_cell.sample_count)
         .map_err(|_| AdaptiveAllocationError::SeedIndexOverflow)?;
     let last_index_exclusive = selected_cell
@@ -253,31 +301,36 @@ pub fn allocate_next_score_batch(
     if last_index_exclusive > (u32::MAX as usize) + 1 {
         return Err(AdaptiveAllocationError::SeedIndexOverflow);
     }
-    let mut seeds = Vec::with_capacity(requested_count);
-    for offset in 0..requested_count {
-        let replication_index = selected_cell
-            .sample_count
-            .checked_add(offset)
-            .ok_or(AdaptiveAllocationError::ReplicationCountOverflow)?;
-        let replication_index = u32::try_from(replication_index)
-            .map_err(|_| AdaptiveAllocationError::SeedIndexOverflow)?;
-        seeds.push(derive_replication_seed(
-            config.root_seed,
-            selected_cell.action_id,
-            selected_cell.scenario_id,
-            replication_index,
-            config.seed_mode,
-        ));
-    }
 
-    let replication_count = u32::try_from(requested_count)
-        .map_err(|_| AdaptiveAllocationError::SeedIndexOverflow)?;
+    let mut cell_requests = Vec::with_capacity(target_action_ids.len());
+    for action_id in target_action_ids {
+        let mut seeds = Vec::with_capacity(requested_count);
+        for offset in 0..requested_count {
+            let replication_index = selected_cell
+                .sample_count
+                .checked_add(offset)
+                .ok_or(AdaptiveAllocationError::ReplicationCountOverflow)?;
+            let replication_index = u32::try_from(replication_index)
+                .map_err(|_| AdaptiveAllocationError::SeedIndexOverflow)?;
+            seeds.push(derive_replication_seed(
+                config.root_seed,
+                action_id,
+                selected_cell.scenario_id,
+                replication_index,
+                config.seed_mode,
+            ));
+        }
+        cell_requests.push(SimulationCellRequest {
+            action_id,
+            first_replication_index: first_index,
+            replication_count: u32::try_from(requested_count)
+                .map_err(|_| AdaptiveAllocationError::SeedIndexOverflow)?,
+            seeds,
+        });
+    }
     let next_batch = SimulationBatchRequest {
-        action_id: selected_cell.action_id,
         scenario_id: selected_cell.scenario_id,
-        first_replication_index: first_index,
-        replication_count,
-        seeds,
+        cells: cell_requests,
         seed_mode: config.seed_mode,
     };
     let selected_cell_priority = Some(selected_cell.priority);
