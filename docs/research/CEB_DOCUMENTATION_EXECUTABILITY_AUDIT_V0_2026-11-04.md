@@ -1,72 +1,78 @@
-# CEB Documentation Executability Audit V0 — 2026-11-04
+# CEB Documentation Executability Audit V0 — 2026-11-05
 
-**Status:** Static documentation-control implementation. The CEB contract and audit passed on exact head `2af26b690b417132db5d82ad5ab07163b04ef723` in workflow run #211.
+**Status:** Static documentation-control implementation. The expanded Cargo manifest/package/binary audit passed on exact head \`82c3549b8309c69ecd079da57ea42f9a89ac2f12\` in CEB Contract Validation V0 run #221.
 
 ## Why this is needed
 
-Research documentation can accidentally turn an intended interface into an apparent implementation. A command block that names a future Cargo manifest is not proof that the manifest, binary target or executable exists. This is especially dangerous when later benchmark reports cite the command as though it had been run.
+Research documentation can accidentally turn an intended interface into an apparent implementation. A command block that names a Cargo package, manifest or binary target is not proof that it exists in the documented workspace. This is especially dangerous when benchmark reports cite a command as though it had been run.
 
-The Rust repository-repair audit documents and BASALT verifier README now explicitly identify their missing manifest paths as design-only/unavailable interfaces. The beverage research contract also now discloses that its standalone manifest exists but its four declared binary source files are absent. These disclosures are not proof that the referenced code works.
+The initial audit found concrete drift:
+- Rust repository-repair regrade/ablation commands referenced a missing \`tools/rust-repair-benchmark-harness/Cargo.toml\`.
+- The BASALT verifier README described a package whose manifest and Rust source were absent.
+- The beverage benchmark standalone manifest existed, but its four declared binary source files were absent.
+- The academic handoff and tools README named \`symthaea-morphogenesis\` and \`symthaea-inspect\` package commands although their manifests/source trees were not in the checkout.
+
+The associated documents now identify these as design-only/unavailable interfaces. Those disclosures do not prove the referenced code works.
 
 ## Implemented static check
 
-The CI helper is [scripts/audit_doc_command_claims.py](../../scripts/audit_doc_command_claims.py). The CEB Contract Validation V0 workflow invokes its parser self-test and repository-wide audit.
+The CI helper is [\`scripts/audit_doc_command_claims.py\`](../../scripts/audit_doc_command_claims.py). The CEB Contract Validation V0 workflow invokes its parser/workspace self-tests and repository-wide audit.
 
 The helper:
-1. Enumerates tracked Markdown files from Git.
-2. Reads fenced code blocks and identifies Cargo commands containing --manifest-path.
-3. Resolves static relative paths from the repository root and checks that the referenced Cargo manifest exists.
-4. When a command includes --bin NAME, parses the referenced manifest with Python's standard-library TOML reader and checks the explicit or conventional binary source path.
-5. Allows a missing manifest or binary only when the same document names the exact path and, for a binary, the exact target name, while clearly labelling it unavailable, not runnable or design-only.
-6. Reports dynamic manifest paths separately; it does not pretend those were verified.
+1. Enumerates tracked Markdown and Cargo manifest paths through Git; it does not trust untracked working-tree files as evidence.
+2. Reads fenced code blocks and identifies Cargo commands with explicit \`--manifest-path\` or \`-p\` / \`--package\` selectors.
+3. Resolves explicit relative manifest paths from the repository root and checks the manifest exists.
+4. Resolves package selectors against the nearest Cargo workspace above the Markdown document, or the workspace containing an explicit manifest. It reads the workspace's declared \`members\` and \`exclude\` patterns rather than searching every Cargo package name indiscriminately.
+5. For \`--bin NAME\`, parses the manifest and checks explicit \`[[bin]]\` source paths or Cargo's conventional binary source locations.
+6. Splits shell commands only on control operators outside quotes and ignores flags following Cargo's \`--\` separator.
+7. Allows a missing manifest/package/binary only when the same document names the exact path or selector and clearly labels it unavailable, not runnable or design-only.
+8. Reports placeholders and unsupported/dynamic selectors separately; they are not counted as verified.
 
 The checker is deliberately offline and static. It does not invoke Cargo, build scripts, proc macros, tests, candidate code, graders or referenced commands. It does not modify files or produce benchmark scores.
 
-## First exact-head result
+## Exact-head result
 
-The first repository-wide CEB validation plus documentation audit passed on commit dc5847ca1f6362d04788f28657828d1140749958, workflow run 207:
+CEB Contract Validation V0 run **#221** passed on exact commit \`82c3549b8309c69ecd079da57ea42f9a89ac2f12\`:
 
 - CEB contract: 10 tasks, 4 schemas, 39 negative controls, 10 repository configuration worlds and 7 conditional facts.
-- Documentation parser self-test: passed.
-- Tracked Markdown files inspected: 1,426.
-- Static manifest references checked: 15.
-- Explicitly unavailable references: 14.
-- Dynamic/out-of-scope references encountered: 0.
-- Unannotated missing manifest or binary references: 0.
+- Documentation audit self-test: passed.
+- Tracked Markdown files inspected: **1,426**.
+- Explicit \`--manifest-path\` references checked: **15**.
+- \`-p\` / \`--package\` selectors resolved to workspace package manifests: **258**.
+- Explicitly unavailable path/package/binary reference occurrences: **18**.
+- Dynamic/out-of-scope references: **1**.
+- Unannotated missing manifest, package or binary references: **0**.
 
-The manifest/unavailable counts above are **reference occurrences, not distinct path counts**. A later self-test/count-label refinement is intended to make that distinction explicit in CI output; this document must be updated if its exact-head rerun changes the counts.
+These are **reference occurrences, not unique paths or unique package names**. A documented-unavailable occurrence remains unavailable; it is not a verified command. The single dynamic reference is not counted as passed.
 
-A separate Beverage Benchmark Contract run triggered by the beverage documentation correction failed at its first rustfmt step because the declared source file crates/domains/symthaea-culinary/src/bin/beverage_benchmark_receipt.rs is absent. The beverage unit tests, schema run, Clippy and receipt steps were skipped. This is not a CEB test failure and is not a test verdict; it confirms that the beverage CLI is not qualified by the current checkout.
+The scan resolved vendor Binius package selectors against the vendor workspace, honoured workspace member globs and exclusions, and kept package names outside the selected workspace from being silently treated as valid. It also confirmed that quoted Nix-shell examples are not misclassified as Cargo package selectors.
 
-The output-label refinement then passed again in CEB Contract Validation V0 run #211 on exact head `2af26b690b417132db5d82ad5ab07163b04ef723`:
+## Separate beverage workflow result
 
-- `CEB_CONTRACT_SCHEMA_PASS: tasks=10 unique_tasks=10 schemas=4 negative_controls=39 worlds=10 conditional_facts=7`
-- `DOC_COMMAND_AUDIT_SELF_TEST_PASS`
-- `DOC_COMMAND_AUDIT_PASS: markdown_files=1426 manifest_references_checked=15 documented_unavailable_references=14 dynamic_references=0 errors=0`
-
-A separate Beverage Benchmark Contract run #2586 on that exact head again failed at the first rustfmt step for the same missing `beverage_benchmark_receipt.rs` source; beverage tests, schema validation, Clippy and receipt generation were skipped.
+A separate Beverage Benchmark Contract workflow on the same development branch fails at its first rustfmt step because \`crates/domains/symthaea-culinary/src/bin/beverage_benchmark_receipt.rs\` is absent. The beverage unit tests, schema validation, Clippy and receipt-generation steps are skipped. This is not a CEB contract failure; it confirms that the beverage CLI is not qualified by the current checkout.
 
 ## Claim boundary and limitations
 
 This is a guard against a specific class of documentation error, not a complete shell interpreter or proof that a command succeeds.
 
-- Relative paths are interpreted from the repository root. Commands requiring another working directory need to state that explicitly and should be handled by a future version.
-- Manifest paths containing variables, globs, backticks or absolute paths are classified as dynamic/out-of-scope rather than being marked verified.
-- V0 audits Cargo commands that name an explicit --manifest-path. Commands expressed only with -p/--package and no manifest path are not yet resolved to a package manifest; this remains a coverage gap and is disclosed rather than silently counted as checked.
-- Binary source checks cover explicit [[bin]] paths and Cargo's conventional src/main.rs, src/bin/NAME.rs and src/bin/NAME/main.rs layouts. Generated or build-script-selected target layouts require manual review.
-- The checker audits Cargo manifest and binary references only. It does not validate arbitrary shell scripts, Nix commands, container images, network endpoints, benchmark datasets, test semantics or runtime outcomes.
-- A documented-unavailable result is not a failure, but it remains unavailable and must not be cited as executed evidence.
-- A manifest or binary existing is not proof that it builds, passes tests, is secure, or has been run on the exact source head.
+- Explicit \`--manifest-path\` values are interpreted relative to the repository root. Package-only commands use the nearest tracked Cargo manifest above the Markdown document as the likely working workspace.
+- The scanner does not interpret arbitrary \`cd\` / \`pushd\` state changes inside a code block. Commands whose effective working directory differs from the documented file's nearest workspace should use an explicit \`--manifest-path\` or be manually reviewed.
+- Package matching supports exact package names in the selected workspace. Version-qualified specs such as \`name@version\` and placeholders such as \`<crate>\` are out-of-scope/dynamic, not verified.
+- Workspace membership uses statically read \`members\` and \`exclude\` entries. Exotic Cargo workspace discovery or generated manifests require manual review.
+- Binary source checks cover explicit \`[[bin]]\` paths and Cargo's conventional \`src/main.rs\`, \`src/bin/NAME.rs\` and \`src/bin/NAME/main.rs\` layouts. Generated or build-script-selected targets require manual review.
+- It does not validate arbitrary shell scripts, Nix commands, container images, network endpoints, benchmark datasets, test semantics, executable permissions or runtime outcomes.
+- A manifest, package or binary existing is not proof that it builds, passes tests, is secure, or has been run on the exact source head.
 
-The next strengthening step is a typed command registry for script/Nix/container invocations, plus package-selector resolution and a reviewer-owned exception file bound to exact commits. Do not infer that scope from this V0 helper.
+The next strengthening step is a typed command registry for script/Nix/container invocations, command-working-directory annotations, version-qualified package matching and a reviewer-owned exception file bound to exact commits. Do not infer that scope from this V0 helper.
 
 ## Acceptance and metrics
 
 The CI audit reports:
-- number of tracked Markdown files inspected;
-- number of static manifest-reference occurrences checked;
-- number of explicitly documented unavailable-reference occurrences;
-- number of dynamic/out-of-scope references;
-- number and location of unannotated missing manifests or binary targets.
+- tracked Markdown files inspected;
+- explicit manifest-reference occurrences checked;
+- package-selector occurrences resolved to workspace package manifests;
+- explicitly documented unavailable-reference occurrences;
+- dynamic/out-of-scope references;
+- unannotated missing manifests, packages or binary targets with source locations.
 
-Required result: **zero unannotated missing manifests or binary targets**. Dynamic references remain an explicit coverage gap, not an implicit pass. Parser self-tests cover shell line continuations, distinct command argument scopes, dynamic paths and exact unavailable annotations for manifest and binary targets.
+Required result: **zero unannotated missing manifests, packages or binary targets**. Dynamic references remain an explicit coverage gap, not an implicit pass. Self-tests cover shell line continuations, quoted control operators, command argument scopes, dynamic paths, exact unavailable annotations, workspace glob members, workspace exclusions and nearest-workspace selection.
