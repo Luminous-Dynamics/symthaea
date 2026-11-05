@@ -562,6 +562,95 @@
         "transition-consistency",
         "reserve-response"
       ]
+    },
+    {
+      "case_id": "RESERVE-PAYMENT-QUALIFICATION-001",
+      "track": "settlement_and_liquidity",
+      "title": "Contracted reserve capacity vs qualifying paid capacity",
+      "scenario": "A Trading Unit has contracted reserve MW but effective availability, SO performance adjustment, actual energy dispatch or response evidence limits its capacity qualifying for payment.",
+      "owner": "Symthaea",
+      "expected_disposition": "not_run",
+      "implementation_state": "declared_not_implemented",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [],
+      "required_evidence": [
+        "reserve contract",
+        "effective available capacity",
+        "official energy sent-out/consumption",
+        "SO performance criteria and performance adjustment",
+        "Trading Period"
+      ],
+      "stress_tags": [
+        "reserve-payment",
+        "performance-adjustment"
+      ]
+    },
+    {
+      "case_id": "RESERVE-LOST-OPPORTUNITY-001",
+      "track": "settlement_and_liquidity",
+      "title": "Product-specific reserve lost-opportunity pricing",
+      "scenario": "Regulating-up, regulating-down, instantaneous and ten-minute reserve use different price equations and price-curve elbow selection rules at the contracted operating point.",
+      "owner": "Symthaea",
+      "expected_disposition": "not_run",
+      "implementation_state": "declared_not_implemented",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [],
+      "required_evidence": [
+        "SMP per Trading Period",
+        "unit-specific incremental price curve",
+        "contracted operating point",
+        "product-specific elbow/MCR/minimum-generation rule"
+      ],
+      "stress_tags": [
+        "reserve-economics",
+        "piecewise-price"
+      ]
+    },
+    {
+      "case_id": "CONSTRAINED-SCHEDULE-COMPENSATION-001",
+      "track": "settlement_and_liquidity",
+      "title": "Unconstrained-to-constrained schedule adjustment",
+      "scenario": "A network-constrained schedule differs from the unconstrained schedule and the associated constrained-purchase payment or constrained-sales charge is calculated using the unit incremental price curve.",
+      "owner": "Symthaea",
+      "expected_disposition": "not_run",
+      "implementation_state": "declared_not_implemented",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [],
+      "required_evidence": [
+        "unconstrained schedule",
+        "constrained schedule",
+        "Trading Period",
+        "incremental price curve",
+        "sign convention"
+      ],
+      "stress_tags": [
+        "congestion",
+        "schedule-revision"
+      ]
+    },
+    {
+      "case_id": "CREDIT-COVER-LIQUIDITY-TIMELINE-001",
+      "track": "settlement_and_liquidity",
+      "title": "Daily credit-cover recalculation and posting deadline",
+      "scenario": "Actual and undefined-potential exposure change during the billing/settlement lifecycle; a daily increase notice triggers a working-day-specific collateral posting deadline and cash availability requirement.",
+      "owner": "Symthaea",
+      "expected_disposition": "not_run",
+      "implementation_state": "declared_not_implemented",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [],
+      "required_evidence": [
+        "Actual Exposure",
+        "Undefined Potential Exposure",
+        "daily recalculation timestamp",
+        "increase notice timestamp",
+        "jurisdiction business-day calendar",
+        "credit cover posted/paid invoice receipt"
+      ],
+      "stress_tags": [
+        "collateral",
+        "working-capital",
+        "deadline-risk"
+      ]
     }
   ]
 }
