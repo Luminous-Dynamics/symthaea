@@ -8,6 +8,7 @@ import copy
 import hashlib
 import json
 import os
+import re
 from importlib.metadata import version
 from datetime import datetime
 from pathlib import Path
@@ -138,6 +139,111 @@ def assert_comparator_negative_controls(manifest: dict[str, Any]) -> int:
     validate_comparator_invariants(manifest)
     return len(controls)
 
+EXPECTED_CASE_IDS = {
+    "BASE-001",
+    "PVHYBRID-001",
+    "SOC-FLOOR-001",
+    "SOC-CEILING-001",
+    "POWER-HEADROOM-001",
+    "MODE-TRANSITION-001",
+    "DAILY-LIMIT-001",
+    "ROLLING-WEEK-001",
+    "NETWORK-CHARGE-001",
+    "NETWORK-DISCHARGE-001",
+    "INTRADAY-GATE-001",
+    "INSTRUCTION-METER-001",
+    "CUMULATIVE-BALANCING-001",
+    "SETTLEMENT-RERUN-001",
+    "CREDIT-COVER-001",
+    "WARRANTY-001",
+    "PRICE-SPIKE-001",
+    "FORECAST-SHIFT-001",
+    "AVAILABILITY-001",
+    "RULE-SUPERSESSION-001",
+    "RESERVE-UP-CHARGE-REDUCTION-001",
+    "RESERVE-DOWN-DISCHARGE-REDUCTION-001",
+    "RESERVE-DEADBAND-001",
+    "RESERVE-PRODUCT-DURATION-001",
+    "RESERVE-UNKNOWN-SUSTAIN-001",
+    "RESERVE-TRANSITION-001",
+}
+
+
+def validate_case_corpus(
+    corpus: dict[str, Any],
+    kernel_source: str,
+    expected_benchmark_id: str,
+) -> tuple[int, int, int]:
+    if corpus.get("corpus_state") != "draft_case_register":
+        raise ValueError("corpus must remain a draft case register until independent adjudication")
+    if corpus.get("benchmark_id") != expected_benchmark_id:
+        raise ValueError("benchmark corpus identifier does not match comparator manifest")
+    cases = corpus.get("cases")
+    if not isinstance(cases, list):
+        raise ValueError("benchmark cases must be an array")
+    identifiers = [case.get("case_id") for case in cases if isinstance(case, dict)]
+    if len(identifiers) != len(cases) or len(set(identifiers)) != len(identifiers):
+        raise ValueError("benchmark corpus contains malformed or duplicate case identifiers")
+    if set(identifiers) != EXPECTED_CASE_IDS:
+        raise ValueError("benchmark corpus case census drifted from the frozen v1 case register")
+
+    kernel_tested_cases = 0
+    not_run_cases = 0
+    referenced_tests: set[str] = set()
+    for case in cases:
+        implementation_state = case["implementation_state"]
+        if case["oracle_state"] != "draft_expected_disposition":
+            raise ValueError("no case may claim independent adjudication in this initial corpus")
+        if implementation_state == "kernel_unit_tested":
+            if case["expected_disposition"] == "not_run" or not case["test_names"]:
+                raise ValueError(f"kernel-tested case lacks an expected disposition or test mapping: {case['case_id']}")
+            for test_name in case["test_names"]:
+                pattern = r"\\#\\[test\\]\\s+fn\\s+" + re.escape(test_name) + r"\\s*\\("
+                if re.search(pattern, kernel_source) is None:
+                    raise ValueError(f"Rust test mapping is missing from kernel: {case['case_id']} -> {test_name}")
+                referenced_tests.add(test_name)
+            kernel_tested_cases += 1
+        elif implementation_state == "declared_not_implemented":
+            if case["expected_disposition"] != "not_run" or case["test_names"]:
+                raise ValueError(f"not-implemented case has an outcome/test claim: {case['case_id']}")
+            not_run_cases += 1
+        else:
+            raise ValueError(f"unexpected implementation state: {implementation_state}")
+    return kernel_tested_cases, not_run_cases, len(referenced_tests)
+
+
+def assert_case_corpus_negative_controls(
+    corpus: dict[str, Any],
+    kernel_source: str,
+    expected_benchmark_id: str,
+) -> int:
+    duplicate = copy.deepcopy(corpus)
+    duplicate["cases"].append(copy.deepcopy(duplicate["cases"][0]))
+    try:
+        validate_case_corpus(duplicate, kernel_source, expected_benchmark_id)
+    except (ValueError, KeyError, TypeError):
+        pass
+    else:
+        raise ValueError("duplicate benchmark case identifier did not fail closed")
+
+    fabricated = copy.deepcopy(corpus)
+    not_run_case = next(
+        item for item in fabricated["cases"]
+        if item["implementation_state"] == "declared_not_implemented"
+    )
+    not_run_case["implementation_state"] = "kernel_unit_tested"
+    not_run_case["expected_disposition"] = "feasible"
+    not_run_case["test_names"] = []
+    try:
+        validate_case_corpus(fabricated, kernel_source, expected_benchmark_id)
+    except (ValueError, KeyError, TypeError):
+        pass
+    else:
+        raise ValueError("unimplemented benchmark case was promoted without a test")
+    validate_case_corpus(corpus, kernel_source, expected_benchmark_id)
+    return 2
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
@@ -148,16 +254,25 @@ def main() -> None:
     fixture_path = root / "docs/research/sawem/v1/sawem-bess-underwriting-profile-v1.synthetic.json"
     comparator_schema_path = root / "docs/research/sawem/v1/sawem-bess-comparator-manifest-v1.schema.json"
     comparator_fixture_path = root / "docs/research/sawem/v1/sawem-bess-comparator-manifest-v1.synthetic.json"
+    benchmark_schema_path = root / "docs/research/sawem/v1/sawem-bess-benchmark-corpus-v1.schema.json"
+    benchmark_corpus_path = root / "docs/research/sawem/v1/sawem-bess-benchmark-corpus-v1.json"
+    kernel_path = root / "tools/sawem-market-reference/src/lib.rs"
 
     try:
         schema_bytes = schema_path.read_bytes()
         fixture_bytes = fixture_path.read_bytes()
         comparator_schema_bytes = comparator_schema_path.read_bytes()
         comparator_fixture_bytes = comparator_fixture_path.read_bytes()
+        benchmark_schema_bytes = benchmark_schema_path.read_bytes()
+        benchmark_corpus_bytes = benchmark_corpus_path.read_bytes()
+        kernel_bytes = kernel_path.read_bytes()
         schema = json.loads(schema_bytes)
         fixture = json.loads(fixture_bytes)
         comparator_schema = json.loads(comparator_schema_bytes)
         comparator_fixture = json.loads(comparator_fixture_bytes)
+        benchmark_schema = json.loads(benchmark_schema_bytes)
+        benchmark_corpus = json.loads(benchmark_corpus_bytes)
+        kernel_source = kernel_bytes.decode("utf-8")
     except (OSError, json.JSONDecodeError) as exc:
         fail(f"cannot load schema or fixture: {exc}")
 
@@ -197,6 +312,43 @@ def main() -> None:
         negative_control_count = assert_comparator_negative_controls(comparator_fixture)
     except (ValueError, KeyError, TypeError) as exc:
         fail(f"comparator invariants or negative controls failed: {exc}")
+
+    if benchmark_schema.get("$schema") != "https://json-schema.org/draft/2020-12/schema":
+        fail("benchmark corpus schema must declare JSON Schema Draft 2020-12")
+    try:
+        Draft202012Validator.check_schema(benchmark_schema)
+    except Exception as exc:
+        fail(f"benchmark corpus schema meta-validation failed: {exc}")
+    benchmark_validator = Draft202012Validator(
+        benchmark_schema, format_checker=FormatChecker()
+    )
+    benchmark_errors = sorted(
+        benchmark_validator.iter_errors(benchmark_corpus),
+        key=lambda error: list(error.absolute_path),
+    )
+    if benchmark_errors:
+        first = benchmark_errors[0]
+        fail(
+            "benchmark corpus violates schema at "
+            f"{list(first.absolute_path)}: {first.message}"
+        )
+    try:
+        (
+            benchmark_kernel_tested_case_count,
+            benchmark_not_run_case_count,
+            benchmark_unique_test_count,
+        ) = validate_case_corpus(
+            benchmark_corpus,
+            kernel_source,
+            comparator_fixture["benchmark_id"],
+        )
+        benchmark_negative_control_count = assert_case_corpus_negative_controls(
+            benchmark_corpus,
+            kernel_source,
+            comparator_fixture["benchmark_id"],
+        )
+    except (ValueError, KeyError, TypeError) as exc:
+        fail(f"benchmark corpus traceability/negative controls failed: {exc}")
 
     # Status is intentionally non-authoritative in the first public profile.
     if fixture["profile_state"] != "research_profile_not_authoritative":
@@ -354,6 +506,13 @@ def main() -> None:
         "fixture_sha256": sha256(fixture_bytes),
         "comparator_schema_sha256": sha256(comparator_schema_bytes),
         "comparator_fixture_sha256": sha256(comparator_fixture_bytes),
+        "benchmark_corpus_schema_sha256": sha256(benchmark_schema_bytes),
+        "benchmark_corpus_sha256": sha256(benchmark_corpus_bytes),
+        "benchmark_case_count": len(benchmark_corpus["cases"]),
+        "benchmark_kernel_tested_case_count": benchmark_kernel_tested_case_count,
+        "benchmark_not_run_case_count": benchmark_not_run_case_count,
+        "benchmark_unique_rust_test_count": benchmark_unique_test_count,
+        "benchmark_negative_control_count": benchmark_negative_control_count,
         "profile_state": fixture["profile_state"],
         "comparator_manifest_state": comparator_fixture["manifest_state"],
         "comparator_run_state": comparator_fixture["run_state"],
