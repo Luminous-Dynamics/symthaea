@@ -941,8 +941,7 @@ fn expand_joint_support(
         expanded_rows[world_index].extend(rows);
         expanded_rows[world_index].sort();
     }
-    let challenge_sha256 =
-        canonical_support_challenge_sha256(base_sha256, challenge, action_ids)?;
+    let challenge_sha256 = canonical_support_challenge_sha256(base_sha256, challenge, action_ids)?;
     let mut expanded_hasher = Sha256::new();
     expanded_hasher.update(b"connectome-adaptive-expanded-joint-support-v1");
     expanded_hasher.update(base_sha256.as_bytes());
@@ -1197,12 +1196,8 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
                 &scenarios,
                 &tuples_by_world,
             )?;
-        let (expanded_solution, _expanded_state_count) = solve_adaptive_policy(
-            &action_ids,
-            &action_effort,
-            &scenarios,
-            &expanded_rows,
-        )?;
+        let (expanded_solution, _expanded_state_count) =
+            solve_adaptive_policy(&action_ids, &action_effort, &scenarios, &expanded_rows)?;
         let expanded_fixed = minimum_fixed_plan(
             &action_ids,
             &action_effort,
@@ -1216,8 +1211,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
             .map(|policy| policy.worst_case_cost);
         let fixed_before = fixed_non_adaptive_optimum.minimum_effort_units;
         let fixed_after = expanded_fixed.minimum_effort_units;
-        let adaptive_non_decreasing =
-            effort_is_non_decreasing(adaptive_before, adaptive_after);
+        let adaptive_non_decreasing = effort_is_non_decreasing(adaptive_before, adaptive_after);
         let fixed_non_decreasing = effort_is_non_decreasing(fixed_before, fixed_after);
         support_challenge_results.push(SupportChallengeResult {
             challenge_id: challenge.challenge_id.clone(),
@@ -1565,7 +1559,10 @@ mod tests {
         let input = support_expansion_fixture();
         let report = evaluate(&input, &bytes(&input)).unwrap();
         assert_eq!(report.worst_case_effort_units, Some(4));
-        assert_eq!(report.fixed_non_adaptive_optimum.minimum_effort_units, Some(5));
+        assert_eq!(
+            report.fixed_non_adaptive_optimum.minimum_effort_units,
+            Some(5)
+        );
         assert_eq!(report.support_challenge_count, 1);
         let challenge = &report.support_challenges[0];
         assert_eq!(challenge.added_joint_tuple_count, 1);
@@ -1595,12 +1592,10 @@ mod tests {
     #[test]
     fn support_expansion_rejects_a_tuple_already_in_base_support() {
         let mut input = support_expansion_fixture();
-        input.support_challenges[0].additions[0].possible_joint_outcomes[0]
-            .outcomes[1]
-            .outcome = "y-same".into();
-        input.support_challenges[0].additions[0].possible_joint_outcomes[0]
-            .outcomes[2]
-            .outcome = "z-d".into();
+        input.support_challenges[0].additions[0].possible_joint_outcomes[0].outcomes[1].outcome =
+            "y-same".into();
+        input.support_challenges[0].additions[0].possible_joint_outcomes[0].outcomes[2].outcome =
+            "z-d".into();
         let error = evaluate(&input, &bytes(&input)).unwrap_err();
         assert!(error.contains("already present"));
     }
