@@ -259,7 +259,10 @@ fn normalized_joint_rows(
     world_support: &JointWorldSupport,
     action_ids: &[String],
 ) -> Result<Vec<Vec<String>>, String> {
-    let known_actions = action_ids.iter().map(String::as_str).collect::<BTreeSet<_>>();
+    let known_actions = action_ids
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
     let mut rows = Vec::with_capacity(world_support.possible_joint_outcomes.len());
     let mut unique_rows = BTreeSet::new();
     for (row_index, tuple) in world_support.possible_joint_outcomes.iter().enumerate() {
@@ -379,7 +382,9 @@ fn validate(input: &Input) -> Result<(Vec<String>, JointTuplesByWorld), String> 
         || !valid_hex(&input.action_set_sha256, 64)
         || !valid_hex(&input.joint_support_sha256, 64)
     {
-        return Err("query, scenario, action, and joint-support digests must be lowercase SHA-256".into());
+        return Err(
+            "query, scenario, action, and joint-support digests must be lowercase SHA-256".into(),
+        );
     }
     if !matches!(
         input.scenario_set_scope.as_str(),
@@ -508,11 +513,17 @@ fn validate(input: &Input) -> Result<(Vec<String>, JointTuplesByWorld), String> 
         supports_by_world.insert(support.scenario_id.clone(), rows);
     }
     if support_ids != scenario_ids {
-        return Err("joint_world_supports must contain exactly one support relation for every scenario".into());
+        return Err(
+            "joint_world_supports must contain exactly one support relation for every scenario"
+                .into(),
+        );
     }
 
-    let actual_joint_digest =
-        canonical_joint_support_sha256(&input.scenarios, &input.actions, &input.joint_world_supports)?;
+    let actual_joint_digest = canonical_joint_support_sha256(
+        &input.scenarios,
+        &input.actions,
+        &input.joint_world_supports,
+    )?;
     if actual_joint_digest != input.joint_support_sha256 {
         return Err(format!(
             "joint-support digest mismatch: declared {}, computed {}",
@@ -524,9 +535,9 @@ fn validate(input: &Input) -> Result<(Vec<String>, JointTuplesByWorld), String> 
     let tuples_by_world = sorted_worlds
         .iter()
         .map(|world| {
-            supports_by_world
-                .remove(&world.scenario_id)
-                .ok_or_else(|| format!("missing normalized joint support for {}", world.scenario_id))
+            supports_by_world.remove(&world.scenario_id).ok_or_else(|| {
+                format!("missing normalized joint support for {}", world.scenario_id)
+            })
         })
         .collect::<Result<Vec<_>, _>>()?;
     Ok((action_ids, tuples_by_world))
@@ -995,21 +1006,20 @@ mod tests {
     #[test]
     fn support_tuple_limit_is_enforced() {
         let mut input = xor_fixture();
-        input.joint_world_supports[0].possible_joint_outcomes =
-            (0..=MAX_JOINT_TUPLES_PER_WORLD)
-                .map(|index| JointOutcome {
-                    outcomes: vec![
-                        ActionOutcome {
-                            action_id: "inspect-x".into(),
-                            outcome: format!("x-{index}"),
-                        },
-                        ActionOutcome {
-                            action_id: "inspect-y".into(),
-                            outcome: format!("y-{index}"),
-                        },
-                    ],
-                })
-                .collect();
+        input.joint_world_supports[0].possible_joint_outcomes = (0..=MAX_JOINT_TUPLES_PER_WORLD)
+            .map(|index| JointOutcome {
+                outcomes: vec![
+                    ActionOutcome {
+                        action_id: "inspect-x".into(),
+                        outcome: format!("x-{index}"),
+                    },
+                    ActionOutcome {
+                        action_id: "inspect-y".into(),
+                        outcome: format!("y-{index}"),
+                    },
+                ],
+            })
+            .collect();
         assert!(
             validate(&input)
                 .unwrap_err()
