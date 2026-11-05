@@ -482,9 +482,14 @@ A new failure mode remains even after receipt verification, exact task accountin
 
 Sun et al., *Which Self-Improvements Should We Trust? Reliable Self-Improvement When Agents Reuse Their Benchmarks*, arXiv:2609.33180 (2026-09-27), formalizes this as adaptive overfitting. REUSE allocates a global error budget over round t and prior promotion count p, and requires the proposer to receive only the promotion decision. It reports zero false promotions in its Covertype experiments versus 75 / 71 for empirical best-of-K at evaluation pool sizes 2,000 / 10,000, while retaining comparable final population performance. These are author-reported results for one tabular binary-classification setting, with 30 seeds, 200 rounds and up to eight proposals per round; they are not proof that the exact procedure transfers to coding, scientific research, multi-metric capability retention or every benchmark distribution.
 
-### New Rust allocation and round-level decision kernel
+### New Rust allocation, round selector and pass/fail confidence certificate
 
-The branch adds \`reuse_error_budget.rs\` with \`allocate_reuse_error_budget\` and \`evaluate_reuse_round\`. It implements the per-round/per-promotion allocation
+The branch adds:
+- \`reuse_error_budget.rs\`: \`allocate_reuse_error_budget\`, the one-based round selector \`evaluate_reuse_round\`, and a crate-private audit path that retains the selected certificate and cumulative lower bound;
+- \`paired_sign_test.rs\`: one shared exact one-sided paired sign-test implementation;
+- \`reuse_confidence_certificate.rs\`: the pass/fail certificate from Lemma A3 of Sun et al., arXiv:2609.33180v2.
+
+The adaptive allocation is
 
 \[
 \delta_{t,p} =
@@ -495,17 +500,37 @@ w_t=\frac{1}{t(t+1)},\quad
 v_p=\frac{1}{(p+1)(p+2)}.
 \]
 
-It computes the binomial term and candidate factor in log space, then splits the allocation into a paired-test budget \`rho * delta\` and a cumulative lower-bound budget \`(1-rho) * delta\`. It rejects invalid parameters, impossible promotion histories, histories beyond the reviewed maximum, and binary64 underflow; zero is never silently treated as a valid error allowance.
+The implementation computes the binomial term and candidate factor in log space, then splits the allocation into a paired-test budget \`rho * delta\` and confidence-bound budget \`delta_c = (1-rho) * delta\`. It rejects invalid parameters, impossible promotion histories, histories beyond the reviewed maximum, binary64 underflow and invalid candidate outcomes.
 
-The exact one-sided paired sign test is shared in \`paired_sign_test.rs\` and reused by both \`paired_evaluation.rs\` and the REUSE selector. The round-level \`evaluate_reuse_round\` requires exactly K candidate summaries, checks each candidate against the shared sign test at \`rho * delta[t,p]\`, and selects the highest preregistered empirical paired improvement among all candidates that pass. Stable proposal order breaks exact ties. Its outward result is the paper's single \`y_t \in {0,\ldots,K}\`: \`RejectAll\` represents 0, while \`PromoteCandidate { candidate_number }\` is one-based in \`1..=K\`. It does not expose individual pass/fail results, p-values or candidate scores to the proposer.
+### Round selector and evidence binding
 
-The caller must supply independent paired-unit wins/losses. If task rows are clustered by repository, project, task family or run, they must first be aggregated to the preregistered independent cluster unit; case-level sign-test counts would be pseudo-replication. The empirical improvement used to select among passing candidates must cover the full eligible evaluation population under the frozen scoring rule, including ties and missingness as specified in the protocol.
+\`ReuseCandidateEvidence\` is constructed from the **complete matched paired-outcome vector** \(Z_i \in \{-1,0,+1\}\). The candidate win count, loss count and empirical mean are all derived from this same vector; callers cannot supply unrelated summary statistics. The selector evaluates exactly K candidates at the shared sign-test threshold, selects the passing candidate with the highest empirical mean, and uses stable proposal order for exact ties.
 
-Twelve REUSE allocation/round-selection tests plus two direct exact-sign-test fixtures are authored (14 focused tests total): hand-calculated allocations, monotonicity, invalid histories and parameters, history bound, underflow, small binomial coefficients, selection among passing candidates, all-tie/all-fail behavior, deterministic ties, candidate-count mismatch, invalid empirical gains and count overflow.
+The proposer-facing API returns only the paper's single \(y_t \in \{0,\ldots,K\}\): \`RejectAll\` represents zero, while \`PromoteCandidate { candidate_number }\` is one-based in \(1..=K\). The selected certificate and cumulative lower bound are retained by a crate-private evaluator audit result, not returned through the proposer-facing function.
 
-The branch also adds \`tools/sym-rsi-reuse-gate\`, a nested standalone Cargo workspace that compiles the same production source files by path. It avoids the unrelated root-workspace member-resolution failure on this feature stack; it validates only these two statistical modules, not the full root crate integration.
+The caller must ensure the paired units are independent under the benchmark's preregistered sampling unit. If rows are clustered by repository, project, family or run, the unit of analysis must be defined and frozen before the sign test; treating correlated rows as independent is pseudo-replication.
 
-This remains a **decision-kernel primitive**, not a qualified REUSE service. It does **not** persist or authenticate promotion history, enforce decision-only access, compute the cumulative lower confidence bound, prove the simultaneous guarantee, protect a holdout, or authorize promotion. The REUSE paper also requires a separate cumulative confidence-bound certificate at \`(1-rho) * delta\`; only after that bound is verified may the independent service return the single round decision. The cumulative certificate is deliberately deferred until its Clopper–Pearson/Bernstein derivation and code are independently reviewed and tested.
+### Pass/fail confidence certificate
+
+For selected candidate paired outcomes \(Z_{1:n}\), the code computes:
+- the conditional-win Clopper–Pearson lower limit \(q_{\rm lo}=\theta(n_+,M,\delta_c/4)\);
+- the discordance-rate lower limit \(d_{\rm lo}=\theta(M,n,\delta_c/4)\);
+- the sign-based lower bound \(\ell_{\rm sign}=(2q_{\rm lo}-1)d_{\rm lo}\) when \(q_{\rm lo}>1/2\), and \(-\infty\) otherwise;
+- the paper's paired empirical-Bernstein lower bound using \(L=\ln(4/\delta_c)\), the KL-inverted upper bound on \(E[Z^2]\), and the stated Bernstein deviation;
+- the combined bound \(\ell^\star=\max(\ell_{\rm sign},\ell_{\rm Bernstein})\);
+- the nonnegative cumulative increment \(\max(\ell^\star,0)\).
+
+The two Clopper–Pearson bounds each use \(\delta_c/4\), while the paired empirical-Bernstein bound uses failure allocation \(\delta_c/2\). This gives the Lemma A3 certificate failure probability at most \(\delta_c\). The beta inverse uses monotone bisection over the repository's existing \`symthaea_statistics::special::betai\`; no second special-function implementation or external runtime dependency is added.
+
+The independent reference fixtures use SciPy beta quantiles for sample sizes through 10,000, plus an end-to-end pass/fail vector with 40 wins, 10 losses and 50 ties. All-tie input produces zero cumulative increment rather than a fabricated positive certificate.
+
+### Qualification boundary
+
+The branch adds \`tools/sym-rsi-reuse-gate\`, a small standalone Cargo workspace that imports the exact production Rust files by path and depends on the existing pure-Rust statistics crate. Its focused workflow runs pinned Rust 1.96.0, metadata, rustfmt, the source-backed tests and Clippy. It avoids loading unrelated root-workspace members; it does **not** prove the full root Symthaea crate integration.
+
+Twenty-three focused tests are authored across the allocation/round selector, confidence certificate and shared sign-test modules. Exact-head runner results are tracked separately from authored tests.
+
+This is still **not** a qualified REUSE service or proof of the simultaneous theorem. It does not persist/authenticate adaptive history, freeze alpha/K/rho in an independent authority, enforce process/network-level decision-only information flow, independently protect the holdout, bind source/build artifacts to the evaluated executable, or grant release authority. Those responsibilities remain with the separate evaluator-service / feedback-firewall work under #10573, the canonical receipt work #10314/#10533, the source/build provenance adapter #10569, the isolation control #10064 and trust-root work #10369. No measured RSI improvement or SOTA superiority is claimed.
 
 ### Required external evaluation boundary
 
