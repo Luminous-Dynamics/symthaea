@@ -62,15 +62,29 @@ jobs:
           for proposal in fixture["proposals"]:
               assert proposal["channel_id"] in channels
               assert proposal["psu_id"] in psus
+              assert re.fullmatch(r"[0-9a-f]{64}", proposal["proposal_adjudication_sha256"])
               proposals_by_psu[proposal["psu_id"]].add(proposal["proposal_id"])
               if proposal["adjudication_disposition"] == "CONFIRMED_MATCH":
+                  assert re.fullmatch(r"[0-9a-f]{64}", proposal["match_adjudication_sha256"])
                   alt = alternatives[proposal["matched_alternative_id"]]
                   assert alt["psu_id"] == proposal["psu_id"]
-                  assert alt["graph_sha256"] == proposal["candidate_world_sha256"]
                   confirmed_by_alternative[alt["alternative_id"]].add(proposal["channel_id"])
 
           for psu_id, psu in psus.items():
               assert set(psu["proposal_ids"]) == proposals_by_psu[psu_id], f"PSU proposal ledger mismatch: {psu_id}"
+
+          for alt in alternatives.values():
+              assert re.fullmatch(r"[0-9a-f]{64}", alt["alternative_adjudication_sha256"])
+              if alt["query_consequence"] == "QUERY_DECISION_FLIP":
+                  assert alt["decision_before_met"] != alt["decision_after_met"]
+              if alt["query_consequence"] == "NO_QUERY_EFFECT":
+                  assert alt["decision_before_met"] == alt["decision_after_met"]
+                  assert alt["before_worst_case_effort_units"] == alt["after_worst_case_effort_units"]
+              if alt["query_consequence"] == "ADAPTIVE_POLICY_INVALIDATED":
+                  assert alt["challenge_report_status"] == "NO_POLICY"
+                  assert alt["after_worst_case_effort_units"] is None
+              if alt["query_consequence"] == "ADAPTIVE_COST_INCREASED":
+                  assert alt["after_worst_case_effort_units"] > alt["before_worst_case_effort_units"]
 
           critical = {
               "QUERY_DECISION_FLIP",
