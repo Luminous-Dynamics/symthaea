@@ -1176,7 +1176,7 @@
       "case_id": "NON-ANTICIPATIVITY-POLICY-AUDIT-001",
       "track": "forecast_and_decision_replay",
       "title": "Scenario policy non-anticipativity and information-set action audit",
-      "scenario": "For every decision timestamp and shared information node, all scenario paths with identical source-digested information set and availability frontier must submit exactly the same net-power, reserve-up, reserve-down and target-SOC action. Actions may diverge only after their information nodes have diverged. Information availability after the decision timestamp, inconsistent information-set digests/availability times, duplicate scenario decisions, undeclared scenario IDs, invalid SOC targets and different actions before the information split fail closed. This audits a submitted policy; it does not solve a stochastic optimization problem.",
+      "scenario": "For every decision timestamp and shared information node, all scenario paths with identical source-digested information set and availability frontier must submit exactly the same net-power, reserve-up, reserve-down and target-SOC action. Actions may diverge only after their information nodes have diverged. Information availability after the decision timestamp, inconsistent information-set digests/availability times, duplicate scenario decisions, undeclared scenario IDs, invalid SOC targets and different actions before the information split fail closed. This audits a submitted policy; it does not solve a stochastic optimization problem. Empty decision sets and declared scenario paths with no actions are incomplete and cannot pass.",
       "owner": "Symthaea",
       "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
@@ -1187,7 +1187,8 @@
         "divergent_actions_after_information_split_are_allowed",
         "information_digest_and_availability_must_match_within_a_node",
         "future_information_and_duplicate_scenario_decisions_fail_closed",
-        "invalid_scenarios_digest_and_soc_target_fail_closed"
+        "invalid_scenarios_digest_and_soc_target_fail_closed",
+        "empty_decisions_and_scenarios_without_actions_do_not_pass"
       ],
       "required_evidence": [
         "declared scenario path identifiers and frozen scenario tree",
