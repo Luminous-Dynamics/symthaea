@@ -52,8 +52,10 @@ jobs:
         run: |
           set -euo pipefail
           report="$RUNNER_TEMP/mel-rmi-canonical-suite.csv"
-          cargo run --locked --manifest-path "$MEL_RMI_MANIFEST" --example canonical_suite > "$report"
+          summary="$RUNNER_TEMP/mel-rmi-dimension-summary.txt"
+          cargo run --locked --manifest-path "$MEL_RMI_MANIFEST" --example canonical_suite > "$report" 2> "$summary"
           cat "$report"
+          cat "$summary"
           rule_count="$(awk -F, '$1 == "trial" && $3 == "rule-positive" && $11 == "true" { count++ } END { print count + 0 }' "$report")"
           fixed_passes="$(awk -F, '$1 == "trial" && $3 == "fixed" && $11 == "true" { count++ } END { print count + 0 }' "$report")"
           imitation_passes="$(awk -F, '$1 == "trial" && $3 == "imitation" && $11 == "true" { count++ } END { print count + 0 }' "$report")"
@@ -63,6 +65,8 @@ jobs:
           reciprocal_count="$(awk -F, '$1 == "reciprocal" && $18 == "true" { count++ } END { print count + 0 }' "$report")"
           reciprocal_oracle_count="$(awk -F, '$1 == "reciprocal" && $17 == "true" { count++ } END { print count + 0 }' "$report")"
           artifact_count="$(awk -F, '$1 == "artifact_verified" { count=$2 } END { print count + 0 }' "$report")"
+          agent_summary_count="$(grep -c '^RMI_AGENT_AGGREGATE,' "$summary")"
+          partner_summary_count="$(grep -c '^RMI_PARTNER_AGGREGATE,' "$summary")"
           test "$rule_count" -eq 160
           test "$fixed_passes" -eq 0
           test "$imitation_passes" -eq 0
@@ -72,3 +76,5 @@ jobs:
           test "$reciprocal_oracle_count" -eq 160
           test "$reciprocal_count" -eq 160
           test "$artifact_count" -eq 1120
+          test "$agent_summary_count" -eq 30
+          test "$partner_summary_count" -eq 5
