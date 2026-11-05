@@ -655,9 +655,8 @@ mod tests {
             selected.receipt.assessment_set_digest,
             "sha256:canonical-assessment-batch"
         );
-        assert_eq!(
-            selected.receipt.selected_worst_case_target_utility,
-            1.0
+        assert!(
+            (selected.receipt.selected_worst_case_target_utility - 1.0).abs() < 1.0e-12
         );
     }
 
