@@ -621,3 +621,8 @@ jobs:
         run: |
           set -euo pipefail
           "$RUNNER_TEMP/ceb-jsonschema/bin/python" scripts/validate_ceb_metric_correspondence.py --self-test --repo-root .
+      - name: Validate CEB task admission and oracle qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/ceb-jsonschema/bin/python" scripts/validate_ceb_task_admission.py --self-test --repo-root .
