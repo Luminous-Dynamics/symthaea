@@ -9,6 +9,7 @@ use std::error::Error;
 use std::fmt;
 
 pub mod credit_cover;
+pub mod liquidity_options;
 
 const EPSILON: f64 = 1.0e-9;
 
