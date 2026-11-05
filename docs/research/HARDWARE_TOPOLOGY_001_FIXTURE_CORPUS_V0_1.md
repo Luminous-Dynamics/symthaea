@@ -36,8 +36,8 @@ Do not expose hidden transforms, expected net partitions, evaluator mutation con
 - **BASE-01:** 200 × 120 × 8 rectangular base plate; bottom face at z=0; centre at (0,0).
 - **POST-L:** 20 × 20 × 100 square post; centre at (-80,0,58); axis parallel +Z.
 - **POST-R:** same part variant; centre at (80,0,58); axis parallel +Z.
-- **BEAM-T:** 180 × 20 × 20 rectangular beam; centre at (0,0,112); long axis parallel +X.
-- **TIE-R:** 180 × 20 × 10 tie bar; centre at (0,45,100); long axis parallel +X.
+- **BEAM-T:** 180 × 20 × 20 rectangular beam; centre at (0,0,118); long axis parallel +X. The posts run from z=8 to z=108, so the beam's bottom face at z=108 seats exactly on both post tops.
+- **TIE-R:** 180 × 20 × 10 tie bar; centre at (0,20,100); long axis parallel +X. Its Y extent is 10–30 mm, so its near face contacts the rear faces of posts centred at y=0 with 20 mm width; its Z extent is 95–105 mm.
 - **GUSSET-L, GUSSET-R:** asymmetric 6 mm plate gussets with a 90 mm leg and a 30 mm leg, each with two Ø6 mounting holes. The long leg faces inward; the datum hole is 15 mm from the lower end. Left/right variants are not freely interchangeable.
 
 **Required relationships:** posts mate to the two base datum pads; the beam seats on both post tops; the tie bar mates to the rear post faces; gussets connect the declared post/beam interfaces. No member may be reversed merely because its outer bounding box still fits.
