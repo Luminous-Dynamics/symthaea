@@ -33,9 +33,13 @@ The manifest binds task/session/seed, policy/version, code revision, condition o
 
 The crate also represents unsupported modality metrics explicitly as NotApplicable; a PCM-only adapter cannot invent note-level MIDI evidence.
 
+## Canonical runnable fixture suite
+
+A frozen five-case suite now exercises motif, rhythm, tempo, role and texture dimensions. `canonical_suite` emits a CSV of fixed, imitation, one-way, yoked and rule-based policy results, plus the reverse-direction four-condition controlled-partner contrast. The dedicated workflow asserts that the rule-based positive control passes all five cases, the fixed and imitation controls pass none, and the responsive-partner reciprocal oracle passes all five. These are finite synthetic control counts—not SOTA results or estimates of performance with musicians.
+
 ## Authored tests
 
-The crate authors 25 deterministic tests covering the positive oracle, all four negative-control families, sham and unrelated control integrity, intervention isolation, event identity, cross-session yoking, controlled partner influence, manifest validation, modality applicability, and exact replay equality. These are authored tests, not executed results until the dedicated GitHub Actions workflow completes on the exact head.
+The crate authors 27 deterministic tests covering the positive oracle, all four negative-control families, sham and unrelated control integrity, intervention isolation, event identity, cross-session yoking, controlled partner influence, manifest validation, modality applicability, and exact replay equality. These are authored tests, not executed results until the dedicated GitHub Actions workflow completes on the exact head.
 
 ## Qualification and claim ceiling
 
