@@ -43,6 +43,20 @@ jobs:
           echo "Actual commit:   $ACTUAL_COMMIT"
           test "$ACTUAL_COMMIT" = "$EXPECTED_COMMIT"
 
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt
+
+      - name: Check Rust reference-kernel formatting
+        run: |
+          cargo fmt --manifest-path tools/sawem-market-reference/Cargo.toml -- --check
+
+      - name: Run Rust storage-feasibility reference tests
+        run: |
+          cargo test --manifest-path tools/sawem-market-reference/Cargo.toml --locked
+
       - name: Set up isolated Python validator runtime
         uses: actions/setup-python@v5
         with:
