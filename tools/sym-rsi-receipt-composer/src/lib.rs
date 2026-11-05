@@ -278,7 +278,7 @@ pub struct MetricEvidence {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ComposedCandidateEvidence {
-    candidate_source_digest: String,
+    candidate_system_identity_digest: String,
     composite_context_digest: String,
     evidence_set_digest: String,
     eligible_task_ids: Vec<String>,
@@ -287,8 +287,8 @@ pub struct ComposedCandidateEvidence {
 }
 
 impl ComposedCandidateEvidence {
-    pub fn candidate_source_digest(&self) -> &str {
-        &self.candidate_source_digest
+    pub fn candidate_system_identity_digest(&self) -> &str {
+        &self.candidate_system_identity_digest
     }
 
     pub fn composite_context_digest(&self) -> &str {
@@ -409,7 +409,7 @@ pub fn compare_candidates(
     if parent.composite_context_digest != candidate.composite_context_digest {
         return Err(ComposerError::ContextMismatch);
     }
-    if parent.candidate_source_digest == candidate.candidate_source_digest {
+    if parent.candidate_system_identity_digest == candidate.candidate_system_identity_digest {
         return Err(ComposerError::SameCandidate);
     }
     if parent.eligible_task_ids != candidate.eligible_task_ids
@@ -558,6 +558,7 @@ pub fn compose_candidate(
     let mut shared_eligible_digest: Option<String> = None;
     let mut shared_candidate_identity: Option<Value> = None;
     let mut shared_compatibility_context: Option<Value> = None;
+    let mut shared_input_digests: Option<BTreeMap<String, String>> = None;
 
     for (metric_id, projection) in &plan.metrics {
         let bytes = receipt_bytes_by_metric
@@ -601,6 +602,18 @@ pub fn compose_candidate(
                 return Err(ComposerError::IncompatibleMetricRunContext);
             }
             None => shared_compatibility_context = Some(parsed.compatibility_context.clone()),
+            _ => {}
+        }
+        let input_digests: BTreeMap<String, String> = parsed
+            .tasks
+            .iter()
+            .map(|(task_id, outcome)| (task_id.clone(), outcome.input_sha256.clone()))
+            .collect();
+        match &shared_input_digests {
+            Some(expected) if expected != &input_digests => {
+                return Err(ComposerError::TaskInputUniverseMismatch);
+            }
+            None => shared_input_digests = Some(input_digests),
             _ => {}
         }
 
@@ -659,10 +672,10 @@ pub fn compose_candidate(
     let candidate_identity = shared_candidate_identity.ok_or(
         ComposerError::CandidateIdentityMismatch,
     )?;
-    let candidate_source_digest = digest_value(&candidate_identity)?;
+    let candidate_system_identity_digest = digest_value(&candidate_identity)?;
 
     Ok(ComposedCandidateEvidence {
-        candidate_source_digest,
+        candidate_system_identity_digest,
         composite_context_digest: context_digest,
         evidence_set_digest,
         eligible_task_ids,
@@ -749,7 +762,7 @@ fn parse_run(bytes: &[u8], projection: &MetricProjection) -> Result<ParsedRun, C
                         "a scored task must have a terminal passed/failed disposition".into(),
                     ));
                 }
-                let kind = required_string(grade_value, "kind", "task grade")?.to_owned();
+                let kind = required_string_from_value(grade_value, "kind", "task grade")?.to_owned();
                 let score = projection.transform.apply(grade_value)?;
                 (Some(kind), Some(score))
             }
@@ -985,6 +998,7 @@ pub enum ComposerError {
     CandidateIdentityMismatch,
     IncompatibleMetricRunContext,
     TaskUniverseMismatch,
+    TaskInputUniverseMismatch,
     ClusterMapMismatch,
     DuplicateEvidenceDigest,
     CoverageBelowMinimum {
@@ -1032,6 +1046,9 @@ impl fmt::Display for ComposerError {
             }
             Self::TaskUniverseMismatch => {
                 write!(f, "metric receipts do not cover the exact same eligible task universe")
+            }
+            Self::TaskInputUniverseMismatch => {
+                write!(f, "metric receipts use different input bytes for one or more matched task IDs")
             }
             Self::ClusterMapMismatch => {
                 write!(f, "cluster map must cover exactly the eligible task universe")
