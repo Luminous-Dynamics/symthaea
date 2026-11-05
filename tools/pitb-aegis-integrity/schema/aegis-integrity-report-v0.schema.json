@@ -109,7 +109,9 @@
         "total_output_tokens",
         "total_api_cost_microusd",
         "p50_elapsed_seconds",
-        "p95_elapsed_seconds"
+        "p95_elapsed_seconds",
+        "resolution_rate_over_attempted",
+        "original_statement_proof_rate_over_attempted"
       ],
       "properties": {
         "selected_specification_count": {
@@ -227,6 +229,30 @@
             {
               "type": "number",
               "minimum": 0
+            }
+          ]
+        },
+        "resolution_rate_over_attempted": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          ]
+        },
+        "original_statement_proof_rate_over_attempted": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
             }
           ]
         }
