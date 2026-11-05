@@ -2824,6 +2824,7 @@ struct KeeperArtifactReadbackReceiptV1 {
     schema_version: u16,
     audio_key: String,
     artifact_layout: &'static str,
+    digest_scope: &'static str,
     artifacts: Vec<KeeperArtifactFileV1>,
 }
 
@@ -2883,6 +2884,7 @@ fn verify_keeper_bundle_readback(
         schema_version: 1,
         audio_key: audio_key.to_owned(),
         artifact_layout: "keeper-directory-v1",
+        digest_scope: "sha256-exact-persisted-file-bytes-v1",
         artifacts,
     })
 }
@@ -3204,8 +3206,13 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
-    let artifact_readback_sha256 =
-        serialized_sha256(&artifact_readback).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let artifact_readback_sha256 = match serialized_sha256(&artifact_readback) {
+        Ok(digest) => digest,
+        Err(_) => {
+            let _ = std::fs::remove_dir_all(&bundle_path);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
 
     // Genealogy is an enrichment, not a requirement -- a ledger failure
     // (missing store, sqlite error) must not block the keep the user asked
