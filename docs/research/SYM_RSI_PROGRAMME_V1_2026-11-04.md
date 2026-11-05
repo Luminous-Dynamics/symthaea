@@ -293,12 +293,12 @@ The additive `ClusteredPairedComparison` view addresses this without changing th
 - Cluster IDs are validated for non-empty, non-control-character identifiers.
 - Paired deltas are averaged within each cluster before directional wins/losses/ties are counted.
 - Both pooled case-weighted mean delta and equal-cluster-weighted mean delta are reported. These are different estimands and must not be conflated.
-- The exact one-sided sign-test diagnostic operates on non-tied cluster means. It is withheld when fewer than two non-tied clusters remain.
+- The exact one-sided sign-test diagnostic operates on non-tied cluster means. It is withheld when fewer than two non-tied clusters remain. This adapter reports point estimates and a directional exact-sign diagnostic; it does **not** yet produce cluster-bootstrap confidence intervals, uncertainty for Pareto frontier membership, or practical-effect/non-inferiority decisions. Those are owned by the existing paired uncertainty issue #8438, while broader task-population and crossed-family uncertainty belongs to #9433. Do not duplicate those statistical backends in the RSI module.
 - Holm step-down family-wise adjustment uses the full predeclared metric-schema size for this one comparison. Metrics without enough independent clusters to produce a p-value have no reported adjusted p-value, but still count conservatively as p=1 in the family size. This does **not** correct across candidates, adaptive search, generations, repeated runs, or a broader preregistered family.
 
 The cluster mapping must originate in the frozen task-family/corpus manifest and be covered by the shared receipt/corpus identity. The in-memory adapter validates mapping shape; it cannot authenticate mapping provenance or prove that clusters are genuinely independent. The independent unit must be chosen before confirmation, not after inspecting outcomes.
 
-This does not replace the original per-case results. It exposes a second analysis at a defensible independent unit, reducing the risk that many correlated cases from one project dominate the evidence. Small numbers of independent clusters remain low-power; cluster-aware analysis does not manufacture sample size.
+This does not replace the original per-case results. It exposes a second analysis at a defensible independent unit, reducing the risk that many correlated cases from one project dominate the evidence. Small numbers of independent clusters remain low-power; cluster-aware analysis does not manufacture sample size. Until #8438 supplies qualified cluster-level intervals and #9433 supplies defensible target-population inference where appropriate, G3/G4 claims remain descriptive/directional and cannot be upgraded to population-generalization claims.
 
 ### Exact evidence boundary
 
