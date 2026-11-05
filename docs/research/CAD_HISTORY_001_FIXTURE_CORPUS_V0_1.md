@@ -182,7 +182,17 @@ Do not collapse the following into one weighted score:
 
 Use tolerances defined for each kernel, exchange format, part scale and task. A single global millimetre tolerance is not sufficient. Record the comparison method and whether it uses native BREP, tessellated mesh, or both. A mesh comparison is auxiliary evidence; it cannot alone establish native parametric editability.
 
-## 7. Matched competitive experiment
+## 7.1 Relation to Parametric CAD Bench V3
+
+The November 2, 2026 V3 paper describes a pinned FreeCAD environment and a separate programmatic verifier that checks native CAD artifacts for geometry and task-specific specification consistency. It explicitly notes that these checks are proxies for requirements and do not certify arbitrary future editability or manufacturing readiness. V3 also does not require exact reproduction of a private reference feature history; alternative constructions can satisfy the same engineering requirements.
+
+The September 24, 2026 public snapshot is particularly useful for locating the gap: Claude Opus 5.5 / Claude Code reports 84.66% on image-to-CAD but 39.69% on create-and-edit; GPT-6 Astra / Codex reports 69.70% on image-to-CAD and 44.37% on create-and-edit. Overall means (61.03% and 56.87%) should not obscure this workflow split. Our additional intervention corpus tests whether inferred relations survive *new, explicitly specified downstream edits*, beyond matching the initial drawing/text task. This is an extension, not a claim that V3 omitted all edit evaluation.
+
+The v3 paper identifies complete model–agent systems, not isolated model capabilities. Matched comparisons must therefore pin and disclose both the model and the agent/tool stack. Keep V3's mean continuous reward distinct from our proposed per-invariant and per-edit hard gates.
+
+Reference: https://arxiv.org/abs/2611.02659 and https://cadbench.ai/leaderboard
+
+## 8. Matched competitive experiment
 
 After the corpus is materialized and its evaluator independently reviewed, compare these arms on the exact same task set and budgets:
 
@@ -195,7 +205,7 @@ After the corpus is materialized and its evaluator independently reviewed, compa
 
 Keep model revision, effort, prompt, CAD kernel/build, task inputs, permitted tool calls, retries, time/token budgets and evaluator fixed. Use paired per-task comparisons and report uncertainty, cost and failed tasks. The public Parametric CAD Bench V3 is a related but separate comparator: it has 100 tasks (30 text-to-CAD, 30 create-and-edit, 40 engineering-drawing reconstruction) and scores mean continuous task reward, with failed/unscored trials counted as zero. Its September 24, 2026 publisher snapshot and its later arXiv paper must be cited as their own versioned results; do not convert that score into geometric-equivalence pass rate. See https://cadbench.ai/leaderboard and https://arxiv.org/abs/2611.02659.
 
-## 8. Prospective gates
+## 9. Prospective gates
 
 These are hypotheses to preregister after a pilot, not present Luminous results or industry standards:
 
@@ -210,7 +220,7 @@ These are hypotheses to preregister after a pilot, not present Luminous results 
 
 Do not freeze these as success criteria until pilot variance, task difficulty, independent evaluator review and the actual kernel's numeric tolerances have been characterized.
 
-## 9. Runner-independent next work
+## 10. Runner-independent next work
 
 1. Generate the six positive source solids from a declared synthetic construction script, but keep alternate valid histories for evaluator testing.
 2. Produce N01–N04 as exact negative fixtures; verify that the intended defect/conflict is present in the source artifact itself.
@@ -220,7 +230,7 @@ Do not freeze these as success criteria until pilot variance, task difficulty, i
 6. Map feature/parameter IDs to FAB-GEOM-001's existing validated geometry and feature-identity contracts. Do not add a second geometry subject, BREP identity or evidence receipt.
 7. Only then create a runner adapter and compare against Parametric CAD Bench V3 under its published rules.
 
-## 10. Claim ceiling
+## 11. Claim ceiling
 
 This corpus is a synthetic design specification only. It establishes no CAD-kernel implementation, geometry equivalence result, parametric reconstruction accuracy, manufacturability, structural adequacy, GD&T compliance, material suitability, product safety, regulatory compliance or physical validation.
 
