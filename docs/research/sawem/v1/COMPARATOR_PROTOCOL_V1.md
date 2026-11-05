@@ -40,7 +40,8 @@ Metrics:
 - SOC and usable-energy conservation error;
 - charge/discharge efficiency and auxiliary load;
 - ramp, minimum stable charge and mode-transition violations;
-- reserve headroom under energy, power, SOC and response limits;
+- reserve headroom/footroom from the scheduled net injection point, including both reducing charge and increasing discharge (up) and reducing discharge and increasing charge (down);
+- product-specific response and sustain checks for regulating, instantaneous and ten-minute reserve;
 - temperature, state-of-health, throughput, cycle life and warranty-envelope violations;
 - network export/import and congestion-limit violations;
 - model-to-meter error once authenticated measurements exist.
