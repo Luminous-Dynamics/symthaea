@@ -543,17 +543,15 @@ mod tests {
 
     #[test]
     fn required_cover_reassessment_changes_cover_gap_only_after_its_event() {
-        let events = [
-            event(
-                "new-mo-cover",
-                3,
-                16 * 60,
-                0,
-                LiquidityEventClass::Committed,
-                LiquidityCashEventKind::RequiredCoverReassessment,
-                40_000_000,
-            ),
-        ];
+        let events = [event(
+            "new-mo-cover",
+            3,
+            16 * 60,
+            0,
+            LiquidityEventClass::Committed,
+            LiquidityCashEventKind::RequiredCoverReassessment,
+            40_000_000,
+        )];
         let result = evaluate_liquidity_waterfall(base_inputs(&events)).unwrap();
         let LiquidityWaterfallResult::Determined(result) = result else {
             panic!("cover source exists");
@@ -595,7 +593,9 @@ mod tests {
             panic!("all reassessments are source-bound");
         };
         assert_eq!(
-            result.committed.maximum_cover_shortfall_through_deadline_minor_zar,
+            result
+                .committed
+                .maximum_cover_shortfall_through_deadline_minor_zar,
             Some(25_000_000)
         );
         assert_eq!(
@@ -667,17 +667,15 @@ mod tests {
 
     #[test]
     fn events_after_credit_cover_deadline_do_not_change_deadline_cash() {
-        let events = [
-            event(
-                "after-deadline",
-                4,
-                9 * 60,
-                0,
-                LiquidityEventClass::Committed,
-                LiquidityCashEventKind::OperatingReceipt,
-                25_000_000,
-            ),
-        ];
+        let events = [event(
+            "after-deadline",
+            4,
+            9 * 60,
+            0,
+            LiquidityEventClass::Committed,
+            LiquidityCashEventKind::OperatingReceipt,
+            25_000_000,
+        )];
         let result = evaluate_liquidity_waterfall(base_inputs(&events)).unwrap();
         let LiquidityWaterfallResult::Determined(result) = result else {
             panic!("deadline lies within horizon");
