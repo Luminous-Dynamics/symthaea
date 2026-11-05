@@ -25,7 +25,9 @@ From this directory, run:
 ```sh
 cargo fmt --check
 cargo test --locked
-MEL_RMI_CODE_REVISION="$(git rev-parse HEAD)" cargo run --locked --example canonical_suite
+MEL_RMI_CODE_REVISION="$(git rev-parse HEAD)" \
+  MEL_RMI_ARTIFACT_REPORT="./mel-rmi-artifact-digests.csv" \
+  cargo run --locked --example canonical_suite
 ```
 
 The example emits a CSV over 160 paired fixtures (32 deterministic seeds per
@@ -34,9 +36,9 @@ shortcut and rule-based policies, followed by 160 four-condition reciprocal
 controlled-partner trials. Every one of the 960 policy trials and 160 reciprocal
 trials also receives four input and four output synthetic score/MIDI payload
 sets plus exact receipt bytes; the example hashes and re-verifies all 1,120
-trial records before reporting `artifact_verified,1120`. The example also emits dimension-specific agent and partner summaries to stderr: sample count, means, targeted-effect dispersion, sham/unrelated contrasts, and control/oracle qualification counts. It does not report a confidence interval or combine dimensions into a single score.
+trial records before reporting `artifact_verified,1120`. The example also emits dimension-specific agent and partner summaries to stderr: sample count, means, targeted-effect dispersion, sham/unrelated contrasts, and control/oracle qualification counts. It does not report a confidence interval or combine dimensions into a single score. The separately written artifact-digest CSV contains one row per input/output artifact, including event ID, transaction-receipt SHA-256, artifact SHA-256, format and byte length (17,920 rows for the canonical sweep).
 
-The repository workflow stages this crate outside the root Cargo workspace, tests the exact pull-request head with a committed `--locked` dependency graph, and gates all expected positive/negative-control counts, all five dimensions' summaries, and 1,120 successful artifact re-verifications.
+The repository workflow stages this crate outside the root Cargo workspace, tests the exact pull-request head using pinned Rust 1.96.0 and a committed `--locked` dependency graph, gates all expected positive/negative-control counts, all five dimensions' summaries, and 1,120 successful artifact re-verifications, then uploads the raw trial CSV, per-dimension summaries and digest CSV as a 90-day workflow artifact.
 
 ## Interpretation boundary
 
