@@ -1747,3 +1747,6 @@ mod tests {
 pub mod sequential;
 /// Failure-preserving scenario aggregation for adaptive candidate assessments.
 pub mod scenario;
+
+/// Known-truth observer and measurement-channel generation for SPECTRA.
+pub mod scenario_dgp;
