@@ -101,6 +101,12 @@ jobs:
               raise SystemExit("synthetic SorryDB denominators changed")
           if report["reproducible_task_count"] != 1 or report["scheduler_admission"] is not False:
               raise SystemExit("SorryDB reproduction/trust boundary changed")
+          if report["assurance_qualified_task_count"] != 0:
+              raise SystemExit("synthetic task without completed audits was assurance-qualified")
+          if report["assurance_disqualified_task_ids"] or len(report["assurance_unreviewed_task_ids"]) != 1:
+              raise SystemExit("synthetic semantic audit coverage accounting changed")
+          if report["full_count_documentation_drift"] is not False:
+              raise SystemExit("synthetic no-drift control changed")
           print("PITB_SORRYDB_PROVENANCE_AND_REPORT_SCHEMA_PASS")
           PY
 
