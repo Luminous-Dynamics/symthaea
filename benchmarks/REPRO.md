@@ -210,3 +210,24 @@ Do not pool V3's continuous reward with PLE's professional engineering hard-cons
 
 No V3 task image, FreeCAD model, Harbor job, validator, model, or external dataset was downloaded or executed by Luminous in this work. Candidate execution is blocked pending CEB task-custody #10436 and OS isolation #10064. Public availability does not bypass these controls.
 
+
+
+## BenchCAD 2.1 — separate protocol and two separate leaderboards (2026-11-05)
+
+Official release: https://benchcad.com/blog/benchcad-2-1  
+Official leaderboard: https://benchcad.com/leaderboard
+
+BenchCAD 2.1 keeps the same 100 Core case files but changes the protocol:
+- 60 rounds per case (v2.0 used 30).
+- 500,000 output tokens per case, thinking included.
+- Model reasoning is carried from one round to the next.
+- The prompt states rounds/tokens spent and says a non-submission scores zero.
+- Task 6 component matching is stricter: each predicted component may only claim its nearest part; duplicate predictions at the same location both score wrong.
+
+**Standard 2.1 board:** Anthropic's published mean of five full passes over all 100 Core cases. At max effort: Claude Opus 5.5 0.490 ±0.013 ($8.1/case); Sonnet 5.5 0.468 ±0.014 ($6.1); Fable 5.1 0.363 ±0.022 ($20); Haiku 5.5 0.186 ±0.016 ($1.4).
+
+**Customized-harness board:** distinct from the standard board, with a common 500,000-token-per-case budget, no round cap/retries, eight-hour wall-clock stop, API-only network access, and one isolated scoring pass. Claude Code/Anthropic self-reported Opus 5.5 0.653, Sonnet 5.5 0.609, Fable 5.1 0.444, and Haiku 5.5 0.229. OpenAI's unreleased internal model 0.875 is displayed on this board but scored using the v2.0 scorer; its model ID/repeats are undisclosed and its approximate $38/case is estimated by BenchCAD. These rows are not standard 2.1 results and are not comparable to the standard board.
+
+Never merge the standard and customized boards or compare v2.1 numbers to v2.0's 0.59/0.57. The current public data/Core access restrictions remain in place; no task content was downloaded and execution_authorized=false.
+
+The BenchCAD Vision2Code 1,000-file subset is another separate evaluation. Kimi K3.1 Pro's October 23 result (0.927 with tools / 0.728 without) is a single-shot max-effort 1,000-file random subset voxel-IoU result, not BenchCAD 2.0 Core. It must not be compared to the Core part/assembly/ECAD score.
