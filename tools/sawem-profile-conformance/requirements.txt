@@ -1,1 +1,2 @@
-# CI-only schema validator; not a production dependency.\njsonschema==4.26.0\n
+# CI-only schema validator; not a production dependency.
+jsonschema==4.26.0
