@@ -70,6 +70,10 @@ pub enum GenealogyBundleError {
     Io(std::io::Error),
     /// Persisted bytes differ from the exact payload that Studio committed.
     ByteMismatch { artifact: &'static str },
+    /// A persisted artifact no longer matches the hash in its manifest.
+    ManifestMismatch { artifact: &'static str },
+    /// The keeper has no genealogy manifest.
+    MissingManifest { audio_key: String },
     /// The verified content hashes could not be committed to SQLite.
     Database(rusqlite::Error),
 }
@@ -81,12 +85,42 @@ impl std::fmt::Display for GenealogyBundleError {
             Self::ByteMismatch { artifact } => {
                 write!(formatter, "persisted keeper artifact differs: {artifact}")
             }
-            Self::Database(error) => write!(formatter, "genealogy database write failed: {error}"),
+            Self::ManifestMismatch { artifact } => {
+                write!(formatter, "keeper artifact no longer matches genealogy manifest: {artifact}")
+            }
+            Self::MissingManifest { audio_key } => {
+                write!(formatter, "keeper has no genealogy manifest: {audio_key}")
+            }
+            Self::Database(error) => write!(formatter, "genealogy database operation failed: {error}"),
         }
     }
 }
 
 impl std::error::Error for GenealogyBundleError {}
+
+/// Read-only result after resolving a keeper's genealogy manifest and
+/// independently re-hashing every artifact currently present in its bundle.
+///
+/// This is suitable as a provenance reference for downstream RMI/evaluation
+/// records. It does not authenticate a musician, grant consent, or establish
+/// authorship or musical quality.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedArtifactBundleV1 {
+    /// Existing durable genealogy record.
+    pub manifest: GenealogyManifest,
+    /// Exact recipe bytes re-read from recipe.json.
+    pub recipe_sha256: String,
+    /// Exact score bytes re-read from score.json, when the manifest binds one.
+    pub score_sha256: Option<String>,
+    /// Exact audio bytes re-read from audio.wav.
+    pub audio_sha256: String,
+    /// Number of bytes in recipe.json.
+    pub recipe_bytes_len: u64,
+    /// Number of bytes in score.json, when present and bound.
+    pub score_bytes_len: Option<u64>,
+    /// Number of bytes in audio.wav.
+    pub audio_bytes_len: u64,
+}
 
 pub struct GenealogyStore {
     conn: Mutex<Connection>,
@@ -99,6 +133,67 @@ impl GenealogyStore {
     /// digest strings. It recomputes SHA-256 from the recipe, optional score,
     /// and audio byte slices immediately before persisting the manifest.
     /// The storage locator remains separate from content identity.
+    /// Resolve the existing manifest for a keeper and independently verify
+    /// its current recipe, optional score, and audio files against the stored
+    /// hashes. Call this before attaching a keeper to a downstream RMI record.
+    ///
+    /// Unlike allocate_root_from_bundle, this read-only operation needs no
+    /// expected caller buffers: the existing manifest is the reference. A
+    /// changed, missing, or substituted file fails closed.
+    pub fn verify_bundle(
+        &self,
+        audio_key: &str,
+        bundle_directory: &Path,
+    ) -> Result<VerifiedArtifactBundleV1, GenealogyBundleError> {
+        let manifest = self
+            .manifest_by_audio_key(audio_key)
+            .map_err(GenealogyBundleError::Database)?
+            .ok_or_else(|| GenealogyBundleError::MissingManifest {
+                audio_key: audio_key.to_owned(),
+            })?;
+
+        let recipe_bytes = std::fs::read(bundle_directory.join("recipe.json"))
+            .map_err(GenealogyBundleError::Io)?;
+        let audio_bytes = std::fs::read(bundle_directory.join("audio.wav"))
+            .map_err(GenealogyBundleError::Io)?;
+        let score_bytes = match manifest.score_sha256.as_ref() {
+            Some(_) => Some(
+                std::fs::read(bundle_directory.join("score.json"))
+                    .map_err(GenealogyBundleError::Io)?,
+            ),
+            None => None,
+        };
+
+        let recipe_sha256 = artifact_sha256_hex(&recipe_bytes);
+        if recipe_sha256 != manifest.recipe_sha256 {
+            return Err(GenealogyBundleError::ManifestMismatch {
+                artifact: "recipe.json",
+            });
+        }
+        let audio_sha256 = artifact_sha256_hex(&audio_bytes);
+        if audio_sha256 != manifest.audio_sha256 {
+            return Err(GenealogyBundleError::ManifestMismatch {
+                artifact: "audio.wav",
+            });
+        }
+        let score_sha256 = score_bytes.as_deref().map(artifact_sha256_hex);
+        if score_sha256 != manifest.score_sha256 {
+            return Err(GenealogyBundleError::ManifestMismatch {
+                artifact: "score.json",
+            });
+        }
+
+        Ok(VerifiedArtifactBundleV1 {
+            manifest,
+            recipe_sha256,
+            score_sha256,
+            audio_sha256,
+            recipe_bytes_len: recipe_bytes.len() as u64,
+            score_bytes_len: score_bytes.as_ref().map(|bytes| bytes.len() as u64),
+            audio_bytes_len: audio_bytes.len() as u64,
+        })
+    }
+
     /// Re-read the published keeper bundle, compare every byte vector with
     /// the payload passed to Studio's atomic bundle writer, and only then
     /// commit a genealogy manifest from the re-read bytes.
@@ -559,6 +654,127 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
+
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn verify_bundle_resolves_manifest_and_rehashes_current_artifact_bytes() {
+        let store = store();
+        let directory = std::env::temp_dir().join(format!(
+            "muse-genealogy-readback-{}-{}",
+            std::process::id(),
+            line!()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+
+        let recipe = br#"{
+  "name": "verified recipe"
+}
+"#;
+        let score = br#"{"notes":[60,64,67]}"#;
+        let audio = b"RIFF\x04\x00\x00\x00WAVE";
+        std::fs::write(directory.join("recipe.json"), recipe).unwrap();
+        std::fs::write(directory.join("score.json"), score).unwrap();
+        std::fs::write(directory.join("audio.wav"), audio).unwrap();
+
+        let manifest = store
+            .allocate_root_from_bundle(
+                &origin(),
+                "verify-after-keep",
+                &directory,
+                recipe,
+                score,
+                audio,
+                1005,
+            )
+            .unwrap();
+        let verified = store
+            .verify_bundle("verify-after-keep", &directory)
+            .unwrap();
+
+        assert_eq!(verified.manifest.id, manifest.id);
+        assert_eq!(verified.manifest.manifest_sha256, manifest.manifest_sha256);
+        assert_eq!(verified.recipe_sha256, artifact_sha256_hex(recipe));
+        assert_eq!(verified.score_sha256, Some(artifact_sha256_hex(score)));
+        assert_eq!(verified.audio_sha256, artifact_sha256_hex(audio));
+        assert_eq!(verified.recipe_bytes_len, recipe.len() as u64);
+        assert_eq!(verified.score_bytes_len, Some(score.len() as u64));
+        assert_eq!(verified.audio_bytes_len, audio.len() as u64);
+
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn verify_bundle_rejects_post_commit_file_substitution() {
+        let store = store();
+        let directory = std::env::temp_dir().join(format!(
+            "muse-genealogy-post-commit-substitution-{}-{}",
+            std::process::id(),
+            line!()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+
+        let recipe = b"recipe-original";
+        let score = b"score-original";
+        let audio = b"audio-original";
+        std::fs::write(directory.join("recipe.json"), recipe).unwrap();
+        std::fs::write(directory.join("score.json"), score).unwrap();
+        std::fs::write(directory.join("audio.wav"), audio).unwrap();
+
+        store
+            .allocate_root_from_bundle(
+                &origin(),
+                "verify-substitution",
+                &directory,
+                recipe,
+                score,
+                audio,
+                1006,
+            )
+            .unwrap();
+        std::fs::write(directory.join("audio.wav"), b"audio-substituted").unwrap();
+
+        assert!(matches!(
+            store.verify_bundle("verify-substitution", &directory),
+            Err(GenealogyBundleError::ManifestMismatch {
+                artifact: "audio.wav"
+            })
+        ));
+
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn verify_bundle_preserves_manifest_with_no_score_artifact() {
+        let store = store();
+        let directory = std::env::temp_dir().join(format!(
+            "muse-genealogy-optional-score-{}-{}",
+            std::process::id(),
+            line!()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+
+        let recipe = b"recipe-only";
+        let audio = b"audio-only";
+        std::fs::write(directory.join("recipe.json"), recipe).unwrap();
+        std::fs::write(directory.join("audio.wav"), audio).unwrap();
+        store
+            .allocate_root_from_bytes(
+                &origin(),
+                "verify-no-score",
+                recipe,
+                None,
+                audio,
+                1007,
+            )
+            .unwrap();
+        let verified = store.verify_bundle("verify-no-score", &directory).unwrap();
+        assert_eq!(verified.score_sha256, None);
+        assert_eq!(verified.score_bytes_len, None);
 
         let _ = std::fs::remove_dir_all(directory);
     }
