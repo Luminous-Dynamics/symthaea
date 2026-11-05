@@ -747,7 +747,8 @@
         "credit_cover_notice_late_and_missing_states_are_not_silently_accepted",
         "credit_cover_timeline_handles_no_increase_and_requires_business_day_recalculation",
         "credit_call_reestablishment_uses_two_business_days",
-        "credit_cover_calendar_requires_authority_order_and_complete_horizon"
+        "credit_cover_calendar_requires_authority_order_and_complete_horizon",
+        "credit_call_on_non_business_day_starts_count_on_next_business_day"
       ],
       "required_evidence": [
         "Actual Exposure and Undefined Potential Exposure source records (not calculated by this increment)",
