@@ -1,0 +1,596 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ceb/task-manifest-v0.schema.json",
+  "title": "CEB Task Admission Manifest V0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "task_status",
+    "family_id",
+    "repository",
+    "source",
+    "task_spec",
+    "environment",
+    "acceptance_contract",
+    "oracle",
+    "custody",
+    "execution_qualification",
+    "dispositions",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 0
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^ceb-rust-[a-z0-9-]+$"
+    },
+    "task_status": {
+      "enum": [
+        "proposed",
+        "static_reviewed",
+        "execution_qualified",
+        "admitted",
+        "rejected"
+      ]
+    },
+    "family_id": {
+      "enum": [
+        "rust-types-traits",
+        "multi-crate-api-regression",
+        "feature-target-configuration",
+        "issue-reproduction-debugging",
+        "security-correctness",
+        "performance-correctness"
+      ]
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repo_full_name",
+        "url",
+        "source_revision",
+        "license"
+      ],
+      "properties": {
+        "repo_full_name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "source_revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "license": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "spdx_expression",
+            "license_file_path",
+            "license_file_sha256",
+            "review_status"
+          ],
+          "properties": {
+            "spdx_expression": {
+              "type": "string",
+              "minLength": 2
+            },
+            "license_file_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "license_file_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "review_status": {
+              "enum": [
+                "not_reviewed",
+                "compatible",
+                "incompatible",
+                "unknown"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_kind",
+        "source_url",
+        "source_id",
+        "opened_at",
+        "fix_commit_sha",
+        "fix_visibility",
+        "solution_leakage_review"
+      ],
+      "properties": {
+        "source_kind": {
+          "enum": [
+            "issue",
+            "pull_request",
+            "regression_report",
+            "maintainer_submission"
+          ]
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "opened_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "fix_commit_sha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "fix_visibility": {
+          "enum": [
+            "public",
+            "private",
+            "not_published",
+            "unknown"
+          ]
+        },
+        "solution_leakage_review": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reviewed_on",
+            "search_protocol_id",
+            "search_record_sha256",
+            "searched_surfaces",
+            "reviewer_id"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "not_run",
+                "incomplete",
+                "complete",
+                "suspected_leakage",
+                "confirmed_leakage"
+              ]
+            },
+            "reviewed_on": {
+              "type": "string",
+              "format": "date"
+            },
+            "search_protocol_id": {
+              "type": "string",
+              "minLength": 3
+            },
+            "search_record_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "searched_surfaces": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 3
+              }
+            },
+            "reviewer_id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9_-]+$"
+            }
+          }
+        }
+      }
+    },
+    "task_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prompt_sha256",
+        "acceptance_spec_sha256",
+        "authoring_protocol_version",
+        "blind_solve_review"
+      ],
+      "properties": {
+        "prompt_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "acceptance_spec_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "authoring_protocol_version": {
+          "type": "string",
+          "minLength": 3
+        },
+        "blind_solve_review": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reviewer_id",
+            "review_record_sha256",
+            "instruction_only_sufficient"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "not_reviewed",
+                "passed",
+                "failed",
+                "disputed"
+              ]
+            },
+            "reviewer_id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9_-]+$"
+            },
+            "review_record_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "instruction_only_sufficient": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rust_toolchain",
+        "cargo_lock_sha256",
+        "target_triple",
+        "feature_set",
+        "environment_image_digest",
+        "resource_policy_sha256",
+        "network_policy",
+        "replay_manifest_sha256",
+        "workload_sha256"
+      ],
+      "properties": {
+        "rust_toolchain": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "cargo_lock_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "target_triple": {
+          "type": "string",
+          "minLength": 5
+        },
+        "feature_set": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "environment_image_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "resource_policy_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "network_policy": {
+          "enum": [
+            "disabled",
+            "endpoint_only",
+            "allowlisted",
+            "unqualified"
+          ]
+        },
+        "replay_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "workload_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "acceptance_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_sha256",
+        "fail_to_pass_check_ids",
+        "pass_to_pass_check_ids",
+        "critical_invariants",
+        "security_review_status",
+        "destructive_side_effects"
+      ],
+      "properties": {
+        "contract_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "fail_to_pass_check_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 3
+          }
+        },
+        "pass_to_pass_check_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 3
+          }
+        },
+        "critical_invariants": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 5
+          }
+        },
+        "security_review_status": {
+          "enum": [
+            "not_reviewed",
+            "passed",
+            "failed",
+            "not_applicable"
+          ]
+        },
+        "destructive_side_effects": {
+          "type": "boolean"
+        }
+      }
+    },
+    "oracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewers",
+        "blinded_to_candidate_output",
+        "llm_only_oracle",
+        "disagreement_status",
+        "adjudicator_id",
+        "gold_patch_sha256",
+        "semantically_equivalent_repairs_allowed",
+        "reference_patch_control",
+        "empty_patch_control",
+        "oracle_record_sha256"
+      ],
+      "properties": {
+        "reviewers": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "reviewer_id",
+              "role",
+              "review_record_sha256",
+              "decision"
+            ],
+            "properties": {
+              "reviewer_id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_-]+$"
+              },
+              "role": {
+                "enum": [
+                  "gold_reviewer",
+                  "adjudicator"
+                ]
+              },
+              "review_record_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "decision": {
+                "enum": [
+                  "accept",
+                  "reject",
+                  "needs_adjudication"
+                ]
+              }
+            }
+          }
+        },
+        "blinded_to_candidate_output": {
+          "type": "boolean"
+        },
+        "llm_only_oracle": {
+          "const": false
+        },
+        "disagreement_status": {
+          "enum": [
+            "none",
+            "resolved_by_adjudicator",
+            "unresolved"
+          ]
+        },
+        "adjudicator_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "gold_patch_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "semantically_equivalent_repairs_allowed": {
+          "const": true
+        },
+        "reference_patch_control": {
+          "enum": [
+            "not_run_blocked",
+            "pass",
+            "fail"
+          ]
+        },
+        "empty_patch_control": {
+          "enum": [
+            "not_run_blocked",
+            "pass",
+            "fail"
+          ]
+        },
+        "oracle_record_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "custody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "partition",
+        "custody_domain_id",
+        "custody_manifest_sha256",
+        "holdout_material_outside_agent_workspace",
+        "agent_access_before_freeze",
+        "public_fix_exposure_accepted"
+      ],
+      "properties": {
+        "partition": {
+          "enum": [
+            "development",
+            "holdout"
+          ]
+        },
+        "custody_domain_id": {
+          "type": "string",
+          "minLength": 3
+        },
+        "custody_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "holdout_material_outside_agent_workspace": {
+          "type": "boolean"
+        },
+        "agent_access_before_freeze": {
+          "type": "boolean"
+        },
+        "public_fix_exposure_accepted": {
+          "type": "boolean"
+        }
+      }
+    },
+    "execution_qualification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_code_executed",
+        "isolation_status",
+        "isolation_profile_sha256",
+        "trust_status",
+        "trust_policy_sha256",
+        "independent_regrade_claimed"
+      ],
+      "properties": {
+        "candidate_code_executed": {
+          "type": "boolean"
+        },
+        "isolation_status": {
+          "enum": [
+            "blocked_issue_10064",
+            "not_qualified",
+            "qualified"
+          ]
+        },
+        "isolation_profile_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "trust_status": {
+          "enum": [
+            "blocked_issue_10369",
+            "not_qualified",
+            "qualified"
+          ]
+        },
+        "trust_policy_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "independent_regrade_claimed": {
+          "const": false
+        }
+      }
+    },
+    "dispositions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "timeouts_counted",
+        "abstentions_counted",
+        "escalations_counted",
+        "ungraded_counted",
+        "denominator_policy_sha256"
+      ],
+      "properties": {
+        "timeouts_counted": {
+          "const": true
+        },
+        "abstentions_counted": {
+          "const": true
+        },
+        "escalations_counted": {
+          "const": true
+        },
+        "ungraded_counted": {
+          "const": true
+        },
+        "denominator_policy_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 30
+    }
+  }
+}
