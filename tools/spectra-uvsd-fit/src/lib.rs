@@ -1753,3 +1753,6 @@ pub mod scenario_dgp;
 
 /// Simultaneous finite-sample confidence bounds for candidate score Monte Carlo.
 pub mod score_bounds;
+
+/// Robust indifference-zone certificates for Monte Carlo design selection.
+pub mod ranking;
