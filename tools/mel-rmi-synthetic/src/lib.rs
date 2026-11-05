@@ -2120,9 +2120,12 @@ mod tests {
         let mut record = run_trial(
             task,
             interventions,
-            &RuleBasedPolicy { id: "rule-positive".to_owned() },
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
             config(),
-        ).unwrap();
+        )
+        .unwrap();
         let (inputs, outputs) = artifact_payloads(&record);
         bind_verified_artifacts(
             &mut record,
@@ -2130,7 +2133,8 @@ mod tests {
             outputs.clone(),
             "independent-sha256-verifier",
             "v1",
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(record.artifact_bindings.as_ref().unwrap().inputs.len(), 4);
         assert_eq!(record.artifact_bindings.as_ref().unwrap().outputs.len(), 4);
         verify_trial_artifact_bindings(&record, &inputs, &outputs).unwrap();
@@ -2142,9 +2146,12 @@ mod tests {
         let mut record = run_trial(
             task,
             interventions,
-            &RuleBasedPolicy { id: "rule-positive".to_owned() },
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
             config(),
-        ).unwrap();
+        )
+        .unwrap();
         let (inputs, outputs) = artifact_payloads(&record);
         bind_verified_artifacts(
             &mut record,
@@ -2152,7 +2159,8 @@ mod tests {
             outputs.clone(),
             "independent-sha256-verifier",
             "v1",
-        ).unwrap();
+        )
+        .unwrap();
         let mut altered_outputs = outputs;
         altered_outputs[1].artifacts[0].bytes.push(0xff);
         assert_eq!(
@@ -2167,9 +2175,12 @@ mod tests {
         let mut record = run_trial(
             task,
             interventions,
-            &RuleBasedPolicy { id: "rule-positive".to_owned() },
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
             config(),
-        ).unwrap();
+        )
+        .unwrap();
         let (inputs, outputs) = artifact_payloads(&record);
         bind_verified_artifacts(
             &mut record,
@@ -2177,7 +2188,8 @@ mod tests {
             outputs.clone(),
             "independent-sha256-verifier",
             "v1",
-        ).unwrap();
+        )
+        .unwrap();
         let mut altered_inputs = inputs;
         altered_inputs[2].transaction_receipt_bytes.push(b'!');
         assert_eq!(
@@ -2192,9 +2204,12 @@ mod tests {
         let mut record = run_trial(
             task,
             interventions,
-            &RuleBasedPolicy { id: "rule-positive".to_owned() },
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
             config(),
-        ).unwrap();
+        )
+        .unwrap();
         let (mut inputs, outputs) = artifact_payloads(&record);
         inputs.swap(0, 1);
         assert_eq!(
@@ -2216,9 +2231,12 @@ mod tests {
         let mut record = run_trial(
             task,
             interventions,
-            &RuleBasedPolicy { id: "rule-positive".to_owned() },
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
             config(),
-        ).unwrap();
+        )
+        .unwrap();
         let (mut inputs, outputs) = artifact_payloads(&record);
         inputs[0].transaction_receipt_bytes.clear();
         assert_eq!(
@@ -2252,9 +2270,12 @@ mod tests {
         let mut record = run_trial(
             task,
             interventions,
-            &RuleBasedPolicy { id: "rule-positive".to_owned() },
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
             config(),
-        ).unwrap();
+        )
+        .unwrap();
         let (inputs, outputs) = artifact_payloads(&record);
         assert_eq!(
             verify_trial_artifact_bindings(&record, &inputs, &outputs),
@@ -2266,7 +2287,8 @@ mod tests {
             outputs.clone(),
             "independent-sha256-verifier",
             "v1",
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(
             bind_verified_artifacts(
                 &mut record,
@@ -2285,9 +2307,12 @@ mod tests {
         let mut record = run_trial(
             task,
             interventions,
-            &RuleBasedPolicy { id: "rule-positive".to_owned() },
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
             config(),
-        ).unwrap();
+        )
+        .unwrap();
         let (inputs, outputs) = artifact_payloads(&record);
         bind_verified_artifacts(
             &mut record,
@@ -2295,7 +2320,8 @@ mod tests {
             outputs,
             "independent-sha256-verifier",
             "v1",
-        ).unwrap();
+        )
+        .unwrap();
         let bindings = record.artifact_bindings.as_mut().unwrap();
         bindings.outputs[0].artifacts[0].sha256_hex = "not-a-hash".to_owned();
         assert_eq!(
@@ -2310,9 +2336,12 @@ mod tests {
         let mut record = run_trial(
             task,
             interventions,
-            &RuleBasedPolicy { id: "rule-positive".to_owned() },
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
             config(),
-        ).unwrap();
+        )
+        .unwrap();
         let (inputs, outputs) = artifact_payloads(&record);
         assert_eq!(
             bind_verified_artifacts(&mut record, inputs, outputs, " ", "v1"),
