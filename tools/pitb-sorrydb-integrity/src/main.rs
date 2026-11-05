@@ -61,6 +61,7 @@ struct Provenance {
     database_git_blob_sha1: String,
     evaluation_split_git_blob_sha1: String,
     expected_database_task_count: usize,
+    documented_database_task_count: usize,
     expected_evaluation_task_count: usize,
     evaluation_split_role: String,
     license: String,
@@ -114,6 +115,8 @@ struct Report {
     database_raw_sha256: String,
     evaluation_split_raw_sha256: String,
     database_task_count: usize,
+    documented_database_task_count: usize,
+    full_count_documentation_drift: bool,
     evaluation_task_count: usize,
     repository_commit_count: usize,
     receipt_count: usize,
@@ -222,6 +225,9 @@ fn validate_provenance(
             provenance.evaluation_split_git_blob_sha1, actual_split_blob
         ));
     }
+    if provenance.documented_database_task_count == 0 {
+        return Err("documented_database_task_count must be non-zero".into());
+    }
     if database.sorries.len() != provenance.expected_database_task_count {
         return Err(format!(
             "full database task count mismatch: expected {}, got {}",
@@ -250,13 +256,13 @@ fn validate_record(record: &SorryRecord, label: &str) -> Result<(), String> {
     if !valid_hex(&record.repo.commit, 40) {
         return Err(format!("{label}.repo.commit must be a 40-character lowercase Git commit"));
     }
+    // SorryDB line numbers are 1-based; columns are 0-based character offsets.
+    // Preserve the upstream convention exactly, including valid start_column=0 rows.
     if record.location.path.trim().is_empty()
         || record.location.start_line == 0
-        || record.location.start_column == 0
         || record.location.end_line == 0
-        || record.location.end_column == 0
     {
-        return Err(format!("{label} has invalid source path or 1-based coordinates"));
+        return Err(format!("{label} has an invalid source path or line coordinate"));
     }
     if (record.location.end_line, record.location.end_column)
         < (record.location.start_line, record.location.start_column)
@@ -460,6 +466,8 @@ fn verify(
         database_raw_sha256: sha256(database_bytes),
         evaluation_split_raw_sha256: sha256(split_bytes),
         database_task_count: database.sorries.len(),
+        documented_database_task_count: provenance.documented_database_task_count,
+        full_count_documentation_drift: database.sorries.len() != provenance.documented_database_task_count,
         evaluation_task_count: split.sorries.len(),
         repository_commit_count: unique_repositories.len(),
         receipt_count: receipts.len(),
@@ -560,6 +568,7 @@ fn run_self_tests() -> Result<(), String> {
         database_git_blob_sha1: git_blob_sha1(&full_bytes, "synthetic full database")?,
         evaluation_split_git_blob_sha1: git_blob_sha1(&split_bytes, "synthetic split")?,
         expected_database_task_count: 2,
+        documented_database_task_count: 2,
         expected_evaluation_task_count: 1,
         evaluation_split_role: "test".into(),
         license: "Apache-2.0".into(),
