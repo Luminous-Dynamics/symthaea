@@ -614,6 +614,54 @@ mod tests {
     }
 
     #[test]
+    fn scenario_assessments_feed_the_sequential_policy_without_score_reconstruction() {
+        let action_set = make_action_set();
+        let scenario_set = make_scenario_set();
+        let batch = aggregate_scenario_assessments(
+            &action_set,
+            &scenario_set,
+            &reference_outcomes(),
+            RobustUtility::LowerTailCvar { tail_mass: 0.5 },
+        )
+        .unwrap();
+        let history = super::super::sequential::PolicyHistory::new(
+            BTreeMap::new(),
+            "sha256:history",
+            &action_set,
+        )
+        .unwrap();
+        let config = super::super::sequential::SequentialPolicyConfig {
+            policy_version: "spectra-test-policy-v1".to_owned(),
+            model_set_version: "spectra-scenario-fixture-v1".to_owned(),
+            assessment_set_digest: "sha256:canonical-assessment-batch".to_owned(),
+            seed: 17,
+            decision_index: 0,
+            exploration_probability: 0.0,
+            minimum_representativeness: 0.1,
+            minimum_model_discrimination_information: Some(1.0),
+            audit_floor_by_stratum: BTreeMap::new(),
+            remaining_participant_time_seconds: Some(3.0),
+        };
+        let selected = super::super::sequential::select_next_action(
+            &action_set,
+            &batch.assessments,
+            &history,
+            &config,
+        )
+        .unwrap();
+        assert_eq!(selected.action.action_id, 7);
+        assert_eq!(selected.receipt.candidate_assessments, batch.assessments);
+        assert_eq!(
+            selected.receipt.assessment_set_digest,
+            "sha256:canonical-assessment-batch"
+        );
+        assert_eq!(
+            selected.receipt.selected_worst_case_target_utility,
+            1.0
+        );
+    }
+
+    #[test]
     fn batch_receipt_preserves_normalized_scenarios_and_canonical_outcomes() {
         let batch = aggregate_scenario_assessments(
             &make_action_set(),
