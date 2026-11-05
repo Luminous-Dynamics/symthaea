@@ -155,13 +155,15 @@ impl ReuseCandidateEvidence {
     }
 }
 
-/// Candidate-facing output for one complete REUSE round. A candidate receives
-/// only this single round decision, never individual pass/fail outcomes,
-/// p-values, empirical improvements or confidence certificates.
+/// Candidate-facing output for one complete REUSE round. This is the paper's
+/// y_t in {0, ..., K}: RejectAll represents zero, and PromoteCandidate uses
+/// a one-based candidate number in 1..=K. A proposer receives only this one
+/// round decision, never individual pass/fail outcomes, p-values, empirical
+/// improvements or confidence certificates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReuseRoundDecision {
     RejectAll,
-    PromoteCandidate { candidate_index: usize },
+    PromoteCandidate { candidate_number: usize },
 }
 
 /// Evaluate all K candidate summaries using the same round/promotion allocation.
@@ -212,12 +214,12 @@ pub fn evaluate_reuse_round(
                 candidate.empirical_improvement > best_improvement
             })
         {
-            best = Some((candidate_index, candidate.empirical_improvement));
+            best = Some((candidate_index + 1, candidate.empirical_improvement));
         }
     }
 
     match best {
-        Some((candidate_index, _)) => Ok(ReuseRoundDecision::PromoteCandidate { candidate_index }),
+        Some((candidate_number, _)) => Ok(ReuseRoundDecision::PromoteCandidate { candidate_number }),
         None => Ok(ReuseRoundDecision::RejectAll),
     }
 }
@@ -424,7 +426,7 @@ mod tests {
         ];
         assert_eq!(
             evaluate_reuse_round(0.05, 1, 0, 3, 0.5, &candidates).unwrap(),
-            ReuseRoundDecision::PromoteCandidate { candidate_index: 1 }
+            ReuseRoundDecision::PromoteCandidate { candidate_number: 2 }
         );
     }
 
@@ -457,7 +459,7 @@ mod tests {
         ];
         assert_eq!(
             evaluate_reuse_round(0.05, 1, 0, 2, 0.5, &candidates).unwrap(),
-            ReuseRoundDecision::PromoteCandidate { candidate_index: 0 }
+            ReuseRoundDecision::PromoteCandidate { candidate_number: 1 }
         );
     }
 
