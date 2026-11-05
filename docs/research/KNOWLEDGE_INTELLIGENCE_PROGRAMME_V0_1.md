@@ -330,3 +330,50 @@ A source-level follow-up on Mycelix current `main@9e12dd46bdd8371e8ed9626a17bc06
 These findings are tracked in [Mycelix #5824](https://github.com/Luminous-Dynamics/mycelix/issues/5824). The immediate implementation repair should preserve actual attestation authors and pass an explicitly declared claim domain. Source URI/evidence support requires a separate, versioned integration with the shared Mycelix evidence plane; do not invent source references.
 
 **Implication for Symthaea:** any consumed Mycelix confidence value must be treated as a legacy, pre-alpha ranking/social signal with these known construction defects. It is not a calibrated probability, source-quality assessment or truth verdict. Symthaea should receive the underlying evidence/lineage/status dimensions once available, not infer them from this scalar.
+
+
+## 13. South African factuality and cross-lingual hallucination qualification
+
+### 13.1 Multi-Hall-SA is a direct evaluation anchor
+
+[Multi-Hall-SA (Findings EACL 2026)](https://aclanthology.org/2026.findings-eacl.330/) is a particularly relevant local benchmark. It evaluates English alongside isiZulu, isiXhosa, Sepedi and Sesotho, with paired factual and hallucinated statements derived from parallel government service documents. Its error families are temporal shifts, entity errors, numerical inaccuracies and location mistakes.
+
+The paper evaluates Gemma 3 (12B), Aya-101 (11B), Llama 3.1 (8B) and T0++ (11B), under zero-shot and knowledge-augmented conditions. It reports up to 23.6% fewer hallucinations detected in South African languages than English; its knowledge-augmented setting reduces the cross-lingual gap by 59.4% on average.
+
+**Interpretation constraints:**
+- The study's knowledge augmentation uses up to five retrieved triples from cross-lingual knowledge bases. The paper describes this as an idealized retrieval setting / upper bound, not an equivalent to a deployed evidence service.
+- The paper's distribution table reports 3,500 statements per language condition, while the currently visible Hugging Face release card reports 11,373 rows across its released splits. Pin the exact dataset revision and inspect its actual manifests before reconciling counts or reproducing scores.
+- The dataset card declares CC BY 4.0. Verify attribution, exact revision and underlying government-source reuse conditions before use.
+- The benchmark establishes four target-language tracks only. It does not establish coverage for all South African official languages, dialects or speech varieties.
+
+References:
+- Paper: https://aclanthology.org/2026.findings-eacl.330/
+- UCT research archive: https://pubs.cs.uct.ac.za/id/eprint/1804/
+- Dataset card: https://huggingface.co/datasets/sello-ralethe/Multi-Hall-SA
+
+### 13.2 The experiment Symthaea/Mycelix should run
+
+Compare zero-shot, language-native BM25, multilingual dense retrieval, hybrid retrieval, translate-to-English retrieval, conventional native-language RAG, source-witness/provenance-aware Symthaea retrieval, and Mycelix evidence-bundle + Symthaea reasoning. Keep context, evidence-token, tool-call, latency and compute budgets matched. The paper's idealized/oracle evidence condition should remain a separate upper bound.
+
+Measure absolute classification quality and cross-language disparity together:
+- accuracy, precision, recall, macro-F1 and supported AUROC/AUPRC;
+- missed-hallucination and false-hallucination rates;
+- English-to-target discrepancy and paired consistency;
+- Brier score, calibration and selective risk/coverage;
+- evidence retrieval recall, exact source-span support and citation validity;
+- results stratified by temporal/entity/numerical/location error type;
+- latency, memory, tokens, calls and cost.
+
+A gap reduction by itself is not sufficient: a system that performs poorly in every language is not an improvement. The primary target should be reducing the *worst target-language missed-hallucination gap* while preserving absolute macro-F1 and improving evidence support.
+
+### 13.3 Critical controls
+
+Use paired interventions that change one semantic fact at a time: date, entity, number or location. Include correct statements with unusual names/numbers to measure false positives; remove the only supporting passage to require abstention; use stale/conflicting government sources to test temporal scope; and use mirrors/common-upstream sources to test independence.
+
+Preserve the target-language, source-language, prompt-language and response-language independently. Do not let translate-to-English baselines silently receive more context or stronger evidence. Native speakers must verify language labels, orthographic variety and semantic equivalence; machine translation is not the sole gold-label authority.
+
+### 13.4 Tracked implementation
+
+This work is decomposed into [SA-FACT-001 / Symthaea #10531](https://github.com/Luminous-Dynamics/symthaea/issues/10531). It composes the existing knowledge-benchmark harness and Mycelix evidence/provenance contracts; it must not create a second benchmark runner or evidence envelope.
+
+The proposed qualification goal is at least a 25% reduction in the worst target-language missed-hallucination gap against a matched zero-retrieval baseline, while keeping English and target-language absolute macro-F1 within 1 percentage point or better. This is a provisional target to be recalibrated after a pilot and preregistered before held-out evaluation—not a result or a guaranteed SOTA claim.
