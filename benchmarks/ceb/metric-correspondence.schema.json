@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ceb/metric-correspondence-v0.schema.json",
+  "title": "CEB Target-to-Comparator Metric Correspondence V0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "crosswalk_id",
+    "status",
+    "snapshot_date",
+    "policy",
+    "metric_mappings"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 0
+    },
+    "crosswalk_id": {
+      "const": "CEB-METRIC-CORRESPONDENCE-V0"
+    },
+    "status": {
+      "const": "design_only_no_matched_comparisons"
+    },
+    "snapshot_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "purpose",
+        "classes",
+        "claim_rule",
+        "denominator_rule",
+        "empty_mapping_rule"
+      ],
+      "properties": {
+        "purpose": {
+          "type": "string",
+          "minLength": 30
+        },
+        "classes": {
+          "type": "string",
+          "minLength": 50
+        },
+        "claim_rule": {
+          "type": "string",
+          "minLength": 50
+        },
+        "denominator_rule": {
+          "type": "string",
+          "minLength": 30
+        },
+        "empty_mapping_rule": {
+          "type": "string",
+          "minLength": 30
+        }
+      }
+    },
+    "metric_mappings": {
+      "type": "array",
+      "minItems": 45,
+      "maxItems": 45,
+      "items": {
+        "$ref": "#/$defs/mapping"
+      }
+    }
+  },
+  "$defs": {
+    "mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lane_id",
+        "ceb_metric_id",
+        "ceb_metric_definition",
+        "target_statement",
+        "target_intent",
+        "correspondence_class",
+        "comparison_use",
+        "external_observation_ids",
+        "rationale",
+        "blockers",
+        "normalization_requirements",
+        "metric_semantics_eligible_for_matched_test",
+        "direct_superiority_claim_allowed"
+      ],
+      "properties": {
+        "lane_id": {
+          "type": "string",
+          "pattern": "^CEB-[A-Z]+$"
+        },
+        "ceb_metric_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "ceb_metric_definition": {
+          "type": "string",
+          "minLength": 10
+        },
+        "target_statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_intent": {
+          "enum": [
+            "matched_comparison_goal",
+            "efficiency_goal",
+            "hard_gate",
+            "sealed_holdout_goal",
+            "quality_goal",
+            "measurement_quality_goal",
+            "complementarity_goal",
+            "pilot_and_holdout_goal",
+            "pilot_guardrail",
+            "coverage_goal"
+          ]
+        },
+        "correspondence_class": {
+          "enum": [
+            "exact_semantics",
+            "close_semantics",
+            "related_but_distinct",
+            "not_comparable"
+          ]
+        },
+        "comparison_use": {
+          "enum": [
+            "replication_candidate",
+            "context_only",
+            "methodology_only",
+            "not_comparable"
+          ]
+        },
+        "external_observation_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          }
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 20
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 5
+          }
+        },
+        "normalization_requirements": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 5
+          }
+        },
+        "metric_semantics_eligible_for_matched_test": {
+          "type": "boolean"
+        },
+        "direct_superiority_claim_allowed": {
+          "const": false
+        }
+      }
+    }
+  }
+}
