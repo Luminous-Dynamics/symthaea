@@ -1,0 +1,43 @@
+{
+  "schema_version": "multi-hall-sa-plan-v0",
+  "plan_id": "multi-hall-sa-synthetic-control-v0",
+  "phase": "synthetic_control",
+  "synthetic_only": true,
+  "candidate_system_id": "symthaea-synthetic",
+  "dataset": {
+    "dataset_id": "Multi-Hall-SA",
+    "revision": "synthetic-only",
+    "license": "synthetic",
+    "split": "synthetic",
+    "pair_manifest_sha256": "99c141e0b4c0297b49d2da92e06851f1c42ee7724d221e6078c61901e7b7c70c",
+    "source_family_disjoint": true,
+    "rights_review_status": "not_applicable_synthetic",
+    "held_out_access": "not_applicable_synthetic",
+    "source_cluster_semantics_reviewed": false
+  },
+  "systems": [
+    {
+      "system_id": "zero-shot-baseline",
+      "baseline_family": "synthetic-baseline",
+      "model_id": "synthetic-baseline",
+      "model_revision": "synthetic-fixture-v0",
+      "retrieval_profile_id": null,
+      "prompt_sha256": null
+    },
+    {
+      "system_id": "symthaea-synthetic",
+      "baseline_family": "synthetic-candidate",
+      "model_id": "symthaea-synthetic",
+      "model_revision": "synthetic-fixture-v0",
+      "retrieval_profile_id": "synthetic-evidence-v0",
+      "prompt_sha256": null
+    }
+  ],
+  "bootstrap": {
+    "replicates": 1000,
+    "seed": 20261105,
+    "minimum_independent_clusters": 30,
+    "confidence_level": 0.95,
+    "multiple_comparison_correction": "bonferroni"
+  }
+}
