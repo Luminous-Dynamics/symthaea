@@ -2,6 +2,7 @@ name: Connectome query-critical discovery contract
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - "docs/neuroscience/CONNECTOME_QUERY_CRITICAL_DISCOVERY_V1.md"
       - "docs/neuroscience/CONNECTOME_QUERY_CRITICAL_DISCOVERY.schema.json"
