@@ -616,13 +616,39 @@ The RSI landscape now has several strong comparators, but each measures a differ
 | Comparator | Published result (authors' report) | What it identifies | Symthaea challenge target |
 |---|---|---|---|
 | RSIGym (arXiv:2610.10310) | RSI-Index 0.4809 for Opus 5 in independent Joint runs; $500 platform-service budget per benchmark run; five task domains | End-to-end Data / Harness / Joint improvement under shared services and budget | Reproduce on the same base model, task set, budget and controller; then target RSI-Index > 0.4809 with positive audited gains on every benchmark and G1–G4 transfer reported separately |
-| AI4AI-Bench (arXiv:2608.20318) | Best system 0.250, mean 0.166 across 10 frozen algorithm families; algorithm-changing submissions averaged 0.226 vs 0.126 for submissions that did not change the learning algorithm | Whether an agent changes the training algorithm itself, not merely data or harness | First reproduce the 0.250 best score and the algorithm-change vs non-algorithm-change gap; then target a mean > 0.250 across the same 10 tasks under the same compute/training limits, with task-level wins and regressions disclosed |
+| AI4AI-Bench (arXiv:2608.20318; independent audit reviewed 2026-11-03) | Paper reports best system 0.250 and mean 0.166; an independent full audit flags the benchmark as flawed: score-changing defects in 4/10 tasks and best-of-three checkpoint selection on the final test metric across all tasks | Whether an agent changes the training algorithm itself, not merely data or harness—but the published aggregate is not a clean score target | Treat 0.250 as a historical comparator only. First reproduce the published protocol, then publish an audit-clean corrected subset/version with frozen checkpoint selection, no exposed final seeds, reachable score anchors and independent multi-seed final evaluation. Compare algorithm changes only on that corrected protocol; do not claim superiority over 0.250 on the flawed aggregate |
 | AIRA₂ / MLE-bench-30 (Meta publication, 2026-04-16) | Mean percentile rank 81.5% at 24h and 83.1% at 72h; strongest reported baseline 72.7%; exceeds human SOTA on 6/20 AIRS-Bench tasks | Research-agent throughput, evaluation noise control and multi-agent/interactive experimentation | Under the same benchmark subset, backbone, 24h/72h budgets and scoring protocol, target >83.1% at 72h and >6/20 AIRS-Bench tasks above the named human reference; report compute and worker parallelism separately |
 | SelfImprove-Bench (arXiv:2611.02797) | G0–G4 generalization ladder; authors report inconsistent gains across levels | Whether improvements transfer beyond seen scenarios and difficulty | Positive independently audited improvement at G1–G4; no G0-only success counts as generalization. Report the complete per-domain transfer vector, not only endpoint score |
 | REUSE (arXiv:2609.33180) | Simultaneous error control across adaptive promotion histories; authors report 0 false promotions in their Covertype experiments, versus up to 20.7% false promotions in comparators | Whether the improvement procedure can reuse a finite audit set without adaptive false promotion, given independence and decision-only feedback | Match the theorem's assumptions and implement the full service/certificate; demonstrate empirical family-wise error control across null adaptive histories and report Monte Carlo confidence bounds, power and cost—not just observed zero |
 | RSI process audit (arXiv:2610.27610) | In 90 RSI-labelled studies, only 22% audit ≥2 full-loop reruns; only 4/26 improver-gain claims use the same-start, matched-budget swap test | Whether a better final product is evidence of a repeatable or improved improver | At least 3 independent full-loop replications for exploratory screening; preregister confirmatory run count by power/precision analysis; require the same-start old-vs-new improver swap test for R4 |
 
 These are *challenge targets*, not claims that the current Symthaea branch has achieved them. The published results are paper-reported and protocol-specific. A target becomes a valid comparison only after reproducing the same benchmark revisions, task splits, model identities, budgets, evaluator and scoring procedures.
+
+### Benchmark integrity gate (must pass before SOTA claims)
+
+Every benchmark used for an RSI claim must pass these checks before its score enters the challenge table:
+
+1. **Split/seed separation:** final task IDs, inputs, seeds, solutions and generator state are inaccessible to the proposer, all editable harnesses and all development tools. Verify with a source audit and canary tests, not a statement in the task README.
+2. **Evaluator independence:** the candidate cannot train directly against the scoring model or edit the final grader. Report construct validity, proxy-to-target alignment, reward-hacking tests and evaluator version.
+3. **Score-domain validity:** every baseline and optimum must be reachable under the actual metric; score clipping, unit conversion, directionality and aggregation must be independently recomputed from raw outputs.
+4. **Selection separation:** choose checkpoints only on development/selection data. The final audit evaluates exactly one frozen, predeclared checkpoint per run. Never report the best of multiple checkpoints selected on the final test metric.
+5. **Noise and replication:** use multiple independent seeds and full-loop runs; disclose between-run variance and task-family clusters. A task whose baseline noise is comparable to the claimed gain cannot support a superiority claim without more replication.
+6. **Artifact/trace reproducibility:** publish source patches, executable identities, raw score rows, all checkpoint dispositions, budgets, retries and analysis code, subject to safe handling of genuinely sensitive data.
+7. **Independent red-team audit:** have a reviewer who did not author the benchmark or the candidate verify the first six checks and replay a sample of raw tasks.
+
+The AI4AI-Bench audit illustrates why this gate matters. The independent review of arXiv:2608.20318 v1 and its 290 published case pages labels the benchmark **Flawed**: it reports score-changing defects in 4 of 10 tasks (RAGEN held-out seed exposure/training overlap; DDPO scorer-optimisation/construct-validity issues; an unreachable NPO optimum; and a BTRM baseline inside seed noise), and identifies best-of-three checkpoint selection on the final metric across all tasks. Its reported 0.250/0.166 aggregates are therefore useful historical references, not clean SOTA targets. Correct the benchmark first and rerun; do not silently adjust the published score.
+
+### Revised R5 benchmark objective
+
+Do not ask merely "can Symthaea beat AI4AI-Bench's 0.250?". Ask:
+
+- Does the system actually change the learning/update algorithm (not just data, prompt, hyperparameters or harness)?
+- Does the change improve a clean-start training run under the same compute and training-data budget?
+- Does the gain survive at least two held-out algorithm families and the G0–G4 transfer protocol?
+- Does the learning rule's gain persist when the produced model is evaluated with a frozen external evaluator and a fresh final checkpoint?
+- Does the gain reproduce over independent training seeds and improve the compute-capability exchange rate rather than only one endpoint score?
+
+Primary R5 measure: independently confirmed improvement in produced-model capability per matched all-in training budget. Keep training algorithm changes, data changes and harness changes in separate factorial arms.
 
 ### Primary productivity metric
 
