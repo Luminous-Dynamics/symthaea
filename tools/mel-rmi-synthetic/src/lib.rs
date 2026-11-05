@@ -624,8 +624,7 @@ pub fn calculate_contrast(
         == rule.apply(interventions.control.current_partner_feature.value)?
         && actions[1].feature.value
             == rule.apply(interventions.targeted.current_partner_feature.value)?;
-    let qualified_synthetic_contingency =
-        input_sensitive && target_specific && oracle_rule_match;
+    let qualified_synthetic_contingency = input_sensitive && target_specific && oracle_rule_match;
 
     Ok(CausalContrast {
         targeted_delta,
@@ -748,8 +747,9 @@ pub fn measure_partner_influence(
         task.target_dimension,
         task.expected_response,
     )?;
-    let targeted_delta =
-        task.expected_response.distance(control_next.value, treated_next.value)?;
+    let targeted_delta = task
+        .expected_response
+        .distance(control_next.value, treated_next.value)?;
     Ok(PartnerInfluence {
         control_next,
         treated_next,
@@ -1094,7 +1094,10 @@ mod tests {
         .unwrap();
         assert_eq!(record.manifest.schema_version, RMI_SCHEMA_VERSION);
         assert_eq!(record.manifest.code_revision, CODE_REVISION);
-        assert_eq!(record.manifest.output_event_ids[1], record.actions[1].event_id);
+        assert_eq!(
+            record.manifest.output_event_ids[1],
+            record.actions[1].event_id
+        );
         let mut invalid = record.manifest;
         invalid.code_revision = "main".to_owned();
         assert_eq!(invalid.validate(), Err(HarnessError::InvalidManifest));
