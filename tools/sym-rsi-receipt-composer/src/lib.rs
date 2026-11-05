@@ -175,6 +175,10 @@ pub struct MetricProjection {
     pub metric_id: String,
     pub benchmark_id: String,
     pub benchmark_version: String,
+    pub benchmark_revision: String,
+    pub dataset_manifest_sha256: String,
+    pub scoring_formula_id: String,
+    pub grader_version: String,
     pub transform: ScoreTransform,
     /// Minimum fraction of eligible tasks that must have a grade before this metric can
     /// enter a candidate capability vector. Missing rows are never removed to satisfy it.
@@ -186,6 +190,10 @@ impl MetricProjection {
         validate_identifier(&self.metric_id, "metric_id")?;
         validate_identifier(&self.benchmark_id, "benchmark_id")?;
         validate_identifier(&self.benchmark_version, "benchmark_version")?;
+        validate_identifier(&self.benchmark_revision, "benchmark_revision")?;
+        validate_sha256(&self.dataset_manifest_sha256, "dataset_manifest_sha256")?;
+        validate_identifier(&self.scoring_formula_id, "scoring_formula_id")?;
+        validate_identifier(&self.grader_version, "grader_version")?;
         self.transform.validate()?;
         if !self.minimum_graded_coverage.is_finite()
             || !(0.0..=1.0).contains(&self.minimum_graded_coverage)
@@ -219,6 +227,7 @@ impl CompositionPlan {
             ));
         }
         let mut dimension_ids = BTreeSet::new();
+        let mut metric_source_ids = BTreeSet::new();
         for (metric_id, projection) in &self.metrics {
             if metric_id != &projection.metric_id {
                 return Err(ComposerError::InvalidPlan(
@@ -226,6 +235,20 @@ impl CompositionPlan {
                 ));
             }
             projection.validate()?;
+            let source_identity = (
+                projection.benchmark_id.clone(),
+                projection.benchmark_version.clone(),
+                projection.benchmark_revision.clone(),
+                projection.dataset_manifest_sha256.clone(),
+                projection.scoring_formula_id.clone(),
+                projection.grader_version.clone(),
+            );
+            if !metric_source_ids.insert(source_identity) {
+                return Err(ComposerError::InvalidPlan(
+                    "one frozen benchmark/scoring/grader source cannot be reused as multiple metrics"
+                        .into(),
+                ));
+            }
             for dimension_id in [
                 metric_id.clone(),
                 format!("{metric_id}.graded_coverage"),
@@ -706,8 +729,18 @@ fn parse_run(bytes: &[u8], projection: &MetricProjection) -> Result<ParsedRun, C
     let benchmark = required_object(value, "benchmark", "receipt")?;
     let benchmark_id = required_string(benchmark, "id", "benchmark")?;
     let benchmark_version = required_string(benchmark, "version", "benchmark")?;
+    let benchmark_revision = required_string(benchmark, "revision", "benchmark")?;
+    let dataset_manifest_sha256 =
+        required_string(benchmark, "dataset_manifest_sha256", "benchmark")?;
+    let scoring_formula_id =
+        required_string(benchmark, "scoring_formula_id", "benchmark")?;
+    let grader_version = required_string(benchmark, "grader_version", "benchmark")?;
     if benchmark_id != projection.benchmark_id
         || benchmark_version != projection.benchmark_version
+        || benchmark_revision != projection.benchmark_revision
+        || dataset_manifest_sha256 != projection.dataset_manifest_sha256
+        || scoring_formula_id != projection.scoring_formula_id
+        || grader_version != projection.grader_version
     {
         return Err(ComposerError::MetricSourceMismatch(
             projection.metric_id.clone(),
@@ -1142,6 +1175,10 @@ mod tests {
             metric_id: metric_id.into(),
             benchmark_id: benchmark_id.into(),
             benchmark_version: "0.1".into(),
+            benchmark_revision: "fixture-1".into(),
+            dataset_manifest_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+            scoring_formula_id: "binary-pass-rate-v1".into(),
+            grader_version: "fixture-grader-1".into(),
             transform: ScoreTransform::Binary {
                 true_score: 1.0,
                 false_score: 0.0,
