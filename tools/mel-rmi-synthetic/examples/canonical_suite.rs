@@ -3,11 +3,10 @@ use mel_rmi_synthetic::{
     ArtifactPayloadV1, ArtifactSetEvidenceV1, Dimension, Feature, FixedResponsePolicy,
     HarnessError, ImitationOnlyPolicy, NegotiatedResponseContractV1, NegotiationChoiceV1,
     Observation, OneWayPromptPolicy, PartnerAuthorityEventV1, PartnerAuthorityV1,
-    ReciprocalTrialRecordV1, ResponsivePartnerPolicy, RuleBasedPolicy, TaskSpec,
-    TrialRecordV1, TrialRunConfig, UnrelatedFeatureShortcutPolicy, assess_negotiation,
-    assess_scoped_negotiation, bind_verified_artifacts, canonical_fixture_replicates_v1,
-    run_policy_suite_v1, run_reciprocal_suite_v1, validate_partner_authority_event,
-    verify_trial_artifact_bindings,
+    ReciprocalTrialRecordV1, ResponsivePartnerPolicy, RuleBasedPolicy, TaskSpec, TrialRecordV1,
+    TrialRunConfig, UnrelatedFeatureShortcutPolicy, assess_negotiation, assess_scoped_negotiation,
+    bind_verified_artifacts, canonical_fixture_replicates_v1, run_policy_suite_v1,
+    run_reciprocal_suite_v1, validate_partner_authority_event, verify_trial_artifact_bindings,
 };
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -446,7 +445,10 @@ fn run_negotiation_conformance() -> Result<(usize, usize), Box<dyn Error>> {
         selected_value: None,
         vetoed_values: Default::default(),
     };
-    let wide_options: Vec<i32> = wide_contract.valid_values(wide_input)?.into_iter().collect();
+    let wide_options: Vec<i32> = wide_contract
+        .valid_values(wide_input)?
+        .into_iter()
+        .collect();
     let clarification = assess_negotiation(
         &wide_contract,
         wide_input,
@@ -492,65 +494,6 @@ fn run_negotiation_conformance() -> Result<(usize, usize), Box<dyn Error>> {
         rejected += 1;
     }
 
-    let wide_contract = NegotiatedResponseContractV1 {
-        target_dimension: Dimension::Motif,
-        modulus: 12,
-        accepted_offsets: (1..=10).collect(),
-        max_branch_count: 3,
-    };
-    let wide_input = Feature {
-        dimension: Dimension::Motif,
-        value: 0,
-    };
-    let wide_authority = PartnerAuthorityV1 {
-        selected_value: None,
-        vetoed_values: Default::default(),
-    };
-    let wide_options: Vec<i32> = wide_contract.valid_values(wide_input)?.into_iter().collect();
-    let clarification = assess_negotiation(
-        &wide_contract,
-        wide_input,
-        &wide_authority,
-        &NegotiationChoiceV1::AskClarification,
-    )?;
-    let excessive_branch = assess_negotiation(
-        &wide_contract,
-        wide_input,
-        &wide_authority,
-        &NegotiationChoiceV1::Branch(wide_options),
-    )?;
-    println!(
-        "negotiation,branch_explosion_clarify,{},{},{},{},{},{},{},{}",
-        clarification.available_option_count,
-        clarification.proposed_option_count,
-        clarification.contract_valid,
-        clarification.veto_respected,
-        clarification.preference_respected,
-        clarification.ambiguity_preserved,
-        clarification.action_well_formed,
-        clarification.qualified,
-    );
-    println!(
-        "negotiation,branch_explosion_rejected,{},{},{},{},{},{},{},{}",
-        excessive_branch.available_option_count,
-        excessive_branch.proposed_option_count,
-        excessive_branch.contract_valid,
-        excessive_branch.veto_respected,
-        excessive_branch.preference_respected,
-        excessive_branch.ambiguity_preserved,
-        excessive_branch.action_well_formed,
-        excessive_branch.qualified,
-    );
-    if clarification.qualified {
-        qualified += 1;
-    } else {
-        rejected += 1;
-    }
-    if excessive_branch.qualified {
-        qualified += 1;
-    } else {
-        rejected += 1;
-    }
     println!("negotiation_qualified,{qualified}");
     println!("negotiation_rejected,{rejected}");
     Ok((qualified, rejected))
@@ -614,50 +557,86 @@ fn run_authority_scope_conformance() -> Result<(usize, usize), Box<dyn Error>> {
 
     event.source_event_id = "different-observation".to_owned();
     let wrong_source = validate_partner_authority_event(
-        &event, &observation, 7, "runner-clock-authority-session", 150,
+        &event,
+        &observation,
+        7,
+        "runner-clock-authority-session",
+        150,
     );
     let passed = wrong_source.is_err();
     println!("authority_scope,cross_event_rejected,{passed}");
-    if passed { rejected += 1; } else { qualified += 1; }
+    if passed {
+        rejected += 1;
+    } else {
+        qualified += 1;
+    }
 
     event.source_event_id = observation.event_id.clone();
     event.control_sequence = 6;
     let stale_sequence = validate_partner_authority_event(
-        &event, &observation, 7, "runner-clock-authority-session", 150,
+        &event,
+        &observation,
+        7,
+        "runner-clock-authority-session",
+        150,
     );
     let passed = stale_sequence.is_err();
     println!("authority_scope,stale_sequence_rejected,{passed}");
-    if passed { rejected += 1; } else { qualified += 1; }
+    if passed {
+        rejected += 1;
+    } else {
+        qualified += 1;
+    }
 
     event.control_sequence = 7;
     let wrong_clock = validate_partner_authority_event(
-        &event, &observation, 7, "different-clock-origin", 150,
+        validate_partner_authority_event(&event, &observation, 7, "different-clock-origin", 150);
     );
     let passed = wrong_clock.is_err();
     println!("authority_scope,clock_origin_rejected,{passed}");
-    if passed { rejected += 1; } else { qualified += 1; }
+    if passed {
+        rejected += 1;
+    } else {
+        qualified += 1;
+    }
 
     let not_effective = validate_partner_authority_event(
         &event, &observation, 7, "runner-clock-authority-session", 99,
     );
     let passed = not_effective.is_err();
     println!("authority_scope,not_yet_effective_rejected,{passed}");
-    if passed { rejected += 1; } else { qualified += 1; }
+    if passed {
+        rejected += 1;
+    } else {
+        qualified += 1;
+    }
 
     let expired = validate_partner_authority_event(
         &event, &observation, 7, "runner-clock-authority-session", 200,
     );
     let passed = expired.is_err();
     println!("authority_scope,expired_rejected,{passed}");
-    if passed { rejected += 1; } else { qualified += 1; }
+    if passed {
+        rejected += 1;
+    } else {
+        qualified += 1;
+    }
 
     event.authority_receipt_ref.clear();
     let missing_receipt = validate_partner_authority_event(
-        &event, &observation, 7, "runner-clock-authority-session", 150,
+        &event,
+        &observation,
+        7,
+        "runner-clock-authority-session",
+        150,
     );
     let passed = missing_receipt.is_err();
     println!("authority_scope,missing_receipt_rejected,{passed}");
-    if passed { rejected += 1; } else { qualified += 1; }
+    if passed {
+        rejected += 1;
+    } else {
+        qualified += 1;
+    }
 
     println!("authority_scope_qualified,{qualified}");
     println!("authority_scope_rejected,{rejected}");
@@ -774,8 +753,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if negotiation_qualified != 6 || negotiation_rejected != 5 {
         return Err("negotiation conformance count mismatch".into());
     }
-    let (authority_scope_qualified, authority_scope_rejected) =
-        run_authority_scope_conformance()?;
+    let (authority_scope_qualified, authority_scope_rejected) = run_authority_scope_conformance()?;
     if authority_scope_qualified != 1 || authority_scope_rejected != 6 {
         return Err("authority scope conformance count mismatch".into());
     }
