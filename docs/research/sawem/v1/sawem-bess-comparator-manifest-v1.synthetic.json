@@ -255,13 +255,7 @@
         {
           "capability": "sa_wem_code_semantics",
           "status": "not_evaluated",
-          "source": {
-            "publisher": null,
-            "url": null,
-            "source_class": "official_documentation",
-            "retrieved_at": "2026-11-05T00:00:00Z",
-            "raw_artifact_sha256": null
-          }
+          "source": null
         }
       ]
     },
