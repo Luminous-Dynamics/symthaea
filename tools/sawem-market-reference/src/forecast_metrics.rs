@@ -395,16 +395,16 @@ mod tests {
     #[test]
     fn exact_empirical_coverage_and_calibration_error_are_count_based() {
         let observations = [
-            observation("obs-low", 100, 200, 300, 50),
-            observation("obs-middle", 100, 200, 300, 200),
-            observation("obs-high", 100, 200, 300, 350),
-            observation("obs-upper", 100, 200, 300, 250),
-            observation("obs-lower", 100, 200, 300, 150),
-            observation("obs-center", 100, 200, 300, 200),
-            observation("obs-upper-2", 100, 200, 300, 250),
-            observation("obs-center-2", 100, 200, 300, 200),
-            observation("obs-high-2", 100, 200, 300, 350),
-            observation("obs-low-2", 100, 200, 300, 50),
+            ForecastCalibrationObservation { valid_period_start_utc: 100, valid_period_end_utc: 110, ..observation("obs-low", 100, 200, 300, 50) },
+            ForecastCalibrationObservation { valid_period_start_utc: 110, valid_period_end_utc: 120, ..observation("obs-middle", 100, 200, 300, 200) },
+            ForecastCalibrationObservation { valid_period_start_utc: 120, valid_period_end_utc: 130, ..observation("obs-high", 100, 200, 300, 350) },
+            ForecastCalibrationObservation { valid_period_start_utc: 130, valid_period_end_utc: 140, ..observation("obs-upper", 100, 200, 300, 250) },
+            ForecastCalibrationObservation { valid_period_start_utc: 140, valid_period_end_utc: 150, ..observation("obs-lower", 100, 200, 300, 150) },
+            ForecastCalibrationObservation { valid_period_start_utc: 150, valid_period_end_utc: 160, ..observation("obs-center", 100, 200, 300, 200) },
+            ForecastCalibrationObservation { valid_period_start_utc: 160, valid_period_end_utc: 170, ..observation("obs-upper-2", 100, 200, 300, 250) },
+            ForecastCalibrationObservation { valid_period_start_utc: 170, valid_period_end_utc: 180, ..observation("obs-center-2", 100, 200, 300, 200) },
+            ForecastCalibrationObservation { valid_period_start_utc: 180, valid_period_end_utc: 190, ..observation("obs-high-2", 100, 200, 300, 350) },
+            ForecastCalibrationObservation { valid_period_start_utc: 190, valid_period_end_utc: 200, ..observation("obs-low-2", 100, 200, 300, 50) },
         ];
         let result = evaluate_forecast_calibration(220, &observations).unwrap();
         assert_eq!(result.sample_count, 10);
