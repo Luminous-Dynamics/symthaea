@@ -33,7 +33,9 @@ jobs:
           toolchain: 1.96.0
           components: clippy
       - name: Resolve isolated receipt harness lock
-        run: cargo generate-lockfile --manifest-path tools/rea-receipt-harness/Cargo.toml
+        run: |
+          cargo generate-lockfile --manifest-path tools/rea-receipt-harness/Cargo.toml
+          echo "460f7e0b6f1091eaba14e9008a2b45402ca300f2abf505d323e6a77224c0bd8e  tools/rea-receipt-harness/Cargo.lock" | sha256sum --check -
       - name: Record schema and dependency provenance
         run: |
           {
