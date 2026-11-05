@@ -313,9 +313,7 @@ fn validate(input: &Input) -> Result<Validated, String> {
     if canonical_action_set_sha256(&input.actions) != input.action_set_sha256 {
         return Err("action-set digest mismatch".into());
     }
-    if canonical_joint_support_set_sha256(&input.joint_supports)
-        != input.joint_support_set_sha256
-    {
+    if canonical_joint_support_set_sha256(&input.joint_supports) != input.joint_support_set_sha256 {
         return Err("joint-support-set digest mismatch".into());
     }
 
@@ -350,7 +348,10 @@ fn validate(input: &Input) -> Result<Validated, String> {
                 | "orthogonal_measurement"
                 | "other"
         ) {
-            return Err(format!("action {} has invalid action_kind", action.action_id));
+            return Err(format!(
+                "action {} has invalid action_kind",
+                action.action_id
+            ));
         }
         if !valid_hex(&action.source_evidence_sha256, 64) {
             return Err(format!(
@@ -496,10 +497,7 @@ fn decision_conflict_pairs(scenarios: &[Scenario]) -> Vec<WorldPair> {
     pairs
 }
 
-fn find_support<'a>(
-    supports: &'a [NormalizedSupport],
-    scenario_id: &str,
-) -> &'a NormalizedSupport {
+fn find_support<'a>(supports: &'a [NormalizedSupport], scenario_id: &str) -> &'a NormalizedSupport {
     supports
         .binary_search_by(|support| support.scenario_id.as_str().cmp(scenario_id))
         .map(|index| &supports[index])
@@ -789,17 +787,17 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
     let marginal_separable = pairs
         .iter()
         .filter(|pair| {
-            marginal.iter().any(|row| {
-                row.separated_conflict_pairs.contains(pair)
-            })
+            marginal
+                .iter()
+                .any(|row| row.separated_conflict_pairs.contains(pair))
         })
         .count();
     let marginally_undiscriminable_pairs = pairs
         .iter()
         .filter(|pair| {
-            !marginal.iter().any(|row| {
-                row.separated_conflict_pairs.contains(pair)
-            })
+            !marginal
+                .iter()
+                .any(|row| row.separated_conflict_pairs.contains(pair))
         })
         .cloned()
         .collect::<Vec<_>>();
@@ -810,8 +808,9 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         &validated.supports,
         input.max_total_effort_units,
     )?;
-    let minimum_joint_plan_within_budget =
-        plan.min_cost.map(|cost| cost <= input.max_total_effort_units);
+    let minimum_joint_plan_within_budget = plan
+        .min_cost
+        .map(|cost| cost <= input.max_total_effort_units);
 
     Ok(Report {
         schema_version: 1,
@@ -929,10 +928,7 @@ mod tests {
         assert_eq!(report.decision_conflict_pair_count, 1);
         assert_eq!(report.marginally_separable_pair_count, 0);
         assert_eq!(report.marginally_undiscriminable_pairs.len(), 1);
-        assert_eq!(
-            report.minimum_joint_disambiguation_effort_units,
-            Some(5)
-        );
+        assert_eq!(report.minimum_joint_disambiguation_effort_units, Some(5));
         assert_eq!(report.minimum_joint_plan_count, 1);
         assert_eq!(
             report.minimum_joint_plans[0].action_ids,
@@ -975,8 +971,7 @@ mod tests {
                 },
             ],
         });
-        input.joint_support_set_sha256 =
-            canonical_joint_support_set_sha256(&input.joint_supports);
+        input.joint_support_set_sha256 = canonical_joint_support_set_sha256(&input.joint_supports);
         let bytes = serde_json::to_vec(&input).unwrap();
         let report = evaluate(&input, &bytes).unwrap();
         assert_eq!(
@@ -1017,7 +1012,10 @@ mod tests {
         let bytes = serde_json::to_vec(&input).unwrap();
         let report = evaluate(&input, &bytes).unwrap();
         assert_eq!(report.minimum_joint_disambiguation_effort_units, Some(7));
-        assert_eq!(report.status, "MINIMUM_COST_JOINT_ROBUST_PLAN_EXCEEDS_BUDGET");
+        assert_eq!(
+            report.status,
+            "MINIMUM_COST_JOINT_ROBUST_PLAN_EXCEEDS_BUDGET"
+        );
         assert_eq!(
             report.minimum_joint_plans[0].action_ids,
             vec!["inspect-x".to_string(), "orthogonal-z".to_string()]
@@ -1058,7 +1056,10 @@ mod tests {
         for mask in 0..(1_usize << baseline.actions.len()) {
             let before = pair_separated_for_mask(before_left, before_right, mask);
             let after = pair_separated_for_mask(after_left, after_right, mask);
-            assert!(!after || before, "support expansion gained separation for mask {mask:#b}");
+            assert!(
+                !after || before,
+                "support expansion gained separation for mask {mask:#b}"
+            );
         }
     }
 
@@ -1068,9 +1069,11 @@ mod tests {
         input.joint_supports[0].rows[0].outcomes.pop();
         input.joint_support_set_sha256 =
             canonical_joint_support_set_sha256(&input.joint_supports);
-        assert!(validate(&input)
-            .unwrap_err()
-            .contains("exactly one outcome for every declared action"));
+        assert!(
+            validate(&input)
+                .unwrap_err()
+                .contains("exactly one outcome for every declared action")
+        );
     }
 
     #[test]
@@ -1097,8 +1100,10 @@ mod tests {
     fn stale_joint_support_digest_fails_closed() {
         let mut input = fixture();
         input.joint_support_set_sha256 = "0".repeat(64);
-        assert!(validate(&input)
-            .unwrap_err()
-            .contains("joint-support-set digest mismatch"));
+        assert!(
+            validate(&input)
+                .unwrap_err()
+                .contains("joint-support-set digest mismatch")
+        );
     }
 }
