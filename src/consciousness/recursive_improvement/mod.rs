@@ -80,8 +80,8 @@ pub use paired_evaluation::{
     PairedEvaluationError,
 };
 pub use reuse_error_budget::{
-    allocate_reuse_error_budget, reuse_sign_test_decision, ReuseBudgetError,
-    ReuseDecision, ReuseErrorAllocation, MAX_REUSE_ROUND,
+    allocate_reuse_error_budget, evaluate_reuse_round, ReuseBudgetError,
+    ReuseCandidateEvidence, ReuseErrorAllocation, ReuseRoundDecision, MAX_REUSE_ROUND,
 };
 
 pub use core::{
