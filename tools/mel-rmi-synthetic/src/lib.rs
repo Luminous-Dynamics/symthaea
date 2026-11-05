@@ -27,6 +27,19 @@ pub enum Dimension {
     Texture,
 }
 
+impl Dimension {
+    /// Stable machine-readable dimension label.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Motif => "motif",
+            Self::Rhythm => "rhythm",
+            Self::Tempo => "tempo",
+            Self::Role => "role",
+            Self::Texture => "texture",
+        }
+    }
+}
+
 /// One discrete feature value with its declared musical dimension.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Feature {
@@ -641,6 +654,118 @@ pub fn run_trial(
         actions,
         contrast,
     })
+}
+
+/// One frozen, synthetic Track A fixture with an explicit paired intervention.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SyntheticFixtureV1 {
+    /// Frozen task definition.
+    pub task: TaskSpec,
+    /// Four paired intervention observations and assignment record.
+    pub interventions: InterventionSet,
+}
+
+/// Return the canonical five-dimension synthetic fixture suite.
+///
+/// These are deterministic evaluator fixtures, not licensed or human-authored
+/// musical examples and not representative samples of world music.
+pub fn canonical_fixture_suite_v1() -> Vec<SyntheticFixtureV1> {
+    let specs = [
+        ("motif-transform", Dimension::Motif, Dimension::Texture, 12, 7, 2, 5, 3, 8),
+        ("rhythm-response", Dimension::Rhythm, Dimension::Motif, 8, 3, 1, 4, 2, 5),
+        ("tempo-drift", Dimension::Tempo, Dimension::Role, 16, 5, 3, 9, 0, 2),
+        ("role-exchange", Dimension::Role, Dimension::Rhythm, 4, 2, 0, 1, 1, 2),
+        ("texture-change", Dimension::Texture, Dimension::Tempo, 8, 1, 2, 6, 4, 7),
+    ];
+    specs
+        .into_iter()
+        .enumerate()
+        .map(
+            |(index, (name, target_dimension, unrelated_dimension, modulus, offset, baseline, treated, unrelated_before, unrelated_after))| {
+                let task_id = format!("rmi-{name}-v1");
+                let task = TaskSpec {
+                    task_id: task_id.clone(),
+                    target_dimension,
+                    unrelated_dimension,
+                    expected_response: ResponseRule { modulus, offset },
+                };
+                let observation = |suffix: &str, target_value: i32, unrelated_value: i32| {
+                    Observation {
+                        event_id: format!("{task_id}-{suffix}"),
+                        session_id: format!("synthetic-session-{index}"),
+                        history_id: format!("synthetic-history-{index}"),
+                        task_id: task_id.clone(),
+                        seed: 10_000 + index as u64,
+                        initial_partner_feature: Feature {
+                            dimension: target_dimension,
+                            value: baseline,
+                        },
+                        current_partner_feature: Feature {
+                            dimension: target_dimension,
+                            value: target_value,
+                        },
+                        unrelated_feature: Feature {
+                            dimension: unrelated_dimension,
+                            value: unrelated_value,
+                        },
+                    }
+                };
+                let randomization_seed = 20_000 + index as u64;
+                SyntheticFixtureV1 {
+                    task,
+                    interventions: InterventionSet {
+                        control: observation("control", baseline, unrelated_before),
+                        targeted: observation("targeted", treated, unrelated_before),
+                        sham: observation("sham", baseline, unrelated_before),
+                        unrelated: observation("unrelated", baseline, unrelated_after),
+                        randomization_seed,
+                        condition_order: condition_order_for_seed(randomization_seed),
+                    },
+                }
+            },
+        )
+        .collect()
+}
+
+/// Run one policy across a frozen fixture collection in deterministic order.
+pub fn run_policy_suite_v1(
+    fixtures: &[SyntheticFixtureV1],
+    policy: &dyn AgentPolicy,
+    config: &TrialRunConfig,
+) -> Result<Vec<TrialRecordV1>, HarnessError> {
+    fixtures
+        .iter()
+        .map(|fixture| {
+            run_trial(
+                fixture.task.clone(),
+                fixture.interventions.clone(),
+                policy,
+                config.clone(),
+            )
+        })
+        .collect()
+}
+
+/// Run both causal directions across a frozen fixture collection.
+pub fn run_reciprocal_suite_v1(
+    fixtures: &[SyntheticFixtureV1],
+    agent_policy: &dyn AgentPolicy,
+    partner_policy: &dyn ControlledPartner,
+    config: &TrialRunConfig,
+) -> Result<Vec<ReciprocalTrialRecordV1>, HarnessError> {
+    fixtures
+        .iter()
+        .map(|fixture| {
+            run_reciprocal_trial(
+                fixture.task.clone(),
+                fixture.interventions.clone(),
+                agent_policy,
+                partner_policy,
+                fixture.interventions.control.initial_partner_feature,
+                config.clone(),
+            )
+        })
+        .collect()
 }
 
 /// Compute separately reported targeted, sham and unrelated contrasts.
@@ -1287,6 +1412,60 @@ mod tests {
                 reason: "audio_only_adapter_has_no_midi_clock".to_owned()
             }
         );
+    }
+
+    #[test]
+    fn canonical_fixture_suite_covers_all_five_declared_dimensions() {
+        let fixtures = canonical_fixture_suite_v1();
+        assert_eq!(fixtures.len(), 5);
+        let dimensions: BTreeSet<Dimension> =
+            fixtures.iter().map(|fixture| fixture.task.target_dimension).collect();
+        assert_eq!(
+            dimensions,
+            [
+                Dimension::Motif,
+                Dimension::Rhythm,
+                Dimension::Tempo,
+                Dimension::Role,
+                Dimension::Texture,
+            ]
+            .into_iter()
+            .collect()
+        );
+        let records = run_policy_suite_v1(
+            &fixtures,
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
+            &config(),
+        )
+        .unwrap();
+        assert_eq!(records.len(), 5);
+        assert!(records.iter().all(|record| record.contrast.qualified_synthetic_contingency));
+    }
+
+    #[test]
+    fn canonical_suite_keeps_negative_controls_below_positive_oracle() {
+        let fixtures = canonical_fixture_suite_v1();
+        let fixed = run_policy_suite_v1(
+            &fixtures,
+            &FixedResponsePolicy {
+                id: "fixed".to_owned(),
+                value: 0,
+            },
+            &config(),
+        )
+        .unwrap();
+        let imitation = run_policy_suite_v1(
+            &fixtures,
+            &ImitationOnlyPolicy {
+                id: "imitation".to_owned(),
+            },
+            &config(),
+        )
+        .unwrap();
+        assert!(fixed.iter().all(|record| !record.contrast.qualified_synthetic_contingency));
+        assert!(imitation.iter().all(|record| !record.contrast.qualified_synthetic_contingency));
     }
 
     #[test]
