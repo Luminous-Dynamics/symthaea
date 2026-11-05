@@ -22,9 +22,10 @@ jobs:
     env:
       CARGO_BUILD_JOBS: 2
     steps:
-      - name: Checkout exact triggering revision
+      - name: Checkout exact PR head or dispatched revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Set up pinned Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
@@ -35,8 +36,13 @@ jobs:
         run: cargo generate-lockfile --manifest-path tools/rea-apk-signing-block-harness/Cargo.toml
       - name: Record source and dependency provenance
         run: |
+          expected_source_commit="${{ github.event.pull_request.head.sha || github.sha }}"
+          checked_out_commit="$(git rev-parse HEAD)"
+          test "$checked_out_commit" = "$expected_source_commit"
           {
-            echo "source_commit=$GITHUB_SHA"
+            echo "tested_source_commit=$checked_out_commit"
+            echo "workflow_event_sha=$GITHUB_SHA"
+            echo "pull_request_head_sha=$expected_source_commit"
             rustc --version --verbose
             cargo --version
             sha256sum tools/rea-apk-signing-block-harness/Cargo.lock
