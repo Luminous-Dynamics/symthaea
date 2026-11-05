@@ -38,7 +38,8 @@ jobs:
 
       - name: Set up pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
-          # Rustfmt and Clippy are provided by the pinned toolchain action.
+        with:
+          components: rustfmt, clippy
       - name: Assert Rust toolchain
         run: |
           test "$(rustc --version | cut -d ' ' -f 2)" = "1.96.0"
