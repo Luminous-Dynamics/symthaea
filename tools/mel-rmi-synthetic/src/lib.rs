@@ -1635,7 +1635,9 @@ impl ControlledPartner for ResponsivePartnerPolicy {
     }
 
     fn fork_from_frozen_state(&self, _common_random_seed: u64) -> Box<dyn ControlledPartner> {
-        Box::new(Self { id: self.id.clone() })
+        Box::new(Self {
+            id: self.id.clone(),
+        })
     }
 
     fn respond(
@@ -3904,7 +3906,10 @@ mod tests {
             })
             .collect();
         assert_eq!(
-            observed.into_iter().map(|(_, _, event_id)| event_id).collect::<Vec<_>>(),
+            observed
+                .into_iter()
+                .map(|(_, _, event_id)| event_id)
+                .collect::<Vec<_>>(),
             expected
         );
     }
