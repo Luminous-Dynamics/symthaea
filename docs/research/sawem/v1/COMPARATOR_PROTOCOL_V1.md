@@ -109,6 +109,11 @@ Metrics:
 - warranty exclusions and replacement/augmentation liability;
 - FX, inflation, tax, fees and financing sensitivity;
 - risk-adjusted NPV and downside distribution.
+- realized-net / theoretical-gross retention, shown by cohort and forecast horizon;
+- evidence-attributed bridge coverage (% of gross-to-net difference backed by unique source references);
+- unexplained residual in currency and as a percentage of gross revenue; never force the residual to zero;
+- category-level forecast regret, availability loss, execution deviation, balancing, fees, degradation/warranty, financing/collateral and contract effects, with overlap adjudication;
+- attribution completeness and source duplication rate (target: 100% required-category coverage, 0 duplicated adjustment sources).
 
 A market-revenue forecast is not an executed offtake contract. A credit-cover estimate is not a collateral notice. An expected insurance/warranty recovery is not certain cash.
 
@@ -167,6 +172,7 @@ The machine-readable [comparator manifest schema](sawem-bess-comparator-manifest
 | Additional open planning reference | GridPath | Production-cost, planning and storage case where supported | Add only after version, licence and feature mapping are frozen |
 | Independent human reference | Two independent SA market/finance reviewers | Risk detection, eligibility, cash-flow assumptions and decision quality | Blind review with adjudication protocol |
 | Luminous composition | Four-system workflow | Evidence lineage, policy/contract/physical integration and decision certificate | No superiority claim before matched execution |
+| Revenue-realization calibration | Modo Energy GB model-vs-realized calibration | Compare only on same GB cohort, horizon and gross/net definitions; 82% central with 77%/87% low/high in Oct 2026 methodology | Calibration-practice comparator, not a SAWEM performance target |
 
 For commercial software, record exact version/build, solver, licence/feature entitlements, adapter, machine and runtime. For open-source tools, record exact commit, dependency lock, solver build and execution environment.
 
@@ -219,6 +225,7 @@ Start with a small, exact, hand-auditable corpus before scaling to thousands of 
 - **FORECAST-CALIBRATION-EXACT-001:** score one exact model build against later-known realized prices using exact median errors, quantile pinball loss, coverage and interval scores.
 - **DISPATCH-EXECUTION-FIDELITY-001:** compare signed scheduled export/import energy with meter records and booked balancing settlement lines over a complete horizon.
 - **BMS-SOC-CAPABILITY-ENVELOPE-001:** assess charge/discharge power against separate conservative SOC-dependent capability curves; reject extrapolation and synthetic operational claims.
+- **REVENUE-REALIZATION-BRIDGE-001:** reconcile theoretical gross revenue to realized net cash using source-bound adjustments by forecast regret, availability, execution, balancing, market fees, degradation/warranty, financing/collateral and contract/curtailment; withhold a complete residual when a required category is missing.
 
 For each case, freeze expected feasible/infeasible state, violated constraint IDs, settlement direction, exposure and evidence disposition. Independent reviewers adjudicate the golden expected outcome.
 
@@ -243,6 +250,9 @@ These are **research targets**, not measured current performance or industry-cer
 | System RTE model error | Reproduce published 2.2 percentage-point deviation | ≤ 1.0 pp |
 | Inverter efficiency error | Reproduce published 0.55 percentage-point deviation | ≤ 0.30 pp |
 | SOC capability extrapolation | 0 | 0; all decisions stay inside measured/certified coverage |
+| Revenue bridge required-category coverage | 100% of declared applicable categories or incomplete status | 100% on source-complete historical case |
+| Revenue adjustment source duplication | 0 | 0 |
+| Revenue bridge unexplained residual | Always report in currency and % gross | Explain ≥ 95% of absolute gross-to-net difference; residual remains visible
 | Independent receipt reproduction | 100% | 100% |
 | Source/authority coverage | 100% of material claims | 100%, with stale-source invalidation |
 | Reviewer time | Establish baseline | 50% reduction without reduced risk recall |
@@ -275,6 +285,6 @@ Never turn indeterminate, not_comparable or not_run into a numerical zero or a p
 
 ## 10. Current status
 
-The synthetic vendor roster remains **not executed**. Product capability claims are literature/documentation signals, not independent feature verification. Product versions, vendor access, solver builds and common adapters are not yet fully pinned. The benchmark corpus currently contains 40 cases: 29 kernel-tested and 11 `not_run`; the 116 mapped Rust test names have been source-checked. The public M5BAT field dataset is identified (RWTH DOI 10.18154/RWTH-2025-06555), but its ZIP has not yet been staged, so the field replay and all M5BAT performance targets remain `not_run`. The current SAWEM rule profile keeps effective status, participant admission and commercial trading unknown.
+The synthetic vendor roster remains **not executed**. Product capability claims are literature/documentation signals, not independent feature verification. Product versions, vendor access, solver builds and common adapters are not yet fully pinned. The benchmark corpus currently contains 41 cases: 30 kernel-tested and 11 `not_run`; mapped Rust test names are source-checked. The public M5BAT field dataset is identified (RWTH DOI 10.18154/RWTH-2025-06555), but its ZIP has not yet been staged, so the field replay and all M5BAT performance targets remain `not_run`. The Modo revenue-realization comparison is methodology-only; no same-cohort backtest has been executed. The current SAWEM rule profile keeps effective status, participant admission and commercial trading unknown.
 
 The next useful result is a complete, independently hand-verified open reference case—not an ungrounded claim that one platform beats the market.
