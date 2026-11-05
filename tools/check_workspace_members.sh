@@ -3,7 +3,7 @@
 # member globs. Exclusions are read from Cargo.toml, not duplicated here.
 set -euo pipefail
 
-root="\${1:-$(cd "$(dirname "\${BASH_SOURCE[0]}")/.." && pwd)}"
+root="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 root="$(cd "$root" && pwd)"
 manifest="$root/Cargo.toml"
 
@@ -18,7 +18,9 @@ array_values() {
         $0 ~ ("^" key " = \\[") { in_array = 1 }
         in_array {
             print
-            if ($0 ~ /^\\]/) exit
+            line = $0
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+            if (line == "]") exit
         }
     ' "$manifest" |
         sed 's/#.*$//' |
@@ -29,7 +31,7 @@ array_values() {
 mapfile -t members < <(array_values members)
 mapfile -t exclusions < <(array_values exclude)
 
-if [[ \${#members[@]} -eq 0 ]]; then
+if [[ ${#members[@]} -eq 0 ]]; then
     printf 'workspace preflight: no root workspace members found\n' >&2
     exit 2
 fi
@@ -39,24 +41,24 @@ eligible=0
 excluded_count=0
 failed=0
 
-for pattern in "\${members[@]}"; do
+for pattern in "${members[@]}"; do
     shopt -s nullglob
     candidates=( "$root"/$pattern )
     shopt -u nullglob
 
-    if [[ "$pattern" != *'*'* && "$pattern" != *'?'* && "$pattern" != *'['* && \${#candidates[@]} -eq 0 ]]; then
+    if [[ "$pattern" != *'*'* && "$pattern" != *'?'* && "$pattern" != *'['* && ${#candidates[@]} -eq 0 ]]; then
         printf 'workspace preflight: literal member path is missing: %s\n' "$pattern" >&2
         failed=1
         continue
     fi
 
-    for candidate in "\${candidates[@]}"; do
+    for candidate in "${candidates[@]}"; do
         [[ -d "$candidate" ]] || continue
-        relative="\${candidate#"$root"/}"
+        relative="${candidate#"$root"/}"
         matched=$((matched + 1))
         is_excluded=0
 
-        for exclusion in "\${exclusions[@]}"; do
+        for exclusion in "${exclusions[@]}"; do
             if [[ "$relative" == $exclusion ]]; then
                 is_excluded=1
                 break
