@@ -130,6 +130,30 @@ pub enum Condition {
     Unrelated,
 }
 
+/// Produce a deterministic Fisher-Yates order for synthetic fixtures.
+///
+/// This function exists for replayable Track A fixtures only. It is not a
+/// cryptographic RNG or an approved randomization procedure for human studies.
+pub fn condition_order_for_seed(seed: u64) -> [Condition; 4] {
+    let mut state = seed;
+    let mut order = [
+        Condition::Control,
+        Condition::Targeted,
+        Condition::Sham,
+        Condition::Unrelated,
+    ];
+    for index in (1..order.len()).rev() {
+        state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut value = state;
+        value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        value ^= value >> 31;
+        let selected = (value % (index as u64 + 1)) as usize;
+        order.swap(index, selected);
+    }
+    order
+}
+
 /// A complete paired intervention set. All conditions share the same frozen
 /// state, seed, session, and task; only the declared intervention changes.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -203,7 +227,7 @@ impl InterventionSet {
         ]
         .into_iter()
         .collect();
-        if assigned != expected {
+        if assigned != expected || self.condition_order != condition_order_for_seed(self.randomization_seed) {
             return Err(HarnessError::InvalidAssignment);
         }
         Ok(())
@@ -224,6 +248,8 @@ pub enum ActionMechanism {
     Yoked,
     /// Applies the task rule to the current partner feature.
     RuleBased,
+    /// Improperly depends on an unrelated feature.
+    DistractorDependent,
 }
 
 /// An agent's next symbolic musical action.
@@ -378,6 +404,32 @@ impl AgentPolicy for RuleBasedPolicy {
     }
 }
 
+/// Deliberately incorrect policy that lets the unrelated feature change its
+/// target action. It is a negative control for evaluator specificity.
+pub struct UnrelatedFeatureShortcutPolicy {
+    /// Stable policy identifier.
+    pub id: String,
+}
+
+impl AgentPolicy for UnrelatedFeatureShortcutPolicy {
+    fn policy_id(&self) -> &str {
+        &self.id
+    }
+
+    fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
+        let value = ((i64::from(observation.current_partner_feature.value)
+            + i64::from(observation.unrelated_feature.value))
+            .rem_euclid(i64::from(task.expected_response.modulus))) as i32;
+        make_action(
+            observation,
+            self.policy_id(),
+            task,
+            value,
+            ActionMechanism::DistractorDependent,
+        )
+    }
+}
+
 fn make_action(
     observation: &Observation,
     policy_id: &str,
@@ -499,6 +551,7 @@ impl TrialManifestV1 {
             || self.input_event_ids.iter().any(|id| id.trim().is_empty())
             || self.output_event_ids.iter().any(|id| id.trim().is_empty())
             || assigned != expected
+            || self.condition_order != condition_order_for_seed(self.randomization_seed)
         {
             return Err(HarnessError::InvalidManifest);
         }
@@ -540,6 +593,13 @@ pub fn run_trial(
     let actions: [AgentAction; 4] = actions
         .try_into()
         .map_err(|_| HarnessError::InvalidPolicy)?;
+
+    for (action, observation) in actions.iter().zip(observations.iter()) {
+        let expected_event_id = format!("{}::{}::action", observation.event_id, policy.policy_id());
+        if action.source_event_id != observation.event_id || action.event_id != expected_event_id {
+            return Err(HarnessError::InvalidPolicy);
+        }
+    }
 
     let contrast = calculate_contrast(&task, &interventions, &actions)?;
     let manifest = TrialManifestV1 {
@@ -823,12 +883,7 @@ mod tests {
             sham: observation("event-sham", 2, 3),
             unrelated: observation("event-unrelated", 2, 8),
             randomization_seed: 991,
-            condition_order: [
-                Condition::Sham,
-                Condition::Targeted,
-                Condition::Control,
-                Condition::Unrelated,
-            ],
+            condition_order: condition_order_for_seed(991),
         };
         (task, interventions)
     }
@@ -1103,5 +1158,145 @@ mod tests {
         let first = run_trial(task_a, interventions_a, &policy, config()).unwrap();
         let second = run_trial(task_b, interventions_b, &policy, config()).unwrap();
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn condition_order_is_reproducible_and_bound_to_assignment_seed() {
+        assert_eq!(condition_order_for_seed(991), condition_order_for_seed(991));
+        let (task, mut interventions) = fixture();
+        interventions.condition_order.swap(0, 1);
+        assert_eq!(
+            interventions.validate(&task),
+            Err(HarnessError::InvalidAssignment)
+        );
+    }
+
+    #[test]
+    fn unrelated_feature_shortcut_is_detected_as_nontargeted_contingency() {
+        let (task, interventions) = fixture();
+        let record = run_trial(
+            task,
+            interventions,
+            &UnrelatedFeatureShortcutPolicy {
+                id: "distractor-shortcut".to_owned(),
+            },
+            config(),
+        )
+        .unwrap();
+        assert!(record.contrast.input_sensitive);
+        assert!(!record.contrast.target_specific);
+        assert!(record.contrast.unrelated_target_delta > 0);
+        assert!(!record.contrast.qualified_synthetic_contingency);
+    }
+
+    #[test]
+    fn sham_noop_effect_is_zero_for_each_deterministic_control() {
+        let (task, interventions) = fixture();
+        let policies: Vec<Box<dyn AgentPolicy>> = vec![
+            Box::new(FixedResponsePolicy {
+                id: "fixed".to_owned(),
+                value: 4,
+            }),
+            Box::new(ImitationOnlyPolicy {
+                id: "imitation".to_owned(),
+            }),
+            Box::new(OneWayPromptPolicy {
+                id: "one-way".to_owned(),
+            }),
+            Box::new(YokedReplayPolicy {
+                id: "yoke".to_owned(),
+                source_session_id: "session-prior".to_owned(),
+                replayed_feature: Feature {
+                    dimension: Dimension::Motif,
+                    value: 9,
+                },
+            }),
+            Box::new(RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            }),
+        ];
+        for policy in policies {
+            let record = run_trial(
+                task.clone(),
+                interventions.clone(),
+                policy.as_ref(),
+                config(),
+            )
+            .unwrap();
+            assert_eq!(record.contrast.sham_delta, 0);
+        }
+    }
+
+    #[test]
+    fn role_exchange_oracle_is_not_motif_specific() {
+        let (mut task, mut interventions) = fixture();
+        task.task_id = "role-complement-01".to_owned();
+        task.target_dimension = Dimension::Role;
+        task.expected_response = ResponseRule {
+            modulus: 4,
+            offset: 2,
+        };
+        for observation in [
+            &mut interventions.control,
+            &mut interventions.targeted,
+            &mut interventions.sham,
+            &mut interventions.unrelated,
+        ] {
+            observation.task_id = task.task_id.clone();
+            observation.initial_partner_feature = Feature {
+                dimension: Dimension::Role,
+                value: 0,
+            };
+            observation.current_partner_feature.dimension = Dimension::Role;
+        }
+        interventions.control.current_partner_feature.value = 0;
+        interventions.targeted.current_partner_feature.value = 1;
+        interventions.sham.current_partner_feature.value = 0;
+        interventions.unrelated.current_partner_feature.value = 0;
+
+        let record = run_trial(
+            task,
+            interventions,
+            &RuleBasedPolicy {
+                id: "role-rule".to_owned(),
+            },
+            config(),
+        )
+        .unwrap();
+        assert_eq!(record.contrast.targeted_delta, 1);
+        assert!(record.contrast.qualified_synthetic_contingency);
+    }
+
+    struct CrossBoundPolicy;
+
+    impl AgentPolicy for CrossBoundPolicy {
+        fn policy_id(&self) -> &str {
+            "cross-bound"
+        }
+
+        fn act(
+            &self,
+            _observation: &Observation,
+            task: &TaskSpec,
+        ) -> Result<AgentAction, HarnessError> {
+            Ok(AgentAction {
+                event_id: "reused-output-event".to_owned(),
+                source_event_id: "event-control".to_owned(),
+                feature: Feature {
+                    dimension: task.target_dimension,
+                    value: 1,
+                },
+                mechanism: ActionMechanism::Fixed,
+            })
+        }
+    }
+
+    #[test]
+    fn adapter_cannot_bind_multiple_outputs_to_one_input_event() {
+        let (task, interventions) = fixture();
+        assert_eq!(
+            run_trial(task, interventions, &CrossBoundPolicy, config()),
+            Err(HarnessError::InvalidPolicy)
+        );
     }
 }
