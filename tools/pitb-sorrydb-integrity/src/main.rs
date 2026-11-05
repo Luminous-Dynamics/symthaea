@@ -875,9 +875,9 @@ fn synthetic_record(label: &str, commit: &str) -> SorryRecord {
         location: Location {
             path: "Example/Theorem.lean".into(),
             start_line: 12,
-            start_column: 1,
+            start_column: 0,
             end_line: 12,
-            end_column: 6,
+            end_column: 5,
         },
         debug_info: DebugInfo {
             goal: format!("⊢ True -- {label}"),
@@ -965,6 +965,13 @@ fn run_self_tests() -> Result<(), String> {
         return Err(format!("Python-compatible SorryDB ID mismatch: expected {}, got {recomputed}", upstream.id));
     }
     validate_record(&upstream, "upstream reference fixture")?;
+    let zero_column = synthetic_record("zero-column", &"9".repeat(40));
+    validate_record(&zero_column, "zero-column fixture")?;
+    let zero_column_receipt = synthetic_receipt(&zero_column);
+    if !validate_receipt(&zero_column_receipt, &zero_column, 999)? {
+        return Err("zero-based source column receipt was not accepted".into());
+    }
+    println!("SELF_TEST_PASS zero-based start columns survive record and receipt validation");
     println!("SELF_TEST_PASS reproduces an actual upstream Python SorryDB ID and Unicode goal");
 
     let mut inclusion_changed = upstream.clone();
