@@ -409,6 +409,101 @@
                   }
                 }
               }
+            },
+            "reported_results": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "publisher",
+                  "reported_at",
+                  "model",
+                  "effort",
+                  "score",
+                  "harness_version",
+                  "evidence_class",
+                  "source_url",
+                  "comparability"
+                ],
+                "properties": {
+                  "publisher": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reported_at": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "effort": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "harness_version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "repeat_count": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1
+                  },
+                  "cost_per_case_usd": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "median_duration_seconds": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "tokens_per_case": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "evidence_class": {
+                    "enum": [
+                      "official_leaderboard",
+                      "paper",
+                      "vendor_report",
+                      "local_reproduction"
+                    ]
+                  },
+                  "source_url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "comparability": {
+                    "type": "string",
+                    "minLength": 20
+                  },
+                  "notes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
             }
           }
         },
