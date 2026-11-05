@@ -384,7 +384,6 @@ pub enum DsuQualificationResult {
 /// A single piecewise-constant segment of a Trading Unit's day-ahead incremental
 /// energy-price curve. The signed schedule axis uses milli-MW: negative means
 /// consumption and positive means generation. Segment boundaries are [lower, upper).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// A single piecewise-constant segment of a Trading Unit's day-ahead incremental
 /// energy-price curve. The signed schedule axis uses milli-MWh per Trading Period:
 /// negative means consumption and positive means generation. Segments are [lower, upper).
