@@ -745,6 +745,50 @@ mod tests {
     }
 
     #[test]
+    fn common_random_number_trial_streams_are_paired_across_actions() {
+        let actions = action_set();
+        let scenario = scenario();
+        let shared_participant = 23;
+        let shared_trial = 7;
+        let requests = vec![
+            TrialRequest {
+                action_id: 1,
+                participant_id: shared_participant,
+                within_participant_trial: shared_trial,
+            },
+            TrialRequest {
+                action_id: 2,
+                participant_id: shared_participant,
+                within_participant_trial: shared_trial,
+            },
+            TrialRequest {
+                action_id: 3,
+                participant_id: shared_participant,
+                within_participant_trial: shared_trial + 1,
+            },
+        ];
+        let dataset = generate_synthetic_dataset(
+            &actions,
+            &scenario,
+            &requests,
+            "sha256:paired-crn-scenario",
+            42,
+        )
+        .unwrap();
+
+        let noise = dataset.trials.iter().find(|trial| trial.action_id == 1).unwrap();
+        let signal = dataset.trials.iter().find(|trial| trial.action_id == 2).unwrap();
+        assert_eq!(noise.oracle_evidence, signal.oracle_evidence);
+        assert_eq!(noise.oracle_lapse, signal.oracle_lapse);
+        assert_eq!(noise.observed_category.is_none(), signal.observed_category.is_none());
+        assert_ne!(
+            noise.oracle_category,
+            signal.oracle_category,
+            "the same latent evidence can map differently because signal/noise actions differ"
+        );
+    }
+
+    #[test]
     fn generation_is_exactly_replayable() {
         let actions = action_set();
         let scenario = scenario();
