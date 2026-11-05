@@ -136,3 +136,46 @@ impl AsyncTrainerHandle {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dynamics::cfc::{CfCNetwork, CfCNetworkConfig};
+
+    fn handle_with_weights(weights: Vec<f32>) -> AsyncTrainerHandle {
+        let (sample_tx, _sample_rx) = mpsc::sync_channel::<TrainingSample>(1);
+        let (weights_tx, weights_rx) = mpsc::channel::<Vec<f32>>();
+        weights_tx.send(weights).expect("test receiver is alive");
+        AsyncTrainerHandle {
+            sample_tx,
+            weights_rx: std::sync::Mutex::new(weights_rx),
+            updates_applied: 0,
+            samples_dropped: 0,
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_async_weight_update_without_mutating_network() {
+        let mut network = CfCNetwork::new(CfCNetworkConfig::default());
+        let before = network.get_weights();
+        let mut malformed = before.clone();
+        malformed.push(0.0);
+        let mut handle = handle_with_weights(malformed);
+
+        assert!(!handle.apply_latest_weights(&mut network));
+        assert_eq!(network.get_weights(), before);
+        assert_eq!(handle.updates_applied, 0);
+    }
+
+    #[test]
+    fn applies_valid_async_weight_update_and_counts_it() {
+        let source = CfCNetwork::new(CfCNetworkConfig::default());
+        let weights = source.get_weights();
+        let mut destination = CfCNetwork::new(CfCNetworkConfig::default());
+        let mut handle = handle_with_weights(weights.clone());
+
+        assert!(handle.apply_latest_weights(&mut destination));
+        assert_eq!(destination.get_weights(), weights);
+        assert_eq!(handle.updates_applied, 1);
+    }
+}
