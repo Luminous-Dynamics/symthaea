@@ -134,3 +134,16 @@ The first public comparison should be a per-language/per-task dashboard with raw
 7. Expand language/task coverage only with native-speaker review and rights-cleared source material.
 
 **Current status:** research matrix only. No dataset has been downloaded, ingested, scored, fine-tuned or independently reviewed by this change. No new leaderboard results or SOTA claims are made.
+
+
+### Released row schema and scoring unit
+
+The current viewer exposes `pair_id`, `file_id`, `fact_index`, `language`, `hallucination_type`, plus:
+- `english_factual_statement`;
+- `english_hallucinated_statement`;
+- `target_factual_statement`;
+- `target_hallucinated_statement`.
+
+Each row contains four aligned statements. A full evaluation records four model predictions per pair row, distinguishing statement language (English/target) from statement kind (factual/hallucinated). `pair_id` is the matched fact identifier; `file_id` is a provisional source-document cluster key that must be confirmed against the exact underlying release metadata before clustered inference.
+
+The current viewer shows four splits and 11.4k total rows, with 2.87k displayed in the selected isiZulu split; its file statistics list 127 `file_id` values. These are mutable viewer values, not a frozen versioned manifest. Pin the dataset revision and hash the exact files before using any row count as a benchmark denominator.
