@@ -1064,8 +1064,8 @@ fn run_self_tests() -> Result<(), String> {
 
     let mut bad_receipt = receipts[0].clone();
     bad_receipt.elaborated_goal_sha256 = fake_hash("different elaborated proposition");
-    if validate_receipt(&bad_receipt, &split.sorries[0], 1).is_err() {
-        return Err("structural goal mismatch should be retained as a disqualifying finding".into());
+    if validate_receipt(&bad_receipt, &split.sorries[0], 1).is_ok() {
+        return Err("different elaborated goal cannot be labeled exact".into());
     }
     bad_receipt.goal_alignment = "mismatch".into();
     if validate_receipt(&bad_receipt, &split.sorries[0], 1).unwrap() {
