@@ -44,7 +44,10 @@ Metrics:
 - product-specific response and sustain checks for regulating, instantaneous and ten-minute reserve;\n- all six directed mode transitions and cross-checks between physical transition time, product deadline and asset response evidence;
 - temperature, state-of-health, throughput, cycle life and warranty-envelope violations;
 - network export/import and congestion-limit violations;
-- model-to-meter error once authenticated measurements exist.
+- model-to-meter energy deviation, unfulfilled scheduled energy and overdelivery, with schedule/meter/settlement coverage reported separately;
+- SOC-dependent charge/discharge capability-envelope error across the calibrated SOC range; never extrapolate beyond field-measured or manufacturer-guaranteed breakpoints;
+- load-dependent inverter/transformer efficiency and BMS curtailment residuals, once synchronized field measurements exist;
+- source-bound meter record and settlement line-item reconciliation, with incomplete coverage withheld rather than scored as zero.
 
 Do not count vendor targets or simulated response as independently measured capability.
 
@@ -85,8 +88,10 @@ Metrics:
 - delivered energy and reserve shortfall;
 - realized imbalance;
 - CVaR 95% / worst-case downside;
-- forecast WAPE and CRPS where a probabilistic forecast exists;
-- calibration error and interval coverage;
+- forecast MAE/WAPE, q10/q50/q90 pinball loss, empirical quantile coverage, CRPS where a full predictive distribution exists, and weighted interval score;
+- calibration error and interval coverage, scored only on forecasts available by the historical decision timestamp and realized observations available by evaluation time;
+- leakage rate: future-known forecast/realized records excluded / records matching the target set; target: **zero leakage**;
+- schedule fulfilment, unfulfilled MWh and booked balancing cost / gross trading revenue on the same field trace;
 - rolling-horizon regret against the best **implementable non-anticipative** policy;
 - runtime, memory and solver gap;
 - strategy robustness under regime shift and distribution shift.
@@ -114,7 +119,9 @@ Measure whether the underwriting conclusion can be reproduced and challenged.
 Metrics:
 - source claim coverage (% material claims linked to content-addressed source);
 - authority and licence verification coverage;
-- decision-time validity and known_at correctness;
+- decision-time validity and known_at correctness, including distinct forecast issue, publication/availability and target valid timestamps;
+- model build identity and digest binding for every forecast comparator;
+- meter/settlement source coverage and duplicate-record rejection;
 - missing/contradictory evidence detection;
 - stale/revoked evidence invalidation latency;
 - false-safe rate and material-risk recall;
@@ -207,6 +214,11 @@ Start with a small, exact, hand-auditable corpus before scaling to thousands of 
 - **RESERVE-LOST-OPPORTUNITY-001:** product-specific reserve price uses the correct piecewise price-curve elbow selection.
 - **CONSTRAINED-SCHEDULE-COMPENSATION-001:** unconstrained-to-constrained schedule adjustment changes the constrained purchase/sales payment.
 - **CREDIT-COVER-LIQUIDITY-TIMELINE-001:** daily credit-cover recalculation triggers a working-day-specific posting deadline and liquidity need.
+- **CREDIT-COVER-LIQUIDITY-STRESS-001 / CREDIT-COVER-LIQUIDITY-WATERFALL-001:** distinguish point-in-time treasury headroom from dated committed/forecast/stress cash paths; preserve peak cover shortfall and first operating-floor breach.
+- **FORECAST-VINTAGE-ASOF-001:** replay only forecast vintages actually available at a frozen decision timestamp; reject future publication and ambiguous/model-unscoped vintages.
+- **FORECAST-CALIBRATION-EXACT-001:** score one exact model build against later-known realized prices using exact median errors, quantile pinball loss, coverage and interval scores.
+- **DISPATCH-EXECUTION-FIDELITY-001:** compare signed scheduled export/import energy with meter records and booked balancing settlement lines over a complete horizon.
+- **BMS-SOC-CAPABILITY-ENVELOPE-001:** assess charge/discharge power against separate conservative SOC-dependent capability curves; reject extrapolation and synthetic operational claims.
 
 For each case, freeze expected feasible/infeasible state, violated constraint IDs, settlement direction, exposure and evidence disposition. Independent reviewers adjudicate the golden expected outcome.
 
@@ -224,6 +236,13 @@ These are **research targets**, not measured current performance or industry-cer
 | Matched policy regret | Report baseline and variance | 5% or less vs best implementable reference in agreed corpus |
 | Material-risk recall | At least 95% on independently adjudicated corpus | 99%+ |
 | False-safe rate | 0 on finite hostile corpus | 0 on release gate; confidence intervals on field sample |
+| Forecast look-ahead leakage | 0 | 0 |
+| Execution evidence completeness | Report schedule, meter and settlement coverage independently | 100% for a scored complete field replay |
+| Unfulfilled energy delivery | Reproduce published M5BAT 238 kWh / 61-hour result on the same input trace | ≤ 120 kWh on the same 61-hour trace |
+| Balancing cost / trading revenue | Reproduce published 1.8% result on the same tariff and settlement scope | ≤ 1.0% on the same trace |
+| System RTE model error | Reproduce published 2.2 percentage-point deviation | ≤ 1.0 pp |
+| Inverter efficiency error | Reproduce published 0.55 percentage-point deviation | ≤ 0.30 pp |
+| SOC capability extrapolation | 0 | 0; all decisions stay inside measured/certified coverage |
 | Independent receipt reproduction | 100% | 100% |
 | Source/authority coverage | 100% of material claims | 100%, with stale-source invalidation |
 | Reviewer time | Establish baseline | 50% reduction without reduced risk recall |
@@ -256,6 +275,6 @@ Never turn indeterminate, not_comparable or not_run into a numerical zero or a p
 
 ## 10. Current status
 
-The synthetic roster in v1 is **not executed**. Product capability claims are literature/documentation signals, not independent feature verification. Product versions, vendor access, datasets, solver builds and common adapters are not yet fully pinned. The current SAWEM rule profile keeps effective status, participant admission and commercial trading unknown.
+The synthetic vendor roster remains **not executed**. Product capability claims are literature/documentation signals, not independent feature verification. Product versions, vendor access, solver builds and common adapters are not yet fully pinned. The benchmark corpus currently contains 40 cases: 29 kernel-tested and 11 `not_run`; the 116 mapped Rust test names have been source-checked. The public M5BAT field dataset is identified (RWTH DOI 10.18154/RWTH-2025-06555), but its ZIP has not yet been staged, so the field replay and all M5BAT performance targets remain `not_run`. The current SAWEM rule profile keeps effective status, participant admission and commercial trading unknown.
 
 The next useful result is a complete, independently hand-verified open reference case—not an ungrounded claim that one platform beats the market.
