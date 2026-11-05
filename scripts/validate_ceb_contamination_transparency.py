@@ -65,6 +65,12 @@ def card_semantic_errors(card: dict, required_surfaces: set[str]) -> list[str]:
         elif row["status"] == "not_searched" and card["assessment_status"] == "searched_no_match_found":
             errors.append(f"{row['surface']}: incomplete surface cannot support searched_no_match_found")
 
+    for row in tier_rows:
+        if row["outcome"] == "not_assessed" and row["evidence_sha256"] is not None:
+            errors.append(f"{row['tier']}: unassessed tier must not claim an evidence digest")
+        elif row["outcome"] != "not_assessed" and not row["evidence_sha256"]:
+            errors.append(f"{row['tier']}: assessed tier outcome requires a scoped evidence digest")
+
     outcomes = [row["outcome"] for row in tier_rows]
     has_match = any(outcome in MATCH_OUTCOMES for outcome in outcomes)
     has_inconclusive = any(outcome == "inconclusive" for outcome in outcomes)
@@ -257,6 +263,10 @@ def self_test(registry: dict, registry_schema: dict, card_schema: dict) -> None:
     mutant = copy.deepcopy(fixture)
     mutant["search_surfaces"][0]["result_sha256"] = None
     must_reject(mutant, "missing search-result digest")
+
+    mutant = copy.deepcopy(fixture)
+    mutant["tier_assessments"][0]["evidence_sha256"] = None
+    must_reject(mutant, "assessed T1 outcome without evidence digest")
 
     mutant = copy.deepcopy(fixture)
     mutant["tier_assessments"][0]["outcome"] = "match_found"
