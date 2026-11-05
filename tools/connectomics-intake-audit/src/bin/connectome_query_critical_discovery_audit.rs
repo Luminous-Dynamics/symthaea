@@ -964,4 +964,40 @@ mod tests {
         value["sampling_binding"]["sampling_frame_sha256"] = json!("not-a-digest");
         assert!(run_value(value).unwrap_err().contains("sampling-frame digest"));
     }
+
+    #[test]
+    fn unresolved_proposal_adjudication_blocks_promotion() {
+        let mut value = fixture_value();
+        let proposal = value["proposals"][0].as_object_mut().unwrap();
+        proposal.insert("adjudication_disposition".into(), json!("UNADJUDICATED"));
+        proposal.remove("matched_alternative_id");
+        proposal.remove("match_adjudication_sha256");
+        let report = run_value(value).unwrap();
+        assert_eq!(report["unadjudicated_proposal_count"], 1);
+        assert_eq!(report["status"], "NOT_PROMOTABLE_UNRESOLVED_PROPOSAL_ADJUDICATION");
+    }
+
+    #[test]
+    fn unresolved_biological_alternative_is_not_counted_as_noncritical() {
+        let mut value = fixture_value();
+        value["alternatives"][1]["biological_disposition"] = json!("INDETERMINATE");
+        let report = run_value(value).unwrap();
+        assert_eq!(report["unresolved_biological_alternative_count"], 1);
+        assert_eq!(report["non_query_critical_admissible_alternative_count"], 0);
+        assert_eq!(report["status"], "NOT_PROMOTABLE_UNRESOLVED_OR_NOT_ESTIMABLE_ALTERNATIVES");
+    }
+
+    #[test]
+    fn query_critical_but_not_estimable_alternative_blocks_promotion() {
+        let mut value = fixture_value();
+        value["alternatives"][1]["query_consequence"] = json!("NOT_ESTIMABLE");
+        value["alternatives"][1]["challenge_report_status"] = json!("NOT_ESTIMABLE");
+        value["alternatives"][1]["after_worst_case_effort_units"] = Value::Null;
+        value["alternatives"][1]["decision_after_met"] = Value::Null;
+        let report = run_value(value).unwrap();
+        assert_eq!(report["not_estimable_admissible_alternative_count"], 1);
+        assert_eq!(report["non_query_critical_admissible_alternative_count"], 0);
+        assert_eq!(report["status"], "NOT_PROMOTABLE_UNRESOLVED_OR_NOT_ESTIMABLE_ALTERNATIVES");
+    }
+
 }
