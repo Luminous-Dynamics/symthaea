@@ -89,6 +89,7 @@ pub enum AsOfReplayError {
     DuplicateRecordId,
     DuplicateTarget,
     AmbiguousLatestVintage,
+    ModelScopeRequired,
     ArithmeticOverflow,
 }
 
@@ -200,6 +201,27 @@ pub fn replay_prices_as_of<'a>(
             .any(|previous| previous.record_id == vintage.record_id)
         {
             return Err(AsOfReplayError::DuplicateRecordId);
+        }
+    }
+
+    // Never select whichever forecast engine happened to publish last when
+    // the target does not name a model. Model outputs are separate evidence,
+    // not interchangeable revisions of one series.
+    for target in targets.iter().copied().filter(|target| target.model_id.is_none()) {
+        let mut forecast_model: Option<&str> = None;
+        for vintage in vintages.iter().copied() {
+            if !target_matches(vintage, target) || vintage.available_at_utc > decision_time_utc {
+                continue;
+            }
+            if let PriceVintageKind::Forecast { model_id, .. } = vintage.kind {
+                match forecast_model {
+                    Some(existing) if existing != model_id => {
+                        return Err(AsOfReplayError::ModelScopeRequired);
+                    }
+                    None => forecast_model = Some(model_id),
+                    _ => {}
+                }
+            }
         }
     }
 
@@ -404,6 +426,18 @@ mod tests {
         assert!(result.is_complete());
         assert_eq!(result.selected[0].value_minor_zar_per_mwh, 600);
         assert_eq!(result.selected[1].value_minor_zar_per_mwh, 900);
+    }
+
+    #[test]
+    fn unscoped_target_with_multiple_forecast_engines_is_rejected() {
+        let vintages = [
+            forecast("model-a", 90, 95, 600, "chronos-v1"),
+            forecast("model-b", 92, 96, 900, "homer-v1"),
+        ];
+        assert_eq!(
+            replay_prices_as_of(100, &[target(None)], &vintages),
+            Err(AsOfReplayError::ModelScopeRequired)
+        );
     }
 
     #[test]
