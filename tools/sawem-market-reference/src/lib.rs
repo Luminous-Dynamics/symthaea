@@ -613,7 +613,6 @@ pub fn evaluate_dispatch(
                 "transition_seconds_before_action",
                 step.transition_seconds_before_action,
             ),
-            ("reserve_duration_hours", step.reserve_duration_hours),
             ("network_export_limit_mw", step.network_export_limit_mw),
             ("network_import_limit_mw", step.network_import_limit_mw),
         ];
@@ -626,7 +625,6 @@ pub fn evaluate_dispatch(
             || step.charge_mw < 0.0
             || step.discharge_mw < 0.0
             || step.transition_seconds_before_action < 0.0
-            || step.reserve_duration_hours < 0.0
             || step.network_export_limit_mw < 0.0
             || step.network_import_limit_mw < 0.0
         {
@@ -688,20 +686,6 @@ pub fn evaluate_dispatch(
             0.0
         };
 
-        let (reserve_up, reserve_down) = match sum_reserves(step.reserves) {
-            Ok(values) => values,
-            Err(mut errors) => {
-                violations.append(&mut errors);
-                (0.0, 0.0)
-            }
-        };
-
-        if step.discharge_mw + reserve_up > limits.max_discharge_mw + EPSILON
-            || step.charge_mw + reserve_down > limits.max_charge_mw + EPSILON
-        {
-            violations.push(Violation::ReservePowerHeadroomExceeded);
-        }
-
         let energy_before = energy;
         let mut candidate_energy = energy_before;
         if action_valid {
@@ -718,18 +702,9 @@ pub fn evaluate_dispatch(
             violations.push(Violation::EnergyAboveMaximum);
         }
 
-        let upward_energy_required =
-            reserve_up * step.reserve_duration_hours / discharge_efficiency;
-        let downward_energy_required =
-            reserve_down * step.reserve_duration_hours * charge_efficiency;
-        if candidate_energy - limits.min_energy_mwh + EPSILON < upward_energy_required
-            || limits.max_energy_mwh - candidate_energy + EPSILON < downward_energy_required
-        {
-            violations.push(Violation::ReserveEnergyHeadroomExceeded);
-        }
-
-        // Commit only physically and network-feasible dispatch. Retain the
-        // attempted energy separately so the audit explains hard failures.
+        // Commit the scheduled operating point only when its own hard constraints
+        // pass. Reserve feasibility is assessed independently around that committed
+        // point and cannot silently alter the base dispatch trace.
         let action_committed = action_valid && energy_bounds_valid;
         if action_committed {
             energy = candidate_energy;
@@ -739,6 +714,21 @@ pub fn evaluate_dispatch(
         } else {
             previous_mode
         };
+        let (reserve_base_charge, reserve_base_discharge) = if action_committed {
+            (step.charge_mw, step.discharge_mw)
+        } else {
+            (0.0, 0.0)
+        };
+        let reserve_assessment = assess_reserves(
+            limits,
+            reserve_base_charge,
+            reserve_base_discharge,
+            energy,
+            charge_efficiency,
+            discharge_efficiency,
+            step.reserves,
+        );
+        violations.extend(reserve_assessment.violations.iter().copied());
 
         results.push(StepResult {
             index,
@@ -749,14 +739,18 @@ pub fn evaluate_dispatch(
             candidate_energy_after_mwh: candidate_energy,
             net_export_mw: net_export,
             transition_seconds_used: step.transition_seconds_before_action,
-            reserve_up_mw: reserve_up,
-            reserve_down_mw: reserve_down,
+            reserve_up_mw: reserve_assessment.committed_up_mw,
+            reserve_down_mw: reserve_assessment.committed_down_mw,
+            reserve_assessment,
             violations,
         });
         previous_mode = achieved_mode;
     }
 
-    let feasible = results.iter().all(|step| step.violations.is_empty());
+    let feasible = results.iter().all(|step| {
+        step.violations.is_empty()
+            && step.reserve_assessment.qualification == ReserveQualification::Qualified
+    });
     Ok(DispatchResult {
         feasible,
         initial_energy_mwh,
