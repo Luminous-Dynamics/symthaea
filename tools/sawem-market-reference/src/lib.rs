@@ -405,72 +405,38 @@ impl GeneratingPriceCurve {
         let is_regulating_down =
             product == ReserveProduct::Regulating && direction == ReserveDirection::Down;
 
-        if (contracted_operating_point_mw - self.maximum_continuous_rating_mw).abs()
-            <= EPSILON
-        {
-            return Ok((
-                PriceIncrement::Three,
-                self.increment_three_minor_per_mwh,
-            ));
+        if (contracted_operating_point_mw - self.maximum_continuous_rating_mw).abs() <= EPSILON {
+            return Ok((PriceIncrement::Three, self.increment_three_minor_per_mwh));
         }
         if (contracted_operating_point_mw - self.elbow_two_mw).abs() <= EPSILON {
             return if is_regulating_down {
-                Ok((
-                    PriceIncrement::Two,
-                    self.increment_two_minor_per_mwh,
-                ))
+                Ok((PriceIncrement::Two, self.increment_two_minor_per_mwh))
             } else {
-                Ok((
-                    PriceIncrement::Three,
-                    self.increment_three_minor_per_mwh,
-                ))
+                Ok((PriceIncrement::Three, self.increment_three_minor_per_mwh))
             };
         }
         if (contracted_operating_point_mw - self.elbow_one_mw).abs() <= EPSILON {
             return if is_regulating_down {
-                Ok((
-                    PriceIncrement::One,
-                    self.increment_one_minor_per_mwh,
-                ))
+                Ok((PriceIncrement::One, self.increment_one_minor_per_mwh))
             } else {
-                Ok((
-                    PriceIncrement::Two,
-                    self.increment_two_minor_per_mwh,
-                ))
+                Ok((PriceIncrement::Two, self.increment_two_minor_per_mwh))
             };
         }
-        if (contracted_operating_point_mw - self.minimum_stable_generation_mw).abs()
-            <= EPSILON
-        {
-            return Ok((
-                PriceIncrement::One,
-                self.increment_one_minor_per_mwh,
-            ));
+        if (contracted_operating_point_mw - self.minimum_stable_generation_mw).abs() <= EPSILON {
+            return Ok((PriceIncrement::One, self.increment_one_minor_per_mwh));
         }
 
         if contracted_operating_point_mw < self.minimum_stable_generation_mw {
-            return Ok((
-                PriceIncrement::Zero,
-                self.increment_zero_minor_per_mwh,
-            ));
+            return Ok((PriceIncrement::Zero, self.increment_zero_minor_per_mwh));
         }
         if contracted_operating_point_mw < self.elbow_one_mw {
-            return Ok((
-                PriceIncrement::One,
-                self.increment_one_minor_per_mwh,
-            ));
+            return Ok((PriceIncrement::One, self.increment_one_minor_per_mwh));
         }
         if contracted_operating_point_mw < self.elbow_two_mw {
-            return Ok((
-                PriceIncrement::Two,
-                self.increment_two_minor_per_mwh,
-            ));
+            return Ok((PriceIncrement::Two, self.increment_two_minor_per_mwh));
         }
         if contracted_operating_point_mw <= self.maximum_continuous_rating_mw {
-            return Ok((
-                PriceIncrement::Three,
-                self.increment_three_minor_per_mwh,
-            ));
+            return Ok((PriceIncrement::Three, self.increment_three_minor_per_mwh));
         }
         Ok((
             PriceIncrement::EmergencyLevelOne,
