@@ -294,7 +294,7 @@ The additive `ClusteredPairedComparison` view addresses this without changing th
 - Paired deltas are averaged within each cluster before directional wins/losses/ties are counted.
 - Both pooled case-weighted mean delta and equal-cluster-weighted mean delta are reported. These are different estimands and must not be conflated.
 - The exact one-sided sign-test diagnostic operates on non-tied cluster means. It is withheld when fewer than two non-tied clusters remain.
-- Holm step-down family-wise adjustment is applied across valid metric p-values within this one comparison. It does **not** correct across candidates, adaptive search, generations, repeated runs, or a broader preregistered family.
+- Holm step-down family-wise adjustment uses the full predeclared metric-schema size for this one comparison. Metrics without enough independent clusters to produce a p-value have no reported adjusted p-value, but still count conservatively as p=1 in the family size. This does **not** correct across candidates, adaptive search, generations, repeated runs, or a broader preregistered family.
 
 The cluster mapping must originate in the frozen task-family/corpus manifest and be covered by the shared receipt/corpus identity. The in-memory adapter validates mapping shape; it cannot authenticate mapping provenance or prove that clusters are genuinely independent. The independent unit must be chosen before confirmation, not after inspecting outcomes.
 
