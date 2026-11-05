@@ -2,7 +2,7 @@
 
 This is a dependency-free standalone Rust harness that compiles the exact
 production source file
-`crates/core/symthaea/src/physics/landauer_erasure.rs` by path.
+`crates/core/symthaea-core/src/physics/landauer_erasure.rs` by path.
 
 Run:
 
