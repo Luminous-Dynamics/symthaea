@@ -411,7 +411,7 @@ fn hoeffding_radius(
     if width == 0.0 {
         return Ok(0.0);
     }
-    let factor = ((1.0 / delta).ln() / (2.0 * sample_count as f64)).sqrt();
+    let factor = (-delta.ln() / (2.0 * sample_count as f64)).sqrt();
     if !factor.is_finite() || factor < 0.0 {
         return Err(ScoreBoundError::BoundComputationNonFinite);
     }
@@ -641,6 +641,32 @@ mod tests {
         assert_eq!(
             bound_candidate_score_samples(&action_set, &scenario_set, &too_few, &config()),
             Err(ScoreBoundError::InvalidReplicateCount)
+        );
+    }
+
+    #[test]
+    fn nonfinite_samples_and_missing_provenance_reject() {
+        let action_set = action_set();
+        let scenario_set = scenario_set();
+        let mut samples = records();
+        samples[0].target_utility[0] = f64::NAN;
+        assert_eq!(
+            bound_candidate_score_samples(&action_set, &scenario_set, &samples, &config()),
+            Err(ScoreBoundError::NonFiniteScoreSample)
+        );
+
+        let samples = records();
+        let mut invalid = config();
+        invalid.score_contract_digest = " ".to_owned();
+        assert_eq!(
+            bound_candidate_score_samples(&action_set, &scenario_set, &samples, &invalid),
+            Err(ScoreBoundError::MissingScoreContractDigest)
+        );
+        invalid = config();
+        invalid.source_digest.clear();
+        assert_eq!(
+            bound_candidate_score_samples(&action_set, &scenario_set, &samples, &invalid),
+            Err(ScoreBoundError::MissingSourceDigest)
         );
     }
 
