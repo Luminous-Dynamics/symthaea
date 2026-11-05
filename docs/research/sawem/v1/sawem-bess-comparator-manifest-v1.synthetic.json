@@ -209,6 +209,165 @@
       ]
     },
     {
+      "engine_id": "aurora-chronos",
+      "vendor_or_project": "Aurora Energy Research",
+      "product": "Chronos for Batteries",
+      "version": "not_pinned",
+      "build_or_commit": null,
+      "engine_class": "commercial",
+      "execution_state": "not_run",
+      "adapter_state": "unknown",
+      "license_state": "unknown",
+      "capability_claims": [
+        {
+          "capability": "battery_physics",
+          "status": "documented",
+          "source": {
+            "publisher": "Aurora Energy Research",
+            "url": "https://auroraer.com/software/chronos",
+            "source_class": "official_documentation",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        },
+        {
+          "capability": "degradation",
+          "status": "documented",
+          "source": {
+            "publisher": "Aurora Energy Research",
+            "url": "https://auroraer.com/software/chronos",
+            "source_class": "official_documentation",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        },
+        {
+          "capability": "revenue_stacking",
+          "status": "documented",
+          "source": {
+            "publisher": "Aurora Energy Research",
+            "url": "https://auroraer.com/software/chronos",
+            "source_class": "official_documentation",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        },
+        {
+          "capability": "sa_wem_code_semantics",
+          "status": "not_evaluated",
+          "source": {
+            "publisher": null,
+            "url": null,
+            "source_class": "official_documentation",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        }
+      ]
+    },
+    {
+      "engine_id": "encompass",
+      "vendor_or_project": "Yes Energy",
+      "product": "EnCompass",
+      "version": "not_pinned",
+      "build_or_commit": null,
+      "engine_class": "commercial",
+      "execution_state": "not_run",
+      "adapter_state": "unknown",
+      "license_state": "unknown",
+      "capability_claims": [
+        {
+          "capability": "energy_dispatch",
+          "status": "documented",
+          "source": {
+            "publisher": "Yes Energy",
+            "url": "https://www.yesenergy.com/products/encompass",
+            "source_class": "official_documentation",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        },
+        {
+          "capability": "network_constraints",
+          "status": "documented",
+          "source": {
+            "publisher": "Yes Energy",
+            "url": "https://www.yesenergy.com/products/encompass",
+            "source_class": "official_documentation",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        },
+        {
+          "capability": "reserve_cooptimization",
+          "status": "documented",
+          "source": {
+            "publisher": "Yes Energy",
+            "url": "https://www.yesenergy.com/products/encompass",
+            "source_class": "official_documentation",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        },
+        {
+          "capability": "sa_wem_code_semantics",
+          "status": "not_evaluated",
+          "source": null
+        }
+      ]
+    },
+    {
+      "engine_id": "gridpath",
+      "vendor_or_project": "Sylvan Energy Analytics / GridPath project",
+      "product": "GridPath",
+      "version": "2026.14.0 documentation; binary/commit not pinned",
+      "build_or_commit": null,
+      "engine_class": "open_source",
+      "execution_state": "not_run",
+      "adapter_state": "unknown",
+      "license_state": "open_source",
+      "capability_claims": [
+        {
+          "capability": "energy_dispatch",
+          "status": "documented",
+          "source": {
+            "publisher": "GridPath project",
+            "url": "https://gridpath.readthedocs.io/en/latest/functionality.html",
+            "source_class": "open_source_documentation",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        },
+        {
+          "capability": "network_constraints",
+          "status": "documented",
+          "source": {
+            "publisher": "GridPath project",
+            "url": "https://gridpath.readthedocs.io/en/latest/functionality.html",
+            "source_class": "open_source_documentation",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        },
+        {
+          "capability": "reserve_cooptimization",
+          "status": "documented",
+          "source": {
+            "publisher": "GridPath project",
+            "url": "https://gridpath.readthedocs.io/en/latest/functionality.html",
+            "source_class": "open_source_documentation",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        },
+        {
+          "capability": "sa_wem_code_semantics",
+          "status": "not_evaluated",
+          "source": null
+        }
+      ]
+    },
+    {
       "engine_id": "sam",
       "vendor_or_project": "NREL",
       "product": "System Advisor Model",
@@ -459,5 +618,5 @@
     }
   ],
   "execution_receipt": null,
-  "claim_ceiling": "Protocol and synthetic comparator roster only. No engine has been run, licensed inputs verified, matched-input claim made, SAM/HOMER/PLEXOS/Aurora/EnCompass/PyPSA performance measured, or live SAWEM participant/project eligibility established."
+  "claim_ceiling": "Synthetic comparator roster only. No engine has been run, no vendor licence or feature entitlement verified, no common input/export or matched-input claim made, and no comparative performance measured. GridPath documentation distinguishes features in its open-source release from functionality that may require additional access."
 }
