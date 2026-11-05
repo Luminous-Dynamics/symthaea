@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/aegis-sample-entry-v0.schema.json",
+  "title": "PITB Aegis sample entry v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "sample_entry_id",
+    "specification_id",
+    "program_id",
+    "selected",
+    "exclusion_reason",
+    "category",
+    "difficulty",
+    "stratum_id"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.aegis-sample-entry.v0"
+    },
+    "sample_entry_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "specification_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "program_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "selected": {
+      "type": "boolean"
+    },
+    "exclusion_reason": {
+      "enum": [
+        "none",
+        "plausible_refuted",
+        "requested_fail",
+        "filtered_specification",
+        "other"
+      ]
+    },
+    "category": {
+      "enum": [
+        "edge_case",
+        "explicit_contract",
+        "functional_correctness",
+        "totality",
+        "output_bound",
+        "output_shape",
+        "relational",
+        "other"
+      ]
+    },
+    "difficulty": {
+      "enum": [
+        "easy",
+        "medium",
+        "hard",
+        "unknown"
+      ]
+    },
+    "stratum_id": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "selected": {
+            "const": true
+          }
+        },
+        "required": [
+          "selected"
+        ]
+      },
+      "then": {
+        "properties": {
+          "exclusion_reason": {
+            "const": "none"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "exclusion_reason": {
+            "const": "requested_fail"
+          }
+        },
+        "required": [
+          "exclusion_reason"
+        ]
+      },
+      "then": {
+        "properties": {
+          "selected": {
+            "const": false
+          }
+        }
+      }
+    }
+  ]
+}
