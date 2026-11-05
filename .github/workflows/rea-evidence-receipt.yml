@@ -20,8 +20,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verifier:
+  rea-target:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    name: REA verifier source-target preflight
+    runs-on: ubuntu-24.04
+    outputs:
+      present: ${{ steps.target.outputs.present }}
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - id: target
+        name: Check REA verifier package manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f "crates/domains/symthaea-rea-evidence-verifier/Cargo.toml" ]]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "REA_TARGET_PRESENT: verifier package manifest exists"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::REA_NOT_APPLICABLE: verifier package manifest is absent; see #8673/#9361"
+          fi
+
+  verifier:
+    if: github.event_name != 'pull_request' || (github.event.pull_request.draft == false && needs.rea-target.outputs.present == 'true')
+    needs: rea-target
+    name: REA evidence receipt verifier (only when package exists)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
