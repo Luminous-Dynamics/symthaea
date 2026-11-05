@@ -1,0 +1,24 @@
+{
+  "schema_version": 0,
+  "registry_id": "CEB-COMPARATIVE-CLAIM-V0",
+  "status": "design_only_no_empirical_claims",
+  "created_on": "2026-11-05",
+  "claim_schema_id": "https://luminousdynamics.io/schemas/ceb/comparative-claim-v0.schema.json",
+  "protocol": {
+    "pilot_claim_ceiling": "The 48-task, six-repository Rust pilot and 24-pair human-escalation pilot are feasibility/variance-estimation instruments. They may produce descriptive and exploratory findings only; they do not establish SOTA superiority.",
+    "confirmatory_repository_cluster_floor": 13,
+    "one_primary_endpoint": true,
+    "primary_alpha": 0.05,
+    "target_power": 0.9,
+    "small_discordance_rule": "For paired binary outcomes with fewer than 25 discordant pairs, use exact McNemar/binomial inference; do not rely only on the asymptotic approximation. Report discordant counts.",
+    "cluster_inference_rule": "Tasks are clustered by repository and root-cause family. Report cluster counts and size distribution. Use pairs cluster bootstrap, wild-cluster restricted bootstrap or randomization-inference sensitivity. V0 conservatively treats 12 or fewer repository clusters as exploratory, not confirmatory; this is a policy guardrail, not a universal theorem.",
+    "multiplicity_rule": "Preregister one primary endpoint and one primary contrast. Apply Holm step-down adjustment to confirmatory secondary metric tests; do not promote unadjusted secondary results to confirmatory claims.",
+    "noninferiority_rule": "Fix the noninferiority margin before holdout access. The current -2 percentage-point candidate margin is not approved by default; it requires engineering justification and pilot-based design review. Claim noninferiority only when the one-sided confidence bound clears the margin.",
+    "hard_gate_rule": "Critical security, evaluator-integrity, authorization or isolation failures are non-compensable. A qualified claim requires zero critical failures, qualified isolation/trust, independent regrade qualification, reference patch PASS and empty patch FAIL.",
+    "pareto_rule": "Publish a vector across correctness, security, cost, latency, reviewer burden, abstention/escalation and evidence completeness. A Pareto claim requires non-inferiority on every preregistered dimension and a strict improvement on at least one; no arbitrary weighted aggregate is allowed.",
+    "seed_pseudoreplication_rule": "The task or task-pair is the independent sampling unit. Seeds are repeated measurements nested within a task and do not increase the task denominator or repository cluster count.",
+    "zero_failure_rule": "For zero observed critical failures, report an exact one-sided binomial upper bound only with the independent-trial assumption stated. Also report fault-family clustering; counting many related variants does not establish independent evidence."
+  },
+  "claims": [],
+  "claim_boundary": "Design-only claim policy. No CEB performance claim, matched superiority result, non-inferiority result or Pareto-dominance claim is registered."
+}
