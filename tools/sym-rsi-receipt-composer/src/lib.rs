@@ -1184,7 +1184,10 @@ impl fmt::Display for ComposerError {
             Self::ContextMismatch => write!(f, "candidate evaluation contexts differ"),
             Self::SameCandidate => write!(f, "cannot compare a candidate with itself"),
             Self::ParentLineageMismatch => {
-                write!(f, "candidate did not declare the compared parent system identity")
+                write!(
+                    f,
+                    "candidate did not declare the compared parent system identity"
+                )
             }
             Self::MetricSetMismatch => write!(f, "candidate metric sets differ"),
             Self::TaskInputMismatch { metric_id, task_id } => {
@@ -1367,10 +1370,7 @@ mod tests {
             &receipt_set("candidate-rev", 'b', "candidate", "disabled"),
         )
         .unwrap();
-        assert_eq!(
-            candidate.parent_system_identity_digests().len(),
-            1
-        );
+        assert_eq!(candidate.parent_system_identity_digests().len(), 1);
         let summaries = compare_candidates(&parent, &candidate).unwrap();
 
         let quality = summaries.get("quality").unwrap();
@@ -1407,7 +1407,13 @@ mod tests {
             &plan,
             &BTreeMap::from([(
                 "quality".into(),
-                make_receipt("synthetic-quality", "candidate", 'b', "run-child", "disabled"),
+                make_receipt(
+                    "synthetic-quality",
+                    "candidate",
+                    'b',
+                    "run-child",
+                    "disabled",
+                ),
             )]),
         )
         .unwrap();
@@ -1425,7 +1431,13 @@ mod tests {
             &plan,
             &BTreeMap::from([(
                 "quality".into(),
-                make_receipt("synthetic-quality", "parent-left", 'a', "run-left", "disabled"),
+                make_receipt(
+                    "synthetic-quality",
+                    "parent-left",
+                    'a',
+                    "run-left",
+                    "disabled",
+                ),
             )]),
         )
         .unwrap();
@@ -1433,17 +1445,23 @@ mod tests {
             &plan,
             &BTreeMap::from([(
                 "quality".into(),
-                make_receipt("synthetic-quality", "parent-right", 'b', "run-right", "disabled"),
+                make_receipt(
+                    "synthetic-quality",
+                    "parent-right",
+                    'b',
+                    "run-right",
+                    "disabled",
+                ),
             )]),
         )
         .unwrap();
         let mut hybrid_plan = plan.clone();
-        hybrid_plan.parent_system_identity_digests.insert(
-            parent_left.candidate_system_identity_digest().to_owned(),
-        );
-        hybrid_plan.parent_system_identity_digests.insert(
-            parent_right.candidate_system_identity_digest().to_owned(),
-        );
+        hybrid_plan
+            .parent_system_identity_digests
+            .insert(parent_left.candidate_system_identity_digest().to_owned());
+        hybrid_plan
+            .parent_system_identity_digests
+            .insert(parent_right.candidate_system_identity_digest().to_owned());
         let hybrid = compose_candidate(
             &hybrid_plan,
             &BTreeMap::from([(
