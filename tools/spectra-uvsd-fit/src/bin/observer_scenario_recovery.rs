@@ -395,13 +395,13 @@ fn csv_option(value: Option<f64>) -> String {
 }
 
 fn emit_csv_row(fields: Vec<String>) {
-    assert_eq!(fields.len(), 42, "CSV row must match the header");
+    assert_eq!(fields.len(), 48, "CSV row must match the header");
     println!("{}", fields.join(","));
 }
 
 fn write_replicate_header() {
     println!(
-        "row_type,scenario_id,scenario_name,estimand_track,replicate,root_seed,dgp_prng_version,schedule_prng_version,trials_per_class,requested_total,observed_signal,observed_noise,missing_signal,missing_noise,rt_observed,rt_timeouts,rt_out_of_range,rt_not_collected,adapter_disposition,fit_status,qualified,truth_mu,truth_sigma,truth_d_a,estimate_mu,estimate_sigma,estimate_d_a,mu_error,sigma_error,d_a_error,mu_rmse,sigma_rmse,d_a_rmse,fit_availability_all,fit_availability_eligible,adapter_ready,adapter_abstentions,boundary,not_identifiable,weakly_identified,not_converged,not_evaluable"
+        "row_type,scenario_id,scenario_name,scenario_digest,action_set_digest,estimand_track,replicate,root_seed,dgp_prng_version,schedule_prng_version,trials_per_class,requested_total,observed_signal,observed_noise,missing_signal,missing_noise,rt_observed,rt_timeouts,rt_out_of_range,rt_not_collected,adapter_disposition,fit_status,qualified,truth_mu,truth_sigma,truth_d_a,estimate_mu,estimate_sigma,estimate_d_a,mu_error,sigma_error,d_a_error,mu_rmse,sigma_rmse,d_a_rmse,fit_availability_all,fit_availability_all_wilson_l95,fit_availability_all_wilson_u95,fit_availability_eligible,fit_availability_eligible_wilson_l95,fit_availability_eligible_wilson_u95,adapter_ready,adapter_abstentions,boundary,not_identifiable,weakly_identified,not_converged,not_evaluable"
     );
 }
 
@@ -433,6 +433,8 @@ fn write_replicate_row(
         "REPLICATE".to_owned(),
         case.id.to_string(),
         case.name.to_owned(),
+        format!("scenario:{}:{}", case.id, case.name),
+        "spectra-recovery-action-set-v0.1".to_owned(),
         track.to_owned(),
         replicate.to_string(),
         seed.to_string(),
@@ -475,6 +477,22 @@ fn write_replicate_row(
     ]);
 }
 
+fn wilson_interval(successes: usize, trials: usize) -> Option<(f64, f64)> {
+    if trials == 0 {
+        return None;
+    }
+    let n = trials as f64;
+    let p = successes as f64 / n;
+    let z = 1.959_963_984_540_054_f64;
+    let z_squared = z * z;
+    let denominator = 1.0 + z_squared / n;
+    let center = (p + z_squared / (2.0 * n)) / denominator;
+    let half_width = z
+        * (p * (1.0 - p) / n + z_squared / (4.0 * n * n)).sqrt()
+        / denominator;
+    Some(((center - half_width).max(0.0), (center + half_width).min(1.0)))
+}
+
 fn write_summary_row(case: &ScenarioCase, aggregate: &Accumulator) {
     let fit_availability_all = aggregate.converged as f64 / aggregate.campaigns.max(1) as f64;
     let fit_availability_eligible =
@@ -488,6 +506,8 @@ fn write_summary_row(case: &ScenarioCase, aggregate: &Accumulator) {
         "SUMMARY".to_owned(),
         case.id.to_string(),
         case.name.to_owned(),
+        format!("scenario:{}:{}", case.id, case.name),
+        "spectra-recovery-action-set-v0.1".to_owned(),
         track.to_owned(),
         "ALL".to_owned(),
         String::new(),
@@ -519,7 +539,15 @@ fn write_summary_row(case: &ScenarioCase, aggregate: &Accumulator) {
         aggregate.rmse(aggregate.sigma_squared_error_sum),
         aggregate.rmse(aggregate.d_a_squared_error_sum),
         csv_number(fit_availability_all),
+        wilson_interval(aggregate.converged, aggregate.campaigns)
+            .map_or_else(String::new, |interval| csv_number(interval.0)),
+        wilson_interval(aggregate.converged, aggregate.campaigns)
+            .map_or_else(String::new, |interval| csv_number(interval.1)),
         csv_number(fit_availability_eligible),
+        wilson_interval(aggregate.converged, aggregate.adapter_ready)
+            .map_or_else(String::new, |interval| csv_number(interval.0)),
+        wilson_interval(aggregate.converged, aggregate.adapter_ready)
+            .map_or_else(String::new, |interval| csv_number(interval.1)),
         aggregate.adapter_ready.to_string(),
         aggregate.adapter_abstentions.to_string(),
         aggregate.boundary.to_string(),
