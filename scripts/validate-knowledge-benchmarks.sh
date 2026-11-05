@@ -16,7 +16,7 @@ run_validator() {
   local output="$4"
 
   echo "==> Validating kind=$kind input=$input"
-  cargo run --locked --manifest-path "$manifest" -- \
+  cargo run --locked --manifest-path "$manifest" --bin knowledge-benchmark-harness -- \
     --kind "$kind" \
     --schema "$schema" \
     --input "$input" \
@@ -26,6 +26,23 @@ run_validator() {
 
 cargo fmt --manifest-path "$manifest" -- --check
 cargo test --locked --manifest-path "$manifest"
+
+echo "==> Validating candidate-only retrieval-plan anchor contract"
+cargo run --locked --manifest-path "$manifest" --bin validate-retrieval-plan -- \
+  --schema benchmarks/retrieval-plan/v0/plan.schema.json \
+  --input benchmarks/retrieval-plan/v0/valid-anchor-plan.json \
+  > "$reports_dir/retrieval-plan-valid.json"
+
+if cargo run --locked --manifest-path "$manifest" --bin validate-retrieval-plan -- \
+  --schema benchmarks/retrieval-plan/v0/plan.schema.json \
+  --input benchmarks/retrieval-plan/v0/invalid-dropped-anchor-plan.json \
+  > "$reports_dir/retrieval-plan-invalid.json"; then
+  echo "ERROR: dropped-anchor negative control was incorrectly accepted" >&2
+  exit 1
+fi
+grep -Fq '"recommended_action": "reject_rewrite_and_use_original_query"' \
+  "$reports_dir/retrieval-plan-invalid.json"
+echo "Dropped-anchor negative control rejected as expected"
 
 run_validator case \
   benchmarks/esoterica-bench/v0/case.schema.json \

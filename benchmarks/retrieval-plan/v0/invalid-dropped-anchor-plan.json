@@ -1,0 +1,26 @@
+{
+  "schema_version": "retrieval-plan-v0.1",
+  "plan_id": "synthetic-anchor-plan-negative-001",
+  "original_query": "What did the 2024 report say about KineticTrust v3.2 in isiZulu?",
+  "original_query_sha256": "78dbc99c3cb17c5f6366306afc557ac8cb52dea2e20c5eb56f5e341dced26ddc",
+  "fallback_query": "What did the 2024 report say about KineticTrust v3.2 in isiZulu?",
+  "rewrite_policy": "anchor_preserving",
+  "required_anchors": [
+    { "anchor_id": "a-year", "kind": "date", "text": "2024", "match_mode": "exact" },
+    { "anchor_id": "a-entity", "kind": "exact_entity", "text": "KineticTrust", "match_mode": "exact" },
+    { "anchor_id": "a-version", "kind": "identifier", "text": "v3.2", "match_mode": "exact" },
+    { "anchor_id": "a-language", "kind": "rare_term", "text": "isiZulu", "match_mode": "case_insensitive" }
+  ],
+  "constraints": [
+    { "constraint_id": "c-language", "kind": "language", "value": "isiZulu" },
+    { "constraint_id": "c-time", "kind": "valid_time", "value": "2024-01-01/2024-12-31" }
+  ],
+  "steps": [
+    {
+      "step_id": "s-primary",
+      "query": "What did the 2024 report say about the product v3.2 in isiZulu?",
+      "required_anchor_ids": ["a-year", "a-entity", "a-version", "a-language"],
+      "required_constraint_ids": ["c-language", "c-time"]
+    }
+  ]
+}
