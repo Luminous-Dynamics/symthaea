@@ -35,6 +35,39 @@ pub struct ReserveCommitment {
     pub product: ReserveProduct,
     pub direction: ReserveDirection,
     pub mw: f64,
+    /// Asset response evidence measured from the scheduled operating point.
+    pub start_response_seconds: Option<f64>,
+    pub full_activation_seconds: Option<f64>,
+    /// Sustained activation duration required by the contract / system profile.
+    /// SAWEM Rev 2.3 does not define this for every reserve product.
+    pub sustain_duration_seconds: Option<f64>,
+    /// Independently demonstrated asset sustain capability, not a nameplate claim.
+    pub proven_sustain_seconds: Option<f64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MarketReserveRequirement {
+    pub maximum_start_response_seconds: Option<f64>,
+    pub maximum_full_activation_seconds: Option<f64>,
+    pub minimum_sustain_seconds: Option<f64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReserveQualification {
+    Qualified,
+    Infeasible,
+    Indeterminate,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ReserveAssessment {
+    pub qualification: ReserveQualification,
+    pub committed_up_mw: f64,
+    pub committed_down_mw: f64,
+    pub available_up_mw: f64,
+    pub available_down_mw: f64,
+    pub indeterminate_reasons: Vec<&'static str>,
+    pub violations: Vec<Violation>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -66,7 +99,6 @@ pub struct DispatchStep {
     pub discharge_mw: f64,
     /// Declared downtime at the start of this interval for a mode transition.
     pub transition_seconds_before_action: f64,
-    pub reserve_duration_hours: f64,
     pub reserves: &'static [ReserveCommitment],
     pub network_export_limit_mw: f64,
     pub network_import_limit_mw: f64,
@@ -84,6 +116,11 @@ pub enum Violation {
     ImportLimitExceeded,
     ReservePowerHeadroomExceeded,
     ReserveEnergyHeadroomExceeded,
+    ReserveTargetBelowMinimumStableCharge,
+    ReserveResponseDeadlineExceeded,
+    ReserveSustainInsufficient,
+    UnsupportedReserveProductDirection,
+    InvalidReserveValue,
     DuplicateReserveProductDirection,
     EnergyBelowMinimum,
     EnergyAboveMaximum,
@@ -103,6 +140,7 @@ pub struct StepResult {
     pub transition_seconds_used: f64,
     pub reserve_up_mw: f64,
     pub reserve_down_mw: f64,
+    pub reserve_assessment: ReserveAssessment,
     pub violations: Vec<Violation>,
 }
 
