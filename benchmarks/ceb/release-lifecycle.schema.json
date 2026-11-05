@@ -1,0 +1,539 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ceb/release-lifecycle-v0.schema.json",
+  "title": "CEB Continuous Benchmark Release and Lifecycle V0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "registry_id",
+    "status",
+    "release_id",
+    "current_version",
+    "previous_release_id",
+    "previous_version",
+    "release_action",
+    "created_on",
+    "artifact_digests",
+    "change_records",
+    "task_lifecycle_entries",
+    "saturation_policy",
+    "saturation_observations",
+    "resource_calibration",
+    "historical_policy",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 0
+    },
+    "registry_id": {
+      "const": "CEB-RELEASE-LIFECYCLE-V0"
+    },
+    "status": {
+      "enum": [
+        "design_only_no_qualified_results",
+        "release_candidate",
+        "released"
+      ]
+    },
+    "release_id": {
+      "type": "string",
+      "pattern": "^ceb-[a-z0-9-]+$"
+    },
+    "current_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "previous_release_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "previous_version": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "release_action": {
+      "enum": [
+        "initial_design_no_qualified_results",
+        "full_rerun",
+        "affected_task_rerun",
+        "regrade_affected",
+        "reuse"
+      ]
+    },
+    "created_on": {
+      "type": "string",
+      "format": "date"
+    },
+    "artifact_digests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_set_sha256",
+        "prompt_set_sha256",
+        "source_set_sha256",
+        "environment_set_sha256",
+        "agent_tool_policy_sha256",
+        "resource_policy_sha256",
+        "grader_sha256",
+        "rubric_sha256",
+        "reference_control_set_sha256",
+        "metadata_sha256",
+        "evaluation_input_sha256"
+      ],
+      "properties": {
+        "task_set_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "prompt_set_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "source_set_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "environment_set_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "agent_tool_policy_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "resource_policy_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "grader_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "rubric_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "reference_control_set_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "metadata_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "evaluation_input_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "change_records": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/change"
+      }
+    },
+    "task_lifecycle_entries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/lifecycle"
+      }
+    },
+    "saturation_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum_trials_per_configuration",
+        "require_all_registered_current_generation_families",
+        "require_all_trials_successful",
+        "model_family_registry",
+        "saturation_disposition",
+        "longitudinal_policy"
+      ],
+      "properties": {
+        "minimum_trials_per_configuration": {
+          "const": 5
+        },
+        "require_all_registered_current_generation_families": {
+          "const": true
+        },
+        "require_all_trials_successful": {
+          "const": true
+        },
+        "model_family_registry": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]+$"
+          }
+        },
+        "saturation_disposition": {
+          "const": "remove_from_active_aggregate_but_retain_in_longitudinal_panel"
+        },
+        "longitudinal_policy": {
+          "type": "string",
+          "minLength": 40
+        }
+      }
+    },
+    "saturation_observations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/saturation"
+      }
+    },
+    "resource_calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "planned_independent_runs_per_reference_task",
+        "actual_independent_runs",
+        "infrastructure_failure_rate_target",
+        "observed_infrastructure_failure_rate",
+        "p95_runtime_seconds",
+        "resource_policy_sha256",
+        "calibration_record_sha256",
+        "agent_and_infrastructure_failures_separated",
+        "agent_timeout_policy_sha256",
+        "claim_boundary"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_run_blocked",
+            "planned",
+            "qualified",
+            "failed"
+          ]
+        },
+        "planned_independent_runs_per_reference_task": {
+          "const": 10
+        },
+        "actual_independent_runs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "infrastructure_failure_rate_target": {
+          "const": 0.01
+        },
+        "observed_infrastructure_failure_rate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "p95_runtime_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "resource_policy_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "calibration_record_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "agent_and_infrastructure_failures_separated": {
+          "const": true
+        },
+        "agent_timeout_policy_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "claim_boundary": {
+          "type": "string",
+          "minLength": 30
+        }
+      }
+    },
+    "historical_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "immutable_release_records",
+        "preserve_superseded_task_denominators",
+        "no_silent_task_deletion",
+        "invalid_and_saturated_tasks_retained",
+        "release_comparison_rule"
+      ],
+      "properties": {
+        "immutable_release_records": {
+          "const": true
+        },
+        "preserve_superseded_task_denominators": {
+          "const": true
+        },
+        "no_silent_task_deletion": {
+          "const": true
+        },
+        "invalid_and_saturated_tasks_retained": {
+          "const": true
+        },
+        "release_comparison_rule": {
+          "type": "string",
+          "minLength": 40
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 50
+    }
+  },
+  "$defs": {
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "change_id",
+        "change_class",
+        "paths",
+        "old_sha256",
+        "new_sha256",
+        "affected_task_ids",
+        "raw_execution_artifacts_available",
+        "evaluation_inputs_unchanged"
+      ],
+      "properties": {
+        "change_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]+$"
+        },
+        "change_class": {
+          "enum": [
+            "agent_visible",
+            "grader_only",
+            "metadata_only"
+          ]
+        },
+        "paths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "old_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "new_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "affected_task_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "raw_execution_artifacts_available": {
+          "type": "boolean"
+        },
+        "evaluation_inputs_unchanged": {
+          "type": "boolean"
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "task_status",
+        "previous_status",
+        "effective_release_id",
+        "reason",
+        "decision_record_sha256",
+        "included_in_current_aggregate",
+        "included_in_longitudinal_panel",
+        "historical_denominator_preserved"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_status": {
+          "enum": [
+            "active",
+            "saturated_retained",
+            "invalid_retained",
+            "retired",
+            "pending_calibration",
+            "superseded"
+          ]
+        },
+        "previous_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "effective_release_id": {
+          "type": "string",
+          "pattern": "^ceb-[a-z0-9-]+$"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 10
+        },
+        "decision_record_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "included_in_current_aggregate": {
+          "type": "boolean"
+        },
+        "included_in_longitudinal_panel": {
+          "type": "boolean"
+        },
+        "historical_denominator_preserved": {
+          "type": "boolean"
+        }
+      }
+    },
+    "saturation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "release_id",
+        "model_generation",
+        "observation_date",
+        "configuration_results",
+        "decision"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "release_id": {
+          "type": "string",
+          "pattern": "^ceb-[a-z0-9-]+$"
+        },
+        "model_generation": {
+          "type": "string",
+          "minLength": 3
+        },
+        "observation_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "configuration_results": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_family_id",
+              "configuration_id",
+              "trials",
+              "successes",
+              "trial_result_digests"
+            ],
+            "properties": {
+              "model_family_id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]+$"
+              },
+              "configuration_id": {
+                "type": "string",
+                "minLength": 3
+              },
+              "trials": {
+                "type": "integer",
+                "minimum": 5
+              },
+              "successes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "trial_result_digests": {
+                "type": "array",
+                "minItems": 5,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
+          }
+        },
+        "decision": {
+          "enum": [
+            "not_saturated",
+            "saturated_candidate",
+            "confirmed_saturated"
+          ]
+        }
+      }
+    }
+  }
+}
