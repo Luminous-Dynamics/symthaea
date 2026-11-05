@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS genealogy_lineage_operations (
 /// Apply the current schema and additive migrations while preserving existing
 /// single-parent manifests. A blank lineage digest marks a legacy/v1 manifest.
 fn initialize_schema(conn: &Connection) -> rusqlite::Result<()> {
+    conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     conn.execute_batch(SCHEMA)?;
     let mut has_lineage_column = false;
     {
@@ -515,6 +516,9 @@ impl GenealogyStore {
                 .map_err(GenealogyLineageError::Database)?
                 .ok_or(GenealogyLineageError::CorruptLineage)?;
             tx.commit().map_err(GenealogyLineageError::Database)?;
+            drop(conn);
+            self.verify_lineage(existing.id)
+                .map_err(|_| GenealogyLineageError::CorruptLineage)?;
             return Ok(existing);
         }
 
