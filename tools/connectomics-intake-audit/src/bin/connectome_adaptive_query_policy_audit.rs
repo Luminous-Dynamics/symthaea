@@ -1380,6 +1380,14 @@ mod tests {
         .expect("adaptive no-policy fixture must parse")
     }
 
+    fn support_expansion_fixture() -> Input {
+        serde_json::from_str(include_str!(
+            "../../../../docs/neuroscience/examples/CONNECTOME_ADAPTIVE_SUPPORT_EXPANSION.example.json"
+        ))
+        .expect("support-expansion fixture must parse")
+    }
+
+
     fn bytes(input: &Input) -> Vec<u8> {
         serde_json::to_vec(input).expect("fixture serializes")
     }
@@ -1528,6 +1536,44 @@ mod tests {
         assert_eq!(report.worst_case_effort_units, Some(1));
         assert_eq!(report.optimal_policy_count, 2);
         assert!(report.policy.is_some());
+    }
+
+    #[test]
+    fn additive_support_expansion_cannot_lower_optimal_effort() {
+        let input = support_expansion_fixture();
+        let report = evaluate(&input, &bytes(&input)).unwrap();
+        assert_eq!(report.worst_case_effort_units, Some(4));
+        assert_eq!(report.fixed_non_adaptive_optimum.minimum_effort_units, Some(5));
+        assert_eq!(report.support_challenge_count, 1);
+        let challenge = &report.support_challenges[0];
+        assert_eq!(challenge.added_joint_tuple_count, 1);
+        assert_eq!(challenge.adaptive_worst_case_effort_before, Some(4));
+        assert_eq!(challenge.adaptive_worst_case_effort_after, Some(5));
+        assert_eq!(challenge.fixed_minimum_effort_before, Some(5));
+        assert_eq!(challenge.fixed_minimum_effort_after, Some(5));
+        assert!(challenge.adaptive_effort_non_decreasing);
+        assert!(challenge.fixed_effort_non_decreasing);
+        assert!(challenge.monotonicity_passed);
+    }
+
+    #[test]
+    fn support_expansion_rejects_a_tuple_already_in_base_support() {
+        let mut input = support_expansion_fixture();
+        input.support_challenges[0].additions[0].possible_joint_outcomes[0]
+            .outcomes[1]
+            .outcome = "y-same".into();
+        input.support_challenges[0].additions[0].possible_joint_outcomes[0]
+            .outcomes[2]
+            .outcome = "z-d".into();
+        let error = evaluate(&input, &bytes(&input)).unwrap_err();
+        assert!(error.contains("already present"));
+    }
+
+    #[test]
+    fn no_policy_cannot_be_resurrected_by_adding_support() {
+        assert!(effort_is_non_decreasing(None, None));
+        assert!(!effort_is_non_decreasing(None, Some(1)));
+        assert!(effort_is_non_decreasing(Some(1), None));
     }
 
     #[test]
