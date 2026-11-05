@@ -43,7 +43,7 @@ The corresponding radius is:
 
 `range_width * sqrt(log(B / delta) / (2 * n))`.
 
-A union bound over the frozen cells, six one-sided claims per cell, and every local look through B gives the stated familywise coverage under the same bounded independent-within-cell stream assumptions. Dependence between cells or metrics does not invalidate this union bound.
+A union bound over the frozen cells, six one-sided claims per cell, and every local look through B gives the stated familywise coverage under the same bounded independent-within-cell stream assumptions. Dependence between cells or metrics does not invalidate this union bound. A practical implementation must also preserve the current radius cap at the full declared score range; when the uncapped factor is at least one, the bound is the full range rather than a larger radius.
 
 ### 3.1 Numerical example
 
@@ -53,7 +53,7 @@ For 24 one-sided claims, familywise alpha 0.05, B=1000, and n=1000:
 - Uniform finite-horizon radius: approximately 0.0809 times the declared score range.
 - Terminal radius reduction: approximately 19.1%.
 
-This is a calculation from the formulas, not a measured Rust benchmark. At early looks, the uniform finite-horizon radius may be wider than the infinite-horizon radius. Plot and report the complete interval-width trajectory, stopping distribution and certificate probability; do not present only the terminal improvement.
+This is a calculation from the formulas, not a measured Rust benchmark. The production implementation caps radii at the full declared score range, so the comparison must apply the same cap. With that cap, B=1000 gives identical full-range radii at n=1 and n=2; at n=5 the finite-horizon radius is about 2.2% wider, at n=10 about 9.7% wider, and at n=20 about 3.5% wider. The curves cross near n=31; at n=100 the finite-horizon radius is about 7.8% smaller, and at n=1000 it is about 19.1% smaller. Plot and report the complete interval-width trajectory, stopping distribution and certificate probability; do not present only the terminal improvement.
 
 ### 3.2 Horizon and budget semantics
 
