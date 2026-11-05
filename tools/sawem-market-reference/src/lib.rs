@@ -1887,9 +1887,9 @@ mod tests {
                 contracted_capacity_mw: Some(70.0),
                 official_energy_consumption_mw: None,
                 effective_available_capacity_mw: Some(75.0),
-            was_utilized_for_reserve_or_balancing: None,
-            energy_instruction_differed_from_contract: None,
-            acceptable_performance: None,
+                was_utilized_for_reserve_or_balancing: None,
+                energy_instruction_differed_from_contract: None,
+                acceptable_performance: None,
             },
             curve,
         )
@@ -1982,8 +1982,8 @@ mod tests {
             official_energy_consumption_mw: None,
             effective_available_capacity_mw: Some(75.0),
             was_utilized_for_reserve_or_balancing: None,
-                energy_instruction_differed_from_contract: None,
-                acceptable_performance: None,
+            energy_instruction_differed_from_contract: None,
+            acceptable_performance: None,
         };
         assert_eq!(
             qualifying_dsu_capacity_for_payment(negative_contract, curve),
