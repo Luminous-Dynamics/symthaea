@@ -569,6 +569,51 @@ mod tests {
     }
 
     #[test]
+    fn category_order_overflow_is_an_explicit_nonready_disposition() {
+        let action_set = actions();
+        let category_counts = vec![0u64; i16::MAX as usize + 2];
+        let mut noise_counts = category_counts.clone();
+        let mut signal_counts = category_counts.clone();
+        noise_counts[0] = 1;
+        signal_counts[0] = 1;
+        let empty_counts = category_counts.clone();
+        let make_summary = |action_id, stimulus_class, requested_trials, category_counts| {
+            ActionCategorySummary {
+                action_id,
+                stimulus_class,
+                requested_trials,
+                category_counts,
+                missing_category: 0,
+                lapse_count_oracle: 0,
+                rt_observed: 0,
+                rt_timeouts: 0,
+                rt_out_of_range: 0,
+                rt_not_collected: requested_trials,
+            }
+        };
+        let data = SyntheticDataset {
+            scenario: scenario(vec![-1.0, 0.0, 1.0]),
+            scenario_digest: "sha256:scenario".to_owned(),
+            action_set_digest: action_set.digest().to_owned(),
+            root_seed: 1,
+            prng_version: "splitmix64-v1",
+            requests: Vec::new(),
+            trials: Vec::new(),
+            summaries: vec![
+                make_summary(1, StimulusClass::Noise, 1, noise_counts),
+                make_summary(2, StimulusClass::Signal, 1, signal_counts),
+                make_summary(3, StimulusClass::Signal, 0, empty_counts),
+            ],
+        };
+        let receipt = adapt_synthetic_dataset_for_uvsd(&data, &action_set).unwrap();
+        let group = receipt.groups.iter()
+            .find(|group| group.key.stimulus_level() == 1.0)
+            .unwrap();
+        assert_eq!(group.disposition, FitDisposition::CategoryOrderOverflow);
+        assert_eq!(group.table, None);
+    }
+
+    #[test]
     fn action_summary_permutation_does_not_change_adapter_receipt() {
         let action_set = actions();
         let schedule = (0..1_000)
