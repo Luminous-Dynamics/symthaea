@@ -134,9 +134,16 @@ pub struct ReuseCandidateEvidence {
 }
 
 impl ReuseCandidateEvidence {
-    /// Construct one candidate's paired pass/fail summary. empirical_improvement
-    /// is the mean paired score difference over the full eligible task universe,
-    /// including ties; it is used only to choose among candidates that pass.
+    /// Construct one candidate's paired pass/fail summary.
+    ///
+    /// `wins` and `losses` must count independent paired evaluation units.
+    /// If task rows are clustered by repository, project, task family or run,
+    /// aggregate to the preregistered independent cluster unit before passing
+    /// counts here. A per-row count would violate the sign-test assumptions.
+    ///
+    /// `empirical_improvement` is the preregistered mean paired improvement
+    /// over the full eligible evaluation population, including ties; it is used
+    /// only to select among candidates that already pass the sign test.
     pub fn new(
         wins: usize,
         losses: usize,
@@ -171,7 +178,12 @@ pub enum ReuseRoundDecision {
 /// This follows the pass/fail REUSE algorithm: test each candidate at
 /// rho * delta[t,p], then among all candidates that pass choose the one with
 /// the largest empirical paired improvement. Stable input order breaks exact
-/// ties. Return only the single promoted candidate index or RejectAll.
+/// ties. Return only the single promoted candidate number or RejectAll.
+///
+/// The input evidence remains private to the evaluator. The caller must ensure
+/// wins/losses represent independent paired units (or pre-aggregate to
+/// preregistered clusters), and that empirical improvement covers the complete
+/// eligible evaluation population under the frozen benchmark scoring rule.
 ///
 /// This function is only a statistical decision kernel. The calling service
 /// must own the private evidence, candidate identity mapping, promotion history,
