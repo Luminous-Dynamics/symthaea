@@ -1,0 +1,470 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ceb/contamination-transparency-card-v0.schema.json",
+  "title": "CEB Contamination Transparency Card V0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "card_id",
+    "version",
+    "task_id",
+    "assessment_status",
+    "created_on",
+    "assessed_on",
+    "source_visibility",
+    "artifact_digests",
+    "lifecycle_dates",
+    "tier_assessments",
+    "search_surfaces",
+    "training_exposure",
+    "agent_access",
+    "answer_key_custody",
+    "mitigations",
+    "residual_uncertainty",
+    "reviewer_disposition",
+    "reviewer_id",
+    "search_protocol_id",
+    "search_record_sha256",
+    "card_record_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 0
+    },
+    "card_id": {
+      "type": "string",
+      "pattern": "^ceb-leak-[a-z0-9-]+$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^0\\.\\d+\\.\\d+$"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^ceb-rust-[a-z0-9-]+$"
+    },
+    "assessment_status": {
+      "enum": [
+        "not_assessed",
+        "searched_no_match_found",
+        "suspected_leakage",
+        "confirmed_leakage"
+      ]
+    },
+    "created_on": {
+      "type": "string",
+      "format": "date"
+    },
+    "assessed_on": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "source_visibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_visibility",
+        "issue_visibility",
+        "fix_visibility",
+        "benchmark_publication_visibility"
+      ],
+      "properties": {
+        "repository_visibility": {
+          "enum": [
+            "public",
+            "private",
+            "not_published",
+            "unknown"
+          ]
+        },
+        "issue_visibility": {
+          "enum": [
+            "public",
+            "private",
+            "not_published",
+            "unknown"
+          ]
+        },
+        "fix_visibility": {
+          "enum": [
+            "public",
+            "private",
+            "not_published",
+            "unknown"
+          ]
+        },
+        "benchmark_publication_visibility": {
+          "enum": [
+            "public",
+            "private",
+            "not_published",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "artifact_digests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_snapshot_sha256",
+        "task_prompt_sha256",
+        "acceptance_contract_sha256",
+        "answer_key_sha256",
+        "environment_sha256"
+      ],
+      "properties": {
+        "repository_snapshot_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "task_prompt_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "acceptance_contract_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "answer_key_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "environment_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "lifecycle_dates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issue_opened_on",
+        "fix_published_on",
+        "task_published_on",
+        "snapshot_frozen_on"
+      ],
+      "properties": {
+        "issue_opened_on": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "fix_published_on": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "task_published_on": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "snapshot_frozen_on": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        }
+      }
+    },
+    "tier_assessments": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tier",
+          "outcome",
+          "method",
+          "evidence_sha256",
+          "reviewer_id",
+          "notes"
+        ],
+        "properties": {
+          "tier": {
+            "enum": [
+              "T1_exact",
+              "T2_syntactic",
+              "T3_semantic",
+              "T4_task_level"
+            ]
+          },
+          "outcome": {
+            "enum": [
+              "not_assessed",
+              "no_match_found",
+              "match_found",
+              "inconclusive"
+            ]
+          },
+          "method": {
+            "type": "string",
+            "minLength": 5
+          },
+          "evidence_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]+$"
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 4
+          }
+        }
+      }
+    },
+    "search_surfaces": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "surface",
+          "status",
+          "method",
+          "query_sha256",
+          "result_sha256",
+          "searched_on",
+          "reviewer_id",
+          "coverage_and_limits"
+        ],
+        "properties": {
+          "surface": {
+            "enum": [
+              "source_git_history",
+              "issue_pr",
+              "forks",
+              "dataset_mirrors",
+              "benchmark_docs",
+              "release_notes",
+              "package_source_archives",
+              "code_search",
+              "web_search",
+              "connected_tools"
+            ]
+          },
+          "status": {
+            "enum": [
+              "searched",
+              "not_available",
+              "not_searched",
+              "not_applicable"
+            ]
+          },
+          "method": {
+            "type": "string",
+            "minLength": 4
+          },
+          "query_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "result_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "searched_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]+$"
+          },
+          "coverage_and_limits": {
+            "type": "string",
+            "minLength": 8
+          }
+        }
+      }
+    },
+    "training_exposure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "method",
+        "evidence_sha256",
+        "reviewer_id",
+        "residual_limit"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "unknown",
+            "known_exposed",
+            "independently_tested_no_evidence"
+          ]
+        },
+        "method": {
+          "type": "string",
+          "minLength": 4
+        },
+        "evidence_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "reviewer_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]+$"
+        },
+        "residual_limit": {
+          "type": "string",
+          "minLength": 20
+        }
+      }
+    },
+    "agent_access": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "egress_policy",
+        "trajectory_logging",
+        "answer_key_in_agent_artifacts",
+        "candidate_workspace_has_hidden_tests",
+        "access_policy_sha256"
+      ],
+      "properties": {
+        "egress_policy": {
+          "enum": [
+            "disabled",
+            "endpoint_only",
+            "allowlisted",
+            "unqualified",
+            "not_run_blocked"
+          ]
+        },
+        "trajectory_logging": {
+          "enum": [
+            "enabled",
+            "disabled",
+            "not_run_blocked"
+          ]
+        },
+        "answer_key_in_agent_artifacts": {
+          "const": false
+        },
+        "candidate_workspace_has_hidden_tests": {
+          "const": false
+        },
+        "access_policy_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "answer_key_custody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "custodian_id",
+        "custody_domain_id",
+        "outside_agent_workspace",
+        "custody_record_sha256"
+      ],
+      "properties": {
+        "custodian_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]+$"
+        },
+        "custody_domain_id": {
+          "type": "string",
+          "minLength": 3
+        },
+        "outside_agent_workspace": {
+          "const": true
+        },
+        "custody_record_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "mitigations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "immutable_pre_fix_snapshot",
+          "filtered_git_history",
+          "network_disabled",
+          "endpoint_only_network",
+          "allowlisted_network",
+          "answer_key_external_custody",
+          "private_or_fresh_task",
+          "development_only_public_exposure",
+          "reject_task",
+          "trajectory_audit"
+        ]
+      }
+    },
+    "residual_uncertainty": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 10
+      }
+    },
+    "reviewer_disposition": {
+      "enum": [
+        "pending",
+        "development_only",
+        "eligible_for_holdout_review",
+        "blocked",
+        "reject"
+      ]
+    },
+    "reviewer_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]+$"
+    },
+    "search_protocol_id": {
+      "type": "string",
+      "minLength": 4
+    },
+    "search_record_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "card_record_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

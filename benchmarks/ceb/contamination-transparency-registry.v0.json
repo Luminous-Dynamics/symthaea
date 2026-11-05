@@ -1,0 +1,33 @@
+{
+  "schema_version": 0,
+  "registry_id": "CEB-CONTAMINATION-TRANSPARENCY-V0",
+  "status": "design_only_no_task_cards",
+  "created_on": "2026-11-05",
+  "required_surfaces": [
+    "source_git_history",
+    "issue_pr",
+    "forks",
+    "dataset_mirrors",
+    "benchmark_docs",
+    "release_notes",
+    "package_source_archives",
+    "code_search",
+    "web_search",
+    "connected_tools"
+  ],
+  "tier_taxonomy": {
+    "T1_exact": "Exact textual or byte-level match to task answer, patch, hidden key or evaluation artifact.",
+    "T2_syntactic": "Normalized or structurally equivalent source/diff/answer match.",
+    "T3_semantic": "Semantically equivalent answer, issue paraphrase or implementation strategy match.",
+    "T4_task_level": "Benchmark metadata, task identity, hidden tests, expected outcomes or task-specific answer leakage."
+  },
+  "policies": {
+    "no_match_is_not_absence": "searched_no_match_found means no match was found in the listed/searchable surfaces at the recorded time. It does not prove no training exposure, no unindexed copy or no inaccessible mirror.",
+    "training_exposure": "Unknown is the default. independently_tested_no_evidence is a scoped finding, not proof of absence. Never label training exposure clean.",
+    "holdout": "A public issue/fix pair cannot be called sealed holdout. Holdout review requires private or not-published fix visibility, answer-key custody outside the agent workspace, and complete surface coverage or explicit not_available reasons.",
+    "evidence": "Every assessment and search surface carries a record digest, reviewer and time; missing or unavailable surfaces remain explicit."
+  },
+  "cards": [],
+  "actual_card_count": 0,
+  "claim_boundary": "Design-only transparency registry. No real task contamination card has been created or assessed."
+}

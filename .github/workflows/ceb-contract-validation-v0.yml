@@ -7,6 +7,8 @@ on:
       - "docs/research/CEB_EXTERNAL_OBSERVATION_REGISTRY_V0_2026-11-05.md"
       - "docs/research/CEB_RUST_PILOT_PREREGISTRATION_V0_2026-11-05.md"
       - "scripts/validate_ceb_observations.py"
+      - "scripts/validate_ceb_contamination_transparency.py"
+      - "scripts/validate_ceb_task_admission.py"
       - "scripts/validate_ceb_human_escalation_pilot.py"
       - "scripts/validate_ceb_balanced_sampling.py"
       - "scripts/validate_ceb_comparative_claims.py"
@@ -624,6 +626,12 @@ jobs:
         run: |
           set -euo pipefail
           "$RUNNER_TEMP/ceb-jsonschema/bin/python" scripts/validate_ceb_metric_correspondence.py --self-test --repo-root .
+      - name: Validate CEB contamination transparency cards
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/ceb-jsonschema/bin/python" scripts/validate_ceb_contamination_transparency.py --self-test --repo-root .
+          "$RUNNER_TEMP/ceb-jsonschema/bin/python" scripts/validate_ceb_contamination_transparency.py --repo-root .
       - name: Validate CEB task admission and oracle qualification
         shell: bash
         run: |

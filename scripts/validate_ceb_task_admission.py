@@ -18,7 +18,7 @@ def load(path: Path):
         raise ValueError(f"cannot load {path}: {error}") from error
 
 
-def validate_task(task: dict, schema: dict, format_checker: FormatChecker) -> list[str]:
+def validate_task(task: dict, schema: dict, format_checker: FormatChecker, contamination_cards: dict[str, dict]) -> list[str]:
     validator = Draft202012Validator(schema, format_checker=format_checker)
     errors = sorted(validator.iter_errors(task), key=lambda error: list(error.absolute_path))
     if errors:
@@ -72,6 +72,47 @@ def validate_task(task: dict, schema: dict, format_checker: FormatChecker) -> li
         semantic.append("static review/admission requires a complete solution-leakage review")
     if task["source"]["solution_leakage_review"]["status"] in ("suspected_leakage", "confirmed_leakage"):
         semantic.append("suspected or confirmed solution leakage blocks admission")
+
+    card_id = task["source"]["contamination_card_id"]
+    card_digest = task["source"]["contamination_card_sha256"]
+    if (card_id is None) != (card_digest is None):
+        semantic.append("contamination card ID and digest must be supplied together")
+    if task["task_status"] in ("static_reviewed", "execution_qualified", "admitted"):
+        if not card_id or not card_digest:
+            semantic.append("static review requires a linked contamination transparency card")
+        else:
+            card = contamination_cards.get(card_id)
+            if card is None:
+                semantic.append("linked contamination transparency card is absent from the registry")
+            else:
+                if card["card_record_sha256"] != card_digest:
+                    semantic.append("task manifest contamination-card digest does not match registry card")
+                if card["task_id"] != task["task_id"]:
+                    semantic.append("contamination card belongs to a different task")
+                if card["assessment_status"] in ("not_assessed", "suspected_leakage", "confirmed_leakage"):
+                    semantic.append("unassessed or contaminated task cannot be statically reviewed")
+                if card["reviewer_disposition"] in ("pending", "blocked", "reject"):
+                    semantic.append("contamination reviewer disposition blocks static task review")
+                if task["custody"]["partition"] == "holdout":
+                    if card["reviewer_disposition"] != "eligible_for_holdout_review":
+                        semantic.append("holdout requires eligible_for_holdout_review disposition")
+                    if card["source_visibility"]["fix_visibility"] not in ("private", "not_published"):
+                        semantic.append("public or unknown fix visibility cannot enter holdout")
+                if task["custody"]["partition"] == "development" and card["source_visibility"]["fix_visibility"] == "public":
+                    if card["reviewer_disposition"] != "development_only":
+                        semantic.append("publicly exposed task must be explicitly classified development_only")
+                if task["task_status"] in ("execution_qualified", "admitted"):
+                    expected_egress = {
+                        "disabled": "disabled",
+                        "endpoint_only": "endpoint_only",
+                        "allowlisted": "allowlisted",
+                        "unqualified": "unqualified",
+                    }.get(task["environment"]["network_policy"])
+                    if card["agent_access"]["egress_policy"] != expected_egress:
+                        semantic.append("contamination card egress policy differs from task environment policy")
+                    if card["agent_access"]["trajectory_logging"] != "enabled":
+                        semantic.append("execution-qualified task requires trajectory logging to be enabled")
+
     if task["task_spec"]["blind_solve_review"]["status"] != "passed" and task["task_status"] != "proposed":
         semantic.append("static review/admission requires a passed blind-solve instruction review")
     if task["task_status"] in ("static_reviewed", "execution_qualified", "admitted"):
@@ -98,11 +139,19 @@ def validate_task(task: dict, schema: dict, format_checker: FormatChecker) -> li
         semantic.append("development task must explicitly disclose accepted public fix exposure")
     if task["family_id"] == "performance-correctness" and task["environment"]["workload_sha256"] is None:
         semantic.append("performance task requires a pinned workload digest")
-    if task["acceptance_contract"]["security_review_status"] == "failed":
+    security_review = task["acceptance_contract"]
+    qualification_states = ("static_reviewed", "execution_qualified", "admitted")
+    if security_review["security_review_status"] == "failed":
         semantic.append("failed security review blocks task admission")
-    if task["acceptance_contract"]["security_review_status"] == "passed" and task["task_status"] in ("static_reviewed", "execution_qualified", "admitted"):
-        if not task["acceptance_contract"]["security_review_record_sha256"] or not task["acceptance_contract"]["security_reviewer_id"]:
-            semantic.append("passed security review requires reviewer identity and record digest")
+    if task["task_status"] in qualification_states:
+        if security_review["security_review_status"] not in ("passed", "not_applicable"):
+            semantic.append("qualification requires a passed security review or explicitly justified not-applicable disposition")
+        if not security_review["security_review_record_sha256"] or not security_review["security_reviewer_id"]:
+            semantic.append("security disposition requires reviewer identity and review-record digest")
+        if not security_review["security_review_rationale"].strip():
+            semantic.append("security disposition requires a non-empty scope rationale")
+        if security_review["security_review_status"] == "not_applicable" and task["family_id"] == "security-correctness":
+            semantic.append("security-correctness tasks cannot declare security review not applicable")
     if task["acceptance_contract"]["destructive_side_effects"]:
         semantic.append("tasks with destructive external side effects are excluded from the pilot")
     if task["execution_qualification"]["candidate_code_executed"]:
@@ -142,7 +191,7 @@ def validate_task(task: dict, schema: dict, format_checker: FormatChecker) -> li
     return semantic
 
 
-def validate_registry(registry: dict, registry_schema: dict, task_schema: dict, format_checker: FormatChecker) -> list[str]:
+def validate_registry(registry: dict, registry_schema: dict, task_schema: dict, format_checker: FormatChecker, contamination_cards: dict[str, dict]) -> list[str]:
     errors = []
     validator = Draft202012Validator(registry_schema, format_checker=format_checker)
     schema_errors = sorted(validator.iter_errors(registry), key=lambda error: list(error.absolute_path))
@@ -171,7 +220,7 @@ def validate_registry(registry: dict, registry_schema: dict, task_schema: dict, 
     if registry["actual_task_count"] == 0 and registry["status"] != "intake_contract_only_no_tasks_admitted":
         errors.append("zero task records must remain explicitly intake-only")
     for task in registry["tasks"]:
-        for error in validate_task(task, task_schema, format_checker):
+        for error in validate_task(task, task_schema, format_checker, contamination_cards):
             errors.append(f"{task.get('task_id','<unknown>')}: {error}")
     return errors
 
@@ -182,12 +231,12 @@ def valid_fixture() -> dict:
       "schema_version":0,"task_id":"ceb-rust-fixture-001","task_status":"proposed","family_id":"rust-types-traits",
       "repository":{"repo_full_name":"example/project","url":"https://github.com/example/project","source_revision":"b"*40,
        "license":{"spdx_expression":"Apache-2.0","license_file_path":"LICENSE","license_file_sha256":digest,"review_status":"compatible","license_review_record_sha256":digest,"license_reviewer_id":"license-reviewer-01"}},
-      "source":{"source_kind":"issue","source_url":"https://github.com/example/project/issues/1","source_id":"1","opened_at":"2026-01-01T00:00:00Z","fix_commit_sha":"c"*40,"fix_visibility":"public",
+      "source":{"source_kind":"issue","source_url":"https://github.com/example/project/issues/1","source_id":"1","opened_at":"2026-01-01T00:00:00Z","fix_commit_sha":"c"*40,"fix_visibility":"public","contamination_card_id":None,"contamination_card_sha256":None,
        "solution_leakage_review":{"status":"complete","reviewed_on":"2026-11-05","search_protocol_id":"CEB-LEAKAGE-SEARCH-001","search_record_sha256":digest,"searched_surfaces":["source-host","commit-history","benchmark-datasets"],"reviewer_id":"leakage-reviewer-01"}},
       "task_spec":{"prompt_sha256":digest,"acceptance_spec_sha256":"d"*64,"authoring_protocol_version":"0.1.0",
        "blind_solve_review":{"status":"passed","reviewer_id":"blind-reviewer-01","review_record_sha256":digest,"instruction_only_sufficient":True}},
       "environment":{"rust_toolchain":"1.96.0","cargo_lock_sha256":digest,"target_triple":"x86_64-unknown-linux-gnu","feature_set":["default"],"environment_image_digest":"sha256:"+"e"*64,"resource_policy_sha256":digest,"network_policy":"disabled","replay_manifest_sha256":digest,"workload_sha256":None},
-      "acceptance_contract":{"contract_sha256":digest,"fail_to_pass_check_ids":["issue-acceptance-001"],"pass_to_pass_check_ids":["existing-regression-001"],"critical_invariants":["trait contract remains sound"],"security_review_status":"passed","destructive_side_effects":False,"security_review_record_sha256":digest,"security_reviewer_id":"security-reviewer-01"},
+      "acceptance_contract":{"contract_sha256":digest,"fail_to_pass_check_ids":["issue-acceptance-001"],"pass_to_pass_check_ids":["existing-regression-001"],"critical_invariants":["trait contract remains sound"],"security_review_status":"passed","security_review_rationale":"Reviewer assessed changed behavior, trust boundaries and relevant security invariants.","destructive_side_effects":False,"security_review_record_sha256":digest,"security_reviewer_id":"security-reviewer-01"},
       "oracle":{"reviewers":[{"reviewer_id":"gold-reviewer-01","role":"gold_reviewer","review_record_sha256":digest,"decision":"accept"},{"reviewer_id":"gold-reviewer-02","role":"gold_reviewer","review_record_sha256":digest,"decision":"accept"}],"blinded_to_candidate_output":True,"llm_only_oracle":False,"disagreement_status":"none","adjudicator_id":None,"adjudication_record_sha256":None,"adjudication_decision":"not_needed","gold_patch_sha256":digest,"semantically_equivalent_repairs_allowed":True,"reference_patch_control":"not_run_blocked","empty_patch_control":"not_run_blocked","oracle_record_sha256":digest},
       "custody":{"partition":"development","custody_domain_id":"dev-custody-01","custodian_id":"custodian-01","custody_manifest_sha256":digest,"holdout_material_outside_agent_workspace":False,"agent_access_before_freeze":False,"public_fix_exposure_accepted":True},
       "execution_qualification":{"candidate_code_executed":False,"isolation_status":"blocked_issue_10064","isolation_profile_sha256":None,"trust_status":"blocked_issue_10369","trust_policy_sha256":None,"independent_regrade_claimed":False},
@@ -198,13 +247,103 @@ def valid_fixture() -> dict:
 
 def self_test(registry: dict, registry_schema: dict, task_schema: dict, format_checker: FormatChecker) -> None:
     fixture = valid_fixture()
-    if validate_task(fixture, task_schema, format_checker):
+    digest = "a" * 64
+    if validate_task(fixture, task_schema, format_checker, {}):
         raise SystemExit("valid synthetic task-manifest fixture unexpectedly failed")
 
-    def must_reject(mutant: dict, label: str) -> None:
-        errors = validate_task(mutant, task_schema, format_checker)
+    def must_reject(mutant: dict, label: str, cards: dict[str, dict] | None = None) -> None:
+        errors = validate_task(mutant, task_schema, format_checker, cards or {})
         if not errors:
             raise SystemExit(f"task-admission negative control unexpectedly passed: {label}")
+
+    def synthetic_card(
+        task_id: str,
+        *,
+        fix_visibility: str = "public",
+        reviewer_disposition: str = "development_only",
+        egress_policy: str = "disabled",
+        trajectory_logging: str = "enabled",
+        card_digest: str = "a" * 64,
+    ) -> dict:
+        return {
+            "card_record_sha256": card_digest,
+            "task_id": task_id,
+            "assessment_status": "searched_no_match_found",
+            "reviewer_disposition": reviewer_disposition,
+            "source_visibility": {"fix_visibility": fix_visibility},
+            "agent_access": {
+                "egress_policy": egress_policy,
+                "trajectory_logging": trajectory_logging,
+            },
+        }
+
+    # Security review is a task-admission prerequisite, distinct from runner isolation.
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "static_reviewed"
+    mutant["acceptance_contract"]["security_review_status"] = "not_reviewed"
+    must_reject(mutant, "qualification with unreviewed security disposition")
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "static_reviewed"
+    mutant["acceptance_contract"]["security_review_status"] = "not_applicable"
+    mutant["acceptance_contract"]["security_review_rationale"] = ""
+    must_reject(mutant, "not-applicable security disposition without rationale")
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "static_reviewed"
+    mutant["family_id"] = "security-correctness"
+    mutant["acceptance_contract"]["security_review_status"] = "not_applicable"
+    mutant["acceptance_contract"]["security_review_rationale"] = "This task is incorrectly claimed to have no security-relevant scope."
+    must_reject(mutant, "security-correctness family marked security review not applicable")
+    positive_na = copy.deepcopy(fixture)
+    positive_na["task_status"] = "static_reviewed"
+    positive_na["acceptance_contract"]["security_review_status"] = "not_applicable"
+    positive_na["acceptance_contract"]["security_review_rationale"] = "The reviewed task scope does not alter security-relevant behavior or trust boundaries."
+    positive_na["source"]["contamination_card_id"] = "ceb-leak-fixture-001"
+    positive_na["source"]["contamination_card_sha256"] = digest
+    positive_na_card = synthetic_card(positive_na["task_id"])
+    if validate_task(positive_na, task_schema, format_checker, {"ceb-leak-fixture-001": positive_na_card}):
+        raise SystemExit("justified not-applicable security disposition positive control unexpectedly failed")
+
+    # A task beyond proposed must bind its contamination card to the exact task and record digest.
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "static_reviewed"
+    mutant["source"]["contamination_card_id"] = "ceb-leak-fixture-001"
+    mutant["source"]["contamination_card_sha256"] = digest
+    must_reject(mutant, "static review without a registered contamination card", {})
+    valid_card = synthetic_card(fixture["task_id"])
+    cards = {"ceb-leak-fixture-001": valid_card}
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "static_reviewed"
+    mutant["source"]["contamination_card_id"] = "ceb-leak-fixture-001"
+    mutant["source"]["contamination_card_sha256"] = "b" * 64
+    must_reject(mutant, "contamination card digest mismatch", cards)
+    wrong_task_card = synthetic_card("ceb-rust-other-task")
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "static_reviewed"
+    mutant["source"]["contamination_card_id"] = "ceb-leak-fixture-001"
+    mutant["source"]["contamination_card_sha256"] = digest
+    must_reject(mutant, "contamination card belongs to another task", {"ceb-leak-fixture-001": wrong_task_card})
+
+    # A public fix is development-only; it cannot be represented as holdout-eligible.
+    public_card = synthetic_card(fixture["task_id"], reviewer_disposition="eligible_for_holdout_review")
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "static_reviewed"
+    mutant["custody"]["partition"] = "holdout"
+    mutant["custody"]["holdout_material_outside_agent_workspace"] = True
+    mutant["source"]["contamination_card_id"] = "ceb-leak-fixture-001"
+    mutant["source"]["contamination_card_sha256"] = digest
+    must_reject(mutant, "public-fix contamination card represented as holdout eligible", {"ceb-leak-fixture-001": public_card})
+
+    # Execution qualification must use the same egress policy that was assessed on the contamination card.
+    mismatched_egress_card = synthetic_card(fixture["task_id"], egress_policy="allowlisted")
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "execution_qualified"
+    mutant["oracle"]["reference_patch_control"] = "pass"
+    mutant["oracle"]["empty_patch_control"] = "fail"
+    mutant["execution_qualification"]["isolation_status"] = "qualified"
+    mutant["execution_qualification"]["isolation_profile_sha256"] = "f" * 64
+    mutant["source"]["contamination_card_id"] = "ceb-leak-fixture-001"
+    mutant["source"]["contamination_card_sha256"] = digest
+    must_reject(mutant, "execution egress differs from contamination assessment", {"ceb-leak-fixture-001": mismatched_egress_card})
 
     mutant = copy.deepcopy(fixture)
     mutant["repository"]["source_revision"] = "main"
@@ -265,12 +404,12 @@ def self_test(registry: dict, registry_schema: dict, task_schema: dict, format_c
 
     registry_mutant = copy.deepcopy(registry)
     registry_mutant["family_targets"][0]["target_tasks"] = 9
-    errors = validate_registry(registry_mutant, registry_schema, task_schema, format_checker)
+    errors = validate_registry(registry_mutant, registry_schema, task_schema, format_checker, {})
     if not errors:
         raise SystemExit("task admission quota negative control unexpectedly passed")
     registry_mutant = copy.deepcopy(registry)
     registry_mutant["actual_task_count"] = 1
-    errors = validate_registry(registry_mutant, registry_schema, task_schema, format_checker)
+    errors = validate_registry(registry_mutant, registry_schema, task_schema, format_checker, {})
     if not errors:
         raise SystemExit("empty task registry count negative control unexpectedly passed")
     print("CEB_TASK_REGISTRY_SELF_TEST_PASS")
@@ -286,13 +425,17 @@ def main() -> int:
         registry = load(base / "task-admission-registry.v0.json")
         registry_schema = load(base / "task-admission-registry.schema.json")
         task_schema = load(base / "task-admission.schema.json")
+        contamination_registry = load(base / "contamination-transparency-registry.v0.json")
+        contamination_cards = {row["card_id"]: row for row in contamination_registry["cards"]}
+        if contamination_registry["actual_card_count"] != len(contamination_cards):
+            raise ValueError("contamination registry card count/identity mismatch")
         Draft202012Validator.check_schema(registry_schema)
         Draft202012Validator.check_schema(task_schema)
     except Exception as error:
         print(f"CEB_TASK_ADMISSION_ERROR: {error}", file=sys.stderr)
         return 2
     format_checker = FormatChecker()
-    errors = validate_registry(registry, registry_schema, task_schema, format_checker)
+    errors = validate_registry(registry, registry_schema, task_schema, format_checker, contamination_cards)
     if errors:
         for error in errors:
             print(f"CEB_TASK_ADMISSION_FAIL: {error}", file=sys.stderr)
