@@ -111,6 +111,14 @@
           },
           "expected_type": {
             "type": "string"
+          },
+          "source_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
           }
         }
       }
