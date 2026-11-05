@@ -42,6 +42,9 @@ pub struct AsOfReplayTarget<'a> {
     /// A target can be scoped to one model family/version identity. Realized
     /// observations are common ground truth and are not filtered by model_id.
     pub model_id: Option<&'a str>,
+    /// Exact immutable model build digest. A human-readable version label is
+    /// not sufficient to bind a historical forecast comparison.
+    pub model_sha256: Option<&'a str>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,6 +60,11 @@ pub struct SelectedPriceVintage<'a> {
     pub record_id: &'a str,
     pub kind: SelectedVintageKind,
     pub value_minor_zar_per_mwh: i64,
+    pub source_ref: &'a str,
+    pub source_sha256: &'a str,
+    pub available_at_utc: i64,
+    pub model_id: Option<&'a str>,
+    pub model_sha256: Option<&'a str>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -83,6 +91,7 @@ pub enum AsOfReplayError {
     InvalidEvidenceReference,
     InvalidSourceDigest,
     InvalidModelDigest,
+    InvalidModelScope,
     InvalidTargetPeriod,
     InvalidVintagePeriod,
     InvalidVintageChronology,
@@ -148,10 +157,17 @@ fn target_matches(vintage: PriceVintage<'_>, target: AsOfReplayTarget<'_>) -> bo
         return false;
     }
     match vintage.kind {
-        PriceVintageKind::Forecast { model_id, .. } => target
-            .model_id
-            .map(|expected| expected == model_id)
-            .unwrap_or(true),
+        PriceVintageKind::Forecast {
+            model_id,
+            model_sha256,
+            ..
+        } => {
+            target.model_id.map(|expected| expected == model_id).unwrap_or(true)
+                && target
+                    .model_sha256
+                    .map(|expected| expected == model_sha256)
+                    .unwrap_or(true)
+        }
         PriceVintageKind::Realized { .. } => true,
     }
 }
@@ -178,6 +194,16 @@ pub fn replay_prices_as_of<'a>(
             || target.model_id.map(nonempty) == Some(false)
         {
             return Err(AsOfReplayError::InvalidTargetPeriod);
+        }
+        if target.model_id.is_some() != target.model_sha256.is_some() {
+            return Err(AsOfReplayError::InvalidModelScope);
+        }
+        if target
+            .model_sha256
+            .map(valid_sha256)
+            == Some(false)
+        {
+            return Err(AsOfReplayError::InvalidModelDigest);
         }
         for previous in &targets[..index] {
             if previous.series_id == target.series_id
@@ -298,6 +324,17 @@ pub fn replay_prices_as_of<'a>(
                     PriceVintageKind::Realized { .. } => SelectedVintageKind::Realized,
                 },
                 value_minor_zar_per_mwh: vintage.value_minor_zar_per_mwh,
+                source_ref: vintage.source_ref,
+                source_sha256: vintage.source_sha256,
+                available_at_utc: vintage.available_at_utc,
+                model_id: match vintage.kind {
+                    PriceVintageKind::Forecast { model_id, .. } => Some(model_id),
+                    PriceVintageKind::Realized { .. } => None,
+                },
+                model_sha256: match vintage.kind {
+                    PriceVintageKind::Forecast { model_sha256, .. } => Some(model_sha256),
+                    PriceVintageKind::Realized { .. } => None,
+                },
             });
             superseded_vintage_count = superseded_vintage_count
                 .checked_add(eligible_count.saturating_sub(1))
@@ -329,6 +366,7 @@ mod tests {
             valid_period_start_utc: 100,
             valid_period_end_utc: 200,
             model_id,
+            model_sha256: model_id.map(|_| MODEL_SHA),
         }
     }
 
@@ -389,6 +427,9 @@ mod tests {
         assert!(result.is_complete());
         assert_eq!(result.selected[0].record_id, "fc-latest-known");
         assert_eq!(result.selected[0].value_minor_zar_per_mwh, 600);
+        assert_eq!(result.selected[0].model_id, Some("chronos-v1"));
+        assert_eq!(result.selected[0].model_sha256, Some(MODEL_SHA));
+        assert_eq!(result.selected[0].source_ref, "fc-latest-known");
         assert_eq!(result.future_known_excluded_count, 2);
         assert_eq!(result.superseded_vintage_count, 1);
     }
@@ -444,6 +485,35 @@ mod tests {
             replay_prices_as_of(100, &[target(None)], &vintages),
             Err(AsOfReplayError::ModelScopeRequired)
         );
+    }
+
+    #[test]
+    fn same_model_label_with_different_build_digests_requires_exact_scope() {
+        let other_model_sha =
+            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
+        let vintages = [
+            forecast("build-a", 90, 95, 600, "chronos-v1"),
+            PriceVintage {
+                kind: PriceVintageKind::Forecast {
+                    issued_at_utc: 91,
+                    model_id: "chronos-v1",
+                    model_sha256: other_model_sha,
+                },
+                ..forecast("build-b", 91, 96, 900, "chronos-v1")
+            },
+        ];
+        assert_eq!(
+            replay_prices_as_of(100, &[target(None)], &vintages),
+            Err(AsOfReplayError::ModelScopeRequired)
+        );
+        let exact_target = AsOfReplayTarget {
+            model_id: Some("chronos-v1"),
+            model_sha256: Some(MODEL_SHA),
+            ..target(Some("chronos-v1"))
+        };
+        let result = replay_prices_as_of(100, &[exact_target], &vintages).unwrap();
+        assert_eq!(result.selected[0].record_id, "build-a");
+        assert_eq!(result.selected[0].model_sha256, Some(MODEL_SHA));
     }
 
     #[test]
