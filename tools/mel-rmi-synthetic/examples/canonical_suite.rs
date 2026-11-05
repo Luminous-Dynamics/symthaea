@@ -49,6 +49,16 @@ impl AgentPolicy for YokedSuitePolicy {
     }
 }
 
+fn synthetic_midi_bytes(marker: &[u8]) -> Vec<u8> {
+    let mut track = vec![0x00, 0xff, 0x01, marker.len() as u8];
+    track.extend_from_slice(marker);
+    track.extend_from_slice(&[0x00, 0xff, 0x2f, 0x00]);
+    let mut bytes = b"MThd\x00\x00\x00\x06\x00\x00\x00\x01\x01\xe0MTrk".to_vec();
+    bytes.extend_from_slice(&(track.len() as u32).to_be_bytes());
+    bytes.extend(track);
+    bytes
+}
+
 fn bind_and_verify_synthetic_artifacts(record: &mut TrialRecordV1) -> Result<(), HarnessError> {
     let inputs = std::array::from_fn(|index| {
         let event_id = record.manifest.input_event_ids[index].clone();
@@ -63,7 +73,7 @@ fn bind_and_verify_synthetic_artifacts(record: &mut TrialRecordV1) -> Result<(),
                 },
                 ArtifactPayloadV1 {
                     format: ArtifactFormatV1::Midi,
-                    bytes: [b"MThd".as_slice(), event_id.as_bytes()].concat(),
+                    bytes: synthetic_midi_bytes(event_id.as_bytes()),
                 },
             ],
         }
@@ -81,7 +91,7 @@ fn bind_and_verify_synthetic_artifacts(record: &mut TrialRecordV1) -> Result<(),
                 },
                 ArtifactPayloadV1 {
                     format: ArtifactFormatV1::Midi,
-                    bytes: [b"MThd".as_slice(), event_id.as_bytes()].concat(),
+                    bytes: synthetic_midi_bytes(event_id.as_bytes()),
                 },
             ],
         }
