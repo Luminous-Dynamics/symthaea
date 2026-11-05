@@ -20,6 +20,7 @@ struct Args {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Plan {
     schema_version: String,
     plan_id: String,
@@ -43,6 +44,7 @@ struct BudgetPlan {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Dataset {
     dataset_id: String,
     revision: String,
@@ -56,6 +58,7 @@ struct Dataset {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct SystemPlan {
     system_id: String,
     baseline_family: String,
@@ -66,6 +69,7 @@ struct SystemPlan {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct BootstrapPlan {
     replicates: usize,
     seed: u64,
@@ -75,6 +79,7 @@ struct BootstrapPlan {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct PairMeta {
     schema_version: String,
     pair_id: String,
@@ -85,6 +90,7 @@ struct PairMeta {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Prediction {
     schema_version: String,
     result_id: String,
@@ -1154,11 +1160,22 @@ fn run() -> Result<(), String> {
     let cluster_count = pair_map.values()
         .map(|pair| (pair.language.clone(), pair.file_id.clone()))
         .collect::<BTreeSet<_>>().len();
-    if plan.phase == "preregistered_held_out" && cluster_count < plan.bootstrap.minimum_independent_clusters {
-        return Err(format!(
-            "held-out run has only {cluster_count} source clusters; requires {}",
-            plan.bootstrap.minimum_independent_clusters
-        ));
+    if plan.phase == "preregistered_held_out" {
+        let mut clusters_by_language: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        for pair in pair_map.values() {
+            clusters_by_language.entry(pair.language.clone())
+                .or_default()
+                .insert(pair.file_id.clone());
+        }
+        for language in &target_languages {
+            let count = clusters_by_language.get(language).map_or(0, BTreeSet::len);
+            if count < plan.bootstrap.minimum_independent_clusters {
+                return Err(format!(
+                    "held-out language {language} has only {count} source clusters; requires {}",
+                    plan.bootstrap.minimum_independent_clusters
+                ));
+            }
+        }
     }
 
     let baseline_count = plan.systems.iter()
@@ -1296,6 +1313,20 @@ mod tests {
             .expect("same pair_id in two source documents is valid");
         assert_eq!(validated.len(), 2);
         assert_ne!(pair_key(&pair("document-0")), pair_key(&pair("document-1")));
+    }
+
+    #[test]
+    fn pair_manifest_record_rejects_unknown_fields() {
+        let invalid = r#"{
+            "schema_version":"multi-hall-sa-pair-v0",
+            "pair_id":"p",
+            "file_id":"f",
+            "fact_index":0,
+            "language":"isiZulu",
+            "hallucination_type":"temporal shift",
+            "unreviewed_extra":"must fail closed"
+        }"#;
+        assert!(serde_json::from_str::<PairMeta>(invalid).is_err());
     }
 
     #[test]
