@@ -1146,7 +1146,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn exhaustive_two_action_two_world_supports_match_direct_projection_oracle() {
         let mut case_count = 0_usize;
