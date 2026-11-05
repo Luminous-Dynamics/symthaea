@@ -73,7 +73,9 @@ This crate does **not** authenticate the actor, verify the receipt signature, or
 
 **Important limitation:** the helper does not access Studio storage, persist artifacts, reopen them, verify receipt signatures, authenticate the actor, validate consent scope, or attest to the verifier binary. The canonical example passes its generated payload arrays back to the verifier; this proves deterministic byte equality for those in-memory synthetic sets only. The helper provides a seam for a real adapter to pass independently re-fetched bytes, but does not itself prove such a read-back occurred.
 
-The `verifier_id` and `verifier_version` fields are caller-supplied labels, not a signed attestation. Hashing a synthetic receipt is not evidence that it originated from Studio or that its signer is trusted. The production integration must reuse MEL-013A: resolve Studio-owned artifacts, independently re-read exact bytes after commit, authenticate the transaction receipt and purpose-specific actor authority, and bind the verified transaction into the RMI trial. Do not create a parallel artifact registry.
+The `verifier_id` and `verifier_version` fields are caller-supplied labels, not a signed attestation. Hashing a synthetic receipt is not evidence that it originated from Studio or that its signer is trusted. A typed `CommittedArtifactReadbackV1` trait now defines the integration seam: the verifier requests each of the eight expected event IDs (four inputs, four outputs) from a committed-storage adapter, then checks the returned bytes/receipt hashes against the manifest-bound evidence. Tests verify exact event lookup and reject a post-commit byte substitution. The fake read-back provider tests this contract; it does not show that Studio persistence was actually reopened.
+
+The production integration must reuse MEL-013A: resolve Studio-owned artifacts, independently re-read exact bytes after commit, authenticate the transaction receipt and purpose-specific actor authority, and bind the verified transaction into the RMI trial. Do not create a parallel artifact registry.
 
 ## Executable suite and output
 
