@@ -942,6 +942,168 @@ mod tests {
     }
 
     #[test]
+    fn upward_reserve_includes_reducing_existing_charge() {
+        static RESERVES: [ReserveCommitment; 1] = [reserve(
+            ReserveProduct::Regulating,
+            ReserveDirection::Up,
+            80.0,
+            Some(5.0),
+            Some(600.0),
+            Some(600.0),
+            Some(600.0),
+        )];
+        let result = evaluate_dispatch(limits(), 150.0, &[step(30.0, 0.0, 300.0, &RESERVES)])
+            .expect("fixture inputs are valid");
+        let assessment = &result.steps[0].reserve_assessment;
+        assert_eq!(assessment.available_up_mw, 90.0);
+        assert_eq!(assessment.committed_up_mw, 80.0);
+        assert_eq!(assessment.qualification, ReserveQualification::Qualified);
+        assert!(result.feasible);
+    }
+
+    #[test]
+    fn downward_reserve_includes_reducing_discharge_and_increasing_charge() {
+        static RESERVES: [ReserveCommitment; 1] = [reserve(
+            ReserveProduct::Regulating,
+            ReserveDirection::Down,
+            80.0,
+            Some(5.0),
+            Some(600.0),
+            Some(600.0),
+            Some(600.0),
+        )];
+        let result = evaluate_dispatch(limits(), 100.0, &[step(0.0, 40.0, 900.0, &RESERVES)])
+            .expect("fixture inputs are valid");
+        let assessment = &result.steps[0].reserve_assessment;
+        assert_eq!(assessment.available_down_mw, 90.0);
+        assert_eq!(assessment.committed_down_mw, 80.0);
+        assert_eq!(assessment.qualification, ReserveQualification::Qualified);
+        assert!(result.feasible);
+    }
+
+    #[test]
+    fn reserve_target_cannot_land_inside_minimum_charging_deadband() {
+        static RESERVES: [ReserveCommitment; 1] = [reserve(
+            ReserveProduct::Regulating,
+            ReserveDirection::Down,
+            11.0,
+            Some(5.0),
+            Some(600.0),
+            Some(600.0),
+            Some(600.0),
+        )];
+        let result = evaluate_dispatch(limits(), 100.0, &[step(0.0, 10.0, 900.0, &RESERVES)])
+            .expect("fixture inputs are valid");
+        assert_eq!(
+            result.steps[0].reserve_assessment.qualification,
+            ReserveQualification::Infeasible
+        );
+        assert!(
+            result.steps[0]
+                .violations
+                .contains(&Violation::ReserveTargetBelowMinimumStableCharge)
+        );
+        assert!(!result.feasible);
+    }
+
+    #[test]
+    fn sawem_rev_2_3_reserve_response_and_sustain_requirements_are_product_specific() {
+        let regulating = sawem_rev_2_3_reserve_requirement(
+            ReserveProduct::Regulating,
+            ReserveDirection::Up,
+        )
+        .expect("regulating up is supported");
+        assert_eq!(regulating.maximum_start_response_seconds, Some(10.0));
+        assert_eq!(regulating.maximum_full_activation_seconds, Some(600.0));
+        assert_eq!(regulating.minimum_sustain_seconds, None);
+
+        let instantaneous = sawem_rev_2_3_reserve_requirement(
+            ReserveProduct::Instantaneous,
+            ReserveDirection::Up,
+        )
+        .expect("instantaneous up is supported");
+        assert_eq!(instantaneous.maximum_full_activation_seconds, Some(10.0));
+        assert_eq!(instantaneous.minimum_sustain_seconds, Some(600.0));
+
+        let ten_minute = sawem_rev_2_3_reserve_requirement(
+            ReserveProduct::TenMinute,
+            ReserveDirection::Up,
+        )
+        .expect("ten-minute up is supported");
+        assert_eq!(ten_minute.maximum_full_activation_seconds, Some(600.0));
+        assert_eq!(ten_minute.minimum_sustain_seconds, None);
+
+        assert_eq!(
+            sawem_rev_2_3_reserve_requirement(
+                ReserveProduct::Instantaneous,
+                ReserveDirection::Down,
+            ),
+            Err(Violation::UnsupportedReserveProductDirection)
+        );
+    }
+
+    #[test]
+    fn ten_minute_reserve_without_operational_sustain_profile_is_indeterminate() {
+        static RESERVES: [ReserveCommitment; 1] = [reserve(
+            ReserveProduct::TenMinute,
+            ReserveDirection::Up,
+            10.0,
+            None,
+            Some(600.0),
+            None,
+            None,
+        )];
+        let result = evaluate_dispatch(limits(), 100.0, &[step(0.0, 0.0, 0.0, &RESERVES)])
+            .expect("fixture inputs are valid");
+        let assessment = &result.steps[0].reserve_assessment;
+        assert_eq!(assessment.qualification, ReserveQualification::Indeterminate);
+        assert!(
+            assessment
+                .indeterminate_reasons
+                .contains(&"sustain_duration_not_defined_by_market_profile")
+        );
+        assert!(!result.feasible);
+        assert!(result.steps[0].violations.is_empty());
+    }
+
+    #[test]
+    fn instantaneous_reserve_enforces_ten_second_activation_and_ten_minute_sustain() {
+        static TOO_SLOW: [ReserveCommitment; 1] = [reserve(
+            ReserveProduct::Instantaneous,
+            ReserveDirection::Up,
+            5.0,
+            None,
+            Some(11.0),
+            None,
+            Some(600.0),
+        )];
+        let slow = evaluate_dispatch(limits(), 100.0, &[step(0.0, 0.0, 0.0, &TOO_SLOW)])
+            .expect("fixture inputs are valid");
+        assert!(
+            slow.steps[0]
+                .violations
+                .contains(&Violation::ReserveResponseDeadlineExceeded)
+        );
+
+        static TOO_SHORT: [ReserveCommitment; 1] = [reserve(
+            ReserveProduct::Instantaneous,
+            ReserveDirection::Up,
+            5.0,
+            None,
+            Some(10.0),
+            None,
+            Some(500.0),
+        )];
+        let short = evaluate_dispatch(limits(), 100.0, &[step(0.0, 0.0, 0.0, &TOO_SHORT)])
+            .expect("fixture inputs are valid");
+        assert!(
+            short.steps[0]
+                .violations
+                .contains(&Violation::ReserveSustainInsufficient)
+        );
+    }
+
+    #[test]
     fn rejects_energy_plus_reserve_double_counting() {
         static RESERVES: [ReserveCommitment; 1] = [reserve(
             ReserveProduct::Instantaneous,
