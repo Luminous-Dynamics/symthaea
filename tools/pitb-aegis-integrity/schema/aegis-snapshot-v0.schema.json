@@ -1,0 +1,327 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/aegis-snapshot-v0.schema.json",
+  "title": "PITB Aegis snapshot provenance v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "benchmark_version",
+    "paper_arxiv_id",
+    "paper_version",
+    "paper_submitted_date",
+    "snapshot_id",
+    "dataset_artifact_status",
+    "dataset_artifact_url",
+    "dataset_archive_sha256",
+    "dataset_license_status",
+    "dataset_license_identifier",
+    "program_pair_count",
+    "candidate_specification_count",
+    "sample_entry_count",
+    "paper_reference",
+    "task_manifest_sha256",
+    "sample_manifest_sha256",
+    "environment_policy_sha256",
+    "sample_protocol"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.aegis-snapshot.v0"
+    },
+    "benchmark_id": {
+      "const": "Aegis"
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "paper_arxiv_id": {
+      "const": "2610.38174"
+    },
+    "paper_version": {
+      "const": "v1"
+    },
+    "paper_submitted_date": {
+      "const": "2026-10-28"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_artifact_status": {
+      "enum": [
+        "not_located",
+        "available",
+        "synthetic_fixture"
+      ]
+    },
+    "dataset_artifact_url": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "format": "uri"
+        }
+      ]
+    },
+    "dataset_archive_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "dataset_license_status": {
+      "enum": [
+        "not_confirmed",
+        "confirmed",
+        "synthetic_only"
+      ]
+    },
+    "dataset_license_identifier": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "minLength": 1
+        }
+      ]
+    },
+    "program_pair_count": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "integer",
+          "minimum": 1
+        }
+      ]
+    },
+    "candidate_specification_count": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "integer",
+          "minimum": 1
+        }
+      ]
+    },
+    "sample_entry_count": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "integer",
+          "minimum": 1
+        }
+      ]
+    },
+    "task_manifest_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "sample_manifest_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "environment_policy_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "paper_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attempted_source_problems",
+        "validated_rust_lean_program_pairs",
+        "candidate_specifications",
+        "evaluation_sample_size",
+        "evaluation_program_count",
+        "evaluation_attempted_count",
+        "evaluation_statement_proofs",
+        "evaluation_unresolved_count",
+        "per_statement_budget_seconds"
+      ],
+      "properties": {
+        "attempted_source_problems": {
+          "const": 2356
+        },
+        "validated_rust_lean_program_pairs": {
+          "const": 2045
+        },
+        "candidate_specifications": {
+          "const": 11533
+        },
+        "evaluation_sample_size": {
+          "const": 2000
+        },
+        "evaluation_program_count": {
+          "const": 1257
+        },
+        "evaluation_attempted_count": {
+          "const": 1997
+        },
+        "evaluation_statement_proofs": {
+          "const": 1054
+        },
+        "evaluation_unresolved_count": {
+          "const": 943
+        },
+        "per_statement_budget_seconds": {
+          "const": 1800
+        }
+      }
+    },
+    "sample_protocol": {
+      "enum": [
+        "paper_v1_hold_only",
+        "custom_polarity_balanced"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "dataset_artifact_status": {
+            "const": "available"
+          }
+        },
+        "required": [
+          "dataset_artifact_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "dataset_artifact_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "dataset_archive_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "dataset_license_status": {
+            "const": "confirmed"
+          },
+          "dataset_license_identifier": {
+            "type": "string",
+            "minLength": 1
+          },
+          "program_pair_count": {
+            "const": 2045
+          },
+          "candidate_specification_count": {
+            "const": 11533
+          },
+          "sample_entry_count": {
+            "const": 2000
+          },
+          "task_manifest_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "sample_manifest_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "environment_policy_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "dataset_artifact_status": {
+            "const": "not_located"
+          }
+        },
+        "required": [
+          "dataset_artifact_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "dataset_artifact_url": {
+            "type": "null"
+          },
+          "dataset_archive_sha256": {
+            "type": "null"
+          },
+          "dataset_license_status": {
+            "const": "not_confirmed"
+          },
+          "dataset_license_identifier": {
+            "type": "null"
+          },
+          "program_pair_count": {
+            "type": "null"
+          },
+          "candidate_specification_count": {
+            "type": "null"
+          },
+          "sample_entry_count": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "dataset_artifact_status": {
+            "const": "synthetic_fixture"
+          }
+        },
+        "required": [
+          "dataset_artifact_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "dataset_license_status": {
+            "const": "synthetic_only"
+          }
+        }
+      }
+    }
+  ]
+}
