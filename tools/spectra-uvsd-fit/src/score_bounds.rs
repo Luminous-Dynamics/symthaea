@@ -16,6 +16,14 @@ use super::scenario::{ScenarioDefinition, ScenarioOutcome, ScenarioSet};
 use super::sequential::{OperationalAction, OperationalActionSet};
 
 pub const SCORE_BOUND_METHOD_ID: &str = "hoeffding-bonferroni-one-sided-v1";
+pub const ANYTIME_SCORE_BOUND_METHOD_ID: &str = "anytime-hoeffding-alpha-spending-v1";
+pub const ANYTIME_ALPHA_SPENDING_RULE_ID: &str = "n-times-n-plus-one-summable-v1";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BoundSchedule {
+    FixedLook,
+    Anytime,
+}
 
 /// A declared finite range for one Monte Carlo score family.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -118,6 +126,10 @@ pub struct MetricScoreBound {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScoreBoundsReceipt {
     pub method_id: &'static str,
+    /// Whether bounds are simultaneous over every replication count.
+    pub time_uniform: bool,
+    /// "none" for fixed-look intervals; a stable rule ID for anytime bounds.
+    pub alpha_spending_rule: &'static str,
     /// Canonical action inputs addressed by action_set_digest.
     pub action_set_digest: String,
     pub action_snapshot: Vec<OperationalAction>,
@@ -207,6 +219,44 @@ pub fn bound_candidate_score_samples(
     samples: &[BoundedScoreSamples],
     config: &ScoreBoundsConfig,
 ) -> Result<ScoreBoundsReceipt, ScoreBoundError> {
+    bound_candidate_score_samples_with_schedule(
+        action_set,
+        scenario_set,
+        samples,
+        config,
+        BoundSchedule::FixedLook,
+    )
+}
+
+/// Construct a time-uniform score confidence sequence for every action × scenario.
+///
+/// For base per-claim alpha delta = familywise_alpha/(6R), the look-n tail
+/// probability is delta_n = delta/[n(n+1)]. Since the sum over n >= 1 of
+/// 1/[n(n+1)] is one, a union bound over all six claims, all cells and all
+/// sample counts gives simultaneous coverage at every look. The radius is
+/// range_width * sqrt(log(n(n+1)/delta)/(2n)).
+pub fn bound_candidate_score_samples_anytime(
+    action_set: &OperationalActionSet,
+    scenario_set: &ScenarioSet,
+    samples: &[BoundedScoreSamples],
+    config: &ScoreBoundsConfig,
+) -> Result<ScoreBoundsReceipt, ScoreBoundError> {
+    bound_candidate_score_samples_with_schedule(
+        action_set,
+        scenario_set,
+        samples,
+        config,
+        BoundSchedule::Anytime,
+    )
+}
+
+fn bound_candidate_score_samples_with_schedule(
+    action_set: &OperationalActionSet,
+    scenario_set: &ScenarioSet,
+    samples: &[BoundedScoreSamples],
+    config: &ScoreBoundsConfig,
+    schedule: BoundSchedule,
+) -> Result<ScoreBoundsReceipt, ScoreBoundError> {
     validate_config(config)?;
 
     let expected_records = action_set
@@ -272,26 +322,31 @@ pub fn bound_candidate_score_samples(
                 &record.target_information,
                 config.ranges.target_information,
                 per_claim_alpha,
+                schedule,
             )?;
             let model_discrimination_information = lower_metric_bound(
                 &record.model_discrimination_information,
                 config.ranges.model_discrimination_information,
                 per_claim_alpha,
+                schedule,
             )?;
             let representativeness = lower_metric_bound(
                 &record.representativeness,
                 config.ranges.representativeness,
                 per_claim_alpha,
+                schedule,
             )?;
             let target_utility_lower = lower_metric_bound(
                 &record.target_utility,
                 config.ranges.target_utility,
                 per_claim_alpha,
+                schedule,
             )?;
             let target_utility_upper = upper_metric_bound(
                 &record.target_utility,
                 config.ranges.target_utility,
                 per_claim_alpha,
+                schedule,
             )?;
             let target_utility = MetricScoreBound {
                 point_estimate: target_utility_lower.point_estimate,
@@ -304,6 +359,7 @@ pub fn bound_candidate_score_samples(
                 &record.participant_burden_seconds,
                 config.ranges.participant_burden_seconds,
                 per_claim_alpha,
+                schedule,
             )?;
 
             metrics.push(ActionScenarioMetricBounds {
@@ -336,8 +392,19 @@ pub fn bound_candidate_score_samples(
         }
     }
 
+    let (method_id, time_uniform, alpha_spending_rule) = match schedule {
+        BoundSchedule::FixedLook => (SCORE_BOUND_METHOD_ID, false, "none"),
+        BoundSchedule::Anytime => (
+            ANYTIME_SCORE_BOUND_METHOD_ID,
+            true,
+            ANYTIME_ALPHA_SPENDING_RULE_ID,
+        ),
+    };
+
     Ok(ScoreBoundsReceipt {
-        method_id: SCORE_BOUND_METHOD_ID,
+        method_id,
+        time_uniform,
+        alpha_spending_rule,
         action_set_digest: action_set.digest().to_owned(),
         action_snapshot: action_set.actions().to_vec(),
         scenario_set_digest: scenario_set.digest().to_owned(),
@@ -429,12 +496,24 @@ fn hoeffding_radius(
     range: ScoreRange,
     sample_count: usize,
     delta: f64,
+    schedule: BoundSchedule,
 ) -> Result<f64, ScoreBoundError> {
     let width = range.width();
     if width == 0.0 {
         return Ok(0.0);
     }
-    let factor = (-delta.ln() / (2.0 * sample_count as f64)).sqrt();
+    let log_inverse_delta = match schedule {
+        BoundSchedule::FixedLook => -delta.ln(),
+        BoundSchedule::Anytime => {
+            let next_count = sample_count
+                .checked_add(1)
+                .ok_or(ScoreBoundError::BoundComputationNonFinite)?;
+            -delta.ln()
+                + (sample_count as f64).ln()
+                + (next_count as f64).ln()
+        }
+    };
+    let factor = (log_inverse_delta / (2.0 * sample_count as f64)).sqrt();
     if !factor.is_finite() || factor < 0.0 {
         return Err(ScoreBoundError::BoundComputationNonFinite);
     }
@@ -447,9 +526,10 @@ fn lower_metric_bound(
     values: &[f64],
     range: ScoreRange,
     delta: f64,
+    schedule: BoundSchedule,
 ) -> Result<MetricScoreBound, ScoreBoundError> {
     let point_estimate = mean(values);
-    let radius = hoeffding_radius(range, values.len(), delta)?;
+    let radius = hoeffding_radius(range, values.len(), delta, schedule)?;
     let lower_bound = (point_estimate - radius).max(range.lower);
     if !point_estimate.is_finite() || !lower_bound.is_finite() {
         return Err(ScoreBoundError::BoundComputationNonFinite);
@@ -467,9 +547,10 @@ fn upper_metric_bound(
     values: &[f64],
     range: ScoreRange,
     delta: f64,
+    schedule: BoundSchedule,
 ) -> Result<MetricScoreBound, ScoreBoundError> {
     let point_estimate = mean(values);
-    let radius = hoeffding_radius(range, values.len(), delta)?;
+    let radius = hoeffding_radius(range, values.len(), delta, schedule)?;
     let upper_bound = (point_estimate + radius).min(range.upper);
     if !point_estimate.is_finite() || !upper_bound.is_finite() {
         return Err(ScoreBoundError::BoundComputationNonFinite);
