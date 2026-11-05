@@ -341,6 +341,245 @@
           "A Luminous benchmark adapter must keep model-visible inputs separate from the reference/evaluator trust domain."
         ]
       }
+    },
+    {
+      "id": "parametric-cad-bench-v3",
+      "name": "Parametric CAD Bench V3",
+      "status": "metadata_only",
+      "publisher": "gNucleus AI",
+      "official_url": "https://cadbench.ai/",
+      "repository_url": "https://github.com/gNucleus-AI/cad-bench-submission",
+      "dataset_url": "https://hub.harborframework.com/datasets/gnucleus-ai/cad-bench/v3",
+      "paper_url": "https://arxiv.org/abs/2611.02659",
+      "paper_revision": "arXiv paper published 2026-11-02; live leaderboard retrieved 2026-11-05",
+      "task_count": 100,
+      "splits": {
+        "development": {
+          "count": 100,
+          "access": "public",
+          "score_scope": "Public V3 cohort. One complete 100-task run per official leaderboard row; task suite described as free to run. Model API and execution costs are paid by participant."
+        },
+        "hidden_test": {
+          "count": 0,
+          "access": "unavailable",
+          "score_scope": "No separate hidden-test split is described in the current V3 public release/leaderboard. Future Luminous holdouts must be separately authored and must not be conflated with this public cohort."
+        }
+      },
+      "disciplines": {
+        "structural": {
+          "total_tasks": null,
+          "development_tasks": null
+        },
+        "civil": {
+          "total_tasks": null,
+          "development_tasks": null
+        },
+        "electrical": {
+          "total_tasks": null,
+          "development_tasks": null
+        },
+        "mechanical": {
+          "total_tasks": null,
+          "development_tasks": null
+        }
+      },
+      "task_families": [
+        {
+          "id": "T1-text-create",
+          "name": "Text-to-CAD creation",
+          "public_count": 30,
+          "core_count": null,
+          "score_status": "public_leaderboard_reported",
+          "notes": [
+            "Create native parametric FreeCAD models from natural-language specifications."
+          ]
+        },
+        {
+          "id": "T2-text-create-edit",
+          "name": "Text-to-CAD create-and-edit",
+          "public_count": 30,
+          "core_count": null,
+          "score_status": "public_leaderboard_reported",
+          "notes": [
+            "Create and then modify a parametric model from subsequent textual instructions."
+          ]
+        },
+        {
+          "id": "T3-engineering-drawing",
+          "name": "Image-to-CAD engineering drawing reconstruction",
+          "public_count": 40,
+          "core_count": null,
+          "score_status": "public_leaderboard_reported",
+          "notes": [
+            "Reconstruct editable 3D CAD models from engineering drawings."
+          ]
+        }
+      ],
+      "licensing": {
+        "runner_code": "Harbor suite and validator are publicly referenced; exact source-code licence and redistribution terms were not verified in this registry pass.",
+        "development_dataset": "Public task suite is described by the official run page as free to run. Redistribution, training, fine-tuning and mirror terms were not independently verified; do not republish task files or assume dataset licensing.",
+        "access_gated": false
+      },
+      "execution": {
+        "official_runner": "Harbor dataset gnucleus-ai/cad-bench@v3; official run command is published on cadbench.ai/benchmark",
+        "harbor_version": "0.23.0",
+        "per_task_time_limit_seconds": 9000,
+        "runner_revision": "V3 protocol; FreeCAD 1.1.0; gnucleus-freecad-validator 0.6.0; Harbor task schema 1.3",
+        "dataset_revision": null,
+        "execution_authorized": false,
+        "official_hidden_test_repeat_count": null,
+        "official_development_baseline_repeat_count": 1,
+        "repeat_policy": "The official run page specifies a fresh 100-task cohort, one attempt per task, four-way concurrency and zero retries; each complete public Harbor job backs one official leaderboard row. Model runs and costs are complete-system totals, not per-task unit cost. The task dataset has an immutable digest that must be recorded from the exact official Harbor run; no such digest has been captured or independently replayed by Luminous.",
+        "max_rounds_per_task": 1,
+        "max_output_tokens_per_task": 9000,
+        "reasoning_carried_across_rounds": false,
+        "task_attempts_per_case": 1,
+        "concurrency": 4,
+        "max_retries": 0,
+        "network_policy": "Agent network access defaults to no network except the selected model provider; the evaluator/reference environment is separate. Keep the exact official isolation policy and /app workspace boundary.",
+        "score_definition": "Mean continuous reward across all 100 tasks combining geometry similarity and specification consistency; failed or unscored trials receive zero. This is not a binary geometry-equivalence pass rate or a manufacturing qualification.",
+        "environment": {
+          "freecad_version": "1.1.0",
+          "validator_version": "gnucleus-freecad-validator 0.6.0 with v2 scorer",
+          "task_schema_version": "1.3",
+          "agent_workspace_policy": "Agent limited to task-required files and state under /app; evaluator and held-back reference geometry remain outside the agent workspace."
+        }
+      },
+      "baseline_context": {
+        "hidden_test_leaderboard_score": null,
+        "paper_abstract_mean_score": 0.6103,
+        "all_hard_checks_clearance": null,
+        "notes": [
+          "Live official leaderboard retrieved 2026-11-05; its public rows are backed by complete 100-task Harbor jobs. Overall values are mean continuous reward on a 0–100 scale; stored as 0–1 fractions.",
+          "The official page states 100 tasks: 30 text-to-CAD create, 30 text-to-CAD create-and-edit, 40 engineering-drawing image-to-CAD.",
+          "V3 uses a pinned FreeCAD 1.1.0 environment, gnucleus-freecad-validator 0.6.0 and Harbor task schema 1.3. The verifier is separate from the agent workspace.",
+          "The official run recipe uses Harbor 0.23.0, one attempt per task, four-way concurrency, zero retries, max available reasoning effort and a 9,000-second time limit. Failures/unscored trials count as zero.",
+          "The live leaderboard scores and run total costs are public. Cost figures below are total cost for the 100-task job, not per-case costs.",
+          "The benchmark measures geometry, spatial alignment, parametric correctness, topology, agent workflow and efficiency. It does not establish manufacturability, GD&T conformance, functional performance or physical safety.",
+          "The leaderboard's September 24, 2026 top snapshot has overlapping overall confidence intervals among leading systems. Report task-family subscores and uncertainty, not only rank/order.",
+          "A separate hidden test split is not specified in the current V3 release. A Luminous held-out set would be a separate new corpus, not a hidden part of official V3."
+        ],
+        "published_results": [
+          {
+            "model": "Claude Opus 5.5",
+            "agent": "Claude Code",
+            "effort": "max",
+            "score": 0.6103,
+            "harness_version": "V3 / Harbor 0.23.0",
+            "repeat_count": 1,
+            "run_cost_total_usd": 573.94,
+            "scored_tasks": null,
+            "perfect_tasks": null,
+            "median_duration_seconds": null,
+            "tokens_per_case": null,
+            "subscores": {
+              "create": 0.5087,
+              "create_and_edit": 0.3969,
+              "image_to_cad": 0.8466
+            },
+            "notes": [
+              "Live official leaderboard row retrieved 2026-11-05. Complete 100-task run total cost USD 573.94."
+            ]
+          },
+          {
+            "model": "Claude Opus 5.5",
+            "agent": "mini-swe-agent",
+            "effort": "max",
+            "score": 0.5796,
+            "harness_version": "V3 / Harbor 0.23.0",
+            "repeat_count": 1,
+            "run_cost_total_usd": 498.28,
+            "scored_tasks": null,
+            "perfect_tasks": null,
+            "median_duration_seconds": null,
+            "tokens_per_case": null,
+            "subscores": {
+              "create": 0.4279,
+              "create_and_edit": 0.4138,
+              "image_to_cad": 0.8177
+            },
+            "notes": [
+              "Live official leaderboard row retrieved 2026-11-05. Complete 100-task run total cost USD 498.28."
+            ]
+          },
+          {
+            "model": "GPT-6 Astra",
+            "agent": "Codex",
+            "effort": "max",
+            "score": 0.5687,
+            "harness_version": "V3 / Harbor 0.23.0",
+            "repeat_count": 1,
+            "run_cost_total_usd": 317.81,
+            "scored_tasks": null,
+            "perfect_tasks": null,
+            "median_duration_seconds": null,
+            "tokens_per_case": null,
+            "subscores": {
+              "create": 0.5226,
+              "create_and_edit": 0.4437,
+              "image_to_cad": 0.697
+            },
+            "notes": [
+              "Live official leaderboard row retrieved 2026-11-05. Complete 100-task run total cost USD 317.81."
+            ]
+          },
+          {
+            "model": "Claude Fable 5.1",
+            "agent": "Claude Code",
+            "effort": "max",
+            "score": 0.5675,
+            "harness_version": "V3 / Harbor 0.23.0",
+            "repeat_count": 1,
+            "run_cost_total_usd": 1056.04,
+            "scored_tasks": null,
+            "perfect_tasks": null,
+            "median_duration_seconds": null,
+            "tokens_per_case": null,
+            "subscores": {
+              "create": 0.5548,
+              "create_and_edit": 0.3675,
+              "image_to_cad": 0.7271
+            },
+            "notes": [
+              "Live official leaderboard row retrieved 2026-11-05. Complete 100-task run total cost USD 1,056.04."
+            ]
+          },
+          {
+            "model": "Claude Opus 5",
+            "agent": "Claude Code",
+            "effort": "max",
+            "score": 0.5086,
+            "harness_version": "V3 / Harbor 0.23.0",
+            "repeat_count": 1,
+            "run_cost_total_usd": 1012.21,
+            "scored_tasks": null,
+            "perfect_tasks": null,
+            "median_duration_seconds": null,
+            "tokens_per_case": null,
+            "subscores": {
+              "create": 0.4948,
+              "create_and_edit": 0.3652,
+              "image_to_cad": 0.6264
+            },
+            "notes": [
+              "Live official leaderboard row retrieved 2026-11-05. Complete 100-task run total cost USD 1,012.21."
+            ]
+          }
+        ]
+      },
+      "ceb_integration": {
+        "task_contract_owner": "External public CAD benchmark; registry metadata and benchmark-neutral accounting only.",
+        "receipt_owner": "Benchmark-neutral accounting #10314 + evidence convergence #10370; native CAD artifacts and complete Harbor job record, not fabricated source-patch digests.",
+        "custody_owner": "CEB task custody #10436",
+        "isolation_blocker": "Symthaea execution isolation #10064",
+        "notes": [
+          "Metadata-only; no Harbor task image, CAD task, verifier, FreeCAD, model, or external job was run by Luminous.",
+          "Do not store the external V3 task files, hidden reference geometry or verifier inside the candidate-visible workspace.",
+          "Record the exact immutable Harbor dataset digest from every official run. The dataset digest is not inferred from the version tag.",
+          "Use the official public submission/review process only after the Luminous task execution isolation and grader custody prerequisites are qualified.",
+          "No CEB patch-only receipt is appropriate for native CAD outputs; use generic benchmark artifact accounting."
+        ]
+      }
     }
   ]
 }
