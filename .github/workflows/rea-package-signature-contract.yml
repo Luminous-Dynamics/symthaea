@@ -1,0 +1,65 @@
+name: REA Package Signature Contract
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "docs/research/package-signature-evaluation-v0.schema.json"
+      - "tools/rea-package-signature-harness/**"
+      - ".github/workflows/rea-package-signature-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-package-signature-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Set up pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: 1.96.0
+          components: clippy
+      - name: Resolve isolated contract lockfile
+        run: cargo generate-lockfile --manifest-path tools/rea-package-signature-harness/Cargo.toml
+      - name: Record exact schema and toolchain provenance
+        run: |
+          {
+            echo "source_commit=$GITHUB_SHA"
+            rustc --version --verbose
+            cargo --version
+            sha256sum docs/research/package-signature-evaluation-v0.schema.json
+            sha256sum tools/rea-package-signature-harness/Cargo.lock
+          } | tee tools/rea-package-signature-harness/run-context.txt
+      - name: Validate schema and dependency metadata
+        run: |
+          cargo tree --manifest-path tools/rea-package-signature-harness/Cargo.toml --locked -e normal,dev
+          cargo metadata --manifest-path tools/rea-package-signature-harness/Cargo.toml --locked --no-deps --format-version 1 > "$RUNNER_TEMP/rea-package-signature-metadata.json"
+      - name: Format check
+        run: cargo fmt --manifest-path tools/rea-package-signature-harness/Cargo.toml -- --check
+      - name: Schema and semantic negative controls
+        run: cargo test --manifest-path tools/rea-package-signature-harness/Cargo.toml --locked
+      - name: Archive resolved lock and exact run context
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: rea-package-signature-contract-lock
+          path: |
+            tools/rea-package-signature-harness/Cargo.lock
+            tools/rea-package-signature-harness/run-context.txt
+          if-no-files-found: error
+          retention-days: 14
+      - name: Clippy with warnings denied
+        run: cargo clippy --manifest-path tools/rea-package-signature-harness/Cargo.toml --locked --all-targets -- -D warnings
