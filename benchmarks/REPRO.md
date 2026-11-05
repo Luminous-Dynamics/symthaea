@@ -163,3 +163,50 @@ This is recorded in the manifest's separate `reported_results` array as `vendor_
 
 The same OpenAI post describes a physical prototype workflow in which manufacturing preparation required several review/iteration rounds because production limits, tolerances and assembly details were not consistently accounted for. This is a separate evidence class from BenchCAD scoring. It motivates an additional engineering gate: design/geometry success must not be promoted to manufacturability, assembly readiness or a conforming physical article without exact process-capability, tolerance, assembly and inspection evidence.
 
+
+
+## Parametric CAD Bench V3 — public suite / metadata-only
+
+Official references:
+- [V3 benchmark and live leaderboard](https://cadbench.ai/)
+- [V3 run recipe](https://cadbench.ai/benchmark)
+- [V3 September 21 release report](https://cadbench.ai/news/cad-bench-v3)
+- [V3 paper / evaluation findings (2026-11-02)](https://cadbench.ai/news/cad-bench-v3-paper)
+- [arXiv paper](https://arxiv.org/abs/2611.02659)
+- [Official Harbor task suite](https://hub.harborframework.com/datasets/gnucleus-ai/cad-bench/v3)
+
+### Task and scoring contract
+
+V3 has 100 public tasks:
+- 30 text-to-CAD creation;
+- 30 text-to-CAD create-and-edit;
+- 40 engineering-drawing image-to-CAD.
+
+It uses native FreeCAD artifacts and a separate programmatic verifier. The current published stack is FreeCAD 1.1.0, gnucleus-freecad-validator 0.6.0 with the v2 scorer, Harbor 0.23.0 and task schema 1.3. The official run page specifies one attempt per task, four-way concurrency, zero retries and a 9,000-second per-task limit. The agent's network access defaults to no network except the selected model provider; the held-back reference geometry/verifier stays outside the agent workspace. Failed/unscored tasks earn zero.
+
+The score is mean continuous reward combining geometry similarity and spec consistency, not a binary geometry pass rate and not a manufacturing/safety qualification. The benchmark measures geometry, spatial alignment, parametric correctness, topology/structure, workflow completion and efficiency.
+
+The official site says the task suite is free to run, while participants pay model API and execution costs. Exact source/dataset redistribution or training terms were not confirmed by this registry pass. Do not redistribute task files or include them in retrieval/training until the official terms are verified. The public V3 tag is not a substitute for the exact immutable dataset digest; capture that digest from the exact official Harbor run before reporting any reproduction. The metadata registry therefore keeps dataset_revision null and execution_authorized false.
+
+### Current public leaderboard snapshot (retrieved 2026-11-05)
+
+| Model | Agent | Overall | Create | Create + edit | Image-to-CAD | 100-task run cost |
+|---|---|---:|---:|---:|---:|---:|
+| Claude Opus 5.5 | Claude Code | 61.03% | 50.87% | 39.69% | 84.66% | $573.94 |
+| Claude Opus 5.5 | mini-swe-agent | 57.96% | 42.79% | 41.38% | 81.77% | $498.28 |
+| GPT-6 Astra | Codex | 56.87% | 52.26% | 44.37% | 69.70% | $317.81 |
+| Claude Fable 5.1 | Claude Code | 56.75% | 55.48% | 36.75% | 72.71% | $1,056.04 |
+| Claude Opus 5 | Claude Code | 50.86% | 49.48% | 36.52% | 62.64% | $1,012.21 |
+
+Costs are publisher-reported whole-job totals for the 100-task cohort, not per-case costs; do not divide or compare without matching the complete run scope. The September 24 paper snapshot reports overlapping confidence intervals among the leading systems; do not infer a statistically decisive rank from point estimates. Use the live page for current rows and the dated paper for the specific September 24 cohort.
+
+### Why this suite is not enough for Luminous claims
+
+The suite grades native CAD artifact geometry/spec consistency, parametric creation/editing and drawing reconstruction. It does not certify future edit preservation across arbitrary downstream changes, measurement traceability, GD&T conformance, manufacturing process capability, assembly access, as-built state, or physical function. Our additional CAD-HISTORY-001 interventions and HARDWARE-TOPOLOGY-001 buildability controls are separate extensions, not replacements for V3 and not directly comparable scores.
+
+Do not pool V3's continuous reward with PLE's professional engineering hard-constraint score or BenchCAD 2.0's Core geometry/assembly/ECAD score. Keep model, agent harness, exact task cohort, scorer and resource budgets separate.
+
+### No Luminous execution
+
+No V3 task image, FreeCAD model, Harbor job, validator, model, or external dataset was downloaded or executed by Luminous in this work. Candidate execution is blocked pending CEB task-custody #10436 and OS isolation #10064. Public availability does not bypass these controls.
+
