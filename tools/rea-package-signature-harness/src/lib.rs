@@ -96,10 +96,7 @@ pub fn canonicalize_evaluation(
 }
 
 /// Hash of the canonical evaluation statement; never a signature or trust assertion.
-pub fn evaluation_sha256(
-    schema: &Value,
-    statement: &Value,
-) -> Result<String, EvaluationError> {
+pub fn evaluation_sha256(schema: &Value, statement: &Value) -> Result<String, EvaluationError> {
     let canonical = canonicalize_evaluation(schema, statement)?;
     Ok(format!("{:x}", Sha256::digest(canonical)))
 }
@@ -290,9 +287,9 @@ fn validate_semantics(statement: &Value) -> Result<(), EvaluationError> {
     }
 
     if claim_status(claims, "signature_cryptographic")? == "pass" {
-        let has_verified_scheme = schemes.iter().any(|scheme| {
-            scheme.get("status").and_then(Value::as_str) == Some("pass")
-        });
+        let has_verified_scheme = schemes
+            .iter()
+            .any(|scheme| scheme.get("status").and_then(Value::as_str) == Some("pass"));
         if !has_verified_scheme {
             return Err(semantic(
                 "signature_cryptographic=pass requires at least one scheme-specific pass",
@@ -303,13 +300,15 @@ fn validate_semantics(statement: &Value) -> Result<(), EvaluationError> {
                 "signature_cryptographic=pass requires at least one signer key/certificate record",
             ));
         }
-        for scheme in schemes.iter().filter(|scheme| {
-            scheme.get("status").and_then(Value::as_str) == Some("pass")
-        }) {
+        for scheme in schemes
+            .iter()
+            .filter(|scheme| scheme.get("status").and_then(Value::as_str) == Some("pass"))
+        {
             let scheme_name = string_at(scheme, &["scheme"])?;
-            if !signers.iter().any(|signer| {
-                signer.get("scheme").and_then(Value::as_str) == Some(scheme_name)
-            }) {
+            if !signers
+                .iter()
+                .any(|signer| signer.get("scheme").and_then(Value::as_str) == Some(scheme_name))
+            {
                 return Err(semantic(format!(
                     "passing scheme {scheme_name} requires a signer record for that same scheme"
                 )));
@@ -363,9 +362,10 @@ fn validate_semantics(statement: &Value) -> Result<(), EvaluationError> {
                 return Err(semantic("APK v4 pass requires a bound .idsig digest"));
             }
             let supporting = array_at(scheme, &["supporting_schemes"])?;
-            if !supporting.iter().any(|value| {
-                matches!(value.as_str(), Some("apk-v2" | "apk-v3"))
-            }) {
+            if !supporting
+                .iter()
+                .any(|value| matches!(value.as_str(), Some("apk-v2" | "apk-v3")))
+            {
                 return Err(semantic(
                     "APK v4 pass requires a complementary v2 or v3 scheme result",
                 ));
@@ -466,15 +466,19 @@ fn validate_semantics(statement: &Value) -> Result<(), EvaluationError> {
     }
 
     if claim_status(claims, "runtime_behavior")? == "pass" {
-        for field in ["test_suite_id", "execution_evidence_sha256", "platform_build", "device_class"] {
+        for field in [
+            "test_suite_id",
+            "execution_evidence_sha256",
+            "platform_build",
+            "device_class",
+        ] {
             if runtime_context.get(field).is_none_or(Value::is_null) {
                 return Err(semantic(format!(
                     "runtime_behavior=pass requires runtime_context.{field}"
                 )));
             }
         }
-        if !is_sha256(string_at(runtime_context, &["execution_evidence_sha256"])?)
-        {
+        if !is_sha256(string_at(runtime_context, &["execution_evidence_sha256"])?) {
             return Err(semantic(
                 "runtime behavior evidence must have an exact SHA-256",
             ));
@@ -533,12 +537,20 @@ fn require_equal_identifier(
         .get(expected_field)
         .and_then(Value::as_str)
         .filter(|value| !value.is_empty())
-        .ok_or_else(|| semantic(format!("{expected_field} is required for authorization pass")))?;
+        .ok_or_else(|| {
+            semantic(format!(
+                "{expected_field} is required for authorization pass"
+            ))
+        })?;
     let observed = authorization
         .get(observed_field)
         .and_then(Value::as_str)
         .filter(|value| !value.is_empty())
-        .ok_or_else(|| semantic(format!("{observed_field} is required for authorization pass")))?;
+        .ok_or_else(|| {
+            semantic(format!(
+                "{observed_field} is required for authorization pass"
+            ))
+        })?;
     if expected != observed {
         return Err(semantic(format!(
             "{expected_field} and {observed_field} must match for authorization pass"
