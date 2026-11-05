@@ -27,3 +27,9 @@ name = "zip_differential"
 path = "fuzz_targets/zip_differential.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "zip_seed_corpus"
+path = "fuzz_targets/zip_seed_corpus.rs"
+test = false
+doc = false
