@@ -95,7 +95,10 @@ pub struct StepResult {
     pub requested_mode: OperatingMode,
     pub achieved_mode: OperatingMode,
     pub energy_before_mwh: f64,
+    /// Feasible state carried into the next interval. Hard-invalid actions do not commit.
     pub energy_after_mwh: f64,
+    /// Candidate state before hard-constraint commit/rejection.
+    pub candidate_energy_after_mwh: f64,
     pub net_export_mw: f64,
     pub transition_seconds_used: f64,
     pub reserve_up_mw: f64,
@@ -352,27 +355,23 @@ pub fn evaluate_dispatch(
         let transition_valid = step.transition_seconds_before_action + EPSILON
             >= required_transition
             && step.transition_seconds_before_action <= interval_seconds + EPSILON;
-        let action_valid = mode_request_valid && transition_valid;
+        let action_valid = mode_request_valid && transition_valid && network_valid;
         let active_hours = if action_valid {
             step.duration_hours - step.transition_seconds_before_action / 3_600.0
         } else {
             0.0
         };
-        // A rejected mode request or incomplete transition must not promote the
-        // internal state. Later intervals continue from the last achieved mode.
-        let achieved_mode = if action_valid {
-            requested_mode
-        } else {
-            previous_mode
-        };
 
         let net_export = step.discharge_mw - step.charge_mw;
-        if net_export > step.network_export_limit_mw + EPSILON {
+        let export_valid = net_export <= step.network_export_limit_mw + EPSILON;
+        if !export_valid {
             violations.push(Violation::ExportLimitExceeded);
         }
-        if -net_export > step.network_import_limit_mw + EPSILON {
+        let import_valid = -net_export <= step.network_import_limit_mw + EPSILON;
+        if !import_valid {
             violations.push(Violation::ImportLimitExceeded);
         }
+        let network_valid = export_valid && import_valid;
 
         let (reserve_up, reserve_down) = match sum_reserves(step.reserves) {
             Ok(values) => values,
@@ -389,15 +388,18 @@ pub fn evaluate_dispatch(
         }
 
         let energy_before = energy;
+        let mut candidate_energy = energy_before;
         if action_valid {
-            energy += step.charge_mw * charge_efficiency * active_hours;
-            energy -= step.discharge_mw / discharge_efficiency * active_hours;
+            candidate_energy += step.charge_mw * charge_efficiency * active_hours;
+            candidate_energy -= step.discharge_mw / discharge_efficiency * active_hours;
         }
 
-        if energy < limits.min_energy_mwh - EPSILON {
+        let energy_bounds_valid = candidate_energy >= limits.min_energy_mwh - EPSILON
+            && candidate_energy <= limits.max_energy_mwh + EPSILON;
+        if candidate_energy < limits.min_energy_mwh - EPSILON {
             violations.push(Violation::EnergyBelowMinimum);
         }
-        if energy > limits.max_energy_mwh + EPSILON {
+        if candidate_energy > limits.max_energy_mwh + EPSILON {
             violations.push(Violation::EnergyAboveMaximum);
         }
 
@@ -405,11 +407,23 @@ pub fn evaluate_dispatch(
             reserve_up * step.reserve_duration_hours / discharge_efficiency;
         let downward_energy_required =
             reserve_down * step.reserve_duration_hours * charge_efficiency;
-        if energy - limits.min_energy_mwh + EPSILON < upward_energy_required
-            || limits.max_energy_mwh - energy + EPSILON < downward_energy_required
+        if candidate_energy - limits.min_energy_mwh + EPSILON < upward_energy_required
+            || limits.max_energy_mwh - candidate_energy + EPSILON < downward_energy_required
         {
             violations.push(Violation::ReserveEnergyHeadroomExceeded);
         }
+
+        // Commit only physically and network-feasible dispatch. Retain the
+        // attempted energy separately so the audit explains hard failures.
+        let action_committed = action_valid && energy_bounds_valid;
+        if action_committed {
+            energy = candidate_energy;
+        }
+        let achieved_mode = if action_committed {
+            requested_mode
+        } else {
+            previous_mode
+        };
 
         results.push(StepResult {
             index,
@@ -417,6 +431,7 @@ pub fn evaluate_dispatch(
             achieved_mode,
             energy_before_mwh: energy_before,
             energy_after_mwh: energy,
+            candidate_energy_after_mwh: candidate_energy,
             net_export_mw: net_export,
             transition_seconds_used: step.transition_seconds_before_action,
             reserve_up_mw: reserve_up,
@@ -681,6 +696,9 @@ mod tests {
                 .violations
                 .contains(&Violation::ExportLimitExceeded)
         );
+        assert_eq!(result.steps[0].energy_after_mwh, 100.0);
+        assert_eq!(result.final_energy_mwh, 100.0);
+        assert_eq!(result.steps[0].achieved_mode, OperatingMode::Standstill);
     }
 
     #[test]
@@ -694,6 +712,8 @@ mod tests {
                 .violations
                 .contains(&Violation::EnergyBelowMinimum)
         );
+        assert_eq!(discharge.steps[0].energy_after_mwh, 25.0);
+        assert!(discharge.steps[0].candidate_energy_after_mwh < 20.0);
 
         let charge =
             evaluate_dispatch(limits(), 195.0, &[step(10.0, 0.0, 300.0, empty_reserves())])
@@ -704,6 +724,8 @@ mod tests {
                 .violations
                 .contains(&Violation::EnergyAboveMaximum)
         );
+        assert_eq!(charge.steps[0].energy_after_mwh, 195.0);
+        assert!(charge.steps[0].candidate_energy_after_mwh > 200.0);
     }
 
     #[test]
