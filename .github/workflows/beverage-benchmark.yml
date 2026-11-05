@@ -35,6 +35,7 @@ concurrency:
 
 jobs:
   synthetic-contract:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Synthetic Corpus Contract
     runs-on: ubuntu-latest
     steps:
