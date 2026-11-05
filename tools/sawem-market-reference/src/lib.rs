@@ -413,7 +413,7 @@ pub fn evaluate_dispatch(
     })
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SevenDayEnergyLimits {
     pub daily_limit_mwh: f64,
     pub next_six_days_limit_mwh: f64,
