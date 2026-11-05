@@ -9,3 +9,7 @@ This directory contains the **design-only** adversarial and positive-control cat
 
 **No execution is claimed.** All entries are `design_only_not_executed`. Candidate-controlled code, task build scripts, tests and attack payloads must not run until #10064 is qualified. Static verifier tests may be authored separately, but are not evidence of runner isolation.
 The CEB Contract Validation V0 workflow also runs `scripts/audit_doc_command_claims.py` to check tracked Markdown Cargo manifest/binary references without executing any documented command.
+
+## Measurement and comparative claims
+
+The CEB-wide [measurement matrix](../measurement-matrix.v0.json) and [comparative claim protocol](../../../docs/research/CEB_MEASUREMENT_AND_COMPARATIVE_CLAIM_PROTOCOL_V0_2026-11-05.md) define the primary metrics, external comparators, baseline arms, evidence authorities, hard gates and holdout design across 13 CEB lanes. The matrix is design-only; it does not contain CEB performance results.
