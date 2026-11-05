@@ -39,14 +39,17 @@ jobs:
         run: cargo generate-lockfile --manifest-path fuzz/Cargo.toml
       - name: Audit resolved fuzz dependency graph
         run: cargo tree --manifest-path fuzz/Cargo.toml --locked -e normal,dev
-      - name: Prepare content-addressable seed corpus
+      - name: Prepare deterministic content-addressable seed corpus
         run: |
           mkdir -p fuzz/corpus/zip_inventory_and_content fuzz/corpus/zip_differential fuzz/artifacts
           base64 --decode fuzz/seeds/minimal-stored-entry.zip.b64 > fuzz/corpus/zip_inventory_and_content/minimal-stored-entry.zip
           cp fuzz/corpus/zip_inventory_and_content/minimal-stored-entry.zip fuzz/corpus/zip_differential/minimal-stored-entry.zip
-          sha256sum fuzz/seeds/minimal-stored-entry.zip.b64 fuzz/corpus/zip_inventory_and_content/minimal-stored-entry.zip fuzz/corpus/zip_differential/minimal-stored-entry.zip
-          echo "dd8a2bd8c16d808363a1d1e7560a4cc86494393c1a202a478db00f00ae53d099  fuzz/corpus/zip_inventory_and_content/minimal-stored-entry.zip" | sha256sum --check -
-          echo "dd8a2bd8c16d808363a1d1e7560a4cc86494393c1a202a478db00f00ae53d099  fuzz/corpus/zip_differential/minimal-stored-entry.zip" | sha256sum --check -
+          cargo +nightly-2026-11-03 run --manifest-path fuzz/Cargo.toml --bin zip_seed_corpus -- \
+            fuzz/corpus/zip_inventory_and_content fuzz/corpus/zip_differential
+          find fuzz/corpus/zip_inventory_and_content fuzz/corpus/zip_differential -type f -name '*.zip' -print0 \
+            | sort -z | xargs -0 sha256sum > fuzz/artifacts/seed-digests.sha256
+          sha256sum fuzz/seeds/minimal-stored-entry.zip.b64 fuzz/artifacts/seed-digests.sha256
+          cat fuzz/artifacts/seed-digests.sha256
       - name: Record exact fuzz run context
         run: |
           pr_head_commit="${{ github.event.pull_request.head.sha || github.sha }}"
@@ -62,7 +65,7 @@ jobs:
             cargo fuzz --version
             uname -a
             sha256sum fuzz/Cargo.lock
-            sha256sum fuzz/seeds/minimal-stored-entry.zip.b64 fuzz/corpus/zip_inventory_and_content/minimal-stored-entry.zip fuzz/corpus/zip_differential/minimal-stored-entry.zip
+            sha256sum fuzz/seeds/minimal-stored-entry.zip.b64 fuzz/artifacts/seed-digests.sha256
             cargo tree --manifest-path fuzz/Cargo.toml --locked -e normal,dev
           } | tee fuzz/artifacts/run-context.txt
       - name: Run bounded production-reader fuzz smoke
