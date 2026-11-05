@@ -72,12 +72,9 @@ For each feasible candidate batch (b):
 6. Recompute every affected (L_a), (U_a), incumbent, and the robust gap using the exact production aggregation and tie-breaking logic.
 7. Rank candidates by:
 
-[
-I(b)=rac{max(0,Gamma_t-Gamma_{t+1}^{	ext{radius-only}})}
-{c(b)},
-]
+`I(b) = max(0, Gamma_before - Gamma_after_radius_only) / cost(b)`
 
-where (c(b)) is a frozen, declared batch-cost estimate in an explicit resource unit.
+where `cost(b)` is a frozen, declared batch-cost estimate in an explicit resource unit.
 
 This evaluates the exact certificate's response to interval-radius contraction for the hypothetical batch. It is not a prediction of the new sample values, not expected value of information, and not a theorem of allocation optimality.
 
@@ -97,15 +94,9 @@ Do not relabel ordinary interval-width reduction as decision value. Do not false
 
 Research a one-step and short-horizon alternative that estimates the expected value of a possible batch.
 
-For candidate batch (b), use a versioned predictive distribution (widehat P_t), fitted only from information available at time (t), to generate possible batch outcomes. Define a declared decision loss (J), for example robust regret or compute-to-valid-certificate, and estimate:
+For candidate batch `b`, use a versioned predictive distribution `P_hat_t`, fitted only from information available at time `t`, to generate possible batch outcomes. Define a declared decision loss `J`, for example robust regret or compute-to-valid-certificate, and estimate:
 
-[
-operatorname{EVC}_t(b)=
-rac{
-J_t-mathbb{E}_{widetilde Xsimwidehat P_t}
-[J_{t+1}(b,widetilde X)]
-}{c(b)}.
-]
+`EVC_t(b) = [J_t - E_{X_tilde ~ P_hat_t}(J_{t+1}(b, X_tilde))] / cost(b)`.
 
 The exact loss, prediction horizon, Monte Carlo error of this estimate, and cost unit must be frozen before comparison.
 
