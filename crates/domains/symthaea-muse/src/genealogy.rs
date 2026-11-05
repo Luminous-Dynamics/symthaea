@@ -116,7 +116,7 @@ impl std::error::Error for GenealogyBundleError {}
 /// This is suitable as a provenance reference for downstream RMI/evaluation
 /// records. It does not authenticate a musician, grant consent, or establish
 /// authorship or musical quality.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct VerifiedArtifactBundleV1 {
     /// Existing durable genealogy record.
     pub manifest: GenealogyManifest,
