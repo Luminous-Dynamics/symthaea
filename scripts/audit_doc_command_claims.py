@@ -557,7 +557,7 @@ def self_test():
             nested_readme,
             manifest_paths + [vendor_manifest, vendor_member],
         )
-        assert nearest == vendor_manifest.resolve()
+        assert nearest == vendor_member.resolve()
         vendor_index = workspace_package_index(
             fixture_root, manifest_paths + [vendor_manifest, vendor_member], nearest
         )
