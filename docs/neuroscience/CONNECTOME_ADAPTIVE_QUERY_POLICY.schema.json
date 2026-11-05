@@ -103,6 +103,13 @@
         "$ref": "#/$defs/supportChallenge"
       },
       "description": "Optional independent additive-only sensitivity branches. Each is applied to the same frozen base support; challenges are not cumulatively applied to one another."
+    },
+    "scenario_challenges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/scenarioExpansionChallenge"
+      },
+      "description": "Optional append-only alternative-world expansions; each is independently evaluated against the same frozen base scenario and joint-support universe."
     }
   },
   "$defs": {
@@ -318,6 +325,54 @@
           "items": {
             "$ref": "#/$defs/jointOutcome"
           }
+        }
+      }
+    },
+    "scenarioExpansionChallenge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "challenge_id",
+        "challenger_evidence_sha256",
+        "challenger_model_sha256",
+        "additions"
+      ],
+      "properties": {
+        "challenge_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "challenger_evidence_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "challenger_model_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "additions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "$ref": "#/$defs/scenarioWorldAddition"
+          }
+        }
+      }
+    },
+    "scenarioWorldAddition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario",
+        "support"
+      ],
+      "properties": {
+        "scenario": {
+          "$ref": "#/$defs/scenario"
+        },
+        "support": {
+          "$ref": "#/$defs/worldSupport"
         }
       }
     }
