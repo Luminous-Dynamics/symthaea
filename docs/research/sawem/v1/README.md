@@ -121,13 +121,17 @@ It currently implements and tests:
 - minimum stable charge and continuous charge/discharge power limits;
 - explicit transition downtime and mode-switch timing;
 - SOC minimum/maximum feasibility;
-- upward and downward reserve power and energy headroom;
+- bidirectional reserve headroom from the net operating point: upward reserve may reduce existing charging, while downward reserve may reduce existing discharging and/or increase charging;
+- minimum-stable-charge deadband validation for reserve target setpoints;
+- SAWEM Rev 2.3 product-specific response requirements: regulating up/down starts within 10 s and fully activates within 10 min; instantaneous up responds within 10 s and sustains for at least 10 min; ten-minute reserve responds within 10 min;
+- separate asset response/sustain evidence from market-rule requirements; missing sustain duration for products where the Code definition is silent remains indeterminate;
+- per-product reserve energy headroom/footroom, evaluated against the activation sustain duration supplied by the applicable operational contract/profile;
 - duplicate reserve product/direction detection and aggregation rather than silent double-counting;
 - network import/export caps;
 - seven-day declaration, next-six-days aggregate and seven-day energy caps;
 - checked integer arithmetic for credit cover and multiple signed balancing-payment components.
 
-The kernel is a deterministic feasibility auditor, not a market optimizer. Its simplified symmetric efficiency assumption must be replaced by boundary-specific measured charge/discharge/auxiliary-loss models before engineering performance claims. It does not model temperature, electrochemical dynamics, degradation, warranty, power flow, market price formation, unit commitment, stochastic policies, SAWEM legal interpretation, authenticated dispatch/meter data or settlement integration.
+The reserve mapping is grounded in NTCSA Market Code Rev 2.3 §§2.1(107), 2.1(167), 2.1(199), 9.1(4), 9.5(2)(b) and 7.4: https://www.ntcsa.co.za/wp-content/uploads/2026/02/Market-Code-v2.3.pdf. Regulating and Ten-Minute reserve definitions do not themselves specify a minimum sustain duration. The reference therefore requires an explicit contract/operator sustain profile for energy qualification and reports indeterminate when absent; it does not assume that all products need 10 minutes.\n\nThe kernel is a deterministic feasibility auditor, not a market optimizer. Its simplified symmetric efficiency assumption must be replaced by boundary-specific measured charge/discharge/auxiliary-loss models before engineering performance claims. It does not model temperature, electrochemical dynamics, degradation, warranty, power flow, market price formation, unit commitment, stochastic policies, SAWEM legal interpretation, authenticated dispatch/meter data or settlement integration.
 
 The first CI run executes its formatting and dependency-locked unit tests in isolation from the repository root workspace. The open reference is intended to become the hand-auditable feasibility oracle for the 20-case benchmark corpus, not a replacement for PLEXOS, Chronos or EnCompass.
 
@@ -140,13 +144,13 @@ The next implementation slice should validate:
 4. Trading Unit charge/discharge and energy fields have valid units and boundaries;
 5. daily / six-day / seven-day energy limits reconcile;
 6. unconstrained and constrained schedules remain separately traceable;
-7. energy and reserve commitments do not double-count available power / energy;
-8. intra-day re-declaration respects the selected Code / Rule version and gate timing;
-9. instructed-versus-metered differences use the correct Trading Period and sign convention;
-10. balancing payment components can be cumulative;
-11. settlement reruns and due-date chronology are preserved;
-12. credit cover includes actual and undefined potential exposure;
-13. synthetic, vendor-declared, registered, operator-certified and measured quantities never silently promote one another.
+7. energy and reserve commitments do not double-count available power / energy;\n8. reserve up/down capability includes charge-reduction/discharge-reduction headroom and respects minimum stable charging;\n9. reserve product response deadlines and sustain durations are distinct, source-backed fields;\n10. missing product sustain profile remains indeterminate;
+11. intra-day re-declaration respects the selected Code / Rule version and gate timing;
+12. instructed-versus-metered differences use the correct Trading Period and sign convention;
+13. balancing payment components can be cumulative;
+14. settlement reruns and due-date chronology are preserved;
+15. credit cover includes actual and undefined potential exposure;
+16. synthetic, vendor-declared, registered, operator-certified and measured quantities never silently promote one another.
 
 ## 7. Nonclaims
 
