@@ -108,3 +108,10 @@ Every plan contains one shared `budget` envelope for all candidate and baseline 
 Each statement-level prediction reports `evidence_tokens`, `input_tokens`, `output_tokens`, `retrieval_calls`, `latency_ms` and optional `cost_microusd`. The scorer rejects any row that exceeds the declared envelope and reports mean observed usage/cost per slice. Cost is only comparable when providers report it consistently; record the provider pricing snapshot and distinguish metered API cost from amortized hardware cost in the run notes.
 
 Use the same evidence/context/token/call/latency envelope for every system in a comparison. The scorer does not itself enforce identical prompt quality, source access or retrieval implementation; those are part of the frozen run plan and external runner receipt. Synthetic fixture usage values are invented solely to test contract behavior and do not represent real inference.
+
+
+**Normalization note:** the released builder assigns `file_id` as an integer document ordinal. The adapter normalizes it to a canonical decimal string (for example, integer `7` becomes `"7"`) in the metadata-only manifest. Synthetic fixtures may use readable string labels. Never strip or merge distinct source IDs during normalization.
+
+The budget caps are **per statement inference**, matching the four predictions per composite pair. Every system gets the same caps. A non-null `max_cost_microusd` requires a reported per-statement cost; costs are integer micro-USD. The scorer reports means from submitted receipts and does not verify provider billing. The run manifest should also state the pricing snapshot or local hardware amortization method.
+
+For a held-out run with multiple target languages, each target-language split must independently meet the minimum source-cluster count. A large combined cluster count across languages cannot compensate for an underpowered split.
