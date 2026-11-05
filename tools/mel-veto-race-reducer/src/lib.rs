@@ -1075,7 +1075,9 @@ mod tests {
     #[test]
     fn new_authorization_uses_new_epoch_and_old_frames_stay_stale() {
         let mut ledger = authorized_ledger();
-        ledger.apply(producer_start_event(2, "producer-7", 0)).unwrap();
+        ledger
+            .apply(producer_start_event(2, "producer-7", 0))
+            .unwrap();
         ledger.apply(veto_event(3)).unwrap();
         ledger
             .apply(render_complete_event(4, "producer-7", 7))
