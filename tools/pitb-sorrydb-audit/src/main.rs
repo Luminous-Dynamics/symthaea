@@ -709,7 +709,8 @@ fn instrument_sorry_span(
     let tactic_declaration = format!(
         "elab \"{capture_tactic}\" : tactic => do\n\
          \x20 let goal ← Lean.Elab.Tactic.getMainGoal\n\
-         \x20 let rendered ← Lean.Meta.ppGoal goal\n\
+         \x20 let rendered ← withOptions (fun options => options.setBool `pp.fullNames true) do\n\
+         \x20   Lean.Meta.ppGoal goal\n\
          \x20 dbg_trace f!\"{begin_marker}\\n{{rendered}}\\n{end_marker}\"\n\n"
     );
     let import_prefix = "import Lean\n";
