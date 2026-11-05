@@ -171,6 +171,10 @@ A superiority claim requires matched inputs, budgets, safety settings, attempts 
 - #10298 — from-scratch firmware reconstruction.
 - #10368 — bounded per-occurrence ZIP content verification, incremental SHA-256 and independent CRC-32, with a test-only zlib-rs Deflate differential oracle.
 - #10451 — content-addressed ZIP corpus and bounded coverage-guided fuzz qualification.
+- #10520 — exact-head differential ZIP campaign passed on the common ordinary ZIP subset: production 3,096,936 executions/181s (17,110 exec/s, 278 MiB peak RSS); independent zip-rs/zlib-rs 3,719,505/181s (20,549 exec/s, 279 MiB). Zero crashes/timeouts reported; artifact digest `sha256:59ebc18993fdae991d26a48b0afae6a24baaa5bb7870ba6cf2753f54e0894c36`. This does not establish ZIP-spec correctness outside the declared subset.
+- #10591 — rebased immutable receipt replayer exact-head pass: 22/22 tests, formatting and Clippy with warnings denied; Linux memfd sealed snapshot, `O_NOFOLLOW` final-component source open, symlink/path-replacement/write-negative controls; workflow [42059013582](https://github.com/Luminous-Dynamics/symthaea/actions/runs/42059013582).
+- #10451 — exact-head two-arm fuzz pass: production reader 1,752,160 executions/181s (9,680 exec/s, 278 MiB peak RSS); differential arm 2,265,353/181s (12,515 exec/s, 268 MiB); zero crashes/timeouts reported; artifact digest `sha256:b3b236840f9a472b7f1d63f3c75d22c689b56a5c1cc1496f68a4df52359bb962`.
+- #10508/#10537/#10538/#10539/#10540 — package evidence research now includes Android v3.2 hybrid classical/PQC signing (API 37+), APK v1–v4 structural coverage, Apple Security.framework validation, and versioned OWASP MASVS–MASWE–MASTG evidence graph ingestion.
 - #10452 — platform-qualified held-file identity; non-Unix content verification remains fail-closed until this is resolved.
 - #10455 — archive-session performance research without weakening per-member decompression limits.
 - #10477 — exact-head receipt validator qualification: 15/15 schema/semantic/JCS tests, formatting and Clippy passed at head `667e26121c371eadbfab6a8cd68729f5efb839c5`; replay remains a separate gate.
@@ -307,4 +311,24 @@ Apple's reference material makes a different distinction:
 - CodeDirectory contains per-page and special-slot hashes that protect executable pages, resources and metadata. [TN3126](https://developer.apple.com/documentation/technotes/tn3126-inside-code-signing-hashes)
 
 The same core rule applies to both platforms: content integrity, signature mathematics, signer key/certificate identity, chain/trust policy, application authorization and runtime behavior are distinct propositions. The benchmark must include valid-but-unexpected signers and authorization mismatches, not only corrupted-signature negatives.
+## 28. 2026-11-05 — differential fuzz and sealed replay exact-head outcomes
+
+### Differential ZIP fuzz (#10520)
+
+The exact-head workflow [run 42056996386](https://github.com/Luminous-Dynamics/symthaea/actions/runs/42056996386) completed both 181-second fuzz arms successfully on commit `0a0be459e78da42ce2a201db2d4168e543706783`:
+
+| Arm | Executions | Mean exec/s | Peak RSS |
+|---|---:|---:|---:|
+| Production reader | 3,096,936 | 17,110 | 278 MiB |
+| Independent differential parser/codec | 3,719,505 | 20,549 | 279 MiB |
+
+No crashes, timeouts or differential mismatch artifacts were reported by that bounded campaign. Run artifact `13430387200` SHA-256 is `59ebc18993fdae991d26a48b0afae6a24baaa5bb7870ba6cf2753f54e0894c36`. These are separate per-arm denominators; do not sum them into a throughput claim. The current PR head adds a deterministic Rust seed generator with Stored, Deflate, mixed-method, zero-length, directory, UTF-8-name and false-EOCD-payload cases; the generator revision still needs its own exact-head rerun.
+
+### Rebased receipt replayer (#10591)
+
+The clean rebase onto the current receipt validator passed [workflow 42059013582](https://github.com/Luminous-Dynamics/symthaea/actions/runs/42059013582) at exact PR head `51d1be2131f21af649943e649bad7cc2387dd704`: 22/22 tests passed, formatting passed, Clippy with warnings denied passed. The added final-component `O_NOFOLLOW | O_CLOEXEC` source open and symlink negative control are included in this run. The Linux replayer copies and hashes into a memfd, verifies all four seals with `F_GET_SEALS`, and passes only the sealed bytes to the parser/decoder. Non-Linux remains Unsupported. The successor PR is [#10591](https://github.com/Luminous-Dynamics/symthaea/pull/10591); older draft #10507 is superseded.
+
+### Interpretation
+
+The reader suite, two fuzz arms, receipt schema validator, and independent replayer qualify different properties. Fuzz executions are not parser correctness percentages. Differential agreement is bounded to the stated shared ZIP subset and two pinned implementations. Sealed replay establishes the content of the captured immutable snapshot, not an atomic point-in-time view of a concurrently changing source or producer authenticity.
 
