@@ -183,6 +183,8 @@ struct OutcomeSummary {
     requested_polarity_opposite_count: usize,
     resolution_rate_over_selected: Option<f64>,
     original_statement_proof_rate_over_selected: Option<f64>,
+    resolution_rate_over_attempted: Option<f64>,
+    original_statement_proof_rate_over_attempted: Option<f64>,
     requested_polarity_accuracy_over_resolved: Option<f64>,
     total_wall_seconds: u64,
     total_input_tokens: u64,
@@ -702,6 +704,8 @@ fn validate_all(
         requested_polarity_opposite_count: 0,
         resolution_rate_over_selected: None,
         original_statement_proof_rate_over_selected: None,
+        resolution_rate_over_attempted: None,
+        original_statement_proof_rate_over_attempted: None,
         requested_polarity_accuracy_over_resolved: None,
         total_wall_seconds: 0,
         total_input_tokens: 0,
@@ -745,6 +749,8 @@ fn validate_all(
     counts.resolved_count = counts.proved_statement_count + counts.proved_negation_count;
     counts.resolution_rate_over_selected = ratio(counts.resolved_count, counts.selected_specification_count);
     counts.original_statement_proof_rate_over_selected = ratio(counts.proved_statement_count, counts.selected_specification_count);
+    counts.resolution_rate_over_attempted = ratio(counts.resolved_count, counts.attempted_specification_count);
+    counts.original_statement_proof_rate_over_attempted = ratio(counts.proved_statement_count, counts.attempted_specification_count);
     counts.requested_polarity_accuracy_over_resolved = ratio(counts.requested_polarity_correct_count, counts.resolved_count);
     counts.p50_elapsed_seconds = percentile(&elapsed, 0.50);
     counts.p95_elapsed_seconds = percentile(&elapsed, 0.95);
