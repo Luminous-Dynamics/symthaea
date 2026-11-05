@@ -121,8 +121,8 @@ pub fn assess_liquidity_stress_snapshot(
     let floor_deficit = snapshot
         .minimum_operating_cash_floor_minor_zar
         .saturating_sub(cash_after_outflows);
-    let cash_headroom = cash_after_outflows
-        .saturating_sub(snapshot.minimum_operating_cash_floor_minor_zar);
+    let cash_headroom =
+        cash_after_outflows.saturating_sub(snapshot.minimum_operating_cash_floor_minor_zar);
     let potentially_fundable = credit_cover_shortfall.min(cash_headroom);
     let external_gap = credit_cover_shortfall.saturating_sub(potentially_fundable);
 
@@ -218,7 +218,10 @@ mod tests {
         let LiquidityStressResult::Determined(assessment) = result else {
             panic!("required cover is source-supplied");
         };
-        assert_eq!(assessment.cash_after_mandatory_outflows_minor_zar, 7_000_000);
+        assert_eq!(
+            assessment.cash_after_mandatory_outflows_minor_zar,
+            7_000_000
+        );
         assert_eq!(assessment.operating_cash_floor_deficit_minor_zar, 3_000_000);
         assert!(assessment.cash_floor_breached);
         assert_eq!(assessment.cash_available_above_floor_minor_zar, 0);
