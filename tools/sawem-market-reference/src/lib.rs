@@ -375,6 +375,75 @@ pub enum DsuQualificationResult {
     Indeterminate { reason: &'static str },
 }
 
+/// Reserve-capacity categories with separate payment clauses in Code §§9.8.4–9.8.7.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReserveCapacityPaymentProduct {
+    RegulatingUp,
+    RegulatingDown,
+    Instantaneous,
+    TenMinute,
+}
+
+/// Reserve-category market price supplied by the Market Operator / authoritative
+/// settlement data, in minor ZAR per MW per Trading Period. This is deliberately
+/// distinct from an SMP or a unit-level lost-opportunity price differential.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReserveCategoryMarketPrice {
+    pub minor_zar_per_mw_per_trading_period: u64,
+}
+
+/// System Operator performance-criteria state for reserve capacity payments.
+///
+/// Code §9.8.3(2) deems all contracted resources acceptable when no performance
+/// criteria have been established. When criteria do exist, the actual SO factor
+/// must be provided; unknown/missing values remain indeterminate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PerformanceAdjustmentEvidence {
+    Unknown,
+    NoCriteriaEstablished,
+    CriteriaEstablished {
+        factor_numerator: Option<u32>,
+        factor_denominator: Option<u32>,
+    },
+}
+
+/// Inputs to the formula-only reserve capacity payment calculation.
+///
+/// Capacities use integer milli-MW. Upstream systems are responsible for binding
+/// each value to the exact Trading Unit, Trading Period, contract and source receipt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReserveCapacityPaymentInputs {
+    pub product: ReserveCapacityPaymentProduct,
+    pub market_price: Option<ReserveCategoryMarketPrice>,
+    pub contracted_capacity_milli_mw: Option<u32>,
+    pub qualifying_capacity_milli_mw: Option<u32>,
+    /// Ten-Minute has no performance-adjustment term in §9.8.7 and requires None.
+    /// Other products require explicit criteria state.
+    pub performance_adjustment: Option<PerformanceAdjustmentEvidence>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReserveCapacityPaymentError {
+    QualifyingCapacityExceedsContracted,
+    UnexpectedPerformanceAdjustmentForTenMinute,
+    MissingPerformanceAdjustmentForProduct,
+    ZeroPerformanceFactorDenominator,
+}
+
+/// Exact rational payment amount in minor ZAR per Trading Period.
+/// No rounding mode or settlement rounding convention is inferred.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ExactReserveCapacityPayment {
+    pub numerator_minor_zar: u128,
+    pub denominator: u128,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReserveCapacityPaymentResult {
+    Determined(ExactReserveCapacityPayment),
+    Indeterminate { reason: &'static str },
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReservePriceError {
     NonFiniteOperatingPoint,
@@ -747,6 +816,118 @@ pub fn qualifying_dsu_capacity_for_payment(
             })
         }
     }
+}
+
+/// Calculate the product-specific reserve-capacity payment formula in Code §§9.8.4–9.8.7.
+///
+/// The input market price is the reserve-category price (Rand/MW/Trading Period)
+/// from the Market Operator, not the energy SMP and not a unit's lost-opportunity
+/// differential. Qualifying capacity must already have been established upstream.
+/// Returns exact rational minor-ZAR per Trading Period and does not round.
+pub fn calculate_reserve_capacity_payment(
+    inputs: ReserveCapacityPaymentInputs,
+) -> Result<ReserveCapacityPaymentResult, ReserveCapacityPaymentError> {
+    let Some(contracted_milli_mw) = inputs.contracted_capacity_milli_mw else {
+        return Ok(ReserveCapacityPaymentResult::Indeterminate {
+            reason: "missing contracted reserve capacity",
+        });
+    };
+
+    let Some(qualifying_milli_mw) = inputs.qualifying_capacity_milli_mw else {
+        if contracted_milli_mw == 0 {
+            return Ok(ReserveCapacityPaymentResult::Determined(
+                ExactReserveCapacityPayment {
+                    numerator_minor_zar: 0,
+                    denominator: 1,
+                },
+            ));
+        }
+        return Ok(ReserveCapacityPaymentResult::Indeterminate {
+            reason: "missing capacity qualifying for payment",
+        });
+    };
+
+    if qualifying_milli_mw > contracted_milli_mw {
+        return Err(ReserveCapacityPaymentError::QualifyingCapacityExceedsContracted);
+    }
+
+    // §9.8.3(1): uncontracted capacity cannot receive a reserve-capacity payment.
+    if contracted_milli_mw == 0 || qualifying_milli_mw == 0 {
+        return Ok(ReserveCapacityPaymentResult::Determined(
+            ExactReserveCapacityPayment {
+                numerator_minor_zar: 0,
+                denominator: 1,
+            },
+        ));
+    }
+
+    let Some(market_price) = inputs.market_price else {
+        return Ok(ReserveCapacityPaymentResult::Indeterminate {
+            reason: "missing reserve-category market price",
+        });
+    };
+
+    let (factor_numerator, factor_denominator) = match inputs.product {
+        ReserveCapacityPaymentProduct::TenMinute => {
+            if inputs.performance_adjustment.is_some() {
+                return Err(
+                    ReserveCapacityPaymentError::UnexpectedPerformanceAdjustmentForTenMinute,
+                );
+            }
+            (1_u32, 1_u32)
+        }
+        ReserveCapacityPaymentProduct::RegulatingUp
+        | ReserveCapacityPaymentProduct::RegulatingDown
+        | ReserveCapacityPaymentProduct::Instantaneous => {
+            let Some(performance) = inputs.performance_adjustment else {
+                return Ok(ReserveCapacityPaymentResult::Indeterminate {
+                    reason: "missing System Operator performance-criteria state",
+                });
+            };
+            match performance {
+                PerformanceAdjustmentEvidence::Unknown => {
+                    return Ok(ReserveCapacityPaymentResult::Indeterminate {
+                        reason: "System Operator performance-criteria state is unknown",
+                    });
+                }
+                PerformanceAdjustmentEvidence::NoCriteriaEstablished => (1, 1),
+                PerformanceAdjustmentEvidence::CriteriaEstablished {
+                    factor_numerator: Some(numerator),
+                    factor_denominator: Some(denominator),
+                } => {
+                    if denominator == 0 {
+                        return Err(
+                            ReserveCapacityPaymentError::ZeroPerformanceFactorDenominator,
+                        );
+                    }
+                    (numerator, denominator)
+                }
+                PerformanceAdjustmentEvidence::CriteriaEstablished {
+                    factor_numerator: _,
+                    factor_denominator: _,
+                } => {
+                    return Ok(ReserveCapacityPaymentResult::Indeterminate {
+                        reason: "published performance criteria lack an authoritative SO factor",
+                    });
+                }
+            }
+        }
+    };
+
+    // price [minor ZAR / MW / period] * capacity [milli-MW / 1000]
+    // * performance factor [numerator / denominator].
+    // u64 * u32 * u32 fits u128 without floating-point conversion.
+    let numerator_minor_zar = u128::from(market_price.minor_zar_per_mw_per_trading_period)
+        * u128::from(qualifying_milli_mw)
+        * u128::from(factor_numerator);
+    let denominator = 1_000_u128 * u128::from(factor_denominator);
+
+    Ok(ReserveCapacityPaymentResult::Determined(
+        ExactReserveCapacityPayment {
+            numerator_minor_zar,
+            denominator,
+        },
+    ))
 }
 
 /// SAWEM Market Code Rev 2.3 product response requirements.
@@ -1702,6 +1883,167 @@ mod tests {
             Err(DsuQualificationError::NonFiniteInput(
                 "effective_available_capacity_mw"
             ))
+        );
+    }
+
+    fn reserve_payment_inputs(
+        product: ReserveCapacityPaymentProduct,
+        performance_adjustment: Option<PerformanceAdjustmentEvidence>,
+    ) -> ReserveCapacityPaymentInputs {
+        ReserveCapacityPaymentInputs {
+            product,
+            market_price: Some(ReserveCategoryMarketPrice {
+                minor_zar_per_mw_per_trading_period: 10_000,
+            }),
+            contracted_capacity_milli_mw: Some(10_000),
+            qualifying_capacity_milli_mw: Some(5_500),
+            performance_adjustment,
+        }
+    }
+
+    #[test]
+    fn reserve_capacity_payment_uses_reserve_category_price_and_exact_performance_factor() {
+        let inputs = reserve_payment_inputs(
+            ReserveCapacityPaymentProduct::RegulatingUp,
+            Some(PerformanceAdjustmentEvidence::CriteriaEstablished {
+                factor_numerator: Some(4),
+                factor_denominator: Some(5),
+            }),
+        );
+        assert_eq!(
+            calculate_reserve_capacity_payment(inputs),
+            Ok(ReserveCapacityPaymentResult::Determined(
+                ExactReserveCapacityPayment {
+                    // 10,000 minor ZAR/MW/period × 5.5 MW × 4/5 = 44,000 minor ZAR.
+                    numerator_minor_zar: 220_000,
+                    denominator: 5,
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn reserve_capacity_payment_uses_unit_factor_when_no_performance_criteria_exist() {
+        for product in [
+            ReserveCapacityPaymentProduct::RegulatingUp,
+            ReserveCapacityPaymentProduct::RegulatingDown,
+            ReserveCapacityPaymentProduct::Instantaneous,
+        ] {
+            let inputs = reserve_payment_inputs(
+                product,
+                Some(PerformanceAdjustmentEvidence::NoCriteriaEstablished),
+            );
+            assert_eq!(
+                calculate_reserve_capacity_payment(inputs),
+                Ok(ReserveCapacityPaymentResult::Determined(
+                    ExactReserveCapacityPayment {
+                        numerator_minor_zar: 55_000_000,
+                        denominator: 1_000,
+                    }
+                ))
+            );
+        }
+    }
+
+    #[test]
+    fn ten_minute_payment_has_no_performance_adjustment_term_and_retains_fractional_minor_units() {
+        let mut inputs = reserve_payment_inputs(
+            ReserveCapacityPaymentProduct::TenMinute,
+            None,
+        );
+        inputs.market_price = Some(ReserveCategoryMarketPrice {
+            minor_zar_per_mw_per_trading_period: 12_345,
+        });
+        inputs.qualifying_capacity_milli_mw = Some(1_250);
+
+        assert_eq!(
+            calculate_reserve_capacity_payment(inputs),
+            Ok(ReserveCapacityPaymentResult::Determined(
+                ExactReserveCapacityPayment {
+                    numerator_minor_zar: 15_431_250,
+                    denominator: 1_000,
+                }
+            ))
+        );
+
+        inputs.performance_adjustment =
+            Some(PerformanceAdjustmentEvidence::NoCriteriaEstablished);
+        assert_eq!(
+            calculate_reserve_capacity_payment(inputs),
+            Err(ReserveCapacityPaymentError::UnexpectedPerformanceAdjustmentForTenMinute)
+        );
+    }
+
+    #[test]
+    fn reserve_capacity_payment_fails_closed_on_missing_criteria_and_missing_market_data() {
+        let mut inputs = reserve_payment_inputs(
+            ReserveCapacityPaymentProduct::Instantaneous,
+            Some(PerformanceAdjustmentEvidence::Unknown),
+        );
+        assert_eq!(
+            calculate_reserve_capacity_payment(inputs),
+            Ok(ReserveCapacityPaymentResult::Indeterminate {
+                reason: "System Operator performance-criteria state is unknown"
+            })
+        );
+
+        inputs.performance_adjustment =
+            Some(PerformanceAdjustmentEvidence::CriteriaEstablished {
+                factor_numerator: Some(1),
+                factor_denominator: None,
+            });
+        assert_eq!(
+            calculate_reserve_capacity_payment(inputs),
+            Ok(ReserveCapacityPaymentResult::Indeterminate {
+                reason: "published performance criteria lack an authoritative SO factor"
+            })
+        );
+
+        inputs.performance_adjustment = None;
+        inputs.market_price = None;
+        assert_eq!(
+            calculate_reserve_capacity_payment(inputs),
+            Ok(ReserveCapacityPaymentResult::Indeterminate {
+                reason: "missing reserve-category market price"
+            })
+        );
+    }
+
+    #[test]
+    fn reserve_capacity_payment_rejects_uncontracted_overclaim_and_bad_factor() {
+        let mut inputs = reserve_payment_inputs(
+            ReserveCapacityPaymentProduct::RegulatingDown,
+            Some(PerformanceAdjustmentEvidence::NoCriteriaEstablished),
+        );
+        inputs.contracted_capacity_milli_mw = Some(0);
+        inputs.qualifying_capacity_milli_mw = Some(0);
+        inputs.market_price = None;
+        assert_eq!(
+            calculate_reserve_capacity_payment(inputs),
+            Ok(ReserveCapacityPaymentResult::Determined(
+                ExactReserveCapacityPayment {
+                    numerator_minor_zar: 0,
+                    denominator: 1
+                }
+            ))
+        );
+
+        inputs.contracted_capacity_milli_mw = Some(1_000);
+        inputs.qualifying_capacity_milli_mw = Some(1_001);
+        assert_eq!(
+            calculate_reserve_capacity_payment(inputs),
+            Err(ReserveCapacityPaymentError::QualifyingCapacityExceedsContracted)
+        );
+
+        inputs.qualifying_capacity_milli_mw = Some(500);
+        inputs.performance_adjustment =
+            Some(PerformanceAdjustmentEvidence::CriteriaEstablished {
+                factor_numerator: Some(1),
+                factor_denominator: Some(0),
+            });
+        assert_eq!(
+            calculate_reserve_capacity_payment(inputs),
+            Err(ReserveCapacityPaymentError::ZeroPerformanceFactorDenominator)
         );
     }
 
