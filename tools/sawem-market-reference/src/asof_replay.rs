@@ -210,6 +210,7 @@ pub fn replay_prices_as_of<'a>(
                 && previous.valid_period_start_utc == target.valid_period_start_utc
                 && previous.valid_period_end_utc == target.valid_period_end_utc
                 && previous.model_id == target.model_id
+                && previous.model_sha256 == target.model_sha256
             {
                 return Err(AsOfReplayError::DuplicateTarget);
             }
@@ -244,17 +245,22 @@ pub fn replay_prices_as_of<'a>(
         if has_realized_observation {
             continue;
         }
-        let mut forecast_model: Option<&str> = None;
+        let mut forecast_model: Option<(&str, &str)> = None;
         for vintage in vintages.iter().copied() {
             if !target_matches(vintage, target) || vintage.available_at_utc > decision_time_utc {
                 continue;
             }
-            if let PriceVintageKind::Forecast { model_id, .. } = vintage.kind {
+            if let PriceVintageKind::Forecast {
+                model_id,
+                model_sha256,
+                ..
+            } = vintage.kind
+            {
                 match forecast_model {
-                    Some(existing) if existing != model_id => {
+                    Some(existing) if existing != (model_id, model_sha256) => {
                         return Err(AsOfReplayError::ModelScopeRequired);
                     }
-                    None => forecast_model = Some(model_id),
+                    None => forecast_model = Some((model_id, model_sha256)),
                     _ => {}
                 }
             }
@@ -264,7 +270,13 @@ pub fn replay_prices_as_of<'a>(
     let future_known_excluded_count = u32::try_from(
         vintages
             .iter()
-            .filter(|vintage| vintage.available_at_utc > decision_time_utc)
+            .filter(|vintage| {
+                vintage.available_at_utc > decision_time_utc
+                    && targets
+                        .iter()
+                        .copied()
+                        .any(|target| target_matches(**vintage, target))
+            })
             .count(),
     )
     .map_err(|_| AsOfReplayError::ArithmeticOverflow)?;
