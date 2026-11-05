@@ -1314,19 +1314,58 @@ mod tests {
     }
 
     #[test]
-    fn rejects_duplicate_receipt_reuse_as_two_metrics() {
+    fn rejects_duplicate_metric_source_identity_at_plan_validation() {
         let plan = plan(vec![
             metric("quality", "synthetic-quality", 0.0),
             metric("retention", "synthetic-quality", 0.0),
         ]);
-        let duplicate = make_receipt("synthetic-quality", "candidate-a", 'a', "run-a", "disabled");
-        let receipts = BTreeMap::from([
-            ("quality".into(), duplicate.clone()),
-            ("retention".into(), duplicate),
-        ]);
+        assert!(matches!(
+            plan.validate(),
+            Err(ComposerError::InvalidPlan(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_dataset_manifest_drift_against_the_frozen_metric_projection() {
+        let plan = plan(vec![metric("quality", "synthetic-quality", 0.0)]);
+        let mut receipt: Value = serde_json::from_slice(&make_receipt(
+            "synthetic-quality",
+            "candidate-a",
+            'a',
+            "run-a",
+            "disabled",
+        ))
+        .unwrap();
+        receipt["benchmark"]["dataset_manifest_sha256"] =
+            json!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+        let receipts = BTreeMap::from([(
+            "quality".into(),
+            serde_json::to_vec(&receipt).unwrap(),
+        )]);
         assert_eq!(
             compose_candidate(&plan, &receipts),
-            Err(ComposerError::DuplicateEvidenceDigest)
+            Err(ComposerError::MetricSourceMismatch("quality".into()))
+        );
+    }
+
+    #[test]
+    fn rejects_same_task_ids_with_different_metric_input_bytes() {
+        let plan = plan(vec![
+            metric("quality", "synthetic-quality", 0.0),
+            metric("retention", "synthetic-retention", 0.0),
+        ]);
+        let mut receipts = receipt_set("candidate-a", 'a', "candidate", "disabled");
+        let mut retention: Value =
+            serde_json::from_slice(receipts.get("retention").unwrap()).unwrap();
+        retention["task_results"][0]["input_sha256"] =
+            json!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+        receipts.insert(
+            "retention".into(),
+            serde_json::to_vec(&retention).unwrap(),
+        );
+        assert_eq!(
+            compose_candidate(&plan, &receipts),
+            Err(ComposerError::TaskInputUniverseMismatch)
         );
     }
 
