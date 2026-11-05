@@ -1,0 +1,660 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/sawem/v1/sawem-bess-underwriting-profile-v1.schema.json",
+  "title": "SAWEM BESS Underwriting Profile v1",
+  "description": "Jurisdiction- and rule-version-bound profile for evidence-bounded storage-unit underwriting. This schema does not establish market admission, rule effectiveness, grid rights, dispatch entitlement or factual truth.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile_version",
+    "profile_state",
+    "data_disclosure",
+    "market_rule_profile",
+    "operational_status",
+    "trading_unit",
+    "energy_constraints",
+    "trading_period",
+    "settlement_exposure",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "profile_version": {
+      "const": "1.0"
+    },
+    "profile_state": {
+      "enum": [
+        "research_profile_not_authoritative",
+        "source_frozen_for_review",
+        "qualified_for_policy_evaluation"
+      ]
+    },
+    "data_disclosure": {
+      "type": "string",
+      "minLength": 20
+    },
+    "market_rule_profile": {
+      "$ref": "#/$defs/marketRuleProfile"
+    },
+    "operational_status": {
+      "$ref": "#/$defs/operationalStatus"
+    },
+    "trading_unit": {
+      "$ref": "#/$defs/tradingUnit"
+    },
+    "energy_constraints": {
+      "$ref": "#/$defs/energyConstraints"
+    },
+    "trading_period": {
+      "$ref": "#/$defs/tradingPeriod"
+    },
+    "settlement_exposure": {
+      "$ref": "#/$defs/settlementExposure"
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 30
+    }
+  },
+  "$defs": {
+    "sha256OrNull": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "utc": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "positiveNumber": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "nonnegativeNumber": {
+      "type": "number",
+      "minimum": 0
+    },
+    "sourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "publisher",
+        "url",
+        "publication_period",
+        "source_class",
+        "retrieved_at",
+        "raw_artifact_sha256",
+        "source_freeze_state"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publisher": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "publication_period": {
+          "type": "string",
+          "minLength": 4
+        },
+        "source_class": {
+          "enum": [
+            "official_code",
+            "official_government_statement",
+            "official_operator_guidance",
+            "secondary_report",
+            "synthetic_assumption"
+          ]
+        },
+        "retrieved_at": {
+          "$ref": "#/$defs/utc"
+        },
+        "raw_artifact_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "source_freeze_state": {
+          "enum": [
+            "not_frozen",
+            "frozen_content_addressed",
+            "not_applicable_synthetic"
+          ]
+        }
+      }
+    },
+    "marketRuleProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "market_id",
+        "jurisdiction",
+        "code_name",
+        "code_revision",
+        "publication_period",
+        "publication_state",
+        "effective_status",
+        "effective_date",
+        "source",
+        "interpretation_profile_version"
+      ],
+      "properties": {
+        "market_id": {
+          "const": "SAWEM"
+        },
+        "jurisdiction": {
+          "const": "ZA"
+        },
+        "code_name": {
+          "const": "South African Wholesale Electricity Market Code"
+        },
+        "code_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publication_period": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}$"
+        },
+        "publication_state": {
+          "enum": [
+            "draft",
+            "consultation",
+            "published",
+            "approved",
+            "superseded"
+          ]
+        },
+        "effective_status": {
+          "enum": [
+            "unknown",
+            "not_yet_effective",
+            "effective_in_part",
+            "effective",
+            "suspended",
+            "superseded"
+          ]
+        },
+        "effective_date": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/utc"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/sourceRef"
+        },
+        "interpretation_profile_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "operationalStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "market_operations_state",
+        "status_as_of",
+        "participant_admission_state",
+        "commercial_trading_state",
+        "status_source",
+        "qualification_note"
+      ],
+      "properties": {
+        "market_operations_state": {
+          "enum": [
+            "unknown",
+            "pre_launch_testing_reported",
+            "limited_live_operation",
+            "live_operation",
+            "suspended"
+          ]
+        },
+        "status_as_of": {
+          "$ref": "#/$defs/utc"
+        },
+        "participant_admission_state": {
+          "enum": [
+            "unknown",
+            "not_admitted",
+            "application_pending",
+            "admitted_for_testing",
+            "admitted_for_commercial_participation",
+            "suspended"
+          ]
+        },
+        "commercial_trading_state": {
+          "enum": [
+            "unknown",
+            "not_open",
+            "limited_open",
+            "open",
+            "suspended"
+          ]
+        },
+        "status_source": {
+          "$ref": "#/$defs/sourceRef"
+        },
+        "qualification_note": {
+          "type": "string",
+          "minLength": 20
+        }
+      }
+    },
+    "tradingUnit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trading_unit_id",
+        "site_id",
+        "point_of_connection_id",
+        "metering_boundary_id",
+        "data_class",
+        "max_continuous_charging_mw",
+        "min_stable_charging_mw",
+        "max_stored_energy_mwh",
+        "min_stored_energy_mwh",
+        "energy_basis",
+        "storage_cycle_efficiency",
+        "mode_transition_seconds",
+        "capability_status"
+      ],
+      "properties": {
+        "trading_unit_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "site_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "point_of_connection_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metering_boundary_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "data_class": {
+          "enum": [
+            "synthetic",
+            "vendor_declared",
+            "registered",
+            "operator_certified",
+            "measured"
+          ]
+        },
+        "max_continuous_charging_mw": {
+          "$ref": "#/$defs/positiveNumber"
+        },
+        "min_stable_charging_mw": {
+          "$ref": "#/$defs/nonnegativeNumber"
+        },
+        "max_stored_energy_mwh": {
+          "$ref": "#/$defs/positiveNumber"
+        },
+        "min_stored_energy_mwh": {
+          "$ref": "#/$defs/nonnegativeNumber"
+        },
+        "energy_basis": {
+          "enum": [
+            "stored_energy",
+            "generating_energy_equivalent",
+            "other_declared"
+          ]
+        },
+        "storage_cycle_efficiency": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "mode_transition_seconds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "standstill_to_charging",
+            "charging_to_discharging",
+            "discharging_to_charging",
+            "standstill_to_discharging"
+          ],
+          "properties": {
+            "standstill_to_charging": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "charging_to_discharging": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "discharging_to_charging": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "standstill_to_discharging": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "capability_status": {
+          "enum": [
+            "synthetic_only",
+            "vendor_target",
+            "registered_value",
+            "operator_certified",
+            "independently_measured"
+          ]
+        }
+      }
+    },
+    "energyConstraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "daily_limit_mwh",
+        "next_six_days_limit_mwh",
+        "seven_day_total_limit_mwh",
+        "daily_declared_energy_mwh",
+        "preferred_run_by_trading_day",
+        "source_state"
+      ],
+      "properties": {
+        "daily_limit_mwh": {
+          "$ref": "#/$defs/nonnegativeNumber"
+        },
+        "next_six_days_limit_mwh": {
+          "$ref": "#/$defs/nonnegativeNumber"
+        },
+        "seven_day_total_limit_mwh": {
+          "$ref": "#/$defs/nonnegativeNumber"
+        },
+        "daily_declared_energy_mwh": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": {
+            "$ref": "#/$defs/nonnegativeNumber"
+          }
+        },
+        "preferred_run_by_trading_day": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": {
+            "type": "boolean"
+          }
+        },
+        "source_state": {
+          "enum": [
+            "synthetic_fixture",
+            "declared_unverified",
+            "registered_source_verified",
+            "operator_confirmed"
+          ]
+        }
+      }
+    },
+    "reserveCommitment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "product",
+        "committed_mw",
+        "capability_class",
+        "simultaneous_energy_double_counted"
+      ],
+      "properties": {
+        "product": {
+          "enum": [
+            "regulating_reserve",
+            "instantaneous_reserve",
+            "ten_minute_reserve"
+          ]
+        },
+        "committed_mw": {
+          "$ref": "#/$defs/nonnegativeNumber"
+        },
+        "capability_class": {
+          "enum": [
+            "synthetic",
+            "declared",
+            "operator_certified",
+            "measured_response"
+          ]
+        },
+        "simultaneous_energy_double_counted": {
+          "const": false
+        }
+      }
+    },
+    "tradingPeriod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trading_period_id",
+        "start_at",
+        "end_at",
+        "duration_minutes",
+        "schedule_stages",
+        "reserve_commitments",
+        "dispatch_instruction",
+        "metered_outcome",
+        "source_state"
+      ],
+      "properties": {
+        "trading_period_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_at": {
+          "$ref": "#/$defs/utc"
+        },
+        "end_at": {
+          "$ref": "#/$defs/utc"
+        },
+        "duration_minutes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "schedule_stages": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "stage",
+              "scheduled_discharge_mw",
+              "network_export_limit_mw",
+              "revision_id"
+            ],
+            "properties": {
+              "stage": {
+                "enum": [
+                  "day_ahead_unconstrained",
+                  "day_ahead_network_constrained",
+                  "intraday_network_constrained"
+                ]
+              },
+              "scheduled_discharge_mw": {
+                "$ref": "#/$defs/nonnegativeNumber"
+              },
+              "network_export_limit_mw": {
+                "$ref": "#/$defs/nonnegativeNumber"
+              },
+              "revision_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "reserve_commitments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/reserveCommitment"
+          }
+        },
+        "dispatch_instruction": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "instructed_discharge_mw",
+            "instruction_source_state"
+          ],
+          "properties": {
+            "instructed_discharge_mw": {
+              "$ref": "#/$defs/nonnegativeNumber"
+            },
+            "instruction_source_state": {
+              "enum": [
+                "synthetic",
+                "operator_instruction_authenticated",
+                "unknown"
+              ]
+            }
+          }
+        },
+        "metered_outcome": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "metered_discharge_mw",
+            "measurement_class",
+            "meter_evidence_ref"
+          ],
+          "properties": {
+            "metered_discharge_mw": {
+              "$ref": "#/$defs/nonnegativeNumber"
+            },
+            "measurement_class": {
+              "enum": [
+                "synthetic",
+                "authenticated_meter",
+                "independently_reconciled_measurement",
+                "unknown"
+              ]
+            },
+            "meter_evidence_ref": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "source_state": {
+          "enum": [
+            "synthetic_fixture",
+            "source_reconciled",
+            "operator_confirmed"
+          ]
+        }
+      }
+    },
+    "settlementExposure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "actual_exposure_minor_units",
+        "undefined_potential_exposure_minor_units",
+        "required_credit_cover_minor_units",
+        "balancing_payment_components",
+        "settlement_state",
+        "data_class"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "actual_exposure_minor_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "undefined_potential_exposure_minor_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "required_credit_cover_minor_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "balancing_payment_components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "payment_type",
+              "amount_minor_units",
+              "status"
+            ],
+            "properties": {
+              "payment_type": {
+                "type": "string",
+                "minLength": 1
+              },
+              "amount_minor_units": {
+                "type": "integer"
+              },
+              "status": {
+                "enum": [
+                  "synthetic",
+                  "indicative",
+                  "initial_statement",
+                  "invoiced",
+                  "settled",
+                  "disputed",
+                  "rerun"
+                ]
+              }
+            }
+          }
+        },
+        "settlement_state": {
+          "enum": [
+            "synthetic",
+            "indicative_statement",
+            "initial_statement",
+            "invoice_issued",
+            "settled",
+            "rerun_pending",
+            "disputed",
+            "unknown"
+          ]
+        },
+        "data_class": {
+          "enum": [
+            "synthetic",
+            "participant_record",
+            "operator_record",
+            "audited"
+          ]
+        }
+      }
+    }
+  }
+}
