@@ -552,6 +552,11 @@ impl TrialManifestV1 {
             || unique_outputs.len() != 4
             || self.input_event_ids.iter().any(|id| id.trim().is_empty())
             || self.output_event_ids.iter().any(|id| id.trim().is_empty())
+            || self
+                .input_event_ids
+                .iter()
+                .zip(self.output_event_ids.iter())
+                .any(|(input, output)| output != &format!("{input}::{}::action", self.policy_id))
             || assigned != expected
             || self.condition_order != condition_order_for_seed(self.randomization_seed)
         {
@@ -645,9 +650,16 @@ pub fn calculate_contrast(
     actions: &[AgentAction; 4],
 ) -> Result<CausalContrast, HarnessError> {
     interventions.validate(task)?;
-    if actions.iter().any(|action| {
+    let observations = [
+        &interventions.control,
+        &interventions.targeted,
+        &interventions.sham,
+        &interventions.unrelated,
+    ];
+    if actions.iter().zip(observations.iter()).any(|(action, observation)| {
         action.feature.dimension != task.target_dimension
-            || action.source_event_id.trim().is_empty()
+            || action.source_event_id != observation.event_id
+            || !action.event_id.starts_with(&format!("{}::", observation.event_id))
             || action.event_id.trim().is_empty()
     }) {
         return Err(HarnessError::InvalidPolicy);
@@ -775,6 +787,12 @@ pub fn measure_partner_influence(
     task: &TaskSpec,
 ) -> Result<PartnerInfluence, HarnessError> {
     task.validate()?;
+    if prior_partner_feature.dimension != task.target_dimension
+        || control_agent_action.feature.dimension != task.target_dimension
+        || treated_agent_action.feature.dimension != task.target_dimension
+    {
+        return Err(HarnessError::InvalidPolicy);
+    }
     let control_next = partner.respond(
         prior_partner_feature,
         control_agent_action,
@@ -787,6 +805,11 @@ pub fn measure_partner_influence(
         task.target_dimension,
         task.expected_response,
     )?;
+    if control_next.dimension != task.target_dimension
+        || treated_next.dimension != task.target_dimension
+    {
+        return Err(HarnessError::InvalidPolicy);
+    }
     let targeted_delta = task
         .expected_response
         .distance(control_next.value, treated_next.value)?;
@@ -1298,6 +1321,96 @@ mod tests {
         let (task, interventions) = fixture();
         assert_eq!(
             run_trial(task, interventions, &CrossBoundPolicy, config()),
+            Err(HarnessError::InvalidPolicy)
+        );
+    }
+
+    #[test]
+    fn public_contrast_rejects_actions_cross_bound_to_other_observations() {
+        let (task, interventions) = fixture();
+        let policy = RuleBasedPolicy {
+            id: "rule-positive".to_owned(),
+        };
+        let observations = [
+            &interventions.control,
+            &interventions.targeted,
+            &interventions.sham,
+            &interventions.unrelated,
+        ];
+        let mut actions: Vec<AgentAction> = observations
+            .iter()
+            .map(|observation| policy.act(observation, &task).unwrap())
+            .collect();
+        actions.swap(0, 1);
+        let actions: [AgentAction; 4] = actions.try_into().unwrap();
+        assert_eq!(
+            calculate_contrast(&task, &interventions, &actions),
+            Err(HarnessError::InvalidPolicy)
+        );
+    }
+
+    #[test]
+    fn manifest_rejects_output_event_rebound_to_another_input() {
+        let (task, interventions) = fixture();
+        let record = run_trial(
+            task,
+            interventions,
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
+            config(),
+        )
+        .unwrap();
+        let mut invalid = record.manifest;
+        invalid.output_event_ids.swap(0, 1);
+        assert_eq!(invalid.validate(), Err(HarnessError::InvalidManifest));
+    }
+
+    struct WrongDimensionPartner;
+
+    impl ControlledPartner for WrongDimensionPartner {
+        fn policy_id(&self) -> &str {
+            "wrong-dimension"
+        }
+
+        fn respond(
+            &self,
+            _prior_partner_feature: Feature,
+            _agent_action: &AgentAction,
+            _target_dimension: Dimension,
+            _rule: ResponseRule,
+        ) -> Result<Feature, HarnessError> {
+            Ok(Feature {
+                dimension: Dimension::Texture,
+                value: 1,
+            })
+        }
+    }
+
+    #[test]
+    fn partner_adapter_cannot_return_an_unrelated_feature_dimension() {
+        let (task, interventions) = fixture();
+        let record = run_trial(
+            task.clone(),
+            interventions,
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
+            config(),
+        )
+        .unwrap();
+        let prior = Feature {
+            dimension: Dimension::Motif,
+            value: 1,
+        };
+        assert_eq!(
+            measure_partner_influence(
+                &WrongDimensionPartner,
+                prior,
+                &record.actions[0],
+                &record.actions[1],
+                &task
+            ),
             Err(HarnessError::InvalidPolicy)
         );
     }
