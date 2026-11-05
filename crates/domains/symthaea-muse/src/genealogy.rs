@@ -169,6 +169,10 @@ impl std::error::Error for GenealogyBundleError {}
 pub enum GenealogyLineageError {
     /// SQLite persistence or query failure.
     Database(rusqlite::Error),
+    /// A committed bundle could not be read.
+    Io(std::io::Error),
+    /// Exact persisted bytes did not match the expected payload.
+    ByteMismatch { artifact: &'static str },
     /// A parent, relation, idempotency key, or input edge is invalid.
     InvalidInput(&'static str),
     /// An idempotency key was reused with a different operation payload.
@@ -181,6 +185,8 @@ impl std::fmt::Display for GenealogyLineageError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Database(error) => write!(formatter, "genealogy lineage database error: {error}"),
+            Self::Io(error) => write!(formatter, "genealogy lineage bundle read failed: {error}"),
+            Self::ByteMismatch { artifact } => write!(formatter, "persisted lineage artifact differs: {artifact}"),
             Self::InvalidInput(reason) => write!(formatter, "invalid genealogy lineage input: {reason}"),
             Self::IdempotencyConflict => write!(formatter, "genealogy lineage idempotency key conflicts with a prior operation"),
             Self::CorruptLineage => write!(formatter, "genealogy lineage edge set or manifest commitment is corrupt"),
@@ -619,6 +625,69 @@ impl GenealogyStore {
             manifest_sha256,
             created_at_unix_ms,
         })
+    }
+
+    /// Allocate a derived node only after re-reading and comparing the exact
+    /// recipe, optional score, and audio payloads from the published bundle.
+    /// This keeps the plural-lineage writer on the same byte-verification
+    /// boundary as the legacy root writer.
+    #[allow(clippy::too_many_arguments)]
+    pub fn allocate_derived_from_bundle(
+        &self,
+        relation: &GenealogyRelation,
+        origin: &GenealogyOrigin,
+        audio_key: &str,
+        bundle_directory: &Path,
+        expected_recipe_bytes: &[u8],
+        expected_score_bytes: Option<&[u8]>,
+        expected_audio_bytes: &[u8],
+        parents: &[GenealogyParentInputV1],
+        allocation_idempotency_key: &str,
+        created_at_unix_ms: u64,
+    ) -> Result<GenealogyManifest, GenealogyLineageError> {
+        let recipe_bytes = std::fs::read(bundle_directory.join("recipe.json"))
+            .map_err(GenealogyLineageError::Io)?;
+        let audio_bytes = std::fs::read(bundle_directory.join("audio.wav"))
+            .map_err(GenealogyLineageError::Io)?;
+        let score_path = bundle_directory.join("score.json");
+        let score_bytes = match expected_score_bytes {
+            Some(_) => Some(
+                std::fs::read(&score_path).map_err(GenealogyLineageError::Io)?,
+            ),
+            None if score_path.exists() => {
+                return Err(GenealogyLineageError::ByteMismatch {
+                    artifact: "score.json",
+                });
+            }
+            None => None,
+        };
+        if recipe_bytes != expected_recipe_bytes {
+            return Err(GenealogyLineageError::ByteMismatch {
+                artifact: "recipe.json",
+            });
+        }
+        if score_bytes.as_deref() != expected_score_bytes {
+            return Err(GenealogyLineageError::ByteMismatch {
+                artifact: "score.json",
+            });
+        }
+        if audio_bytes != expected_audio_bytes {
+            return Err(GenealogyLineageError::ByteMismatch {
+                artifact: "audio.wav",
+            });
+        }
+
+        self.allocate_derived_from_bytes(
+            relation,
+            origin,
+            audio_key,
+            &recipe_bytes,
+            score_bytes.as_deref(),
+            &audio_bytes,
+            parents,
+            allocation_idempotency_key,
+            created_at_unix_ms,
+        )
     }
 
     /// Opens (creating if absent) the genealogy ledger at `path`, applying
