@@ -381,6 +381,70 @@ pub enum DsuQualificationResult {
     Indeterminate { reason: &'static str },
 }
 
+/// A single piecewise-constant segment of a Trading Unit's day-ahead incremental
+/// energy-price curve. The signed schedule axis uses milli-MW: negative means
+/// consumption and positive means generation. Segment boundaries are [lower, upper).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct IncrementalPriceSegment {
+    pub lower_schedule_milli_mw: i32,
+    pub upper_schedule_milli_mw: i32,
+    pub price_minor_zar_per_mwh: i64,
+}
+
+/// A missing source record is different from an authoritative statement that no
+/// day-ahead energy price was submitted. Code §9.8.2(2) assigns R0/MWh only to
+/// the latter case.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IncrementalPriceSubmission<'a> {
+    Unknown,
+    NotSubmitted,
+    Submitted(&'a [IncrementalPriceSegment]),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConstrainedScheduleAdjustmentInputs<'a> {
+    pub unconstrained_schedule_milli_mw: i32,
+    pub constrained_schedule_milli_mw: i32,
+    pub trading_period_duration_minutes: u32,
+    pub price_submission: IncrementalPriceSubmission<'a>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConstrainedScheduleDirection {
+    NoChange,
+    PaymentToTradingUnit,
+    ChargeToTradingUnit,
+}
+
+/// Exact signed cashflow to the Trading Unit, in minor ZAR. Positive means
+/// payment to the Trading Unit; negative means a charge to the Trading Unit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ExactConstrainedScheduleCashflow {
+    pub numerator_minor_zar: i128,
+    pub denominator: u128,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConstrainedScheduleAdjustmentResult {
+    Determined {
+        direction: ConstrainedScheduleDirection,
+        cashflow_to_trading_unit: ExactConstrainedScheduleCashflow,
+    },
+    Indeterminate {
+        reason: &'static str,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConstrainedScheduleAdjustmentError {
+    InvalidTradingPeriodDuration,
+    EmptySubmittedPriceCurve,
+    InvalidPriceCurveSegment,
+    PriceCurveGapOrOverlap,
+    PriceCurveDoesNotCoverScheduleChange,
+    ArithmeticOverflow,
+}
+
 /// Reserve-capacity categories with separate payment clauses in Code §§9.8.4–9.8.7.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReserveCapacityPaymentProduct {
@@ -857,6 +921,128 @@ pub fn qualifying_dsu_capacity_for_payment(
             let reducible_mw = (effective_available_mw - curve.third_elbow_mw).max(0.0);
             Ok(DsuQualificationResult::Determined {
                 qualifying_capacity_mw: contracted_mw.min(reducible_mw),
+            })
+        }
+    }
+}
+
+/// Calculate the §9.8.2 constrained-schedule adjustment over the exact
+/// Unconstrained -> Constrained schedule interval.
+///
+/// A Constrained Schedule increase (CG > SG) is a payment to the Trading Unit;
+/// a decrease (SG > CG) is a charge to the Trading Unit. The day-ahead price
+/// curve is integrated piecewise over the signed schedule axis. Trading Period
+/// duration is explicit; no one-hour assumption or rounding is introduced.
+///
+/// If an authoritative record says no energy price was submitted, §9.8.2(2)
+/// supplies R0/MWh. If submission state is unknown, the result is indeterminate.
+pub fn calculate_constrained_schedule_adjustment(
+    inputs: ConstrainedScheduleAdjustmentInputs<'_>,
+) -> Result<ConstrainedScheduleAdjustmentResult, ConstrainedScheduleAdjustmentError> {
+    if inputs.trading_period_duration_minutes == 0
+        || inputs.trading_period_duration_minutes > 1_440
+    {
+        return Err(ConstrainedScheduleAdjustmentError::InvalidTradingPeriodDuration);
+    }
+
+    let sg = inputs.unconstrained_schedule_milli_mw;
+    let cg = inputs.constrained_schedule_milli_mw;
+    if sg == cg {
+        return Ok(ConstrainedScheduleAdjustmentResult::Determined {
+            direction: ConstrainedScheduleDirection::NoChange,
+            cashflow_to_trading_unit: ExactConstrainedScheduleCashflow {
+                numerator_minor_zar: 0,
+                denominator: 1,
+            },
+        });
+    }
+
+    let (lower, upper, direction, cashflow_sign): (i32, i32, _, i128) = if cg > sg {
+        (
+            sg,
+            cg,
+            ConstrainedScheduleDirection::PaymentToTradingUnit,
+            1,
+        )
+    } else {
+        (
+            cg,
+            sg,
+            ConstrainedScheduleDirection::ChargeToTradingUnit,
+            -1,
+        )
+    };
+
+    match inputs.price_submission {
+        IncrementalPriceSubmission::Unknown => {
+            Ok(ConstrainedScheduleAdjustmentResult::Indeterminate {
+                reason: "day-ahead incremental price submission state is unknown",
+            })
+        }
+        IncrementalPriceSubmission::NotSubmitted => {
+            Ok(ConstrainedScheduleAdjustmentResult::Determined {
+                direction,
+                cashflow_to_trading_unit: ExactConstrainedScheduleCashflow {
+                    numerator_minor_zar: 0,
+                    denominator: 1,
+                },
+            })
+        }
+        IncrementalPriceSubmission::Submitted(segments) => {
+            if segments.is_empty() {
+                return Err(ConstrainedScheduleAdjustmentError::EmptySubmittedPriceCurve);
+            }
+
+            for segment in segments {
+                if segment.lower_schedule_milli_mw >= segment.upper_schedule_milli_mw {
+                    return Err(ConstrainedScheduleAdjustmentError::InvalidPriceCurveSegment);
+                }
+            }
+            for pair in segments.windows(2) {
+                if pair[0].upper_schedule_milli_mw != pair[1].lower_schedule_mw {
+                    return Err(ConstrainedScheduleAdjustmentError::PriceCurveGapOrOverlap);
+                }
+            }
+            if segments[0].lower_schedule_milli_mw > lower
+                || segments[segments.len() - 1].upper_schedule_milli_mw < upper
+            {
+                return Err(
+                    ConstrainedScheduleAdjustmentError::PriceCurveDoesNotCoverScheduleChange,
+                );
+            }
+
+            // Integral units:
+            // (milli-MW / 1000) * (minutes / 60) * (minor-ZAR / MWh)
+            // = minor-ZAR, so use the exact common denominator 60,000.
+            let mut integral_numerator: i128 = 0;
+            for segment in segments {
+                let overlap_lower = lower.max(segment.lower_schedule_milli_mw);
+                let overlap_upper = upper.min(segment.upper_schedule_milli_mw);
+                if overlap_upper <= overlap_lower {
+                    continue;
+                }
+                let delta_milli_mw = i128::from(overlap_upper - overlap_lower);
+                let price_duration_product = delta_milli_mw
+                    .checked_mul(i128::from(inputs.trading_period_duration_minutes))
+                    .and_then(|value| {
+                        value.checked_mul(i128::from(segment.price_minor_zar_per_mwh))
+                    })
+                    .ok_or(ConstrainedScheduleAdjustmentError::ArithmeticOverflow)?;
+                integral_numerator = integral_numerator
+                    .checked_add(price_duration_product)
+                    .ok_or(ConstrainedScheduleAdjustmentError::ArithmeticOverflow)?;
+            }
+
+            let signed_numerator = integral_numerator
+                .checked_mul(cashflow_sign)
+                .ok_or(ConstrainedScheduleAdjustmentError::ArithmeticOverflow)?;
+
+            Ok(ConstrainedScheduleAdjustmentResult::Determined {
+                direction,
+                cashflow_to_trading_unit: ExactConstrainedScheduleCashflow {
+                    numerator_minor_zar: signed_numerator,
+                    denominator: 60_000,
+                },
             })
         }
     }
@@ -2004,6 +2190,228 @@ mod tests {
             Err(DsuQualificationError::NonFiniteInput(
                 "effective_available_capacity_mw"
             ))
+        );
+    }
+
+    fn constrained_price_curve() -> [IncrementalPriceSegment; 2] {
+        [
+            IncrementalPriceSegment {
+                lower_schedule_milli_mw: 10_000,
+                upper_schedule_milli_mw: 12_000,
+                price_minor_zar_per_mwh: 30,
+            },
+            IncrementalPriceSegment {
+                lower_schedule_milli_mw: 12_000,
+                upper_schedule_milli_mw: 15_000,
+                price_minor_zar_per_mwh: 50,
+            },
+        ]
+    }
+
+    #[test]
+    fn constrained_purchase_integrates_each_incremental_price_segment() {
+        let curve = constrained_price_curve();
+        let result = calculate_constrained_schedule_adjustment(
+            ConstrainedScheduleAdjustmentInputs {
+                unconstrained_schedule_milli_mw: 10_000,
+                constrained_schedule_milli_mw: 15_000,
+                trading_period_duration_minutes: 30,
+                price_submission: IncrementalPriceSubmission::Submitted(&curve),
+            },
+        )
+        .expect("synthetic constrained purchase is valid");
+        assert_eq!(
+            result,
+            ConstrainedScheduleAdjustmentResult::Determined {
+                direction: ConstrainedScheduleDirection::PaymentToTradingUnit,
+                cashflow_to_trading_unit: ExactConstrainedScheduleCashflow {
+                    // 2 MW × 0.5 h × 30 + 3 MW × 0.5 h × 50 = 105 minor ZAR.
+                    numerator_minor_zar: 6_300_000,
+                    denominator: 60_000,
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn constrained_sales_charge_is_the_opposite_signed_cashflow() {
+        let curve = constrained_price_curve();
+        let result = calculate_constrained_schedule_adjustment(
+            ConstrainedScheduleAdjustmentInputs {
+                unconstrained_schedule_milli_mw: 15_000,
+                constrained_schedule_milli_mw: 10_000,
+                trading_period_duration_minutes: 30,
+                price_submission: IncrementalPriceSubmission::Submitted(&curve),
+            },
+        )
+        .expect("synthetic constrained sale is valid");
+        assert_eq!(
+            result,
+            ConstrainedScheduleAdjustmentResult::Determined {
+                direction: ConstrainedScheduleDirection::ChargeToTradingUnit,
+                cashflow_to_trading_unit: ExactConstrainedScheduleCashflow {
+                    numerator_minor_zar: -6_300_000,
+                    denominator: 60_000,
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn constrained_schedule_handles_signed_consumption_axis() {
+        let curve = [
+            IncrementalPriceSegment {
+                lower_schedule_milli_mw: -5_000,
+                upper_schedule_milli_mw: -2_000,
+                price_minor_zar_per_mwh: 40,
+            },
+        ];
+        let result = calculate_constrained_schedule_adjustment(
+            ConstrainedScheduleAdjustmentInputs {
+                unconstrained_schedule_milli_mw: -5_000,
+                constrained_schedule_milli_mw: -2_000,
+                trading_period_duration_minutes: 60,
+                price_submission: IncrementalPriceSubmission::Submitted(&curve),
+            },
+        )
+        .expect("signed consumption-axis interval is covered");
+        assert_eq!(
+            result,
+            ConstrainedScheduleAdjustmentResult::Determined {
+                direction: ConstrainedScheduleDirection::PaymentToTradingUnit,
+                cashflow_to_trading_unit: ExactConstrainedScheduleCashflow {
+                    numerator_minor_zar: 7_200_000,
+                    denominator: 60_000,
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn constrained_schedule_zero_submission_and_no_change_are_distinct() {
+        let no_price = calculate_constrained_schedule_adjustment(
+            ConstrainedScheduleAdjustmentInputs {
+                unconstrained_schedule_milli_mw: 10_000,
+                constrained_schedule_milli_mw: 15_000,
+                trading_period_duration_minutes: 30,
+                price_submission: IncrementalPriceSubmission::NotSubmitted,
+            },
+        )
+        .expect("explicit no-price submission is a zero-price rule");
+        assert_eq!(
+            no_price,
+            ConstrainedScheduleAdjustmentResult::Determined {
+                direction: ConstrainedScheduleDirection::PaymentToTradingUnit,
+                cashflow_to_trading_unit: ExactConstrainedScheduleCashflow {
+                    numerator_minor_zar: 0,
+                    denominator: 1,
+                }
+            }
+        );
+
+        let unchanged = calculate_constrained_schedule_adjustment(
+            ConstrainedScheduleAdjustmentInputs {
+                unconstrained_schedule_milli_mw: -10_000,
+                constrained_schedule_milli_mw: -10_000,
+                trading_period_duration_minutes: 30,
+                price_submission: IncrementalPriceSubmission::Unknown,
+            },
+        )
+        .expect("unchanged schedules require no price curve");
+        assert_eq!(
+            unchanged,
+            ConstrainedScheduleAdjustmentResult::Determined {
+                direction: ConstrainedScheduleDirection::NoChange,
+                cashflow_to_trading_unit: ExactConstrainedScheduleCashflow {
+                    numerator_minor_zar: 0,
+                    denominator: 1,
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn constrained_schedule_rejects_unknown_and_incomplete_price_evidence() {
+        let unknown = calculate_constrained_schedule_adjustment(
+            ConstrainedScheduleAdjustmentInputs {
+                unconstrained_schedule_milli_mw: 10_000,
+                constrained_schedule_milli_mw: 15_000,
+                trading_period_duration_minutes: 30,
+                price_submission: IncrementalPriceSubmission::Unknown,
+            },
+        )
+        .expect("unknown price state is indeterminate");
+        assert_eq!(
+            unknown,
+            ConstrainedScheduleAdjustmentResult::Indeterminate {
+                reason: "day-ahead incremental price submission state is unknown"
+            }
+        );
+
+        let gap = [
+            IncrementalPriceSegment {
+                lower_schedule_milli_mw: 10_000,
+                upper_schedule_milli_mw: 12_000,
+                price_minor_zar_per_mwh: 30,
+            },
+            IncrementalPriceSegment {
+                lower_schedule_milli_mw: 13_000,
+                upper_schedule_milli_mw: 15_000,
+                price_minor_zar_per_mwh: 50,
+            },
+        ];
+        assert_eq!(
+            calculate_constrained_schedule_adjustment(ConstrainedScheduleAdjustmentInputs {
+                unconstrained_schedule_milli_mw: 10_000,
+                constrained_schedule_milli_mw: 15_000,
+                trading_period_duration_minutes: 30,
+                price_submission: IncrementalPriceSubmission::Submitted(&gap),
+            }),
+            Err(ConstrainedScheduleAdjustmentError::PriceCurveGapOrOverlap)
+        );
+
+        let short_curve = [IncrementalPriceSegment {
+            lower_schedule_milli_mw: 10_000,
+            upper_schedule_milli_mw: 12_000,
+            price_minor_zar_per_mwh: 30,
+        }];
+        assert_eq!(
+            calculate_constrained_schedule_adjustment(ConstrainedScheduleAdjustmentInputs {
+                unconstrained_schedule_milli_mw: 10_000,
+                constrained_schedule_milli_mw: 15_000,
+                trading_period_duration_minutes: 30,
+                price_submission: IncrementalPriceSubmission::Submitted(&short_curve),
+            }),
+            Err(ConstrainedScheduleAdjustmentError::PriceCurveDoesNotCoverScheduleChange)
+        );
+    }
+
+    #[test]
+    fn constrained_schedule_rejects_zero_duration_and_invalid_segments() {
+        let curve = constrained_price_curve();
+        assert_eq!(
+            calculate_constrained_schedule_adjustment(ConstrainedScheduleAdjustmentInputs {
+                unconstrained_schedule_milli_mw: 10_000,
+                constrained_schedule_milli_mw: 15_000,
+                trading_period_duration_minutes: 0,
+                price_submission: IncrementalPriceSubmission::Submitted(&curve),
+            }),
+            Err(ConstrainedScheduleAdjustmentError::InvalidTradingPeriodDuration)
+        );
+
+        let invalid = [IncrementalPriceSegment {
+            lower_schedule_milli_mw: 12_000,
+            upper_schedule_milli_mw: 10_000,
+            price_minor_zar_per_mwh: 30,
+        }];
+        assert_eq!(
+            calculate_constrained_schedule_adjustment(ConstrainedScheduleAdjustmentInputs {
+                unconstrained_schedule_milli_mw: 10_000,
+                constrained_schedule_milli_mw: 15_000,
+                trading_period_duration_minutes: 30,
+                price_submission: IncrementalPriceSubmission::Submitted(&invalid),
+            }),
+            Err(ConstrainedScheduleAdjustmentError::InvalidPriceCurveSegment)
         );
     }
 
