@@ -2,7 +2,7 @@
   "corpus_version": "1.0",
   "corpus_state": "draft_case_register",
   "benchmark_id": "SAWEM-BESS-MATCHED-001",
-  "claim_ceiling": "This file is a case register and test-to-case traceability index. Rust unit tests listed here are synthetic reference tests, not independently adjudicated benchmark outcomes, vendor comparisons, SAWEM operator verification or investment-performance results. Cases marked not_run have no measured result. The DSU price-curve unit tests remain synthetic price-lookup conformance, not evidence of DSU product admission, reserve qualification, settlement or revenue. DSU qualifying-capacity tests cover only the named synthetic Code arithmetic branches; they do not authenticate source records, implement utilized-service alternatives, calculate performance-adjusted payments or establish market qualification. Reserve-capacity payment tests are exact formula checks over synthetic or prequalified inputs; they do not establish reserve-category prices, real qualifying capacity, operator performance factors, market admission, settlement or received cash. DSU capacity-path tests distinguish utilized, changed-instruction and unchanged-instruction cases and apply the effective-availability ceiling; acceptable-performance decisions are still supplied as prequalified inputs. The reserve payment formula rejects a reserve-category price labeled for a different reserve product.",
+  "claim_ceiling": "This file is a case register and test-to-case traceability index. Rust unit tests listed here are synthetic reference tests, not independently adjudicated benchmark outcomes, vendor comparisons, SAWEM operator verification or investment-performance results. Cases marked not_run have no measured result. The DSU price-curve unit tests remain synthetic price-lookup conformance, not evidence of DSU product admission, reserve qualification, settlement or revenue. DSU qualifying-capacity tests cover only the named synthetic Code arithmetic branches; they do not authenticate source records, implement utilized-service alternatives, calculate performance-adjusted payments or establish market qualification. Reserve-capacity payment tests are exact formula checks over synthetic or prequalified inputs; they do not establish reserve-category prices, real qualifying capacity, operator performance factors, market admission, settlement or received cash. DSU capacity-path tests distinguish utilized, changed-instruction and unchanged-instruction cases and apply the effective-availability ceiling; acceptable-performance decisions are still supplied as prequalified inputs. The reserve payment formula rejects a reserve-category price labeled for a different reserve product. The constrained-schedule oracle integrates a synthetic piecewise-constant curve over signed schedule values with explicit Trading Period duration; it is not a Market Operator settlement reproduction and does not authenticate schedules, price submissions or market statements.",
   "cases": [
     {
       "case_id": "BASE-001",
@@ -707,18 +707,26 @@
       "case_id": "CONSTRAINED-SCHEDULE-COMPENSATION-001",
       "track": "settlement_and_liquidity",
       "title": "Unconstrained-to-constrained schedule adjustment",
-      "scenario": "A network-constrained schedule differs from the unconstrained schedule and the associated constrained-purchase payment or constrained-sales charge is calculated using the unit incremental price curve.",
+      "scenario": "The Market Operator integrates the submitted piecewise incremental price curve over the exact signed-MW interval between the Unconstrained and Constrained Schedules; schedule increase is a payment and reduction is a charge. Explicit no-price-submission is R0/MWh; unknown source state and gaps in the curve remain indeterminate or invalid.",
       "owner": "Symthaea",
-      "expected_disposition": "not_run",
-      "implementation_state": "declared_not_implemented",
+      "expected_disposition": "mixed_by_subcase",
+      "implementation_state": "kernel_unit_tested",
       "oracle_state": "draft_expected_disposition",
-      "test_names": [],
+      "test_names": [
+        "constrained_purchase_integrates_each_incremental_price_segment",
+        "constrained_sales_charge_is_the_opposite_signed_cashflow",
+        "constrained_schedule_handles_signed_consumption_axis",
+        "constrained_schedule_zero_submission_and_no_change_are_distinct",
+        "constrained_schedule_rejects_unknown_and_incomplete_price_evidence",
+        "constrained_schedule_rejects_zero_duration_and_invalid_segments"
+      ],
       "required_evidence": [
-        "unconstrained schedule",
-        "constrained schedule",
-        "Trading Period",
-        "incremental price curve",
-        "sign convention"
+        "exact Trading Unit and Trading Period",
+        "Unconstrained Schedule and Constrained Schedule revisions",
+        "Trading Period duration in minutes",
+        "authoritative day-ahead incremental price submission state",
+        "complete signed-MW incremental price curve covering the schedule delta",
+        "price-curve segment units and source revision"
       ],
       "stress_tags": [
         "congestion",
