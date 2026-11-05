@@ -225,6 +225,44 @@
             },
             "reasoning_carried_across_rounds": {
               "type": "boolean"
+            },
+            "task_attempts_per_case": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "concurrency": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_retries": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "network_policy": {
+              "type": "string",
+              "minLength": 10
+            },
+            "score_definition": {
+              "type": "string",
+              "minLength": 20
+            },
+            "environment": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "freecad_version": {
+                  "type": "string"
+                },
+                "validator_version": {
+                  "type": "string"
+                },
+                "task_schema_version": {
+                  "type": "string"
+                },
+                "agent_workspace_policy": {
+                  "type": "string"
+                }
+              }
             }
           }
         },
@@ -405,6 +443,61 @@
                     "type": "array",
                     "items": {
                       "type": "string"
+                    }
+                  },
+                  "agent": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "run_cost_total_usd": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "scored_tasks": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "perfect_tasks": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "subscores": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "create": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "create_and_edit": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "image_to_cad": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0,
+                        "maximum": 1
+                      }
                     }
                   }
                 }
