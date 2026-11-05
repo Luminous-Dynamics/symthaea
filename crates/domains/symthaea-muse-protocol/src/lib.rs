@@ -2778,7 +2778,6 @@ mod tests {
     }
 }
 
-
 #[cfg(test)]
 mod rmi_artifact_binding_tests {
     use super::*;
