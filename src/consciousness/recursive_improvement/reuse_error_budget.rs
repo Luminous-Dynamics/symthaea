@@ -40,6 +40,8 @@ pub enum ReuseBudgetError {
     HistoryTooLarge,
     AllocationUnderflow,
     ComparisonCountOverflow,
+    InvalidEmpiricalImprovement,
+    CandidateCountMismatch { expected: usize, actual: usize },
 }
 
 impl fmt::Display for ReuseBudgetError {
@@ -65,6 +67,12 @@ impl fmt::Display for ReuseBudgetError {
             ),
             Self::ComparisonCountOverflow => {
                 write!(f, "paired win/loss counts overflow usize")
+            }
+            Self::InvalidEmpiricalImprovement => {
+                write!(f, "empirical paired improvement must be finite and within [-1, 1]")
+            }
+            Self::CandidateCountMismatch { expected, actual } => {
+                write!(f, "expected {expected} candidate summaries, got {actual}")
             }
         }
     }
@@ -111,43 +119,114 @@ impl ReuseErrorAllocation {
     }
 }
 
-/// The only candidate-facing output permitted by the REUSE evaluation protocol.
-/// Detailed p-values, task-level outcomes and certificates must remain in the
-/// independent evaluator service.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ReuseDecision {
-    Promote,
-    Reject,
-}
-
-/// Apply the exact one-sided paired sign test using the REUSE allocation.
+/// Private per-candidate statistics held by the independent evaluator.
 ///
-/// `wins` is n_plus (candidate succeeds where incumbent fails) and `losses`
-/// is n_minus (incumbent succeeds where candidate fails). Tied tasks are not
-/// included. An all-tie comparison has p=1 and is rejected.
-///
-/// The exact p-value is computed by the shared paired-evaluation implementation
-/// but never returned. Only the predeclared decision is exposed. This function
-/// is suitable only inside an independently controlled evaluator; calling it
-/// inside the self-modifying proposer would violate decision-only feedback.
-pub fn reuse_sign_test_decision(
+/// The proposer must not receive this structure or its contents. It is input
+/// to the evaluator's round-level decision function only.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ReuseCandidateEvidence {
     wins: usize,
     losses: usize,
-    allocation: ReuseErrorAllocation,
-) -> Result<ReuseDecision, ReuseBudgetError> {
-    let total = wins
-        .checked_add(losses)
+    empirical_improvement: f64,
+}
+
+impl ReuseCandidateEvidence {
+    /// Construct one candidate's paired pass/fail summary. empirical_improvement
+    /// is the mean paired score difference over the full eligible task universe,
+    /// including ties; it is used only to choose among candidates that pass.
+    pub fn new(
+        wins: usize,
+        losses: usize,
+        empirical_improvement: f64,
+    ) -> Result<Self, ReuseBudgetError> {
+        wins.checked_add(losses)
+            .ok_or(ReuseBudgetError::ComparisonCountOverflow)?;
+        if !empirical_improvement.is_finite()
+            || !(-1.0..=1.0).contains(&empirical_improvement)
+        {
+            return Err(ReuseBudgetError::InvalidEmpiricalImprovement);
+        }
+        Ok(Self {
+            wins,
+            losses,
+            empirical_improvement,
+        })
+    }
+}
+
+/// Candidate-facing output for one complete REUSE round. A candidate receives
+/// only this single round decision, never individual pass/fail outcomes,
+/// p-values, empirical improvements or confidence certificates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReuseRoundDecision {
+    RejectAll,
+    PromoteCandidate { candidate_index: usize },
+}
+
+/// Evaluate all K candidate summaries using the same round/promotion allocation.
+///
+/// This follows the pass/fail REUSE algorithm: test each candidate at
+/// rho * delta[t,p], then among all candidates that pass choose the one with
+/// the largest empirical paired improvement. Stable input order breaks exact
+/// ties. Return only the single promoted candidate index or RejectAll.
+///
+/// This function is only a statistical decision kernel. The calling service
+/// must own the private evidence, candidate identity mapping, promotion history,
+/// incumbent transition, cumulative confidence certificate and feedback
+/// firewall. Never expose per-candidate input rows or intermediate booleans to
+/// the proposer.
+pub fn evaluate_reuse_round(
+    alpha: f64,
+    round: usize,
+    prior_promotions: usize,
+    candidates_per_round: usize,
+    rho: f64,
+    candidates: &[ReuseCandidateEvidence],
+) -> Result<ReuseRoundDecision, ReuseBudgetError> {
+    if candidates.len() != candidates_per_round {
+        return Err(ReuseBudgetError::CandidateCountMismatch {
+            expected: candidates_per_round,
+            actual: candidates.len(),
+        });
+    }
+    let allocation = allocate_reuse_error_budget(
+        alpha,
+        round,
+        prior_promotions,
+        candidates_per_round,
+        rho,
+    )?;
+
+    let mut best: Option<(usize, f64)> = None;
+    for (candidate_index, candidate) in candidates.iter().enumerate() {
+        let total = candidate
+            .wins
+            .checked_add(candidate.losses)
+            .ok_or(ReuseBudgetError::ComparisonCountOverflow)?;
+        if total == 0 {
+            continue;
+        }
+
+        let p_value = super::paired_sign_test::exact_sign_test_upper_tail(
+            candidate.wins,
+            candidate.losses,
+        )
         .ok_or(ReuseBudgetError::ComparisonCountOverflow)?;
-    if total == 0 {
-        return Ok(ReuseDecision::Reject);
+
+        if p_value <= allocation.paired_test_error_budget
+            && best.is_none_or(|(_, best_improvement)| {
+                candidate.empirical_improvement > best_improvement
+            })
+        {
+            best = Some((candidate_index, candidate.empirical_improvement));
+        }
     }
 
-    let p_value = super::paired_sign_test::exact_sign_test_upper_tail(wins, losses)
-        .ok_or(ReuseBudgetError::ComparisonCountOverflow)?;
-    if p_value <= allocation.paired_test_error_budget {
-        Ok(ReuseDecision::Promote)
-    } else {
-        Ok(ReuseDecision::Reject)
+    match best {
+        Some((candidate_index, _)) => {
+            Ok(ReuseRoundDecision::PromoteCandidate { candidate_index })
+        }
+        None => Ok(ReuseRoundDecision::RejectAll),
     }
 }
 
@@ -343,45 +422,70 @@ mod tests {
         assert_eq!(log_binomial_coefficient(10, 10), 0.0);
     }
     #[test]
-    fn decision_only_sign_test_uses_the_allocated_error_budget() {
-        let allocation = allocate_reuse_error_budget(0.05, 1, 0, 1, 0.5).unwrap();
-        // alpha=0.05, round=1, K=1, rho=0.5 gives a paired-test
-        // threshold of 0.00625. Eight all-win pairs yield p=1/256 and pass;
-        // seven yield p=1/128 and correctly remain above the threshold.
+    fn round_selector_promotes_only_the_best_candidate_that_passes() {
+        // At t=1, p=0, K=3, alpha=.05 and rho=.5, the paired-test
+        // threshold is .0020833. Ten and nine all-win pairs pass; eight do not.
+        let candidates = [
+            ReuseCandidateEvidence::new(10, 0, 0.1).unwrap(),
+            ReuseCandidateEvidence::new(9, 0, 0.2).unwrap(),
+            ReuseCandidateEvidence::new(8, 0, 0.9).unwrap(),
+        ];
         assert_eq!(
-            reuse_sign_test_decision(8, 0, allocation).unwrap(),
-            ReuseDecision::Promote
-        );
-        assert_eq!(
-            reuse_sign_test_decision(7, 0, allocation).unwrap(),
-            ReuseDecision::Reject
-        );
-        assert_eq!(
-            reuse_sign_test_decision(6, 0, allocation).unwrap(),
-            ReuseDecision::Reject
-        );
-        assert_eq!(
-            reuse_sign_test_decision(2, 3, allocation).unwrap(),
-            ReuseDecision::Reject
+            evaluate_reuse_round(0.05, 1, 0, 3, 0.5, &candidates).unwrap(),
+            ReuseRoundDecision::PromoteCandidate { candidate_index: 1 }
         );
     }
 
     #[test]
-    fn decision_only_sign_test_rejects_all_ties_and_is_inclusive_at_boundary() {
-        let allocation = allocate_reuse_error_budget(0.05, 1, 0, 1, 0.5).unwrap();
+    fn round_selector_rejects_all_ties_and_all_candidates_that_fail() {
+        let tied = [
+            ReuseCandidateEvidence::new(0, 0, 0.0).unwrap(),
+            ReuseCandidateEvidence::new(0, 0, 0.0).unwrap(),
+        ];
         assert_eq!(
-            reuse_sign_test_decision(0, 0, allocation).unwrap(),
-            ReuseDecision::Reject
+            evaluate_reuse_round(0.05, 1, 0, 2, 0.5, &tied).unwrap(),
+            ReuseRoundDecision::RejectAll
         );
 
-        // With alpha=0.5, t=1, K=1 and rho=0.5, the paired-test
-        // allocation is exactly 1/16. Four wins and zero losses has p=1/16.
-        let boundary = allocate_reuse_error_budget(0.5, 1, 0, 1, 0.5).unwrap();
+        let insufficient = [
+            ReuseCandidateEvidence::new(3, 2, 0.02).unwrap(),
+            ReuseCandidateEvidence::new(4, 3, 0.05).unwrap(),
+        ];
         assert_eq!(
-            reuse_sign_test_decision(4, 0, boundary).unwrap(),
-            ReuseDecision::Promote
+            evaluate_reuse_round(0.05, 1, 0, 2, 0.5, &insufficient).unwrap(),
+            ReuseRoundDecision::RejectAll
         );
     }
+
+    #[test]
+    fn round_selector_breaks_equal_empirical_gains_by_input_order() {
+        let candidates = [
+            ReuseCandidateEvidence::new(10, 0, 0.2).unwrap(),
+            ReuseCandidateEvidence::new(11, 0, 0.2).unwrap(),
+        ];
+        assert_eq!(
+            evaluate_reuse_round(0.05, 1, 0, 2, 0.5, &candidates).unwrap(),
+            ReuseRoundDecision::PromoteCandidate { candidate_index: 0 }
+        );
+    }
+
+    #[test]
+    fn round_selector_rejects_count_mismatch_and_invalid_empirical_gain() {
+        let one = [ReuseCandidateEvidence::new(10, 0, 0.1).unwrap()];
+        assert_eq!(
+            evaluate_reuse_round(0.05, 1, 0, 2, 0.5, &one),
+            Err(ReuseBudgetError::CandidateCountMismatch { expected: 2, actual: 1 })
+        );
+        assert_eq!(
+            ReuseCandidateEvidence::new(10, 0, f64::NAN),
+            Err(ReuseBudgetError::InvalidEmpiricalImprovement)
+        );
+        assert_eq!(
+            ReuseCandidateEvidence::new(10, 0, 1.1),
+            Err(ReuseBudgetError::InvalidEmpiricalImprovement)
+        );
+    }
+
 
     #[test]
     fn rejects_overflowing_paired_comparison_counts() {
