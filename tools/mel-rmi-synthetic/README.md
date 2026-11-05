@@ -1,6 +1,6 @@
 # Melothaea RMI-Bench v1 — synthetic Track A harness
 
-This isolated, dependency-free Rust crate implements the first offline milestone from the preregistered RMI-Bench v1 protocol.
+This isolated, dependency-minimal Rust crate implements the first offline milestone from the preregistered RMI-Bench v1 protocol.
 
 It is a benchmark-integrity oracle, not a Melothaea evaluation. Its positive control is a rule-based policy whose expected transformation is declared by a small synthetic task fixture. It does not establish human musical relevance, collaborative value, consciousness, or performance against a commercial model.
 
@@ -17,6 +17,7 @@ It is a benchmark-integrity oracle, not a Melothaea evaluation. Its positive con
 - Pinned `sha2 = 0.10.9` dependency and minimal committed lockfile; all test/run commands use `--locked`.
 - A fresh policy fork restored from one frozen pre-intervention checkpoint for every condition; mutable policy state cannot leak between counterfactual arms. The same explicit common-random-number seed is passed to every arm so stochastic adapters can pair random draws.
 - Explicit NotApplicable metric state for unsupported modalities.
+- Multi-valid negotiated response contracts that distinguish contract validity, partner vetoes, explicit partner choice, unresolved ambiguity, and clarification/branch/abstention.
 
 ## Run
 
@@ -45,3 +46,23 @@ The repository workflow stages this crate outside the root Cargo workspace, test
 Passing these tests means only that this finite synthetic harness detects its known positive and negative controls. The manifest stores exact event identities and a caller-supplied code revision; it does not cryptographically hash arbitrary audio or MIDI payloads. Real artifact digests and Studio transaction receipts must be supplied by the MEL-013A adapter before external or human-session claims.
 
 Track A's deterministic fixture set is a census of those fixtures, not a statistical sample of musicians. Human/live tracks still require a pilot, preregistered power analysis, appropriate ethics review, and blinded musician judgments. No human data collection is included here.
+
+
+## Multi-valid response negotiation
+
+The crate also provides an interaction-level `NegotiatedResponseContractV1`.
+A contract can admit several symbolic alternatives; it does not rank them or
+claim they are perceptually interchangeable. Partner authority is represented
+separately as an optional explicit choice plus vetoes. Under unresolved
+multi-option preference, the agent must either preserve the complete viable
+branch set or ask for clarification. It may not silently commit to one valid
+option. Once the partner has selected an option, a different valid option is
+not preference-compliant. If vetoes eliminate every option, abstention is the
+qualified outcome.
+
+The assessment reports contract validity, veto compliance, explicit-choice
+compliance, ambiguity preservation, action shape and qualification separately.
+These are synthetic interaction/authority checks—not human judgments,
+authorship rulings, or score/audio perceptual-equivalence claims. The response
+contract composes with the existing symbolic realization-equivalence work in
+PR #9325; it does not reimplement its Score/event matching logic.
