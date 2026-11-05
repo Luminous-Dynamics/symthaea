@@ -614,4 +614,5 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          "$RUNNER_TEMP/ceb-jsonschema/bin/python" scripts/validate_ceb_observations.py --self-test --repo-root .
           "$RUNNER_TEMP/ceb-jsonschema/bin/python" scripts/validate_ceb_observations.py --repo-root .
