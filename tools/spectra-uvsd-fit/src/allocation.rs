@@ -477,9 +477,15 @@ fn validate_receipt_sample_grid(
     if metric_by_pair.len() != expected {
         return Err(AdaptiveAllocationError::MissingScoreSampleCell);
     }
+    if receipt.minimum_replicates < 2 {
+        return Err(AdaptiveAllocationError::SampleMetricCountMismatch);
+    }
     let mut seen = BTreeMap::new();
     for sample in &receipt.samples {
         let count = common_cell_sample_count(sample)?;
+        if count < receipt.minimum_replicates {
+            return Err(AdaptiveAllocationError::SampleMetricCountMismatch);
+        }
         let key = (sample.action_id, sample.scenario_id);
         if seen.insert(key, count).is_some() {
             return Err(AdaptiveAllocationError::MissingScoreSampleCell);
@@ -488,12 +494,44 @@ fn validate_receipt_sample_grid(
             .get(&key)
             .copied()
             .ok_or(AdaptiveAllocationError::MissingScoreSampleCell)?;
-        if metric.target_utility.sample_count != count {
+        if metric.target_utility.sample_count != count
+            || metric.target_information.sample_count != count
+            || metric.model_discrimination_information.sample_count != count
+            || metric.representativeness.sample_count != count
+            || metric.participant_burden_seconds.sample_count != count
+        {
             return Err(AdaptiveAllocationError::SampleMetricCountMismatch);
         }
+        validate_score_vector(&sample.target_information, receipt.ranges.target_information)?;
+        validate_score_vector(
+            &sample.model_discrimination_information,
+            receipt.ranges.model_discrimination_information,
+        )?;
+        validate_score_vector(&sample.representativeness, receipt.ranges.representativeness)?;
+        validate_score_vector(&sample.target_utility, receipt.ranges.target_utility)?;
+        validate_score_vector(
+            &sample.participant_burden_seconds,
+            receipt.ranges.participant_burden_seconds,
+        )?;
     }
     if seen.len() != expected {
         return Err(AdaptiveAllocationError::MissingScoreSampleCell);
+    }
+    Ok(())
+}
+
+fn validate_score_vector(
+    values: &[f64],
+    range: super::score_bounds::ScoreRange,
+) -> Result<(), AdaptiveAllocationError> {
+    if !range.lower.is_finite()
+        || !range.upper.is_finite()
+        || range.lower > range.upper
+        || values
+            .iter()
+            .any(|value| !value.is_finite() || *value < range.lower || *value > range.upper)
+    {
+        return Err(AdaptiveAllocationError::SampleMetricCountMismatch);
     }
     Ok(())
 }
