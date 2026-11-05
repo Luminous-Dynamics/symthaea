@@ -1097,7 +1097,6 @@ fn summarize(scenario: Scenario, model: Model) -> Summary {
         scenario: scenario.name(),
         model: model.name(),
         dacs: summarize_dacs(&rows, scenario, model),
-        dacs: summarize_dacs(&rows, scenario, model),
         mean_pair_coverage: rows.iter().map(|row| row.pair_coverage).sum::<f64>() / denominator,
         mean_effect_sign_accuracy: mean_optional(
             &rows.iter().map(|row| row.sign_accuracy).collect::<Vec<_>>(),
