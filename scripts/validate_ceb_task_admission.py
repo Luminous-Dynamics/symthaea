@@ -404,12 +404,12 @@ def self_test(registry: dict, registry_schema: dict, task_schema: dict, format_c
 
     registry_mutant = copy.deepcopy(registry)
     registry_mutant["family_targets"][0]["target_tasks"] = 9
-    errors = validate_registry(registry_mutant, registry_schema, task_schema, format_checker)
+    errors = validate_registry(registry_mutant, registry_schema, task_schema, format_checker, {})
     if not errors:
         raise SystemExit("task admission quota negative control unexpectedly passed")
     registry_mutant = copy.deepcopy(registry)
     registry_mutant["actual_task_count"] = 1
-    errors = validate_registry(registry_mutant, registry_schema, task_schema, format_checker)
+    errors = validate_registry(registry_mutant, registry_schema, task_schema, format_checker, {})
     if not errors:
         raise SystemExit("empty task registry count negative control unexpectedly passed")
     print("CEB_TASK_REGISTRY_SELF_TEST_PASS")
