@@ -388,7 +388,9 @@
         "semantically_equivalent_repairs_allowed",
         "reference_patch_control",
         "empty_patch_control",
-        "oracle_record_sha256"
+        "oracle_record_sha256",
+        "adjudication_record_sha256",
+        "adjudication_decision"
       ],
       "properties": {
         "reviewers": {
@@ -410,8 +412,7 @@
               },
               "role": {
                 "enum": [
-                  "gold_reviewer",
-                  "adjudicator"
+                  "gold_reviewer"
                 ]
               },
               "review_record_sha256": {
@@ -471,6 +472,21 @@
         "oracle_record_sha256": {
           "type": "string",
           "pattern": "^[a-f0-9]{64}$"
+        },
+        "adjudication_record_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "adjudication_decision": {
+          "enum": [
+            "not_needed",
+            "accept",
+            "reject",
+            "unresolved"
+          ]
         }
       }
     },
