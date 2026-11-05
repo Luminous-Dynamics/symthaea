@@ -24,7 +24,7 @@ A response artifact can accumulate separate observations:
 
 CPAL callback observation is not predicted DAC time. Predicted playback is not independent acoustic measurement. Loopback is a separate clock domain; timestamps from different domains are never subtracted without a qualified mapping.
 
-The ledger updates pending application-frame counts only from exact enqueue and callback receipts; callback consumption cannot exceed the pending queue, and rejected clock/frame receipts do not partially mutate state. The ledger does not infer physical silence from YIELD or VETO. It reports only queue/frame invalidation receipts supplied to it.
+The ledger updates pending application-frame counts only from exact enqueue and callback receipts; callback consumption cannot exceed the pending queue, and rejected clock/frame receipts do not partially mutate state. Stable effect receipt IDs are independently deduplicated even when event IDs differ; conflicting receipt reuse fails. A CONTINUE decision receives at most one accepted preservation receipt. Runner-monotonic enqueue/application timestamps constrain later chunk timestamps, so a later event cannot be backdated behind already accepted output work. The ledger does not infer physical silence from YIELD or VETO. It reports only queue/frame invalidation receipts supplied to it.
 
 ## Run
 
