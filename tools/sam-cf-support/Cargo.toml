@@ -1,0 +1,11 @@
+[package]
+name = "sam-cf-support"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0 OR MIT"
+description = "Deterministic fixtures for counterfactual support and cross-world identification."
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
