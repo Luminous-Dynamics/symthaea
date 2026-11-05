@@ -2832,7 +2832,9 @@ mod tests {
     #[test]
     fn provider_replacement_deadline_is_ten_business_days_after_cessation() {
         let calendar = BusinessDayCalendarEvidence {
-            business_day_ordinals: &[10, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27],
+            business_day_ordinals: &[
+                10, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
+            ],
             complete_through_day: 27,
             source_digest: "sha256:provider-replacement-calendar",
         };
