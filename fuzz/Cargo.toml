@@ -10,6 +10,8 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "=0.4.13"
 symthaea-rea-artifact-reader = { path = "../crates/domains/symthaea-rea-artifact-reader" }
+sha2 = "=0.10.9"
+zip = { version = "=9.3.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [[bin]]
 name = "zip_inventory_and_content"
@@ -20,3 +22,8 @@ doc = false
 [workspace]
 members = ["."]
 resolver = "2"
+[[bin]]
+name = "zip_differential"
+path = "fuzz_targets/zip_differential.rs"
+test = false
+doc = false
