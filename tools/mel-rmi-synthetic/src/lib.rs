@@ -285,6 +285,14 @@ pub trait AgentPolicy {
     /// Stable policy identifier.
     fn policy_id(&self) -> &str;
 
+    /// Create an isolated policy instance restored from the same frozen
+    /// pre-intervention checkpoint. Implementations must not carry actions,
+    /// memory updates or mutable state from another condition into this fork.
+    ///
+    /// Shared telemetry may be retained only when it cannot affect policy
+    /// decisions (for example, an external invocation-order recorder).
+    fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy>;
+
     /// Produce one next action from the observed state.
     fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError>;
 }
@@ -302,6 +310,13 @@ impl AgentPolicy for FixedResponsePolicy {
         &self.id
     }
 
+    fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+                Box::new(Self {
+                    id: self.id.clone(),
+                    value: self.value,
+                })
+    }
+
     fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
         make_action(
             observation,
@@ -314,6 +329,7 @@ impl AgentPolicy for FixedResponsePolicy {
 }
 
 /// Policy that copies the current partner feature without transformation.
+#[derive(Clone)]
 pub struct ImitationOnlyPolicy {
     /// Stable policy identifier.
     pub id: String,
@@ -322,6 +338,10 @@ pub struct ImitationOnlyPolicy {
 impl AgentPolicy for ImitationOnlyPolicy {
     fn policy_id(&self) -> &str {
         &self.id
+    }
+
+    fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+                Box::new(self.clone())
     }
 
     fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
@@ -336,6 +356,7 @@ impl AgentPolicy for ImitationOnlyPolicy {
 }
 
 /// Policy that acts only on the frozen initial partner feature.
+#[derive(Clone)]
 pub struct OneWayPromptPolicy {
     /// Stable policy identifier.
     pub id: String,
@@ -344,6 +365,10 @@ pub struct OneWayPromptPolicy {
 impl AgentPolicy for OneWayPromptPolicy {
     fn policy_id(&self) -> &str {
         &self.id
+    }
+
+    fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+                Box::new(self.clone())
     }
 
     fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
@@ -361,6 +386,7 @@ impl AgentPolicy for OneWayPromptPolicy {
 }
 
 /// Policy that replays a value captured from a distinct prior session.
+#[derive(Clone)]
 pub struct YokedReplayPolicy {
     /// Stable policy identifier.
     pub id: String,
@@ -373,6 +399,10 @@ pub struct YokedReplayPolicy {
 impl AgentPolicy for YokedReplayPolicy {
     fn policy_id(&self) -> &str {
         &self.id
+    }
+
+    fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+                Box::new(self.clone())
     }
 
     fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
@@ -395,6 +425,7 @@ impl AgentPolicy for YokedReplayPolicy {
 /// Positive-control policy: applies the fixture's complementary response
 /// rule to the current partner input. This is an oracle, not a candidate
 /// Melothaea implementation.
+#[derive(Clone)]
 pub struct RuleBasedPolicy {
     /// Stable policy identifier.
     pub id: String,
@@ -403,6 +434,10 @@ pub struct RuleBasedPolicy {
 impl AgentPolicy for RuleBasedPolicy {
     fn policy_id(&self) -> &str {
         &self.id
+    }
+
+    fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+                Box::new(self.clone())
     }
 
     fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
@@ -421,6 +456,7 @@ impl AgentPolicy for RuleBasedPolicy {
 
 /// Deliberately incorrect policy that lets the unrelated feature change its
 /// target action. It is a negative control for evaluator specificity.
+#[derive(Clone)]
 pub struct UnrelatedFeatureShortcutPolicy {
     /// Stable policy identifier.
     pub id: String,
@@ -429,6 +465,10 @@ pub struct UnrelatedFeatureShortcutPolicy {
 impl AgentPolicy for UnrelatedFeatureShortcutPolicy {
     fn policy_id(&self) -> &str {
         &self.id
+    }
+
+    fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+                Box::new(self.clone())
     }
 
     fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
@@ -614,7 +654,11 @@ pub fn run_trial(
             Condition::Sham => 2,
             Condition::Unrelated => 3,
         };
-        actions_by_condition[index] = Some(policy.act(observations[index], &task)?);
+        let isolated_policy = policy.fork_from_frozen_state();
+        if isolated_policy.policy_id() != policy.policy_id() {
+            return Err(HarnessError::InvalidPolicy);
+        }
+        actions_by_condition[index] = Some(isolated_policy.act(observations[index], &task)?);
     }
     let actions: [AgentAction; 4] = actions_by_condition
         .into_iter()
@@ -1581,12 +1625,18 @@ mod tests {
     }
 
     struct OrderRecordingPolicy {
-        seen: std::sync::Mutex<Vec<String>>,
+        seen: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
     }
 
     impl AgentPolicy for OrderRecordingPolicy {
         fn policy_id(&self) -> &str {
             "order-recording"
+        }
+
+        fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+            Box::new(Self {
+                seen: std::sync::Arc::clone(&self.seen),
+            })
         }
 
         fn act(
@@ -1608,11 +1658,62 @@ mod tests {
         }
     }
 
+    struct StatefulCounterPolicy {
+        calls: std::sync::atomic::AtomicUsize,
+        ordinals: std::sync::Arc<std::sync::Mutex<Vec<usize>>>,
+    }
+
+    impl AgentPolicy for StatefulCounterPolicy {
+        fn policy_id(&self) -> &str {
+            "stateful-counter"
+        }
+
+        fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+            Box::new(Self {
+                calls: std::sync::atomic::AtomicUsize::new(0),
+                ordinals: std::sync::Arc::clone(&self.ordinals),
+            })
+        }
+
+        fn act(
+            &self,
+            observation: &Observation,
+            task: &TaskSpec,
+        ) -> Result<AgentAction, HarnessError> {
+            let ordinal = self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+            self.ordinals
+                .lock()
+                .map_err(|_| HarnessError::InvalidPolicy)?
+                .push(ordinal);
+            make_action(
+                observation,
+                self.policy_id(),
+                task,
+                observation.current_partner_feature.value + ordinal as i32,
+                ActionMechanism::Fixed,
+            )
+        }
+    }
+
+    #[test]
+    fn stateful_policy_is_forked_from_frozen_checkpoint_for_every_condition() {
+        let (task, interventions) = fixture();
+        let ordinals = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let policy = StatefulCounterPolicy {
+            calls: std::sync::atomic::AtomicUsize::new(0),
+            ordinals: std::sync::Arc::clone(&ordinals),
+        };
+        let record = run_trial(task, interventions, &policy, config()).unwrap();
+        assert_eq!(*ordinals.lock().unwrap(), vec![1, 1, 1, 1]);
+        assert_eq!(record.contrast.sham_delta, 0);
+        assert_eq!(record.contrast.unrelated_target_delta, 0);
+    }
+
     #[test]
     fn policy_invocations_follow_the_recorded_seeded_condition_order() {
         let (task, interventions) = fixture();
         let policy = OrderRecordingPolicy {
-            seen: std::sync::Mutex::new(Vec::new()),
+            seen: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
         };
         run_trial(task, interventions.clone(), &policy, config()).unwrap();
         let expected: Vec<String> = interventions
@@ -1740,6 +1841,10 @@ mod tests {
     impl AgentPolicy for CrossBoundPolicy {
         fn policy_id(&self) -> &str {
             "cross-bound"
+        }
+
+        fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+            Box::new(Self)
         }
 
         fn act(
