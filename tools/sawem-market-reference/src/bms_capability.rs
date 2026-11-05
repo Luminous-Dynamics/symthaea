@@ -327,7 +327,7 @@ mod tests {
     }
 
     #[test]
-    fn synthetic_assumptions_are_never_evidence_basis_is_non_synthetic() {
+    fn synthetic_assumptions_never_claim_non_synthetic_evidence_basis() {
         let profile = envelope(
             CapabilityEvidenceBasis::SyntheticAssumption,
             &CHARGE,
