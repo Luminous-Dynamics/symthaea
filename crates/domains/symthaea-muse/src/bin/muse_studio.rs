@@ -3094,9 +3094,8 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
     // for. Every manifest allocated here is a `Root`: nothing upstream yet
     // tracks "this candidate was derived from kept piece X" (see
     // `symthaea_muse::genealogy`'s module docs).
-    // Hashes below are over the exact bytes written into the keeper bundle.
-    // The genealogy store independently recomputes them from these byte slices.
-    let recipe_sha256 = sha256_hex(&recipe_bytes);
+    // The score hash is also written to the keeper index for duplicate detection.
+    // The genealogy store independently hashes all exact byte slices, including recipe and audio.
     let score_sha256 = sha256_hex(&score_bytes);
     let genealogy = studio.genealogy.as_ref().and_then(|store| {
         let origin = symthaea_muse_protocol::GenealogyOrigin::MuseGenerated {
@@ -5468,5 +5467,41 @@ mod compose_bars_contract_tests {
             Err((status, _)) => assert_eq!(status, axum::http::StatusCode::BAD_REQUEST),
             Ok(_) => panic!("1 bar is below COMPOSE_BARS_RANGE and must be rejected"),
         }
+    }
+}
+
+#[cfg(test)]
+mod keeper_artifact_hash_tests {
+    use super::*;
+
+    #[test]
+    fn recipe_identity_uses_the_exact_pretty_bytes_written_to_bundle() {
+        let recipe = serde_json::json!({
+            "name": "byte-bound recipe",
+            "parts": [1, 2, 3]
+        });
+        let persisted_bytes = serde_json::to_vec_pretty(&recipe).unwrap();
+        assert_eq!(
+            serialized_pretty_sha256(&recipe).unwrap(),
+            sha256_hex(&persisted_bytes)
+        );
+        assert_ne!(
+            serialized_sha256(&recipe).unwrap(),
+            sha256_hex(&persisted_bytes),
+            "compact re-serialization is not the persisted pretty-printed artifact"
+        );
+    }
+
+    #[test]
+    fn score_identity_uses_the_exact_compact_bytes_written_to_bundle() {
+        let score = serde_json::json!({
+            "notes": [60, 64, 67],
+            "tempo": 96
+        });
+        let persisted_bytes = serde_json::to_vec(&score).unwrap();
+        assert_eq!(
+            serialized_sha256(&score).unwrap(),
+            sha256_hex(&persisted_bytes)
+        );
     }
 }
