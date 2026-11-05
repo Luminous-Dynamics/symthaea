@@ -1875,6 +1875,7 @@ mod tests {
         let pair = json!({
             "split":"synthetic",
             "synthetic_only":true,
+            "source_family_ids":["SYN-FAMILY-SYN-RESTRICTED-RECORD"],
             "dimension": "rights_revocation",
             "expected_relation": "deny_access",
             "baseline": {
