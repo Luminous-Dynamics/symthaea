@@ -1217,7 +1217,7 @@ impl CfCNetwork {
         let manifest_digest = blake3::hash(&manifest_bytes).to_hex().to_string();
 
         let mut architecture_hasher = blake3::Hasher::new();
-        architecture_hasher.update(b"symthaea-cfc-architecture-v1\\0");
+        architecture_hasher.update(b"symthaea-cfc-architecture-v1\0");
         architecture_hasher.update(&config_bytes);
         architecture_hasher.update(&manifest_bytes);
         let architecture_digest = architecture_hasher.finalize().to_hex().to_string();
@@ -1229,7 +1229,7 @@ impl CfCNetwork {
         let parameter_digest = parameter_hasher.finalize().to_hex().to_string();
 
         let mut model_hasher = blake3::Hasher::new();
-        model_hasher.update(b"symthaea-cfc-model-v1\\0");
+        model_hasher.update(b"symthaea-cfc-model-v1\0");
         model_hasher.update(architecture_digest.as_bytes());
         model_hasher.update(manifest_digest.as_bytes());
         model_hasher.update(parameter_digest.as_bytes());
