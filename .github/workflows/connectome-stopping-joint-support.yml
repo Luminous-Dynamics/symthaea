@@ -40,11 +40,12 @@ jobs:
       - name: Evaluate longitudinal joint-support receipt fixture
         run: |
           cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_stopping_audit -- --input docs/neuroscience/examples/CONNECTOME_STOPPING_JOINT_SUPPORT_RECEIPTS.example.jsonl --tail-window 3 --output "$RUNNER_TEMP/stopping-joint-support-report.json"
-          python3 - <<'PY'
+          REPORT_PATH="$RUNNER_TEMP/stopping-joint-support-report.json" python3 - <<'PY'
           import json
+          import os
           from pathlib import Path
 
-          report = json.loads(Path("$RUNNER_TEMP/stopping-joint-support-report.json").read_text())
+          report = json.loads(Path(os.environ["REPORT_PATH"]).read_text())
           assert report["status"] == "VALIDATED_NOT_STOPPED", report
           assert report["recommendation"] == "CONTINUE_REVIEW", report
           assert report["graph_invariants_stable_in_tail"] is True, report
