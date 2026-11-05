@@ -4,6 +4,8 @@
 //! It deliberately does not estimate population recall, fit capture-recapture models,
 //! authenticate evidence producers, or establish biological truth.
 
+#![recursion_limit = "256"]
+
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -184,7 +186,9 @@ fn require_sha(value: &str, length: usize, label: &str) -> Result<(), String> {
     if valid_hex(value, length) {
         Ok(())
     } else {
-        Err(format!("{label} must be {length} lowercase hexadecimal characters"))
+        Err(format!(
+            "{label} must be {length} lowercase hexadecimal characters"
+        ))
     }
 }
 
@@ -197,7 +201,9 @@ where
     for value in values {
         let value = value.into();
         if !nonempty(&value) || !seen.insert(value.clone()) {
-            return Err(format!("{label} contains an empty or duplicate identity: {value}"));
+            return Err(format!(
+                "{label} contains an empty or duplicate identity: {value}"
+            ));
         }
     }
     Ok(())
@@ -277,10 +283,16 @@ fn validate_alternative(alternative: &Alternative, input: &Input) -> Result<(), 
     match alternative.query_consequence.as_str() {
         "QUERY_DECISION_FLIP" => {
             let before = alternative.decision_before_met.ok_or_else(|| {
-                format!("alternative {} lacks its before-decision", alternative.alternative_id)
+                format!(
+                    "alternative {} lacks its before-decision",
+                    alternative.alternative_id
+                )
             })?;
             let after = alternative.decision_after_met.ok_or_else(|| {
-                format!("alternative {} lacks its after-decision", alternative.alternative_id)
+                format!(
+                    "alternative {} lacks its after-decision",
+                    alternative.alternative_id
+                )
             })?;
             if before == after {
                 return Err(format!(
@@ -303,10 +315,16 @@ fn validate_alternative(alternative: &Alternative, input: &Input) -> Result<(), 
         }
         "ADAPTIVE_COST_INCREASED" => {
             let before = alternative.before_worst_case_effort_units.ok_or_else(|| {
-                format!("alternative {} has no baseline policy cost", alternative.alternative_id)
+                format!(
+                    "alternative {} has no baseline policy cost",
+                    alternative.alternative_id
+                )
             })?;
             let after = alternative.after_worst_case_effort_units.ok_or_else(|| {
-                format!("alternative {} has no expanded policy cost", alternative.alternative_id)
+                format!(
+                    "alternative {} has no expanded policy cost",
+                    alternative.alternative_id
+                )
             })?;
             if alternative.challenge_report_status != "POLICY_EXISTS" || after <= before {
                 return Err(format!(
@@ -345,8 +363,7 @@ fn validate_alternative(alternative: &Alternative, input: &Input) -> Result<(), 
     }
 
     match alternative.biological_disposition.as_str() {
-        "ADMISSIBLE" | "INADMISSIBLE" | "INDETERMINATE" | "DISPUTED"
-        | "NOT_ADJUDICATED" => Ok(()),
+        "ADMISSIBLE" | "INADMISSIBLE" | "INDETERMINATE" | "DISPUTED" | "NOT_ADJUDICATED" => Ok(()),
         other => Err(format!(
             "alternative {} has unknown biological disposition {other}",
             alternative.alternative_id
@@ -372,8 +389,16 @@ fn validate_input(input: &Input, input_bytes: &[u8]) -> Result<Value, String> {
         40,
         "dataset revision commit SHA",
     )?;
-    require_sha(&input.query.query_spec_sha256, 64, "query specification digest")?;
-    require_sha(&input.query.decision_rule_sha256, 64, "query decision-rule digest")?;
+    require_sha(
+        &input.query.query_spec_sha256,
+        64,
+        "query specification digest",
+    )?;
+    require_sha(
+        &input.query.decision_rule_sha256,
+        64,
+        "query decision-rule digest",
+    )?;
     require_sha(
         &input.baseline.scenario_set_sha256,
         64,
@@ -421,7 +446,9 @@ fn validate_input(input: &Input, input_bytes: &[u8]) -> Result<Value, String> {
         || input.sampling_binding.psu_population_count < input.sampling_binding.sampled_psu_count
         || input.psus.is_empty()
     {
-        return Err("sampling population/sample counts do not reconcile with the PSU records".into());
+        return Err(
+            "sampling population/sample counts do not reconcile with the PSU records".into(),
+        );
     }
     match input.baseline.adaptive_policy_status.as_str() {
         "POLICY_EXISTS" if input.baseline.adaptive_worst_case_effort_units.is_some() => {}
@@ -429,14 +456,20 @@ fn validate_input(input: &Input, input_bytes: &[u8]) -> Result<Value, String> {
         _ => return Err("baseline adaptive-policy status and effort are inconsistent".into()),
     }
 
-    validate_unique(input.channels.iter().map(|row| row.channel_id.clone()), "channel IDs")?;
+    validate_unique(
+        input.channels.iter().map(|row| row.channel_id.clone()),
+        "channel IDs",
+    )?;
     validate_unique(input.psus.iter().map(|row| row.psu_id.clone()), "PSU IDs")?;
     validate_unique(
         input.proposals.iter().map(|row| row.proposal_id.clone()),
         "proposal IDs",
     )?;
     validate_unique(
-        input.alternatives.iter().map(|row| row.alternative_id.clone()),
+        input
+            .alternatives
+            .iter()
+            .map(|row| row.alternative_id.clone()),
         "alternative IDs",
     )?;
 
@@ -493,7 +526,12 @@ fn validate_input(input: &Input, input_bytes: &[u8]) -> Result<Value, String> {
             "COMPLETE_SEARCH" => complete_search_psu_count += 1,
             "INCOMPLETE_SEARCH" => incomplete_search_psu_count += 1,
             "SOURCE_INACCESSIBLE" => inaccessible_psu_count += 1,
-            other => return Err(format!("PSU {} has unknown search disposition {other}", psu.psu_id)),
+            other => {
+                return Err(format!(
+                    "PSU {} has unknown search disposition {other}",
+                    psu.psu_id
+                ));
+            }
         }
         if psu.proposal_ids.is_empty() {
             zero_proposal_psu_count += 1;
@@ -560,14 +598,23 @@ fn validate_input(input: &Input, input_bytes: &[u8]) -> Result<Value, String> {
 
         match proposal.adjudication_disposition.as_str() {
             "CONFIRMED_MATCH" => {
-                let alternative_id = proposal
-                    .matched_alternative_id
-                    .as_deref()
-                    .ok_or_else(|| format!("confirmed proposal {} lacks alternative ID", proposal.proposal_id))?;
-                let match_receipt = proposal
-                    .match_adjudication_sha256
-                    .as_deref()
-                    .ok_or_else(|| format!("confirmed proposal {} lacks blinded match receipt", proposal.proposal_id))?;
+                let alternative_id =
+                    proposal.matched_alternative_id.as_deref().ok_or_else(|| {
+                        format!(
+                            "confirmed proposal {} lacks alternative ID",
+                            proposal.proposal_id
+                        )
+                    })?;
+                let match_receipt =
+                    proposal
+                        .match_adjudication_sha256
+                        .as_deref()
+                        .ok_or_else(|| {
+                            format!(
+                                "confirmed proposal {} lacks blinded match receipt",
+                                proposal.proposal_id
+                            )
+                        })?;
                 require_sha(match_receipt, 64, "proposal match-adjudication digest")?;
                 let alternative = alternatives.get(alternative_id).ok_or_else(|| {
                     format!(
@@ -616,7 +663,11 @@ fn validate_input(input: &Input, input_bytes: &[u8]) -> Result<Value, String> {
     }
 
     for (psu_id, psu) in &psus {
-        let declared = psu.proposal_ids.iter().map(String::as_str).collect::<BTreeSet<_>>();
+        let declared = psu
+            .proposal_ids
+            .iter()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>();
         let observed = observed_proposals_by_psu
             .get(psu_id)
             .cloned()
@@ -691,8 +742,16 @@ fn validate_input(input: &Input, input_bytes: &[u8]) -> Result<Value, String> {
         for right_index in (left_index + 1)..ordered_channels.len() {
             let left = channels[ordered_channels[left_index]];
             let right = channels[ordered_channels[right_index]];
-            let left_groups = left.ancestry_group_ids.iter().map(String::as_str).collect::<BTreeSet<_>>();
-            let right_groups = right.ancestry_group_ids.iter().map(String::as_str).collect::<BTreeSet<_>>();
+            let left_groups = left
+                .ancestry_group_ids
+                .iter()
+                .map(String::as_str)
+                .collect::<BTreeSet<_>>();
+            let right_groups = right
+                .ancestry_group_ids
+                .iter()
+                .map(String::as_str)
+                .collect::<BTreeSet<_>>();
             let shared = left_groups
                 .intersection(&right_groups)
                 .map(|group| (*group).to_string())
@@ -707,21 +766,26 @@ fn validate_input(input: &Input, input_bytes: &[u8]) -> Result<Value, String> {
         }
     }
 
-    let all_list_missed_sensitivity_status = if let Some(sensitivity) = &input.all_list_missed_sensitivity {
-        if sensitivity.owner != "9248" {
-            return Err("all-list-missed sensitivity owner must remain #9248".into());
-        }
-        require_sha(&sensitivity.report_sha256, 64, "all-list-missed report digest")?;
-        if !matches!(
-            sensitivity.status.as_str(),
-            "NOT_RUN" | "ESTIMABLE_SENSITIVITY_RANGE" | "NOT_IDENTIFIABLE" | "NOT_ESTIMABLE"
-        ) {
-            return Err("unknown all-list-missed sensitivity status".into());
-        }
-        sensitivity.status.clone()
-    } else {
-        "NOT_SUPPLIED".into()
-    };
+    let all_list_missed_sensitivity_status =
+        if let Some(sensitivity) = &input.all_list_missed_sensitivity {
+            if sensitivity.owner != "9248" {
+                return Err("all-list-missed sensitivity owner must remain #9248".into());
+            }
+            require_sha(
+                &sensitivity.report_sha256,
+                64,
+                "all-list-missed report digest",
+            )?;
+            if !matches!(
+                sensitivity.status.as_str(),
+                "NOT_RUN" | "ESTIMABLE_SENSITIVITY_RANGE" | "NOT_IDENTIFIABLE" | "NOT_ESTIMABLE"
+            ) {
+                return Err("unknown all-list-missed sensitivity status".into());
+            }
+            sensitivity.status.clone()
+        } else {
+            "NOT_SUPPLIED".into()
+        };
 
     let status = if incomplete_search_psu_count > 0 || inaccessible_psu_count > 0 {
         "NOT_PROMOTABLE_INCOMPLETE_OR_INACCESSIBLE_SEARCH"
@@ -854,10 +918,19 @@ mod tests {
         assert_eq!(report["admissible_alternative_count"], 3);
         assert_eq!(report["query_critical_alternative_count"], 2);
         assert_eq!(report["captured_query_critical_alternative_count"], 1);
-        assert_eq!(report["missed_query_critical_alternative_ids"][0], "ALT-OMITTED-HIGH-IMPACT");
+        assert_eq!(
+            report["missed_query_critical_alternative_ids"][0],
+            "ALT-OMITTED-HIGH-IMPACT"
+        );
         assert_eq!(report["non_query_critical_admissible_alternative_count"], 1);
-        assert_eq!(report["population_estimate_status"], "NOT_COMPUTED_BY_THIS_TOOL_OWNER_9204");
-        assert_eq!(report["independence_disposition"], "NOT_ESTABLISHED_BY_ANCESTRY_LABELS");
+        assert_eq!(
+            report["population_estimate_status"],
+            "NOT_COMPUTED_BY_THIS_TOOL_OWNER_9204"
+        );
+        assert_eq!(
+            report["independence_disposition"],
+            "NOT_ESTABLISHED_BY_ANCESTRY_LABELS"
+        );
     }
 
     #[test]
@@ -870,14 +943,18 @@ mod tests {
     #[test]
     fn duplicate_alternative_identity_is_rejected() {
         let mut value = fixture_value();
-        value["alternatives"][1]["alternative_id"] = value["alternatives"][0]["alternative_id"].clone();
+        value["alternatives"][1]["alternative_id"] =
+            value["alternatives"][0]["alternative_id"].clone();
         assert!(run_value(value).unwrap_err().contains("duplicate identity"));
     }
 
     #[test]
     fn proposal_ledger_must_match_psu_records() {
         let mut value = fixture_value();
-        value["psus"][0]["proposal_ids"].as_array_mut().unwrap().pop();
+        value["psus"][0]["proposal_ids"]
+            .as_array_mut()
+            .unwrap()
+            .pop();
         assert!(run_value(value).unwrap_err().contains("proposal ledger"));
     }
 
@@ -898,15 +975,26 @@ mod tests {
     #[test]
     fn confirmed_match_requires_blinded_receipt() {
         let mut value = fixture_value();
-        value["proposals"][0].as_object_mut().unwrap().remove("match_adjudication_sha256");
-        assert!(run_value(value).unwrap_err().contains("lacks blinded match receipt"));
+        value["proposals"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("match_adjudication_sha256");
+        assert!(
+            run_value(value)
+                .unwrap_err()
+                .contains("lacks blinded match receipt")
+        );
     }
 
     #[test]
     fn query_flip_requires_different_decisions() {
         let mut value = fixture_value();
         value["alternatives"][0]["decision_after_met"] = json!(true);
-        assert!(run_value(value).unwrap_err().contains("decisions are equal"));
+        assert!(
+            run_value(value)
+                .unwrap_err()
+                .contains("decisions are equal")
+        );
     }
 
     #[test]
@@ -929,40 +1017,63 @@ mod tests {
         value["psus"][3]["search_disposition"] = json!("SOURCE_INACCESSIBLE");
         let report = run_value(value).unwrap();
         assert_eq!(report["source_inaccessible_psu_count"], 1);
-        assert_eq!(report["status"], "NOT_PROMOTABLE_INCOMPLETE_OR_INACCESSIBLE_SEARCH");
+        assert_eq!(
+            report["status"],
+            "NOT_PROMOTABLE_INCOMPLETE_OR_INACCESSIBLE_SEARCH"
+        );
     }
 
     #[test]
     fn repeated_alternative_capture_is_counted_once_for_union() {
         let report = run_value(fixture_value()).unwrap();
         assert_eq!(report["captured_query_critical_alternative_count"], 1);
-        assert_eq!(report["channel_summaries"][0]["query_critical_alternative_ids"][0], "ALT-QUERY-FLIP");
-        assert_eq!(report["channel_summaries"][1]["query_critical_alternative_ids"][0], "ALT-QUERY-FLIP");
+        assert_eq!(
+            report["channel_summaries"][0]["query_critical_alternative_ids"][0],
+            "ALT-QUERY-FLIP"
+        );
+        assert_eq!(
+            report["channel_summaries"][1]["query_critical_alternative_ids"][0],
+            "ALT-QUERY-FLIP"
+        );
     }
 
     #[test]
     fn shared_ancestry_is_reported_without_independence_credit() {
         let report = run_value(fixture_value()).unwrap();
-        assert!(report["shared_ancestry_overlaps"].as_array().unwrap().iter().any(
-            |row| row["channel_a"] == "em-specialist"
-                && row["channel_b"] == "morphology-review"
-                && row["shared_group_ids"][0] == "raw-volume-001"
-        ));
-        assert_eq!(report["independence_disposition"], "NOT_ESTABLISHED_BY_ANCESTRY_LABELS");
+        assert!(
+            report["shared_ancestry_overlaps"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|row| row["channel_a"] == "em-specialist"
+                    && row["channel_b"] == "morphology-review"
+                    && row["shared_group_ids"][0] == "raw-volume-001")
+        );
+        assert_eq!(
+            report["independence_disposition"],
+            "NOT_ESTABLISHED_BY_ANCESTRY_LABELS"
+        );
     }
 
     #[test]
     fn all_list_missed_is_sensitivity_not_ground_truth() {
         let report = run_value(fixture_value()).unwrap();
         assert_eq!(report["all_list_missed_sensitivity_status"], "NOT_RUN");
-        assert_eq!(report["biological_truth_disposition"], "NOT_ESTABLISHED_BY_THIS_TOOL");
+        assert_eq!(
+            report["biological_truth_disposition"],
+            "NOT_ESTABLISHED_BY_THIS_TOOL"
+        );
     }
 
     #[test]
     fn malformed_source_digest_is_rejected() {
         let mut value = fixture_value();
         value["sampling_binding"]["sampling_frame_sha256"] = json!("not-a-digest");
-        assert!(run_value(value).unwrap_err().contains("sampling-frame digest"));
+        assert!(
+            run_value(value)
+                .unwrap_err()
+                .contains("sampling-frame digest")
+        );
     }
 
     #[test]
@@ -974,7 +1085,10 @@ mod tests {
         proposal.remove("match_adjudication_sha256");
         let report = run_value(value).unwrap();
         assert_eq!(report["unadjudicated_proposal_count"], 1);
-        assert_eq!(report["status"], "NOT_PROMOTABLE_UNRESOLVED_PROPOSAL_ADJUDICATION");
+        assert_eq!(
+            report["status"],
+            "NOT_PROMOTABLE_UNRESOLVED_PROPOSAL_ADJUDICATION"
+        );
     }
 
     #[test]
@@ -984,7 +1098,10 @@ mod tests {
         let report = run_value(value).unwrap();
         assert_eq!(report["unresolved_biological_alternative_count"], 1);
         assert_eq!(report["non_query_critical_admissible_alternative_count"], 0);
-        assert_eq!(report["status"], "NOT_PROMOTABLE_UNRESOLVED_OR_NOT_ESTIMABLE_ALTERNATIVES");
+        assert_eq!(
+            report["status"],
+            "NOT_PROMOTABLE_UNRESOLVED_OR_NOT_ESTIMABLE_ALTERNATIVES"
+        );
     }
 
     #[test]
