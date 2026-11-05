@@ -794,6 +794,224 @@ fn validate_policy_tree(node: &PolicyNode) -> Result<(), String> {
     Ok(())
 }
 
+fn normalized_addition_rows(
+    addition: &JointSupportAddition,
+    action_ids: &[String],
+) -> Result<Vec<Vec<String>>, String> {
+    let support = JointWorldSupport {
+        scenario_id: addition.scenario_id.clone(),
+        source_evidence_sha256: addition.source_evidence_sha256.clone(),
+        joint_observation_model_sha256: addition.joint_observation_model_sha256.clone(),
+        dependence_groups: addition.dependence_groups.clone(),
+        possible_joint_outcomes: addition.possible_joint_outcomes.clone(),
+    };
+    normalized_joint_rows(&support, action_ids)
+}
+
+fn canonical_support_challenge_sha256(
+    base_support_sha256: &str,
+    challenge: &SupportChallenge,
+    action_ids: &[String],
+) -> Result<String, String> {
+    let mut additions = challenge.additions.iter().collect::<Vec<_>>();
+    additions.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
+    let mut hasher = Sha256::new();
+    hasher.update(b"connectome-adaptive-support-expansion-challenge-v1");
+    hasher.update(base_support_sha256.as_bytes());
+    hash_field(&mut hasher, &challenge.challenge_id);
+    hasher.update(challenge.challenger_evidence_sha256.as_bytes());
+    hasher.update(challenge.challenger_model_sha256.as_bytes());
+    hasher.update((additions.len() as u64).to_be_bytes());
+    for addition in additions {
+        hasher.update(b"WORLD-ADDITION");
+        hash_field(&mut hasher, &addition.scenario_id);
+        hasher.update(addition.source_evidence_sha256.as_bytes());
+        hasher.update(addition.joint_observation_model_sha256.as_bytes());
+        let mut groups = addition.dependence_groups.clone();
+        groups.sort();
+        hasher.update((groups.len() as u64).to_be_bytes());
+        for group in groups {
+            hasher.update(b"DEPENDENCE");
+            hash_field(&mut hasher, &group);
+        }
+        let rows = normalized_addition_rows(addition, action_ids)?;
+        hasher.update((rows.len() as u64).to_be_bytes());
+        for row in rows {
+            hasher.update(b"ADDED-JOINT-TUPLE");
+            for (action_id, outcome) in action_ids.iter().zip(row) {
+                hash_field(&mut hasher, action_id);
+                hash_field(&mut hasher, &outcome);
+            }
+        }
+    }
+    Ok(hex::encode(hasher.finalize()))
+}
+
+fn expand_joint_support(
+    base_sha256: &str,
+    challenge: &SupportChallenge,
+    action_ids: &[String],
+    scenarios: &[Scenario],
+    base_rows: &[Vec<Vec<String>>],
+) -> Result<(String, String, usize, TupleRowsByWorld), String> {
+    if !nonempty(&challenge.challenge_id) {
+        return Err("support challenge ID must be non-empty".into());
+    }
+    if !valid_hex(&challenge.challenger_evidence_sha256, 64)
+        || !valid_hex(&challenge.challenger_model_sha256, 64)
+    {
+        return Err(format!(
+            "support challenge {} challenger evidence/model digests must be SHA-256",
+            challenge.challenge_id
+        ));
+    }
+    if challenge.additions.is_empty() || challenge.additions.len() > scenarios.len() {
+        return Err(format!(
+            "support challenge {} must add tuples to 1..={} worlds",
+            challenge.challenge_id,
+            scenarios.len()
+        ));
+    }
+    let scenario_indices = scenarios
+        .iter()
+        .enumerate()
+        .map(|(index, world)| (world.scenario_id.as_str(), index))
+        .collect::<BTreeMap<_, _>>();
+    let mut seen_worlds = BTreeSet::new();
+    let mut expanded_rows = base_rows.to_vec();
+    let mut added_tuple_count = 0_usize;
+    for addition in &challenge.additions {
+        let Some(world_index) = scenario_indices.get(addition.scenario_id.as_str()).copied() else {
+            return Err(format!(
+                "support challenge {} references unknown world {}",
+                challenge.challenge_id, addition.scenario_id
+            ));
+        };
+        if !seen_worlds.insert(addition.scenario_id.as_str()) {
+            return Err(format!(
+                "support challenge {} repeats world {}",
+                challenge.challenge_id, addition.scenario_id
+            ));
+        }
+        if !valid_hex(&addition.source_evidence_sha256, 64)
+            || !valid_hex(&addition.joint_observation_model_sha256, 64)
+        {
+            return Err(format!(
+                "support challenge {} world {} has invalid source/model digest",
+                challenge.challenge_id, addition.scenario_id
+            ));
+        }
+        let mut groups = BTreeSet::new();
+        for group in &addition.dependence_groups {
+            if !nonempty(group) || !groups.insert(group) {
+                return Err(format!(
+                    "support challenge {} world {} has duplicate/empty dependence group",
+                    challenge.challenge_id, addition.scenario_id
+                ));
+            }
+        }
+        let rows = normalized_addition_rows(addition, action_ids)?;
+        if rows.is_empty() {
+            return Err(format!(
+                "support challenge {} world {} contains no added tuples",
+                challenge.challenge_id, addition.scenario_id
+            ));
+        }
+        let existing = expanded_rows[world_index].iter().collect::<BTreeSet<_>>();
+        if rows.iter().any(|row| existing.contains(row)) {
+            return Err(format!(
+                "support challenge {} world {} attempts to add a tuple already present",
+                challenge.challenge_id, addition.scenario_id
+            ));
+        }
+        let new_count = expanded_rows[world_index]
+            .len()
+            .checked_add(rows.len())
+            .ok_or_else(|| "expanded joint tuple count overflow".to_string())?;
+        if new_count > MAX_JOINT_TUPLES_PER_WORLD {
+            return Err(format!(
+                "support challenge {} world {} exceeds the {}-tuple expanded support cap",
+                challenge.challenge_id, addition.scenario_id, MAX_JOINT_TUPLES_PER_WORLD
+            ));
+        }
+        added_tuple_count = added_tuple_count
+            .checked_add(rows.len())
+            .ok_or_else(|| "added joint tuple count overflow".to_string())?;
+        expanded_rows[world_index].extend(rows);
+        expanded_rows[world_index].sort();
+    }
+    let challenge_sha256 =
+        canonical_support_challenge_sha256(base_sha256, challenge, action_ids)?;
+    let mut expanded_hasher = Sha256::new();
+    expanded_hasher.update(b"connectome-adaptive-expanded-joint-support-v1");
+    expanded_hasher.update(base_sha256.as_bytes());
+    expanded_hasher.update(challenge_sha256.as_bytes());
+    let expanded_sha256 = hex::encode(expanded_hasher.finalize());
+    Ok((
+        challenge_sha256,
+        expanded_sha256,
+        added_tuple_count,
+        expanded_rows,
+    ))
+}
+
+fn effort_is_non_decreasing(before: Option<u64>, after: Option<u64>) -> bool {
+    match (before, after) {
+        (Some(before), Some(after)) => after >= before,
+        (Some(_), None) | (None, None) => true,
+        (None, Some(_)) => false,
+    }
+}
+
+fn solve_adaptive_policy(
+    action_ids: &[String],
+    action_effort: &[u64],
+    scenarios: &[Scenario],
+    tuples_by_world: &[Vec<Vec<String>>],
+) -> Result<(Option<PolicySolution>, usize), String> {
+    let full_world_masks = tuples_by_world
+        .iter()
+        .map(|tuples| {
+            if tuples.len() == 64 {
+                u64::MAX
+            } else {
+                (1_u64 << tuples.len()) - 1
+            }
+        })
+        .collect::<Vec<_>>();
+    let initial_state = PolicyState {
+        remaining_action_mask: (1_u16 << action_ids.len()) - 1,
+        world_row_masks: full_world_masks,
+    };
+    let outcome_masks = build_outcome_masks(action_ids, tuples_by_world);
+    let mut solver = Solver {
+        action_ids,
+        action_effort,
+        scenarios,
+        outcome_masks,
+        state_count: 0,
+        memo: BTreeMap::new(),
+    };
+    let solution = solver.solve(initial_state)?;
+    Ok((solution, solver.state_count))
+}
+
+fn adaptive_status(solution: &Option<PolicySolution>) -> &'static str {
+    if solution.is_some() {
+        "POLICY_EXISTS"
+    } else {
+        "NO_POLICY"
+    }
+}
+
+fn fixed_status(summary: &FixedPlanSummary) -> &'static str {
+    if summary.minimum_effort_units.is_some() {
+        "FIXED_PLAN_EXISTS"
+    } else {
+        "NO_FIXED_PLAN"
+    }
+}
+
 fn decision_conflict_pairs(scenarios: &[Scenario]) -> Vec<(usize, usize)> {
     let mut pairs = Vec::new();
     for left in 0..scenarios.len() {
