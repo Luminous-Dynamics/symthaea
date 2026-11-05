@@ -2,7 +2,7 @@
   "corpus_version": "1.0",
   "corpus_state": "draft_case_register",
   "benchmark_id": "SAWEM-BESS-MATCHED-001",
-  "claim_ceiling": "This file is a case register and test-to-case traceability index. Rust unit tests listed here are synthetic reference tests, not independently adjudicated benchmark outcomes, vendor comparisons, SAWEM operator verification or investment-performance results. Cases marked not_run have no measured result. The DSU price-curve unit tests remain synthetic price-lookup conformance, not evidence of DSU product admission, reserve qualification, settlement or revenue. DSU qualifying-capacity tests cover only the named synthetic Code arithmetic branches; they do not authenticate source records, implement utilized-service alternatives, calculate performance-adjusted payments or establish market qualification.",
+  "claim_ceiling": "This file is a case register and test-to-case traceability index. Rust unit tests listed here are synthetic reference tests, not independently adjudicated benchmark outcomes, vendor comparisons, SAWEM operator verification or investment-performance results. Cases marked not_run have no measured result. The DSU price-curve unit tests remain synthetic price-lookup conformance, not evidence of DSU product admission, reserve qualification, settlement or revenue. DSU qualifying-capacity tests cover only the named synthetic Code arithmetic branches; they do not authenticate source records, implement utilized-service alternatives, calculate performance-adjusted payments or establish market qualification. Reserve-capacity payment tests are exact formula checks over synthetic or prequalified inputs; they do not establish reserve-category prices, real qualifying capacity, operator performance factors, market admission, settlement or received cash.",
   "cases": [
     {
       "case_id": "BASE-001",
@@ -666,6 +666,36 @@
         "qualifying-capacity",
         "product-specific",
         "no-silent-default"
+      ]
+    },
+    {
+      "case_id": "RESERVE-CAPACITY-PAYMENT-001",
+      "track": "settlement_and_liquidity",
+      "title": "Product-specific reserve capacity payment arithmetic",
+      "scenario": "A reserve-category price from the Market Operator is multiplied by already-qualified contracted reserve MW and the correct product-specific performance adjustment; Ten-Minute excludes the adjustment, uncontracted reserve receives zero, and unresolved evidence remains indeterminate.",
+      "owner": "Symthaea",
+      "expected_disposition": "mixed_by_subcase",
+      "implementation_state": "kernel_unit_tested",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [
+        "reserve_capacity_payment_uses_reserve_category_price_and_exact_performance_factor",
+        "reserve_capacity_payment_uses_unit_factor_when_no_performance_criteria_exist",
+        "ten_minute_payment_has_no_performance_adjustment_term_and_retains_fractional_minor_units",
+        "reserve_capacity_payment_fails_closed_on_missing_criteria_and_missing_market_data",
+        "reserve_capacity_payment_rejects_uncontracted_overclaim_and_bad_factor"
+      ],
+      "required_evidence": [
+        "System Operator reserve-category price for exact Trading Period",
+        "contracted reserve capacity",
+        "capacity qualifying for payment",
+        "System Operator performance criteria state",
+        "System Operator performance adjustment factor where criteria are established"
+      ],
+      "stress_tags": [
+        "reserve-capacity-payment",
+        "performance-adjustment",
+        "exact-arithmetic",
+        "contracted-only"
       ]
     },
     {
