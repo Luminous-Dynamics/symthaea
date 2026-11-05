@@ -725,9 +725,8 @@
         "exact Trading Unit and Trading Period",
         "Unconstrained Schedule and Constrained Schedule revisions",
         "authoritative day-ahead incremental price submission state",
-        "complete signed-MW incremental price curve covering the schedule delta",
-        "price-curve segment units and source revision",
-        "Trading Period identity and schedule revision pair"
+        "complete signed milli-MWh-per-Trading-Period incremental price curve covering the schedule-energy delta",
+        "price-curve segment units and source revision"
       ],
       "stress_tags": [
         "congestion",
