@@ -588,12 +588,17 @@ fn validate_receipt(
     if !matches!(receipt.goal_alignment.as_str(), "exact" | "normalized" | "reviewed" | "mismatch") {
         return Err(format!("{label} has unsupported goal_alignment"));
     }
-    if receipt.goal_alignment == "reviewed" && receipt.goal_alignment_review_sha256.is_none() {
-        return Err(format!("{label} reviewed goal alignment requires a review receipt"));
+    let exact_goal_match = receipt.elaborated_goal_sha256 == receipt.debug_goal_sha256;
+    if receipt.goal_alignment == "exact" && !exact_goal_match {
+        return Err(format!("{label} claims exact goal alignment but elaborated and pinned debug-goal digests differ"));
     }
-    if receipt.goal_alignment == "mismatch" {
-        // A mismatch is an auditable finding and disqualifies the task; it is not
-        // silently accepted as a reproduction success.
+    if matches!(receipt.goal_alignment.as_str(), "normalized" | "reviewed")
+        && receipt.goal_alignment_review_sha256.is_none()
+    {
+        return Err(format!("{label} normalized/reviewed goal alignment requires a digest-bound equivalence or review receipt"));
+    }
+    if receipt.goal_alignment == "mismatch" && exact_goal_match {
+        return Err(format!("{label} claims a goal mismatch while elaborated and pinned debug-goal digests are identical"));
     }
     for (name, status, evidence) in [
         ("semantic_audit", &receipt.semantic_audit_status, &receipt.semantic_audit_receipt_sha256),
@@ -932,7 +937,7 @@ fn synthetic_receipt(record: &SorryRecord) -> TaskReceipt {
         debug_goal_sha256: sha256(record.debug_info.goal.as_bytes()),
         source_file_sha256: fake_hash("source-file"),
         source_range_sha256: fake_hash("source-range"),
-        elaborated_goal_sha256: fake_hash("elaborated-goal"),
+        elaborated_goal_sha256: sha256(record.debug_info.goal.as_bytes()),
         lean_toolchain_sha256: fake_hash("lean-toolchain"),
         lake_manifest_sha256: Some(fake_hash("lake-manifest")),
         source_location_reproduced: true,
