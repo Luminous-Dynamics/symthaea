@@ -1402,8 +1402,6 @@ mod tests {
         .expect("no-policy support-expansion fixture must parse")
     }
 
-
-
     fn bytes(input: &Input) -> Vec<u8> {
         serde_json::to_vec(input).expect("fixture serializes")
     }
