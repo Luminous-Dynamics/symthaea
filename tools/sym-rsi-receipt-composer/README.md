@@ -3,7 +3,9 @@
 This standalone Rust library composes multiple canonical benchmark-run receipts into a
 multi-dimensional candidate evidence view. It consumes the existing
 `benchmark-run-receipt-validator` crate; it does not define or persist another receipt
-schema.
+schema. The candidate identity digest is derived from the declared system name, arm,
+version, source revision, executable digest, model ID, configuration digest and prompt
+digest. It is **not** a source-tree digest and must not be substituted for one.
 
 ## Contract
 
@@ -27,7 +29,9 @@ schema.
 The receipt validator proves schema and accounting consistency relative to its contract.
 It does not authenticate a producer, qualify runner isolation, prove grader truth, or
 verify independent regrade. This composer always reports that lower assurance ceiling.
-Use the independent attestation, trust and isolation owners before confirmatory claims.
+It does not establish source-tree identity; bind the actual source tree through its own
+evidence and applicable attestation/regrade path. Use the independent attestation, trust
+and isolation owners before confirmatory claims.
 
 The cluster mapping and experiment preregistration digest are supplied by the caller. The
 composer checks exact coverage and binds them into an in-memory context digest, but does
