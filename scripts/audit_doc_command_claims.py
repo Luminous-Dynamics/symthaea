@@ -175,10 +175,20 @@ def repo_path(root: Path, value: str):
 
 
 def has_unavailable_note(markdown: str, path: str, target: str | None = None) -> bool:
+    """Accept an unavailable exception only where its exact command target is named.
+
+    A document-wide search lets an unrelated unavailable note mask a broken
+    Cargo command elsewhere in the same Markdown file. Requiring the path,
+    optional binary target and status phrase on one line keeps the exception
+    attached to the command it describes.
+    """
     normalized = path.replace("\\", "/").removeprefix("./")
-    path_is_named = normalized in markdown
-    target_is_named = target is None or target in markdown
-    return path_is_named and target_is_named and UNAVAILABLE.search(markdown) is not None
+    return any(
+        normalized in line
+        and (target is None or target in line)
+        and UNAVAILABLE.search(line) is not None
+        for line in markdown.splitlines()
+    )
 
 
 def _path_pattern_matches(path: str, pattern: str) -> bool:
@@ -578,6 +588,18 @@ def self_test():
     target_note = note + " --bin example_audit has no checked-in source."
     assert has_unavailable_note(target_note, "tools/missing/Cargo.toml", "example_audit")
     assert not has_unavailable_note(target_note, "tools/missing/Cargo.toml", "different_target")
+    unrelated_note = (
+        "The command names tools/missing/Cargo.toml.\\n\\n"
+        "A separate optional interface is not currently runnable."
+    )
+    assert not has_unavailable_note(unrelated_note, "tools/missing/Cargo.toml")
+    split_target_note = (
+        "tools/missing/Cargo.toml is documented here.\\n"
+        "The unrelated example_audit binary is not currently runnable."
+    )
+    assert not has_unavailable_note(
+        split_target_note, "tools/missing/Cargo.toml", "example_audit"
+    )
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
