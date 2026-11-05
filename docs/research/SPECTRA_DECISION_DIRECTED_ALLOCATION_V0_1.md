@@ -20,35 +20,27 @@ A no-certificate outcome is not a system failure. It is preferable to an unjusti
 
 ## 2. Existing certificate and decision gap
 
-For each frozen action (a), scenario (s), and replication history, retain a simultaneous time-uniform utility interval:
+For each frozen action `a`, scenario `s`, and replication history, retain a simultaneous time-uniform utility interval:
 
-[
-[l_{a,s},u_{a,s}].
-]
+`[l_{a,s}, u_{a,s}]`.
 
-For the frozen monotone robust aggregation function (ho) (currently Maximin or lower-tail CVaR), define:
+For the frozen monotone robust aggregation function `rho` (currently Maximin or lower-tail CVaR), define:
 
-[
-L_a=ho(l_{a,cdot}),qquad U_a=ho(u_{a,cdot}).
-]
+`L_a = rho(l_{a,*})`
+
+`U_a = rho(u_{a,*})`.
 
 Choose the incumbent deterministically:
 
-[
-a^star=operatorname{argmax}_a L_a,
-]
+`a_star = argmax_a L_a`
 
 using the existing stable action-ID tie-break. The certificate gap is:
 
-[
-Gamma=max_a U_a-L_{a^star}.
-]
+`Gamma = max_a U_a - L_{a_star}`.
 
 The existing certificate condition remains exactly:
 
-[
-Gammaleqepsilon.
-]
+`Gamma <= epsilon`.
 
 No allocation policy may weaken this inequality, alter the frozen objective, change epsilon after observing outcomes, or treat a point estimate as a certificate.
 
@@ -81,7 +73,7 @@ For each feasible candidate batch (b):
 7. Rank candidates by:
 
 [
-I(b)=rac{max(0,Gamma_t-Gamma_{t+1}^{	ext{radius-only}})}
+I(b)=rac{max(0,Gamma_t-Gamma_{t+1}^{	ext{radius-only}})}
 {c(b)},
 ]
 
@@ -109,7 +101,7 @@ For candidate batch (b), use a versioned predictive distribution (widehat P_t), 
 
 [
 operatorname{EVC}_t(b)=
-rac{
+rac{
 J_t-mathbb{E}_{widetilde Xsimwidehat P_t}
 [J_{t+1}(b,widetilde X)]
 }{c(b)}.
@@ -156,7 +148,7 @@ Use at least 10,000 independent outer campaigns per primary regime and untouched
 
 ### Primary outcomes
 
-- familywise (PCS_epsilon), false-winner probability, and no-certificate probability;
+- familywise PCS_epsilon, false-winner probability, and no-certificate probability;
 - expected robust opportunity cost and worst-decile regret;
 - total simulations and per-cell allocation;
 - compute, wall-clock, and other resource cost to a valid certificate;
