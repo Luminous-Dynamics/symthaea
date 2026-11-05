@@ -82,6 +82,14 @@ These are distinct:
 
 A gold label must never imply the latter states merely from a benchmark answer.
 
+## 4.1 Machine-readable evaluator contract
+
+The strict JSON Schema 2020-12 counterpart is maintained separately at:
+
+`benchmarks/engineering-change-impact/gold-record.schema.json`
+
+It is evaluator-only, not part of the public 24-blueprint manifest and must not be mounted into a candidate workspace. It constrains the disposition vocabulary, source/target generation digests, dependency paths, equivalence-witness scope, follow-up obligations, criticality, assessor records, adjudication state, seal state and claim ceiling. The schema does not create gold labels or seal any record; the current public corpus remains unadjudicated.
+
 ## 5. Gold record format
 
 The evaluator-only gold record for each claim–evidence pair should contain:
