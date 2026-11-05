@@ -625,6 +625,14 @@
         "clippy_warnings_denied": "passed",
         "supported_claim": "Unix-only Stored/Deflate per-occurrence content verification; bounded ZIP-relative decoder view; parser/codec/CRC/occurrence differences preserved",
         "claim_ceiling": "One exact-head Linux x86_64 run; no Windows/non-Unix support, full APK/IPA semantics, archive completeness, producer authenticity, or sustained fuzz qualification."
+      },
+      "latest_exact_head_validation": {
+        "head": "ed7e0232751416372c78ae4948f9af006348d555",
+        "workflow_run": 42025442615,
+        "result": "success",
+        "format": "passed",
+        "adversarial_tests": "passed",
+        "clippy_warnings_denied": "passed"
       }
     },
     {
@@ -1792,9 +1800,9 @@
     },
     {
       "id": "independent_member_receipt_replay",
-      "status": "sealed_snapshot_exact_head_passed",
+      "status": "rebased_exact_head_passed_with_linux_sealed_snapshot_and_no_follow_source",
       "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10507",
-      "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10507",
+      "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10591",
       "oracle": {
         "crate": "zip",
         "version": "9.3.0",
@@ -1844,7 +1852,9 @@
         "never parse a mutable source path after hashing; stream input once into a sealed, content-addressed snapshot",
         "on Linux use memfd_create and require F_SEAL_WRITE, F_SEAL_GROW, F_SEAL_SHRINK and F_SEAL_SEAL; verify exact seals with F_GET_SEALS",
         "hash, preflight, parse, stream and post-hash only the sealed snapshot; pathname replacement and mutable source inode are no longer in the parser threat window",
-        "return Unsupported on platforms without a qualified immutable snapshot backend"
+        "return Unsupported on platforms without a qualified immutable snapshot backend",
+        "open the final archive path component with O_NOFOLLOW | O_CLOEXEC on Linux before copying to the sealed snapshot",
+        "reject symlink sources as a source-selection failure; never silently follow the final-component symlink"
       ],
       "boundaries": {
         "supported_subset": "Unique raw filenames, unencrypted regular files, Stored and Deflate, single-disk conventional ZIP layouts accepted by zip-rs.",
@@ -1852,37 +1862,47 @@
         "zip64_and_prefix": "May be Unsupported in this first independent replay slice; do not relax source-offset bounds or heuristically remap.",
         "authenticity": "Replay verifies observed bytes against a receipt, not the producer's identity or truthfulness.",
         "checksum_commonality": "zipcore/zip use crc32fast in ZIP parsing; the replay custom CRC path is required as a second calculation.",
-        "snapshot": "Current same-open-file pre/post hashing detects ordinary persistent changes, but does not prove immutable bytes under adversarial concurrent mutate-and-restore. Exact immutable snapshot capture is a separate gate tracked by #10526."
+        "snapshot": "Sealed snapshot binds the exact captured bytes supplied to the independent parser. O_NOFOLLOW refuses a symlink at the final path component. This does not prove the source copy was an atomic point-in-time view if a concurrent writer mutates the source during copying."
       },
       "validation": {
-        "exact_head": "520335e19963d6842da393080f335702d2470442",
-        "workflow_run": 41994293575,
+        "exact_head": "51d1be2131f21af649943e649bad7cc2387dd704",
+        "workflow_run": 42059013582,
         "workflow_name": "REA Member Receipt",
-        "tested_tree_commit": "d43bb7bfbaa28a65f555188dcf64d3180b0206a8",
         "result": "success",
         "tests": {
-          "passed": 21,
+          "passed": 22,
           "failed": 0,
           "ignored": 0,
-          "elapsed_seconds": 0.08
+          "elapsed_seconds": 0.06
         },
         "formatting": "passed",
         "clippy_warnings_denied": "passed",
-        "executable": "rea-receipt-replay compiled as all-target target; synthetic Stored and Deflate receipts independently replayed",
-        "immutable_snapshot": {
-          "backend": "Linux memfd_create with F_SEAL_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL",
-          "seal_readback": "F_GET_SEALS verified all required flags",
-          "negative_control": "replaced source path and attempted writes through cloned snapshot descriptor; sealed bytes/digest unchanged",
-          "cross_platform": "non-Linux remains Unsupported until native immutable snapshot backend"
+        "snapshot": {
+          "backend": "Linux memfd_create",
+          "seals": [
+            "F_SEAL_WRITE",
+            "F_SEAL_GROW",
+            "F_SEAL_SHRINK",
+            "F_SEAL_SEAL"
+          ],
+          "seal_readback": "F_GET_SEALS verified all required bits",
+          "source_open": "O_NOFOLLOW | O_CLOEXEC on final path component",
+          "negative_controls": [
+            "symlink source refused",
+            "replace source path after snapshot; snapshot bytes unchanged",
+            "write through cloned descriptor refused"
+          ],
+          "parser_input": "preflight, zip-rs parsing, decompression and digest checks operate on the same sealed snapshot",
+          "non_linux": "Unsupported until native immutable snapshot backend is qualified"
         },
-        "cargo_lock": {
-          "lines": 922,
-          "sha256": "3ee6650c71cec05aed87e36fab66734412b5043f8660b89afb17c16bbab14a75",
-          "artifact_id": 13399069495,
-          "artifact_sha256": "sha256:1831e30bf51d6439a5ca35378ae3436f14a83e427c5ddf0fe4f358dac03ad8a0",
-          "status": "generated lock digest pinned in workflow at next revision; source-committing exact lock remains preferred before release"
+        "dependencies": {
+          "zip": "9.3.0",
+          "deflate": "flate2 / zlib-rs",
+          "libc": "0.2.191",
+          "toolchain": "Rust 1.96.0"
         },
-        "claim": "Linux sealed-snapshot, schema-validated independent zip-rs/zlib-rs replay of synthetic Stored/Deflate receipts; no production application corpus replay yet"
+        "cargo_lock_sha256": "3ee6650c71cec05aed87e36fab66734412b5043f8660b89afb17c16bbab14a75",
+        "claim": "Linux sealed-snapshot replay of synthetic Stored/Deflate receipts; no application-corpus replay, macOS or Windows qualification"
       }
     },
     {
@@ -1914,7 +1934,15 @@
         "valid_signature_from_unexpected_signer_preserved_as_crypto_valid_policy_denied",
         "signature_scheme_results_are_separate_from_installability_and_runtime",
         "Apple_profile_claimed_entitlements_vs_signature_entitlements_subset",
-        "Android_v4_idsig_companion_package_digest_and_merkle_binding"
+        "Android_v4_idsig_companion_package_digest_and_merkle_binding",
+        "apk_v32_hybrid_classical_and_ml_dsa_65_or_87_two_signers",
+        "apk_v32_signer_sdk_ranges_must_match",
+        "apk_v32_signing_lineage_shared_ancestry_and_implicit_rotation",
+        "apk_v32_block_id_0x70e1c89f_structure_and_exact_byte_range",
+        "apk_v32_required_hybrid_block_cannot_be_stripped_on_api_37_plus",
+        "apk_v32_pre_android_17_fallback_uses_prior_v3_schemes",
+        "apk_v32_transition_back_to_single_signer_requires_both_hybrid_keys_in_lineage",
+        "apk_v32_hybrid_verification_against_android_cts_platform_oracle"
       ],
       "metrics": [
         "scheme_presence_and_verification_accuracy_by_platform_version",
@@ -1948,7 +1976,10 @@
         "keep content integrity, signature validity, signer identity, trust, authorization, installability, runtime behavior and MASVS control outcome as independent fields",
         "validate package signature evaluation JSON against docs/research/rea-package-signature-evaluation-v0.schema.json",
         "do not create or accept a single trusted boolean; report each scheme, signer, trust-policy, authorization, nested-code and runtime result independently",
-        "preserve a cryptographically valid but policy-denied signer as two separate positive/negative results"
+        "preserve a cryptographically valid but policy-denied signer as two separate positive/negative results",
+        "Android API 37+ requires a v3.2 hybrid evaluator arm; keep the v3.2 block, classical signer, PQC signer, SDK-range pairing, shared signing ancestry, implicit rotation, stripping protection and rollback outcomes separate",
+        "test v3.2 on API 37+ and separately verify that older APIs skip v3.2 and use applicable prior v3 scheme behavior",
+        "use official Android CTS HybridSignatureVerificationTest cases and apksig/apksigner as versioned reference arms"
       ],
       "claim_boundaries": {
         "content_integrity": "ZIP SHA-256/CRC and member receipts do not establish package signature validity.",
@@ -1971,7 +2002,7 @@
     },
     {
       "id": "differential_zip_parser_decoder_consistency",
-      "status": "exact_head_workflow_running",
+      "status": "exact_head_dual_fuzz_campaign_passed; deterministic_seed_corpus_expansion_pending_rerun",
       "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10520",
       "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10520",
       "target": "Zero silent mismatch acceptance; 100_percent explicit abstention outside declared shared subset; every confirmed mismatch minimized and retained as a deterministic regression fixture.",
@@ -1995,7 +2026,13 @@
         "differential_deflate_payload_sha256_size_and_crc",
         "differential_one_sided_acceptance_is_preserved",
         "duplicate_zip64_prefix_partial_traversal_abstains",
-        "malformed_stream_crc_and_declared_size_faults"
+        "malformed_stream_crc_and_declared_size_faults",
+        "seed_generator_produces_stored_and_deflate_valid_archives",
+        "seed_generator_produces_mixed_compression_archive",
+        "seed_generator_produces_zero_length_member",
+        "seed_generator_produces_directory_and_nested_child",
+        "seed_generator_produces_utf8_member_name",
+        "seed_generator_produces_eocd_signature_in_payload_without_fake_eocd"
       ],
       "metrics": [
         "shared_subset_differential_agreement_rate",
@@ -2006,7 +2043,10 @@
         "coverage_features_by_parser_arm",
         "false_positive_disagreement_rate",
         "minimized_regression_fixture_retention_rate",
-        "peak_rss_and_timeout_rate"
+        "peak_rss_and_timeout_rate",
+        "valid_seed_family_coverage",
+        "differential_arm_executions_per_second",
+        "fuzzer_corpus_seed_digest_reproducibility"
       ],
       "protocol": [
         "feed identical raw archive bytes to the production inventory/content path and independent zip-rs/zlib-rs oracle",
@@ -2028,11 +2068,34 @@
         "runner": "Ubuntu 24.04 Linux x86_64",
         "toolchain": "nightly-2026-11-03",
         "cargo_fuzz": "0.13.2"
-      }
+      },
+      "last_successful_run": {
+        "source_commit": "0a0be459e78da42ce2a201db2d4168e543706783",
+        "workflow_run": 42056996386,
+        "artifact_id": 13430387200,
+        "artifact_digest": "sha256:59ebc18993fdae991d26a48b0afae6a24baaa5bb7870ba6cf2753f54e0894c36",
+        "duration_seconds_per_arm": 181,
+        "production_reader": {
+          "executions": 3096936,
+          "average_exec_per_second": 17110,
+          "peak_rss_mib": 278
+        },
+        "differential_oracle": {
+          "executions": 3719505,
+          "average_exec_per_second": 20549,
+          "peak_rss_mib": 279
+        },
+        "crashes": 0,
+        "timeouts": 0,
+        "outcome": "both exact-head bounded fuzz arms completed successfully; no parser/content mismatch or crash was reported by the campaigns",
+        "claim": "bounded fuzz agreement on the shared ordinary ZIP subset, not ZIP-spec correctness or broad layout coverage"
+      },
+      "current_working_head": "b45a02ef6370659b484fc6131fe092411dadf9c0",
+      "current_pending_work": "Deterministic Rust seed generator adds Stored, Deflate, mixed-method, zero-length, directory, UTF-8 and EOCD-signature-in-payload examples; workflow rerun required."
     },
     {
       "id": "sealed_immutable_replay_snapshot",
-      "status": "research_issue_opened",
+      "status": "linux_memfd_sealed_snapshot_exact_head_passed",
       "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10526",
       "objective": "Replay the exact content-addressed archive byte sequence from a stable private immutable snapshot rather than trusting path identity and pre/post hashing over a concurrently mutable source.",
       "cases": [
@@ -2069,11 +2132,34 @@
         "stable_snapshot": "Sealing ensures parser input bytes remain unchanged after seal.",
         "source_consistency": "Sealed snapshot does not prove the source copy was an atomic point-in-time view if source changed during copying.",
         "authenticity": "Snapshot hash does not identify or authenticate producer."
+      },
+      "validation": {
+        "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10591",
+        "exact_head": "51d1be2131f21af649943e649bad7cc2387dd704",
+        "workflow_run": 42059013582,
+        "result": "success",
+        "tests": {
+          "passed": 22,
+          "failed": 0,
+          "ignored": 0
+        },
+        "controls": [
+          "F_GET_SEALS confirms WRITE/GROW/SHRINK/SEAL",
+          "source pathname replacement does not alter snapshot",
+          "write through cloned descriptor denied",
+          "final-component symlink source refused"
+        ],
+        "supported_platform": "Linux",
+        "unsupported_platforms": [
+          "Windows",
+          "macOS",
+          "other non-Linux pending backend qualification"
+        ]
       }
     },
     {
       "id": "zip_cross_parser_differential_fuzz",
-      "status": "implementation_committed_exact_head_compile_awaiting_rerun",
+      "status": "exact_head_dual_fuzz_campaign_passed",
       "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10451",
       "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10451",
       "target": "Zero unresolved high-confidence differential findings in the declared common subset; zero silent occurrence remapping; every confirmed finding becomes a minimized permanent regression fixture.",
@@ -2132,7 +2218,27 @@
       ],
       "not_compared": [
         "full raw 16-bit general-purpose flag value, because zip-rs 9.3.0 public API does not expose ZipFileFlags.bits()"
-      ]
+      ],
+      "last_successful_run": {
+        "source_commit": "d1e847dfe99cd1c5dae55b899cf75172d6249732",
+        "workflow_run": 42054624107,
+        "artifact_id": 13429681524,
+        "artifact_digest": "sha256:b3b236840f9a472b7f1d63f3c75d22c689b56a5c1cc1496f68a4df52359bb962",
+        "duration_seconds_per_arm": 181,
+        "production_reader": {
+          "executions": 1752160,
+          "average_exec_per_second": 9680,
+          "peak_rss_mib": 278
+        },
+        "differential_oracle": {
+          "executions": 2265353,
+          "average_exec_per_second": 12515,
+          "peak_rss_mib": 268
+        },
+        "crashes": 0,
+        "timeouts": 0,
+        "claim": "two bounded 181-second Linux fuzz arms; no crashes/timeouts reported; not sustained fuzz qualification"
+      }
     }
   ],
   "promotion_policy": {
