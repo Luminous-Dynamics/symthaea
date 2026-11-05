@@ -274,8 +274,9 @@ pub struct MetricSummary {
     pub graded_mean: Option<f64>,
     /// graded_count / eligible_count.
     pub graded_coverage: f64,
-    /// Sum of normalized grades / eligible_count. This is a coverage-adjusted yield,
-    /// not an imputed task score and not the benchmark owner's official score.
+    /// Sum of normalized grades / eligible_count. Grade-less eligible tasks contribute
+    /// zero to this derived yield by formula, without claiming an observed zero grade.
+    /// It is not the benchmark owner's official score.
     pub coverage_adjusted_yield: f64,
     /// Non-terminal tasks are counted by their attempt state (for example not_attempted).
     pub disposition_counts: BTreeMap<String, usize>,
