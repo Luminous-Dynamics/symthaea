@@ -395,6 +395,7 @@ pub enum ReserveCapacityPaymentProduct {
 /// distinct from an SMP or a unit-level lost-opportunity price differential.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ReserveCategoryMarketPrice {
+    pub product: ReserveCapacityPaymentProduct,
     pub minor_zar_per_mw_per_trading_period: u64,
 }
 
@@ -430,6 +431,7 @@ pub struct ReserveCapacityPaymentInputs {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReserveCapacityPaymentError {
+    MarketPriceProductMismatch,
     QualifyingCapacityExceedsContracted,
     UnexpectedPerformanceAdjustmentForTenMinute,
     MissingPerformanceAdjustmentForProduct,
@@ -908,6 +910,9 @@ pub fn calculate_reserve_capacity_payment(
             reason: "missing reserve-category market price",
         });
     };
+    if market_price.product != inputs.product {
+        return Err(ReserveCapacityPaymentError::MarketPriceProductMismatch);
+    }
 
     let (factor_numerator, factor_denominator) = match inputs.product {
         ReserveCapacityPaymentProduct::TenMinute => {
@@ -2009,6 +2014,7 @@ mod tests {
         ReserveCapacityPaymentInputs {
             product,
             market_price: Some(ReserveCategoryMarketPrice {
+                product,
                 minor_zar_per_mw_per_trading_period: 10_000,
             }),
             contracted_capacity_milli_mw: Some(10_000),
@@ -2065,6 +2071,7 @@ mod tests {
     fn ten_minute_payment_has_no_performance_adjustment_term_and_retains_fractional_minor_units() {
         let mut inputs = reserve_payment_inputs(ReserveCapacityPaymentProduct::TenMinute, None);
         inputs.market_price = Some(ReserveCategoryMarketPrice {
+            product: ReserveCapacityPaymentProduct::TenMinute,
             minor_zar_per_mw_per_trading_period: 12_345,
         });
         inputs.qualifying_capacity_milli_mw = Some(1_250);
@@ -2121,6 +2128,22 @@ mod tests {
     }
 
     #[test]
+    fn reserve_capacity_payment_rejects_cross_category_market_price() {
+        let mut inputs = reserve_payment_inputs(
+            ReserveCapacityPaymentProduct::RegulatingUp,
+            Some(PerformanceAdjustmentEvidence::NoCriteriaEstablished),
+        );
+        inputs.market_price = Some(ReserveCategoryMarketPrice {
+            product: ReserveCapacityPaymentProduct::Instantaneous,
+            minor_zar_per_mw_per_trading_period: 10_000,
+        });
+        assert_eq!(
+            calculate_reserve_capacity_payment(inputs),
+            Err(ReserveCapacityPaymentError::MarketPriceProductMismatch)
+        );
+    }
+
+    #[test]
     fn reserve_capacity_payment_rejects_uncontracted_overclaim_and_bad_factor() {
         let mut inputs = reserve_payment_inputs(
             ReserveCapacityPaymentProduct::RegulatingDown,
@@ -2140,6 +2163,7 @@ mod tests {
         );
 
         inputs.market_price = Some(ReserveCategoryMarketPrice {
+            product: ReserveCapacityPaymentProduct::RegulatingDown,
             minor_zar_per_mw_per_trading_period: 10_000,
         });
         inputs.contracted_capacity_milli_mw = Some(1_000);
