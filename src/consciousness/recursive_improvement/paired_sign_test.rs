@@ -53,3 +53,20 @@ pub(crate) fn exact_sign_test_upper_tail(wins: usize, losses: usize) -> Option<f
     }
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::exact_sign_test_upper_tail;
+
+    #[test]
+    fn exact_upper_tail_matches_small_binomial_fixtures() {
+        assert!((exact_sign_test_upper_tail(4, 0).unwrap() - 1.0 / 16.0).abs() < 1e-12);
+        assert!((exact_sign_test_upper_tail(3, 1).unwrap() - 5.0 / 16.0).abs() < 1e-12);
+        assert_eq!(exact_sign_test_upper_tail(0, 3), Some(1.0));
+    }
+
+    #[test]
+    fn zero_disagreements_has_no_sign_test_estimate() {
+        assert_eq!(exact_sign_test_upper_tail(0, 0), None);
+    }
+}
