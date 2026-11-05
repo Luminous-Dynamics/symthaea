@@ -212,8 +212,7 @@ impl MetricProjection {
             })
         {
             return Err(ComposerError::InvalidPlan(
-                "metric cluster map must have non-empty, control-free task and cluster IDs"
-                    .into(),
+                "metric cluster map must have non-empty, control-free task and cluster IDs".into(),
             ));
         }
         self.transform.validate()?;
@@ -366,10 +365,7 @@ impl ComposedCandidateEvidence {
             .map(|evidence| evidence.eligible_task_ids.as_slice())
     }
 
-    pub fn cluster_by_task(
-        &self,
-        metric_id: &str,
-    ) -> Option<&BTreeMap<String, String>> {
+    pub fn cluster_by_task(&self, metric_id: &str) -> Option<&BTreeMap<String, String>> {
         self.metrics
             .get(metric_id)
             .map(|evidence| &evidence.cluster_by_task)
@@ -728,8 +724,7 @@ pub fn compose_candidate(
 
     let candidate_identity =
         shared_candidate_identity.ok_or(ComposerError::CandidateIdentityMismatch)?;
-    let system_arm =
-        required_value_from_value(&candidate_identity, "arm", "system identity")?;
+    let system_arm = required_value_from_value(&candidate_identity, "arm", "system identity")?;
     let context_manifest = json!({
         "experiment_id": plan.experiment_id.clone(),
         "preregistration_digest": plan.preregistration_digest.clone(),
@@ -807,9 +802,7 @@ fn parse_run(bytes: &[u8], projection: &MetricProjection) -> Result<ParsedRun, C
         }
     }
     eligible_task_ids.sort();
-    if eligible_task_ids.is_empty()
-        || eligible_task_ids.windows(2).any(|pair| pair[0] == pair[1])
-    {
+    if eligible_task_ids.is_empty() || eligible_task_ids.windows(2).any(|pair| pair[0] == pair[1]) {
         return Err(ComposerError::TaskUniverseMismatch);
     }
     let eligible_set: BTreeSet<String> = eligible_task_ids.iter().cloned().collect();
@@ -1143,9 +1136,10 @@ impl fmt::Display for ComposerError {
                     "metric receipts do not share one candidate system identity"
                 )
             }
-            Self::BudgetCapsMismatch => {
-                write!(f, "receipt budget caps differ from the frozen metric projection")
-            }
+            Self::BudgetCapsMismatch => write!(
+                f,
+                "receipt budget caps differ from the frozen metric projection"
+            ),
             Self::TaskUniverseMismatch => {
                 write!(
                     f,
@@ -1308,14 +1302,10 @@ mod tests {
         }
 
         let mut canonical_universe = receipt["task_universe"].as_array().unwrap().clone();
-        canonical_universe.sort_by(|left, right| {
-            left["task_id"]
-                .as_str()
-                .cmp(&right["task_id"].as_str())
-        });
-        let universe_digest = sha256_hex(
-            &canonical_json_bytes(&Value::Array(canonical_universe)).unwrap()
-        );
+        canonical_universe
+            .sort_by(|left, right| left["task_id"].as_str().cmp(&right["task_id"].as_str()));
+        let universe_digest =
+            sha256_hex(&canonical_json_bytes(&Value::Array(canonical_universe)).unwrap());
 
         let mut eligible_ids = receipt["task_universe"]
             .as_array()
@@ -1325,9 +1315,7 @@ mod tests {
             .map(|row| row["task_id"].as_str().unwrap().to_owned())
             .collect::<Vec<_>>();
         eligible_ids.sort();
-        let eligible_digest = sha256_hex(
-            &canonical_json_bytes(&json!(eligible_ids)).unwrap()
-        );
+        let eligible_digest = sha256_hex(&canonical_json_bytes(&json!(eligible_ids)).unwrap());
         receipt["task_universe_sha256"] = json!(universe_digest);
         receipt["eligible_task_set_sha256"] = json!(eligible_digest);
         receipt["comparison"]["eligible_task_set_sha256"] = json!(eligible_digest);
@@ -1658,16 +1646,12 @@ mod tests {
             Err(ComposerError::TaskUniverseMismatch)
         );
 
-        let mut paired_receipts =
-            paired_receipt_set("candidate-a", 'a', "candidate", "disabled");
+        let mut paired_receipts = paired_receipt_set("candidate-a", 'a', "candidate", "disabled");
         let mut retention: Value =
             serde_json::from_slice(paired_receipts.get("retention").unwrap()).unwrap();
         retention["task_results"][0]["input_sha256"] =
             json!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
-        paired_receipts.insert(
-            "retention".into(),
-            serde_json::to_vec(&retention).unwrap(),
-        );
+        paired_receipts.insert("retention".into(), serde_json::to_vec(&retention).unwrap());
         assert_eq!(
             compose_candidate(&plan, &paired_receipts),
             Err(ComposerError::TaskInputUniverseMismatch)
