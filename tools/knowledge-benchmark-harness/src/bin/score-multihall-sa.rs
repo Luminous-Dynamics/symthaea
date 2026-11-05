@@ -9,10 +9,8 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 const TOOL_VERSION: &str = "score-multihall-sa-v0.1.0";
-const PLAN_SCHEMA: &str =
-    include_str!("../../../../benchmarks/multi-hall-sa/v0/plan.schema.json");
-const PAIR_SCHEMA: &str =
-    include_str!("../../../../benchmarks/multi-hall-sa/v0/pair.schema.json");
+const PLAN_SCHEMA: &str = include_str!("../../../../benchmarks/multi-hall-sa/v0/plan.schema.json");
+const PAIR_SCHEMA: &str = include_str!("../../../../benchmarks/multi-hall-sa/v0/pair.schema.json");
 const RESULT_SCHEMA: &str =
     include_str!("../../../../benchmarks/multi-hall-sa/v0/result.schema.json");
 const REPORT_SCHEMA: &str =
