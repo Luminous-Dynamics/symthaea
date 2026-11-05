@@ -283,6 +283,168 @@ fn validate_provenance(
     Ok(())
 }
 
+fn valid_iso_offset_datetime(value: &str, allow_fraction: bool) -> bool {
+    let bytes = value.as_bytes();
+    if bytes.len() < 25
+        || bytes.get(4) != Some(&b'-')
+        || bytes.get(7) != Some(&b'-')
+        || bytes.get(10) != Some(&b'T')
+        || bytes.get(13) != Some(&b':')
+        || bytes.get(16) != Some(&b':')
+    {
+        return false;
+    }
+    let digits = |start: usize, end: usize| -> Option<u32> {
+        let slice = bytes.get(start..end)?;
+        if !slice.iter().all(u8::is_ascii_digit) {
+            return None;
+        }
+        std::str::from_utf8(slice).ok()?.parse().ok()
+    };
+    let (Some(year), Some(month), Some(day), Some(hour), Some(minute), Some(second)) = (
+        digits(0, 4), digits(5, 7), digits(8, 10),
+        digits(11, 13), digits(14, 16), digits(17, 19),
+    ) else {
+        return false;
+    };
+    if year == 0 || !(1..=12).contains(&month) || !(1..=31).contains(&day)
+        || hour > 23 || minute > 59 || second > 59
+    {
+        return false;
+    }
+    let mut offset_start = 19usize;
+    if bytes.get(offset_start) == Some(&b'.') {
+        if !allow_fraction {
+            return false;
+        }
+        offset_start += 1;
+        let fraction_start = offset_start;
+        while bytes.get(offset_start).is_some_and(u8::is_ascii_digit) {
+            offset_start += 1;
+        }
+        let fraction_len = offset_start - fraction_start;
+        if fraction_len == 0 || fraction_len > 6 {
+            return false;
+        }
+    }
+    if bytes.len() != offset_start + 6
+        || !matches!(bytes[offset_start], b'+' | b'-')
+        || bytes[offset_start + 3] != b':'
+    {
+        return false;
+    }
+    let (Some(offset_hour), Some(offset_minute)) = (
+        digits(offset_start + 1, offset_start + 3),
+        digits(offset_start + 4, offset_start + 6),
+    ) else {
+        return false;
+    };
+    offset_hour <= 23 && offset_minute <= 59
+}
+
+fn python_escape_string(value: &str, output: &mut String) {
+    output.push('"');
+    for character in value.chars() {
+        match character {
+            '"' => output.push_str("\\\""),
+            '\\' => output.push_str("\\\\"),
+            '\u{0008}' => output.push_str("\\b"),
+            '\u{000c}' => output.push_str("\\f"),
+            '\n' => output.push_str("\\n"),
+            '\r' => output.push_str("\\r"),
+            '\t' => output.push_str("\\t"),
+            character if (character as u32) < 0x20 => {
+                output.push_str(&format!("\\u{:04x}", character as u32));
+            }
+            character if (character as u32) > 0x7e => {
+                let code = character as u32;
+                if code <= 0xffff {
+                    output.push_str(&format!("\\u{code:04x}"));
+                } else {
+                    let adjusted = code - 0x10000;
+                    let high = 0xd800 + (adjusted >> 10);
+                    let low = 0xdc00 + (adjusted & 0x3ff);
+                    output.push_str(&format!("\\u{high:04x}\\u{low:04x}"));
+                }
+            }
+            character => output.push(character),
+        }
+    }
+    output.push('"');
+}
+
+// SorryDB computes its ID with Python json.dumps(sort_keys=True): ASCII
+// escaping and the default ", " / ": " separators are part of the digest.
+fn python_json_dumps_sorted(value: &Value, output: &mut String) -> Result<(), String> {
+    match value {
+        Value::Null => output.push_str("null"),
+        Value::Bool(value) => output.push_str(if *value { "true" } else { "false" }),
+        Value::Number(number) => output.push_str(&number.to_string()),
+        Value::String(value) => python_escape_string(value, output),
+        Value::Array(values) => {
+            output.push('[');
+            for (index, item) in values.iter().enumerate() {
+                if index > 0 {
+                    output.push_str(", ");
+                }
+                python_json_dumps_sorted(item, output)?;
+            }
+            output.push(']');
+        }
+        Value::Object(object) => {
+            let mut entries: Vec<(&String, &Value)> = object.iter().collect();
+            entries.sort_by(|left, right| left.0.cmp(right.0));
+            output.push('{');
+            for (index, (key, item)) in entries.iter().enumerate() {
+                if index > 0 {
+                    output.push_str(", ");
+                }
+                python_escape_string(key, output);
+                output.push_str(": ");
+                python_json_dumps_sorted(item, output)?;
+            }
+            output.push('}');
+        }
+    }
+    Ok(())
+}
+
+fn expected_sorry_id(record: &SorryRecord) -> Result<String, String> {
+    let email_hash = record.metadata.get("blame_email_hash")
+        .and_then(Value::as_str).ok_or("SorryDB metadata.blame_email_hash missing")?;
+    let blame_date = record.metadata.get("blame_date")
+        .and_then(Value::as_str).ok_or("SorryDB metadata.blame_date missing")?;
+    if !valid_iso_offset_datetime(blame_date, false) {
+        return Err("SorryDB metadata.blame_date is not normalized offset-aware ISO-8601".into());
+    }
+    let payload = serde_json::json!({
+        "repo": {
+            "remote": record.repo.remote,
+            "branch": record.repo.branch,
+            "commit": record.repo.commit,
+            "lean_version": record.repo.lean_version
+        },
+        "location": {
+            "path": record.location.path,
+            "start_line": record.location.start_line,
+            "start_column": record.location.start_column,
+            "end_line": record.location.end_line,
+            "end_column": record.location.end_column
+        },
+        "debug_info": {
+            "goal": record.debug_info.goal,
+            "url": record.debug_info.url
+        },
+        "metadata": {
+            "blame_email_hash": email_hash,
+            "blame_date": blame_date
+        }
+    });
+    let mut canonical = String::new();
+    python_json_dumps_sorted(&payload, &mut canonical)?;
+    Ok(sha256(canonical.as_bytes()))
+}
+
 fn validate_record(record: &SorryRecord, label: &str) -> Result<(), String> {
     if record.id.trim().is_empty() {
         return Err(format!("{label}.id cannot be empty"));
