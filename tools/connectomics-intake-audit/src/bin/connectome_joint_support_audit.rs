@@ -1007,8 +1007,7 @@ mod tests {
                 },
             ],
         });
-        input.joint_support_set_sha256 =
-            canonical_joint_support_set_sha256(&input.joint_supports);
+        input.joint_support_set_sha256 = canonical_joint_support_set_sha256(&input.joint_supports);
         let bytes = serde_json::to_vec(&input).unwrap();
         let report = evaluate(&input, &bytes).unwrap();
         assert_eq!(report.minimum_joint_disambiguation_effort_units, Some(7));
@@ -1046,8 +1045,7 @@ mod tests {
                 },
             ],
         });
-        input.joint_support_set_sha256 =
-            canonical_joint_support_set_sha256(&input.joint_supports);
+        input.joint_support_set_sha256 = canonical_joint_support_set_sha256(&input.joint_supports);
         let expanded = validated(&input);
         let before_left = support_for(&baseline, &pair.world_a);
         let before_right = support_for(&baseline, &pair.world_b);
@@ -1067,8 +1065,7 @@ mod tests {
     fn full_row_requires_each_declared_action_once() {
         let mut input = fixture();
         input.joint_supports[0].rows[0].outcomes.pop();
-        input.joint_support_set_sha256 =
-            canonical_joint_support_set_sha256(&input.joint_supports);
+        input.joint_support_set_sha256 = canonical_joint_support_set_sha256(&input.joint_supports);
         assert!(
             validate(&input)
                 .unwrap_err()
