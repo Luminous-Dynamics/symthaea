@@ -253,7 +253,10 @@ fn normalized_joint_rows(
     support: &JointWorldSupport,
     action_ids: &[String],
 ) -> Result<Vec<Vec<String>>, String> {
-    let known_actions = action_ids.iter().map(String::as_str).collect::<BTreeSet<_>>();
+    let known_actions = action_ids
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
     let mut rows = Vec::with_capacity(support.possible_joint_outcomes.len());
     let mut unique_rows = BTreeSet::new();
     for (row_index, tuple) in support.possible_joint_outcomes.iter().enumerate() {
@@ -365,7 +368,9 @@ fn validate(input: &Input) -> Result<(Vec<String>, TupleRowsByWorld), String> {
         || !valid_hex(&input.action_set_sha256, 64)
         || !valid_hex(&input.joint_support_sha256, 64)
     {
-        return Err("dataset, query, scenario, action and joint-support digests are malformed".into());
+        return Err(
+            "dataset, query, scenario, action and joint-support digests are malformed".into(),
+        );
     }
     if !matches!(
         input.scenario_set_scope.as_str(),
@@ -383,10 +388,14 @@ fn validate(input: &Input) -> Result<(Vec<String>, TupleRowsByWorld), String> {
         return Err("effort unit and budget must be positive".into());
     }
     if !(2..=MAX_SCENARIOS).contains(&input.scenarios.len()) {
-        return Err(format!("adaptive policy supports 2..={MAX_SCENARIOS} worlds"));
+        return Err(format!(
+            "adaptive policy supports 2..={MAX_SCENARIOS} worlds"
+        ));
     }
     if input.actions.is_empty() || input.actions.len() > MAX_ACTIONS {
-        return Err(format!("adaptive policy supports 1..={MAX_ACTIONS} actions"));
+        return Err(format!(
+            "adaptive policy supports 1..={MAX_ACTIONS} actions"
+        ));
     }
     let mut scenario_ids = BTreeSet::new();
     for scenario in &input.scenarios {
@@ -413,7 +422,10 @@ fn validate(input: &Input) -> Result<(Vec<String>, TupleRowsByWorld), String> {
         let mut groups = BTreeSet::new();
         for group in &action.dependence_groups {
             if !nonempty(group) || !groups.insert(group) {
-                return Err(format!("action {} has duplicate/empty dependence group", action.action_id));
+                return Err(format!(
+                    "action {} has duplicate/empty dependence group",
+                    action.action_id
+                ));
             }
         }
     }
@@ -447,7 +459,10 @@ fn validate(input: &Input) -> Result<(Vec<String>, TupleRowsByWorld), String> {
         let mut groups = BTreeSet::new();
         for group in &support.dependence_groups {
             if !nonempty(group) || !groups.insert(group) {
-                return Err(format!("world {} has duplicate/empty dependence group", support.scenario_id));
+                return Err(format!(
+                    "world {} has duplicate/empty dependence group",
+                    support.scenario_id
+                ));
             }
         }
         supports_by_world.insert(
@@ -470,9 +485,9 @@ fn validate(input: &Input) -> Result<(Vec<String>, TupleRowsByWorld), String> {
     let tuples_by_world = worlds
         .iter()
         .map(|world| {
-            supports_by_world.remove(&world.scenario_id).ok_or_else(|| {
-                format!("missing normalized support for {}", world.scenario_id)
-            })
+            supports_by_world
+                .remove(&world.scenario_id)
+                .ok_or_else(|| format!("missing normalized support for {}", world.scenario_id))
         })
         .collect::<Result<Vec<_>, _>>()?;
     Ok((action_ids, tuples_by_world))
@@ -661,10 +676,9 @@ impl<'a> Solver<'a> {
                     branches,
                 },
             };
-            if best
-                .as_ref()
-                .is_none_or(|best_solution| candidate.worst_case_cost < best_solution.worst_case_cost)
-            {
+            if best.as_ref().is_none_or(|best_solution| {
+                candidate.worst_case_cost < best_solution.worst_case_cost
+            }) {
                 best = Some(candidate);
             }
         }
@@ -732,8 +746,16 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         memo: BTreeMap::new(),
     };
     let solution = solver.solve(initial_state)?;
-    let (worst_case, min_path, max_path, within_budget, policy, policy_nodes, policy_branches, status) =
-        match solution {
+    let (
+        worst_case,
+        min_path,
+        max_path,
+        within_budget,
+        policy,
+        policy_nodes,
+        policy_branches,
+        status,
+    ) = match solution {
             Some(solution) => {
                 let within = solution.worst_case_cost <= input.max_total_effort_units;
                 let (nodes, branches) = count_policy_nodes(&solution.node);
@@ -824,7 +846,9 @@ fn main() -> ExitCode {
     let rendered = match serde_json::to_string_pretty(&report) {
         Ok(json) => json + "\n",
         Err(error) => {
-            eprintln!("connectome-adaptive-query-policy-audit: could not serialize report: {error}");
+            eprintln!(
+                "connectome-adaptive-query-policy-audit: could not serialize report: {error}"
+            );
             return ExitCode::from(2);
         }
     };
@@ -873,8 +897,16 @@ mod tests {
         let root = report.policy.unwrap();
         assert_eq!(root.action_id.as_deref(), Some("inspect-x"));
         assert_eq!(root.branches.len(), 2);
-        assert!(root.branches.iter().any(|branch| branch.child.action_id.as_deref() == Some("inspect-y")));
-        assert!(root.branches.iter().any(|branch| branch.child.action_id.as_deref() == Some("inspect-z")));
+        assert!(
+            root.branches
+                .iter()
+                .any(|branch| branch.child.action_id.as_deref() == Some("inspect-y"))
+        );
+        assert!(
+            root.branches
+                .iter()
+                .any(|branch| branch.child.action_id.as_deref() == Some("inspect-z"))
+        );
         let x_right = root
             .branches
             .iter()
