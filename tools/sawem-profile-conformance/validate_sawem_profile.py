@@ -181,6 +181,7 @@ EXPECTED_CASE_IDS = {
     "DISPATCH-EXECUTION-FIDELITY-001",
     "BMS-SOC-CAPABILITY-ENVELOPE-001",
     "BMS-MULTIDIM-CAPABILITY-SURFACE-001",
+    "NON-ANTICIPATIVITY-POLICY-AUDIT-001",
     "REVENUE-REALIZATION-BRIDGE-001",
 }
 
@@ -322,6 +323,7 @@ def main() -> None:
     execution_fidelity_kernel_path = root / "tools/sawem-market-reference/src/execution_fidelity.rs"
     bms_capability_kernel_path = root / "tools/sawem-market-reference/src/bms_capability.rs"
     bms_capability_surface_kernel_path = root / "tools/sawem-market-reference/src/bms_capability_surface.rs"
+    non_anticipativity_kernel_path = root / "tools/sawem-market-reference/src/non_anticipativity.rs"
     revenue_realization_kernel_path = root / "tools/sawem-market-reference/src/revenue_realization.rs"
 
     try:
@@ -341,6 +343,7 @@ def main() -> None:
         execution_fidelity_kernel_bytes = execution_fidelity_kernel_path.read_bytes()
         bms_capability_kernel_bytes = bms_capability_kernel_path.read_bytes()
         bms_capability_surface_kernel_bytes = bms_capability_surface_kernel_path.read_bytes()
+        non_anticipativity_kernel_bytes = non_anticipativity_kernel_path.read_bytes()
         revenue_realization_kernel_bytes = revenue_realization_kernel_path.read_bytes()
         schema = json.loads(schema_bytes)
         fixture = json.loads(fixture_bytes)
@@ -368,6 +371,8 @@ def main() -> None:
             + bms_capability_kernel_bytes
             + b"\n"
             + bms_capability_surface_kernel_bytes
+            + b"\n"
+            + non_anticipativity_kernel_bytes
             + b"\n"
             + revenue_realization_kernel_bytes
         ).decode("utf-8")
