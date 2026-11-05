@@ -697,10 +697,17 @@ fn instrument_sorry_span(
         leading_indent
     };
 
-    let mut instrumented = String::with_capacity(source.len() + 128);
+    let mut instrumented = String::with_capacity(source.len() + 160);
     instrumented.push_str(&source[..start]);
+    // Put the first instrumentation tactic on its own layout line. A SorryDB
+    // record can point to an inline by-sorry; appending trace on that line
+    // followed by an indented continuation makes Lean's tactic layout depend
+    // on the surrounding term's line structure.
+    if !instrumented.ends_with('\n') {
+        instrumented.push('\n');
+    }
     instrumented.push_str(&format!(
-        "trace \"{begin_marker}\"\n{tactic_indent}trace_state\n{tactic_indent}trace \"{end_marker}\"\n{tactic_indent}sorry"
+        "{tactic_indent}trace \"{begin_marker}\"\n{tactic_indent}trace_state\n{tactic_indent}trace \"{end_marker}\"\n{tactic_indent}sorry"
     ));
     instrumented.push_str(&source[end..]);
     Ok(instrumented)
@@ -825,13 +832,23 @@ fn replay_goal_with_lake(
     fs::write(receipt_path, receipt_bytes)
         .map_err(|e| format!("write Lean goal-replay receipt: {e}"))?;
     if !goal_reproduced {
+        let diagnostic = String::from_utf8_lossy(&log_bytes);
+        let diagnostic_tail: String = diagnostic
+            .chars()
+            .rev()
+            .take(6000)
+            .collect::<String>()
+            .chars()
+            .rev()
+            .collect();
         return Err(format!(
-            "Lean goal replay failed for {} (exit={}, capture_status={}); expected goal digest {}. Inspect {}",
+            "Lean goal replay failed for {} (exit={}, capture_status={}); expected goal digest {}. Inspect {}. Last replay output:\n{}",
             record.id,
             receipt.replay_exit_code,
             receipt.goal_capture_status,
             receipt.goal_sha256,
-            log_path.display()
+            log_path.display(),
+            diagnostic_tail
         ));
     }
     Ok(receipt)
