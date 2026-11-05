@@ -710,7 +710,7 @@ fn execute() -> Result<(), String> {
         println!("PITB_SORRYDB_INTEGRITY_SYNTHETIC_REPORT_OK");
         return Ok(());
     }
-    if args.len() != 7 || args[1] != "--verify" {
+    if args.len() != 6 || args[1] != "--verify" {
         return Err(format!(
             "usage: {} --verify <full-database.json> <evaluation-split.json> <provenance.json> <task-receipts.jsonl> <report.json> OR --self-test",
             args.first().map(String::as_str).unwrap_or("pitb-sorrydb-integrity")
