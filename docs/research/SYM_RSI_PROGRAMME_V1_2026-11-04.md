@@ -389,3 +389,34 @@ Sources:
 - Wang et al., *FIRE-Bench*, PMLR 306 (2026): https://proceedings.mlr.press/v306/wang26d.html
 - Chi et al., *AI4AI-Bench*, arXiv:2608.20318 (2026-08-20): https://arxiv.org/abs/2608.20318
 - Artificial Analysis Coding Agent Index v2.0 methodology (2026-10): https://artificialanalysis.ai/methodology/coding-agents-benchmarking/
+
+
+## 13. Research-agent throughput and evaluation-noise controls: AIRA₂
+
+Meta AI's AIRA₂ (published 2026-04-16) is an important industry comparator for the R3/R4 research-agent substrate. Its authors identify three bottlenecks: synchronous single-GPU execution, noisy validation-based selection over long search horizons, and fixed single-turn operators. Their architecture combines an asynchronous multi-GPU worker pool, Hidden Consistent Evaluation (HCE), and ReAct agents that dynamically scope actions and debug interactively. The Meta publication reports MLE-bench-30 mean Percentile Rank of 81.5% at 24 hours and 83.1% at 72 hours, versus 72.7% for the strongest baseline; on AIRS-Bench it exceeds human state-of-the-art on 6 of 20 tasks. These are the paper's own results on its own protocol, not Symthaea measurements or directly transferable scores. [Source: Meta AI publication, 2026-04-16](https://ai.meta.com/research/publications/aira-overcoming-bottlenecks-in-ai-research-agents/).
+
+### What Symthaea should test rather than merely imitate
+
+1. **Asynchronous experiment orchestration:** submit independent candidate/probe jobs without serially blocking on the slowest evaluation. Preserve exact candidate and experiment identities, bounded queues, cancellation, retry lineage, resource attribution, and deterministic collection order. Workers may propose and execute only within the external controller's permission; they cannot edit the evaluator or trust roots.
+2. **Hidden-consistent evaluation:** distinguish cheap/public development feedback from a frozen, independently controlled confirmation signal. Repeat or aggregate noisy evaluations with a predeclared estimator; retain every replicate and its resource use. A score used for candidate selection must not also be presented as independent confirmation. Measure selection regret and false-winner rate over long search horizons, not just evaluator repeatability.
+3. **Interactive research operators:** compare fixed single-turn edit/score operators with ReAct-style diagnose → formulate a falsifiable hypothesis → choose a bounded probe → inspect evidence → debug/refine. Each step should emit a trace with the hypothesis, predicted observation, selected probe, actual result, and whether the hypothesis was falsified.
+4. **Joint ablation:** test async pool only, HCE only, interactive operator only, all three, and frozen baseline. Use the same foundation model, accessible data, total GPU/CPU hours, candidate-generation budget, evaluator calls, and allowed toolset. A second operational comparison may fix wall-clock instead, but must report the extra compute/energy consumed. Never compare equal wall-clock with unequal compute as if it were a compute-matched result.
+
+### RSI-specific measurements
+
+- Independently confirmed, held-out improvements per total compute-hour and per wall-clock hour (separate scorecards).
+- Best-so-far trajectory, final checkpoint, number of candidates proposed/evaluated/retained/rejected, and improvement survival after fresh evaluation.
+- Worker utilization, queue delay, GPU/CPU hours, peak memory, total tokens, energy and cost; retries and failed proposals remain in the denominator.
+- Evaluation noise, replicate variance, HCE repeatability, false-winner rate, selection regret and post-selection reversal rate.
+- Interactive operator's hypothesis falsification rate, useful-probe rate, debugging iterations, patch collateral and independently verified outcome.
+- Transfer across SelfImprove-Bench G0–G4 and AIRS-Bench task families, without using final confirmation items during search.
+
+### Hardware-aware execution strategy
+
+The local Symthaea development target includes a single RTX 2070 Laptop GPU (~8 GB VRAM). It should not claim AIRA₂'s multi-GPU throughput scaling from asynchronous scheduling alone. An honest first implementation can overlap CPU-side static analysis, repository indexing, fixture generation, scoring and artifact checks while keeping GPU inference/training concurrency bounded by measured VRAM. For any remote/multi-GPU experiment, charge all workers and queue retries to the same all-in budget. Publish quality-versus-compute and quality-versus-wall-clock curves separately.
+
+### Proposed target
+
+Under a frozen, repeated-run research task suite, the combined system should yield more **independently confirmed generalizing improvements per fixed total compute budget** than both a synchronous interactive baseline and an asynchronous fixed-operator baseline, with no protected capability regression. In the equal-wall-clock track it should improve time-to-first-confirmed-gain without hiding increased compute, energy or cost. No numeric superiority threshold should be frozen until the baseline variance and practical effect are measured on a development set; the confirmatory threshold and power plan must then be preregistered.
+
+This complements #10497 (meta-RSI comparison), #8438 (paired/cluster uncertainty), #9433 (population generalization), and #10521/#10533 (validated receipt composition). It does not create a second scheduler, receipt format, evaluator or runner-isolation boundary.
