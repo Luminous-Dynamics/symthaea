@@ -4,7 +4,15 @@ use sha2::{Digest, Sha256};
 pub const MEMORY_PROJECTION_SCHEMA_VERSION: u16 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum MemoryKind { Working, Episodic, Semantic, Procedural, KnowledgeGraph, Vector, Hdc }
+pub enum MemoryKind {
+    Working,
+    Episodic,
+    Semantic,
+    Procedural,
+    KnowledgeGraph,
+    Vector,
+    Hdc,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct MemoryProjectionRef {
@@ -17,7 +25,13 @@ pub struct MemoryProjectionRef {
 }
 
 impl MemoryProjectionRef {
-    pub fn new(canonical_identity: impl Into<String>, memory_kind: MemoryKind, projection_profile: impl Into<String>, representation_bytes: &[u8], source_frontier: Option<String>) -> Self {
+    pub fn new(
+        canonical_identity: impl Into<String>,
+        memory_kind: MemoryKind,
+        projection_profile: impl Into<String>,
+        representation_bytes: &[u8],
+        source_frontier: Option<String>,
+    ) -> Self {
         Self {
             schema_version: MEMORY_PROJECTION_SCHEMA_VERSION,
             canonical_identity: canonical_identity.into(),
@@ -33,7 +47,13 @@ impl MemoryProjectionRef {
     }
 
     pub fn projection_identity_digest(&self) -> String {
-        let projection = (self.schema_version, &self.canonical_identity, self.memory_kind, &self.projection_profile, &self.source_frontier);
+        let projection = (
+            self.schema_version,
+            &self.canonical_identity,
+            self.memory_kind,
+            &self.projection_profile,
+            &self.source_frontier,
+        );
         let bytes = serde_json::to_vec(&projection).expect("projection fields are serializable");
         sha256_hex(&bytes)
     }
@@ -57,7 +77,9 @@ pub struct MemoryProvenance {
 }
 
 impl MemoryProvenance {
-    pub fn provenance_identity(&self) -> Option<&str> { self.provenance_family.as_deref() }
+    pub fn provenance_identity(&self) -> Option<&str> {
+        self.provenance_family.as_deref()
+    }
 }
 
 pub fn sha256_hex(bytes: &[u8]) -> String {
@@ -71,31 +93,61 @@ mod tests {
 
     #[test]
     fn representations_share_canonical_identity_but_not_projection_identity() {
-        let a = MemoryProjectionRef::new("claim:abc", MemoryKind::Semantic, "semantic-v1", b"summary-a", None);
-        let b = MemoryProjectionRef::new("claim:abc", MemoryKind::Vector, "embedding-v1", b"embedding-b", None);
+        let a = MemoryProjectionRef::new(
+            "claim:abc",
+            MemoryKind::Semantic,
+            "semantic-v1",
+            b"summary-a",
+            None,
+        );
+        let b = MemoryProjectionRef::new(
+            "claim:abc",
+            MemoryKind::Vector,
+            "embedding-v1",
+            b"embedding-b",
+            None,
+        );
         assert_eq!(a.canonical_identity_digest(), b.canonical_identity_digest());
         assert_ne!(a.representation_digest, b.representation_digest);
-        assert_ne!(a.projection_identity_digest(), b.projection_identity_digest());
+        assert_ne!(
+            a.projection_identity_digest(),
+            b.projection_identity_digest()
+        );
     }
 
     #[test]
     fn schema_version_changes_projection_not_canonical_identity() {
-        let a = MemoryProjectionRef::new("claim:abc", MemoryKind::Semantic, "semantic-v1", b"same", None);
+        let a = MemoryProjectionRef::new(
+            "claim:abc",
+            MemoryKind::Semantic,
+            "semantic-v1",
+            b"same",
+            None,
+        );
         let mut b = a.clone();
         b.schema_version += 1;
         assert_eq!(a.canonical_identity_digest(), b.canonical_identity_digest());
-        assert_ne!(a.projection_identity_digest(), b.projection_identity_digest());
+        assert_ne!(
+            a.projection_identity_digest(),
+            b.projection_identity_digest()
+        );
     }
 
     #[test]
     fn provenance_family_is_stable_across_retrieval_indexes() {
         let a = MemoryProvenance {
-            memory_id: "mem-a".into(), memory_kind: MemoryKind::Vector,
+            memory_id: "mem-a".into(),
+            memory_kind: MemoryKind::Vector,
             created_at: "2026-09-29T00:00:00Z".into(),
-            source_event: Some("event-1".into()), canonical_artifact_ref: Some("artifact-1".into()),
-            statement_ref: Some("statement-1".into()), provenance_family: Some("family-1".into()),
-            epistemic_state: Some("Observed".into()), claim_ceiling: Some("source-scoped".into()),
-            frontier_ref: Some("frontier-1".into()), derivation_ref: None, model_ref: None,
+            source_event: Some("event-1".into()),
+            canonical_artifact_ref: Some("artifact-1".into()),
+            statement_ref: Some("statement-1".into()),
+            provenance_family: Some("family-1".into()),
+            epistemic_state: Some("Observed".into()),
+            claim_ceiling: Some("source-scoped".into()),
+            frontier_ref: Some("frontier-1".into()),
+            derivation_ref: None,
+            model_ref: None,
             retrieval_index_ref: Some("index-a".into()),
         };
         let mut b = a.clone();
@@ -106,6 +158,9 @@ mod tests {
 
     #[test]
     fn sha256_is_deterministic() {
-        assert_eq!(sha256_hex(b"symthaea-memory"), sha256_hex(b"symthaea-memory"));
+        assert_eq!(
+            sha256_hex(b"symthaea-memory"),
+            sha256_hex(b"symthaea-memory")
+        );
     }
 }
