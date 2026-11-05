@@ -1753,3 +1753,6 @@ pub mod scenario_dgp;
 
 /// Simultaneous finite-sample confidence bounds for candidate score Monte Carlo.
 pub mod score_bounds;
+
+/// Fail-closed conversion of observed category counts into UVSD fitter tables.
+pub mod observation_table_adapter;
