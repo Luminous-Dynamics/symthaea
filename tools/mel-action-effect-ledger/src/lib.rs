@@ -131,7 +131,7 @@ pub enum ClockDomain {
 }
 
 /// Distinct downstream evidence boundaries for a response artifact.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum EffectStage {
     /// Response applied to the bounded note queue.
     AppliedAtNoteQueue,
