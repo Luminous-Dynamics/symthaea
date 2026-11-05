@@ -1,0 +1,30 @@
+[package]
+name = "rea-zip-fuzz"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "=0.4.13"
+symthaea-rea-artifact-reader = { path = "../crates/domains/symthaea-rea-artifact-reader" }
+sha2 = "=0.10.9"
+zip = { version = "=9.3.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+
+[[bin]]
+name = "zip_inventory_and_content"
+path = "fuzz_targets/zip_inventory_and_content.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "zip_parser_differential"
+path = "fuzz_targets/zip_parser_differential.rs"
+test = false
+doc = false
+
+[workspace]
+members = ["."]
+resolver = "2"
