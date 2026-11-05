@@ -264,7 +264,8 @@ No status may be promoted solely because a local Fisher-information score is fav
 
 ## 13. Immediate implementation tickets
 
-- Typed, frozen `OperationalActionSet` and action-to-observation qualification status.
+- Typed, frozen `OperationalActionSet` and action-to-observation qualification status ([draft PR #10493](https://github.com/Luminous-Dynamics/symthaea/pull/10493)).
+- Conservative scenario aggregation across a complete action × scenario matrix, including lower/upper score bounds, maximin/CVaR and fail-closed coverage ([issue #10509](https://github.com/Luminous-Dynamics/symthaea/issues/10509), [draft PR #10511](https://github.com/Luminous-Dynamics/symthaea/pull/10511)).
 - Scenario registry with Gaussian, lapse, drift, heterogeneity, RT/confidence channel and MNAR generators.
 - Policy interface with deterministic replay and propensity receipts.
 - Fixed, QUEST+-style and one-step EIG baselines.
