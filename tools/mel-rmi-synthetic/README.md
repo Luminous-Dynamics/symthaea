@@ -34,9 +34,9 @@ shortcut and rule-based policies, followed by 160 four-condition reciprocal
 controlled-partner trials. Every one of the 960 policy trials and 160 reciprocal
 trials also receives four input and four output synthetic score/MIDI payload
 sets plus exact receipt bytes; the example hashes and re-verifies all 1,120
-trial records before reporting `artifact_verified,1120`. The repository workflow
-stages this crate outside the root Cargo workspace, tests the exact pull-request
-head, and gates all expected positive/negative-control counts.
+trial records before reporting `artifact_verified,1120`. The example also emits dimension-specific agent and partner summaries to stderr: sample count, means, targeted-effect dispersion, sham/unrelated contrasts, and control/oracle qualification counts. It does not report a confidence interval or combine dimensions into a single score.
+
+The repository workflow stages this crate outside the root Cargo workspace, tests the exact pull-request head with a committed `--locked` dependency graph, and gates all expected positive/negative-control counts, all five dimensions' summaries, and 1,120 successful artifact re-verifications.
 
 ## Interpretation boundary
 
