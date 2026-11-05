@@ -125,6 +125,182 @@
           "PLE produces deliverables rather than source patches. Do not fabricate a patch digest or force PLE outputs into CEB v0's patch-centric receipt; use the canonical generic accounting/artifact mapping defined by #10314/#10370."
         ]
       }
+    },
+    {
+      "id": "benchcad-2.0",
+      "name": "BenchCAD 2.0",
+      "status": "access_gated",
+      "publisher": "BenchCAD team",
+      "official_url": "https://benchcad.com/benchcad-2",
+      "repository_url": "https://github.com/BenchCAD-org/benchcad-2-main",
+      "dataset_url": "https://huggingface.co/datasets/BenchCAD/benchcad-2.0-public",
+      "paper_url": "https://benchcad.com/blog/benchcad-2",
+      "paper_revision": "Official blog snapshot 2026-10-12; published reference uses v2.0-core1; current v2.1 differs",
+      "task_count": 200,
+      "splits": {
+        "development": {
+          "count": 100,
+          "access": "access_gated",
+          "score_scope": "Public evaluation-only set; 100 cases across six tasks, disjoint from Core. Scores are for testing the harness and are explicitly not reportable."
+        },
+        "hidden_test": {
+          "count": 100,
+          "access": "access_gated",
+          "score_scope": "Core held-out 100-case set behind an evaluation-only agreement; published reference scores are calculated on this split. No task material is stored in this registry."
+        }
+      },
+      "disciplines": {
+        "structural": {
+          "total_tasks": null,
+          "development_tasks": null
+        },
+        "civil": {
+          "total_tasks": null,
+          "development_tasks": null
+        },
+        "electrical": {
+          "total_tasks": null,
+          "development_tasks": null
+        },
+        "mechanical": {
+          "total_tasks": null,
+          "development_tasks": null
+        }
+      },
+      "task_families": [
+        {
+          "id": "T1-drawing-part",
+          "name": "Drawing to CAD: part",
+          "public_count": 21,
+          "core_count": null,
+          "score_status": "public_scores_not_reportable",
+          "notes": [
+            "Dimensioned part drawing to CadQuery part."
+          ]
+        },
+        {
+          "id": "T2-drawing-assembly-supplied",
+          "name": "Drawing to CAD: assembly with supplied parts",
+          "public_count": 14,
+          "core_count": null,
+          "score_status": "public_scores_not_reportable",
+          "notes": [
+            "STEP parts and assembly drawing to positioned assembly."
+          ]
+        },
+        {
+          "id": "T3-view-part",
+          "name": "3D reverse engineering: part",
+          "public_count": 23,
+          "core_count": null,
+          "score_status": "public_scores_not_reportable",
+          "notes": [
+            "Four rendered views to a CAD part."
+          ]
+        },
+        {
+          "id": "T4-view-assembly",
+          "name": "3D reverse engineering: assembly",
+          "public_count": 27,
+          "core_count": null,
+          "score_status": "public_scores_not_reportable",
+          "notes": [
+            "Views of mechanism and parts to parts plus an assembly."
+          ]
+        },
+        {
+          "id": "T5-drawing-parts-assembly",
+          "name": "Drawing to CAD: parts and assembly",
+          "public_count": 6,
+          "core_count": null,
+          "score_status": "public_scores_not_reportable",
+          "notes": [
+            "Drawings of parts to make, supplied STEP parts, and assembly drawing to parts plus assembly."
+          ]
+        },
+        {
+          "id": "T6-ecad-wiring",
+          "name": "ECAD reverse engineering: board wiring",
+          "public_count": 9,
+          "core_count": null,
+          "score_status": "public_scores_not_reportable",
+          "notes": [
+            "Six PCB renders to an electrical wiring/schematic graph."
+          ]
+        }
+      ],
+      "licensing": {
+        "runner_code": "Repository metadata does not declare a code license; verify with maintainers before redistribution or reuse.",
+        "development_dataset": "BenchCAD 2.0 evaluation-only terms; public set terms prohibit training, fine-tuning, distillation, RL environments, pre-training/retrieval/search inclusion, redistribution and public posting of cases.",
+        "access_gated": true
+      },
+      "execution": {
+        "official_runner": "BenchCAD-org/benchcad-2-main tools/run_core.sh",
+        "harbor_version": "not_applicable; native BenchCAD sandbox",
+        "per_task_time_limit_seconds": null,
+        "runner_revision": "v2.0-core1 for the published reference snapshot; v2.1 is a distinct non-comparable protocol",
+        "dataset_revision": null,
+        "execution_authorized": false,
+        "official_hidden_test_repeat_count": null,
+        "repeat_policy": "Published reference lines use harness v2.0: 30 rounds per case and reasoning is not carried between rounds. Claude rows are single repetitions; GPT-6 Astra is a mean of three repetitions except ECAD T6, which is one repetition. Current v2.1 carries reasoning across rounds and uses 60 rounds plus a 500,000 output-token budget per case; do not compare v2.1 scores with v2.0. Public-set scores are not reportable. Record exact per-model/per-task repetitions rather than assuming a uniform repeat count.",
+        "official_development_baseline_repeat_count": null,
+        "max_rounds_per_task": 30,
+        "reasoning_carried_across_rounds": false
+      },
+      "baseline_context": {
+        "hidden_test_leaderboard_score": 0.59,
+        "paper_abstract_mean_score": null,
+        "all_hard_checks_clearance": null,
+        "notes": [
+          "The 2026-10-12 official blog reports GPT-6 Astra at max effort = 0.59 on the 100-case Core set, at about $11 per case, 135k tokens per case and 62 minutes median per case.",
+          "The same v2.0 snapshot reports Claude Opus 5.5 at max effort = 0.57, about $28 per case, 1.3M tokens per case and 3.7 hours per case.",
+          "The score is a mean across 100 Core cases with deterministic, non-LLM reference scoring. Parts are scored for geometry overlap and topology; assemblies additionally score placement; boards score wiring connectivity.",
+          "The blog reports that 83–96% of zero-scoring part types in evaluated assembly tasks had the right shape but wrong placement. At max effort, GPT-6 Astra found 80% of board connections and Claude Opus 5.5 68%; the blog describes serious rail shorts/splits and says the runs did not test for shorts or opens.",
+          "BenchCAD 2.0 scoring does not measure manufacturability or physical performance. Do not equate geometric/placement/connectivity score with engineering safety or production readiness.",
+          "Published v2.0 results and current v2.1 are different harness protocols. The current v2.1 protocol carries reasoning between rounds and allows 60 rounds / 500k output tokens per case; these are not comparable to v2.0."
+        ],
+        "published_results": [
+          {
+            "model": "GPT-6 Astra",
+            "effort": "max",
+            "score": 0.59,
+            "harness_version": "v2.0",
+            "repeat_count": 3,
+            "cost_per_case_usd": 11,
+            "median_duration_seconds": 3720,
+            "tokens_per_case": 135000,
+            "notes": [
+              "Published 3-repetition mean except T6 ECAD, which has one repetition."
+            ]
+          },
+          {
+            "model": "Claude Opus 5.5",
+            "effort": "max",
+            "score": 0.57,
+            "harness_version": "v2.0",
+            "repeat_count": 1,
+            "cost_per_case_usd": 28,
+            "median_duration_seconds": 13320,
+            "tokens_per_case": 1300000,
+            "notes": [
+              "Published single repetition."
+            ]
+          }
+        ]
+      },
+      "ceb_integration": {
+        "task_contract_owner": "Benchmark-neutral run accounting #10314 and evidence convergence #10370; CEB v0 #10115 remains for patch-bearing repository tasks.",
+        "receipt_owner": "Benchmark-neutral accounting #10314 + evidence convergence #10370; preserve native CAD and ECAD artifacts, not fabricated source-patch hashes.",
+        "custody_owner": "CEB task custody #10436",
+        "isolation_blocker": "Symthaea execution isolation #10064",
+        "notes": [
+          "Metadata only. No public or Core case has been downloaded or executed by Luminous.",
+          "Public and Core evaluation terms must be satisfied; held-out Core access requires the exact agreement.",
+          "Do not copy or expose BenchCAD public/Core cases, drawings, renders, reference artifacts or canaries in source control, retrieval or training corpora.",
+          "The benchmark emits CAD artifacts/assemblies or wiring graphs, not source patches. Use generic artifact accounting rather than CEB's patch-only DSSE subject.",
+          "A Luminous benchmark adapter must keep model-visible inputs separate from the reference/evaluator trust domain."
+        ]
+      }
     }
   ]
 }
