@@ -2125,10 +2125,7 @@ mod tests {
             .iter()
             .find(|artifact| artifact.format == ArtifactFormatV1::ScoreJson)
             .unwrap();
-        assert_eq!(
-            score.bytes,
-            br#"{"fixture":"fixture-1"}"#.to_vec()
-        );
+        assert_eq!(score.bytes, br#"{"fixture":"fixture-1"}"#.to_vec());
 
         let midi = payload
             .artifacts
@@ -2139,13 +2136,22 @@ mod tests {
         assert_eq!(&midi.bytes[0..4], b"MThd");
         assert_eq!(u32::from_be_bytes(midi.bytes[4..8].try_into().unwrap()), 6);
         assert_eq!(u16::from_be_bytes(midi.bytes[8..10].try_into().unwrap()), 0);
-        assert_eq!(u16::from_be_bytes(midi.bytes[10..12].try_into().unwrap()), 1);
-        assert_eq!(u16::from_be_bytes(midi.bytes[12..14].try_into().unwrap()), 480);
+        assert_eq!(
+            u16::from_be_bytes(midi.bytes[10..12].try_into().unwrap()),
+            1
+        );
+        assert_eq!(
+            u16::from_be_bytes(midi.bytes[12..14].try_into().unwrap()),
+            480
+        );
         assert_eq!(&midi.bytes[14..18], b"MTrk");
         let track_len = u32::from_be_bytes(midi.bytes[18..22].try_into().unwrap()) as usize;
         assert_eq!(track_len, midi.bytes.len() - 22);
         assert_eq!(&midi.bytes[22..26], &[0x00, 0xff, 0x01, 0x09]);
-        assert_eq!(&midi.bytes[midi.bytes.len() - 4..], &[0x00, 0xff, 0x2f, 0x00]);
+        assert_eq!(
+            &midi.bytes[midi.bytes.len() - 4..],
+            &[0x00, 0xff, 0x2f, 0x00]
+        );
     }
 
     #[test]
