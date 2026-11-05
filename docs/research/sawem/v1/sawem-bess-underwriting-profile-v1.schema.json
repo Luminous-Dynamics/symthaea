@@ -431,7 +431,16 @@
         "product",
         "committed_mw",
         "capability_class",
-        "simultaneous_energy_double_counted"
+        "simultaneous_energy_double_counted",
+        "direction",
+        "start_response_seconds",
+        "full_activation_seconds",
+        "sustain_duration_seconds",
+        "proven_sustain_seconds",
+        "response_evidence_class",
+        "sustain_evidence_class",
+        "response_evidence_ref",
+        "sustain_evidence_ref"
       ],
       "properties": {
         "product": {
@@ -454,8 +463,128 @@
         },
         "simultaneous_energy_double_counted": {
           "const": false
+        },
+        "direction": {
+          "enum": [
+            "up",
+            "down"
+          ]
+        },
+        "start_response_seconds": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/nonnegativeNumber"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "full_activation_seconds": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/nonnegativeNumber"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sustain_duration_seconds": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/nonnegativeNumber"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "proven_sustain_seconds": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/nonnegativeNumber"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "response_evidence_class": {
+          "enum": [
+            "synthetic",
+            "vendor_declared",
+            "operator_certified",
+            "independently_measured",
+            "unknown"
+          ]
+        },
+        "sustain_evidence_class": {
+          "enum": [
+            "synthetic",
+            "vendor_declared",
+            "operator_certified",
+            "independently_measured",
+            "unknown"
+          ]
+        },
+        "response_evidence_ref": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sustain_evidence_ref": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "product": {
+                "const": "instantaneous_reserve"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "direction": {
+                "const": "up"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "product": {
+                "const": "ten_minute_reserve"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "direction": {
+                "const": "up"
+              }
+            }
+          }
+        }
+      ]
     },
     "tradingPeriod": {
       "type": "object",
