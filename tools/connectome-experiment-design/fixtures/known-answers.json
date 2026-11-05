@@ -1,0 +1,110 @@
+{
+  "schema_version": "1.0.0",
+  "evidence_class": "synthetic_known_answer",
+  "claim_ceiling": "SYNTHETIC_ONLY",
+  "units": "bits",
+  "cases": [
+    {
+      "id": "uninformative_binary",
+      "priors": [
+        0.5,
+        0.5
+      ],
+      "likelihoods_by_hypothesis": [
+        [
+          0.5,
+          0.5
+        ],
+        [
+          0.5,
+          0.5
+        ]
+      ],
+      "expected_prior_entropy": 1,
+      "expected_posterior_entropy": 1,
+      "expected_eig": 0
+    },
+    {
+      "id": "perfect_uniform_binary",
+      "priors": [
+        0.5,
+        0.5
+      ],
+      "likelihoods_by_hypothesis": [
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "expected_prior_entropy": 1,
+      "expected_posterior_entropy": 0,
+      "expected_eig": 1
+    },
+    {
+      "id": "noisy_90_10_binary",
+      "priors": [
+        0.5,
+        0.5
+      ],
+      "likelihoods_by_hypothesis": [
+        [
+          0.9,
+          0.1
+        ],
+        [
+          0.1,
+          0.9
+        ]
+      ],
+      "expected_prior_entropy": 1,
+      "expected_posterior_entropy": 0.4689955935892812,
+      "expected_eig": 0.5310044064107188
+    },
+    {
+      "id": "perfect_asymmetric_binary",
+      "priors": [
+        0.8,
+        0.2
+      ],
+      "likelihoods_by_hypothesis": [
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "expected_prior_entropy": 0.7219280948873623,
+      "expected_posterior_entropy": 0,
+      "expected_eig": 0.7219280948873623
+    }
+  ],
+  "cost_ranking_case": {
+    "priors": [
+      0.5,
+      0.5
+    ],
+    "candidates": [
+      {
+        "id": "expensive_high_raw_eig",
+        "cost": 5,
+        "eig_bits": 0.5310044064107188,
+        "eig_bits_per_cost": 0.10620088128214375
+      },
+      {
+        "id": "cheap_moderate_raw_eig",
+        "cost": 1,
+        "eig_bits": 0.2780719051126377,
+        "eig_bits_per_cost": 0.2780719051126377
+      }
+    ],
+    "expected_first": "cheap_moderate_raw_eig"
+  },
+  "notes": "Analytic finite-outcome cases only. Likelihoods are stipulated, not measured or calibrated from biological data."
+}

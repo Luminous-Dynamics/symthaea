@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-decision-value-output-v1.schema.json",
+  "title": "Open-world decision-focused EVSI experiment-design report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "decision_problem",
+    "ranked_experiments"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "connectome-decision-value-v1"
+    },
+    "decision_problem": {
+      "$ref": "#/$defs/decision_problem"
+    },
+    "ranked_experiments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/ranked_experiment"
+      }
+    }
+  },
+  "$defs": {
+    "decision_problem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "hypothesis_ids",
+        "actions"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hypothesis_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "utility_by_hypothesis"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "utility_by_hypothesis": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "ranked_experiment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "experiment_id",
+        "score"
+      ],
+      "properties": {
+        "experiment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "score": {
+          "$ref": "#/$defs/score"
+        }
+      }
+    },
+    "score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "experiment_id",
+        "decision_problem_id",
+        "cost",
+        "unresolved_prior_mass",
+        "worst_case_scenario_id",
+        "best_case_scenario_id",
+        "worst_case_evsi",
+        "best_case_evsi",
+        "worst_case_evsi_per_cost",
+        "best_case_evsi_per_cost",
+        "scenario_values"
+      ],
+      "properties": {
+        "experiment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_problem_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cost": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "unresolved_prior_mass": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "worst_case_scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "best_case_scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "worst_case_evsi": {
+          "type": "number",
+          "minimum": 0
+        },
+        "best_case_evsi": {
+          "type": "number",
+          "minimum": 0
+        },
+        "worst_case_evsi_per_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "best_case_evsi_per_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "scenario_values": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/scenario_value"
+          }
+        }
+      }
+    },
+    "scenario_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "current_best_action_id",
+        "current_expected_utility",
+        "expected_post_experiment_utility",
+        "expected_value_of_sample_information",
+        "evsi_per_cost",
+        "outcome_decisions"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "current_best_action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "current_expected_utility": {
+          "type": "number"
+        },
+        "expected_post_experiment_utility": {
+          "type": "number"
+        },
+        "expected_value_of_sample_information": {
+          "type": "number",
+          "minimum": 0
+        },
+        "evsi_per_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "outcome_decisions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/outcome_decision"
+          }
+        }
+      }
+    },
+    "outcome_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome_id",
+        "outcome_probability",
+        "selected_action_id",
+        "posterior_expected_utility"
+      ],
+      "properties": {
+        "outcome_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "selected_action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "posterior_expected_utility": {
+          "type": "number"
+        }
+      }
+    }
+  }
+}

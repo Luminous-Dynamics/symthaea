@@ -1,0 +1,97 @@
+{
+  "priors": [
+    0.3,
+    0.3,
+    0.3,
+    0.1
+  ],
+  "objective": {
+    "id": "functional-output-at-least-0.8",
+    "outcome_ids": [
+      "subthreshold",
+      "hit"
+    ],
+    "outcome_values": [
+      0,
+      1
+    ],
+    "threshold": 0.8,
+    "direction": "AtLeast"
+  },
+  "candidates": [
+    {
+      "id": "mechanism-discriminator",
+      "cost": 1,
+      "outcomes": [
+        "subthreshold",
+        "hit"
+      ],
+      "hypothesis_ids": [
+        "mechanism_a",
+        "mechanism_b",
+        "mechanism_no_effect",
+        "OTHER_OR_UNRESOLVED"
+      ],
+      "likelihood_scenarios": [
+        {
+          "id": "known-answer",
+          "likelihoods_by_hypothesis": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              0.5,
+              0.5
+            ],
+            [
+              0.5,
+              0.5
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hit-discriminator",
+      "cost": 1,
+      "outcomes": [
+        "subthreshold",
+        "hit"
+      ],
+      "hypothesis_ids": [
+        "mechanism_a",
+        "mechanism_b",
+        "mechanism_no_effect",
+        "OTHER_OR_UNRESOLVED"
+      ],
+      "likelihood_scenarios": [
+        {
+          "id": "known-answer",
+          "likelihoods_by_hypothesis": [
+            [
+              0.2,
+              0.8
+            ],
+            [
+              0.2,
+              0.8
+            ],
+            [
+              0.9,
+              0.1
+            ],
+            [
+              0.5,
+              0.5
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}
