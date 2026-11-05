@@ -1015,45 +1015,6 @@ fn summarize_dacs(rows: &[PairMetrics], scenario: Scenario, model: Model) -> Dac
     }
 }
 
-fn summarize_dacs(rows: &[PairMetrics], scenario: Scenario, model: Model) -> DacsSummary {
-    let separation: Vec<Option<f64>> = rows.iter().map(|row| row.dacs.action_pair_separation_rate).collect();
-    let sign: Vec<Option<f64>> = rows.iter().map(|row| row.dacs.action_response_sign_accuracy).collect();
-    let response: Vec<Option<f64>> = rows.iter().map(|row| row.dacs.action_response_vector_mae).collect();
-    let drift: Vec<Option<f64>> = rows.iter().map(|row| row.dacs.neutral_input_drift_energy).collect();
-    let multi_step: Vec<Option<f64>> = rows.iter().map(|row| row.dacs.multi_step_response_mae).collect();
-
-    let separation_ci = bootstrap_mean_ci(&separation, metric_bootstrap_seed(scenario, model, 7));
-    let sign_ci = bootstrap_mean_ci(&sign, metric_bootstrap_seed(scenario, model, 8));
-    let response_ci = bootstrap_mean_ci(&response, metric_bootstrap_seed(scenario, model, 9));
-    let drift_ci = bootstrap_mean_ci(&drift, metric_bootstrap_seed(scenario, model, 10));
-    let multi_step_ci = bootstrap_mean_ci(&multi_step, metric_bootstrap_seed(scenario, model, 11));
-
-    DacsSummary {
-        mean_prediction_coverage: rows.iter().map(|row| row.dacs.prediction_coverage).sum::<f64>() / rows.len() as f64,
-        mean_action_pair_separation_rate: mean_optional(&separation),
-        action_pair_separation_episode_count: optional_sample_count(&separation),
-        action_pair_separation_ci95_lower: separation_ci.map(|interval| interval.0),
-        action_pair_separation_ci95_upper: separation_ci.map(|interval| interval.1),
-        mean_action_response_sign_accuracy: mean_optional(&sign),
-        action_response_sign_episode_count: optional_sample_count(&sign),
-        action_response_sign_ci95_lower: sign_ci.map(|interval| interval.0),
-        action_response_sign_ci95_upper: sign_ci.map(|interval| interval.1),
-        mean_action_response_vector_mae: mean_optional(&response),
-        action_response_vector_episode_count: optional_sample_count(&response),
-        action_response_vector_ci95_lower: response_ci.map(|interval| interval.0),
-        action_response_vector_ci95_upper: response_ci.map(|interval| interval.1),
-        mean_neutral_input_drift_energy: mean_optional(&drift),
-        neutral_input_drift_episode_count: optional_sample_count(&drift),
-        neutral_input_drift_ci95_lower: drift_ci.map(|interval| interval.0),
-        neutral_input_drift_ci95_upper: drift_ci.map(|interval| interval.1),
-        mean_multi_step_response_mae: mean_optional(&multi_step),
-        multi_step_response_episode_count: optional_sample_count(&multi_step),
-        multi_step_response_ci95_lower: multi_step_ci.map(|interval| interval.0),
-        multi_step_response_ci95_upper: multi_step_ci.map(|interval| interval.1),
-        mean_multi_step_action_coverage: rows.iter().map(|row| row.dacs.multi_step_action_coverage).sum::<f64>() / rows.len() as f64,
-    }
-}
-
 fn summarize(scenario: Scenario, model: Model) -> Summary {
     let mut rows = Vec::with_capacity(EPISODES);
     for episode in 0..EPISODES {
