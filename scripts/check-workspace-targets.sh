@@ -24,6 +24,9 @@ MEMBER_GLOBS=(crates/core/* crates/domains/* crates/bridges/*)
 
 # Excluded members — must mirror [workspace].exclude in Cargo.toml.
 EXCLUDES=(
+  "crates/core/symthaea"
+  "crates/core/symthaea-observation-attestation"
+  "crates/domains/symthaea-rea-evidence-verifier"
   "crates/core/symthaea-zkproof/methods"
   "crates/core/symthaea-zkproof/host"
   "crates/domains/symthaea-spore/fuzz"
@@ -49,8 +52,14 @@ has_target() {
 fail=0
 for glob in "${MEMBER_GLOBS[@]}"; do
   for dir in $glob; do
-    [[ -f "$dir/Cargo.toml" ]] || continue
+    [[ -d "$dir" ]] || continue
     is_excluded "$dir" && continue
+    if [[ ! -f "$dir/Cargo.toml" ]]; then
+      echo "INVALID WORKSPACE GLOB ENTRY: $dir  (matched by [workspace].members glob but has no Cargo.toml)"
+      echo "  Add a valid manifest, or explicitly exclude the path in Cargo.toml and EXCLUDES."
+      fail=1
+      continue
+    fi
     if ! has_target "$dir"; then
       echo "MISSING TARGET: $dir  (Cargo.toml but no src/lib.rs, src/main.rs, src/bin/*.rs, [lib], or [[bin]])"
       fail=1
