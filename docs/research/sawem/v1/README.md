@@ -220,9 +220,11 @@ The new `bms_capability_surface.rs` module extends the SOC-only curve into a com
 
 The evaluator does **not** interpolate between cell limits. It selects the containing half-open cell, includes the final axis endpoint in the last cell, and rejects any state outside the calibrated range. An incomplete Cartesian grid, duplicate coordinate or source reference, malformed axis, missing digest or insufficient field sample count fails closed. This sacrifices smoothness for a clearer evidence boundary: no measurement cell, no inferred operating authority.
 
-The surface evaluator validates and selects precomputed conservative limits; it does not fit them from raw samples. The next empirical step is to build cells from the M5BAT Test 1 calibration campaign using a frozen lower-quantile method, then validate the envelope on Test 2 without refitting. We must report per-cell sample counts, false-safe/false-derate rates and delivered-energy impact. The surface is not a BMS or electrochemical safety model and does not authorize dispatch.
+The surface evaluator validates and selects precomputed conservative limits. The new `bms_calibration.rs` module supplies a deterministic lower empirical order-statistic fitter for each cell, using only BMS-reported available-power telemetry or explicit capability-limit tests. Ordinary delivered dispatch power is rejected because it is censored by the request. The fitter requires a frozen calibration campaign, unique source-bound measurements, a declared lower quantile and a minimum per-cell sample count. It returns the selected sample/rank; a separate canonical sample manifest must be frozen and hashed before the cell enters the surface.
 
-Benchmark case: `BMS-MULTIDIM-CAPABILITY-SURFACE-001`. No field-derived grid has yet been fitted; surface validation against M5BAT remains `not_run`.
+The fitter does not estimate statistical confidence bounds or authenticate raw sources. A complete evaluation still needs campaign-separated validation: fit on M5BAT Test 1 only, freeze every cell and its evidence manifest, then test coverage and delivery outcomes on Test 2 without refitting. Report per-cell counts, selected quantile, false-safe/false-derate rates, residuals and delivered-energy impact. The surface is not a BMS or electrochemical safety model and does not authorize dispatch.
+
+Benchmark cases: `BMS-MULTIDIM-CAPABILITY-SURFACE-001` and `BMS-CAPABILITY-CELL-CALIBRATION-001`. No field-derived grid has yet been fitted; calibration and validation against M5BAT remain `not_run`.
 
 ### Revenue realization: decomposing the haircut into evidence
 
