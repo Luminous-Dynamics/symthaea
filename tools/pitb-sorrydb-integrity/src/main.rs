@@ -626,11 +626,49 @@ fn run_self_tests() -> Result<(), String> {
     Ok(())
 }
 
+fn synthetic_report() -> Result<Report, String> {
+    let full = Database { sorries: vec![
+        synthetic_record("task-a", &"1".repeat(40)),
+        synthetic_record("task-b", &"2".repeat(40)),
+    ]};
+    let split = Database { sorries: vec![full.sorries[0].clone()] };
+    let receipt = synthetic_receipt(&split.sorries[0]);
+    let full_bytes = serde_json::to_vec(&full).map_err(|e| e.to_string())?;
+    let split_bytes = serde_json::to_vec(&split).map_err(|e| e.to_string())?;
+    let provenance = Provenance {
+        schema_version: PROVENANCE_SCHEMA.into(),
+        snapshot_id: "SorryDB-synthetic".into(),
+        upstream_repository: "https://github.com/SorryDB/SorryDB".into(),
+        upstream_repository_commit: "3".repeat(40),
+        database_git_blob_sha1: git_blob_sha1(&full_bytes, "synthetic full database")?,
+        evaluation_split_git_blob_sha1: git_blob_sha1(&split_bytes, "synthetic split")?,
+        expected_database_task_count: 2,
+        expected_evaluation_task_count: 1,
+        evaluation_split_role: "test".into(),
+        license: "Apache-2.0".into(),
+        paper_url: "https://proceedings.mlr.press/v306/letson26a.html".into(),
+    };
+    let provenance_bytes = serde_json::to_vec(&provenance).map_err(|e| e.to_string())?;
+    let receipt_bytes = [
+        serde_json::to_vec(&receipt).map_err(|e| e.to_string())?,
+        b"\n".to_vec(),
+    ].concat();
+    verify(&full_bytes, &split_bytes, &provenance_bytes, &receipt_bytes)
+}
+
 fn execute() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
     if args.len() == 2 && args[1] == "--self-test" {
         run_self_tests()?;
         println!("PITB_SORRYDB_INTEGRITY_SELF_TEST_PASS");
+        return Ok(());
+    }
+    if args.len() == 3 && args[1] == "--self-test-report" {
+        run_self_tests()?;
+        let report = synthetic_report()?;
+        let bytes = serde_json::to_vec_pretty(&report).map_err(|e| format!("serialize synthetic report: {e}"))?;
+        fs::write(&args[2], bytes).map_err(|e| format!("write synthetic report: {e}"))?;
+        println!("PITB_SORRYDB_INTEGRITY_SYNTHETIC_REPORT_OK");
         return Ok(());
     }
     if args.len() != 7 || args[1] != "--verify" {
