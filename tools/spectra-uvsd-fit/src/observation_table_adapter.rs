@@ -591,8 +591,11 @@ mod tests {
                 rt_not_collected: requested_trials,
             }
         };
+        let mut overflow_scenario = scenario(vec![-1.0, 0.0, 1.0]);
+        overflow_scenario.response_scales[0].latent_criteria =
+            (0..category_counts.len() - 1).map(|index| index as f64).collect();
         let data = SyntheticDataset {
-            scenario: scenario(vec![-1.0, 0.0, 1.0]),
+            scenario: overflow_scenario,
             scenario_digest: "sha256:scenario".to_owned(),
             action_set_digest: action_set.digest().to_owned(),
             root_seed: 1,
