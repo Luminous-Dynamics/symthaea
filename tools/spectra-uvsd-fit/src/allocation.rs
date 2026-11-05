@@ -886,15 +886,11 @@ mod tests {
         let actions = action_set();
         let scenarios = scenario_set();
         let mut samples = fixed.samples.clone();
-        for values in [
-            &mut samples[0].target_information,
-            &mut samples[0].model_discrimination_information,
-            &mut samples[0].representativeness,
-            &mut samples[0].target_utility,
-            &mut samples[0].participant_burden_seconds,
-        ] {
-            values.push(values.last().copied().unwrap());
-        }
+        samples[0].target_information.push(1.0);
+        samples[0].model_discrimination_information.push(0.5);
+        samples[0].representativeness.push(0.9);
+        samples[0].target_utility.push(0.8);
+        samples[0].participant_burden_seconds.push(1.0);
         let cfg = ScoreBoundsConfig {
             familywise_alpha: fixed.familywise_alpha,
             minimum_replicates: fixed.minimum_replicates,
