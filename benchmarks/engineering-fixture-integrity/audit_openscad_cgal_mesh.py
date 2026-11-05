@@ -118,7 +118,7 @@ def run_openscad(
         f"OpenSCAD did not report a CGAL polyhedron conversion: {mesh_path.name}: {log[-2000:]}",
     )
     require(
-        re.search(r"Simple:\\s+yes", log) is not None,
+        re.search(r"Simple:\s+yes", log) is not None,
         f"OpenSCAD CGAL output was not simple: {mesh_path.name}: {log[-2000:]}",
     )
     require(
