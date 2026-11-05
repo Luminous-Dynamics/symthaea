@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "analysis_id": "synthetic-robust-query-disambiguation-v1",
+  "dataset_revision_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "query_id": "directed-circuit-decision-is-supported",
+  "query_spec_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "scenario_set_sha256": "e00a946ef8caeb2180fde69297e9705bc392f043bd85b35f7742b3a1e629be92",
+  "baseline_action_set_sha256": "523fbba88ddc92808525546072a8ea320496c6f655d3e39b7a3006b44d71d753",
+  "challenger_protocol_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+  "records": [
+    {
+      "challenge_id": "challenge-synapse-beta-ambiguous",
+      "action_id": "inspect-synapse",
+      "scenario_id": "world-beta",
+      "additional_possible_outcomes": [
+        "pre-pattern-A"
+      ],
+      "source_evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "dependence_groups": [
+        "independent-review-batch-01",
+        "raw-em-volume-002"
+      ]
+    },
+    {
+      "challenge_id": "challenge-alt-synapse-beta-ambiguous",
+      "action_id": "inspect-synapse-alternative",
+      "scenario_id": "world-beta",
+      "additional_possible_outcomes": [
+        "axon-a"
+      ],
+      "source_evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "dependence_groups": [
+        "independent-review-batch-02",
+        "raw-em-volume-003"
+      ]
+    },
+    {
+      "challenge_id": "challenge-morphology-gamma-ambiguous",
+      "action_id": "inspect-morphology",
+      "scenario_id": "world-gamma",
+      "additional_possible_outcomes": [
+        "morph-a"
+      ],
+      "source_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "dependence_groups": [
+        "independent-review-batch-03",
+        "mesh-review-set-004"
+      ]
+    },
+    {
+      "challenge_id": "challenge-orthogonal-beta-ambiguous",
+      "action_id": "orthogonal-measurement",
+      "scenario_id": "world-beta",
+      "additional_possible_outcomes": [
+        "orthogonal-A"
+      ],
+      "source_evidence_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "dependence_groups": [
+        "orthogonal-review-set-01"
+      ]
+    },
+    {
+      "challenge_id": "challenge-orthogonal-gamma-ambiguous",
+      "action_id": "orthogonal-measurement",
+      "scenario_id": "world-gamma",
+      "additional_possible_outcomes": [
+        "orthogonal-A"
+      ],
+      "source_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "dependence_groups": [
+        "orthogonal-review-set-02"
+      ]
+    }
+  ]
+}
