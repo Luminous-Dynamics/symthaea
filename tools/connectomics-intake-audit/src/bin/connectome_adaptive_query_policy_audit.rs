@@ -52,6 +52,8 @@ struct Input {
     joint_world_supports: Vec<JointWorldSupport>,
     #[serde(default)]
     support_challenges: Vec<SupportChallenge>,
+    #[serde(default)]
+    scenario_challenges: Vec<ScenarioExpansionChallenge>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -126,6 +128,22 @@ struct JointSupportAddition {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+struct ScenarioExpansionChallenge {
+    challenge_id: String,
+    challenger_evidence_sha256: String,
+    challenger_model_sha256: String,
+    additions: Vec<ScenarioWorldAddition>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ScenarioWorldAddition {
+    scenario: Scenario,
+    support: JointWorldSupport,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct JointOutcome {
     outcomes: Vec<ActionOutcome>,
 }
@@ -196,6 +214,26 @@ struct SupportChallengeResult {
 }
 
 #[derive(Debug, Serialize)]
+struct ScenarioExpansionResult {
+    challenge_id: String,
+    challenge_sha256: String,
+    expanded_scenario_set_sha256: String,
+    expanded_joint_support_sha256: String,
+    added_scenario_count: usize,
+    adaptive_worst_case_effort_before: Option<u64>,
+    adaptive_worst_case_effort_after: Option<u64>,
+    adaptive_status_before: String,
+    adaptive_status_after: String,
+    adaptive_effort_non_decreasing: bool,
+    fixed_minimum_effort_before: Option<u64>,
+    fixed_minimum_effort_after: Option<u64>,
+    fixed_status_before: String,
+    fixed_status_after: String,
+    fixed_effort_non_decreasing: bool,
+    monotonicity_passed: bool,
+}
+
+#[derive(Debug, Serialize)]
 struct Report {
     schema_version: u32,
     tool: &'static str,
@@ -224,6 +262,9 @@ struct Report {
     support_challenge_count: usize,
     support_challenges: Vec<SupportChallengeResult>,
     support_expansion_monotonicity_passed: bool,
+    scenario_challenge_count: usize,
+    scenario_challenges: Vec<ScenarioExpansionResult>,
+    hypothesis_expansion_monotonicity_passed: bool,
     policy: Option<PolicyNode>,
     out_of_model_observation_disposition: &'static str,
     expected_cost_claim: &'static str,
