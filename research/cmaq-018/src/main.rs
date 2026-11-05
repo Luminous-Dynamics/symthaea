@@ -1,3 +1,5 @@
+pub mod dacs1_vehicle;
+
 use std::fmt::Write as _;
 
 const SCHEMA: &str = "cmaq-018-counterfactual-branch-fidelity-v0.2";
