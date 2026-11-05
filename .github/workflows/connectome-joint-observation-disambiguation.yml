@@ -1,0 +1,51 @@
+name: Correlated joint connectome observation disambiguation
+
+on:
+  pull_request:
+    paths:
+      - "tools/connectomics-intake-audit/src/bin/connectome_joint_observation_disambiguation_audit.rs"
+      - "tools/connectomics-intake-audit/reference/verify_joint_observation_disambiguation_oracle.py"
+      - "docs/neuroscience/CONNECTOME_JOINT_OBSERVATION_SUPPORT.schema.json"
+      - "docs/neuroscience/CONNECTOME_JOINT_OBSERVATION_SUPPORT_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_JOINT_OBSERVATION_*.example.json"
+      - ".github/workflows/connectome-joint-observation-disambiguation.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "tools/connectomics-intake-audit/src/bin/connectome_joint_observation_disambiguation_audit.rs"
+      - "tools/connectomics-intake-audit/reference/verify_joint_observation_disambiguation_oracle.py"
+      - "docs/neuroscience/CONNECTOME_JOINT_OBSERVATION_SUPPORT.schema.json"
+      - "docs/neuroscience/CONNECTOME_JOINT_OBSERVATION_SUPPORT_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_JOINT_OBSERVATION_*.example.json"
+      - ".github/workflows/connectome-joint-observation-disambiguation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-joint-observation-plan:
+    name: Exact correlated joint-support planner and independent projection oracle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Check joint-support planner formatting
+        run: rustfmt --edition 2024 --check tools/connectomics-intake-audit/src/bin/connectome_joint_observation_disambiguation_audit.rs
+      - name: Run strict Clippy for joint-support planner
+        run: cargo clippy --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_joint_observation_disambiguation_audit -- -D warnings
+      - name: Run Rust joint-support planner tests
+        run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_joint_observation_disambiguation_audit
+      - name: Evaluate XOR complementarity fixture
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_joint_observation_disambiguation_audit -- --input docs/neuroscience/examples/CONNECTOME_JOINT_OBSERVATION_XOR.example.json --output "$RUNNER_TEMP/joint-xor-report.json"
+          python3 tools/connectomics-intake-audit/reference/verify_joint_observation_disambiguation_oracle.py --input docs/neuroscience/examples/CONNECTOME_JOINT_OBSERVATION_XOR.example.json --report "$RUNNER_TEMP/joint-xor-report.json"
+      - name: Evaluate shared-tuple negative control
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_joint_observation_disambiguation_audit -- --input docs/neuroscience/examples/CONNECTOME_JOINT_OBSERVATION_SHARED_TUPLE.example.json --output "$RUNNER_TEMP/joint-shared-tuple-report.json"
+          python3 tools/connectomics-intake-audit/reference/verify_joint_observation_disambiguation_oracle.py --input docs/neuroscience/examples/CONNECTOME_JOINT_OBSERVATION_SHARED_TUPLE.example.json --report "$RUNNER_TEMP/joint-shared-tuple-report.json"
+      - name: Verify independent oracle syntax
+        run: python3 -m py_compile tools/connectomics-intake-audit/reference/verify_joint_observation_disambiguation_oracle.py
