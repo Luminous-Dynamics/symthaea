@@ -552,6 +552,32 @@ fn percentile(values: &[u64], q: f64) -> Option<f64> {
     sorted.get(idx).copied().map(|x| x as f64)
 }
 
+fn task_manifest_digest(program_digest: &str, specification_digest: &str) -> String {
+    let mut bytes = Vec::with_capacity(program_digest.len() + specification_digest.len() + 1);
+    bytes.extend_from_slice(program_digest.as_bytes());
+    bytes.push(0);
+    bytes.extend_from_slice(specification_digest.as_bytes());
+    sha256(&bytes)
+}
+
+fn environment_policy_digest(programs: &[ProgramPair]) -> Result<String, String> {
+    let environments: BTreeSet<Vec<String>> = programs.iter().map(|program| vec![
+        program.rust_compiler_version.clone(),
+        program.rust_toolchain_sha256.clone(),
+        program.charon_version.clone(),
+        program.charon_source_commit.clone(),
+        program.charon_config_sha256.clone(),
+        program.aeneas_version.clone(),
+        program.aeneas_source_commit.clone(),
+        program.aeneas_config_sha256.clone(),
+        program.lean_toolchain.clone(),
+        program.lean_environment_sha256.clone(),
+    ]).collect();
+    let bytes = serde_json::to_vec(&environments)
+        .map_err(|e| format!("serialize Aegis environment policy: {e}"))?;
+    Ok(sha256(&bytes))
+}
+
 fn validate_all(
     snapshot: &Snapshot,
     programs: &[ProgramPair],
@@ -569,6 +595,37 @@ fn validate_all(
         ("attempts", input_digests[3].as_str()),
     ] {
         digest(d, &format!("input {name} JSONL digest"))?;
+    }
+    if snapshot.dataset_artifact_status == "available" {
+        if snapshot.program_pair_count != Some(programs.len())
+            || snapshot.candidate_specification_count != Some(specifications.len())
+            || snapshot.sample_entry_count != Some(sample.len())
+        {
+            return Err("snapshot declared counts differ from exact program/specification/sample ledgers".into());
+        }
+        if programs.len() != snapshot.paper_reference.validated_rust_lean_program_pairs
+            || specifications.len() != snapshot.paper_reference.candidate_specifications
+        {
+            return Err("available Aegis artifact does not match the published paper-v1 program/specification counts".into());
+        }
+        let selected_count = sample.iter().filter(|entry| entry.selected).count();
+        if selected_count != snapshot.paper_reference.evaluation_sample_size {
+            return Err(format!(
+                "selected sample count {selected_count} differs from the paper-v1 evaluation denominator {}",
+                snapshot.paper_reference.evaluation_sample_size
+            ));
+        }
+        let expected_task_manifest = task_manifest_digest(&input_digests[0], &input_digests[1]);
+        if snapshot.task_manifest_sha256.as_deref() != Some(expected_task_manifest.as_str()) {
+            return Err("snapshot task_manifest_sha256 does not bind program and specification ledgers".into());
+        }
+        if snapshot.sample_manifest_sha256.as_deref() != Some(input_digests[2].as_str()) {
+            return Err("snapshot sample_manifest_sha256 differs from the exact sample JSONL bytes".into());
+        }
+        let expected_environment_policy = environment_policy_digest(programs)?;
+        if snapshot.environment_policy_sha256.as_deref() != Some(expected_environment_policy.as_str()) {
+            return Err("snapshot environment_policy_sha256 differs from the exact program toolchain set".into());
+        }
     }
     let mut program_map = BTreeMap::<String, &ProgramPair>::new();
     for (i, program) in programs.iter().enumerate() {
