@@ -93,6 +93,7 @@ Metrics:
 - leakage rate: future-known forecast/realized records excluded / records matching the target set; target: **zero leakage**;
 - schedule fulfilment, unfulfilled MWh and booked balancing cost / gross trading revenue on the same field trace;
 - rolling-horizon regret against the best **implementable non-anticipative** policy;
+- non-anticipativity violations: **zero** across all shared information nodes; allow divergence only after the information frontier branches;
 - runtime, memory and solver gap;
 - strategy robustness under regime shift and distribution shift.
 
@@ -223,6 +224,7 @@ Start with a small, exact, hand-auditable corpus before scaling to thousands of 
 - **CREDIT-COVER-LIQUIDITY-STRESS-001 / CREDIT-COVER-LIQUIDITY-WATERFALL-001:** distinguish point-in-time treasury headroom from dated committed/forecast/stress cash paths; preserve peak cover shortfall and first operating-floor breach.
 - **FORECAST-VINTAGE-ASOF-001:** replay only forecast vintages actually available at a frozen decision timestamp; reject future publication and ambiguous/model-unscoped vintages.
 - **FORECAST-CALIBRATION-EXACT-001:** score one exact model build against later-known realized prices using exact median errors, quantile pinball loss, coverage and interval scores.
+- **NON-ANTICIPATIVITY-POLICY-AUDIT-001:** enforce identical actions across scenario paths sharing a source-digested decision-time information set; diverge only after the information tree branches.
 - **DISPATCH-EXECUTION-FIDELITY-001:** compare signed scheduled export/import energy with meter records and booked balancing settlement lines over a complete horizon.
 - **BMS-SOC-CAPABILITY-ENVELOPE-001:** assess charge/discharge power against separate conservative SOC-dependent capability curves; reject extrapolation and synthetic operational claims.
 - **REVENUE-REALIZATION-BRIDGE-001:** reconcile theoretical gross revenue to realized net cash using source-bound adjustments by forecast regret, availability, execution, balancing, market fees, degradation/warranty, financing/collateral and contract/curtailment; withhold a complete residual when a required category is missing.
@@ -244,6 +246,7 @@ These are **research targets**, not measured current performance or industry-cer
 | Material-risk recall | At least 95% on independently adjudicated corpus | 99%+ |
 | False-safe rate | 0 on finite hostile corpus | 0 on release gate; confidence intervals on field sample |
 | Forecast look-ahead leakage | 0 | 0 |
+| Shared-information action divergence | 0 violations | 0 violations on all scenario-tree nodes |
 | Execution evidence completeness | Report schedule, meter and settlement coverage independently | 100% for a scored complete field replay |
 | Unfulfilled energy delivery | Reproduce published M5BAT 238 kWh / 61-hour result on the same input trace | ≤ 120 kWh on the same 61-hour trace |
 | Balancing cost / trading revenue | Reproduce published 1.8% result on the same tariff and settlement scope | ≤ 1.0% on the same trace |
@@ -285,6 +288,6 @@ Never turn indeterminate, not_comparable or not_run into a numerical zero or a p
 
 ## 10. Current status
 
-The synthetic vendor roster remains **not executed**. Product capability claims are literature/documentation signals, not independent feature verification. Product versions, vendor access, solver builds and common adapters are not yet fully pinned. The benchmark corpus currently contains 41 cases: 30 kernel-tested and 11 `not_run`; mapped Rust test names are source-checked. The public M5BAT field dataset is identified (RWTH DOI 10.18154/RWTH-2025-06555), but its ZIP has not yet been staged, so the field replay and all M5BAT performance targets remain `not_run`. The Modo revenue-realization comparison is methodology-only; no same-cohort backtest has been executed. The current SAWEM rule profile keeps effective status, participant admission and commercial trading unknown.
+The synthetic vendor roster remains **not executed**. Product capability claims are literature/documentation signals, not independent feature verification. Product versions, vendor access, solver builds and common adapters are not yet fully pinned. The benchmark corpus currently contains 43 cases; the latest source/test mapping audit must be rerun on the exact current head. The public M5BAT field dataset is identified (RWTH DOI 10.18154/RWTH-2025-06555), but its ZIP has not yet been staged, so the field replay and all M5BAT performance targets remain `not_run`. The Modo revenue-realization comparison is methodology-only; no same-cohort backtest has been executed. The current SAWEM rule profile keeps effective status, participant admission and commercial trading unknown.
 
 The next useful result is a complete, independently hand-verified open reference case—not an ungrounded claim that one platform beats the market.
