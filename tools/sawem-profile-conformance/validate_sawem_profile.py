@@ -179,6 +179,7 @@ EXPECTED_CASE_IDS = {
     "FORECAST-VINTAGE-ASOF-001",
     "FORECAST-CALIBRATION-EXACT-001",
     "DISPATCH-EXECUTION-FIDELITY-001",
+    "BMS-SOC-CAPABILITY-ENVELOPE-001",
 }
 
 
@@ -317,6 +318,7 @@ def main() -> None:
     asof_replay_kernel_path = root / "tools/sawem-market-reference/src/asof_replay.rs"
     forecast_metrics_kernel_path = root / "tools/sawem-market-reference/src/forecast_metrics.rs"
     execution_fidelity_kernel_path = root / "tools/sawem-market-reference/src/execution_fidelity.rs"
+    bms_capability_kernel_path = root / "tools/sawem-market-reference/src/bms_capability.rs"
 
     try:
         schema_bytes = schema_path.read_bytes()
@@ -333,6 +335,7 @@ def main() -> None:
         asof_replay_kernel_bytes = asof_replay_kernel_path.read_bytes()
         forecast_metrics_kernel_bytes = forecast_metrics_kernel_path.read_bytes()
         execution_fidelity_kernel_bytes = execution_fidelity_kernel_path.read_bytes()
+        bms_capability_kernel_bytes = bms_capability_kernel_path.read_bytes()
         schema = json.loads(schema_bytes)
         fixture = json.loads(fixture_bytes)
         comparator_schema = json.loads(comparator_schema_bytes)
@@ -355,6 +358,8 @@ def main() -> None:
             + forecast_metrics_kernel_bytes
             + b"\n"
             + execution_fidelity_kernel_bytes
+            + b"\n"
+            + bms_capability_kernel_bytes
         ).decode("utf-8")
     except (OSError, json.JSONDecodeError) as exc:
         fail(f"cannot load schema or fixture: {exc}")
