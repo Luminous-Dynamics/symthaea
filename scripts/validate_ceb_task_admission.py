@@ -98,11 +98,19 @@ def validate_task(task: dict, schema: dict, format_checker: FormatChecker) -> li
         semantic.append("development task must explicitly disclose accepted public fix exposure")
     if task["family_id"] == "performance-correctness" and task["environment"]["workload_sha256"] is None:
         semantic.append("performance task requires a pinned workload digest")
-    if task["acceptance_contract"]["security_review_status"] == "failed":
+    security_review = task["acceptance_contract"]
+    qualification_states = ("static_reviewed", "execution_qualified", "admitted")
+    if security_review["security_review_status"] == "failed":
         semantic.append("failed security review blocks task admission")
-    if task["acceptance_contract"]["security_review_status"] == "passed" and task["task_status"] in ("static_reviewed", "execution_qualified", "admitted"):
-        if not task["acceptance_contract"]["security_review_record_sha256"] or not task["acceptance_contract"]["security_reviewer_id"]:
-            semantic.append("passed security review requires reviewer identity and record digest")
+    if task["task_status"] in qualification_states:
+        if security_review["security_review_status"] not in ("passed", "not_applicable"):
+            semantic.append("qualification requires a passed security review or explicitly justified not-applicable disposition")
+        if not security_review["security_review_record_sha256"] or not security_review["security_reviewer_id"]:
+            semantic.append("security disposition requires reviewer identity and review-record digest")
+        if not security_review["security_review_rationale"].strip():
+            semantic.append("security disposition requires a non-empty scope rationale")
+        if security_review["security_review_status"] == "not_applicable" and task["family_id"] == "security-correctness":
+            semantic.append("security-correctness tasks cannot declare security review not applicable")
     if task["acceptance_contract"]["destructive_side_effects"]:
         semantic.append("tasks with destructive external side effects are excluded from the pilot")
     if task["execution_qualification"]["candidate_code_executed"]:
@@ -187,7 +195,7 @@ def valid_fixture() -> dict:
       "task_spec":{"prompt_sha256":digest,"acceptance_spec_sha256":"d"*64,"authoring_protocol_version":"0.1.0",
        "blind_solve_review":{"status":"passed","reviewer_id":"blind-reviewer-01","review_record_sha256":digest,"instruction_only_sufficient":True}},
       "environment":{"rust_toolchain":"1.96.0","cargo_lock_sha256":digest,"target_triple":"x86_64-unknown-linux-gnu","feature_set":["default"],"environment_image_digest":"sha256:"+"e"*64,"resource_policy_sha256":digest,"network_policy":"disabled","replay_manifest_sha256":digest,"workload_sha256":None},
-      "acceptance_contract":{"contract_sha256":digest,"fail_to_pass_check_ids":["issue-acceptance-001"],"pass_to_pass_check_ids":["existing-regression-001"],"critical_invariants":["trait contract remains sound"],"security_review_status":"passed","destructive_side_effects":False,"security_review_record_sha256":digest,"security_reviewer_id":"security-reviewer-01"},
+      "acceptance_contract":{"contract_sha256":digest,"fail_to_pass_check_ids":["issue-acceptance-001"],"pass_to_pass_check_ids":["existing-regression-001"],"critical_invariants":["trait contract remains sound"],"security_review_status":"passed","security_review_rationale":"Reviewer assessed changed behavior, trust boundaries and relevant security invariants.","destructive_side_effects":False,"security_review_record_sha256":digest,"security_reviewer_id":"security-reviewer-01"},
       "oracle":{"reviewers":[{"reviewer_id":"gold-reviewer-01","role":"gold_reviewer","review_record_sha256":digest,"decision":"accept"},{"reviewer_id":"gold-reviewer-02","role":"gold_reviewer","review_record_sha256":digest,"decision":"accept"}],"blinded_to_candidate_output":True,"llm_only_oracle":False,"disagreement_status":"none","adjudicator_id":None,"adjudication_record_sha256":None,"adjudication_decision":"not_needed","gold_patch_sha256":digest,"semantically_equivalent_repairs_allowed":True,"reference_patch_control":"not_run_blocked","empty_patch_control":"not_run_blocked","oracle_record_sha256":digest},
       "custody":{"partition":"development","custody_domain_id":"dev-custody-01","custodian_id":"custodian-01","custody_manifest_sha256":digest,"holdout_material_outside_agent_workspace":False,"agent_access_before_freeze":False,"public_fix_exposure_accepted":True},
       "execution_qualification":{"candidate_code_executed":False,"isolation_status":"blocked_issue_10064","isolation_profile_sha256":None,"trust_status":"blocked_issue_10369","trust_policy_sha256":None,"independent_regrade_claimed":False},
@@ -205,6 +213,28 @@ def self_test(registry: dict, registry_schema: dict, task_schema: dict, format_c
         errors = validate_task(mutant, task_schema, format_checker)
         if not errors:
             raise SystemExit(f"task-admission negative control unexpectedly passed: {label}")
+
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "static_reviewed"
+    mutant["acceptance_contract"]["security_review_status"] = "not_reviewed"
+    must_reject(mutant, "qualification with unreviewed security disposition")
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "static_reviewed"
+    mutant["acceptance_contract"]["security_review_status"] = "not_applicable"
+    mutant["acceptance_contract"]["security_review_rationale"] = ""
+    must_reject(mutant, "not-applicable security disposition without rationale")
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "static_reviewed"
+    mutant["family_id"] = "security-correctness"
+    mutant["acceptance_contract"]["security_review_status"] = "not_applicable"
+    mutant["acceptance_contract"]["security_review_rationale"] = "The reviewer claims this security task has no security-relevant scope."
+    must_reject(mutant, "security-correctness family marked security review not applicable")
+    positive_na = copy.deepcopy(fixture)
+    positive_na["task_status"] = "static_reviewed"
+    positive_na["acceptance_contract"]["security_review_status"] = "not_applicable"
+    positive_na["acceptance_contract"]["security_review_rationale"] = "This task's defined change scope was reviewed and found not to affect security properties."
+    if validate_task(positive_na, task_schema, format_checker):
+        raise SystemExit("justified not-applicable security review positive control unexpectedly failed")
 
     mutant = copy.deepcopy(fixture)
     mutant["repository"]["source_revision"] = "main"
