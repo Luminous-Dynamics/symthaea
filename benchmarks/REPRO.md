@@ -107,3 +107,50 @@ The page describes highest reasoning effort in each model's native harness, thre
 
 This dated hidden-set snapshot is descriptive context only. It is not a Luminous baseline, is not the public 29-task development leaderboard mean, and is not the separate competition-entry development score based on committed artifacts plus a live sample check. Reproduce the exact official public development protocol before making matched claims. Never use hidden-test scores as a target for tuning or claim a local improvement from a different split/harness.
 
+
+## BenchCAD 2.0 — metadata-only / evaluation-gated
+
+Official references:
+- [BenchCAD 2.0](https://benchcad.com/benchcad-2)
+- [Official v2 repository](https://github.com/BenchCAD-org/benchcad-2-main)
+- [Public 100-case set and terms](https://huggingface.co/datasets/BenchCAD/benchcad-2.0-public)
+- [Core access agreement](https://benchcad.com/access)
+
+### Task coverage
+
+BenchCAD 2.0 has six task families:
+1. Dimensioned drawing → part.
+2. Supplied STEP parts + assembly drawing → placed assembly.
+3. Four rendered views → part.
+4. Rendered views of a mechanism → individual parts + assembly.
+5. Part drawings + supplied parts + assembly drawing → parts + assembly.
+6. Six PCB renders → ECAD wiring/schematic graph.
+
+The public set contains 100 cases (21, 14, 23, 27, 6 and 9 across those task families). A separate 100-case Core set is the held-out source of published scores; its task-family distribution is not copied into this registry. The public and Core sets do not overlap.
+
+### Published v2.0 baseline
+
+The official 2026-10-12 report gives GPT-6 Astra at max effort 0.59 on Core (about $11/case, 135k tokens/case and 62 minutes median) and Claude Opus 5.5 at max effort 0.57 (about $28/case, 1.3M tokens/case and 3.7 hours median). These are v2.0 results, not the current v2.1 protocol.
+
+The v2.0 published setting uses 30 rounds per case and does not carry reasoning between rounds. Claude reference lines are single runs; GPT-6 Astra is a three-run mean except ECAD T6, which has one run. Preserve per-task/per-model repetition differences.
+
+The repository's current v2.1 uses reasoning carried across rounds, 60 rounds and a 500,000 output-token budget per case. The maintainers explicitly say v2.1 results are not comparable with v2.0. Do not run from a floating `main` ref and call it a reproduction; pin the release tag and record all pinned revisions and scorer digests.
+
+### What the benchmark reveals
+
+Its automated reference scoring separates part geometry/topology, assembly placement, and PCB wiring connectivity. The report highlights that assembly outputs often have the right parts but wrong poses: 83–96% of zero-scoring part types in the evaluated assembly tasks had the correct shape in the wrong place. It also reports connection recovery below component recovery on boards; in the max-effort snapshot, GPT-6 Astra found 80% of board connections and Claude Opus 5.5 found 68%. The report describes serious power-rail merge/split errors and notes that the model runs did not test for shorts or opens.
+
+These observations motivate Luminous work on exact assembly datum/pose constraints, component identity, connectivity graphs, and independent short/open checks. They do not mean that a high geometry score proves manufacturability, electrical safety, signal integrity or physical function. BenchCAD 2.0 does not score manufacturing readiness or physical performance.
+
+### Access and execution restrictions
+
+- The public 100-case set is available only after accepting evaluation-only terms. Scores on this set are explicitly not reportable.
+- The public terms prohibit training, fine-tuning, distillation, RL-environment construction, pre-training/retrieval/search inclusion, redistribution/mirroring, and posting cases, drawings, renders or reference answers. Preserve the canary in any permitted local copy.
+- Core's 100 held-out cases require a separate evaluation-only agreement. Do not retrieve them before access and the Luminous isolation/custody gates are qualified.
+- The official repository README documents `tools/run_core.sh` and requires Docker, a Hugging Face account, and a model API key. It executes a sandbox, provider calls and task code; no such run is authorized here.
+- Exact runner revision, dataset revision and scorer digest must be pinned from the chosen release before reproduction. Dataset revision remains null in the metadata registry because it has not yet been verified.
+- The Git repository does not visibly declare a code licence in its top-level metadata. Do not assume a licence or redistribute runner code until maintainers' terms are verified.
+- No Luminous CAD/assembly/ECAD task has been downloaded, run, or scored.
+
+The initial registry entry is metadata-only / access-gated. It establishes a comparator and execution plan, not a local score or a qualification result.
+
