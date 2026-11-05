@@ -31,7 +31,7 @@ pub enum LiquidityCashEventKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LiquidityCashEvent<'a> {
-    pub event_id: Option<&'a str>,
+    pub event_id: &'a str,
     pub source_ref: &'a str,
     pub day_ordinal: i32,
     pub minute_of_day: u16,
@@ -88,7 +88,7 @@ pub enum LiquidityWaterfallError {
 pub struct LiquidityBreachPoint<'a> {
     pub day_ordinal: i32,
     pub minute_of_day: u16,
-    pub event_id: &'a str,
+    pub event_id: Option<&'a str>,
     pub cash_balance_minor_zar: i128,
 }
 
@@ -712,7 +712,10 @@ mod tests {
         let LiquidityWaterfallResult::Determined(result) = result else {
             panic!("deadline is within the projection horizon");
         };
-        assert_eq!(result.committed.cash_at_cover_deadline_minor_zar, 50_000_000);
+        assert_eq!(
+            result.committed.cash_at_cover_deadline_minor_zar,
+            50_000_000
+        );
         assert_eq!(result.committed.end_cash_minor_zar, 75_000_000);
     }
 
