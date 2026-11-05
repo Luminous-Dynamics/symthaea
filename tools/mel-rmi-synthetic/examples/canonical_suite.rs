@@ -182,7 +182,7 @@ fn write_trial_event_rows<W: Write>(
         let action = &record.actions[index];
         let partner_output = partner_outputs.map(|outputs| outputs[index]);
         let contrast = record.contrast;
-        let mut fields = vec![
+        let fields = vec![
             csv_cell(record_kind),
             csv_cell(&record.task.task_id),
             csv_cell(&record.manifest.session_id),
@@ -231,7 +231,7 @@ fn write_trial_event_rows<W: Write>(
                 .unwrap_or_default(),
         ];
         // Keep a fixed column contract even when the reverse direction is N/A.
-        if fields.len() != 41 {
+        if fields.len() != 40 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "trial event row column count mismatch",
