@@ -222,6 +222,17 @@ def main() -> None:
         fail("minimum stable charging point exceeds maximum continuous charging rating")
     if unit["min_stored_energy_mwh"] >= unit["max_stored_energy_mwh"]:
         fail("minimum stored energy must be below maximum stored energy")
+    transitions = unit["mode_transition_seconds"]
+    required_transition_keys = {
+        "standstill_to_charging",
+        "standstill_to_discharging",
+        "charging_to_standstill",
+        "discharging_to_standstill",
+        "charging_to_discharging",
+        "discharging_to_charging",
+    }
+    if set(transitions) != required_transition_keys:
+        fail("all six directed transitions between standstill, charging and discharging must be present")
 
     constraints = fixture["energy_constraints"]
     declared = constraints["daily_declared_energy_mwh"]
@@ -256,6 +267,44 @@ def main() -> None:
     reserve_products = [item["product"] for item in period["reserve_commitments"]]
     if len(reserve_products) != len(set(reserve_products)):
         fail("duplicate reserve products are not allowed in this fixture")
+    reserve_keys = [(item["product"], item["direction"]) for item in period["reserve_commitments"]]
+    if len(reserve_keys) != len(set(reserve_keys)):
+        fail("duplicate reserve product/direction pairs are not allowed")
+    for reserve in period["reserve_commitments"]:
+        product = reserve["product"]
+        direction = reserve["direction"]
+        if product in {"instantaneous_reserve", "ten_minute_reserve"} and direction != "up":
+            fail(f"{product} direction is not supported by the declared SAWEM Rev 2.3 profile")
+        start = reserve["start_response_seconds"]
+        full = reserve["full_activation_seconds"]
+        obligation_sustain = reserve["sustain_duration_seconds"]
+        proven_sustain = reserve["proven_sustain_seconds"]
+        if product == "regulating_reserve":
+            if start is None or start > 10:
+                fail("regulating reserve must begin response within 10 seconds")
+            if full is None or full > 600:
+                fail("regulating reserve must fully activate within 10 minutes")
+        elif product == "instantaneous_reserve":
+            if full is None or full > 10:
+                fail("instantaneous reserve must fully activate within 10 seconds")
+            if obligation_sustain is None or obligation_sustain < 600:
+                fail("instantaneous reserve must carry at least 10 minutes of sustain obligation")
+        elif product == "ten_minute_reserve":
+            if full is None or full > 600:
+                fail("ten-minute reserve must fully respond within 10 minutes")
+            # The Code definition does not set a sustain duration. Do not invent one.
+        if obligation_sustain is not None and (
+            proven_sustain is None or proven_sustain < obligation_sustain
+        ):
+            fail("asset-proven reserve sustain is missing or shorter than the operational obligation")
+        if reserve["capability_class"] != "synthetic":
+            fail("synthetic reference must not promote reserve capability to a certified class")
+        if reserve["response_evidence_class"] not in {"synthetic", "unknown"}:
+            fail("synthetic reserve response evidence cannot be promoted")
+        if reserve["sustain_evidence_class"] not in {"synthetic", "unknown"}:
+            fail("synthetic reserve sustain evidence cannot be promoted")
+        if reserve["response_evidence_ref"] is not None or reserve["sustain_evidence_ref"] is not None:
+            fail("synthetic reserve entries cannot carry purported live evidence references")
     if set(reserve_products) != {
         "regulating_reserve",
         "instantaneous_reserve",
