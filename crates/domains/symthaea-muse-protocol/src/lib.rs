@@ -569,6 +569,79 @@ pub struct GenealogyManifest {
     pub created_at_unix_ms: u64,
 }
 
+/// Semantic type of one source-to-result genealogy edge.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GenealogyEdgeKindV1 {
+    /// The result is derived from the source artifact.
+    DerivedFrom,
+    /// The source contributed motif material to the result.
+    MotifContribution,
+    /// The source contributed arrangement or orchestration material.
+    ArrangementContribution,
+    /// The source provides a performance/rendition reference.
+    PerformanceSource,
+    /// The source is a reference only and is not asserted as a derivation.
+    ReferenceOnly,
+}
+
+/// Requested immutable parent edge when allocating a derived artifact.
+///
+/// Contributor and authority references are opaque identifiers. Recording
+/// them does not authenticate a person, verify a signature, prove consent,
+/// or establish authorship.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GenealogyParentInputV1 {
+    /// Existing parent genealogy manifest.
+    pub parent_manifest_id: i64,
+    /// Why this parent is connected to the derived artifact.
+    pub kind: GenealogyEdgeKindV1,
+    /// Session/event that records this contribution, when available.
+    pub source_event_id: Option<String>,
+    /// Opaque contributor reference; not an authenticated identity claim.
+    pub contributor_ref: Option<String>,
+    /// Opaque authority receipt reference; not a verified consent claim.
+    pub authority_receipt_ref: Option<String>,
+    /// Caller-supplied idempotency identity for this parent edge.
+    pub idempotency_key: String,
+}
+
+/// One persisted source-to-result genealogy edge.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GenealogyParentEdgeV1 {
+    /// SQLite row ID.
+    pub id: i64,
+    /// Parent/source manifest.
+    pub parent_manifest_id: i64,
+    /// Derived/result manifest.
+    pub child_manifest_id: i64,
+    /// Why the source is connected to the result.
+    pub kind: GenealogyEdgeKindV1,
+    /// Session/event that records this contribution, when available.
+    pub source_event_id: Option<String>,
+    /// Opaque contributor reference; not an authenticated identity claim.
+    pub contributor_ref: Option<String>,
+    /// Opaque authority receipt reference; not a verified consent claim.
+    pub authority_receipt_ref: Option<String>,
+    /// Idempotency identity for this edge.
+    pub idempotency_key: String,
+    /// Domain-separated SHA-256 commitment to the edge and both manifests.
+    pub edge_sha256: String,
+    /// Operational creation time; not part of musical identity.
+    pub created_at_unix_ms: u64,
+}
+
+/// Independently reverified multi-parent lineage projection for one manifest.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GenealogyLineageVerificationV1 {
+    /// The existing compatible manifest DTO.
+    pub manifest: GenealogyManifest,
+    /// All immutable source edges for the manifest.
+    pub parent_edges: Vec<GenealogyParentEdgeV1>,
+    /// Commitment to the complete, sorted parent-edge set.
+    pub lineage_sha256: String,
+}
+
 /// Reference from one RMI interaction edge to the exact keeper artifacts that
 /// were independently re-read and matched against a stored genealogy manifest.
 ///
