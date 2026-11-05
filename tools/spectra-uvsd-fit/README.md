@@ -219,3 +219,12 @@ The scenario ladder includes:
 Signal/noise trials are exactly balanced and their order is shuffled by a second deterministic SplitMix64/Fisher–Yates schedule stream keyed by the campaign seed. The same balanced action schedule is reused across DGP scenarios for each replicate, so class is not tied to trial parity or a fixed block order. The action set keeps the same experimenter-controlled stimulus level, condition and response scale. Each generated dataset contains one participant-session. The adapter keeps that participant as the fit unit; it never pools participants. Oracle mu/sigma are extracted only after fitting (or after a missingness abstention) for known-truth scoring and are never input to the adapter or fitter.
 
 This runner is a first recovery/smoke harness. It does not calibrate Wald intervals, equal-vs-unequal likelihood-ratio tests, familywise false-positive rates or sequential stopping. Heavy tails, lapses and criterion drift are explicit misspecification tracks; their RMSE must not be mixed into the correctly specified Gaussian recovery aggregate. Missing-category scenarios are expected to abstain, not to fit a complete-case subset. All results remain synthetic and exploratory until exact-head Rust verification and larger held-out campaigns are run.
+
+
+## Category-resolved UVSD goodness-of-fit diagnostics (experimental)
+
+The `gof` module computes fitted multinomial expectations for the ordered noise and signal category cells using the same stable standard-normal log-interval routine as the UVSD likelihood. It preserves observed class totals and emits per-category observed/expected counts and standardized Pearson residuals, per-class Pearson X² and likelihood-ratio deviance G², minimum expected cells, and counts of expected cells below 5 and below 1.
+
+For K response categories and a regular interior single-observer UVSD with K-1 fitted criteria plus mu and sigma, the nominal residual degrees of freedom are `K - 3`. For K ≤ 3, the output explicitly reports `NoPositiveResidualDegreesOfFreedom`.
+
+**No p-value or model-adequacy pass is emitted.** The statistics are descriptive discrepancy measures; sparse cells and degrees-of-freedom limitations are preserved rather than hidden. The asymptotic chi-square reference is not assumed to be calibrated for small or sparse samples. A separate parametric-bootstrap goodness-of-fit test, with refitting and complete failure accounting, is required before a model-adequacy decision can veto an experiment.

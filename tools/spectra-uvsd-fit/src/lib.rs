@@ -1756,3 +1756,6 @@ pub mod score_bounds;
 
 /// Fail-closed conversion of observed category counts into UVSD fitter tables.
 pub mod observation_table_adapter;
+
+/// Category-resolved descriptive multinomial adequacy diagnostics for UVSD.
+pub mod gof;
