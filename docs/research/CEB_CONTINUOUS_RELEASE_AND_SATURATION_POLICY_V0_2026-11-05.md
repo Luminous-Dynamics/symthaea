@@ -49,7 +49,7 @@ A task that is invalid, flaky, refused or incompatible is also retained with an 
 
 Before a matched experiment, measure infrastructure behavior separately from agent behavior.
 
-The proposed resource-calibration slice uses at least ten independent reference-task trials per environment. Record:
+The proposed resource-calibration slice uses at least three representative reference tasks per environment and at least ten independent repeats per reference task. It must report the number of tasks and the minimum repeated-trial count separately; ten aggregate runs across an environment are not sufficient. Record:
 - worker/image identity and resource policy;
 - CPU, memory, disk and network saturation;
 - wall-clock distribution and p95 runtime;
