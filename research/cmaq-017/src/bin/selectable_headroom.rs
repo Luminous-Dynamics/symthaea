@@ -20,7 +20,6 @@ const COUPLING_CONTINUATIONS: usize = 128;
 struct CandidateProfile {
     expected_value: f64,
     common_loading: f64,
-    local_scale: f64,
     interaction_scale: f64,
 }
 
@@ -28,9 +27,11 @@ fn candidate_profile(candidate_id: usize) -> CandidateProfile {
     let index = candidate_id as f64;
     CandidateProfile {
         expected_value: 0.80 - 0.009 * index,
-        common_loading: 0.035 + 0.0025 * index,
-        local_scale: 0.025 + 0.0065 * index,
-        interaction_scale: 0.012 + 0.0030 * index,
+        // The shared continuation main effect has equal loading across candidates.
+        common_loading: 0.035,
+        // Residual variation is a candidate-by-continuation interaction, not a
+        // separate candidate-local main effect.
+        interaction_scale: 0.015 + 0.008 * index,
     }
 }
 
@@ -62,17 +63,15 @@ fn rademacher(seed: u64, candidate_id: usize, continuation_id: usize, component:
     if rng.next_u64() & 1 == 0 { -1.0 } else { 1.0 }
 }
 
-/// One realized continuation outcome. The three noise sources are distinct:
-/// a causally shared world factor, a candidate-local residual, and a
-/// candidate-by-continuation interaction term.
+/// One realized continuation outcome with a three-way decomposition:
+/// candidate expected-value main effect, shared continuation main effect,
+/// and candidate-by-continuation interaction.
 fn continuation_outcome(seed: u64, candidate_id: usize, continuation_id: usize) -> f64 {
     let profile = candidate_profile(candidate_id);
     let shared_world = rademacher(seed, 0, continuation_id, 0);
-    let candidate_local = rademacher(seed, candidate_id, continuation_id, 1);
-    let candidate_continuation = rademacher(seed, candidate_id, continuation_id, 2);
+    let candidate_continuation = rademacher(seed, candidate_id, continuation_id, 1);
     profile.expected_value
         + profile.common_loading * shared_world
-        + profile.local_scale * candidate_local
         + profile.interaction_scale * candidate_continuation
 }
 
@@ -189,7 +188,6 @@ fn evaluate_condition(
 struct VarianceDecomposition {
     candidate_mean_variance: f64,
     shared_continuation_variance: f64,
-    candidate_local_variance: f64,
     candidate_continuation_interaction_variance: f64,
 }
 
@@ -211,11 +209,6 @@ fn variance_decomposition(candidate_count: usize) -> VarianceDecomposition {
         shared_continuation_variance: profiles
             .iter()
             .map(|profile| profile.common_loading.powi(2))
-            .sum::<f64>()
-            / profiles.len() as f64,
-        candidate_local_variance: profiles
-            .iter()
-            .map(|profile| profile.local_scale.powi(2))
             .sum::<f64>()
             / profiles.len() as f64,
         candidate_continuation_interaction_variance: profiles
@@ -420,11 +413,10 @@ mod tests {
     }
 
     #[test]
-    fn variance_decomposition_keeps_shared_local_and_interaction_noise_separate() {
+    fn variance_decomposition_keeps_candidate_shared_continuation_and_interaction_effects_separate() {
         let result = variance_decomposition(32);
         assert!(result.candidate_mean_variance > 0.0);
         assert!(result.shared_continuation_variance > 0.0);
-        assert!(result.candidate_local_variance > 0.0);
         assert!(result.candidate_continuation_interaction_variance > 0.0);
     }
 }
