@@ -626,7 +626,7 @@ fn run_self_tests() -> Result<(), String> {
     Ok(())
 }
 
-fn synthetic_report() -> Result<Report, String> {
+fn synthetic_report_and_receipt() -> Result<(Report, TaskReceipt), String> {
     let full = Database { sorries: vec![
         synthetic_record("task-a", &"1".repeat(40)),
         synthetic_record("task-b", &"2".repeat(40)),
@@ -653,7 +653,8 @@ fn synthetic_report() -> Result<Report, String> {
         serde_json::to_vec(&receipt).map_err(|e| e.to_string())?,
         b"\n".to_vec(),
     ].concat();
-    verify(&full_bytes, &split_bytes, &provenance_bytes, &receipt_bytes)
+    let report = verify(&full_bytes, &split_bytes, &provenance_bytes, &receipt_bytes)?;
+    Ok((report, receipt))
 }
 
 fn execute() -> Result<(), String> {
@@ -663,11 +664,16 @@ fn execute() -> Result<(), String> {
         println!("PITB_SORRYDB_INTEGRITY_SELF_TEST_PASS");
         return Ok(());
     }
-    if args.len() == 3 && args[1] == "--self-test-report" {
+    if args.len() == 4 && args[1] == "--self-test-report" {
         run_self_tests()?;
-        let report = synthetic_report()?;
-        let bytes = serde_json::to_vec_pretty(&report).map_err(|e| format!("serialize synthetic report: {e}"))?;
-        fs::write(&args[2], bytes).map_err(|e| format!("write synthetic report: {e}"))?;
+        let (report, receipt) = synthetic_report_and_receipt()?;
+        let report_bytes = serde_json::to_vec_pretty(&report).map_err(|e| format!("serialize synthetic report: {e}"))?;
+        fs::write(&args[2], report_bytes).map_err(|e| format!("write synthetic report: {e}"))?;
+        let receipt_bytes = [
+            serde_json::to_vec(&receipt).map_err(|e| format!("serialize synthetic receipt: {e}"))?,
+            b"\n".to_vec(),
+        ].concat();
+        fs::write(&args[3], receipt_bytes).map_err(|e| format!("write synthetic receipt: {e}"))?;
         println!("PITB_SORRYDB_INTEGRITY_SYNTHETIC_REPORT_OK");
         return Ok(());
     }
