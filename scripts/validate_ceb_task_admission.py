@@ -54,6 +54,8 @@ def validate_task(task: dict, schema: dict, format_checker: FormatChecker) -> li
     if not task["task_spec"]["blind_solve_review"]["instruction_only_sufficient"] and task["task_status"] != "proposed":
         semantic.append("task instructions must be sufficient without access to the fix diff")
     if task["custody"]["partition"] == "holdout":
+        if task["source"]["fix_visibility"] not in ("private", "not_published"):
+            semantic.append("holdout requires private or not-published fix visibility; unknown is not sealed")
         if task["source"]["fix_visibility"] == "public":
             semantic.append("publicly visible fix cannot be admitted as sealed holdout")
         if task["custody"]["agent_access_before_freeze"]:
@@ -78,6 +80,12 @@ def validate_task(task: dict, schema: dict, format_checker: FormatChecker) -> li
     if task["execution_qualification"]["isolation_status"] == "qualified":
         if not task["execution_qualification"]["isolation_profile_sha256"]:
             semantic.append("qualified isolation requires a policy/profile digest")
+    if task["execution_qualification"]["isolation_status"] != "qualified" and not task["execution_qualification"]["candidate_code_executed"]:
+        if task["oracle"]["reference_patch_control"] != "not_run_blocked" or task["oracle"]["empty_patch_control"] != "not_run_blocked":
+            semantic.append("reference/empty-patch controls must remain not_run_blocked until isolation is qualified")
+    if task["task_status"] in ("static_reviewed", "execution_qualified", "admitted"):
+        if any(row["decision"] != "accept" for row in reviewers if row["role"] == "gold_reviewer"):
+            semantic.append("static review requires two accepting gold-reviewer decisions")
     if task["execution_qualification"]["trust_status"] == "qualified" and not task["execution_qualification"]["trust_policy_sha256"]:
         semantic.append("qualified trust status requires a trust-policy digest")
     if task["execution_qualification"]["independent_regrade_claimed"]:
@@ -86,9 +94,9 @@ def validate_task(task: dict, schema: dict, format_checker: FormatChecker) -> li
     controls = task["oracle"]
     if task["task_status"] in ("execution_qualified", "admitted"):
         if controls["reference_patch_control"] != "pass":
-            semantic.append("execution-qualified task requires reference-patch control pass")
-        if controls["empty_patch_control"] != "pass":
-            semantic.append("execution-qualified task requires empty-patch control pass")
+            semantic.append("two-sided oracle gate requires reference-patch control pass")
+        if controls["empty_patch_control"] != "fail":
+            semantic.append("two-sided oracle gate requires empty-patch control fail")
         if task["execution_qualification"]["isolation_status"] != "qualified":
             semantic.append("execution-qualified task requires qualified isolation")
     if task["task_status"] == "admitted":
@@ -117,6 +125,14 @@ def validate_registry(registry: dict, registry_schema: dict, task_schema: dict, 
     task_ids = [task.get("task_id") for task in registry["tasks"]]
     if len(task_ids) != len(set(task_ids)):
         errors.append("duplicate task_id")
+    quota_by_family = {row["family_id"]: row["target_tasks"] for row in registry["family_targets"]}
+    counts_by_family: dict[str, int] = {}
+    for task in registry["tasks"]:
+        family = task.get("family_id")
+        counts_by_family[family] = counts_by_family.get(family, 0) + 1
+    for family, count in counts_by_family.items():
+        if family not in quota_by_family or count > quota_by_family[family]:
+            errors.append(f"task family {family} exceeds or lacks a declared quota")
     if registry["status"] == "intake_contract_only_no_tasks_admitted" and registry["actual_task_count"] != 0:
         errors.append("intake-only V0 cannot claim actual task records")
     if registry["actual_task_count"] == 0 and registry["status"] != "intake_contract_only_no_tasks_admitted":
@@ -186,6 +202,20 @@ def self_test(registry: dict, registry_schema: dict, task_schema: dict, format_c
     mutant["oracle"]["empty_patch_control"] = "pass"
     mutant["execution_qualification"]["isolation_status"] = "blocked_issue_10064"
     must_reject(mutant, "execution before OS isolation qualification")
+
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "execution_qualified"
+    mutant["oracle"]["reference_patch_control"] = "pass"
+    mutant["oracle"]["empty_patch_control"] = "pass"
+    mutant["execution_qualification"]["isolation_status"] = "qualified"
+    mutant["execution_qualification"]["isolation_profile_sha256"] = "f" * 64
+    must_reject(mutant, "empty patch incorrectly passes the two-sided oracle gate")
+
+    mutant = copy.deepcopy(fixture)
+    mutant["custody"]["partition"] = "holdout"
+    mutant["custody"]["holdout_material_outside_agent_workspace"] = True
+    mutant["source"]["fix_visibility"] = "unknown"
+    must_reject(mutant, "unknown fix visibility treated as sealed holdout")
     mutant = copy.deepcopy(fixture)
     mutant["execution_qualification"]["candidate_code_executed"] = True
     must_reject(mutant, "candidate code executed without isolation")
