@@ -125,8 +125,6 @@
         "fix_visibility",
         "solution_leakage_review",
         "contamination_card_id",
-        "contamination_card_sha256",
-        "contamination_card_id",
         "contamination_card_sha256"
       ],
       "properties": {
@@ -357,6 +355,7 @@
         "pass_to_pass_check_ids",
         "critical_invariants",
         "security_review_status",
+        "security_review_rationale",
         "destructive_side_effects",
         "security_review_record_sha256",
         "security_reviewer_id"
@@ -399,6 +398,10 @@
             "failed",
             "not_applicable"
           ]
+        },
+        "security_review_rationale": {
+          "type": "string",
+          "minLength": 20
         },
         "destructive_side_effects": {
           "type": "boolean"
