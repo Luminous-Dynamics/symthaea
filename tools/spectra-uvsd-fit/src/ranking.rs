@@ -19,8 +19,8 @@ use std::fmt;
 
 use super::scenario::{RobustUtility, ScenarioDefinition};
 use super::score_bounds::{
-    ScoreBoundsReceipt, ANYTIME_ALPHA_SPENDING_RULE_ID, ANYTIME_SCORE_BOUND_METHOD_ID,
-    SCORE_BOUND_METHOD_ID,
+    verify_score_bounds_receipt, ScoreBoundsReceipt, ANYTIME_ALPHA_SPENDING_RULE_ID,
+    ANYTIME_SCORE_BOUND_METHOD_ID, SCORE_BOUND_METHOD_ID,
 };
 
 /// Robust-utility interval for one operational action.
@@ -76,6 +76,7 @@ pub enum RobustSelectionError {
     MissingMetricRecord,
     InvalidUtilityInterval,
     InvalidScoreReceiptProvenance,
+    ScoreReceiptRecomputationFailed,
     NumericFailure,
 }
 
@@ -95,6 +96,7 @@ impl fmt::Display for RobustSelectionError {
             Self::MissingMetricRecord => "utility interval is missing for a frozen action × scenario pair",
             Self::InvalidUtilityInterval => "target-utility interval must be finite, ordered and inside its declared range",
             Self::InvalidScoreReceiptProvenance => "score receipt method, digests, multiplicity or familywise confidence are inconsistent",
+            Self::ScoreReceiptRecomputationFailed => "score receipt bounds or outputs do not reproduce from its raw Monte Carlo samples",
             Self::NumericFailure => "robust utility aggregation or selection certificate was not finite",
         };
         f.write_str(message)
@@ -232,6 +234,8 @@ pub fn certify_epsilon_optimal_action(
     if by_pair.len() != expected_metrics {
         return Err(RobustSelectionError::MissingMetricRecord);
     }
+    verify_score_bounds_receipt(receipt)
+        .map_err(|_| RobustSelectionError::ScoreReceiptRecomputationFailed)?;
 
     let mut action_intervals = Vec::with_capacity(action_ids.len());
     for action_id in action_ids.iter().copied() {
@@ -599,6 +603,24 @@ mod tests {
         assert_eq!(
             certificate.status,
             RobustSelectionStatus::CertifiedWithinIndifferenceZone
+        );
+    }
+
+    #[test]
+    fn selection_refuses_tampered_utility_interval_even_when_ordered() {
+        let (mut receipt, _) = bounded_receipt(
+            &[
+                (1, 10, 0.9),
+                (1, 20, 0.9),
+                (2, 10, 0.1),
+                (2, 20, 0.1),
+            ],
+            500,
+        );
+        receipt.metrics[0].target_utility.lower_bound += 0.01;
+        assert_eq!(
+            certify_epsilon_optimal_action(&receipt, RobustUtility::Maximin, 0.2),
+            Err(RobustSelectionError::ScoreReceiptRecomputationFailed)
         );
     }
 
