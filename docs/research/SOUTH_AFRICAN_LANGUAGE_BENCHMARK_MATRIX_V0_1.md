@@ -304,3 +304,35 @@ Consequences:
 
 Dataset card: https://huggingface.co/datasets/sello-ralethe/Multi-Hall-SA  
 Paper: https://aclanthology.org/2026.findings-eacl.330/
+
+## 8. New international comparators and detector method track
+
+### Poly-FEVER — translated multilingual factuality
+
+[Poly-FEVER (Findings EMNLP 2026)](https://aclanthology.org/2026.findings-emnlp.540/) aligns 77,973 Supported/Refuted claims across 11 languages, extending FEVER, Climate-FEVER and SciFact. It uses Google Cloud Translation with targeted human validation, prompt variation and DPR retrieval over Wikipedia.
+
+Use this as a broad **translated-claim** comparator, distinct from Multi-Hall-SA's parallel government-document facts. Pin exact data revision/digests, splits and upstream source rights. Report translation quality/lineage as a separate factor; do not combine Poly-FEVER and Multi-Hall-SA into one score.
+
+Dataset: https://huggingface.co/datasets/HanzhiZhang/Poly-FEVER
+
+### MultiHaluDet — hidden-state probing
+
+[MultiHaluDet (MeLLM 2026)](https://aclanthology.org/2026.mellm-1.6/) uses full hidden-state trajectories from frozen models with a calibrated stacked detector. The paper reports up to 98.55% AUROC on English HaluEval/TriviaQA using Mistral-7B and LLaMA2-7B, with transfer experiments in French, Bangla and Amharic.
+
+This is a white-box method requiring access to internal model states. Treat it as an optional open-weight detector baseline, not a black-box/frontier or source-verification equivalent. Reproduce it only with the same model revision and held-out source families; add a direct South African-language transfer experiment.
+
+### LitBench — human preference for generated writing
+
+[LitBench (EACL 2026)](https://aclanthology.org/2026.eacl-long.362/) reports 43,827 training story pairs and 2,480 test pairs; its strongest tested zero-shot judge achieved 73% human preference agreement, versus 78% for specialized reward models.
+
+This is a creative-writing preference benchmark, not literary knowledge or historical/cultural correctness. Keep it in a separate generation/evaluator lane.
+
+### Method-level comparison requirement
+
+The new portfolio should compare independent channels:
+- external evidence relevance, provenance lineage and time-scope verification;
+- internal model hidden-state / HDC temporal uncertainty signals;
+- paired cross-view and counterfactual invariance tests;
+- calibration, selective prediction and explicit abstention.
+
+A detector that flags an answer as suspicious has not established the correct answer. A source verifier that finds a matching passage has not established its relevance or authenticity. The research question is whether the channels complement each other under matched compute/context budgets and preserve failure explanations.
