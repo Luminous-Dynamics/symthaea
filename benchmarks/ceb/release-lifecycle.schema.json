@@ -21,7 +21,8 @@
     "saturation_observations",
     "resource_calibration",
     "historical_policy",
-    "claim_boundary"
+    "claim_boundary",
+    "previous_evaluation_input_sha256"
   ],
   "properties": {
     "schema_version": {
@@ -335,6 +336,13 @@
     "claim_boundary": {
       "type": "string",
       "minLength": 50
+    },
+    "previous_evaluation_input_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
     }
   },
   "$defs": {
@@ -521,7 +529,8 @@
                 "items": {
                   "type": "string",
                   "pattern": "^[a-f0-9]{64}$"
-                }
+                },
+                "uniqueItems": true
               }
             }
           }
