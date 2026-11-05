@@ -11,15 +11,25 @@ It is a benchmark-integrity oracle, not a Melothaea evaluation. Its positive con
 - Fixed-response, imitation-only, one-way-prompt and cross-session yoked controls, plus a rule-based positive control.
 - Separate targeted, sham and unrelated-feature action contrasts.
 - A task-specific synthetic response-relation check. Imitation can be input-sensitive while still failing this complementarity oracle.
-- A controlled responsive partner and a fixed partner to test the agent-to-partner scoring path.
-- Exact event-ID, condition-order, policy-version and Git-revision binding.
+- A four-condition controlled-partner response path with separate targeted/sham/unrelated contrasts and a declared reverse-direction response-rule oracle.
+- Exact event-ID, seeded condition-order execution, policy-version and Git-revision binding.
 - Explicit NotApplicable metric state for unsupported modalities.
 
 ## Run
 
-From this directory, run cargo fmt --check and cargo test --locked.
+From this directory, run:
 
-The repository workflow stages this crate outside the root Cargo workspace and runs the same commands against the exact pull-request head.
+```sh
+cargo fmt --check
+cargo test --locked
+MEL_RMI_CODE_REVISION="$(git rev-parse HEAD)" cargo run --locked --example canonical_suite
+```
+
+The example emits a CSV over the five feature dimensions for fixed, imitation,
+one-way, yoked, unrelated-feature-shortcut and rule-based policies, followed by
+four-condition reciprocal controlled-partner trials. The repository workflow
+stages this crate outside the root Cargo workspace, tests the exact pull-request
+head, and gates all expected positive/negative-control counts.
 
 ## Interpretation boundary
 
