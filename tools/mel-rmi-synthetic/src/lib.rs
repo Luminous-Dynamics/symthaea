@@ -1686,6 +1686,42 @@ mod tests {
         );
     }
 
+    struct DimensionYokedPolicy;
+
+    impl AgentPolicy for DimensionYokedPolicy {
+        fn policy_id(&self) -> &str {
+            "yoked"
+        }
+
+        fn fork_from_frozen_state(&self, _common_random_seed: u64) -> Box<dyn AgentPolicy> {
+            Box::new(Self)
+        }
+
+        fn act(
+            &self,
+            observation: &Observation,
+            task: &TaskSpec,
+        ) -> Result<AgentAction, HarnessError> {
+            if observation.task_id != task.task_id {
+                return Err(HarnessError::InvalidPolicy);
+            }
+            let value = match task.target_dimension {
+                Dimension::Motif => 9,
+                Dimension::Rhythm => 3,
+                Dimension::Tempo => 8,
+                Dimension::Role => 2,
+                Dimension::Texture => 4,
+            };
+            make_action(
+                observation,
+                self.policy_id(),
+                task,
+                value,
+                ActionMechanism::Yoked,
+            )
+        }
+    }
+
     #[test]
     fn repeated_five_dimension_stress_suite_preserves_all_control_gates() {
         let fixtures = canonical_fixture_replicates_v1(32);
@@ -1733,14 +1769,7 @@ mod tests {
             &OneWayPromptPolicy {
                 id: "one-way".to_owned(),
             },
-            &YokedReplayPolicy {
-                id: "yoked".to_owned(),
-                source_session_id: "prior-session".to_owned(),
-                replayed_feature: Feature {
-                    dimension: Dimension::Motif,
-                    value: 9,
-                },
-            },
+            &DimensionYokedPolicy,
             &UnrelatedFeatureShortcutPolicy {
                 id: "distractor".to_owned(),
             },
