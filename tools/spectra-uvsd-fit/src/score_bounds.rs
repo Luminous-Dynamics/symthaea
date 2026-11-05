@@ -103,7 +103,7 @@ pub struct ScoreBoundsConfig {
     pub root_seed: u64,
 }
 
-/// Point estimate and finite-sample one-sided bound for one metric.
+/// Point estimate and finite-sample one-sided or two-sided score bounds.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MetricScoreBound {
     pub point_estimate: f64,
@@ -196,10 +196,11 @@ impl std::error::Error for ScoreBoundError {}
 /// Construct simultaneous one-sided Hoeffding bounds and convert them to
 /// ScenarioOutcome records consumed directly by the scenario aggregator.
 ///
-/// With R = action_count × scenario_count records and five metric claims per
-/// record, each one-sided claim receives delta = familywise_alpha/(5R).
-/// Hoeffding's bound is valid for independent bounded Monte Carlo replicates
-/// within each series. Bonferroni does not require independence between claims.
+/// With R = action_count × scenario_count records there are six one-sided
+/// claims per record: four lower bounds, one upper burden bound, and a second
+/// upper utility bound. Each receives delta = familywise_alpha/(6R). Hoeffding
+/// is valid for independent bounded Monte Carlo replicates within each series.
+/// Bonferroni does not require independence between claims.
 pub fn bound_candidate_score_samples(
     action_set: &OperationalActionSet,
     scenario_set: &ScenarioSet,
@@ -217,7 +218,7 @@ pub fn bound_candidate_score_samples(
         return Err(ScoreBoundError::IncompleteActionScenarioCoverage);
     }
     let claim_count = expected_records
-        .checked_mul(5)
+        .checked_mul(6)
         .ok_or(ScoreBoundError::OutcomeCountOverflow)?;
     let per_claim_alpha = config.familywise_alpha / claim_count as f64;
     if !per_claim_alpha.is_finite() || per_claim_alpha <= 0.0 {
@@ -282,11 +283,23 @@ pub fn bound_candidate_score_samples(
                 config.ranges.representativeness,
                 per_claim_alpha,
             )?;
-            let target_utility = lower_metric_bound(
+            let target_utility_lower = lower_metric_bound(
                 &record.target_utility,
                 config.ranges.target_utility,
                 per_claim_alpha,
             )?;
+            let target_utility_upper = upper_metric_bound(
+                &record.target_utility,
+                config.ranges.target_utility,
+                per_claim_alpha,
+            )?;
+            let target_utility = MetricScoreBound {
+                point_estimate: target_utility_lower.point_estimate,
+                lower_bound: target_utility_lower.lower_bound,
+                upper_bound: target_utility_upper.upper_bound,
+                sample_count: target_utility_lower.sample_count,
+                declared_range: target_utility_lower.declared_range,
+            };
             let participant_burden_seconds = upper_metric_bound(
                 &record.participant_burden_seconds,
                 config.ranges.participant_burden_seconds,
@@ -566,10 +579,10 @@ mod tests {
         let scenario_set = scenario_set();
         let receipt = bound_candidate_score_samples(&action_set, &scenario_set, &records(), &config())
             .unwrap();
-        assert_eq!(receipt.claim_count, 20);
-        assert!((receipt.per_claim_alpha - 0.0025).abs() < 1.0e-12);
+        assert_eq!(receipt.claim_count, 24);
+        assert!((receipt.per_claim_alpha - (0.05 / 24.0)).abs() < 1.0e-12);
         let expected_radius =
-            4.0 * ((1.0 / 0.0025_f64).ln() / (2.0 * 4.0)).sqrt();
+            4.0 * ((1.0 / (0.05_f64 / 24.0_f64)).ln() / (2.0 * 4.0)).sqrt();
         let metric = &receipt.metrics[0].target_information;
         assert!((metric.point_estimate - 1.0).abs() < 1.0e-12);
         assert!((metric.lower_bound - (1.0 - expected_radius)).abs() < 1.0e-12);
@@ -589,6 +602,7 @@ mod tests {
         let metric = &receipt.metrics[0];
         assert!(metric.target_utility.point_estimate < 0.0);
         assert!(metric.target_utility.lower_bound <= metric.target_utility.point_estimate);
+        assert!(metric.target_utility.upper_bound >= metric.target_utility.point_estimate);
         assert!(
             metric.participant_burden_seconds.upper_bound
                 >= metric.participant_burden_seconds.point_estimate
@@ -741,6 +755,10 @@ mod tests {
             assert!(outcome.representativeness_lower_bound <= outcome.representativeness);
             assert!(outcome.target_utility_lower_bound <= outcome.target_utility);
             assert!(outcome.participant_burden_upper_bound >= outcome.participant_burden_seconds);
+        }
+        for metric in &bounded.metrics {
+            assert!(metric.target_utility.lower_bound <= metric.target_utility.point_estimate);
+            assert!(metric.target_utility.upper_bound >= metric.target_utility.point_estimate);
         }
     }
 }
