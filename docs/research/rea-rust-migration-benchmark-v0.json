@@ -517,7 +517,7 @@
         "artifact_sha256": "9cfb88ccf477fc9a983d93343b7258316927ee56853adf9c62048a147c45c578",
         "artifact_id": "13358996504",
         "claim_ceiling": "One 181-second bounded libFuzzer run, exact source commit, toolchain, seed and resource envelope. No crash was reported by this run; this is not a security certification, sustained fuzz qualification, broad platform coverage or proof of absence of bugs.",
-        "status": "two-bounded-production-reader-smoke-campaigns-passed; durable-raw-log-artifact-verified; differential-arm-pending",
+        "status": "bounded_smoke_passed; cross-parser differential target added on 2026-11-05 and exact-head run pending",
         "current_run": "https://github.com/Luminous-Dynamics/symthaea/actions/runs/41904482693",
         "current_source_commit": "361be1d1f2989a3b98f81ad326806c03e85aabac",
         "runs": [
@@ -570,19 +570,13 @@
           "duration_seconds": 181,
           "executions": 2067019,
           "average_executions_per_second": 11419,
-          "new_units_added": 566,
           "peak_rss_mib": 264,
+          "libfuzzer_coverage_edges": 1093,
+          "libfuzzer_features": 1524,
           "crash_count": 0,
           "timeout_count": 0,
-          "raw_log_sha256": "12a06689d769c26cbb637f7387521984de79d14d80e24f0b762c107853cdc875",
-          "retained_artifacts": [
-            "run-context.txt",
-            "production-fuzz-output.txt",
-            "production-fuzz-summary.txt",
-            "fuzz/Cargo.lock",
-            "corpus"
-          ],
-          "result": "no crash found in bounded production-reader smoke; durable raw output uploaded; not sustained fuzz qualification"
+          "raw_log_and_summary_artifact": true,
+          "result": "no crash found in bounded production-reader campaign; not sustained fuzz qualification"
         },
         "current_working_head": "c7e9969363d94a46f0156a188c6343b0080a6883",
         "raw_log_capture": "Added to c7e9969; exact-head fuzz rerun is required before claiming log-artifact capture succeeded.",
@@ -595,6 +589,25 @@
           "target": "zip_differential",
           "oracle": "zip 9.3.0 / flate2-zlib-rs",
           "scope": "complete unique-name unprefixed non-ZIP64 ordinary ZIPs; metadata plus bounded Stored/Deflate content"
+        },
+        "next_differential_head": "62fa511a69d2b0c5634fd3747dbe09295905e2bc",
+        "differential_target": {
+          "path": "fuzz/fuzz_targets/zip_parser_differential.rs",
+          "oracle": "zip 9.3.0 / flate2-zlib-rs",
+          "status": "implementation_committed; exact-head compile and fuzz pending",
+          "support_intersection": "non-prefixed, non-ZIP64, unique-name ordinary single-disk ZIPs; unencrypted Stored/Deflate regular files",
+          "comparisons": [
+            "raw filename bytes",
+            "local-header and data offsets",
+            "flags",
+            "compression method",
+            "declared compressed/uncompressed sizes",
+            "declared CRC",
+            "successful stream length",
+            "payload SHA-256",
+            "independent CRC-32"
+          ],
+          "outcome_policy": "panic only on concrete mismatches inside the shared supported subset; skip duplicate-name and unsupported layouts; classify zip-rs stream failures separately"
         }
       },
       "validation": {
@@ -1779,7 +1792,7 @@
     },
     {
       "id": "independent_member_receipt_replay",
-      "status": "exact_head_harness_tests_passed; sealed_source_snapshot_remains_open",
+      "status": "independent replay passed synthetic corpus; sealed snapshot backend added and awaits exact-head workflow",
       "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10507",
       "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10507",
       "oracle": {
@@ -1827,7 +1840,11 @@
         "recompute independent CRC and SHA-256; require exact observed size and decoder EOF",
         "report exact zip version, zlib-rs backend, Cargo.lock digest, source commit and runtime platform",
         "same-open-file pre/post hashing prevents path replacement and detects persistent mutation but does not establish immutability against a concurrent mutate-and-restore writer",
-        "before promotion, either replay a sealed immutable snapshot bound by the archive digest or keep the concurrent mutation claim explicitly outside the supported guarantee; see issue #10526"
+        "before promotion, either replay a sealed immutable snapshot bound by the archive digest or keep the concurrent mutation claim explicitly outside the supported guarantee; see issue #10526",
+        "never parse a mutable source path after hashing; stream input once into a sealed, content-addressed snapshot",
+        "on Linux use memfd_create and require F_SEAL_WRITE, F_SEAL_GROW, F_SEAL_SHRINK and F_SEAL_SEAL; verify exact seals with F_GET_SEALS",
+        "hash, preflight, parse, stream and post-hash only the sealed snapshot; pathname replacement and mutable source inode are no longer in the parser threat window",
+        "return Unsupported on platforms without a qualified immutable snapshot backend"
       ],
       "boundaries": {
         "supported_subset": "Unique raw filenames, unencrypted regular files, Stored and Deflate, single-disk conventional ZIP layouts accepted by zip-rs.",
@@ -1852,7 +1869,15 @@
         "clippy_warnings_denied": "passed",
         "executable": "rea-receipt-replay compiled as an all-target Clippy target; no production corpus run yet",
         "claim": "synthetic Stored/Deflate receipts independently replayed with zip-rs/zlib-rs; duplicate-name abstention and negative controls passed",
-        "remaining": "replay still hashes/streams/re-hashes the same opened source file; adversarial mutate-and-restore race requires immutable snapshot work tracked by #10526"
+        "remaining": "replay still hashes/streams/re-hashes the same opened source file; adversarial mutate-and-restore race requires immutable snapshot work tracked by #10526",
+        "immutable_snapshot": {
+          "status": "implementation_and_test_committed; exact-head workflow pending",
+          "backend": "Linux memfd_create with F_SEAL_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL",
+          "source_snapshot": "stream-copy and SHA-256 in one pass; all parser/decoder/digest work uses the sealed snapshot; verifies seals with F_GET_SEALS",
+          "negative_control": "test replaces original source path and attempts write through a cloned snapshot descriptor; digest and content must remain unchanged",
+          "unsupported_platforms": "non-Linux returns Unsupported until platform-native immutable snapshot backend exists",
+          "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10526"
+        }
       }
     },
     {
@@ -2039,6 +2064,54 @@
         "stable_snapshot": "Sealing ensures parser input bytes remain unchanged after seal.",
         "source_consistency": "Sealed snapshot does not prove the source copy was an atomic point-in-time view if source changed during copying.",
         "authenticity": "Snapshot hash does not identify or authenticate producer."
+      }
+    },
+    {
+      "id": "zip_cross_parser_differential_fuzz",
+      "status": "implementation_committed_exact_head_run_pending",
+      "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10451",
+      "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10451",
+      "target": "Zero unresolved high-confidence differential findings in the declared common subset; zero silent occurrence remapping; every confirmed finding becomes a minimized permanent regression fixture.",
+      "oracle": {
+        "crate": "zip",
+        "version": "9.3.0",
+        "deflate_backend": "flate2 / zlib-rs 0.6.8",
+        "production": "Symthaea REA reader / zipcore 0.10.2 / miniz_oxide"
+      },
+      "objective": "Find parser acceptance, metadata, boundary, stream, CRC and payload disagreements over the shared supported ZIP subset using coverage-guided mutation.",
+      "cases": [
+        "same_input_two_independent_parsers_same_occurrence_inventory",
+        "unique_raw_name_occurrence_index_and_offsets_agree",
+        "stored_and_deflate_stream_eof_size_sha_crc_agree",
+        "both_parsers_accept_but_metadata_differs_is_fuzz_finding",
+        "both_parsers_reach_eof_but_payload_digest_differs_is_fuzz_finding",
+        "oracle_accepts_and_custom_reader_rejects_common_subset_entry_is_fuzz_finding",
+        "duplicate_name_index_ambiguity_outside_oracle_subset",
+        "zip64_prefix_and_multidisk_layouts_explicitly_skipped"
+      ],
+      "metrics": [
+        "new_coverage_edges_and_features_per_cpu_hour",
+        "unique_minimized_differential_findings",
+        "metadata_disagreement_rate_by_field",
+        "successful_dual_decode_disagreement_rate",
+        "oracle_accept_custom_reject rate",
+        "false_positive_rate_after_manual_adjudication",
+        "peak_rss_and_executions_per_second",
+        "regression_corpus_growth_and_replay_rate"
+      ],
+      "protocol": [
+        "fuzz both parsers on identical temporary archive bytes, with unique-name and no-prefix/no-ZIP64 restriction for indexed parity",
+        "compare raw names, offsets, flags, methods, sizes and CRC before comparing content",
+        "if both decoders reach EOF, independently recompute SHA-256 and CRC-32 and compare to each other and declarations",
+        "treat parser-only acceptance differences as findings only after common-subset and metadata preconditions hold",
+        "skip duplicate-name, ZIP64 and unsupported carrier layouts rather than coercing them into an index match",
+        "run independent reader-only smoke and differential target as separate bounded campaigns with separate logs, summaries and artifact digests",
+        "minimize and preserve every confirmed differential crash/disagreement as an immutable content-addressed seed"
+      ],
+      "claim_boundaries": {
+        "coverage": "LibFuzzer edges/features are harness-specific exploration signals, not a percent of parser correctness.",
+        "oracle": "A second implementation is an oracle, not ground truth; each disagreement needs adjudication.",
+        "supported_subset": "Only the mutually supported non-prefixed, non-ZIP64, unique-name Stored/Deflate regular-file subset is compared."
       }
     }
   ],
