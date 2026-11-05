@@ -490,10 +490,7 @@ fn assess_reserve_mode_transition(
     indeterminate_reasons: &mut Vec<&'static str>,
     violations: &mut Vec<Violation>,
 ) {
-    let baseline_mode = mode_for(
-        (-baseline_net_mw).max(0.0),
-        baseline_net_mw.max(0.0),
-    );
+    let baseline_mode = mode_for((-baseline_net_mw).max(0.0), baseline_net_mw.max(0.0));
     let (target_charge, target_discharge) =
         match operating_point_for_net_power(target_net_mw, limits.min_stable_charge_mw) {
             Ok(value) => value,
@@ -524,7 +521,9 @@ fn assess_reserve_mode_transition(
         match reserve.full_activation_seconds {
             Some(actual) if actual + EPSILON >= required_transition => {}
             Some(_) => violations.push(Violation::ReserveTransitionEvidenceContradiction),
-            None => indeterminate_reasons.push("missing_full_activation_evidence_for_mode_transition"),
+            None => {
+                indeterminate_reasons.push("missing_full_activation_evidence_for_mode_transition")
+            }
         }
     }
 }
@@ -1133,12 +1132,8 @@ mod tests {
             Some(600.0),
             Some(600.0),
         )];
-        let result = evaluate_dispatch(
-            asset,
-            150.0,
-            &[step(30.0, 0.0, 300.0, &RESERVES)],
-        )
-        .expect("fixture inputs are valid");
+        let result = evaluate_dispatch(asset, 150.0, &[step(30.0, 0.0, 300.0, &RESERVES)])
+            .expect("fixture inputs are valid");
         assert!(
             result.steps[0]
                 .violations
