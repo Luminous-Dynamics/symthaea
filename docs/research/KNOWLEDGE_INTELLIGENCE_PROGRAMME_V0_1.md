@@ -425,3 +425,19 @@ This portfolio should support two separate competitive claims:
 2. **Evidence-grounded factuality:** better supported answers, calibrated abstention and verifiable source lineage.
 
 A win in one lane does not imply a win in another.
+
+
+### 13.5 Released data row and paired evaluation unit
+
+The currently visible [Hugging Face viewer](https://huggingface.co/datasets/sello-ralethe/Multi-Hall-SA/viewer) exposes:
+- `pair_id`, `file_id`, `fact_index`, `language`, `hallucination_type`;
+- `english_factual_statement`, `english_hallucinated_statement`;
+- `target_factual_statement`, `target_hallucinated_statement`.
+
+Each row contains four aligned statements: English factual/hallucinated and target-language factual/hallucinated. A complete system run therefore emits four predictions per row, not a single prediction per row. Preserve pair identity and statement-language/statement-kind separately in the result receipt.
+
+The viewer currently reports four language splits, 11.4k rows in the default view and 2.87k rows in its selected isiZulu split. It reports 127 distinct `file_id` values. These are viewer snapshots, not immutable release counts; pin the exact dataset revision and inspect all underlying files first.
+
+Retain `pair_id` as the matched fact-row key. Use `file_id` as a provisional source-document cluster only after confirming its meaning in the underlying CSV and source metadata. All four statements in a row must stay together; all rows sharing one source-document cluster must remain in the same bootstrap cluster. Do not treat four statement predictions as four independent sampling units.
+
+The scoring adapter should report per statement-language and error type: false-negative (missed hallucination), false-positive (factual statement incorrectly marked hallucinated), macro-F1, selective coverage/risk and optional probability calibration. Compare English and target-language detection on the *same paired facts*, and publish both absolute quality and disparity.
