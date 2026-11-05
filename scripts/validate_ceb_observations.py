@@ -244,6 +244,66 @@ def self_test(payload: dict, schema: dict, format_checker: FormatChecker) -> Non
     print("CEB_EXTERNAL_OBSERVATION_SELF_TEST_PASS")
 
 
+def validate_pilot_payload(pilot: dict, schema: dict, format_checker: FormatChecker) -> list[str]:
+    validator = Draft202012Validator(schema, format_checker=format_checker)
+    schema_errors = sorted(validator.iter_errors(pilot), key=lambda error: list(error.absolute_path))
+    if schema_errors:
+        return [
+            f"pilot schema: {'/'.join(map(str, error.absolute_path)) or '<root>'}: {error.message}"
+            for error in schema_errors
+        ]
+    errors: list[str] = []
+    families = pilot["population"]["root_cause_families"]
+    if len({row["id"] for row in families}) != len(families):
+        errors.append("pilot root-cause family IDs are not unique")
+    if sum(row["target_tasks"] for row in families) != pilot["population"]["target_task_count"]:
+        errors.append("pilot root-cause family task targets do not sum to the target task count")
+    custody = pilot["task_custody"]
+    if custody["development_partition_tasks"] + custody["heldout_partition_tasks"] != pilot["population"]["target_task_count"]:
+        errors.append("pilot development and holdout partitions do not sum to the target task count")
+    if pilot["statistics"]["independent_seeds_minimum"] < 3:
+        errors.append("pilot minimum independent seed count is below three")
+    if pilot["status"] != "design_only_not_executed":
+        errors.append("pilot must remain design_only_not_executed")
+    if pilot["execution_gate"]["candidate_controlled_execution"] != "blocked_until_issue_10064_qualified":
+        errors.append("candidate-controlled execution gate was weakened")
+    if pilot["execution_gate"]["independent_regrade_claim"] != "blocked_until_issue_10369_qualified":
+        errors.append("independent regrade trust gate was weakened")
+    return errors
+
+
+def pilot_self_test(pilot: dict, schema: dict, format_checker: FormatChecker) -> None:
+    def must_reject(mutant: dict, label: str) -> None:
+        if not validate_pilot_payload(mutant, schema, format_checker):
+            raise SystemExit(f"pilot negative control unexpectedly passed: {label}")
+
+    mutant = copy.deepcopy(pilot)
+    mutant["population"]["root_cause_families"][0]["target_tasks"] += 1
+    must_reject(mutant, "root-cause strata do not sum to 48")
+
+    mutant = copy.deepcopy(pilot)
+    mutant["task_custody"]["heldout_partition_tasks"] = 15
+    must_reject(mutant, "development/holdout partition is incomplete")
+
+    mutant = copy.deepcopy(pilot)
+    mutant["status"] = "qualified"
+    must_reject(mutant, "design-only pilot marked qualified")
+
+    mutant = copy.deepcopy(pilot)
+    mutant["execution_gate"]["candidate_controlled_execution"] = "allowed"
+    must_reject(mutant, "OS isolation gate weakened")
+
+    mutant = copy.deepcopy(pilot)
+    mutant["statistics"]["independent_seeds_minimum"] = 2
+    must_reject(mutant, "insufficient independent seed count")
+
+    mutant = copy.deepcopy(pilot)
+    mutant["statistics"]["pilot_is_exploratory"] = False
+    must_reject(mutant, "pilot converted into an unsupported superiority study")
+
+    print("CEB_RUST_PILOT_SELF_TEST_PASS")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
@@ -254,24 +314,38 @@ def main() -> int:
     try:
         payload = load_json(base / "external-observations.v0.json")
         schema = load_json(base / "external-observations.schema.json")
+        pilot = load_json(base / "rust-pilot-preregistration.v0.json")
+        pilot_schema = load_json(base / "rust-pilot-preregistration.schema.json")
         Draft202012Validator.check_schema(schema)
-    except (ValueError, Exception) as error:
+        Draft202012Validator.check_schema(pilot_schema)
+    except Exception as error:
         print(f"CEB_EXTERNAL_OBSERVATION_ERROR: {error}", file=sys.stderr)
         return 2
     format_checker = FormatChecker()
     if args.self_test:
         self_test(payload, schema, format_checker)
+        pilot_self_test(pilot, pilot_schema, format_checker)
         return 0
     errors = validate_payload(payload, schema, format_checker)
-    if errors:
+    pilot_errors = validate_pilot_payload(pilot, pilot_schema, format_checker)
+    if errors or pilot_errors:
         for error in errors:
             print(f"CEB_EXTERNAL_OBSERVATION_FAIL: {error}", file=sys.stderr)
+        for error in pilot_errors:
+            print(f"CEB_RUST_PILOT_FAIL: {error}", file=sys.stderr)
         return 1
     print(
         "CEB_EXTERNAL_OBSERVATION_PASS: "
         f"sources={len(payload['sources'])} "
         f"comparators={len(payload['comparators'])} "
         f"observations={len(payload['observations'])}"
+    )
+    print(
+        "CEB_RUST_PILOT_PASS: "
+        f"tasks={pilot['population']['target_task_count']} "
+        f"families={len(pilot['population']['root_cause_families'])} "
+        f"arms={len(pilot['baseline_arms'])} "
+        f"holdout={pilot['task_custody']['heldout_partition_tasks']}"
     )
     return 0
 
