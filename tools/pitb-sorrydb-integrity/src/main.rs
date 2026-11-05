@@ -16,11 +16,14 @@ const REPORT_SCHEMA: &str = "pitb.sorrydb-integrity-report.v0";
 const SNAPSHOT_REPORT_SCHEMA: &str = "pitb.sorrydb-snapshot-integrity-report.v0";
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct Database {
+    documentation: String,
     sorries: Vec<SorryRecord>,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 struct SorryRecord {
     repo: RepoInfo,
     location: Location,
@@ -30,6 +33,7 @@ struct SorryRecord {
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 struct RepoInfo {
     remote: String,
     branch: String,
@@ -38,6 +42,7 @@ struct RepoInfo {
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 struct Location {
     path: String,
     start_line: u64,
@@ -47,6 +52,7 @@ struct Location {
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 struct DebugInfo {
     goal: String,
     url: String,
@@ -247,6 +253,11 @@ fn validate_provenance(
     }
     if provenance.evaluation_split_role != "test" {
         return Err("frozen SorryDB evaluation split must be declared as test".into());
+    }
+    if database.documentation.trim().is_empty()
+        || database.documentation != split.documentation
+    {
+        return Err("full dataset and evaluation split documentation metadata must be non-empty and identical".into());
     }
     if provenance.license != "Apache-2.0" {
         return Err("SorryDB source repository license identity changed; require explicit review".into());
@@ -491,6 +502,15 @@ fn validate_record(record: &SorryRecord, label: &str) -> Result<(), String> {
         return Err(format!("{label} debug URL is not bound to the exact repo, commit, path and start line"));
     }
 
+    let metadata_object = record.metadata.as_object()
+        .ok_or_else(|| format!("{label}.metadata must be an object"))?;
+    let expected_metadata_keys: BTreeSet<&str> =
+        ["blame_email_hash", "blame_date", "inclusion_date"].into_iter().collect();
+    if metadata_object.len() != expected_metadata_keys.len()
+        || metadata_object.keys().any(|key| !expected_metadata_keys.contains(key.as_str()))
+    {
+        return Err(format!("{label}.metadata has missing or unknown fields"));
+    }
     let email_hash = record.metadata.get("blame_email_hash").and_then(Value::as_str)
         .ok_or_else(|| format!("{label}.metadata.blame_email_hash is missing"))?;
     if !valid_hex(email_hash, 12) {
@@ -957,11 +977,18 @@ fn run_self_tests() -> Result<(), String> {
     }
     println!("SELF_TEST_PASS changing the debug goal changes the upstream task identity");
 
-    let full = Database { sorries: vec![
-        synthetic_record("task-a", &"1".repeat(40)),
-        synthetic_record("task-b", &"2".repeat(40)),
-    ]};
-    let split = Database { sorries: vec![full.sorries[0].clone()] };
+    let documentation = "deduplicated list of sorries, for each unique goal string the most recent inclusion date is chosen".to_owned();
+    let full = Database {
+        documentation: documentation.clone(),
+        sorries: vec![
+            synthetic_record("task-a", &"1".repeat(40)),
+            synthetic_record("task-b", &"2".repeat(40)),
+        ],
+    };
+    let split = Database {
+        documentation: documentation.clone(),
+        sorries: vec![full.sorries[0].clone()],
+    };
     let receipts = vec![synthetic_receipt(&split.sorries[0])];
     let full_bytes = serde_json::to_vec(&full).map_err(|e| e.to_string())?;
     let split_bytes = serde_json::to_vec(&split).map_err(|e| e.to_string())?;
@@ -1053,11 +1080,18 @@ fn run_self_tests() -> Result<(), String> {
 }
 
 fn synthetic_report_and_receipt() -> Result<(Report, TaskReceipt), String> {
-    let full = Database { sorries: vec![
-        synthetic_record("task-a", &"1".repeat(40)),
-        synthetic_record("task-b", &"2".repeat(40)),
-    ]};
-    let split = Database { sorries: vec![full.sorries[0].clone()] };
+    let documentation = "deduplicated list of sorries, for each unique goal string the most recent inclusion date is chosen".to_owned();
+    let full = Database {
+        documentation: documentation.clone(),
+        sorries: vec![
+            synthetic_record("task-a", &"1".repeat(40)),
+            synthetic_record("task-b", &"2".repeat(40)),
+        ],
+    };
+    let split = Database {
+        documentation: documentation.clone(),
+        sorries: vec![full.sorries[0].clone()],
+    };
     let receipt = synthetic_receipt(&split.sorries[0]);
     let full_bytes = serde_json::to_vec(&full).map_err(|e| e.to_string())?;
     let split_bytes = serde_json::to_vec(&split).map_err(|e| e.to_string())?;
