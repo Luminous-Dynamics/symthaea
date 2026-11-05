@@ -80,14 +80,17 @@ impl ScoreTransform {
     }
 
     fn apply(&self, grade: &Value) -> Result<f64, ComposerError> {
-        let kind = required_string(grade, "kind", "task grade")?;
+        let grade_object = grade.as_object().ok_or_else(|| {
+            ComposerError::InvalidGrade("task grade must be an object".into())
+        })?;
+        let kind = required_string(grade_object, "kind", "task grade")?;
         if kind != self.expected_grade_kind() {
             return Err(ComposerError::GradeKindMismatch {
                 expected: self.expected_grade_kind().into(),
                 actual: kind.into(),
             });
         }
-        let value = required_value(grade, "value", "task grade")?;
+        let value = required_value(grade_object, "value", "task grade")?;
         let score = match self {
             Self::Numeric {
                 minimum,
@@ -685,7 +688,7 @@ fn parse_run(bytes: &[u8], projection: &MetricProjection) -> Result<ParsedRun, C
         ));
     }
 
-    let grading_mode = required_string(value, "grading_mode", "receipt")?;
+    let grading_mode = required_string_from_value(value, "grading_mode", "receipt")?;
     if grading_mode != projection.transform.expected_grade_kind() {
         return Err(ComposerError::GradeKindMismatch {
             expected: projection.transform.expected_grade_kind().into(),
@@ -704,8 +707,8 @@ fn parse_run(bytes: &[u8], projection: &MetricProjection) -> Result<ParsedRun, C
     let task_universe = required_array(value, "task_universe", "receipt")?;
     let mut eligible_task_ids = Vec::new();
     for task in task_universe {
-        let task_id = required_string(task, "task_id", "task_universe item")?;
-        let eligibility = required_string(task, "eligibility", "task_universe item")?;
+        let task_id = required_string_from_value(task, "task_id", "task_universe item")?;
+        let eligibility = required_string_from_value(task, "eligibility", "task_universe item")?;
         if eligibility == "eligible" {
             eligible_task_ids.push(task_id.to_owned());
         }
@@ -715,16 +718,20 @@ fn parse_run(bytes: &[u8], projection: &MetricProjection) -> Result<ParsedRun, C
         return Err(ComposerError::TaskUniverseMismatch);
     }
 
-    let universe_digest = required_string(value, "task_universe_sha256", "receipt")?.to_owned();
+    let universe_digest =
+        required_string_from_value(value, "task_universe_sha256", "receipt")?.to_owned();
     let eligible_digest =
-        required_string(value, "eligible_task_set_sha256", "receipt")?.to_owned();
+        required_string_from_value(value, "eligible_task_set_sha256", "receipt")?.to_owned();
 
     let task_results = required_array(value, "task_results", "receipt")?;
     let mut tasks = BTreeMap::new();
     for row in task_results {
-        let task_id = required_string(row, "task_id", "task_result")?.to_owned();
-        let input_sha256 = required_string(row, "input_sha256", "task_result")?.to_owned();
-        let attempt_state = required_string(row, "attempt_state", "task_result")?.to_owned();
+        let task_id =
+            required_string_from_value(row, "task_id", "task_result")?.to_owned();
+        let input_sha256 =
+            required_string_from_value(row, "input_sha256", "task_result")?.to_owned();
+        let attempt_state =
+            required_string_from_value(row, "attempt_state", "task_result")?.to_owned();
         let terminal_disposition = row
             .get("terminal_disposition")
             .and_then(Value::as_str)
@@ -830,16 +837,16 @@ fn compatibility_context(receipt: &Value) -> Result<Value, ComposerError> {
     let comparison = required_object(receipt, "comparison", "receipt")?;
     Ok(json!({
         "system_arm": required_value(system, "arm", "system")?,
-        "target_scope": required_value(receipt, "target_scope", "receipt")?,
-        "runner": required_value(receipt, "runner", "receipt")?,
+        "target_scope": required_value_from_value(receipt, "target_scope", "receipt")?,
+        "runner": required_value_from_value(receipt, "runner", "receipt")?,
         "comparison": {
             "group_id": required_value(comparison, "group_id", "comparison")?,
             "protocol_sha256": required_value(comparison, "protocol_sha256", "comparison")?,
             "eligible_task_set_sha256": required_value(comparison, "eligible_task_set_sha256", "comparison")?
         },
-        "task_universe_sha256": required_value(receipt, "task_universe_sha256", "receipt")?,
-        "eligible_task_set_sha256": required_value(receipt, "eligible_task_set_sha256", "receipt")?,
-        "budget_caps": required_value(receipt, "budget_caps", "receipt")
+        "task_universe_sha256": required_value_from_value(receipt, "task_universe_sha256", "receipt")?,
+        "eligible_task_set_sha256": required_value_from_value(receipt, "eligible_task_set_sha256", "receipt")?,
+        "budget_caps": required_value_from_value(receipt, "budget_caps", "receipt")
     }))
 }
 
@@ -853,7 +860,7 @@ fn metric_context(receipt: &Value) -> Result<Value, ComposerError> {
         "access_class": required_value(benchmark, "access_class", "benchmark")?,
         "scoring_formula_id": required_value(benchmark, "scoring_formula_id", "benchmark")?,
         "grader_version": required_value(benchmark, "grader_version", "benchmark")?,
-        "grading_mode": required_value(receipt, "grading_mode", "receipt")?
+        "grading_mode": required_value_from_value(receipt, "grading_mode", "receipt")?
     }))
 }
 
@@ -921,6 +928,32 @@ fn required_value(
         .cloned()
         .ok_or_else(|| {
             ComposerError::InvalidReceiptShape(format!("{context}.{key} is required"))
+        })
+}
+
+fn required_value_from_value(
+    value: &Value,
+    key: &str,
+    context: &str,
+) -> Result<Value, ComposerError> {
+    value.get(key).cloned().ok_or_else(|| {
+        ComposerError::InvalidReceiptShape(format!("{context}.{key} is required"))
+    })
+}
+
+fn required_string_from_value<'a>(
+    value: &'a Value,
+    key: &str,
+    context: &str,
+) -> Result<&'a str, ComposerError> {
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .filter(|string| !string.trim().is_empty())
+        .ok_or_else(|| {
+            ComposerError::InvalidReceiptShape(format!(
+                "{context}.{key} must be a non-empty string"
+            ))
         })
 }
 
