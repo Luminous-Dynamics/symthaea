@@ -224,6 +224,24 @@ fn scenario_cases() -> Vec<ScenarioCase> {
         correctly_specified_single_observer_gaussian: true,
     });
 
+    let mut near_high = base_scenario(10);
+    near_high.signal_sigma = 1.1;
+    cases.push(ScenarioCase {
+        id: 10,
+        name: "gaussian_near_null_sigma_1_1",
+        spec: near_high,
+        correctly_specified_single_observer_gaussian: true,
+    });
+
+    let mut near_low = base_scenario(11);
+    near_low.signal_sigma = 0.9;
+    cases.push(ScenarioCase {
+        id: 11,
+        name: "gaussian_near_null_sigma_0_9",
+        spec: near_low,
+        correctly_specified_single_observer_gaussian: true,
+    });
+
     let mut high_variance = base_scenario(2);
     high_variance.signal_sigma = 1.3;
     cases.push(ScenarioCase {
@@ -687,6 +705,32 @@ mod tests {
             schedule.iter().map(|request| request.action_id).collect::<Vec<_>>(),
             (0..202).map(|trial| if trial % 2 == 0 { 1 } else { 2 }).collect::<Vec<_>>()
         );
+    }
+
+    #[test]
+    fn scenario_ladder_includes_null_near_null_and_both_variance_directions() {
+        let cases = scenario_cases();
+        let sigma_by_id = cases
+            .iter()
+            .map(|case| (case.id, case.spec.signal_sigma))
+            .collect::<std::collections::BTreeMap<_, _>>();
+        assert_eq!(sigma_by_id[&1], 1.0);
+        assert_eq!(sigma_by_id[&10], 1.1);
+        assert_eq!(sigma_by_id[&11], 0.9);
+        assert_eq!(sigma_by_id[&2], 1.3);
+        assert_eq!(sigma_by_id[&3], 0.7);
+    }
+
+    #[test]
+    fn wilson_interval_is_ordered_contains_empirical_rate_and_handles_zero_trials() {
+        let interval = wilson_interval(95, 100).unwrap();
+        assert!(interval.0 <= 0.95);
+        assert!(interval.1 >= 0.95);
+        assert!(interval.0 < interval.1);
+        assert_eq!(wilson_interval(0, 0), None);
+        let all_success = wilson_interval(10, 10).unwrap();
+        assert!(all_success.0 < 1.0);
+        assert_eq!(all_success.1, 1.0);
     }
 
     #[test]
