@@ -62,6 +62,7 @@ jobs:
           distractor_passes="$(awk -F, '$1 == "trial" && $3 == "distractor-shortcut" && $11 == "true" { count++ } END { print count + 0 }' "$report")"
           reciprocal_count="$(awk -F, '$1 == "reciprocal" && $18 == "true" { count++ } END { print count + 0 }' "$report")"
           reciprocal_oracle_count="$(awk -F, '$1 == "reciprocal" && $17 == "true" { count++ } END { print count + 0 }' "$report")"
+          artifact_count="$(awk -F, '$1 == "artifact_verified" { count=$2 } END { print count + 0 }' "$report")"
           test "$rule_count" -eq 160
           test "$fixed_passes" -eq 0
           test "$imitation_passes" -eq 0
@@ -70,3 +71,4 @@ jobs:
           test "$distractor_passes" -eq 0
           test "$reciprocal_oracle_count" -eq 160
           test "$reciprocal_count" -eq 160
+          test "$artifact_count" -eq 1120
