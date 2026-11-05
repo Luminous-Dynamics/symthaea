@@ -1036,10 +1036,7 @@ pub fn verify_trial_artifact_bindings(
 pub trait CommittedArtifactReadbackV1 {
     /// Fetch the exact committed artifact set and serialized transaction
     /// receipt for one event identity.
-    fn read_committed_event(
-        &self,
-        event_id: &str,
-    ) -> Result<ArtifactPayloadSetV1, HarnessError>;
+    fn read_committed_event(&self, event_id: &str) -> Result<ArtifactPayloadSetV1, HarnessError>;
 }
 
 /// Re-fetch all eight trial event artifact sets through a committed-storage
