@@ -1287,13 +1287,26 @@ mod tests {
         let down = reserve_opportunity_price(
             ReserveProduct::Regulating,
             ReserveDirection::Down,
-            35,
+            25,
             70.0,
             curve,
         )
         .expect("regulating down is supported");
         assert_eq!(down.selected_increment, PriceIncrement::Two);
         assert_eq!(down.price_difference_minor_per_mwh, 5);
+
+        // When the selected incremental price is below SMP, the Code's
+        // max(IP - SMP, 0) rule must clamp the opportunity price to zero.
+        let down_clamped = reserve_opportunity_price(
+            ReserveProduct::Regulating,
+            ReserveDirection::Down,
+            35,
+            70.0,
+            curve,
+        )
+        .expect("regulating down zero-clamp case is supported");
+        assert_eq!(down_clamped.selected_increment, PriceIncrement::Two);
+        assert_eq!(down_clamped.price_difference_minor_per_mwh, 0);
 
         let up = reserve_opportunity_price(
             ReserveProduct::Regulating,
