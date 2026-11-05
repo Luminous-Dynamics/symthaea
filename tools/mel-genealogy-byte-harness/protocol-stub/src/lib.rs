@@ -37,3 +37,43 @@ pub struct GenealogyManifest {
     pub manifest_sha256: String,
     pub created_at_unix_ms: u64,
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum GenealogyEdgeKindV1 {
+    DerivedFrom,
+    MotifContribution,
+    ArrangementContribution,
+    PerformanceSource,
+    ReferenceOnly,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GenealogyParentInputV1 {
+    pub parent_manifest_id: i64,
+    pub kind: GenealogyEdgeKindV1,
+    pub source_event_id: Option<String>,
+    pub contributor_ref: Option<String>,
+    pub authority_receipt_ref: Option<String>,
+    pub idempotency_key: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GenealogyParentEdgeV1 {
+    pub id: i64,
+    pub parent_manifest_id: i64,
+    pub child_manifest_id: i64,
+    pub kind: GenealogyEdgeKindV1,
+    pub source_event_id: Option<String>,
+    pub contributor_ref: Option<String>,
+    pub authority_receipt_ref: Option<String>,
+    pub idempotency_key: String,
+    pub edge_sha256: String,
+    pub created_at_unix_ms: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GenealogyLineageVerificationV1 {
+    pub manifest: GenealogyManifest,
+    pub parent_edges: Vec<GenealogyParentEdgeV1>,
+    pub lineage_sha256: String,
+}
