@@ -1,0 +1,343 @@
+{
+  "schema_version": 1,
+  "analysis_id": "synthetic-hypothesis-space-expansion-v1",
+  "dataset_revision_commit_sha": "9999999999999999999999999999999999999999",
+  "query_id": "adaptive-query-decision",
+  "query_spec_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "scenario_set_scope": "exhaustive_declared_scenario_space",
+  "scenario_set_sha256": "f617895108b57aa7aa22de5ce663ca285567363bdc4e385fa51873acae3b7f21",
+  "action_set_sha256": "d7a28966c938eafec9653f640f5ae1403887b25fec001e87548975c2133afbbf",
+  "joint_support_scope": "exhaustive_declared_joint_support",
+  "effort_unit": "expert_review_minutes",
+  "max_total_effort_units": 4,
+  "scenarios": [
+    {
+      "scenario_id": "world-a",
+      "graph_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision_met": true
+    },
+    {
+      "scenario_id": "world-b",
+      "graph_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "decision_met": false
+    },
+    {
+      "scenario_id": "world-c",
+      "graph_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "decision_met": true
+    },
+    {
+      "scenario_id": "world-d",
+      "graph_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "decision_met": false
+    },
+    {
+      "scenario_id": "world-e",
+      "graph_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "decision_met": true
+    }
+  ],
+  "actions": [
+    {
+      "action_id": "inspect-x",
+      "action_kind": "image_inspection",
+      "effort_units": 1,
+      "source_evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "observation_model_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "dependence_groups": [
+        "volume-x"
+      ]
+    },
+    {
+      "action_id": "inspect-y",
+      "action_kind": "morphology_review",
+      "effort_units": 2,
+      "source_evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "observation_model_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "dependence_groups": [
+        "morph-y"
+      ]
+    },
+    {
+      "action_id": "inspect-z",
+      "action_kind": "synapse_adjudication",
+      "effort_units": 3,
+      "source_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "observation_model_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "dependence_groups": [
+        "synapse-z"
+      ]
+    }
+  ],
+  "joint_support_sha256": "2e32fa23a76d8f6e126b29ea82f313e2e420b82d6fb3e6c7971840ad18840f35",
+  "joint_world_supports": [
+    {
+      "scenario_id": "world-a",
+      "source_evidence_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "joint_observation_model_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "dependence_groups": [
+        "shared-imaging-acquisition"
+      ],
+      "possible_joint_outcomes": [
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-x",
+              "outcome": "x-left"
+            },
+            {
+              "action_id": "inspect-y",
+              "outcome": "y-a"
+            },
+            {
+              "action_id": "inspect-z",
+              "outcome": "z-same"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "scenario_id": "world-b",
+      "source_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "joint_observation_model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "dependence_groups": [
+        "shared-imaging-acquisition"
+      ],
+      "possible_joint_outcomes": [
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-x",
+              "outcome": "x-left"
+            },
+            {
+              "action_id": "inspect-y",
+              "outcome": "y-b"
+            },
+            {
+              "action_id": "inspect-z",
+              "outcome": "z-same"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "scenario_id": "world-c",
+      "source_evidence_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "joint_observation_model_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "dependence_groups": [
+        "shared-imaging-acquisition"
+      ],
+      "possible_joint_outcomes": [
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-x",
+              "outcome": "x-right"
+            },
+            {
+              "action_id": "inspect-y",
+              "outcome": "y-same"
+            },
+            {
+              "action_id": "inspect-z",
+              "outcome": "z-c"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "scenario_id": "world-d",
+      "source_evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "joint_observation_model_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "dependence_groups": [
+        "shared-imaging-acquisition"
+      ],
+      "possible_joint_outcomes": [
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-x",
+              "outcome": "x-right"
+            },
+            {
+              "action_id": "inspect-y",
+              "outcome": "y-same"
+            },
+            {
+              "action_id": "inspect-z",
+              "outcome": "z-d"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "scenario_id": "world-e",
+      "source_evidence_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "joint_observation_model_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "dependence_groups": [
+        "shared-imaging-acquisition"
+      ],
+      "possible_joint_outcomes": [
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-x",
+              "outcome": "x-right"
+            },
+            {
+              "action_id": "inspect-y",
+              "outcome": "y-other"
+            },
+            {
+              "action_id": "inspect-z",
+              "outcome": "z-c"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scenario_challenges": [
+    {
+      "challenge_id": "append-refuting-world-sharing-observation-tuple",
+      "challenger_evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "challenger_model_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "additions": [
+        {
+          "scenario": {
+            "scenario_id": "world-f-refutes",
+            "graph_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "decision_met": false
+          },
+          "support": {
+            "scenario_id": "world-f-refutes",
+            "source_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "joint_observation_model_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "dependence_groups": [
+              "new-region-morphology-review",
+              "challenger-session-21"
+            ],
+            "possible_joint_outcomes": [
+              {
+                "outcomes": [
+                  {
+                    "action_id": "inspect-x",
+                    "outcome": "x-right"
+                  },
+                  {
+                    "action_id": "inspect-y",
+                    "outcome": "y-other"
+                  },
+                  {
+                    "action_id": "inspect-z",
+                    "outcome": "z-c"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "attestation": {
+        "envelope_json_base64": "ewogICJwYXlsb2FkIjogImV5SmpiR0ZwYlY5elkyOXdaU0k2SW5ONWJuUm9aWFJwWXlCdmJteDVPeUJ1YnlCaWFXOXNiMmRwWTJGc0lHTnNZV2x0SWl3aVpHRjBZWE5sZEY5eVpYWnBjMmx2Ymw5amIyMXRhWFJmYzJoaElqb2lZV0ZoWVdGaFlXRmhZV0ZoWVdGaFlXRmhZV0ZoWVdGaFlXRmhZV0ZoWVdGaFlXRmhZV0ZoWVNJc0ltVjJhV1JsYm1ObFgzTm9ZVEkxTmlJNkltUmtaR1JrWkdSa1pHUmtaR1JrWkdSa1pHUmtaR1JrWkdSa1pHUmtaR1JrWkdSa1pHUmtaR1JrWkdSa1pHUmtaR1JrWkdSa1pHUmtaR1JrWkdSa1pHUWlMQ0psZUhCcGNtVnpYMkYwWDNWdWFYZ2lPakUzT1RRNU1EQXdNREFzSW1semMzVmxaRjloZEY5MWJtbDRJam94Tnprek9Ea3dNREF3TENKdlluTmxjblpsY2w5eVpXTnZjbVJmYVdRaU9pSnZZbk5sY25abGNpMW1hWGgwZFhKbExUQXdNU0lzSW5CeWIzUnZZMjlzWDNOb1lUSTFOaUk2SW1WbFpXVmxaV1ZsWldWbFpXVmxaV1ZsWldWbFpXVmxaV1ZsWldWbFpXVmxaV1ZsWldWbFpXVmxaV1ZsWldWbFpXVmxaV1ZsWldWbFpXVmxaV1ZsWldVaUxDSnhkV1Z5ZVY5cFpDSTZJbk41Ym5Sb1pYUnBZeTF4ZFdWeWVTSXNJbkYxWlhKNVgzTndaV05mYzJoaE1qVTJJam9pWW1KaVltSmlZbUppWW1KaVltSmlZbUppWW1KaVltSmlZbUppWW1KaVltSmlZbUppWW1KaVltSmlZbUppWW1KaVltSmlZbUppWW1KaVltSmlZbUppWWlJc0luTmphR1Z0WVY5MlpYSnphVzl1SWpveExDSnpkR0YwWlcxbGJuUmZhV1FpT2lKemVXNTBhR1YwYVdNdGIySnpaWEoyWVhScGIyNHRNREF4SWl3aWMzUmhkR1Z0Wlc1MFgzUjVjR1VpT2lKamIyNXVaV04wYjIxbExtOWljMlZ5ZG1GMGFXOXVMbll4SWl3aWMzVmlhbVZqZEY5emFHRXlOVFlpT2lKalkyTmpZMk5qWTJOalkyTmpZMk5qWTJOalkyTmpZMk5qWTJOalkyTmpZMk5qWTJOalkyTmpZMk5qWTJOalkyTmpZMk5qWTJOalkyTmpZMk5qWTJOakluMD0iLAogICJwYXlsb2FkX3R5cGUiOiAiYXBwbGljYXRpb24vdm5kLmx1bWlub3VzLmNvbm5lY3RvbWUtZXZpZGVuY2UranNvbjt2ZXJzaW9uPTEiLAogICJzaWduYXR1cmVzIjogWwogICAgewogICAgICAia2V5aWQiOiAiZml4dHVyZS1vYnNlcnZlci1rZXktdjEiLAogICAgICAic2lnIjogIkg1UWJhK0RNRGh1MHR2bjZKRG5WY25uQnhOcUc3UUl6TU45dWk1YXFRZElTSnVDVlhhMkNJSkJsRHFWTjQvSlAzb2VGZi9lbXRDT1R4cklWelpIVURRPT0iCiAgICB9LAogICAgewogICAgICAia2V5aWQiOiAiZml4dHVyZS1pbmRlcGVuZGVudF9yZXZpZXdlci1rZXktdjEiLAogICAgICAic2lnIjogInFZMkZIbFN0aFdzMzZOaXFVb3BMM3QxYjhxSlhlT2Q0SzhMbDNuTGVnblc3MzMvWE9LNGRZaHRQMU9oQ0VlWm5vZ1liUmYyaG9LVDVCbk9Jd1JoYkJBPT0iCiAgICB9LAogICAgewogICAgICAia2V5aWQiOiAiZml4dHVyZS1kYXRhX3N0ZXdhcmQta2V5LXYxIiwKICAgICAgInNpZyI6ICJxTTI5MWJrVTdDVXZ5Q24wcjc4T3R1SEhmeksxWDNKUDlGd0VscHJJUStuczJUdFhUbmV1QnJTWXoreGVhaFdudTRTeFptQTRoRnR4YkI1TUdTbXdEZz09IgogICAgfQogIF0KfQo=",
+        "trust_policy_json_base64": "ewogICJzY2hlbWFfdmVyc2lvbiI6IDEsCiAgInBvbGljeV9pZCI6ICJjb25uZWN0b21lLXN5bnRoZXRpYy10cnVzdC1wb2xpY3ktdjEiLAogICJtaW5pbXVtX3NpZ25hdHVyZXMiOiAzLAogICJyZXF1aXJlZF9yb2xlcyI6IFsib2JzZXJ2ZXIiLCAiaW5kZXBlbmRlbnRfcmV2aWV3ZXIiLCAiZGF0YV9zdGV3YXJkIl0sCiAgInRydXN0ZWRfa2V5cyI6IFsKICAgIHsKICAgICAgImtleV9pZCI6ICJmaXh0dXJlLW9ic2VydmVyLWtleS12MSIsCiAgICAgICJwdWJsaWNfa2V5X2hleCI6ICI2ZTRmNjkzYmU0YzNjZWQzODI1YTZjMzZhMzJjZjAyYzBjNzdkMjdlYTc5NTM4ZTQ0ZmU0YzM4OTdkZWFhNTIxIiwKICAgICAgInJvbGUiOiAib2JzZXJ2ZXIiLAogICAgICAidmFsaWRfZnJvbV91bml4IjogMTc5MDAwMDAwMCwKICAgICAgInZhbGlkX3VudGlsX3VuaXgiOiAxODAwMDAwMDAwLAogICAgICAicmV2b2tlZF9hdF91bml4IjogbnVsbAogICAgfSwKICAgIHsKICAgICAgImtleV9pZCI6ICJmaXh0dXJlLWluZGVwZW5kZW50X3Jldmlld2VyLWtleS12MSIsCiAgICAgICJwdWJsaWNfa2V5X2hleCI6ICI2MTM0NDFiMjg2MDA2ODJlNzFiMGE1NzMwNmY5Nzk5OGI3NDJlNDhmOWYxMTI2ZDRlYjJiYjI0MmYwMzU2ZGI2IiwKICAgICAgInJvbGUiOiAiaW5kZXBlbmRlbnRfcmV2aWV3ZXIiLAogICAgICAidmFsaWRfZnJvbV91bml4IjogMTc5MDAwMDAwMCwKICAgICAgInZhbGlkX3VudGlsX3VuaXgiOiAxODAwMDAwMDAwLAogICAgICAicmV2b2tlZF9hdF91bml4IjogbnVsbAogICAgfSwKICAgIHsKICAgICAgImtleV9pZCI6ICJmaXh0dXJlLWRhdGFfc3Rld2FyZC1rZXktdjEiLAogICAgICAicHVibGljX2tleV9oZXgiOiAiMzEwYjg2YThlOTcxOGRlZDlkZjcxZmZlZjBhNjIzMDkzNTdjZDg3YTkzYTAxODY5YjdhM2ZkZjU3ZmNiNzRlZCIsCiAgICAgICJyb2xlIjogImRhdGFfc3Rld2FyZCIsCiAgICAgICJ2YWxpZF9mcm9tX3VuaXgiOiAxNzkwMDAwMDAwLAogICAgICAidmFsaWRfdW50aWxfdW5peCI6IDE4MDAwMDAwMDAsCiAgICAgICJyZXZva2VkX2F0X3VuaXgiOiBudWxsCiAgICB9CiAgXQp9Cg==",
+        "expected_trust_policy_sha256": "0cb8afc26e7aafe3d212c65120ae8ef6a080be8bf75cce0f84412b2fa07d045e",
+        "verification_time_unix": 1793900000
+      }
+    },
+    {
+      "challenge_id": "append-supporting-world-with-covered-observation",
+      "challenger_evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "challenger_model_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "additions": [
+        {
+          "scenario": {
+            "scenario_id": "world-f-supports",
+            "graph_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "decision_met": true
+          },
+          "support": {
+            "scenario_id": "world-f-supports",
+            "source_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+            "joint_observation_model_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "dependence_groups": [
+              "same-observation-family"
+            ],
+            "possible_joint_outcomes": [
+              {
+                "outcomes": [
+                  {
+                    "action_id": "inspect-x",
+                    "outcome": "x-right"
+                  },
+                  {
+                    "action_id": "inspect-y",
+                    "outcome": "y-other"
+                  },
+                  {
+                    "action_id": "inspect-z",
+                    "outcome": "z-c"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "attestation": {
+        "envelope_json_base64": "ewogICJwYXlsb2FkIjogImV5SmpiR0ZwYlY5elkyOXdaU0k2SW5ONWJuUm9aWFJwWXlCdmJteDVPeUJ1YnlCaWFXOXNiMmRwWTJGc0lHTnNZV2x0SWl3aVpHRjBZWE5sZEY5eVpYWnBjMmx2Ymw5amIyMXRhWFJmYzJoaElqb2lZV0ZoWVdGaFlXRmhZV0ZoWVdGaFlXRmhZV0ZoWVdGaFlXRmhZV0ZoWVdGaFlXRmhZV0ZoWVNJc0ltVjJhV1JsYm1ObFgzTm9ZVEkxTmlJNkltUmtaR1JrWkdSa1pHUmtaR1JrWkdSa1pHUmtaR1JrWkdSa1pHUmtaR1JrWkdSa1pHUmtaR1JrWkdSa1pHUmtaR1JrWkdSa1pHUmtaR1JrWkdSa1pHUWlMQ0psZUhCcGNtVnpYMkYwWDNWdWFYZ2lPakUzT1RRNU1EQXdNREFzSW1semMzVmxaRjloZEY5MWJtbDRJam94Tnprek9Ea3dNREF3TENKdlluTmxjblpsY2w5eVpXTnZjbVJmYVdRaU9pSnZZbk5sY25abGNpMW1hWGgwZFhKbExUQXdNU0lzSW5CeWIzUnZZMjlzWDNOb1lUSTFOaUk2SW1WbFpXVmxaV1ZsWldWbFpXVmxaV1ZsWldWbFpXVmxaV1ZsWldWbFpXVmxaV1ZsWldWbFpXVmxaV1ZsWldWbFpXVmxaV1ZsWldWbFpXVmxaV1ZsWldVaUxDSnhkV1Z5ZVY5cFpDSTZJbk41Ym5Sb1pYUnBZeTF4ZFdWeWVTSXNJbkYxWlhKNVgzTndaV05mYzJoaE1qVTJJam9pWW1KaVltSmlZbUppWW1KaVltSmlZbUppWW1KaVltSmlZbUppWW1KaVltSmlZbUppWW1KaVltSmlZbUppWW1KaVltSmlZbUppWW1KaVltSmlZbUppWWlJc0luTmphR1Z0WVY5MlpYSnphVzl1SWpveExDSnpkR0YwWlcxbGJuUmZhV1FpT2lKemVXNTBhR1YwYVdNdGIySnpaWEoyWVhScGIyNHRNREF4SWl3aWMzUmhkR1Z0Wlc1MFgzUjVjR1VpT2lKamIyNXVaV04wYjIxbExtOWljMlZ5ZG1GMGFXOXVMbll4SWl3aWMzVmlhbVZqZEY5emFHRXlOVFlpT2lKalkyTmpZMk5qWTJOalkyTmpZMk5qWTJOalkyTmpZMk5qWTJOalkyTmpZMk5qWTJOalkyTmpZMk5qWTJOalkyTmpZMk5qWTJOalkyTmpZMk5qWTJOakluMD0iLAogICJwYXlsb2FkX3R5cGUiOiAiYXBwbGljYXRpb24vdm5kLmx1bWlub3VzLmNvbm5lY3RvbWUtZXZpZGVuY2UranNvbjt2ZXJzaW9uPTEiLAogICJzaWduYXR1cmVzIjogWwogICAgewogICAgICAia2V5aWQiOiAiZml4dHVyZS1vYnNlcnZlci1rZXktdjEiLAogICAgICAic2lnIjogIkg1UWJhK0RNRGh1MHR2bjZKRG5WY25uQnhOcUc3UUl6TU45dWk1YXFRZElTSnVDVlhhMkNJSkJsRHFWTjQvSlAzb2VGZi9lbXRDT1R4cklWelpIVURRPT0iCiAgICB9LAogICAgewogICAgICAia2V5aWQiOiAiZml4dHVyZS1pbmRlcGVuZGVudF9yZXZpZXdlci1rZXktdjEiLAogICAgICAic2lnIjogInFZMkZIbFN0aFdzMzZOaXFVb3BMM3QxYjhxSlhlT2Q0SzhMbDNuTGVnblc3MzMvWE9LNGRZaHRQMU9oQ0VlWm5vZ1liUmYyaG9LVDVCbk9Jd1JoYkJBPT0iCiAgICB9LAogICAgewogICAgICAia2V5aWQiOiAiZml4dHVyZS1kYXRhX3N0ZXdhcmQta2V5LXYxIiwKICAgICAgInNpZyI6ICJxTTI5MWJrVTdDVXZ5Q24wcjc4T3R1SEhmeksxWDNKUDlGd0VscHJJUStuczJUdFhUbmV1QnJTWXoreGVhaFdudTRTeFptQTRoRnR4YkI1TUdTbXdEZz09IgogICAgfQogIF0KfQo=",
+        "trust_policy_json_base64": "ewogICJzY2hlbWFfdmVyc2lvbiI6IDEsCiAgInBvbGljeV9pZCI6ICJjb25uZWN0b21lLXN5bnRoZXRpYy10cnVzdC1wb2xpY3ktdjEiLAogICJtaW5pbXVtX3NpZ25hdHVyZXMiOiAzLAogICJyZXF1aXJlZF9yb2xlcyI6IFsib2JzZXJ2ZXIiLCAiaW5kZXBlbmRlbnRfcmV2aWV3ZXIiLCAiZGF0YV9zdGV3YXJkIl0sCiAgInRydXN0ZWRfa2V5cyI6IFsKICAgIHsKICAgICAgImtleV9pZCI6ICJmaXh0dXJlLW9ic2VydmVyLWtleS12MSIsCiAgICAgICJwdWJsaWNfa2V5X2hleCI6ICI2ZTRmNjkzYmU0YzNjZWQzODI1YTZjMzZhMzJjZjAyYzBjNzdkMjdlYTc5NTM4ZTQ0ZmU0YzM4OTdkZWFhNTIxIiwKICAgICAgInJvbGUiOiAib2JzZXJ2ZXIiLAogICAgICAidmFsaWRfZnJvbV91bml4IjogMTc5MDAwMDAwMCwKICAgICAgInZhbGlkX3VudGlsX3VuaXgiOiAxODAwMDAwMDAwLAogICAgICAicmV2b2tlZF9hdF91bml4IjogbnVsbAogICAgfSwKICAgIHsKICAgICAgImtleV9pZCI6ICJmaXh0dXJlLWluZGVwZW5kZW50X3Jldmlld2VyLWtleS12MSIsCiAgICAgICJwdWJsaWNfa2V5X2hleCI6ICI2MTM0NDFiMjg2MDA2ODJlNzFiMGE1NzMwNmY5Nzk5OGI3NDJlNDhmOWYxMTI2ZDRlYjJiYjI0MmYwMzU2ZGI2IiwKICAgICAgInJvbGUiOiAiaW5kZXBlbmRlbnRfcmV2aWV3ZXIiLAogICAgICAidmFsaWRfZnJvbV91bml4IjogMTc5MDAwMDAwMCwKICAgICAgInZhbGlkX3VudGlsX3VuaXgiOiAxODAwMDAwMDAwLAogICAgICAicmV2b2tlZF9hdF91bml4IjogbnVsbAogICAgfSwKICAgIHsKICAgICAgImtleV9pZCI6ICJmaXh0dXJlLWRhdGFfc3Rld2FyZC1rZXktdjEiLAogICAgICAicHVibGljX2tleV9oZXgiOiAiMzEwYjg2YThlOTcxOGRlZDlkZjcxZmZlZjBhNjIzMDkzNTdjZDg3YTkzYTAxODY5YjdhM2ZkZjU3ZmNiNzRlZCIsCiAgICAgICJyb2xlIjogImRhdGFfc3Rld2FyZCIsCiAgICAgICJ2YWxpZF9mcm9tX3VuaXgiOiAxNzkwMDAwMDAwLAogICAgICAidmFsaWRfdW50aWxfdW5peCI6IDE4MDAwMDAwMDAsCiAgICAgICJyZXZva2VkX2F0X3VuaXgiOiBudWxsCiAgICB9CiAgXQp9Cg==",
+        "expected_trust_policy_sha256": "0cb8afc26e7aafe3d212c65120ae8ef6a080be8bf75cce0f84412b2fa07d045e",
+        "verification_time_unix": 1793900000
+      }
+    }
+  ],
+  "require_signed_attestations": true,
+  "support_challenges": [
+    {
+      "challenge_id": "add-query-relevant-outcome-to-world-d",
+      "challenger_evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "challenger_model_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "additions": [
+        {
+          "scenario_id": "world-d",
+          "source_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "joint_observation_model_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "dependence_groups": [
+            "shared-imaging-acquisition",
+            "challenger-reviewer-session-17"
+          ],
+          "possible_joint_outcomes": [
+            {
+              "outcomes": [
+                {
+                  "action_id": "inspect-x",
+                  "outcome": "x-right"
+                },
+                {
+                  "action_id": "inspect-y",
+                  "outcome": "y-d"
+                },
+                {
+                  "action_id": "inspect-z",
+                  "outcome": "z-c"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "attestation": {
+        "envelope_json_base64": "ewogICJwYXlsb2FkIjogImV5SmpiR0ZwYlY5elkyOXdaU0k2SW5ONWJuUm9aWFJwWXlCdmJteDVPeUJ1YnlCaWFXOXNiMmRwWTJGc0lHTnNZV2x0SWl3aVpHRjBZWE5sZEY5eVpYWnBjMmx2Ymw5amIyMXRhWFJmYzJoaElqb2lZV0ZoWVdGaFlXRmhZV0ZoWVdGaFlXRmhZV0ZoWVdGaFlXRmhZV0ZoWVdGaFlXRmhZV0ZoWVNJc0ltVjJhV1JsYm1ObFgzTm9ZVEkxTmlJNkltUmtaR1JrWkdSa1pHUmtaR1JrWkdSa1pHUmtaR1JrWkdSa1pHUmtaR1JrWkdSa1pHUmtaR1JrWkdSa1pHUmtaR1JrWkdSa1pHUmtaR1JrWkdSa1pHUWlMQ0psZUhCcGNtVnpYMkYwWDNWdWFYZ2lPakUzT1RRNU1EQXdNREFzSW1semMzVmxaRjloZEY5MWJtbDRJam94Tnprek9Ea3dNREF3TENKdlluTmxjblpsY2w5eVpXTnZjbVJmYVdRaU9pSnZZbk5sY25abGNpMW1hWGgwZFhKbExUQXdNU0lzSW5CeWIzUnZZMjlzWDNOb1lUSTFOaUk2SW1WbFpXVmxaV1ZsWldWbFpXVmxaV1ZsWldWbFpXVmxaV1ZsWldWbFpXVmxaV1ZsWldWbFpXVmxaV1ZsWldWbFpXVmxaV1ZsWldWbFpXVmxaV1ZsWldVaUxDSnhkV1Z5ZVY5cFpDSTZJbk41Ym5Sb1pYUnBZeTF4ZFdWeWVTSXNJbkYxWlhKNVgzTndaV05mYzJoaE1qVTJJam9pWW1KaVltSmlZbUppWW1KaVltSmlZbUppWW1KaVltSmlZbUppWW1KaVltSmlZbUppWW1KaVltSmlZbUppWW1KaVltSmlZbUppWW1KaVltSmlZbUppWWlJc0luTmphR1Z0WVY5MlpYSnphVzl1SWpveExDSnpkR0YwWlcxbGJuUmZhV1FpT2lKemVXNTBhR1YwYVdNdGIySnpaWEoyWVhScGIyNHRNREF4SWl3aWMzUmhkR1Z0Wlc1MFgzUjVjR1VpT2lKamIyNXVaV04wYjIxbExtOWljMlZ5ZG1GMGFXOXVMbll4SWl3aWMzVmlhbVZqZEY5emFHRXlOVFlpT2lKalkyTmpZMk5qWTJOalkyTmpZMk5qWTJOalkyTmpZMk5qWTJOalkyTmpZMk5qWTJOalkyTmpZMk5qWTJOalkyTmpZMk5qWTJOalkyTmpZMk5qWTJOakluMD0iLAogICJwYXlsb2FkX3R5cGUiOiAiYXBwbGljYXRpb24vdm5kLmx1bWlub3VzLmNvbm5lY3RvbWUtZXZpZGVuY2UranNvbjt2ZXJzaW9uPTEiLAogICJzaWduYXR1cmVzIjogWwogICAgewogICAgICAia2V5aWQiOiAiZml4dHVyZS1vYnNlcnZlci1rZXktdjEiLAogICAgICAic2lnIjogIkg1UWJhK0RNRGh1MHR2bjZKRG5WY25uQnhOcUc3UUl6TU45dWk1YXFRZElTSnVDVlhhMkNJSkJsRHFWTjQvSlAzb2VGZi9lbXRDT1R4cklWelpIVURRPT0iCiAgICB9LAogICAgewogICAgICAia2V5aWQiOiAiZml4dHVyZS1pbmRlcGVuZGVudF9yZXZpZXdlci1rZXktdjEiLAogICAgICAic2lnIjogInFZMkZIbFN0aFdzMzZOaXFVb3BMM3QxYjhxSlhlT2Q0SzhMbDNuTGVnblc3MzMvWE9LNGRZaHRQMU9oQ0VlWm5vZ1liUmYyaG9LVDVCbk9Jd1JoYkJBPT0iCiAgICB9LAogICAgewogICAgICAia2V5aWQiOiAiZml4dHVyZS1kYXRhX3N0ZXdhcmQta2V5LXYxIiwKICAgICAgInNpZyI6ICJxTTI5MWJrVTdDVXZ5Q24wcjc4T3R1SEhmeksxWDNKUDlGd0VscHJJUStuczJUdFhUbmV1QnJTWXoreGVhaFdudTRTeFptQTRoRnR4YkI1TUdTbXdEZz09IgogICAgfQogIF0KfQo=",
+        "trust_policy_json_base64": "ewogICJzY2hlbWFfdmVyc2lvbiI6IDEsCiAgInBvbGljeV9pZCI6ICJjb25uZWN0b21lLXN5bnRoZXRpYy10cnVzdC1wb2xpY3ktdjEiLAogICJtaW5pbXVtX3NpZ25hdHVyZXMiOiAzLAogICJyZXF1aXJlZF9yb2xlcyI6IFsib2JzZXJ2ZXIiLCAiaW5kZXBlbmRlbnRfcmV2aWV3ZXIiLCAiZGF0YV9zdGV3YXJkIl0sCiAgInRydXN0ZWRfa2V5cyI6IFsKICAgIHsKICAgICAgImtleV9pZCI6ICJmaXh0dXJlLW9ic2VydmVyLWtleS12MSIsCiAgICAgICJwdWJsaWNfa2V5X2hleCI6ICI2ZTRmNjkzYmU0YzNjZWQzODI1YTZjMzZhMzJjZjAyYzBjNzdkMjdlYTc5NTM4ZTQ0ZmU0YzM4OTdkZWFhNTIxIiwKICAgICAgInJvbGUiOiAib2JzZXJ2ZXIiLAogICAgICAidmFsaWRfZnJvbV91bml4IjogMTc5MDAwMDAwMCwKICAgICAgInZhbGlkX3VudGlsX3VuaXgiOiAxODAwMDAwMDAwLAogICAgICAicmV2b2tlZF9hdF91bml4IjogbnVsbAogICAgfSwKICAgIHsKICAgICAgImtleV9pZCI6ICJmaXh0dXJlLWluZGVwZW5kZW50X3Jldmlld2VyLWtleS12MSIsCiAgICAgICJwdWJsaWNfa2V5X2hleCI6ICI2MTM0NDFiMjg2MDA2ODJlNzFiMGE1NzMwNmY5Nzk5OGI3NDJlNDhmOWYxMTI2ZDRlYjJiYjI0MmYwMzU2ZGI2IiwKICAgICAgInJvbGUiOiAiaW5kZXBlbmRlbnRfcmV2aWV3ZXIiLAogICAgICAidmFsaWRfZnJvbV91bml4IjogMTc5MDAwMDAwMCwKICAgICAgInZhbGlkX3VudGlsX3VuaXgiOiAxODAwMDAwMDAwLAogICAgICAicmV2b2tlZF9hdF91bml4IjogbnVsbAogICAgfSwKICAgIHsKICAgICAgImtleV9pZCI6ICJmaXh0dXJlLWRhdGFfc3Rld2FyZC1rZXktdjEiLAogICAgICAicHVibGljX2tleV9oZXgiOiAiMzEwYjg2YThlOTcxOGRlZDlkZjcxZmZlZjBhNjIzMDkzNTdjZDg3YTkzYTAxODY5YjdhM2ZkZjU3ZmNiNzRlZCIsCiAgICAgICJyb2xlIjogImRhdGFfc3Rld2FyZCIsCiAgICAgICJ2YWxpZF9mcm9tX3VuaXgiOiAxNzkwMDAwMDAwLAogICAgICAidmFsaWRfdW50aWxfdW5peCI6IDE4MDAwMDAwMDAsCiAgICAgICJyZXZva2VkX2F0X3VuaXgiOiBudWxsCiAgICB9CiAgXQp9Cg==",
+        "expected_trust_policy_sha256": "0cb8afc26e7aafe3d212c65120ae8ef6a080be8bf75cce0f84412b2fa07d045e",
+        "verification_time_unix": 1793900000
+      }
+    }
+  ]
+}
