@@ -12,4 +12,4 @@ The CEB Contract Validation V0 workflow also runs `scripts/audit_doc_command_cla
 
 ## Measurement and comparative claims
 
-The CEB-wide [measurement matrix](../measurement-matrix.v0.json) and [comparative claim protocol](../../../docs/research/CEB_MEASUREMENT_AND_COMPARATIVE_CLAIM_PROTOCOL_V0_2026-11-05.md) define the primary metrics, external comparators, baseline arms, evidence authorities, hard gates and holdout design across 13 CEB lanes. The matrix is design-only; it does not contain CEB performance results.
+The CEB-wide [measurement matrix](../measurement-matrix.v0.json) and [comparative claim protocol](../../../docs/research/CEB_MEASUREMENT_CLAIM_PROTOCOL_V0_2026-11-05.md) define the primary metrics, external comparators, baseline arms, evidence authorities, hard gates and holdout design across 13 CEB lanes. The matrix is design-only; it does not contain CEB performance results.
