@@ -72,7 +72,7 @@
       "title": "Microsoft Research CRBugBench paper",
       "source_type": "paper",
       "accessed_on": "2026-11-05",
-      "published_on": "2026-10-01",
+      "published_on": null,
       "supports": [
         "CEB-REVIEW"
       ]
@@ -94,7 +94,7 @@
       "title": "Rust-SWE-bench and RUSTFORGER ICSE 2026 paper",
       "source_type": "paper",
       "accessed_on": "2026-11-05",
-      "published_on": "2026-02-01",
+      "published_on": null,
       "supports": [
         "CEB-RUST"
       ]
@@ -105,7 +105,7 @@
       "title": "SWE-fficiency ICML 2026 paper",
       "source_type": "paper",
       "accessed_on": "2026-11-05",
-      "published_on": "2026-07-01",
+      "published_on": null,
       "supports": [
         "CEB-OPT"
       ]
@@ -150,7 +150,7 @@
       "title": "AgentAbstain benchmark and leaderboard",
       "source_type": "benchmark_leaderboard",
       "accessed_on": "2026-11-05",
-      "published_on": "2026-11-05",
+      "published_on": null,
       "supports": [
         "CEB-HUMAN"
       ]
@@ -1158,11 +1158,11 @@
       "metric": {
         "metric_id": "exploration_prompt_lift",
         "label": "Exploration-prompt performance lift",
-        "definition": "Maximum reported performance lift from exploration-nudging prompt changes; not a distinct absolute score.",
+        "definition": "Maximum relative performance lift reported for exploration-nudging prompt changes; source does not specify percentage-point interpretation.",
         "value": 5.8,
         "value_status": "reported",
         "operator": "equal",
-        "unit": "percentage_points",
+        "unit": "reported_percent_lift",
         "direction": "maximize",
         "raw_display": "up to 5.8% performance lift",
         "uncertainty": {
