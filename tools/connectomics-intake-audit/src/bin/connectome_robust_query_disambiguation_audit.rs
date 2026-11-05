@@ -196,7 +196,9 @@ fn canonical_action_set_sha256(actions: &[ObservationAction]) -> String {
     hasher.update((rows.len() as u64).to_be_bytes());
     for mut action in rows {
         action.dependence_groups.sort();
-        action.outcomes.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
+        action
+            .outcomes
+            .sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
         hasher.update(b"ACTION");
         hash_field(&mut hasher, &action.action_id);
         hash_field(&mut hasher, action.action_kind.as_str());
@@ -337,7 +339,10 @@ fn validate(input: &Input) -> Result<Vec<OutcomesByWorld>, String> {
                     ));
                 }
             }
-            if outcomes.insert(outcome.scenario_id.clone(), possible).is_some() {
+            if outcomes
+                .insert(outcome.scenario_id.clone(), possible)
+                .is_some()
+            {
                 return Err(format!(
                     "action {} has duplicate outcome set for world {}",
                     action.action_id, outcome.scenario_id
@@ -499,16 +504,15 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         .collect::<Vec<_>>();
     let robustly_separable = pair_count - robustly_undiscriminable_pairs.len();
 
-    let (subset_count, minimum_count, mut plans, min_cost) = if pair_count == 0
-        || !robustly_undiscriminable_pairs.is_empty()
-    {
-        (0, 0, Vec::new(), None)
-    } else {
-        let (subsets, count, plans) =
-            exact_minimum_robust_plan(input, &pairs, &outcomes_by_action)?;
-        let cost = plans.first().map(|plan| plan.effort_units);
-        (subsets, count, plans, cost)
-    };
+    let (subset_count, minimum_count, mut plans, min_cost) =
+        if pair_count == 0 || !robustly_undiscriminable_pairs.is_empty() {
+            (0, 0, Vec::new(), None)
+        } else {
+            let (subsets, count, plans) =
+                exact_minimum_robust_plan(input, &pairs, &outcomes_by_action)?;
+            let cost = plans.first().map(|plan| plan.effort_units);
+            (subsets, count, plans, cost)
+        };
     let status = if pair_count == 0 {
         "NO_DECISION_DISAGREEMENT_WITHIN_DECLARED_SCENARIOS"
     } else if !robustly_undiscriminable_pairs.is_empty() {
@@ -563,14 +567,18 @@ fn main() -> ExitCode {
     let input_bytes = match fs::read(&args.input) {
         Ok(bytes) => bytes,
         Err(error) => {
-            eprintln!("connectome-robust-query-disambiguation-audit: could not read input: {error}");
+            eprintln!(
+                "connectome-robust-query-disambiguation-audit: could not read input: {error}"
+            );
             return ExitCode::from(2);
         }
     };
     let input: Input = match serde_json::from_slice(&input_bytes) {
         Ok(input) => input,
         Err(error) => {
-            eprintln!("connectome-robust-query-disambiguation-audit: invalid JSON input: {error}");
+            eprintln!(
+                "connectome-robust-query-disambiguation-audit: invalid JSON input: {error}"
+            );
             return ExitCode::from(2);
         }
     };
@@ -584,13 +592,17 @@ fn main() -> ExitCode {
     let rendered = match serde_json::to_string_pretty(&report) {
         Ok(json) => json + "\n",
         Err(error) => {
-            eprintln!("connectome-robust-query-disambiguation-audit: could not serialize report: {error}");
+            eprintln!(
+                "connectome-robust-query-disambiguation-audit: could not serialize report: {error}"
+            );
             return ExitCode::from(2);
         }
     };
     if let Some(path) = args.output {
         if let Err(error) = fs::write(path, rendered.as_bytes()) {
-            eprintln!("connectome-robust-query-disambiguation-audit: could not write report: {error}");
+            eprintln!(
+                "connectome-robust-query-disambiguation-audit: could not write report: {error}"
+            );
             return ExitCode::from(2);
         }
     } else {
@@ -628,17 +640,22 @@ mod tests {
         assert_eq!(report.minimum_plan_count, 2);
         assert_eq!(report.subset_count_evaluated, 31);
         assert_eq!(report.status, "MINIMUM_COST_ROBUST_DISAMBIGUATION_PLAN");
-        assert!(report.plans.iter().all(|plan| {
-            plan.action_ids.len() == 2 && plan.effort_units == 4
-        }));
+        assert!(
+            report
+                .plans
+                .iter()
+                .all(|plan| { plan.action_ids.len() == 2 && plan.effort_units == 4 })
+        );
     }
 
     #[test]
     fn overlapping_possible_outcomes_do_not_count_as_robust_separation() {
         let input = fixture();
         let report = evaluate(&input, &fixture_bytes()).unwrap();
-        let synapse = report.action_pair_coverage.iter()
-            .find(|row| row.action_id == "inspect-synapse")
+        let synapse = report
+            .action_pair_coverage
+            .iter()
+            .find(|row| row.action_id == "inspect-synapse" )
             .unwrap();
         assert_eq!(synapse.robustly_separated_decision_conflict_pair_count, 1);
     }
@@ -678,7 +695,11 @@ mod tests {
     fn possible_outcome_sets_must_be_complete_and_unique() {
         let mut input = fixture();
         input.actions[0].outcomes[0].possible_outcomes.clear();
-        assert!(validate(&input).unwrap_err().contains("at least one possible outcome"));
+        assert!(
+            validate(&input)
+                .unwrap_err()
+                .contains("at least one possible outcome")
+        );
     }
 
     #[test]
@@ -695,7 +716,10 @@ mod tests {
                 outcome.possible_outcomes.reverse();
             }
         }
-        assert_eq!(scenario_hash, canonical_scenario_set_sha256(&input.scenarios));
+        assert_eq!(
+            scenario_hash,
+            canonical_scenario_set_sha256(&input.scenarios)
+        );
         assert_eq!(action_hash, canonical_action_set_sha256(&input.actions));
     }
 
@@ -703,7 +727,11 @@ mod tests {
     fn scenario_set_digest_mismatch_fails_closed() {
         let mut input = fixture();
         input.scenario_set_sha256 = "0".repeat(64);
-        assert!(validate(&input).unwrap_err().contains("scenario-set digest mismatch"));
+        assert!(
+            validate(&input)
+                .unwrap_err()
+                .contains("scenario-set digest mismatch")
+        );
     }
 
     #[test]
