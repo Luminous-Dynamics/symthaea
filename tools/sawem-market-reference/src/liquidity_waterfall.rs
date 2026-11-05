@@ -185,8 +185,14 @@ fn assess_path<'a>(
             match event.kind {
                 LiquidityCashEventKind::RequiredCoverReassessment => {
                     deadline_cover = Some(event.amount_minor_zar);
-                    minimum_cover_shortfall = deadline_cover
-                        .map(|required| required.saturating_sub(inputs.posted_credit_cover_minor_zar));
+                    let current_shortfall = event
+                        .amount_minor_zar
+                        .saturating_sub(inputs.posted_credit_cover_minor_zar);
+                    maximum_cover_shortfall = Some(
+                        maximum_cover_shortfall
+                            .unwrap_or(current_shortfall)
+                            .max(current_shortfall),
+                    );
                 }
                 _ => {
                     cash = cash
@@ -259,7 +265,7 @@ fn assess_path<'a>(
         cash_at_cover_deadline_minor_zar: cash_at_deadline,
         cash_headroom_at_cover_deadline_minor_zar: headroom_u64,
         first_operating_floor_breach: first_breach,
-        maximum_cover_shortfall_minor_zar: minimum_cover_shortfall,
+        maximum_cover_shortfall_minor_zar: maximum_cover_shortfall,
         cover_shortfall_at_deadline_minor_zar: shortfall_at_deadline,
         potentially_fundable_cover_at_deadline_minor_zar: potentially_fundable,
         external_funding_gap_at_deadline_minor_zar: external_gap,
