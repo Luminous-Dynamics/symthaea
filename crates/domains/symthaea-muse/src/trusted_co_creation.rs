@@ -326,6 +326,12 @@ impl<'a> TrustedCoCreationAdapterV1<'a> {
             .ok_or(TrustedCoCreationErrorV1::SequenceExhausted)?;
         let purpose = action_purpose(&action);
 
+        // Authenticate before querying grant or artifact state; a caller
+        // without a valid identity must not get a grant-existence oracle.
+        self.actor_authenticator
+            .authenticate_actor(credential_bytes, participant_id)
+            .map_err(TrustedCoCreationErrorV1::Boundary)?;
+
         let grant = self
             .session
             .grants()
@@ -348,12 +354,6 @@ impl<'a> TrustedCoCreationAdapterV1<'a> {
         {
             return Err(CreativeEcologyError::ConsentNotActive.into());
         }
-
-        // Authenticate before artifact reads; an unauthenticated caller must
-        // not use this adapter as an artifact-existence oracle.
-        self.actor_authenticator
-            .authenticate_actor(credential_bytes, participant_id)
-            .map_err(TrustedCoCreationErrorV1::Boundary)?;
 
         let artifact_sha256s = referenced_artifact_digests(self.session, &action)?;
         let mut artifact_evidence = Vec::with_capacity(artifact_sha256s.len());
@@ -579,9 +579,7 @@ fn encode_hex(bytes: &[u8]) -> String {
 
 fn is_sha256_hex(value: &str) -> bool {
     value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 /// Shared test support for host-provided implementations.
