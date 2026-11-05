@@ -18,7 +18,8 @@ use super::ranking::{
 };
 use super::scenario::{RobustUtility, ScenarioDefinition};
 use super::score_bounds::{
-    ScoreBoundsReceipt, ANYTIME_ALPHA_SPENDING_RULE_ID, ANYTIME_SCORE_BOUND_METHOD_ID,
+    verify_score_bounds_receipt, ScoreBoundsReceipt, ANYTIME_ALPHA_SPENDING_RULE_ID,
+    ANYTIME_SCORE_BOUND_METHOD_ID,
 };
 use super::sequential::OperationalAction;
 
@@ -140,6 +141,8 @@ pub enum AdaptiveAllocationError {
     ReplicationCountOverflow,
     MissingScoreSampleCell,
     SampleMetricCountMismatch,
+    InvalidScoreReceipt,
+    AllocationReceiptRecomputationMismatch,
     NoActionableCell,
     InvalidScenarioWeights,
     InvalidCvarTailMass,
@@ -161,6 +164,8 @@ impl fmt::Display for AdaptiveAllocationError {
             Self::ReplicationCountOverflow => "total or per-cell replication count overflowed",
             Self::MissingScoreSampleCell => "score receipt is missing a raw sample cell",
             Self::SampleMetricCountMismatch => "metric score vectors do not have a common per-cell sample count",
+            Self::InvalidScoreReceipt => "score receipt failed raw-sample recomputation before allocation replay",
+            Self::AllocationReceiptRecomputationMismatch => "allocation receipt does not reproduce from the frozen score receipt and allocation configuration",
             Self::NoActionableCell => "no competitive action/scenario cell can receive another replication",
             Self::InvalidScenarioWeights => "scenario weights must be finite, positive and normalized",
             Self::InvalidCvarTailMass => "CVaR tail mass must be finite and in (0, 1]",
@@ -380,6 +385,31 @@ pub fn allocate_next_score_batch(
         cell_priorities: priorities,
         next_batch: Some(next_batch),
     })
+}
+
+/// Deterministically replay and verify an allocation receipt.
+///
+/// This verifier first reconstructs the score-bound receipt from its raw samples,
+/// then reruns the registered allocator with the supplied frozen configuration
+/// and compares every field of the resulting allocation receipt. It detects
+/// modified priorities, certificates, dispositions, batch requests and seeds.
+///
+/// This is a replay verifier, not an independent second implementation of the
+/// allocation algorithm. Caller-provided digest strings are compared as opaque
+/// commitments; this function does not authenticate hashes or signatures.
+pub fn verify_adaptive_allocation_receipt(
+    score_receipt: &ScoreBoundsReceipt,
+    config: &AdaptiveAllocationConfig,
+    allocation_receipt: &AdaptiveAllocationReceipt,
+) -> Result<(), AdaptiveAllocationError> {
+    verify_score_bounds_receipt(score_receipt)
+        .map_err(|_| AdaptiveAllocationError::InvalidScoreReceipt)?;
+
+    let expected = allocate_next_score_batch(score_receipt, config)?;
+    if &expected != allocation_receipt {
+        return Err(AdaptiveAllocationError::AllocationReceiptRecomputationMismatch);
+    }
+    Ok(())
 }
 
 fn build_stop_receipt(
@@ -801,6 +831,86 @@ mod tests {
             max_total_replications: max_total,
             next_batch_size: batch,
         }
+    }
+
+    #[test]
+    fn allocation_receipts_replay_for_batch_and_stop_dispositions() {
+        let receipt = score_receipt(4, [0.8, 0.7], true);
+        let cfg = config(0.01, 40, 3);
+        let allocation = allocate_next_score_batch(&receipt, &cfg).unwrap();
+        assert_eq!(allocation.disposition, AllocationDisposition::AllocateMore);
+        assert_eq!(
+            verify_adaptive_allocation_receipt(&receipt, &cfg, &allocation),
+            Ok(())
+        );
+
+        let stop_score = score_receipt(2_000, [0.9, 0.1], true);
+        let stop_cfg = config(0.3, 20_000, 10);
+        let stop = allocate_next_score_batch(&stop_score, &stop_cfg).unwrap();
+        assert_eq!(stop.disposition, AllocationDisposition::CertifiedStop);
+        assert_eq!(
+            verify_adaptive_allocation_receipt(&stop_score, &stop_cfg, &stop),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn allocation_receipt_replay_rejects_mutated_priorities_seeds_and_disposition() {
+        let score = score_receipt(4, [0.8, 0.7], true);
+        let cfg = config(0.01, 40, 3);
+        let valid = allocate_next_score_batch(&score, &cfg).unwrap();
+
+        let mut bad_priority = valid.clone();
+        bad_priority.cell_priorities[0].priority += 0.01;
+        assert_eq!(
+            verify_adaptive_allocation_receipt(&score, &cfg, &bad_priority),
+            Err(AdaptiveAllocationError::AllocationReceiptRecomputationMismatch)
+        );
+
+        let mut bad_seed = valid.clone();
+        bad_seed.next_batch.as_mut().unwrap().cells[0].seeds[0] ^= 1;
+        assert_eq!(
+            verify_adaptive_allocation_receipt(&score, &cfg, &bad_seed),
+            Err(AdaptiveAllocationError::AllocationReceiptRecomputationMismatch)
+        );
+
+        let mut bad_disposition = valid.clone();
+        bad_disposition.disposition = AllocationDisposition::BudgetExhaustedWithoutCertificate;
+        assert_eq!(
+            verify_adaptive_allocation_receipt(&score, &cfg, &bad_disposition),
+            Err(AdaptiveAllocationError::AllocationReceiptRecomputationMismatch)
+        );
+
+        let mut bad_competitors = valid.clone();
+        bad_competitors.competitive_action_ids.clear();
+        assert_eq!(
+            verify_adaptive_allocation_receipt(&score, &cfg, &bad_competitors),
+            Err(AdaptiveAllocationError::AllocationReceiptRecomputationMismatch)
+        );
+
+        let mut bad_digest = valid.clone();
+        bad_digest.score_receipt_digest.push_str("-tampered");
+        assert_eq!(
+            verify_adaptive_allocation_receipt(&score, &cfg, &bad_digest),
+            Err(AdaptiveAllocationError::AllocationReceiptRecomputationMismatch)
+        );
+
+        let mut changed_config = cfg.clone();
+        changed_config.root_seed ^= 1;
+        assert!(verify_adaptive_allocation_receipt(&score, &changed_config, &valid).is_err());
+    }
+
+    #[test]
+    fn allocation_receipt_replay_rejects_tampered_raw_score_samples() {
+        let mut score = score_receipt(4, [0.8, 0.7], true);
+        let cfg = config(0.01, 40, 3);
+        let valid = allocate_next_score_batch(&score, &cfg).unwrap();
+
+        score.samples[0].target_information[0] += 0.01;
+        assert_eq!(
+            verify_adaptive_allocation_receipt(&score, &cfg, &valid),
+            Err(AdaptiveAllocationError::InvalidScoreReceipt)
+        );
     }
 
     #[test]
