@@ -24,9 +24,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - name: Checkout exact triggering revision
+      - name: Checkout exact PR head or dispatched revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Set up pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
