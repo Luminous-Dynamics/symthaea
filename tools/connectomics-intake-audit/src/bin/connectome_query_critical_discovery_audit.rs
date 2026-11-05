@@ -736,7 +736,7 @@ fn validate_input(input: &Input, input_bytes: &[u8]) -> Result<Value, String> {
         "zero_proposal_psu_count": zero_proposal_psu_count,
         "channel_count": channels.len(),
         "proposal_count": input.proposals.len(),
-        "confirmed_match_count": captured_alternatives_by_channel.values().map(BTreeSet::len).sum::<usize>(),
+        "confirmed_match_count": confirmed_matches_by_channel.values().sum::<usize>(),
         "alternative_count": input.alternatives.len(),
         "admissible_alternative_count": admissible_alternative_count,
         "query_critical_alternative_count": query_critical_ids.len(),
