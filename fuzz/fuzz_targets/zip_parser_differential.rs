@@ -119,6 +119,7 @@ fuzz_target!(|data: &[u8]| {
         if oracle_method != expected.compression_method {
             mismatch("compression method differs");
         }
+        let oracle_crc32 = member.crc32();
 
         if expected.kind != EntryKind::File
             || expected.encrypted
@@ -163,7 +164,7 @@ fuzz_target!(|data: &[u8]| {
             if !verified.verified_crc32 {
                 mismatch("custom reader reported success without independent CRC acceptance");
             }
-            if verified.observed_crc32 != member.crc32() {
+            if verified.observed_crc32 != oracle_crc32 {
                 mismatch("custom streaming CRC differs from zip-rs central-directory CRC");
             }
         }
