@@ -11,6 +11,7 @@ digest. It is **not** a source-tree digest and must not be substituted for one.
 
 - Every input byte string is passed through `verify_receipt_json` before projection.
 - Every metric pins benchmark ID/version/revision, dataset-manifest digest, scoring-formula ID, grader version and a frozen score transform.
+- The frozen plan declares zero, one, or multiple parent candidate system-identity digests; comparison rejects any parent not explicitly declared. This supports root, mutation and hybrid candidates without treating the receipt itself as lineage authority.
 - All metric runs for one candidate must cover the exact same eligible task universe,
   share the same candidate system identity, and use compatible cohort, runner, comparison,
   protocol and budget context.
@@ -30,8 +31,12 @@ The receipt validator proves schema and accounting consistency relative to its c
 It does not authenticate a producer, qualify runner isolation, prove grader truth, or
 verify independent regrade. This composer always reports that lower assurance ceiling.
 It does not establish source-tree identity; bind the actual source tree through its own
-evidence and applicable attestation/regrade path. Use the independent attestation, trust
-and isolation owners before confirmatory claims.
+evidence and applicable attestation/regrade path. The system identity digest binds the
+receipt's declared model ID, but cannot prove that a mutable model alias refers to immutable
+weight bytes; model/checkpoint provenance must be made content-addressed in the upstream
+receipt/attestation path. The declared parent digests and cluster map are caller-supplied
+plan claims, not cryptographically authenticated lineage. Use the independent attestation,
+trust and isolation owners before confirmatory claims.
 
 The cluster mapping and experiment preregistration digest are supplied by the caller. The
 composer checks exact coverage and binds them into an in-memory context digest, but does
