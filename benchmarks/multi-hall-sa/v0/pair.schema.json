@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/multi-hall-sa-pair-v0.schema.json",
+  "title": "Multi-Hall-SA normalized pair metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "pair_id", "file_id", "fact_index", "language", "hallucination_type"],
+  "properties": {
+    "schema_version": {"const": "multi-hall-sa-pair-v0"},
+    "pair_id": {"type": "string", "minLength": 1},
+    "file_id": {"type": "string", "minLength": 1},
+    "fact_index": {"type": "integer", "minimum": 0},
+    "language": {"type": "string", "enum": ["isiZulu", "isiXhosa", "Sepedi", "Sesotho"]},
+    "hallucination_type": {
+      "type": "string",
+      "enum": ["temporal shift", "entity error", "numerical inaccuracy", "location mistake"]
+    }
+  }
+}
