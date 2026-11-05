@@ -162,3 +162,18 @@ The generator returns a canonical request/trial receipt. Each trial retains obse
 Random streams are keyed by root seed, scenario, participant and trial identity, so permuting the input request vector leaves each generated trial unchanged. The versioned SplitMix64 generator is for reproducible simulation, not cryptographic randomness or production random assignment. Caller-supplied scenario/action digests are opaque commitments; this module does not hash or sign the dataset.
 
 The v0.1 DGP does not model correlated participant random effects, sequential learning beyond linear criterion drift, a validated cognitive RT model, or human behavior. The Student-t family is a controlled heavy-tail alternative. Synthetic data cannot validate a human protocol or establish empirical performance.
+
+
+## Simultaneous candidate-score confidence bounds (experimental)
+
+The `score_bounds` module converts bounded independent Monte Carlo replicate vectors into simultaneous finite-sample score bounds for candidate decisions. For each action × scenario pair, callers provide replicate vectors for target information, model discrimination, representativeness, target utility and participant burden, with a frozen finite range for each family.
+
+For R action × scenario records it allocates `familywise_alpha` across six one-sided tail claims per record: lower bounds for target information, model discrimination, representativeness and target utility; an upper bound for participant burden; and a second upper bound for target utility. Thus `delta = familywise_alpha / (6R)`. The one-sided Hoeffding radius is:
+
+`(upper - lower) * sqrt(log(1 / delta) / (2 * n))`.
+
+Information, model-discrimination and representativeness use lower bounds; participant burden uses an upper bound; utility receives both lower and upper bounds so a separate indifference-zone selector can construct a robust-utility interval. The resulting point estimates and bounds map directly into `ScenarioOutcome` and can be passed to `aggregate_scenario_assessments`. The batch preserves every raw replicate vector, declared range, familywise/per-claim alpha, seed, source digest, score-contract digest, the frozen action snapshot and the normalized scenario snapshot.
+
+Bonferroni does not require independence across action/metric claims, but Hoeffding does require independent bounded Monte Carlo replications within each score series. This method is intentionally conservative; it is not an empirical Bernstein estimate. It quantifies Monte Carlo uncertainty about the supplied score-generating process only. It cannot repair a biased simulator, an invalid score definition, a wrong estimand or an incomplete scenario bank. A simultaneous bound around a biased point-generating process is still biased.
+
+All bounds and ranges are caller-contractual: the implementation validates sample membership and range ordering, but it does not prove that the declared ranges or independent-replication assumptions are scientifically correct. The method ID is `hoeffding-bonferroni-one-sided-v1`. The module is experimental and is not authorized for live adaptive experiments.

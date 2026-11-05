@@ -1750,3 +1750,6 @@ pub mod scenario;
 
 /// Known-truth observer and measurement-channel generation for SPECTRA.
 pub mod scenario_dgp;
+
+/// Simultaneous finite-sample confidence bounds for candidate score Monte Carlo.
+pub mod score_bounds;
