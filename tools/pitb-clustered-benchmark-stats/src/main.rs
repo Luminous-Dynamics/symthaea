@@ -142,6 +142,7 @@ struct Report {
     schema_version: String,
     evaluation_split_git_blob_sha1: String,
     evaluation_split_raw_sha256: String,
+    synthetic_fixture: bool,
     proof_runs_jsonl_sha256: String,
     evaluation_task_count: usize,
     strategy_summaries: Vec<StrategyIdentity>,
@@ -638,11 +639,14 @@ fn compare(
         interpretation: "Paired two-stage cluster bootstrap: resample repositories, then source files within repositories, retaining all task outcomes within selected files. This addresses repository/file clustering but does not remove model/scaffold/budget confounding; those must be matched by experimental design.".into(),
     };
 
+    let split_blob = git_blob_sha1(split_bytes)?;
+    let synthetic_fixture = split_blob != EXPECTED_EVALUATION_BLOB;
     let summaries = strategies.values().map(|s| strategy_summary(s, task_count)).collect();
     Ok(Report {
         schema_version: REPORT_SCHEMA.into(),
-        evaluation_split_git_blob_sha1: EXPECTED_EVALUATION_BLOB.into(),
+        evaluation_split_git_blob_sha1: split_blob,
         evaluation_split_raw_sha256: sha256(split_bytes),
+        synthetic_fixture,
         proof_runs_jsonl_sha256: sha256(runs_bytes),
         evaluation_task_count: task_count,
         strategy_summaries: summaries,
