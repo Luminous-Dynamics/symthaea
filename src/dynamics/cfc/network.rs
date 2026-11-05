@@ -1864,7 +1864,7 @@ mod tests {
         for group in &manifest.groups {
             assert_eq!(group.offset, expected_offset, "gap before {}", group.name);
             assert_eq!(
-                group.shape.iter().product::<usize>(),
+                group.shape.iter().copied().product::<usize>(),
                 group.len,
                 "shape/length mismatch for {}",
                 group.name
@@ -1880,7 +1880,7 @@ mod tests {
     }
 
     // ---------------------------------------------------------------
-    // 14. get_weights() and set_weights() round-trip
+    // 15. get_weights() and set_weights() round-trip
     // ---------------------------------------------------------------
     #[test]
     fn test_weights_round_trip() {
@@ -1927,7 +1927,7 @@ mod tests {
     }
 
     // ---------------------------------------------------------------
-    // 15. try_set_weights() rejects malformed payloads transactionally
+    // 16. try_set_weights() rejects malformed payloads transactionally
     // ---------------------------------------------------------------
     #[test]
     fn test_try_set_weights_rejects_wrong_length_without_mutation() {
