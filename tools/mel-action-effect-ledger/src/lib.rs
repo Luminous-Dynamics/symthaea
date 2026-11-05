@@ -492,6 +492,18 @@ impl ActionEffectLedger {
         event: LedgerEvent,
         verifier: &dyn VetoAuthorityVerifier,
     ) -> Result<(), LedgerError> {
+        if event.event_id.trim().is_empty() {
+            return Err(LedgerError::EmptyIdentity);
+        }
+        if let Some(existing) = self.events.get(&event.event_id) {
+            return if existing == &event {
+                Ok(())
+            } else {
+                Err(LedgerError::ConflictingDuplicateEvent {
+                    event_id: event.event_id,
+                })
+            };
+        }
         if let EventKind::VetoApplied(receipt) = &event.kind {
             verifier.verify_veto(VetoAuthorization {
                 session_id: &receipt.session_id,
@@ -1542,6 +1554,36 @@ mod tests {
             ledger.apply(respond_event("decision-0", 3)),
             Err(LedgerError::RevokedDecision)
         );
+    }
+
+    #[test]
+    fn exact_veto_replay_is_idempotent_without_reauthorizing() {
+        let mut ledger = ledger();
+        let before = initial_state();
+        let after = invalidate_state(&before);
+        let veto = event(
+            1,
+            "veto-idempotent",
+            EventKind::VetoApplied(VetoReceipt {
+                session_id: "session-1".into(),
+                turn_id: "turn-1".into(),
+                participant_id: "performer-1".into(),
+                authority_receipt_ref: "signed-veto-ref-1".into(),
+                control_sequence: 1,
+                before,
+                after,
+                discarded_unconsumed_notes: 5,
+                discarded_application_frames: 480,
+            }),
+        );
+        ledger
+            .apply_with_authority_verifier(veto.clone(), &AcceptVetoVerifier)
+            .unwrap();
+        assert_eq!(
+            ledger.apply_with_authority_verifier(veto, &RejectVetoVerifier),
+            Ok(())
+        );
+        assert_eq!(ledger.state().epoch, 1);
     }
 
     #[test]
