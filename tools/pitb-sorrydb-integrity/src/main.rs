@@ -984,6 +984,18 @@ fn run_self_tests() -> Result<(), String> {
         serde_json::to_vec(&receipts[0]).map_err(|e| e.to_string())?,
         b"\n".to_vec(),
     ].concat();
+    let snapshot_report = audit_snapshot(&full_bytes, &split_bytes, &provenance_bytes)?;
+    if snapshot_report.database_task_count != 2
+        || snapshot_report.evaluation_task_count != 1
+        || snapshot_report.full_task_ids_recomputed != 2
+        || snapshot_report.evaluation_task_ids_recomputed != 1
+        || snapshot_report.evaluation_repository_overlap_count != 1
+        || snapshot_report.project_disjoint_evaluation_split
+    {
+        return Err("synthetic receipt-free snapshot audit control failed".into());
+    }
+    println!("SELF_TEST_PASS receipt-free snapshot audit independently verifies exact task IDs and project overlap");
+
     let report = verify(&full_bytes, &split_bytes, &provenance_bytes, &receipt_bytes)?;
     if report.reproducible_task_count != 1 || report.evaluation_task_count != 1 {
         return Err("synthetic SorryDB identity and reproduction control failed".into());
@@ -1092,9 +1104,27 @@ fn execute() -> Result<(), String> {
         println!("PITB_SORRYDB_INTEGRITY_SYNTHETIC_REPORT_OK");
         return Ok(());
     }
-    if args.len() != 6 || args[1] != "--verify" {
+    if args.len() == 6 && args[1] == "--audit-snapshot" {
+        let database_bytes = fs::read(&args[2]).map_err(|e| format!("read full database: {e}"))?;
+        let split_bytes = fs::read(&args[3]).map_err(|e| format!("read evaluation split: {e}"))?;
+        let provenance_bytes = fs::read(&args[4]).map_err(|e| format!("read provenance: {e}"))?;
+        let report = audit_snapshot(&database_bytes, &split_bytes, &provenance_bytes)?;
+        let output = serde_json::to_vec_pretty(&report).map_err(|e| format!("serialize snapshot audit report: {e}"))?;
+        fs::write(&args[5], output).map_err(|e| format!("write snapshot audit report: {e}"))?;
+        println!("PITB_SORRYDB_SNAPSHOT_AUDIT_OK");
+        println!(
+            "snapshot={} tasks={} eval={} repositories={} project_disjoint={}",
+            report.snapshot_id,
+            report.database_task_count,
+            report.evaluation_task_count,
+            report.evaluation_unique_repositories,
+            report.project_disjoint_evaluation_split
+        );
+        return Ok(());
+    }
+    if args.len() != 7 || args[1] != "--verify" {
         return Err(format!(
-            "usage: {} --verify <full-database.json> <evaluation-split.json> <provenance.json> <task-receipts.jsonl> <report.json> OR --self-test",
+            "usage: {} --audit-snapshot <full-database.json> <evaluation-split.json> <provenance.json> <snapshot-report.json> OR --verify <full-database.json> <evaluation-split.json> <provenance.json> <task-receipts.jsonl> <report.json> OR --self-test",
             args.first().map(String::as_str).unwrap_or("pitb-sorrydb-integrity")
         ));
     }
