@@ -279,29 +279,306 @@ fn required_transition_seconds(
     }
 }
 
-fn sum_reserves(reserves: &[ReserveCommitment]) -> Result<(f64, f64), Vec<Violation>> {
+/// SAWEM Market Code Rev 2.3 product response requirements.
+///
+/// The Code specifies no minimum sustain duration for regulating or ten-minute
+/// reserve in these definitions. That remains an external operator/contract
+/// input; it is deliberately not inferred here.
+pub fn sawem_rev_2_3_reserve_requirement(
+    product: ReserveProduct,
+    direction: ReserveDirection,
+) -> Result<MarketReserveRequirement, Violation> {
+    match (product, direction) {
+        (ReserveProduct::Regulating, ReserveDirection::Up)
+        | (ReserveProduct::Regulating, ReserveDirection::Down) => {
+            Ok(MarketReserveRequirement {
+                maximum_start_response_seconds: Some(10.0),
+                maximum_full_activation_seconds: Some(600.0),
+                minimum_sustain_seconds: None,
+            })
+        }
+        (ReserveProduct::Instantaneous, ReserveDirection::Up) => {
+            Ok(MarketReserveRequirement {
+                maximum_start_response_seconds: None,
+                maximum_full_activation_seconds: Some(10.0),
+                minimum_sustain_seconds: Some(600.0),
+            })
+        }
+        (ReserveProduct::TenMinute, ReserveDirection::Up) => {
+            Ok(MarketReserveRequirement {
+                maximum_start_response_seconds: None,
+                maximum_full_activation_seconds: Some(600.0),
+                minimum_sustain_seconds: None,
+            })
+        }
+        _ => Err(Violation::UnsupportedReserveProductDirection),
+    }
+}
+
+fn operating_point_for_net_power(
+    net_export_mw: f64,
+    min_stable_charge_mw: f64,
+) -> Result<(f64, f64), Violation> {
+    if net_export_mw < -EPSILON {
+        let charge_mw = -net_export_mw;
+        if charge_mw + EPSILON < min_stable_charge_mw {
+            return Err(Violation::ReserveTargetBelowMinimumStableCharge);
+        }
+        Ok((charge_mw, 0.0))
+    } else {
+        Ok((0.0, net_export_mw.max(0.0)))
+    }
+}
+
+fn validate_reserve_response(
+    reserve: ReserveCommitment,
+    requirement: MarketReserveRequirement,
+    indeterminate_reasons: &mut Vec<&'static str>,
+    violations: &mut Vec<Violation>,
+) {
+    for value in [
+        reserve.mw,
+        reserve.start_response_seconds.unwrap_or(0.0),
+        reserve.full_activation_seconds.unwrap_or(0.0),
+        reserve.sustain_duration_seconds.unwrap_or(0.0),
+        reserve.proven_sustain_seconds.unwrap_or(0.0),
+    ] {
+        if !value.is_finite() || value < 0.0 {
+            violations.push(Violation::InvalidReserveValue);
+            return;
+        }
+    }
+    if reserve.mw <= EPSILON {
+        violations.push(Violation::InvalidReserveValue);
+        return;
+    }
+
+    if let Some(deadline) = requirement.maximum_start_response_seconds {
+        match reserve.start_response_seconds {
+            Some(actual) if actual <= deadline + EPSILON => {}
+            Some(_) => violations.push(Violation::ReserveResponseDeadlineExceeded),
+            None => indeterminate_reasons.push("missing_start_response_evidence"),
+        }
+    }
+
+    if let Some(deadline) = requirement.maximum_full_activation_seconds {
+        match reserve.full_activation_seconds {
+            Some(actual) if actual <= deadline + EPSILON => {}
+            Some(_) => violations.push(Violation::ReserveResponseDeadlineExceeded),
+            None => indeterminate_reasons.push("missing_full_activation_evidence"),
+        }
+    }
+
+    let required_minimum = requirement.minimum_sustain_seconds.unwrap_or(0.0);
+    let energy_assessment_duration = match reserve.sustain_duration_seconds {
+        Some(duration) => duration.max(required_minimum),
+        None if required_minimum > 0.0 => required_minimum,
+        None => {
+            indeterminate_reasons.push("sustain_duration_not_defined_by_market_profile");
+            return;
+        }
+    };
+    if energy_assessment_duration <= EPSILON {
+        violations.push(Violation::InvalidReserveValue);
+        return;
+    }
+
+    match reserve.proven_sustain_seconds {
+        Some(proven) if proven + EPSILON >= energy_assessment_duration => {}
+        Some(_) => violations.push(Violation::ReserveSustainInsufficient),
+        None => indeterminate_reasons.push("missing_asset_sustain_evidence"),
+    }
+}
+
+fn evaluate_reserve_energy_scenario(
+    reserves: &[ReserveCommitment],
+    direction: ReserveDirection,
+    base_charge_mw: f64,
+    base_discharge_mw: f64,
+    starting_energy_mwh: f64,
+    limits: AssetLimits,
+    charge_efficiency: f64,
+    discharge_efficiency: f64,
+) -> Result<(), Violation> {
+    let mut timed_reserves = Vec::new();
+    for reserve in reserves.iter().filter(|item| item.direction == direction) {
+        let requirement = sawem_rev_2_3_reserve_requirement(reserve.product, reserve.direction)?;
+        let minimum = requirement.minimum_sustain_seconds.unwrap_or(0.0);
+        let duration = match reserve.sustain_duration_seconds {
+            Some(value) => value.max(minimum),
+            None if minimum > 0.0 => minimum,
+            None => return Err(Violation::InvalidReserveValue),
+        };
+        if reserve
+            .proven_sustain_seconds
+            .is_none_or(|proven| proven + EPSILON < duration)
+        {
+            return Err(Violation::ReserveSustainInsufficient);
+        }
+        timed_reserves.push((reserve.mw, duration));
+    }
+    if timed_reserves.is_empty() {
+        return Ok(());
+    }
+
+    let mut boundaries: Vec<f64> = timed_reserves.iter().map(|(_, duration)| *duration).collect();
+    boundaries.sort_by(f64::total_cmp);
+    boundaries.dedup_by(|left, right| (*left - *right).abs() <= EPSILON);
+
+    let baseline_net = base_discharge_mw - base_charge_mw;
+    let mut energy = starting_energy_mwh;
+    let mut previous_boundary = 0.0;
+
+    for boundary in boundaries {
+        let active_reserve_mw: f64 = timed_reserves
+            .iter()
+            .filter(|(_, duration)| *duration > previous_boundary + EPSILON)
+            .map(|(mw, _)| *mw)
+            .sum();
+        let target_net = match direction {
+            ReserveDirection::Up => baseline_net + active_reserve_mw,
+            ReserveDirection::Down => baseline_net - active_reserve_mw,
+        };
+        let (target_charge_mw, target_discharge_mw) =
+            operating_point_for_net_power(target_net, limits.min_stable_charge_mw)?;
+
+        if target_charge_mw > limits.max_charge_mw + EPSILON
+            || target_discharge_mw > limits.max_discharge_mw + EPSILON
+        {
+            return Err(Violation::ReservePowerHeadroomExceeded);
+        }
+
+        // Integrate only the incremental energy effect of reserve activation
+        // relative to the scheduled operating point. This correctly treats
+        // stopping an existing charge/discharge as reserve response.
+        let incremental_energy_rate =
+            (target_charge_mw - base_charge_mw) * charge_efficiency
+                - (target_discharge_mw - base_discharge_mw) / discharge_efficiency;
+        let elapsed_hours = (boundary - previous_boundary) / 3_600.0;
+        energy += incremental_energy_rate * elapsed_hours;
+
+        if energy < limits.min_energy_mwh - EPSILON {
+            return Err(Violation::ReserveEnergyHeadroomExceeded);
+        }
+        if energy > limits.max_energy_mwh + EPSILON {
+            return Err(Violation::ReserveEnergyHeadroomExceeded);
+        }
+        previous_boundary = boundary;
+    }
+    Ok(())
+}
+
+fn assess_reserves(
+    limits: AssetLimits,
+    charge_mw: f64,
+    discharge_mw: f64,
+    energy_after_schedule_mwh: f64,
+    charge_efficiency: f64,
+    discharge_efficiency: f64,
+    reserves: &[ReserveCommitment],
+) -> ReserveAssessment {
+    let baseline_net = discharge_mw - charge_mw;
+    let available_up_mw = (limits.max_discharge_mw - baseline_net).max(0.0);
+    let available_down_mw = (baseline_net + limits.max_charge_mw).max(0.0);
+    let mut committed_up_mw = 0.0;
+    let mut committed_down_mw = 0.0;
     let mut seen = BTreeSet::new();
-    let mut upward = 0.0;
-    let mut downward = 0.0;
+    let mut indeterminate_reasons = Vec::new();
     let mut violations = Vec::new();
 
     for reserve in reserves {
-        if !reserve.mw.is_finite() || reserve.mw < 0.0 {
-            violations.push(Violation::ReservePowerHeadroomExceeded);
-            continue;
-        }
         if !seen.insert((reserve.product, reserve.direction)) {
             violations.push(Violation::DuplicateReserveProductDirection);
+            continue;
         }
+        let requirement = match sawem_rev_2_3_reserve_requirement(reserve.product, reserve.direction) {
+            Ok(value) => value,
+            Err(violation) => {
+                violations.push(violation);
+                continue;
+            }
+        };
+        validate_reserve_response(
+            *reserve,
+            requirement,
+            &mut indeterminate_reasons,
+            &mut violations,
+        );
         match reserve.direction {
-            ReserveDirection::Up => upward += reserve.mw,
-            ReserveDirection::Down => downward += reserve.mw,
+            ReserveDirection::Up => committed_up_mw += reserve.mw,
+            ReserveDirection::Down => committed_down_mw += reserve.mw,
         }
     }
-    if violations.is_empty() {
-        Ok((upward, downward))
+
+    if committed_up_mw > available_up_mw + EPSILON {
+        violations.push(Violation::ReservePowerHeadroomExceeded);
+    }
+    if committed_down_mw > available_down_mw + EPSILON {
+        violations.push(Violation::ReservePowerHeadroomExceeded);
+    }
+
+    if committed_up_mw > EPSILON {
+        let target = baseline_net + committed_up_mw;
+        if let Err(violation) = operating_point_for_net_power(target, limits.min_stable_charge_mw) {
+            violations.push(violation);
+        }
+    }
+    if committed_down_mw > EPSILON {
+        let target = baseline_net - committed_down_mw;
+        if let Err(violation) = operating_point_for_net_power(target, limits.min_stable_charge_mw) {
+            violations.push(violation);
+        }
+    }
+
+    if !reserves.is_empty() {
+        if reserves.iter().any(|reserve| {
+            let requirement = sawem_rev_2_3_reserve_requirement(reserve.product, reserve.direction);
+            requirement.is_err()
+                || (reserve.sustain_duration_seconds.is_none()
+                    && requirement
+                        .ok()
+                        .is_some_and(|value| value.minimum_sustain_seconds.is_none()))
+        }) {
+            indeterminate_reasons.push("reserve_energy_duration_incomplete");
+        } else {
+            for direction in [ReserveDirection::Up, ReserveDirection::Down] {
+                match evaluate_reserve_energy_scenario(
+                    reserves,
+                    direction,
+                    charge_mw,
+                    discharge_mw,
+                    energy_after_schedule_mwh,
+                    limits,
+                    charge_efficiency,
+                    discharge_efficiency,
+                ) {
+                    Ok(()) => {}
+                    Err(violation) => violations.push(violation),
+                }
+            }
+        }
+    }
+
+    violations.sort_by_key(|value| format!("{value:?}"));
+    violations.dedup();
+    indeterminate_reasons.sort_unstable();
+    indeterminate_reasons.dedup();
+
+    let qualification = if !violations.is_empty() {
+        ReserveQualification::Infeasible
+    } else if !indeterminate_reasons.is_empty() {
+        ReserveQualification::Indeterminate
     } else {
-        Err(violations)
+        ReserveQualification::Qualified
+    };
+    ReserveAssessment {
+        qualification,
+        committed_up_mw,
+        committed_down_mw,
+        available_up_mw,
+        available_down_mw,
+        indeterminate_reasons,
+        violations,
     }
 }
 
