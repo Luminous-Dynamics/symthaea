@@ -798,7 +798,7 @@ mod tests {
         }
     }
 
-    fn fixture_expected<'a>(id: &str) -> &'a str {
+    fn fixture_expected(id: &str) -> String {
         let (manifest, _) = validate_arbitration_manifest(ARBITRATION_MANIFEST).unwrap();
         let case = manifest
             .scenarios
@@ -808,7 +808,7 @@ mod tests {
             .unwrap_or_else(|| panic!("fixture case {id} missing"));
         // The caller checks the fixture value against a separately authored
         // semantic assertion in each test.
-        Box::leak(case.expected_decision.clone().into_boxed_str())
+        case.expected_decision.clone()
     }
 
     fn evaluate(
