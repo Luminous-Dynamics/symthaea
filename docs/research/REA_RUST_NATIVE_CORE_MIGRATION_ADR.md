@@ -1175,3 +1175,16 @@ Do not collapse reader tests, receipt validation, independent replay, fuzz smoke
 6. Mobile test evidence mapping to MASTG/MASVS with explicit platform oracle.
 7. Agent-level SRE/AgentRE evaluation only when actually run under benchmark rules.
 
+## 27. 2026-11-05 — sealed immutable replay qualification
+
+The independent replay path now closes the mutable-source recheck window on Linux by taking a single streaming copy into `memfd_create`, hashing while copying, applying `F_SEAL_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL`, then reading back all four flags with `F_GET_SEALS`. The parser, EOCD preflight, decoder, payload hash/CRC and final source digest all operate against the same sealed snapshot. A Linux-only negative control replaces the original source path and attempts writes through a cloned snapshot descriptor; both are rejected/isolated and the original content digest remains unchanged.
+
+Exact-head qualification:
+- PR [#10507](https://github.com/Luminous-Dynamics/symthaea/pull/10507), head `520335e19963d6842da393080f335702d2470442`.
+- Workflow [run 41994293575](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41994293575), checked-out synthetic PR merge tree `d43bb7bfbaa28a65f555188dcf64d3180b0206a8`.
+- 21 tests passed, 0 failed/ignored; formatting and Clippy with warnings denied passed.
+- The dedicated snapshot mutation test passed.
+- Generated 922-line Cargo.lock SHA-256: `3ee6650c71cec05aed87e36fab66734412b5043f8660b89afb17c16bbab14a75`, uploaded as artifact `13399069495`, artifact digest `sha256:1831e30bf51d6439a5ca35378ae3436f14a83e427c5ddf0fe4f358dac03ad8a0`. Workflow now pins this lock digest and records both tested tree SHA and pull-request head SHA.
+
+This exact-head result qualifies the Linux sealed-snapshot implementation and synthetic Stored/Deflate receipts. It is not production corpus coverage, producer authentication, package signature validity, runtime safety or non-Linux support. Non-Linux replay explicitly returns Unsupported until an equivalent immutable snapshot backend is independently implemented and tested.
+
