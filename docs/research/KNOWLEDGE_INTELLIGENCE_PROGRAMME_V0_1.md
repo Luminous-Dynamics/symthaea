@@ -441,3 +441,120 @@ The viewer currently reports four language splits, 11.4k rows in the default vie
 Retain `pair_id` as the matched fact-row key. Use `file_id` as a provisional source-document cluster only after confirming its meaning in the underlying CSV and source metadata. All four statements in a row must stay together; all rows sharing one source-document cluster must remain in the same bootstrap cluster. Do not treat four statement predictions as four independent sampling units.
 
 The scoring adapter should report per statement-language and error type: false-negative (missed hallucination), false-positive (factual statement incorrectly marked hallucinated), macro-F1, selective coverage/risk and optional probability calibration. Compare English and target-language detection on the *same paired facts*, and publish both absolute quality and disparity.
+
+
+## 15. African-language evidence and safety research added after the initial plan
+
+### 15.1 AfrIFact: evidence retrieval, extraction and verification as separate stages
+
+[AfrIFact (EMNLP 2026)](https://aclanthology.org/2026.emnlp-main.133/) evaluates the full fact-checking chain across ten African languages plus English:
+1. retrieve relevant material;
+2. extract the minimal supporting/contradicting evidence;
+3. assess the claim against that evidence.
+
+The paper reports cross-lingual retrieval weaknesses even in leading embedding models, healthcare-document retrieval being harder than cultural/news retrieval, few-shot prompting gains up to 43% for AfriqueQwen-14B, and task-specific fine-tuning gains up to 26%. These are paper-reported improvements in that study, not verified current SOTA or a result for Symthaea.
+
+This supports a key architecture decision: **retrieve → localize evidence → assess relations → decide** must be separately observable. A final answer score cannot tell us whether failure came from the query, retriever, source-family resolution, evidence extraction, reasoning, or calibration.
+
+Implementation is tracked in [AFR-FACT-001 / #10544](https://github.com/Luminous-Dynamics/symthaea/issues/10544). The exact ten-language list, South African overlap, release revision, task splits and license must be inspected before admission. Compose the existing Mycelix evidence plane and Symthaea benchmark harness; do not create a parallel evidence envelope or runner.
+
+### 15.2 TukaBench: safety and language comprehension must be disentangled
+
+[TukaBench (EMNLP 2026)](https://aclanthology.org/2026.emnlp-main.692/) evaluates seven African languages under translated, culturally adapted, human-curated and code-switched jailbreak settings. It separates three response outcomes: Jailbroken, Refused and Deflected (off-target/incoherent). It also reports that LLM-judge agreement with humans degrades in lower-resource languages and less commonly supported scripts.
+
+Track [AFR-SAFE-001 / #10545](https://github.com/Luminous-Dynamics/symthaea/issues/10545) now handles this as a **separate safety capability**. Safety evaluation must distinguish comprehension, allowed-request helpfulness, appropriate refusal and harmful compliance. Never mix safety scores into factuality, evidence confidence or a universal cognition score. Native-speaker adjudication is required for a representative subset; a model judge is not a gold oracle.
+
+### 15.3 Multi-Hall-SA source-construction audit: do not key facts by pair_id alone
+
+The public [SA-Knowledge repository](https://github.com/sello-ralethe/SA-knowledge) was inspected at immutable commit `a45185cb7ad26f583f74503f4da28c580a28e813`:
+- [builder](https://github.com/sello-ralethe/SA-knowledge/blob/a45185cb7ad26f583f74503f4da28c580a28e813/saknow/hallucination/build.py);
+- [prompts](https://github.com/sello-ralethe/SA-knowledge/blob/a45185cb7ad26f583f74503f4da28c580a28e813/saknow/hallucination/prompts.py);
+- [evaluation helper](https://github.com/sello-ralethe/SA-knowledge/blob/a45185cb7ad26f583f74503f4da28c580a28e813/saknow/hallucination/evaluate.py);
+- [document alignment](https://github.com/sello-ralethe/SA-knowledge/blob/a45185cb7ad26f583f74503f4da28c580a28e813/saknow/corpus/align_documents.py).
+
+The builder resets `fact_index` per source document and constructs `pair_id` from language, fact index and error type without including document ID. Thus `pair_id` is **not globally unique**. `file_id` is assigned from the enumerated document-pair position and is used by the evaluation helper to retrieve the document. Treat it only as a within-language-split document ordinal, not a canonical source hash across separately built language splits.
+
+The scorer now joins by the composite identity `(file_id, pair_id, fact_index, language, hallucination_type)`. Its synthetic fixture deliberately contains the same `pair_id` in two source documents. English and target-language system comparisons are performed separately inside each target-language split so document ordinals cannot create false cross-language clusters.
+
+The repository has reusable detection prompt templates, although the Hugging Face card says the detection prompts were not included with the dataset artifact. Existence of a generic source-code template does not prove it exactly matches each paper evaluation run; pin the source revision and compare it with the paper protocol before calling a run an exact reproduction.
+
+The builder also extracts from the first 6,000 characters of each aligned document, defaults to at most ten facts per source, generates one candidate variant per error type and balances error types by truncating groups to the smallest count. These are dataset construction characteristics, not incidental implementation details. Measure sensitivity to source coverage and distinguish controlled synthetic perturbations from naturally occurring hallucinations.
+
+### 15.4 Competitive evaluation discipline
+
+The new workstreams enforce:
+- source-native vs translated test sets as different tracks;
+- end-to-end vs oracle-evidence evaluation as different tracks;
+- retrieval quality vs evidence relation vs final verdict as separate scores;
+- safety vs comprehension vs helpfulness as separate scores;
+- absolute quality and worst-language quality alongside cross-language gap;
+- source-document/source-family-clustered inference, never statement-level pseudo-replication;
+- immutable model, prompt, data and scoring identities, with cost/latency/token budgets;
+- rights and access as non-compensatory gates, not factors that can be traded for accuracy.
+
+No single Africa-wide aggregate score can establish robust evidence-grounded intelligence.
+
+## 16. Literary knowledge and plural interpretation: a stronger comparison programme
+
+Three recent benchmarks clarify where a literary-knowledge system can make a defensible contribution:
+
+- [NarraBench (EACL 2026)](https://aclanthology.org/2026.eacl-long.176/) surveys 78 narrative benchmarks and estimates that only 27% adequately cover core narrative tasks. Events, style, perspective and revelation are particularly underrepresented; some narrative judgements are perspectival and do not have one universal answer.
+- [LitVISTA (ACL 2026)](https://aclanthology.org/2026.acl-long.1024/) finds that frontier LLMs struggle to jointly represent narrative function and structure and fail to form an integrated global view. Its end-to-end errors are dominated by event-anchor identification/localization; oracle-anchor evaluation therefore must be reported separately from end-to-end performance.
+- [LitBench (EACL 2026)](https://aclanthology.org/2026.eacl-long.362/) reports only 73% agreement between its strongest off-the-shelf LLM judge and human preferences, while benchmark-trained reward models reach 78% on its creative-writing preference task. Those numbers are specific to LitBench, but they reinforce that fluent model judging is not a substitute for human literary adjudication.
+
+### Required literary-knowledge tracks
+
+1. **Witness-grounded close reading:** exact passage/line attribution; edition, translation and textual witness identity; quoted span precision; claim-to-passage support.
+2. **Narrative event understanding:** anchor detection/localization; entity and event identity; temporal order; causal vs sequential relations; event salience and narrative function.
+3. **Narrative orchestration:** tension/rhythm, plot arcs, revelation, pacing, motif development, foreshadowing and retrospective reinterpretation.
+4. **Perspective and voice:** narrator vs author vs character; focalization; free indirect discourse; unreliable narration; stance and point of view.
+5. **Interpretive plurality:** multiple defensible readings, evidence for each, disagreement and counter-readings. Grade evidence quality and reasoning, not conformity to one judge's interpretation.
+6. **Literary style and form:** genre conventions, register, rhetoric, meter/structure where relevant, stylistic evolution and intertextual allusion.
+7. **Historical and cultural context:** distinguish primary witness, later commentary, reception history, translation and adaptation; never infer historical influence from structural resemblance alone.
+8. **Rights-aware research:** copyrighted text may require metadata-only evaluation, licensed excerpts, public-domain works or explicit permission. Rights restrictions must also cover retained embeddings, summaries and generated derivative fixtures.
+
+### Experimental design
+
+For every narrative task, run:
+- **oracle anchor:** provide gold event/passages to isolate downstream interpretation;
+- **end-to-end:** require the system to locate the relevant event/passages itself;
+- **source witness held-out:** split by work/source family/edition where leakage is plausible;
+- **variant intervention:** change edition, translation, narrator, chronology or passage availability and require the output to change only where justified;
+- **plural-reference adjudication:** collect multiple expert readings, evidence spans and uncertainty rather than one forced canonical answer.
+
+Metrics should include anchor span F1, event coreference, temporal/causal relation F1, narrative-function macro-F1, viewpoint/focalization accuracy, exact citation/locator precision, supported-interpretation rate, alternative-reading recall, counter-reading handling, abstention quality, inter-annotator agreement and cost/latency. Report oracle and end-to-end results separately.
+
+### Paradigm shift
+
+Literary knowledge should not be represented as a single “canonical story graph”. The atomic object is a **contexted interpretation supported by a source witness**. Each interpretation records its evidence, method, perspective, scope, tradition/edition, alternative readings and rights. The graph records relations such as `supports`, `contradicts`, `reframes`, `foreshadows`, `adapts`, `translates`, `resembles` and `influences` without collapsing them.
+
+This gives Symthaea a route beyond answer memorization: coherent, revisable narrative models that remain accountable to the text and preserve legitimate interpretive disagreement. Existing #8245, #8252, #8253 and #7365 remain the implementation roots; this programme must compose them, not fork a competing literary ontology or benchmark harness.
+
+## 17. Knowledge portfolio priorities beyond literature
+
+Use a shared evidence/provenance plane and domain-specific verification modules rather than one giant undifferentiated knowledge graph.
+
+| Priority | Knowledge family | Necessary capabilities and verification |
+|---|---|---|
+| P0 | Mathematics, logic and formal systems | Proof objects, theorem-prover checking, assumptions, counterexamples and proof provenance |
+| P0 | Scientific knowledge | Experiment/method/data lineage, uncertainty, replication, causal vs correlational claims, versioned consensus |
+| P0 | History, archives and oral/community knowledge | Witness/copy/translation family, separate event time and record time, contested chronology, consent and access authority |
+| P0 | Language, literature and cultural knowledge | Multilingual morphology/semantics, discourse, source-witness identity, variants, plural readings and rights |
+| P0 | Law, governance and civic knowledge | Jurisdiction, authority, effective dates, legal hierarchy, amendments, procedural obligations and source validity |
+| P1 | Medicine and public health | Evidence-grade by claim type, guidelines and version dates, patient/population scope, contraindication and mandatory abstention for unsupported high-stakes output |
+| P1 | Engineering and operations | Executable constraints, safety cases, standards versions, simulation-vs-test distinction, maintenance and incident lineage |
+| P1 | Climate, agriculture, ecology and geography | Spatial/time resolution, measurement lineage, local knowledge authority, model uncertainty, sensor and remote-sensing fusion |
+| P1 | Economics and social systems | Causal inference, cohort/selection effects, competing models, assumptions and forecast calibration |
+| P1 | Cybersecurity and digital systems | Threat models, exploit preconditions, provenance of advisories, version/asset scope, reproducible tests and adversarial evidence |
+| P2 | Philosophy, religion and metaphysics | Separate empirical, formal, normative and interpretive claims; represent schools and disagreements without a false universal verdict |
+| P2 | Craft, procedure and embodied skills | Demonstration, temporal step dependencies, prerequisite knowledge, safety constraints and outcome verification |
+
+The priority order is an engineering sequence, not a claim that lower-ranked domains are less valuable. Each new domain should have: a typed claim schema; accepted evidence methods; source and authority semantics; update/retraction rules; domain-specific negative controls; and at least one external benchmark or expert-reviewed test set.
+
+## 18. New execution and evidence status
+
+- South African benchmark matrix: updated with AfrIFact, TukaBench, MzansiBench details and a secondary industry leaderboard caveat.
+- Multi-Hall-SA scorer: source-aware composite pair identity, within-language source clusters, paired candidate-vs-baseline metrics, and synthetic repeated-`pair_id` control authored.
+- GitHub issues: #10531, #10544 and #10545 track separate benchmark tracks.
+
+All scorer code and tests are authored but **not compiled or executed** in this session. The synthetic fixture is not model evaluation. No expert annotation, corpus ingestion, held-out run, commercial rights clearance, SOTA result or production readiness is claimed.
