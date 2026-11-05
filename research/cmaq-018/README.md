@@ -1,6 +1,6 @@
 # CMAQ-018 — Matched-History Counterfactual Branch Fidelity
 
-**Status:** deterministic synthetic v0.1 harness authored; exact-head Rust qualification is pending. The candidate predictor boundary is now expressed as the VIS-005 adapter trait and a content-addressed interface contract.
+**Status:** deterministic synthetic v0.1 branch harness plus versioned v0.2 DACS-0 diagnostics; exact-head qualification is pending. The candidate predictor boundary is now expressed as the VIS-005 adapter trait and a content-addressed interface contract.
 
 ## Research question
 
@@ -58,7 +58,7 @@ The fixed candidate, generator, metric, observation, action, reward, wrapper and
 
 - `candidate-config.v0.1.json`
 - `generator-config.v0.1.json`
-- `metric-bundle.v0.1.json`
+- `metric-bundle.v0.2.json`
 - `observation-schema.v0.1.json`
 - `action-schema.v0.1.json`
 - `reward-definition.v0.1.json`
