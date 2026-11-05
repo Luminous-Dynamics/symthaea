@@ -266,3 +266,17 @@ The current Scale consolidated leaderboard adds an important capability comparis
 These are different tasks and rubrics. They are not combined into a single agent score. Use the Scale consolidated page as the source index and pin the exact task leaderboard/revision when conducting any replication: https://labs.scale.com/leaderboard
 
 The CEB machine-readable measurement matrix now has 13 lanes, 41 primary metrics, 15 comparator records and 13 registered source URLs. Its comparator registry uses the consolidated Scale source for Test Writing and HiL-Bench rather than unverified deep links. This matrix is a design artifact, not a Symthaea result.
+
+
+## 2026-11-05 normalized-comparator refresh
+
+The comparator registry is being normalized at the observation level so every score remains attached to one benchmark revision/split, one metric, one model+harness configuration, one denominator and one source locator.
+
+Newly explicit source-backed details:
+- **AgentAbstain:** 263 paired tasks in 42 executable environments. Gemini 3.1 Pro + Google ADK reports 90.5% act-side accuracy, 65.4% abstain-side accuracy, 59.5% paired accuracy and 65.7% conditioned abstention rate. Paired accuracy requires both sides of a pair to be correct. Source: https://agentabstain.github.io/
+- **SWE Atlas task scopes:** 124 Codebase QnA tasks, 90 Test Writing tasks and 70 Refactoring tasks. Source: https://labs.scale.com/papers/sweatlas
+- **HiL-Bench:** 300 tasks across software engineering and text-to-SQL, 200 public and 100 private held-out, with 1,131 blockers. Its methodology is documented separately from the consolidated leaderboard number. Source: https://labs.scale.com/leaderboard/hil
+
+The parent 13-lane matrix now records 16 comparator records and 16 source URLs. Of those source URLs, 15 are external benchmark or methodology references and one is the internal documentation-audit implementation reference. The external-observation registry contains only the 15 external sources. These counts are different by design; they are not to be silently equated.
+
+No CEB performance result is implied by these external observations.
