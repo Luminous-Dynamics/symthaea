@@ -868,7 +868,7 @@
       "case_id": "CREDIT-COVER-LIQUIDITY-WATERFALL-001",
       "track": "settlement_and_liquidity",
       "title": "Event-ordered treasury cash waterfall through the cover deadline",
-      "scenario": "Replay dated committed receipts/obligations, forecast receipts/flows and adverse stress adjustments in strict timestamp/sequence order. Produce separate cash paths, minimum unrestricted cash, first operating-floor breach, cash headroom at the Credit Cover deadline, deadline cover shortfall and potential external funding gap. Credit Cover requirement may be reassessed as new MO source evidence arrives. Planned Collateral Reserve Account cash lock-up and early invoice payment reduce projected unrestricted cash but do not increase Posted Credit Cover; a separate receipt-backed posting record is required. A later downward reassessment must not erase the peak shortfall observed before the deadline; the deadline's own gap is reported separately. A deadline earlier than the evaluation start timestamp is invalid.",
+      "scenario": "Replay dated committed receipts/obligations, forecast receipts/flows and adverse stress adjustments in strict timestamp/sequence order. Produce separate cash paths, minimum unrestricted cash, first operating-floor breach, cash headroom at the Credit Cover deadline, deadline cover shortfall and potential external funding gap. Credit Cover requirement may be reassessed as new MO source evidence arrives. Planned Collateral Reserve Account cash lock-up and early invoice payment reduce projected unrestricted cash but do not increase Posted Credit Cover; a separate receipt-backed posting record is required. A later downward reassessment must not erase the peak shortfall observed before the deadline; the deadline's own gap is reported separately. A deadline earlier than the evaluation start timestamp is invalid. Any event earlier than the projection start timestamp, including earlier on the same civil date, is rejected.",
       "owner": "Symthaea",
       "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
@@ -882,7 +882,8 @@
         "missing_required_cover_keeps_cash_paths_but_no_cover_conclusion",
         "unordered_events_duplicate_ids_and_incomplete_calendars_fail_closed",
         "peak_cover_shortfall_is_preserved_when_the_requirement_later_falls",
-        "same_day_deadline_before_start_time_is_rejected"
+        "same_day_deadline_before_start_time_is_rejected",
+        "event_before_projection_start_is_rejected"
       ],
       "required_evidence": [
         "source-digested civil calendar covering the full cash projection horizon",
