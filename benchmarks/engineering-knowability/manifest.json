@@ -1,0 +1,295 @@
+{
+  "schema_version": "0.1.0",
+  "programme_id": "ENG-KNOW-QUAL-001",
+  "source_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10652",
+  "status": {
+    "corpus": "blueprint_only",
+    "gold_adjudication": "not_yet_adjudicated",
+    "scoring": "not_scored",
+    "candidate_execution_authorized": false,
+    "physical_testing_authorized": false
+  },
+  "canonical_owners": [
+    {
+      "id": "ENG-DESIGN-006",
+      "issue": 6124,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/6124"
+    },
+    {
+      "id": "ENG-MEAS",
+      "issue": 4919,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/4919"
+    },
+    {
+      "id": "ENG-TOL",
+      "issue": 4883,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/4883"
+    },
+    {
+      "id": "ENG-REF",
+      "issue": 6121,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/6121"
+    },
+    {
+      "id": "ETK",
+      "issue": 1738,
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/1738"
+    }
+  ],
+  "fixture_sources": [
+    {
+      "id": "CADH-P01",
+      "programme": "CAD-HISTORY-001",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/10529"
+    },
+    {
+      "id": "CADH-P03",
+      "programme": "CAD-HISTORY-001",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/10529"
+    },
+    {
+      "id": "CADH-P04",
+      "programme": "CAD-HISTORY-001",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/10529"
+    },
+    {
+      "id": "CADH-P06",
+      "programme": "CAD-HISTORY-001",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/10529"
+    },
+    {
+      "id": "ASM-P01",
+      "programme": "HARDWARE-TOPOLOGY-001",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/10532"
+    },
+    {
+      "id": "ASM-P02",
+      "programme": "HARDWARE-TOPOLOGY-001",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/10532"
+    },
+    {
+      "id": "ECAD-P01",
+      "programme": "HARDWARE-TOPOLOGY-001",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/10532"
+    }
+  ],
+  "cases": [
+    {
+      "id": "KNOW-P01",
+      "kind": "positive_blueprint",
+      "fixture_refs": [
+        "CADH-P01"
+      ],
+      "claim_family": "dimensional_and_geometric",
+      "intent": "Map hole diameter, centre location, datum offsets, pattern symmetry and plate thickness to feasible, distinct observation paths before and after the length intervention.",
+      "required_semantics": [
+        "exact feature and datum references",
+        "direct or derived measurand type",
+        "measurement access after assembly state",
+        "instrument/method family",
+        "calibration/reference artifact dependency",
+        "uncertainty relative to case-specific tolerance",
+        "requalification after edit"
+      ],
+      "seeded_fault": null
+    },
+    {
+      "id": "KNOW-P02",
+      "kind": "positive_blueprint",
+      "fixture_refs": [
+        "CADH-P03"
+      ],
+      "claim_family": "enclosure_and_hidden_features",
+      "intent": "Distinguish measurements available before closure from those feasible after final assembly; propose inspection affordances or appropriately limited pre-closure evidence.",
+      "required_semantics": [
+        "lifecycle phase",
+        "cavity/wall/floor measurands",
+        "line-of-sight or probe access",
+        "pre-closure vs post-closure evidence scope",
+        "measurement back-action and access constraints"
+      ],
+      "seeded_fault": null
+    },
+    {
+      "id": "KNOW-P03",
+      "kind": "positive_blueprint",
+      "fixture_refs": [
+        "ASM-P01"
+      ],
+      "claim_family": "assembly_interfaces",
+      "intent": "Map declared frame/post/beam/tie/gusset interfaces to evidence paths that can actually be performed in the assembled state.",
+      "required_semantics": [
+        "exact component pair/interface",
+        "datum and mating frame",
+        "pre-assembly vs post-assembly method",
+        "access constraints",
+        "contact evidence vs physical conformity distinction"
+      ],
+      "seeded_fault": null
+    },
+    {
+      "id": "KNOW-P04",
+      "kind": "positive_blueprint",
+      "fixture_refs": [
+        "ASM-P02"
+      ],
+      "claim_family": "remount_and_alignment",
+      "intent": "Identify the measurement path required to re-establish shaft/bearing alignment after a pedestal remount.",
+      "required_semantics": [
+        "article and fixture identity",
+        "remount registration reference",
+        "instrument calibration dependency",
+        "alignment measurand",
+        "measurement uncertainty",
+        "fresh evidence/currentness obligations"
+      ],
+      "seeded_fault": null
+    },
+    {
+      "id": "KNOW-P05",
+      "kind": "positive_blueprint",
+      "fixture_refs": [
+        "CADH-P01",
+        "ASM-P01"
+      ],
+      "claim_family": "independence_and_common_mode",
+      "intent": "Classify whether two observations provide independent corroboration when they share the same datum, calibration artifact, instrument or reference chain.",
+      "required_semantics": [
+        "measurement source graph",
+        "common-mode dependencies",
+        "independence claim scope",
+        "separate observations vs independent evidence",
+        "unknown where dependence cannot be resolved"
+      ],
+      "seeded_fault": null
+    },
+    {
+      "id": "KNOW-P06",
+      "kind": "positive_blueprint",
+      "fixture_refs": [
+        "CADH-P01",
+        "CADH-P04"
+      ],
+      "claim_family": "uncertainty_and_tolerance",
+      "intent": "Select a feasible measurement method whose uncertainty can resolve the exact case-specific tolerance/decision boundary, without assuming a universal uncertainty ratio.",
+      "required_semantics": [
+        "quantity kind and units",
+        "exact nominal/tolerance profile",
+        "measurement equation",
+        "uncertainty budget references",
+        "decision boundary",
+        "method resolution/capability profile"
+      ],
+      "seeded_fault": null
+    },
+    {
+      "id": "KNOW-P07",
+      "kind": "positive_blueprint",
+      "fixture_refs": [
+        "ECAD-P01"
+      ],
+      "claim_family": "electrical_diagnostics",
+      "intent": "Distinguish declared logical-net correctness from a physically testable board; identify which claims require test points, probe access, powered tests or additional circuit observability.",
+      "required_semantics": [
+        "exact net/pin identity",
+        "logical vs physical claim class",
+        "test-point/access requirements",
+        "instrument range and isolation profile references",
+        "power state and safe test conditions",
+        "unknown when no routed board exists"
+      ],
+      "seeded_fault": null
+    },
+    {
+      "id": "KNOW-P08",
+      "kind": "positive_blueprint",
+      "fixture_refs": [
+        "ASM-P01",
+        "CADH-P06"
+      ],
+      "claim_family": "service_and_requalification",
+      "intent": "Propose a replacement/service path that retains article identity and registration or explicitly reopens datum, alignment and conformity evidence after replacement.",
+      "required_semantics": [
+        "replaceable component identity",
+        "service access",
+        "remount reference",
+        "article/configuration generation",
+        "reopened measurements and obligations",
+        "preserved vs stale evidence distinction"
+      ],
+      "seeded_fault": null
+    },
+    {
+      "id": "KNOW-N01",
+      "kind": "negative_control_blueprint",
+      "fixture_refs": [
+        "CADH-P03"
+      ],
+      "claim_family": "inaccessible_claim",
+      "intent": "Reject a claimed post-closure cavity measurement path when no inspection opening, probe path or alternate justified method exists.",
+      "required_semantics": [
+        "final assembled state",
+        "access proof",
+        "admissible alternative or explicit Unknown",
+        "narrowed claim if needed"
+      ],
+      "seeded_fault": "Remove all post-closure inspection access while retaining a candidate claim that the hidden cavity was measured after closure."
+    },
+    {
+      "id": "KNOW-N02",
+      "kind": "negative_control_blueprint",
+      "fixture_refs": [
+        "ASM-P02"
+      ],
+      "claim_family": "calibration_currentness",
+      "intent": "Reject a numeric alignment/conformance conclusion when the calibration reference is stale, missing or bound to another instrument.",
+      "required_semantics": [
+        "exact instrument identity",
+        "calibration identity and validity",
+        "article/fixture binding",
+        "Unknown/stale disposition"
+      ],
+      "seeded_fault": "Substitute an expired calibration reference or another instrument identity without changing the displayed measurement."
+    },
+    {
+      "id": "KNOW-N03",
+      "kind": "negative_control_blueprint",
+      "fixture_refs": [
+        "ECAD-P01"
+      ],
+      "claim_family": "non_identifiable_measurand",
+      "intent": "Return Unknown or request a new measurement where the available logical netlist does not establish physical observability or permit a unique fault diagnosis.",
+      "required_semantics": [
+        "logical/physical evidence separation",
+        "observable state set",
+        "competing hypotheses",
+        "missing sensor/test-point information",
+        "Unknown/needs-evidence disposition"
+      ],
+      "seeded_fault": "Ask for a physical board test result from a logical netlist-only fixture with no routed board, test points or instrument profile."
+    },
+    {
+      "id": "KNOW-N04",
+      "kind": "negative_control_blueprint",
+      "fixture_refs": [
+        "CADH-P01"
+      ],
+      "claim_family": "measurement_back_action",
+      "intent": "Reject or qualify a proposed measurement whose contact force or setup disturbance changes the quantity being measured beyond the declared model envelope.",
+      "required_semantics": [
+        "measurement interaction model",
+        "back-action/displacement uncertainty",
+        "admissible measurement envelope",
+        "review/alternative method disposition"
+      ],
+      "seeded_fault": "Use a high-force contact measurement on a thin/compliant feature without modelling the induced deformation."
+    }
+  ],
+  "limitations": [
+    "All cases are public authoring blueprints, not adjudicated gold fixtures or scored tasks.",
+    "The referenced CAD and assembly objects are synthetic development fixtures. Their materialization does not establish instrument or measurement-system capability.",
+    "ECAD-P01 is a logical netlist only, not a routed PCB; physical testability is intentionally Unknown without additional EDA and instrumentation artifacts.",
+    "No real article, calibration certificate, instrument, supplier or production record is included.",
+    "No measurement plan proposal is evidence admission, engineering approval, product qualification or physical execution authority."
+  ]
+}
