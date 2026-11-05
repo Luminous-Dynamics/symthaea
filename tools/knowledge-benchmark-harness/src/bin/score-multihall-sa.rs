@@ -390,6 +390,21 @@ fn is_git_sha(value: &str) -> bool {
             .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
+fn validate_budget(budget: &BudgetPlan) -> Result<(), String> {
+    if budget.max_input_tokens == 0
+        || budget.max_output_tokens == 0
+        || budget.max_latency_ms == 0
+    {
+        return Err("input-token, output-token and latency budgets must be positive".into());
+    }
+    // Zero evidence tokens and zero retrieval calls are valid: they represent a
+    // genuine no-retrieval / closed-book baseline, not an invalid budget.
+    if budget.max_evidence_tokens > budget.max_input_tokens {
+        return Err("max_evidence_tokens cannot exceed max_input_tokens".into());
+    }
+    Ok(())
+}
+
 fn validate_plan(plan: &Plan) -> Result<(), String> {
     if plan.schema_version != "multi-hall-sa-plan-v0" {
         return Err(format!(
@@ -408,17 +423,7 @@ fn validate_plan(plan: &Plan) -> Result<(), String> {
     if plan.dataset.dataset_id != "Multi-Hall-SA" && !plan.synthetic_only {
         return Err("non-synthetic plans must identify dataset_id=Multi-Hall-SA".into());
     }
-    if plan.budget.max_evidence_tokens == 0
-        || plan.budget.max_input_tokens == 0
-        || plan.budget.max_output_tokens == 0
-        || plan.budget.max_retrieval_calls == 0
-        || plan.budget.max_latency_ms == 0
-    {
-        return Err("all token, retrieval-call and latency budgets must be positive".into());
-    }
-    if plan.budget.max_evidence_tokens > plan.budget.max_input_tokens {
-        return Err("max_evidence_tokens cannot exceed max_input_tokens".into());
-    }
+    validate_budget(&plan.budget)?;
 
     if plan.bootstrap.replicates < 1_000 || plan.bootstrap.replicates > 100_000 {
         return Err("bootstrap replicates must be between 1000 and 100000".into());
@@ -1614,6 +1619,36 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn zero_retrieval_budget_is_a_valid_closed_book_baseline() {
+        let budget = BudgetPlan {
+            max_evidence_tokens: 0,
+            max_input_tokens: 512,
+            max_output_tokens: 128,
+            max_retrieval_calls: 0,
+            max_latency_ms: 1_000,
+            max_cost_microusd: Some(0),
+        };
+        assert!(validate_budget(&budget).is_ok());
+    }
+
+    #[test]
+    fn evidence_budget_cannot_exceed_total_input_budget() {
+        let budget = BudgetPlan {
+            max_evidence_tokens: 513,
+            max_input_tokens: 512,
+            max_output_tokens: 128,
+            max_retrieval_calls: 0,
+            max_latency_ms: 1_000,
+            max_cost_microusd: None,
+        };
+        assert!(
+            validate_budget(&budget)
+                .expect_err("evidence token cap must fit inside the total input cap")
+                .contains("max_evidence_tokens cannot exceed max_input_tokens")
+        );
+    }
 
     #[test]
     fn pair_manifest_rejects_missing_target_language_tracks() {
