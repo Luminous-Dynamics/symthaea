@@ -115,3 +115,12 @@ Use the same evidence/context/token/call/latency envelope for every system in a 
 The budget caps are **per statement inference**, matching the four predictions per composite pair. Every system gets the same caps. A non-null `max_cost_microusd` requires a reported per-statement cost; costs are integer micro-USD. The scorer reports means from submitted receipts and does not verify provider billing. The run manifest should also state the pricing snapshot or local hardware amortization method.
 
 For a held-out run with multiple target languages, each target-language split must independently meet the minimum source-cluster count. A large combined cluster count across languages cannot compensate for an underpowered split.
+
+
+### Zero-retrieval baseline compatibility
+
+A closed-book / zero-shot baseline is valid and may declare:
+- `max_evidence_tokens = 0`;
+- `max_retrieval_calls = 0`.
+
+Input, output and latency caps must remain positive. This lets the comparison ladder include true no-retrieval, BM25, dense, hybrid and source-grounded RAG systems under one common schema. The same zero caps apply to every system in that specific comparison; do not mix a zero-retrieval budget with systems that are expected to retrieve evidence.
