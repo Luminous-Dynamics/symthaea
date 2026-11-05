@@ -40,5 +40,10 @@ jobs:
       - name: Run energy meter unit tests
         run: cargo test --locked --all-features --manifest-path research/energy-meter-001/Cargo.toml
 
+      - name: Smoke-test runtime sensor probe and validate JSON
+        run: |
+          cargo run --locked --all-features --manifest-path research/energy-meter-001/Cargo.toml --bin energy-meter-probe -- 1 > energy-meter-probe.json
+          python3 -m json.tool energy-meter-probe.json > /dev/null
+
       - name: Strict Clippy
         run: cargo clippy --locked --all-features --manifest-path research/energy-meter-001/Cargo.toml --all-targets -- -D warnings
