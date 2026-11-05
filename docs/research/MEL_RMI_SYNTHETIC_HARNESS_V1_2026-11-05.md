@@ -25,7 +25,7 @@ The crate implements fixed-response, imitation-only, one-way-prompt and cross-se
 
 The imitation control is intentionally important: copying the current partner can be input-sensitive but is not automatically considered musically complementary. The oracle relation is deliberately narrow and task-defined; it must not be presented as a human judgment or a general metric of musicality.
 
-A second, controlled-partner path distinguishes a fixed partner from a responsive simulator. Its result is simulator-only evidence, not proof of influence over musicians.
+A second, controlled-partner path now runs all four matched agent-action conditions and reports targeted, sham and unrelated effects separately. It distinguishes a fixed partner from a responsive simulator. A joint synthetic record requires both partner-to-agent and agent-to-partner gates; its result is simulator-only evidence, not proof of influence over musicians.
 
 ## Evidence boundary and next integration seam
 
@@ -35,7 +35,7 @@ The crate also represents unsupported modality metrics explicitly as NotApplicab
 
 ## Authored tests
 
-The crate authors 23 deterministic tests covering the positive oracle, all four negative-control families, sham and unrelated control integrity, intervention isolation, event identity, cross-session yoking, controlled partner influence, manifest validation, modality applicability, and exact replay equality. These are authored tests, not executed results until the dedicated GitHub Actions workflow completes on the exact head.
+The crate authors 25 deterministic tests covering the positive oracle, all four negative-control families, sham and unrelated control integrity, intervention isolation, event identity, cross-session yoking, controlled partner influence, manifest validation, modality applicability, and exact replay equality. These are authored tests, not executed results until the dedicated GitHub Actions workflow completes on the exact head.
 
 ## Qualification and claim ceiling
 
