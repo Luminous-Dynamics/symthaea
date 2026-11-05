@@ -305,3 +305,13 @@ The next frontier is therefore not exact original-history recovery. It is **edit
 
 An independent review of Symtropy's latest advertised solver head found a scale-invariance defect in force/moment residual normalization: fixed 1 N and 1 N·m denominator floors can make a 100% imbalance appear numerically tiny for sub-unit problems. The reviewer independently recomputed the published load-case displacement vectors (maximum discrepancy below (5.5\times10^{-20}\,m)); this checks those fixture values only, not Rust execution. The issue and inline review are tracked in [Symtropy #3676](https://github.com/Luminous-Dynamics/symtropy/issues/3676) and [solver PR #2363](https://github.com/Luminous-Dynamics/symtropy/pull/2363). This illustrates why benchmark gates themselves need dimensional and scale-invariance audits.
 
+
+
+### CAD-HISTORY-001 synthetic fixture advancement (2026-11-05)
+
+The initial CAD reconstruction benchmark has now advanced from a taxonomy into a synthetic contract corpus in [draft PR #10529](https://github.com/Luminous-Dynamics/symthaea/pull/10529), linked from [CAD-HISTORY-001 #10510](https://github.com/Luminous-Dynamics/symthaea/issues/10510). It specifies six positive editable-part cases, four negative/abstention controls and ten metamorphic probes. The evaluator accepts alternative native feature histories when they satisfy the observable geometry and semantic-edit contract; it does not reward guessing a private original history.
+
+The corpus is deliberately an extension to, not a replacement for, Parametric CAD Bench V3. The V3 paper (2026-11-02) uses pinned FreeCAD and a separate verifier for native CAD artifacts, but notes that geometry/specification checks do not establish arbitrary future editability or manufacturing readiness. Its 2026-09-24 leaderboard snapshot shows a significant workflow difference: Opus 5.5 / Claude Code 84.66% image-to-CAD versus 39.69% create-and-edit; GPT-6 Astra / Codex 69.70% versus 44.37%. The proposed extension tests held-out semantic interventions and preservation of unrelated invariants after reconstruction. It has not yet generated CAD fixtures or run a CAD kernel.
+
+The PHYS-TRUSS follow-up [Symtropy #3676](https://github.com/Luminous-Dynamics/symtropy/issues/3676) now includes explicit dimensionless force, moment and normwise free-DOF residual formulas, zero-denominator disposition, and scale-metamorphic test requirements. The original inline review remains unresolved; the formulas are implementation guidance, not a code fix or numerical qualification.
+
