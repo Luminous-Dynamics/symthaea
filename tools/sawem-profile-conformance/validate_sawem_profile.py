@@ -177,6 +177,7 @@ EXPECTED_CASE_IDS = {
     "CREDIT-COVER-LIQUIDITY-STRESS-001",
     "CREDIT-COVER-LIQUIDITY-WATERFALL-001",
     "FORECAST-VINTAGE-ASOF-001",
+    "FORECAST-CALIBRATION-EXACT-001",
 }
 
 
@@ -313,6 +314,7 @@ def main() -> None:
     liquidity_stress_kernel_path = root / "tools/sawem-market-reference/src/liquidity_stress.rs"
     liquidity_waterfall_kernel_path = root / "tools/sawem-market-reference/src/liquidity_waterfall.rs"
     asof_replay_kernel_path = root / "tools/sawem-market-reference/src/asof_replay.rs"
+    forecast_metrics_kernel_path = root / "tools/sawem-market-reference/src/forecast_metrics.rs"
 
     try:
         schema_bytes = schema_path.read_bytes()
@@ -327,6 +329,7 @@ def main() -> None:
         liquidity_stress_kernel_bytes = liquidity_stress_kernel_path.read_bytes()
         liquidity_waterfall_kernel_bytes = liquidity_waterfall_kernel_path.read_bytes()
         asof_replay_kernel_bytes = asof_replay_kernel_path.read_bytes()
+        forecast_metrics_kernel_bytes = forecast_metrics_kernel_path.read_bytes()
         schema = json.loads(schema_bytes)
         fixture = json.loads(fixture_bytes)
         comparator_schema = json.loads(comparator_schema_bytes)
@@ -345,6 +348,8 @@ def main() -> None:
             + liquidity_waterfall_kernel_bytes
             + b"\n"
             + asof_replay_kernel_bytes
+            + b"\n"
+            + forecast_metrics_kernel_bytes
         ).decode("utf-8")
     except (OSError, json.JSONDecodeError) as exc:
         fail(f"cannot load schema or fixture: {exc}")
