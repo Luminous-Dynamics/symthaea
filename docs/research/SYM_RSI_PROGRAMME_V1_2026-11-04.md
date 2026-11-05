@@ -420,3 +420,53 @@ The local Symthaea development target includes a single RTX 2070 Laptop GPU (~8 
 Under a frozen, repeated-run research task suite, the combined system should yield more **independently confirmed generalizing improvements per fixed total compute budget** than both a synchronous interactive baseline and an asynchronous fixed-operator baseline, with no protected capability regression. In the equal-wall-clock track it should improve time-to-first-confirmed-gain without hiding increased compute, energy or cost. No numeric superiority threshold should be frozen until the baseline variance and practical effect are measured on a development set; the confirmatory threshold and power plan must then be preregistered.
 
 This complements #10497 (meta-RSI comparison), #8438 (paired/cluster uncertainty), #9433 (population generalization), and #10521/#10533 (validated receipt composition). It does not create a second scheduler, receipt format, evaluator or runner-isolation boundary.
+
+
+## 14. Claim-indexed RSI evidence and same-start improver identification
+
+Chen, Zhu and Zheng, *Auditing the Product, Not the Recursion: The Evaluation Evidence Behind Recursive Self-Improvement Claims*, arXiv:2610.27610 (2026-10-20), provides a useful empirical audit of RSI evaluation practice. In an October 2026 search frame of 114 eligible studies, including 90 RSI-labelled studies, 60% reported evaluation on tasks unused for selection, but only 22% audited at least two independent reruns of the full loop. Of 26 studies claiming a better improver, only four compared earlier and later improvers from identical starting artifacts at a matched budget. The study distinguishes the resulting system's performance (a product claim) from repeatability/accumulation and a better improvement procedure (process claims). These are meta-research findings for its defined search frame, not universal estimates of all RSI work.
+
+### Claim-indexed qualification ladder
+
+Do not use one RSI label to cover all forms of evidence. Each claim must point to its identifying experiment:
+
+| Claim | Required evidence | What it does not establish |
+|---|---|---|
+| Product gain (R1/R2) | Final successor vs initial system on tasks never used for candidate selection; independent audit grader; exact denominators and full protected capability vector | That the process repeats or that the improver improved |
+| Accumulation (R3) | Audited retained checkpoints across each round; development and independent audit outcomes reported for the same rounds; at least two independent full-loop reruns | That a later improver is intrinsically better at a common starting state |
+| Improver gain (R4) | Same-start swap test: clone identical solver, corpus/research state, data access and checkpoint; apply earlier vs later improver under matched all-in compute and evaluator budgets; independently audit both | Algorithmic RSI or model-training improvement |
+| Algorithmic gain (R5) | Freeze base model, data, harness, training budget and evaluation; change the declared learning objective/update algorithm; clean-start train successors; independent held-out audit | Improvement caused only by harness/data/search changes |
+
+### Required R4 experiment
+
+At each meta-improver generation k, freeze the current solver artifacts, research memory, task corpus, tools, prompts, evaluator interface and resource policy. Create two byte-identical starting states:
+
+- **A — prior improver:** generation k-1's improvement procedure;
+- **B — evolved improver:** generation k's improvement procedure.
+
+Both arms receive the same total compute-hours, accelerator type, wall-clock cap (report separately), data and network permissions, candidate proposal budget, evaluation calls, retries and toolset. Randomize independent paired run IDs and repeat the full loop across multiple seeds and task-family blocks. Every proposal, rejected candidate, retry, model call, tool call, training step, resource unit and checkpoint is retained. A fixed-improver and matched random/human-search control remain additional arms; they do not replace the same-start swap test.
+
+Primary R4 estimand: paired difference in independently confirmed, generalizing improvements per matched all-in resource budget. Secondary outcomes: time-to-first-confirmed-gain; best-so-far and final capability vector; survival of each selected change after fresh audit; proposal/acceptance/reversal rates; cost per accepted improvement; G0–G4 transfer; and protected-capability regression. A final candidate score selected from the same development signal is not an independent audit.
+
+### Full-loop repeatability
+
+A single successful chain of five sequential improvements is not five independent demonstrations of the loop. Report (1) within-run accumulation across retained checkpoints and (2) independent full-loop reruns from frozen starting artifacts as separate quantities. Run at least three independent full-loop replications for exploratory screening, then preregister the confirmatory run count by power/precision analysis; the two-rerun threshold in the meta-research paper is a minimum reporting indicator, not an adequate sample-size prescription. Report run-level distributions and failure trajectories, not only the best run.
+
+### Selection and evaluator controls
+
+- Separate cheap development feedback from the independent audit. Do not tune on the audit set or repeatedly reveal its results to the improver.
+- Use the frozen candidate archive to retain every proposal and evaluation; never keep only the champion or overwrite rejected attempts.
+- Add noise-aware selection and a preregistered correction/holdout policy for adaptive reuse. The audit paper cites REUSE's reported reduction of false promotions from up to 20.7% to zero in its own live experiments; this is a published result to evaluate as a comparator, not a Symthaea result.
+- Include a null loop (shuffled feedback or proposals that cannot improve the target) to estimate apparent gain from search/selection noise.
+- Audit grader independence and error correlation with the development judge. A held-out task set does not cure shared grader bias by itself.
+- Keep exact candidate/source identity, full budget, task universe, cluster unit, checkpoint lineage and verifier identity in every evidence record.
+
+### RSI-Index comparison: RSIGym
+
+RSIGym (Meng et al., arXiv:2610.10310, 2026-10-07) is an additional external comparator for the R4 programme. It offers reusable training, inference, rollout, evaluation and sandbox services with shared budget and permission controls. Its Data, Harness and Joint tracks distinguish data changes from execution-harness changes and their combination. It reports a best RSI-Index of 0.4809 for Opus 5 in independent Joint runs under a $500 platform-service budget per benchmark run, and selected-system gains on SWE-bench Verified (17.67% to 50.33%) and AIME (31.67% to 97.78%). Those are author-reported preprint results on RSIGym's protocol; they are not directly comparable to AI4AI-Bench's algorithm-only score, RSI-Env's experiments or SelfImprove-Bench's G0–G4 transfer levels.
+
+For Symthaea, reproduce the Data-only, Harness-only and Joint tracks, add an explicit Algorithm-only track, and include a frozen baseline. Keep all-in compute, service cost and wall-clock as distinct budgets. Report each benchmark lane, capability retention, independent audit and repeated-loop variance; do not optimize only for RSI-Index.
+
+Sources:
+- Chen, Zhu & Zheng, *Auditing the Product, Not the Recursion*, arXiv:2610.27610 (2026-10-20): https://arxiv.org/abs/2610.27610
+- Meng et al., *RSIGym: A Flexible Environment for Recursive Self-Improvement*, arXiv:2610.10310 (2026-10-07): https://arxiv.org/abs/2610.10310
