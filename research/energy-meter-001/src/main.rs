@@ -386,8 +386,10 @@ mod tests {
             "discovery_directory_error",
         );
         let unsupported = failed_result("nvml-device-1", "counter not supported", "unsupported");
-
         assert!(!discovery_is_complete(&[unavailable, unsupported]));
-        assert!(discovery_is_complete(&[unsupported]));
+
+        let only_unsupported =
+            failed_result("nvml-device-1", "counter not supported", "unsupported");
+        assert!(discovery_is_complete(&[only_unsupported]));
     }
 }
