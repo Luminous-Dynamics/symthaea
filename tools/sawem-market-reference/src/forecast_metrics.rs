@@ -512,12 +512,19 @@ mod tests {
             Err(ForecastCalibrationError::QuantileCrossing)
         );
 
-        let other_model = [ForecastCalibrationObservation {
-            model_id: "homer-v1",
-            ..observation("other-model", 100, 200, 300, 250)
-        }];
+        let mixed_models = [
+            observation("chronos-model", 100, 200, 300, 250),
+            ForecastCalibrationObservation {
+                model_id: "homer-v1",
+                valid_period_start_utc: 200,
+                valid_period_end_utc: 210,
+                realized_observed_at_utc: 215,
+                realized_available_at_utc: 220,
+                ..observation("homer-model", 100, 200, 300, 250)
+            },
+        ];
         assert_eq!(
-            evaluate_forecast_calibration(220, &other_model),
+            evaluate_forecast_calibration(220, &mixed_models),
             Err(ForecastCalibrationError::MixedModelBuild)
         );
 
