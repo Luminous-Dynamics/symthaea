@@ -955,6 +955,88 @@ mod tests {
     }
 
     #[test]
+    fn abstained_hallucination_is_counted_as_an_unconditional_miss() {
+        let pair = PairMeta {
+            schema_version: "multi-hall-sa-pair-v0".into(),
+            pair_id: "pair-1".into(),
+            file_id: "document-1".into(),
+            fact_index: 0,
+            language: "isiZulu".into(),
+            hallucination_type: "temporal shift".into(),
+        };
+        let factual = Prediction {
+            schema_version: "multi-hall-sa-result-v0".into(),
+            result_id: "result-factual".into(),
+            plan_id: "plan".into(),
+            system_id: "system".into(),
+            pair_id: "pair-1".into(),
+            statement_language: "target".into(),
+            statement_kind: "factual".into(),
+            predicted_label: "factual".into(),
+            p_hallucinated: Some(0.05),
+            latency_ms: Some(10),
+            input_tokens: Some(20),
+            output_tokens: Some(5),
+            retrieval_calls: Some(1),
+        };
+        let hallucinated = Prediction {
+            schema_version: "multi-hall-sa-result-v0".into(),
+            result_id: "result-hallucinated".into(),
+            plan_id: "plan".into(),
+            system_id: "system".into(),
+            pair_id: "pair-1".into(),
+            statement_language: "target".into(),
+            statement_kind: "hallucinated".into(),
+            predicted_label: "abstain".into(),
+            p_hallucinated: Some(0.50),
+            latency_ms: Some(11),
+            input_tokens: Some(21),
+            output_tokens: Some(6),
+            retrieval_calls: Some(1),
+        };
+        let rows = vec![
+            Observed { pair: pair.clone(), prediction: factual },
+            Observed { pair, prediction: hallucinated },
+        ];
+        let metrics = metric_slice(&rows, "isiZulu", None);
+
+        assert_eq!(metrics.abstained, 1);
+        assert_eq!(metrics.coverage, Some(0.5));
+        assert_eq!(metrics.accuracy_on_covered, Some(1.0));
+        assert_eq!(metrics.missed_hallucination_rate_unconditional, Some(1.0));
+        assert_eq!(metrics.probability_count, 2);
+    }
+
+    #[test]
+    fn paired_cluster_bootstrap_is_deterministic_and_keeps_cluster_units() {
+        let clusters: BTreeMap<String, Vec<PairedMiss>> = (0..30)
+            .map(|index| {
+                (
+                    format!("document-{index}"),
+                    vec![PairedMiss {
+                        target_missed: true,
+                        english_missed: false,
+                    }],
+                )
+            })
+            .collect();
+        let plan = BootstrapPlan {
+            replicates: 1000,
+            seed: 7,
+            minimum_independent_clusters: 30,
+            confidence_level: 0.95,
+            multiple_comparison_correction: "none".into(),
+        };
+        let first = bootstrap_gap_ci(&clusters, &plan, 1).expect("30 clusters qualify for an exploratory interval");
+        let second = bootstrap_gap_ci(&clusters, &plan, 1).expect("same input must score twice");
+        assert_eq!(first.lower, 1.0);
+        assert_eq!(first.upper, 1.0);
+        assert_eq!(first.lower, second.lower);
+        assert_eq!(first.upper, second.upper);
+        assert_eq!(first.cluster_count, 30);
+    }
+
+    #[test]
     fn percentile_returns_expected_order_statistic() {
         let values = vec![-1.0, 0.0, 0.5, 1.0, 2.0];
         assert_eq!(percentile(&values, 0.0), Some(-1.0));
