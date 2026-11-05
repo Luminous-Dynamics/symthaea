@@ -1,0 +1,37 @@
+name: Muse Studio keeper read-back integrity
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-muse/src/bin/muse_studio.rs"
+      - ".github/workflows/mel-studio-keeper-readback.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  keeper-readback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.ref || github.ref_name }}
+          persist-credentials: false
+      - name: Verify exact pull request head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Format Muse Studio binary source
+        run: rustfmt +1.96.0 --edition 2024 --check crates/domains/symthaea-muse/src/bin/muse_studio.rs
+      - name: Test committed keeper read-back
+        run: cargo +1.96.0 test --locked -p symthaea-muse --features studio --bin muse_studio keeper_readback_tests
