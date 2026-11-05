@@ -1635,18 +1635,36 @@ mod tests {
 
     #[test]
     fn duplicate_pair_ids_are_disambiguated_by_source_document() {
-        let pair = |file_id: &str| PairMeta {
+        let pair = |file_id: &str, pair_id: &str, language: &str, kind: &str| PairMeta {
             schema_version: "multi-hall-sa-pair-v0".into(),
-            pair_id: "English_isiZulu_fact0_temporal_shift".into(),
+            pair_id: pair_id.into(),
             file_id: file_id.into(),
             fact_index: 0,
-            language: "isiZulu".into(),
-            hallucination_type: "temporal shift".into(),
+            language: language.into(),
+            hallucination_type: kind.into(),
         };
-        let validated = validate_pairs(&[pair("document-0"), pair("document-1")])
-            .expect("same pair_id in two source documents is valid");
-        assert_eq!(validated.len(), 2);
-        assert_ne!(pair_key(&pair("document-0")), pair_key(&pair("document-1")));
+        let first = pair(
+            "document-0",
+            "English_isiZulu_fact0_temporal_shift",
+            "isiZulu",
+            "temporal shift",
+        );
+        let second = pair(
+            "document-1",
+            "English_isiZulu_fact0_temporal_shift",
+            "isiZulu",
+            "temporal shift",
+        );
+        let validated = validate_pairs(&[
+            first.clone(),
+            second.clone(),
+            pair("document-2", "pair-x", "isiXhosa", "entity error"),
+            pair("document-3", "pair-y", "Sepedi", "numerical inaccuracy"),
+            pair("document-4", "pair-z", "Sesotho", "location mistake"),
+        ])
+        .expect("same pair_id in two source documents is valid within a complete language manifest");
+        assert_eq!(validated.len(), 5);
+        assert_ne!(pair_key(&first), pair_key(&second));
     }
 
     #[test]
