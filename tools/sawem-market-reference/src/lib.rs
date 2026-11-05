@@ -321,11 +321,32 @@ pub struct GeneratingPriceCurve {
     pub emergency_level_one_minor_per_mwh: i64,
 }
 
+/// Demand-side Trading Unit consumption price curve from Market Code Rev 2.3 §9.3(1)(d).
+///
+/// Unlike the generating curve, its volume axis descends from Declared Consumption
+/// through three elbow points. This type only resolves the synthetic unit price at
+/// a supplied contracted-consumption operating point; it does not establish DSU
+/// eligibility, qualifying reserve capacity, or settlement.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DemandSideConsumptionPriceCurve {
+    pub declared_consumption_mw: f64,
+    pub first_elbow_mw: f64,
+    pub second_elbow_mw: f64,
+    pub third_elbow_mw: f64,
+    /// Cost increments use the same explicit minor-currency-per-MWh basis as
+    /// the generating-price oracle. They are not reserve payments.
+    pub increment_one_minor_per_mwh: i64,
+    pub increment_two_minor_per_mwh: i64,
+    pub increment_three_minor_per_mwh: i64,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReservePriceError {
     NonFiniteOperatingPoint,
     ContractedPointOutsideCurve,
     InvalidPriceCurve,
+    InvalidConsumptionPriceCurve,
+    NoReducibleConsumptionBelowThirdElbow,
     NegativeIncrementalPrice,
     NonMonotonicIncrementalPrice,
     AmbiguousCoincidentElbows,
@@ -445,6 +466,90 @@ impl GeneratingPriceCurve {
     }
 }
 
+impl DemandSideConsumptionPriceCurve {
+    pub fn validate(self) -> Result<(), ReservePriceError> {
+        let points = [
+            self.declared_consumption_mw,
+            self.first_elbow_mw,
+            self.second_elbow_mw,
+            self.third_elbow_mw,
+        ];
+        if points.iter().any(|value| !value.is_finite()) {
+            return Err(ReservePriceError::NonFiniteOperatingPoint);
+        }
+        if points.iter().any(|value| *value < 0.0)
+            || self.first_elbow_mw > self.declared_consumption_mw
+            || self.second_elbow_mw > self.first_elbow_mw
+            || self.third_elbow_mw > self.second_elbow_mw
+        {
+            return Err(ReservePriceError::InvalidConsumptionPriceCurve);
+        }
+
+        let prices = [
+            self.increment_one_minor_per_mwh,
+            self.increment_two_minor_per_mwh,
+            self.increment_three_minor_per_mwh,
+        ];
+        if prices.iter().any(|value| *value < 0) {
+            return Err(ReservePriceError::NegativeIncrementalPrice);
+        }
+        if self.increment_two_minor_per_mwh < self.increment_one_minor_per_mwh
+            || self.increment_three_minor_per_mwh < self.increment_two_minor_per_mwh
+        {
+            return Err(ReservePriceError::NonMonotonicIncrementalPrice);
+        }
+        Ok(())
+    }
+
+    /// Select the price increment for an absolute contracted consumption point.
+    /// At an elbow, use the next non-empty lower-consumption block. The third
+    /// elbow is the bottom of the declared curve and has no further shed-able block.
+    pub fn price_at(
+        self,
+        contracted_consumption_mw: f64,
+    ) -> Result<(PriceIncrement, i64), ReservePriceError> {
+        self.validate()?;
+        if !contracted_consumption_mw.is_finite() {
+            return Err(ReservePriceError::NonFiniteOperatingPoint);
+        }
+        if contracted_consumption_mw < self.third_elbow_mw - EPSILON
+            || contracted_consumption_mw > self.declared_consumption_mw + EPSILON
+        {
+            return Err(ReservePriceError::ContractedPointOutsideCurve);
+        }
+        if (contracted_consumption_mw - self.third_elbow_mw).abs() <= EPSILON {
+            return Err(ReservePriceError::NoReducibleConsumptionBelowThirdElbow);
+        }
+
+        if (contracted_consumption_mw - self.first_elbow_mw).abs() <= EPSILON {
+            if self.first_elbow_mw - self.second_elbow_mw > EPSILON {
+                return Ok((PriceIncrement::Two, self.increment_two_minor_per_mwh));
+            }
+            if self.second_elbow_mw - self.third_elbow_mw > EPSILON {
+                return Ok((PriceIncrement::Three, self.increment_three_minor_per_mwh));
+            }
+            return Err(ReservePriceError::NoReducibleConsumptionBelowThirdElbow);
+        }
+        if (contracted_consumption_mw - self.second_elbow_mw).abs() <= EPSILON {
+            if self.second_elbow_mw - self.third_elbow_mw > EPSILON {
+                return Ok((PriceIncrement::Three, self.increment_three_minor_per_mwh));
+            }
+            return Err(ReservePriceError::NoReducibleConsumptionBelowThirdElbow);
+        }
+
+        if contracted_consumption_mw > self.first_elbow_mw {
+            return Ok((PriceIncrement::One, self.increment_one_minor_per_mwh));
+        }
+        if contracted_consumption_mw > self.second_elbow_mw {
+            return Ok((PriceIncrement::Two, self.increment_two_minor_per_mwh));
+        }
+        if contracted_consumption_mw > self.third_elbow_mw {
+            return Ok((PriceIncrement::Three, self.increment_three_minor_per_mwh));
+        }
+        Err(ReservePriceError::NoReducibleConsumptionBelowThirdElbow)
+    }
+}
+
 /// Calculate the §9.6 Trading Unit opportunity-price differential for a
 /// generating price curve. This does not calculate contracted MW, qualifying
 /// capacity, reserve-capacity payments, performance adjustment or settlement.
@@ -471,6 +576,35 @@ pub fn reserve_opportunity_price(
         _ => return Err(ReservePriceError::UnsupportedProductDirection),
     }
     .ok_or(ReservePriceError::ArithmeticOverflow)?;
+
+    Ok(ReserveOpportunityPrice {
+        selected_increment,
+        price_difference_minor_per_mwh: difference.max(0),
+    })
+}
+
+/// Calculate an upward-reserve opportunity-price differential for a Demand Side Unit
+/// using its §9.3(1)(d) consumption curve. This is a price-curve component only:
+/// eligibility, contracted MW, qualifying capacity, performance adjustment and
+/// settlement are separate evidence-bound calculations.
+pub fn dsu_upward_reserve_opportunity_price(
+    product: ReserveProduct,
+    system_marginal_price_minor_per_mwh: i64,
+    contracted_consumption_mw: f64,
+    curve: DemandSideConsumptionPriceCurve,
+) -> Result<ReserveOpportunityPrice, ReservePriceError> {
+    let (selected_increment, unit_incremental_price) =
+        curve.price_at(contracted_consumption_mw)?;
+    let difference = system_marginal_price_minor_per_mwh
+        .checked_sub(unit_incremental_price)
+        .ok_or(ReservePriceError::ArithmeticOverflow)?;
+
+    // DSU qualifying-capacity clauses are specified for Regulating Up,
+    // Instantaneous and Ten-Minute reserve; this helper deliberately exposes
+    // only those upward products and does not infer a Regulating Down DSU path.
+    match product {
+        ReserveProduct::Regulating | ReserveProduct::Instantaneous | ReserveProduct::TenMinute => {}
+    }
 
     Ok(ReserveOpportunityPrice {
         selected_increment,
@@ -1189,6 +1323,104 @@ mod tests {
             network_export_limit_mw: 60.0,
             network_import_limit_mw: 50.0,
         }
+    }
+
+    fn demand_side_consumption_price_curve() -> DemandSideConsumptionPriceCurve {
+        DemandSideConsumptionPriceCurve {
+            declared_consumption_mw: 100.0,
+            first_elbow_mw: 80.0,
+            second_elbow_mw: 50.0,
+            third_elbow_mw: 20.0,
+            increment_one_minor_per_mwh: 10,
+            increment_two_minor_per_mwh: 20,
+            increment_three_minor_per_mwh: 30,
+        }
+    }
+
+    #[test]
+    fn demand_side_consumption_price_curve_selects_next_increment_at_elbows() {
+        let curve = demand_side_consumption_price_curve();
+        assert_eq!(curve.price_at(90.0), Ok((PriceIncrement::One, 10)));
+        assert_eq!(curve.price_at(80.0), Ok((PriceIncrement::Two, 20)));
+        assert_eq!(curve.price_at(65.0), Ok((PriceIncrement::Two, 20)));
+        assert_eq!(curve.price_at(50.0), Ok((PriceIncrement::Three, 30)));
+        assert_eq!(curve.price_at(35.0), Ok((PriceIncrement::Three, 30)));
+        assert_eq!(
+            curve.price_at(20.0),
+            Err(ReservePriceError::NoReducibleConsumptionBelowThirdElbow)
+        );
+    }
+
+    #[test]
+    fn dsu_reserve_opportunity_price_uses_consumption_curve_and_upward_products() {
+        let curve = demand_side_consumption_price_curve();
+
+        let regulating = dsu_upward_reserve_opportunity_price(
+            ReserveProduct::Regulating,
+            50,
+            80.0,
+            curve,
+        )
+        .expect("DSU regulating-up price curve point is valid");
+        assert_eq!(regulating.selected_increment, PriceIncrement::Two);
+        assert_eq!(regulating.price_difference_minor_per_mwh, 30);
+
+        let instantaneous = dsu_upward_reserve_opportunity_price(
+            ReserveProduct::Instantaneous,
+            25,
+            50.0,
+            curve,
+        )
+        .expect("DSU instantaneous-up price curve point is valid");
+        assert_eq!(instantaneous.selected_increment, PriceIncrement::Three);
+        assert_eq!(instantaneous.price_difference_minor_per_mwh, 0);
+
+        let ten_minute = dsu_upward_reserve_opportunity_price(
+            ReserveProduct::TenMinute,
+            35,
+            90.0,
+            curve,
+        )
+        .expect("DSU ten-minute-up price curve point is valid");
+        assert_eq!(ten_minute.selected_increment, PriceIncrement::One);
+        assert_eq!(ten_minute.price_difference_minor_per_mwh, 25);
+    }
+
+    #[test]
+    fn demand_side_consumption_price_curve_rejects_invalid_and_unavailable_points() {
+        let curve = demand_side_consumption_price_curve();
+        assert_eq!(
+            curve.price_at(110.0),
+            Err(ReservePriceError::ContractedPointOutsideCurve)
+        );
+
+        let mut invalid_order = curve;
+        invalid_order.second_elbow_mw = 85.0;
+        assert_eq!(
+            invalid_order.validate(),
+            Err(ReservePriceError::InvalidConsumptionPriceCurve)
+        );
+
+        let mut negative_price = curve;
+        negative_price.increment_one_minor_per_mwh = -1;
+        assert_eq!(
+            negative_price.validate(),
+            Err(ReservePriceError::NegativeIncrementalPrice)
+        );
+
+        let mut non_monotonic = curve;
+        non_monotonic.increment_three_minor_per_mwh = 15;
+        assert_eq!(
+            non_monotonic.validate(),
+            Err(ReservePriceError::NonMonotonicIncrementalPrice)
+        );
+
+        let mut coincident_empty_blocks = curve;
+        coincident_empty_blocks.first_elbow_mw = 50.0;
+        assert_eq!(
+            coincident_empty_blocks.price_at(50.0),
+            Ok((PriceIncrement::Three, 30))
+        );
     }
 
     #[test]
