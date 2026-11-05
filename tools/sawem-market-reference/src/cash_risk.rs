@@ -17,7 +17,8 @@ pub struct CashScenarioOutcome<'a> {
     pub result_source_sha256: &'a str,
     pub probability_source_ref: &'a str,
     pub probability_source_sha256: &'a str,
-    pub available_at_utc: i64,
+    pub result_available_at_utc: i64,
+    pub probability_available_at_utc: i64,
     pub probability_bps: u16,
     /// Final net cash in minor ZAR, after the declared model's costs.
     pub net_cash_minor_zar: i64,
@@ -122,7 +123,9 @@ pub fn evaluate_cash_risk<'a>(
         if scenario.probability_bps == 0 {
             return Err(CashRiskError::InvalidScenarioProbability);
         }
-        if scenario.available_at_utc > inputs.evaluation_as_of_utc {
+        if scenario.result_available_at_utc > inputs.evaluation_as_of_utc
+            || scenario.probability_available_at_utc > inputs.evaluation_as_of_utc
+        {
             return Err(CashRiskError::FutureKnownScenario);
         }
         if !scenario_ids.insert(scenario.scenario_id) {
@@ -222,7 +225,8 @@ mod tests {
             result_source_sha256: SOURCE_SHA,
             probability_source_ref: "probability/manifest/v1",
             probability_source_sha256: SOURCE_SHA,
-            available_at_utc: 90,
+            result_available_at_utc: 90,
+            probability_available_at_utc: 85,
             probability_bps: probability,
             net_cash_minor_zar: cash,
         }
@@ -286,9 +290,13 @@ mod tests {
 
     #[test]
     fn future_known_duplicate_and_bad_source_evidence_fail_closed() {
-        let future = [CashScenarioOutcome {
-            available_at_utc: 101,
-            ..scenario("future", 10_000, 100)
+        let future_result = [CashScenarioOutcome {
+            result_available_at_utc: 101,
+            ..scenario("future-result", 10_000, 100)
+        }];
+        let future_probability = [CashScenarioOutcome {
+            probability_available_at_utc: 101,
+            ..scenario("future-probability", 10_000, 100)
         }];
         assert_eq!(
             evaluate_cash_risk(inputs(&future, 500)),
