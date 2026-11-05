@@ -124,8 +124,8 @@ impl NegotiatedResponseContractV1 {
             .accepted_offsets
             .iter()
             .map(|offset| {
-                (i64::from(input.value) + i64::from(*offset))
-                    .rem_euclid(i64::from(self.modulus)) as i32
+                (i64::from(input.value) + i64::from(*offset)).rem_euclid(i64::from(self.modulus))
+                    as i32
             })
             .collect())
     }
@@ -204,9 +204,7 @@ pub fn assess_negotiation(
                 values.len() >= 2 && unique.len() == values.len(),
             )
         }
-        NegotiationChoiceV1::AskClarification | NegotiationChoiceV1::Abstain => {
-            (Vec::new(), true)
-        }
+        NegotiationChoiceV1::AskClarification | NegotiationChoiceV1::Abstain => (Vec::new(), true),
     };
     let proposed_set: BTreeSet<i32> = proposed.iter().copied().collect();
     let contract_valid = proposed.iter().all(|value| contract_values.contains(value));
