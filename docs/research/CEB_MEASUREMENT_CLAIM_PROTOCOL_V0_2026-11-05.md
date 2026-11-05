@@ -92,7 +92,7 @@ Quarantine tasks after a confirmed answer leak, pass-channel shortcut, invalid r
 
 - Scale SWE-Bench Pro V2: https://labs.scale.com/leaderboard/swe_bench_pro_public_v2
 - Scale SWE Atlas QnA: https://labs.scale.com/leaderboard/sweatlas-qna
-- Scale SWE Atlas Test Writing: https://labs.scale.com/leaderboard/sweatlas-test-writing
+- Scale SWE Atlas Test Writing: https://labs.scale.com/leaderboard
 - Scale SWE Atlas Refactoring: https://labs.scale.com/leaderboard/sweatlas-refactoring
 - ContextBench: https://contextbench.github.io/
 - PDB results: https://huggingface.co/datasets/Precise-Debugging-Benchmarking/PDB-Results
@@ -100,6 +100,6 @@ Quarantine tasks after a confirmed answer leak, pass-channel shortcut, invalid r
 - Endor Labs Agent Security League: https://www.endorlabs.com/research/ai-code-security-benchmark
 - Rust-SWE-bench / RUSTFORGER: https://arxiv.org/abs/2602.22764
 - SWE-fficiency: https://proceedings.mlr.press/v306/ma26l.html
-- Scale HiL-Bench: https://labs.scale.com/leaderboard/hil-bench
+- Scale consolidated leaderboard (HiL-Bench): https://labs.scale.com/leaderboard
 - Epoch AI Terminal-Bench 4.0.0 review: https://epoch.ai/benchmarks/terminal-bench-4/review
 - Terminal-Bench lifecycle and verifier roadmap: https://www.tbench.ai/news/terminal-bench-4-0
