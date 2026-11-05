@@ -599,12 +599,11 @@ pub fn dsu_upward_reserve_opportunity_price(
         .checked_sub(unit_incremental_price)
         .ok_or(ReservePriceError::ArithmeticOverflow)?;
 
-    // DSU qualifying-capacity clauses are specified for Regulating Up,
-    // Instantaneous and Ten-Minute reserve; this helper deliberately exposes
-    // only those upward products and does not infer a Regulating Down DSU path.
-    match product {
-        ReserveProduct::Regulating | ReserveProduct::Instantaneous | ReserveProduct::TenMinute => {}
-    }
+    // This helper is upward-only. The Code defines DSU qualifying-capacity
+    // clauses for these product families, but eligibility and qualifying MW
+    // remain separate from this price-curve calculation.
+    sawem_rev_2_3_reserve_requirement(product, ReserveDirection::Up)
+        .map_err(|_| ReservePriceError::UnsupportedProductDirection)?;
 
     Ok(ReserveOpportunityPrice {
         selected_increment,
