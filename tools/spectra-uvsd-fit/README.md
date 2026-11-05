@@ -177,3 +177,20 @@ Information, model-discrimination, representativeness and utility use lower boun
 Bonferroni does not require independence across action/metric claims, but Hoeffding does require independent bounded Monte Carlo replications within each score series. This method is intentionally conservative; it is not an empirical Bernstein estimate. It quantifies Monte Carlo uncertainty about the supplied score-generating process only. It cannot repair a biased simulator, an invalid score definition, a wrong estimand or an incomplete scenario bank. A simultaneous bound around a biased point-generating process is still biased.
 
 All bounds and ranges are caller-contractual: the implementation validates sample membership and range ordering, but it does not prove that the declared ranges or independent-replication assumptions are scientifically correct. The method ID is `hoeffding-bonferroni-one-sided-v1`. The module is experimental and is not authorized for live adaptive experiments.
+
+
+## Synthetic-observation to UVSD table adapter (experimental)
+
+The `observation_table_adapter` module converts observed category counts from `SyntheticDataset` into the `CategoryTable` expected by the UVSD fitter. It groups only by the exact frozen condition ID, stimulus-level bit pattern and response-scale ID. Signal and noise actions are combined only when all three grouping fields match.
+
+The adapter reads observed category counts and action metadata only. It does not read oracle evidence, oracle categories, lapse indicators or the latent criterion values. Category order is represented as integer ranks 0..K-1.
+
+A group is fit-eligible only when:
+- every response category is observed (no missing confidence/category responses);
+- both signal and noise classes have observed trials;
+- the category order fits the fitter's `i16` category-rank representation;
+- the resulting counts pass `CategoryTable::new`.
+
+Otherwise the adapter returns a non-ready disposition (`MissingCategoryResponses`, `MissingSignalClass`, `MissingNoiseClass`, `CategoryOrderOverflow` or `InvalidCategoryTable`) and **no table**. Missing counts, requested class totals, observed class totals and RT timeout dispositions remain explicit. In particular, the adapter does not assume missing-at-random or silently remove missing rows; the current UVSD fitter has no missingness model.
+
+This is a synthetic-data adapter, not a missingness correction or model-adequacy test. It must be reviewed before being used with human datasets.
