@@ -25,8 +25,8 @@
 //! never rounded to zero because zero would falsely imply an error-free test.
 
 use super::reuse_confidence_certificate::{
-    pass_fail_confidence_certificate, ReuseCertificateError, ReuseConfidenceCertificate,
-    MAX_CERTIFICATE_SAMPLE_COUNT,
+    MAX_CERTIFICATE_SAMPLE_COUNT, ReuseCertificateError, ReuseConfidenceCertificate,
+    pass_fail_confidence_certificate,
 };
 use std::fmt;
 
@@ -654,7 +654,9 @@ mod tests {
         let audit = evaluate_reuse_round_audited(0.05, 1, 0, 1, 0.5, &candidates, 0.25).unwrap();
         assert_eq!(
             audit.decision(),
-            ReuseRoundDecision::PromoteCandidate { candidate_number: 1 }
+            ReuseRoundDecision::PromoteCandidate {
+                candidate_number: 1
+            }
         );
         let certificate = audit.selected_certificate().unwrap();
         assert!(certificate.lower_bound() > 0.0);
