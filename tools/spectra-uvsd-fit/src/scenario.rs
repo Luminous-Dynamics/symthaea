@@ -8,7 +8,7 @@
 //! the CandidateAssessment consumed by the sequential policy. The raw scenario
 //! definitions and outcomes are retained in the returned batch receipt.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fmt;
 
 use super::sequential::{
@@ -264,8 +264,8 @@ pub fn aggregate_scenario_assessments(
             action_id: action.action_id,
             operational_mapping_qualified,
             model_adequacy_qualified,
-            target_information,
-            model_discrimination_information,
+            target_information: Some(target_information),
+            model_discrimination_information: Some(model_discrimination_information),
             representativeness: Some(representativeness),
             worst_case_target_utility: Some(worst_case_target_utility),
             participant_burden_seconds: Some(participant_burden_seconds),
@@ -342,7 +342,6 @@ fn aggregate_robust_utility(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tools_placeholder;
 
     fn make_action_set() -> OperationalActionSet {
         OperationalActionSet::new(
