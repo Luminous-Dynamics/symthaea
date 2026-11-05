@@ -39,15 +39,15 @@ No scalar musical-quality score is produced. A contract-valid alternative may fa
 
 ## Executable conformance
 
-The canonical runner emits nine negotiation rows and the dedicated workflow gates:
-- **5 qualified:** complete branch, clarification, veto-compliant branch, following explicit partner selection, and abstention after all options are vetoed.
-- **4 rejected:** premature single commitment, a branch containing a vetoed value, fabricated commitment after all options are removed, and incomplete branching.
+The canonical runner emits eleven negotiation rows and the dedicated workflow gates:
+- **6 qualified:** complete branch within budget, clarification, veto-compliant branch, following explicit partner selection, abstention after all options are vetoed, and clarification when the viable alternative set exceeds the branch budget.
+- **5 rejected:** premature single commitment, a branch containing a vetoed value, fabricated commitment after all options are removed, incomplete branching, and attempted branch explosion above the configured fan-out limit.
 
 These are finite, hand-constructed synthetic controls. They do not estimate how often real musicians prefer branching or clarification.
 
 ## Adversarial unit-test coverage
 
-Ten new Rust tests cover multiple valid witnesses; full branching; clarification; premature single commitment; veto handling; explicit selection; empty-set abstention; duplicate/incomplete branches; no-op/wrong-dimension contracts; and clarification after an already explicit partner selection.
+Twelve new Rust tests cover multiple valid witnesses; full branching; clarification; premature single commitment; veto handling; explicit selection; empty-set abstention; duplicate/incomplete branches; no-op/wrong-dimension contracts; clarification after an already explicit partner selection; bounded branch fan-out; and clarification instead of excessive branching.
 
 ## Relationship to existing work
 
