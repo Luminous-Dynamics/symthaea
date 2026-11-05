@@ -482,9 +482,9 @@ A new failure mode remains even after receipt verification, exact task accountin
 
 Sun et al., *Which Self-Improvements Should We Trust? Reliable Self-Improvement When Agents Reuse Their Benchmarks*, arXiv:2609.33180 (2026-09-27), formalizes this as adaptive overfitting. REUSE allocates a global error budget over round t and prior promotion count p, and requires the proposer to receive only the promotion decision. It reports zero false promotions in its Covertype experiments versus 75 / 71 for empirical best-of-K at evaluation pool sizes 2,000 / 10,000, while retaining comparable final population performance. These are author-reported results for one tabular binary-classification setting, with 30 seeds, 200 rounds and up to eight proposals per round; they are not proof that the exact procedure transfers to coding, scientific research, multi-metric capability retention or every benchmark distribution.
 
-### New Rust arithmetic primitive
+### New Rust allocation and decision-only gate
 
-The branch adds `reuse_error_budget.rs` with `allocate_reuse_error_budget`. It implements the per-round/per-promotion allocation
+The branch adds `reuse_error_budget.rs` with `allocate_reuse_error_budget` and `reuse_sign_test_decision`. It implements the per-round/per-promotion allocation
 
 [
 \delta_{t,p} =
@@ -495,9 +495,9 @@ w_t=\frac{1}{t(t+1)},\quad
 v_p=\frac{1}{(p+1)(p+2)}.
 ]
 
-It computes the binomial term and candidate factor in log space, then splits the allocation into a paired-test budget `rho * delta` and a cumulative lower-bound budget `(1-rho) * delta`. It rejects invalid parameters, impossible promotion histories, histories beyond the reviewed maximum, and binary64 underflow; zero is never silently treated as a valid error allowance. Seven tests are authored for hand-calculated allocations, monotonicity, invalid histories, history bounds, underflow and small exact binomial coefficients.
+It computes the binomial term and candidate factor in log space, then splits the allocation into a paired-test budget `rho * delta` and a cumulative lower-bound budget `(1-rho) * delta`. It rejects invalid parameters, impossible promotion histories, histories beyond the reviewed maximum, and binary64 underflow; zero is never silently treated as a valid error allowance. The exact one-sided paired sign test is reused from `paired_evaluation.rs`; the new `reuse_sign_test_decision` returns only `Promote` or `Reject` and never returns a p-value. It treats an all-tie comparison as p=1 / reject and uses an inclusive comparison at the allocated threshold. Nine tests are now authored for hand-calculated allocations, monotonicity, invalid histories, history bounds, underflow, small binomial coefficients, decision thresholds and the all-tie case.
 
-This is only a deterministic arithmetic helper. It does **not** implement the REUSE sequential test, prove the simultaneous guarantee, retain promotion history, protect a holdout, hide scores, create a certificate, or authorize promotion. The implementation's convention for `rho` must be reviewed against the exact theorem/proof before any decision service uses it.
+This remains a **decision-kernel primitive**, not a qualified REUSE service. It does **not** persist or authenticate promotion history, enforce decision-only access, compute the cumulative lower confidence bound, prove the simultaneous guarantee, protect a holdout, or authorize promotion. The REUSE paper requires the paired sign test to consume `rho * delta` and a separate confidence-bound certificate at `(1-rho) * delta`; only the decision is returned to the proposer. The exact cumulative certificate is deliberately deferred until its Clopper–Pearson/Bernstein implementation is independently reviewed and tested.
 
 ### Required external evaluation boundary
 
@@ -527,3 +527,47 @@ The closest comparison is not a raw accuracy leaderboard. Run best-of-K, Bonferr
 REUSE's result is a strong methodological comparator, not a performance target to copy uncritically. The Symthaea target is to retain the statistical guarantee while supporting multiple independently measured capability dimensions and real engineering/science tasks, without exposing their audit scores to the evolving proposer.
 
 Source: Sun et al., *Which Self-Improvements Should We Trust? Reliable Self-Improvement When Agents Reuse Their Benchmarks*, arXiv:2609.33180 (2026-09-27): https://arxiv.org/abs/2609.33180
+
+
+
+## 16. Generalization ladder: from benchmark fit to transferable capability
+
+Xu et al., *SelfImprove-Bench: Evaluating Generalization in Self-Improving Agents*, arXiv:2611.02797 (2026-11-02), makes a useful distinction: an improved score on the scenario used during search is not evidence that the improvement transfers. Its G0–G4 ladder measures progressively more distant transfer:
+- **G0 — seen-instance replay:** evaluate on previously seen instances. This is a regression/retention diagnostic only; it is not generalization evidence.
+- **G1 — fresh same-difficulty instances:** new instances from the same task family and difficulty distribution.
+- **G2 — harder same-family instances:** shift difficulty while preserving the task family.
+- **G3 — sibling-task transfer:** transfer to a different task/game within the same capability family.
+- **G4 — cross-capability transfer:** transfer to a different capability family.
+
+The paper instantiates Exploring, Planning and Reasoning on six games and reports that improvement patterns are inconsistent across levels. Its specific G3 groupings and game tasks are useful controlled exemplars, but they are not a universal definition of capability. For Symthaea, use the structure while defining independent domain families and frozen transfer mappings appropriate to code, systems engineering and science.
+
+### Symthaea-adapted transfer matrix
+
+| Domain | G1: fresh IID-like instances | G2: harder same-family | G3: sibling task | G4: cross-capability |
+|---|---|---|---|---|
+| Software engineering | New issue instances from held-out repositories | Larger/less documented changes, more tests, deeper dependency surfaces | Transfer among bug fixing, refactoring, API migration, dependency and build debugging | Transfer from code work to systems diagnosis or scientific method tasks |
+| Systems / cyber | New hosts, configs, incident traces and control-plane states | Multi-stage incidents, partial evidence, adversarial noise, constrained permissions | Transfer among identity, networking, endpoint, cloud and recovery tasks | Transfer from cyber diagnosis to software reliability or operational planning |
+| Scientific research | New seeds / initial conditions / held-out parameter regimes | Stiffer, more coupled, higher-dimensional or multi-physics regimes | Transfer among adjacent physical models or experimental-design problems | Transfer from physics to materials, energy or biological inference |
+| Tool/harness engineering | New tasks on held-out tool schemas and repositories | Longer action chains, stateful tools, constrained resources | Transfer among new harness / tool APIs / execution models | Transfer from tool use to research planning and algorithm design |
+
+G0 stays in the report because regressions on seen tasks still matter, but never count it as evidence of generalization. The benchmark must keep instance generation, family assignments and difficulty tiers frozen outside the proposer. New task templates and G4 mappings cannot be authored by the evaluated agent and then scored by its own evaluator.
+
+### Metrics and acceptance
+
+Do not collapse the ladder to one HCI/RSI-Index. Report, per domain and level:
+- absolute task success / official benchmark score;
+- paired change versus the initial system and the matched frozen-improver baseline;
+- capability retention and catastrophic-regression rate;
+- resource and time cost per independently confirmed gain;
+- cluster-level uncertainty, task count, independent cluster count and coverage;
+- the fraction of improvements surviving each successive level (G1→G2→G3→G4);
+- improvement attribution: source artifact, edit surface (data, harness, algorithm, meta-procedure), parentage and exact run/evaluator identities.
+
+A useful ladder-retention statistic is a vector, not a scalar:
+`[G1_retention, G2_retention, G3_retention, G4_retention]`, where each coordinate is the independently audited improvement retained at that level relative to its own frozen baseline. If a scalar is needed for resource allocation, preregister its formula and keep the raw vector; do not use it for universal ranking.
+
+### New target
+
+The target is not merely to outperform SelfImprove-Bench's game results. The target is to demonstrate that improvements discovered in one software/science family remain beneficial on fresh instances, harder conditions, sibling tasks and cross-capability tasks—under equal budgets, independent evaluation and full-loop replications. The first benchmark release should include at least two independently held-out task families per level and enough independent clusters for the uncertainty analysis; exact sample size must be set by a pre-study power/precision analysis, not an arbitrary task count.
+
+Source: Xu et al., *SelfImprove-Bench: Evaluating Generalization in Self-Improving Agents*, arXiv:2611.02797 (2026-11-02): https://arxiv.org/abs/2611.02797
