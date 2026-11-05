@@ -589,9 +589,8 @@ fn run_authority_scope_conformance() -> Result<(usize, usize), Box<dyn Error>> {
     }
 
     event.control_sequence = 7;
-    let wrong_clock = validate_partner_authority_event(
+    let wrong_clock =
         validate_partner_authority_event(&event, &observation, 7, "different-clock-origin", 150);
-    );
     let passed = wrong_clock.is_err();
     println!("authority_scope,clock_origin_rejected,{passed}");
     if passed {
