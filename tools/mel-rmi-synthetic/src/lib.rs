@@ -227,7 +227,9 @@ impl InterventionSet {
         ]
         .into_iter()
         .collect();
-        if assigned != expected || self.condition_order != condition_order_for_seed(self.randomization_seed) {
+        if assigned != expected
+            || self.condition_order != condition_order_for_seed(self.randomization_seed)
+        {
             return Err(HarnessError::InvalidAssignment);
         }
         Ok(())
@@ -419,7 +421,7 @@ impl AgentPolicy for UnrelatedFeatureShortcutPolicy {
     fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
         let value = ((i64::from(observation.current_partner_feature.value)
             + i64::from(observation.unrelated_feature.value))
-            .rem_euclid(i64::from(task.expected_response.modulus))) as i32;
+        .rem_euclid(i64::from(task.expected_response.modulus))) as i32;
         make_action(
             observation,
             self.policy_id(),
