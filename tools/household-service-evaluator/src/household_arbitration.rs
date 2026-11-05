@@ -76,6 +76,57 @@ pub enum AuthorizationState {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
+pub enum RegulatoryApplicability {
+    Required,
+    NotRequired,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RegulatoryAuthorizationStatus {
+    Approved,
+    Denied,
+    Revoked,
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RegulatoryAuthorizationRequirement {
+    /// This applicability must come from a current jurisdiction/source/use
+    /// profile. The evaluator does not decide whether permission is required.
+    pub applicability: RegulatoryApplicability,
+    pub scope_id: Option<String>,
+    pub jurisdiction: Option<String>,
+    pub source_id: Option<String>,
+    pub site_id: Option<String>,
+    pub installation_revision: Option<String>,
+    pub permitted_use: Option<WaterUseClass>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RegulatoryAuthorizationEvidence {
+    pub status: RegulatoryAuthorizationStatus,
+    pub authority_id: String,
+    pub instrument_id: String,
+    pub permission_reference: String,
+    pub scope_id: String,
+    pub jurisdiction: String,
+    pub source_id: String,
+    pub site_id: String,
+    pub installation_revision: String,
+    pub permitted_use: WaterUseClass,
+    pub valid_from_unix_ms: i64,
+    pub valid_until_unix_ms: Option<i64>,
+    /// A missing end date is accepted only when the underlying instrument
+    /// explicitly establishes open-ended validity.
+    pub no_expiry_evidenced: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum HouseholdActionKind {
     MaintainLocalService,
     RouteWater,
@@ -117,6 +168,7 @@ pub struct HouseholdActionRequest {
     pub required_authorization_scope_id: String,
     pub required_capability_revision: String,
     pub requested_water_use: Option<WaterUseClass>,
+    pub regulatory_requirement: RegulatoryAuthorizationRequirement,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -125,6 +177,8 @@ pub struct HouseholdCoordinationSnapshot {
     pub safety_gate: GateState,
     pub critical_service_floor: GateState,
     pub water_qualification: Option<WaterQualificationEvidence>,
+    pub regulatory_authorization: Option<RegulatoryAuthorizationEvidence>,
+    pub evaluation_time_unix_ms: i64,
     pub authorization: AuthorizationEvidence,
     pub coordinator_state: CoordinatorState,
     pub local_controller: LocalControllerEvidence,
@@ -136,6 +190,11 @@ pub enum HouseholdActionDecision {
     EligibleForLocalControllerEvaluation,
     RejectedSafety,
     SafetyUnknown,
+    RegulatoryAuthorizationDenied,
+    RegulatoryAuthorizationUnknown,
+    RegulatoryAuthorizationExpired,
+    RegulatoryAuthorizationNotYetValid,
+    RegulatoryAuthorizationScopeMismatch,
     RejectedWaterUseQualification,
     WaterUseQualificationUnknown,
     RejectedCriticalServiceFloor,
@@ -165,6 +224,7 @@ pub struct HouseholdActionEvaluation {
     pub local_manual_control_available: bool,
     pub local_controller_final_authority: bool,
     pub authorization_policy_revision: Option<String>,
+    pub regulatory_permission_reference: Option<String>,
     pub capability_revision: String,
 }
 
@@ -184,6 +244,10 @@ fn finish(
         local_manual_control_available: snapshot.local_controller.manual_control_available,
         local_controller_final_authority: true,
         authorization_policy_revision: snapshot.authorization.policy_revision.clone(),
+        regulatory_permission_reference: snapshot
+            .regulatory_authorization
+            .as_ref()
+            .map(|evidence| evidence.permission_reference.clone()),
         capability_revision: snapshot.local_controller.capability_revision.clone(),
     }
 }
@@ -231,6 +295,140 @@ pub fn evaluate_household_action(
                 "hard_safety_gate_unknown_or_not_applicable",
                 false,
             ));
+        }
+    }
+
+    match request.regulatory_requirement.applicability {
+        RegulatoryApplicability::Unknown => {
+            return Ok(finish(
+                request,
+                snapshot,
+                HouseholdActionDecision::RegulatoryAuthorizationUnknown,
+                "regulatory_permission_applicability_unknown",
+                false,
+            ));
+        }
+        RegulatoryApplicability::NotRequired => {}
+        RegulatoryApplicability::Required => {
+            let requirement = &request.regulatory_requirement;
+            let required_fields = [
+                ("scope_id", requirement.scope_id.as_deref()),
+                ("jurisdiction", requirement.jurisdiction.as_deref()),
+                ("source_id", requirement.source_id.as_deref()),
+                ("site_id", requirement.site_id.as_deref()),
+                ("installation_revision", requirement.installation_revision.as_deref()),
+            ];
+            if required_fields.iter().any(|(_, value)| value.is_none_or(str::is_empty))
+                || requirement.permitted_use.is_none()
+            {
+                return Ok(finish(
+                    request,
+                    snapshot,
+                    HouseholdActionDecision::RegulatoryAuthorizationUnknown,
+                    "required_regulatory_scope_incomplete",
+                    false,
+                ));
+            }
+            let Some(evidence) = &snapshot.regulatory_authorization else {
+                return Ok(finish(
+                    request,
+                    snapshot,
+                    HouseholdActionDecision::RegulatoryAuthorizationUnknown,
+                    "required_regulatory_permission_evidence_missing",
+                    false,
+                ));
+            };
+            if evidence.authority_id.trim().is_empty()
+                || evidence.instrument_id.trim().is_empty()
+                || evidence.permission_reference.trim().is_empty()
+                || evidence.scope_id.trim().is_empty()
+                || evidence.jurisdiction.trim().is_empty()
+                || evidence.source_id.trim().is_empty()
+                || evidence.site_id.trim().is_empty()
+                || evidence.installation_revision.trim().is_empty()
+            {
+                return Ok(finish(
+                    request,
+                    snapshot,
+                    HouseholdActionDecision::RegulatoryAuthorizationUnknown,
+                    "regulatory_permission_identity_incomplete",
+                    false,
+                ));
+            }
+            match evidence.status {
+                RegulatoryAuthorizationStatus::Denied | RegulatoryAuthorizationStatus::Revoked => {
+                    return Ok(finish(
+                        request,
+                        snapshot,
+                        HouseholdActionDecision::RegulatoryAuthorizationDenied,
+                        "regulatory_permission_denied_or_revoked",
+                        false,
+                    ));
+                }
+                RegulatoryAuthorizationStatus::Unknown => {
+                    return Ok(finish(
+                        request,
+                        snapshot,
+                        HouseholdActionDecision::RegulatoryAuthorizationUnknown,
+                        "regulatory_permission_status_unknown",
+                        false,
+                    ));
+                }
+                RegulatoryAuthorizationStatus::Approved => {}
+            }
+            if evidence.valid_from_unix_ms > snapshot.evaluation_time_unix_ms {
+                return Ok(finish(
+                    request,
+                    snapshot,
+                    HouseholdActionDecision::RegulatoryAuthorizationNotYetValid,
+                    "regulatory_permission_not_yet_valid",
+                    false,
+                ));
+            }
+            if let Some(valid_until) = evidence.valid_until_unix_ms {
+                if !evidence.no_expiry_evidenced && snapshot.evaluation_time_unix_ms >= valid_until {
+                    return Ok(finish(
+                        request,
+                        snapshot,
+                        HouseholdActionDecision::RegulatoryAuthorizationExpired,
+                        "regulatory_permission_expired",
+                        false,
+                    ));
+                }
+                if valid_until <= evidence.valid_from_unix_ms {
+                    return Ok(finish(
+                        request,
+                        snapshot,
+                        HouseholdActionDecision::RegulatoryAuthorizationUnknown,
+                        "regulatory_permission_validity_interval_invalid",
+                        false,
+                    ));
+                }
+            } else if !evidence.no_expiry_evidenced {
+                return Ok(finish(
+                    request,
+                    snapshot,
+                    HouseholdActionDecision::RegulatoryAuthorizationUnknown,
+                    "regulatory_permission_expiry_or_open_ended_validity_not_evidenced",
+                    false,
+                ));
+            }
+            let matches_scope = evidence.scope_id == requirement.scope_id.as_deref().unwrap_or_default()
+                && evidence.jurisdiction == requirement.jurisdiction.as_deref().unwrap_or_default()
+                && evidence.source_id == requirement.source_id.as_deref().unwrap_or_default()
+                && evidence.site_id == requirement.site_id.as_deref().unwrap_or_default()
+                && evidence.installation_revision
+                    == requirement.installation_revision.as_deref().unwrap_or_default()
+                && Some(evidence.permitted_use) == requirement.permitted_use;
+            if !matches_scope {
+                return Ok(finish(
+                    request,
+                    snapshot,
+                    HouseholdActionDecision::RegulatoryAuthorizationScopeMismatch,
+                    "regulatory_permission_does_not_cover_exact_source_site_installation_and_use",
+                    false,
+                ));
+            }
         }
     }
 
@@ -789,6 +987,15 @@ mod tests {
             required_authorization_scope_id: "home-policy-scope-1".into(),
             required_capability_revision: "capability-r3".into(),
             requested_water_use: None,
+            regulatory_requirement: RegulatoryAuthorizationRequirement {
+                applicability: RegulatoryApplicability::NotRequired,
+                scope_id: None,
+                jurisdiction: None,
+                source_id: None,
+                site_id: None,
+                installation_revision: None,
+                permitted_use: None,
+            },
         }
     }
 
@@ -797,6 +1004,8 @@ mod tests {
             safety_gate: GateState::Pass,
             critical_service_floor: GateState::Pass,
             water_qualification: None,
+            regulatory_authorization: None,
+            evaluation_time_unix_ms: 1_800_000_000_000,
             authorization: AuthorizationEvidence {
                 state: AuthorizationState::Granted,
                 policy_id: Some("home-policy-1".into()),
@@ -873,6 +1082,124 @@ mod tests {
         assert_eq!(result.decision, HouseholdActionDecision::RejectedSafety);
         assert!(!result.local_request_eligible);
         assert!(!result.actuator_command_emitted);
+    }
+
+    fn required_coj_borehole_requirement() -> RegulatoryAuthorizationRequirement {
+        RegulatoryAuthorizationRequirement {
+            applicability: RegulatoryApplicability::Required,
+            scope_id: Some("coj-residential-borehole-domestic-v1".into()),
+            jurisdiction: Some("ZA-GP-JOHANNESBURG".into()),
+            source_id: Some("borehole-main".into()),
+            site_id: Some("site-test-001".into()),
+            installation_revision: Some("plumbing-rev-3".into()),
+            permitted_use: Some(WaterUseClass::Drinking),
+        }
+    }
+
+    fn approved_coj_borehole_evidence() -> RegulatoryAuthorizationEvidence {
+        RegulatoryAuthorizationEvidence {
+            status: RegulatoryAuthorizationStatus::Approved,
+            authority_id: "city-of-johannesburg".into(),
+            instrument_id: "coj-water-services-bylaws-2023-s72".into(),
+            permission_reference: "consent-letter-test-001".into(),
+            scope_id: "coj-residential-borehole-domestic-v1".into(),
+            jurisdiction: "ZA-GP-JOHANNESBURG".into(),
+            source_id: "borehole-main".into(),
+            site_id: "site-test-001".into(),
+            installation_revision: "plumbing-rev-3".into(),
+            permitted_use: WaterUseClass::Drinking,
+            valid_from_unix_ms: 1_700_000_000_000,
+            valid_until_unix_ms: Some(1_900_000_000_000),
+            no_expiry_evidenced: false,
+        }
+    }
+
+    #[test]
+    fn required_source_permission_missing_blocks_otherwise_qualified_drinking_water() {
+        let mut request = valid_request();
+        request.requested_water_use = Some(WaterUseClass::Drinking);
+        request.regulatory_requirement = required_coj_borehole_requirement();
+        let mut snapshot = valid_snapshot();
+        snapshot.water_qualification = Some(WaterQualificationEvidence {
+            status: WaterQualificationStatus::QualifiedForDeclaredUse,
+            declared_use: WaterUseClass::Drinking,
+        });
+        snapshot.regulatory_authorization = None;
+        let result = evaluate(&request, &snapshot);
+        assert_eq!(result.decision, HouseholdActionDecision::RegulatoryAuthorizationUnknown);
+        assert!(!result.local_request_eligible);
+    }
+
+    #[test]
+    fn exact_approved_source_permission_allows_local_evaluation_only() {
+        let mut request = valid_request();
+        request.requested_water_use = Some(WaterUseClass::Drinking);
+        request.regulatory_requirement = required_coj_borehole_requirement();
+        let mut snapshot = valid_snapshot();
+        snapshot.water_qualification = Some(WaterQualificationEvidence {
+            status: WaterQualificationStatus::QualifiedForDeclaredUse,
+            declared_use: WaterUseClass::Drinking,
+        });
+        snapshot.regulatory_authorization = Some(approved_coj_borehole_evidence());
+        let result = evaluate(&request, &snapshot);
+        assert_eq!(result.decision, HouseholdActionDecision::EligibleForLocalControllerEvaluation);
+        assert_eq!(
+            result.regulatory_permission_reference.as_deref(),
+            Some("consent-letter-test-001")
+        );
+        assert!(!result.actuator_command_emitted);
+    }
+
+    #[test]
+    fn approved_permission_for_different_site_or_use_does_not_transfer() {
+        let mut request = valid_request();
+        request.requested_water_use = Some(WaterUseClass::Drinking);
+        request.regulatory_requirement = required_coj_borehole_requirement();
+        let mut evidence = approved_coj_borehole_evidence();
+        evidence.site_id = "different-site".into();
+        let mut snapshot = valid_snapshot();
+        snapshot.water_qualification = Some(WaterQualificationEvidence {
+            status: WaterQualificationStatus::QualifiedForDeclaredUse,
+            declared_use: WaterUseClass::Drinking,
+        });
+        snapshot.regulatory_authorization = Some(evidence);
+        let result = evaluate(&request, &snapshot);
+        assert_eq!(result.decision, HouseholdActionDecision::RegulatoryAuthorizationScopeMismatch);
+    }
+
+    #[test]
+    fn expired_source_permission_blocks_otherwise_qualified_water() {
+        let mut request = valid_request();
+        request.requested_water_use = Some(WaterUseClass::Drinking);
+        request.regulatory_requirement = required_coj_borehole_requirement();
+        let mut evidence = approved_coj_borehole_evidence();
+        evidence.valid_until_unix_ms = Some(snapshot_time_for_expired_permission());
+        let mut snapshot = valid_snapshot();
+        snapshot.water_qualification = Some(WaterQualificationEvidence {
+            status: WaterQualificationStatus::QualifiedForDeclaredUse,
+            declared_use: WaterUseClass::Drinking,
+        });
+        snapshot.regulatory_authorization = Some(evidence);
+        let result = evaluate(&request, &snapshot);
+        assert_eq!(result.decision, HouseholdActionDecision::RegulatoryAuthorizationExpired);
+    }
+
+    fn snapshot_time_for_expired_permission() -> i64 {
+        1_799_000_000_000
+    }
+
+    #[test]
+    fn unknown_regulatory_applicability_fails_closed() {
+        let mut request = valid_request();
+        request.regulatory_requirement.applicability = RegulatoryApplicability::Unknown;
+        let result = evaluate(&request, &valid_snapshot());
+        assert_eq!(result.decision, HouseholdActionDecision::RegulatoryAuthorizationUnknown);
+    }
+
+    #[test]
+    fn explicit_not_required_profile_does_not_invent_permission_requirement() {
+        let result = evaluate(&valid_request(), &valid_snapshot());
+        assert_eq!(result.decision, HouseholdActionDecision::EligibleForLocalControllerEvaluation);
     }
 
     #[test]
