@@ -2777,3 +2777,85 @@ mod tests {
         assert!(back.source_note_id.is_none());
     }
 }
+
+
+#[cfg(test)]
+mod rmi_artifact_binding_tests {
+    use super::*;
+
+    fn manifest() -> GenealogyManifest {
+        GenealogyManifest {
+            id: 7,
+            family_id: 7,
+            parent_id: None,
+            namespace: "C".to_owned(),
+            relation: GenealogyRelation::Root,
+            origin: GenealogyOrigin::MuseGenerated {
+                seed: 41,
+                style_name: "Piano".to_owned(),
+            },
+            audio_key: "keeper-7".to_owned(),
+            recipe_sha256: "a".repeat(64),
+            score_sha256: Some("b".repeat(64)),
+            audio_sha256: "c".repeat(64),
+            manifest_sha256: "d".repeat(64),
+            created_at_unix_ms: 1_000,
+        }
+    }
+
+    fn binding() -> RmiArtifactBindingV1 {
+        RmiArtifactBindingV1 {
+            schema_version: 1,
+            source_event_id: "partner-input-17".to_owned(),
+            action_event_id: "agent-action-18".to_owned(),
+            genealogy: manifest(),
+            recipe_bytes_len: 128,
+            score_bytes_len: Some(256),
+            audio_bytes_len: 4096,
+        }
+    }
+
+    #[test]
+    fn valid_binding_requires_distinct_events_and_manifest_digests() {
+        assert_eq!(binding().validate_reference(), Ok(()));
+    }
+
+    #[test]
+    fn binding_rejects_same_event_identity() {
+        let mut value = binding();
+        value.action_event_id = value.source_event_id.clone();
+        assert_eq!(
+            value.validate_reference(),
+            Err("RMI source/action event IDs must be distinct and non-empty")
+        );
+    }
+
+    #[test]
+    fn binding_rejects_malformed_manifest_digest() {
+        let mut value = binding();
+        value.genealogy.audio_sha256 = "not-a-hash".to_owned();
+        assert_eq!(
+            value.validate_reference(),
+            Err("genealogy manifest contains a malformed SHA-256 digest")
+        );
+    }
+
+    #[test]
+    fn binding_rejects_score_digest_length_presence_mismatch() {
+        let mut value = binding();
+        value.score_bytes_len = None;
+        assert_eq!(
+            value.validate_reference(),
+            Err("score digest and score byte length presence differ")
+        );
+    }
+
+    #[test]
+    fn binding_round_trips_as_a_protocol_reference() {
+        let value = binding();
+        let encoded = serde_json::to_vec(&value).unwrap();
+        let decoded: RmiArtifactBindingV1 = serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(decoded, value);
+        assert_eq!(decoded.validate_reference(), Ok(()));
+    }
+}
