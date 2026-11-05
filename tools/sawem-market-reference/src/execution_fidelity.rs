@@ -202,8 +202,11 @@ pub fn evaluate_execution_fidelity<'a>(
         return Err(ExecutionFidelityError::EmptyExecutionTrace);
     }
 
-    let horizon_seconds = u128::try_from(inputs.horizon_end_utc - inputs.horizon_start_utc)
-        .map_err(|_| ExecutionFidelityError::ArithmeticOverflow)?;
+    let horizon_seconds = u128::try_from(
+        i128::from(inputs.horizon_end_utc) - i128::from(inputs.horizon_start_utc),
+    )
+    .map_err(|_| ExecutionFidelityError::ArithmeticOverflow)?;
+    let mut previous_interval_start: Option<i64> = None;
     let mut previous_interval_end = inputs.horizon_start_utc;
     let mut scheduled_seconds = 0_u128;
     let mut meter_seconds = 0_u128;
@@ -241,12 +244,20 @@ pub fn evaluate_execution_fidelity<'a>(
         {
             return Err(ExecutionFidelityError::ScheduleWasNotAvailableAtDelivery);
         }
+        if previous_interval_start.is_some_and(|previous| {
+            interval.interval_start_utc < previous
+        }) {
+            return Err(ExecutionFidelityError::IntervalsOutOfOrder);
+        }
         if interval.interval_start_utc < previous_interval_end {
             return Err(ExecutionFidelityError::OverlappingIntervals);
         }
 
-        let duration = u128::try_from(interval.interval_end_utc - interval.interval_start_utc)
-            .map_err(|_| ExecutionFidelityError::ArithmeticOverflow)?;
+        let duration = u128::try_from(
+            i128::from(interval.interval_end_utc) - i128::from(interval.interval_start_utc),
+        )
+        .map_err(|_| ExecutionFidelityError::ArithmeticOverflow)?;
+        previous_interval_start = Some(interval.interval_start_utc);
         scheduled_seconds = checked_sum_u128(scheduled_seconds, duration)?;
         scheduled_energy_abs =
             checked_sum_u128(scheduled_energy_abs, abs_i64(interval.scheduled_energy_milli_wh)?)?;
@@ -551,6 +562,63 @@ mod tests {
         assert_eq!(result.meter_time_coverage_bps, 8_000);
         assert_eq!(result.schedule_fulfilment_bps, None);
         assert!(!result.trace_complete);
+    }
+
+    #[test]
+    fn schedule_revision_published_after_delivery_start_is_rejected() {
+        let mut late_schedule = interval(
+            "late-schedule",
+            100,
+            300,
+            10_000,
+            Some(meter("meter-late-schedule", 10_000)),
+            None,
+        );
+        late_schedule.schedule_available_at_utc = 101;
+        assert_eq!(
+            evaluate_execution_fidelity(inputs(&[late_schedule])),
+            Err(ExecutionFidelityError::ScheduleWasNotAvailableAtDelivery)
+        );
+    }
+
+    #[test]
+    fn settlement_without_meter_and_meter_before_interval_end_are_rejected() {
+        let settlement_without_meter = [interval(
+            "settlement-only",
+            100,
+            300,
+            10_000,
+            None,
+            Some(settlement("settlement-only", 10)),
+        )];
+        assert_eq!(
+            evaluate_execution_fidelity(inputs(&settlement_without_meter)),
+            Err(ExecutionFidelityError::SettlementWithoutMeterEvidence)
+        );
+
+        let early_meter = [ExecutionInterval {
+            meter: Some(MeteredEnergyEvidence {
+                observed_at_utc: 299,
+                ..meter("early-meter", 10_000)
+            }),
+            ..interval("early-observation", 100, 300, 10_000, None, None)
+        }];
+        assert_eq!(
+            evaluate_execution_fidelity(inputs(&early_meter)),
+            Err(ExecutionFidelityError::MeterObservedBeforeDeliveryEnded)
+        );
+    }
+
+    #[test]
+    fn out_of_order_intervals_are_distinguished_from_overlapping_intervals() {
+        let out_of_order = [
+            interval("later", 200, 300, 5_000, None, None),
+            interval("earlier", 100, 200, 5_000, None, None),
+        ];
+        assert_eq!(
+            evaluate_execution_fidelity(inputs(&out_of_order)),
+            Err(ExecutionFidelityError::IntervalsOutOfOrder)
+        );
     }
 
     #[test]
