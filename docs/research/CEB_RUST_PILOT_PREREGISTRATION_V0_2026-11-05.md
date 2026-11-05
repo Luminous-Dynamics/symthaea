@@ -3,6 +3,7 @@
 **Protocol:** `CEB-RUST-PILOT-001`  
 **Status:** Design-only; not executed.  
 **Machine-readable preregistration:** [`benchmarks/ceb/rust-pilot-preregistration.v0.json`](../../benchmarks/ceb/rust-pilot-preregistration.v0.json)  
+**Schema:** [`benchmarks/ceb/rust-pilot-preregistration.schema.json`](../../benchmarks/ceb/rust-pilot-preregistration.schema.json)  
 **Execution dependencies:** [#10064 OS-level isolation](https://github.com/Luminous-Dynamics/symthaea/issues/10064) and [#10369 trust roots/independent runner attestations](https://github.com/Luminous-Dynamics/symthaea/issues/10369).
 
 ## 1. Purpose and claim ceiling
