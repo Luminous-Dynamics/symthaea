@@ -110,13 +110,22 @@ pub struct ScenarioOutcome {
     pub scenario_id: u16,
     pub operational_mapping_qualified: bool,
     pub model_adequacy_qualified: bool,
+    /// Point estimate retained for audit and diagnostics.
     pub target_information: f64,
+    /// Conservative lower bound supplied by the frozen score evaluator.
+    pub target_information_lower_bound: f64,
     pub model_discrimination_information: f64,
-    /// Scenario-specific representativeness score on [0, 1].
+    pub model_discrimination_information_lower_bound: f64,
+    /// Scenario-specific representativeness point estimate and lower bound.
     pub representativeness: f64,
+    pub representativeness_lower_bound: f64,
     /// Higher is better; negative values are allowed.
     pub target_utility: f64,
+    /// Conservative lower bound consumed by maximin / lower-tail CVaR.
+    pub target_utility_lower_bound: f64,
     pub participant_burden_seconds: f64,
+    /// Conservative upper bound consumed by the participant-time gate.
+    pub participant_burden_upper_bound: f64,
 }
 
 /// Complete input/output receipt for a scenario aggregation campaign.
@@ -127,6 +136,8 @@ pub struct ScenarioOutcome {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScenarioAssessmentBatch {
     pub scenario_set_digest: String,
+    /// Caller-supplied digest of the method, uncertainty bounds and score generator.
+    pub score_contract_digest: String,
     pub scenarios: Vec<ScenarioDefinition>,
     pub robust_utility: RobustUtility,
     pub outcomes: Vec<ScenarioOutcome>,
@@ -137,6 +148,7 @@ pub struct ScenarioAssessmentBatch {
 pub enum ScenarioAssessmentError {
     EmptyScenarioSet,
     MissingScenarioSetDigest,
+    MissingScoreContractDigest,
     InvalidScenarioWeight,
     ScenarioWeightOverflow,
     DuplicateScenarioId,
@@ -154,6 +166,7 @@ impl fmt::Display for ScenarioAssessmentError {
         let message = match self {
             Self::EmptyScenarioSet => "scenario set must not be empty",
             Self::MissingScenarioSetDigest => "scenario-set digest must not be empty",
+            Self::MissingScoreContractDigest => "score-contract digest must not be empty",
             Self::InvalidScenarioWeight => "scenario weights must be finite and positive",
             Self::ScenarioWeightOverflow => "scenario weight total overflowed or was nonpositive",
             Self::DuplicateScenarioId => "scenario IDs must be unique",
@@ -177,19 +190,24 @@ impl std::error::Error for ScenarioAssessmentError {}
 
 /// Aggregate a complete action × scenario outcome matrix into policy inputs.
 ///
-/// Weighted target information and model-discrimination information are
-/// descriptive averages. Representativeness is the minimum across scenarios,
-/// burden is the maximum, and model/mapping eligibility requires every
-/// scenario to be qualified. Robust utility is either the minimum or the
-/// exact weighted lower-tail CVaR. No scenario is dropped or reweighted after
-/// an error or failed qualification.
+/// Weighted information and model-discrimination lower bounds are averaged.
+/// Representativeness is the minimum lower bound, burden is the maximum upper
+/// bound, and model/mapping eligibility requires every scenario to be
+/// qualified. Robust utility aggregates scenario-specific utility lower
+/// bounds by maximin or exact weighted lower-tail CVaR. The caller-supplied
+/// score-contract digest commits to the method behind those bounds.
 pub fn aggregate_scenario_assessments(
     action_set: &OperationalActionSet,
     scenario_set: &ScenarioSet,
     outcomes: &[ScenarioOutcome],
     robust_utility: RobustUtility,
+    score_contract_digest: impl Into<String>,
 ) -> Result<ScenarioAssessmentBatch, ScenarioAssessmentError> {
     validate_robust_utility(robust_utility)?;
+    let score_contract_digest = score_contract_digest.into();
+    if score_contract_digest.trim().is_empty() {
+        return Err(ScenarioAssessmentError::MissingScoreContractDigest);
+    }
 
     let expected_outcomes = action_set
         .actions()
@@ -244,19 +262,21 @@ pub fn aggregate_scenario_assessments(
                 .copied()
                 .ok_or(ScenarioAssessmentError::IncompleteOutcomeCoverage)?;
 
-            target_information += scenario.weight * outcome.target_information;
+            target_information +=
+                scenario.weight * outcome.target_information_lower_bound;
             model_discrimination_information +=
-                scenario.weight * outcome.model_discrimination_information;
-            representativeness = representativeness.min(outcome.representativeness);
+                scenario.weight * outcome.model_discrimination_information_lower_bound;
+            representativeness =
+                representativeness.min(outcome.representativeness_lower_bound);
             participant_burden_seconds =
-                participant_burden_seconds.max(outcome.participant_burden_seconds);
+                participant_burden_seconds.max(outcome.participant_burden_upper_bound);
             operational_mapping_qualified &=
                 outcome.operational_mapping_qualified;
             model_adequacy_qualified &= outcome.model_adequacy_qualified;
             target_utility_by_scenario.push((
                 scenario.scenario_id,
                 scenario.weight,
-                outcome.target_utility,
+                outcome.target_utility_lower_bound,
             ));
         }
 
@@ -277,6 +297,7 @@ pub fn aggregate_scenario_assessments(
 
     Ok(ScenarioAssessmentBatch {
         scenario_set_digest: scenario_set.digest().to_owned(),
+        score_contract_digest,
         scenarios: scenario_set.scenarios().to_vec(),
         robust_utility,
         outcomes: canonical_outcomes,
@@ -297,14 +318,28 @@ fn validate_robust_utility(
 
 fn validate_outcome(outcome: &ScenarioOutcome) -> Result<(), ScenarioAssessmentError> {
     if !outcome.target_information.is_finite()
+        || !outcome.target_information_lower_bound.is_finite()
         || !outcome.model_discrimination_information.is_finite()
+        || !outcome.model_discrimination_information_lower_bound.is_finite()
         || !outcome.representativeness.is_finite()
+        || !outcome.representativeness_lower_bound.is_finite()
         || !outcome.target_utility.is_finite()
+        || !outcome.target_utility_lower_bound.is_finite()
         || !outcome.participant_burden_seconds.is_finite()
+        || !outcome.participant_burden_upper_bound.is_finite()
         || outcome.target_information < 0.0
+        || outcome.target_information_lower_bound < 0.0
+        || outcome.target_information_lower_bound > outcome.target_information
         || outcome.model_discrimination_information < 0.0
+        || outcome.model_discrimination_information_lower_bound < 0.0
+        || outcome.model_discrimination_information_lower_bound
+            > outcome.model_discrimination_information
         || !(0.0..=1.0).contains(&outcome.representativeness)
+        || !(0.0..=1.0).contains(&outcome.representativeness_lower_bound)
+        || outcome.representativeness_lower_bound > outcome.representativeness
+        || outcome.target_utility_lower_bound > outcome.target_utility
         || outcome.participant_burden_seconds < 0.0
+        || outcome.participant_burden_upper_bound < outcome.participant_burden_seconds
     {
         return Err(ScenarioAssessmentError::InvalidOutcomeValue);
     }
@@ -394,10 +429,15 @@ mod tests {
             operational_mapping_qualified: true,
             model_adequacy_qualified: true,
             target_information: information,
+            target_information_lower_bound: information,
             model_discrimination_information: discrimination,
+            model_discrimination_information_lower_bound: discrimination,
             representativeness,
+            representativeness_lower_bound: representativeness,
             target_utility: utility,
+            target_utility_lower_bound: utility,
             participant_burden_seconds: burden,
+            participant_burden_upper_bound: burden,
         }
     }
 
@@ -430,6 +470,7 @@ mod tests {
             &make_scenario_set(),
             &reference_outcomes(),
             RobustUtility::Maximin,
+            "sha256:scenario-score-contract",
         )
         .unwrap();
         let assessment = &batch.assessments[0];
@@ -443,12 +484,46 @@ mod tests {
     }
 
     #[test]
+    fn aggregation_consumes_bounds_not_optimistic_point_estimates() {
+        let action_set = make_action_set();
+        let scenario_set = make_scenario_set();
+        let mut outcomes = reference_outcomes();
+        outcomes[0].target_information_lower_bound = 0.5;
+        outcomes[0].model_discrimination_information_lower_bound = 1.0;
+        outcomes[0].representativeness_lower_bound = 0.8;
+        outcomes[0].target_utility_lower_bound = 8.0;
+        outcomes[0].participant_burden_upper_bound = 1.5;
+        outcomes[1].target_information_lower_bound = 2.0;
+        outcomes[1].model_discrimination_information_lower_bound = 3.0;
+        outcomes[1].representativeness_lower_bound = 0.1;
+        outcomes[1].target_utility_lower_bound = -7.0;
+        outcomes[1].participant_burden_upper_bound = 3.5;
+        let batch = aggregate_scenario_assessments(
+            &action_set,
+            &scenario_set,
+            &outcomes,
+            RobustUtility::LowerTailCvar { tail_mass: 0.5 },
+            "sha256:scenario-score-contract",
+        )
+        .unwrap();
+        let assessment = &batch.assessments[0];
+        assert!((assessment.target_information.unwrap() - 0.95).abs() < 1.0e-12);
+        assert!((assessment.model_discrimination_information.unwrap() - 1.6).abs() < 1.0e-12);
+        assert!((assessment.representativeness.unwrap() - 0.1).abs() < 1.0e-12);
+        assert!((assessment.participant_burden_seconds.unwrap() - 3.5).abs() < 1.0e-12);
+        // Worst 0.5 mass: -7 at weight .3, then +8 at mass .2.
+        assert!((assessment.worst_case_target_utility.unwrap() + 1.0).abs() < 1.0e-12);
+        assert_eq!(batch.score_contract_digest, "sha256:scenario-score-contract");
+    }
+
+    #[test]
     fn lower_tail_cvar_integrates_fractional_scenario_mass() {
         let batch = aggregate_scenario_assessments(
             &make_action_set(),
             &make_scenario_set(),
             &reference_outcomes(),
             RobustUtility::LowerTailCvar { tail_mass: 0.5 },
+            "sha256:scenario-score-contract",
         )
         .unwrap();
         // The worst 0.5 mass consists of all 0.3 mass at utility -5
@@ -511,6 +586,7 @@ mod tests {
                 &scenario_set,
                 &missing,
                 RobustUtility::Maximin,
+                "sha256:scenario-score-contract",
             ),
             Err(ScenarioAssessmentError::IncompleteOutcomeCoverage)
         );
@@ -573,6 +649,7 @@ mod tests {
                 &scenario_set,
                 &reference_outcomes(),
                 RobustUtility::LowerTailCvar { tail_mass: 0.0 },
+                "sha256:scenario-score-contract",
             ),
             Err(ScenarioAssessmentError::InvalidTailMass)
         );
@@ -622,6 +699,7 @@ mod tests {
             &scenario_set,
             &reference_outcomes(),
             RobustUtility::LowerTailCvar { tail_mass: 0.5 },
+            "sha256:scenario-score-contract",
         )
         .unwrap();
         let history = super::super::sequential::PolicyHistory::new(
