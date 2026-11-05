@@ -13,6 +13,8 @@ It is a benchmark-integrity oracle, not a Melothaea evaluation. Its positive con
 - A task-specific synthetic response-relation check. Imitation can be input-sensitive while still failing this complementarity oracle.
 - A four-condition controlled-partner response path with separate targeted/sham/unrelated contrasts and a declared reverse-direction response-rule oracle.
 - Exact event-ID, seeded condition-order execution, policy-version and Git-revision binding.
+- SHA-256 binding of exact source/output bytes and exact Studio transaction-receipt bytes, with an independent re-read/re-hash verification function.
+- Pinned `sha2 = 0.10.9` dependency and minimal committed lockfile; all test/run commands use `--locked`.
 - A fresh policy fork restored from one frozen pre-intervention checkpoint for every condition; mutable policy state cannot leak between counterfactual arms. The same explicit common-random-number seed is passed to every arm so stochastic adapters can pair random draws.
 - Explicit NotApplicable metric state for unsupported modalities.
 
