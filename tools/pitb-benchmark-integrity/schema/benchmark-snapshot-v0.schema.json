@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/benchmark-snapshot-v0.schema.json",
+  "title": "PITB benchmark snapshot envelope v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "benchmark_version",
+    "snapshot_id",
+    "upstream_repository",
+    "upstream_repository_commit",
+    "source_split_path",
+    "source_split_blob_sha1",
+    "source_repository_license",
+    "task_count",
+    "task_records_jsonl_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.benchmark-snapshot.v0"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "snapshot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "upstream_repository": {
+      "type": "string",
+      "minLength": 1
+    },
+    "upstream_repository_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "source_split_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_split_blob_sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "source_repository_license": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "task_records_jsonl_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "gitSha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    }
+  }
+}
