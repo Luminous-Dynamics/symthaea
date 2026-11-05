@@ -177,4 +177,19 @@ Both options use exact rational minor-currency arithmetic. The comparison is onl
 
 This is a synthetic decision-support calculation over prequalified assumptions—not a live settlement, bankability or legal opinion.
 
+#### Treasury cash-at-risk snapshot
+
+The new `liquidity_stress.rs` module consumes a source-referenced Market Operator Required Credit Cover amount, Posted Credit Cover balance, unrestricted treasury cash, mandatory non-cover outflows and a separately approved minimum operating cash floor. It reports separately:
+
+- the actual cover shortfall between Required and Posted Credit Cover;
+- cash remaining after mandatory non-cover outflows;
+- any deficit below the operating cash floor;
+- unrestricted cash headroom above the floor;
+- the portion of the cover shortfall that could be funded from this headroom; and
+- the residual external funding gap.
+
+The output field `potentially_fundable_cover_minor_zar` is deliberately not added to Posted Credit Cover. Cash must still be transferred to the Collateral Reserve Account and evidenced with a separate receipt. The model assumes neither instant transfer nor Market Operator acceptance. Missing MO Required Credit Cover remains indeterminate; the module does not calculate UEF or §15.10.3 exposure. All money fields are explicitly minor ZAR, and source-reference collisions are rejected to reduce accidental double-counting.
+
+This is a point-in-time stress snapshot, not a chronological cashflow forecast. It does not infer future receipts, settlement reruns, bank drawdowns, transfer latency or cure periods. A future extension should consume a dated sequence of MO Required Cover, posted collateral, cash inflows/outflows and confirmed release/posting receipts, then report peak funding gap, duration, deadline misses and liquidity-at-risk across separately declared scenarios.
+
 References: NTCSA Market Code Rev 2.3 §§2.3(a), 15.2, 15.2.1, 15.10.2–15.10.4 and Annexure 2.
