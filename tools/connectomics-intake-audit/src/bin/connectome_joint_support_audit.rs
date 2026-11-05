@@ -1169,7 +1169,7 @@ mod tests {
                             .actions
                             .iter()
                             .enumerate()
-                            .filter(|(index, _)| mask & (1_usize << index) != 0)
+                            .filter(|(index, _)| *mask & (1_usize << *index) != 0)
                             .map(|(_, action)| action.effort_units)
                             .sum::<u64>()
                     })
@@ -1226,7 +1226,7 @@ mod tests {
                                 .actions
                                 .iter()
                                 .enumerate()
-                                .filter(|(index, _)| **mask & (1_usize << index) != 0)
+                                .filter(|(index, _)| **mask & (1_usize << *index) != 0)
                                 .map(|(_, action)| action.effort_units)
                                 .sum::<u64>()
                                 == minimum
@@ -1265,7 +1265,7 @@ mod tests {
                         continue;
                     }
                     let missing_tuple = (0_u8..4)
-                        .find(|tuple| source_mask & (1_u8 << tuple) == 0)
+                        .find(|tuple| source_mask & (1_u8 << *tuple) == 0)
                         .expect("a non-full support has a missing tuple");
                     let mut expanded_input = baseline_input.clone();
                     expanded_input.joint_supports[world_index].rows.push(JointRow {
