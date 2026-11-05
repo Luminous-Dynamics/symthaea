@@ -272,6 +272,123 @@
           "minimum": 0
         }
       }
+    },
+    "joint_support_evidence": {
+      "type": "object",
+      "description": "Optional per-snapshot receipt from connectome-joint-support-audit. Binds a query-specific joint-support result to the exact dataset revision, graph snapshot and query definition. It is an evidence pointer and status record, not an independently authenticated replay or stopping authorization.",
+      "additionalProperties": false,
+      "required": [
+        "receipt_schema_version",
+        "tool",
+        "analysis_id",
+        "dataset_revision_commit_sha",
+        "snapshot_graph_sha256",
+        "query_id",
+        "query_spec_sha256",
+        "scenario_set_sha256",
+        "action_set_sha256",
+        "joint_support_set_sha256",
+        "input_sha256",
+        "report_sha256",
+        "joint_support_scope",
+        "effort_unit",
+        "max_total_effort_units",
+        "minimum_joint_disambiguation_effort_units",
+        "minimum_joint_plan_within_budget",
+        "search_complete",
+        "status",
+        "probability_claim"
+      ],
+      "properties": {
+        "receipt_schema_version": {
+          "const": 1
+        },
+        "tool": {
+          "const": "connectome-joint-support-audit"
+        },
+        "analysis_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_revision_commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "snapshot_graph_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_spec_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "scenario_set_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "action_set_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "joint_support_set_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "input_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "report_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "joint_support_scope": {
+          "enum": [
+            "exhaustive_declared_joint_support",
+            "sampled_joint_sensitivity_set"
+          ]
+        },
+        "effort_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_total_effort_units": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_joint_disambiguation_effort_units": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "minimum_joint_plan_within_budget": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "search_complete": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "MINIMUM_COST_JOINT_ROBUST_PLAN",
+            "MINIMUM_COST_JOINT_ROBUST_PLAN_EXCEEDS_BUDGET",
+            "NO_JOINT_SUPPORT_PLAN_WITHIN_DECLARED_RELATIONS",
+            "NO_DECISION_DISAGREEMENT_WITHIN_DECLARED_SCENARIOS",
+            "JOINT_SUPPORT_SEARCH_LIMIT_REACHED"
+          ]
+        },
+        "probability_claim": {
+          "const": "NONE_JOINT_SET_VALUED_DISCRIMINATION_ONLY"
+        }
+      }
     }
   },
   "allOf": [
