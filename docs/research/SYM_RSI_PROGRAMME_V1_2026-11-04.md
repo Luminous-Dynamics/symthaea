@@ -281,3 +281,29 @@ No queued workflow is a pass. No source-authored receipt proves the evaluator wa
 The programme's target is simple to state and difficult to fake:
 
 > A successor must independently outperform its parent, preserve the capabilities we require, generalize beyond the selection tasks, and become demonstrably better at finding the next improvement.
+
+
+## 10. Cluster-aware statistical qualification — issue #10513
+
+The original paired adapter retains per-case wins/losses/ties and its exact sign test, but that test assumes independent non-tied case-pair signs. Cases from one repository, project, task family, or run are often correlated; treating them as independent can create pseudo-replication.
+
+The additive `ClusteredPairedComparison` view addresses this without changing the shared receipt format:
+
+- The caller supplies a case-ID → cluster-ID map that must cover exactly the matched case set.
+- Cluster IDs are validated for non-empty, non-control-character identifiers.
+- Paired deltas are averaged within each cluster before directional wins/losses/ties are counted.
+- Both pooled case-weighted mean delta and equal-cluster-weighted mean delta are reported. These are different estimands and must not be conflated.
+- The exact one-sided sign-test diagnostic operates on non-tied cluster means. It is withheld when fewer than two non-tied clusters remain.
+- Holm step-down family-wise adjustment is applied across valid metric p-values within this one comparison. It does **not** correct across candidates, adaptive search, generations, repeated runs, or a broader preregistered family.
+
+The cluster mapping must originate in the frozen task-family/corpus manifest and be covered by the shared receipt/corpus identity. The in-memory adapter validates mapping shape; it cannot authenticate mapping provenance or prove that clusters are genuinely independent. The independent unit must be chosen before confirmation, not after inspecting outcomes.
+
+This does not replace the original per-case results. It exposes a second analysis at a defensible independent unit, reducing the risk that many correlated cases from one project dominate the evidence. Small numbers of independent clusters remain low-power; cluster-aware analysis does not manufacture sample size.
+
+### Exact evidence boundary
+
+- This is analysis code, not a new persisted receipt schema.
+- The input rows and cluster map still require upstream validation through #10314 / #10167 / #10370.
+- Holm adjustment is local to one metric family and one comparison. Sequential candidate selection and generation-level inference remain a separate preregistered confirmation problem.
+- No p-value is a practical-effect threshold, non-inferiority result, or promotion authorization.
+- Tests are authored in the PR but remain unexecuted until exact-head Rust qualification is available.
