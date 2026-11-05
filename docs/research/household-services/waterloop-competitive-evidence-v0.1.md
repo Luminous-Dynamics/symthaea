@@ -244,3 +244,15 @@ These are proposed research gates, not standards or achieved results:
 ## 10. Claim ceiling
 
 This comparator file does not establish a Hydraloop defect or certification failure, WaterLoop performance/superiority, water savings, potable safety, treatment efficacy, installation legality, local market availability, affordability or household demand. It establishes a source-bound acquisition and matched-test plan only.
+
+
+## 11. International standards frontier — status checked 5 November 2026
+
+Two different ISO work items now help frame the greywater/reuse landscape:
+
+- **ISO 18998:2026** is a published International Standard (Edition 1, January 2026) for management of decentralized water-reuse systems in urban areas. Its scope spans source/reclaimed water, treatment, storage, distribution, operations/maintenance, monitoring and emergency response. ISO expressly says it does not set monitoring parameters or regulatory values. It is a management-system comparator, not a water-quality limit table or installation permission.
+- **ISO 25446** is the more building-specific greywater-reuse guidance. ISO's lifecycle page now records the committee draft approved for DIS registration (30.99), DIS registered (40.00), and DIS approved for registration as FDIS (40.99). It remains under development; it is not yet a published International Standard. Keep it out of claims that imply a final adopted standard.
+
+**Design implication:** compare WaterLoop against a full decentralized-system management lifecycle—source, collection, treatment, storage, distribution, operation, maintenance, monitoring and emergency response—not merely the treatment vessel. But keep performance numbers and quality limits tied to current South African law, applicable SANS publications and qualified test methods.
+
+Sources: https://www.iso.org/standard/85697.html ; https://www.iso.org/standard/90421.html
