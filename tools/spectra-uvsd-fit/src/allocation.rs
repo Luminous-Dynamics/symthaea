@@ -835,6 +835,42 @@ mod tests {
     }
 
     #[test]
+    fn common_random_number_mode_refuses_unequal_per_action_scenario_counts() {
+        let fixed = score_receipt(4, [0.8, 0.7], true);
+        let actions = action_set();
+        let scenarios = scenario_set();
+        let mut samples = fixed.samples.clone();
+        for values in [
+            &mut samples[0].target_information,
+            &mut samples[0].model_discrimination_information,
+            &mut samples[0].representativeness,
+            &mut samples[0].target_utility,
+            &mut samples[0].participant_burden_seconds,
+        ] {
+            values.push(values.last().copied().unwrap());
+        }
+        let cfg = ScoreBoundsConfig {
+            familywise_alpha: fixed.familywise_alpha,
+            minimum_replicates: fixed.minimum_replicates,
+            ranges: fixed.ranges,
+            score_contract_digest: fixed.score_contract_digest.clone(),
+            source_digest: fixed.source_digest.clone(),
+            root_seed: fixed.root_seed,
+        };
+        let variable = bound_candidate_score_samples_anytime(
+            &actions,
+            &scenarios,
+            &samples,
+            &cfg,
+        )
+        .unwrap();
+        assert_eq!(
+            allocate_next_score_batch(&variable, &config(0.01, 100, 2)),
+            Err(AdaptiveAllocationError::CommonRandomNumberCountMismatch)
+        );
+    }
+
+    #[test]
     fn common_random_number_batch_is_atomic_under_compute_budget() {
         let receipt = score_receipt(4, [0.8, 0.7], true);
         let decision = allocate_next_score_batch(&receipt, &config(0.01, 17, 4)).unwrap();
