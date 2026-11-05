@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-reviewer-key-registry-v1.schema.json",
+  "title": "PITB SorryDB reviewer public-key registry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "registry_id",
+    "keys"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-reviewer-key-registry.v1"
+    },
+    "registry_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "keys": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key_id",
+          "reviewer_id",
+          "public_key_pem",
+          "status"
+        ],
+        "properties": {
+          "key_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reviewer_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "public_key_pem": {
+            "type": "string",
+            "minLength": 64,
+            "pattern": "-----BEGIN PUBLIC KEY-----"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "revoked"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
