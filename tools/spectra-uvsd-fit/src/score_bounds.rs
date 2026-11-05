@@ -525,10 +525,10 @@ mod tests {
                         replication_index: replication_index as u32,
                         operational_mapping_qualified: true,
                         model_adequacy_qualified: true,
-                        target_information: if favorable { 7.0 } else { 5.0 } + perturbation,
+                        target_information: (if favorable { 7.0 } else { 5.0 }) + perturbation,
                         model_discrimination_information: 3.0 + perturbation,
                         representativeness: if scenario_id == 20 { 0.65 } else { 0.85 },
-                        target_utility: if favorable { 4.0 } else { 2.0 } + perturbation,
+                        target_utility: (if favorable { 4.0 } else { 2.0 }) + perturbation,
                         participant_burden_seconds: 1.0 + perturbation,
                     });
                 }
