@@ -1050,7 +1050,7 @@
       "case_id": "BMS-SOC-CAPABILITY-ENVELOPE-001",
       "track": "physical_execution_and_settlement",
       "title": "Evidence-qualified SOC-dependent charge/discharge capability envelope",
-      "scenario": "Evaluate requested charge or discharge power against separate source-bound piecewise-linear conservative capability curves over the declared SOC calibration range. Interpolation rounds down, SOC outside the calibration range is rejected rather than extrapolated, malformed/unsorted curves fail closed, and synthetic-only assumptions are never marked operationally qualified. This is a bounded SOC-only envelope; temperature, SOH, cell voltage, imbalance and dynamic BMS state remain separate future dimensions.",
+      "scenario": "Evaluate requested charge or discharge power against separate source-bound piecewise-linear conservative capability curves over the declared SOC calibration range. Interpolation rounds down, SOC outside the calibration range is rejected rather than extrapolated, malformed/unsorted curves fail closed, and synthetic-only assumptions cannot claim a non-synthetic evidence basis and are never operational authorization. This is a bounded SOC-only envelope; temperature, SOH, cell voltage, imbalance and dynamic BMS state remain separate future dimensions.",
       "owner": "Symthaea",
       "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
@@ -1060,7 +1060,7 @@
         "derating_interpolation_rounds_down_conservatively",
         "request_above_soc_capability_requires_derating",
         "soc_outside_measured_range_is_rejected_not_extrapolated",
-        "synthetic_assumptions_are_never_operationally_qualified",
+        "synthetic_assumptions_never_claim_non_synthetic_evidence_basis",
         "invalid_and_unsorted_curves_fail_closed",
         "malformed_evidence_digest_is_rejected"
       ],
