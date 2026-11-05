@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/engineering-change-impact/manifest.schema.json",
+  "title": "ENG-DESIGN-CHANGE-QUAL-001 public blueprint manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "benchmark_id",
+    "version",
+    "updated_at",
+    "status",
+    "task_count",
+    "task_families",
+    "cases",
+    "terminal_dispositions",
+    "score_dimensions",
+    "hard_gates",
+    "baseline_arms",
+    "ownership",
+    "custody",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "benchmark_id": {
+      "const": "ENG-DESIGN-CHANGE-QUAL-001"
+    },
+    "version": {
+      "type": "string",
+      "const": "0.1.0"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "const": "public_blueprint_specification_only"
+    },
+    "task_count": {
+      "type": "integer",
+      "const": 24
+    },
+    "task_families": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "case_ids"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "case_ids": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 4,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^EDC-[A-F][0-9]{2}$"
+            }
+          }
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 24,
+      "maxItems": 24,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "family_id",
+          "title",
+          "candidate_visible_scenario",
+          "changed_subjects",
+          "evaluation_axes",
+          "critical_impact_control",
+          "ambiguity_control",
+          "gold_status",
+          "score_status",
+          "disposition_contract",
+          "materialization_status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^EDC-[A-F][0-9]{2}$"
+          },
+          "family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "candidate_visible_scenario": {
+            "type": "string",
+            "minLength": 20
+          },
+          "changed_subjects": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "evaluation_axes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "critical_impact_control": {
+            "type": "boolean"
+          },
+          "ambiguity_control": {
+            "type": "boolean"
+          },
+          "gold_status": {
+            "const": "not_yet_adjudicated"
+          },
+          "score_status": {
+            "const": "not_scored"
+          },
+          "disposition_contract": {
+            "const": "per_claim_evidence_item"
+          },
+          "materialization_status": {
+            "const": "blueprint_only"
+          }
+        }
+      }
+    },
+    "terminal_dispositions": {
+      "type": "array",
+      "minItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "score_dimensions": {
+      "type": "array",
+      "minItems": 7,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "hard_gates": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "baseline_arms": {
+      "type": "array",
+      "minItems": 7,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "ownership": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "custody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_visible_blueprints",
+        "gold_labels_adjudicated",
+        "sealed_holdout_created",
+        "evaluator_outside_candidate_workspace_required",
+        "untrusted_execution_authorized",
+        "execution_authorized",
+        "physical_testing_authorized"
+      ],
+      "properties": {
+        "candidate_visible_blueprints": {
+          "const": true
+        },
+        "gold_labels_adjudicated": {
+          "const": false
+        },
+        "sealed_holdout_created": {
+          "const": false
+        },
+        "evaluator_outside_candidate_workspace_required": {
+          "const": true
+        },
+        "untrusted_execution_authorized": {
+          "const": false
+        },
+        "execution_authorized": {
+          "const": false
+        },
+        "physical_testing_authorized": {
+          "const": false
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 50
+    }
+  }
+}
