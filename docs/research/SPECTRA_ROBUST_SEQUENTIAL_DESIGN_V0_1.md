@@ -275,6 +275,10 @@ No status may be promoted solely because a local Fisher-information score is fav
 - End-to-end known-truth DGP → observed-only adapter → UVSD recovery runner with randomized balanced schedules, failure-inclusive output and Wilson fit-availability intervals — [issue #10567](https://github.com/Luminous-Dynamics/symthaea/issues/10567), [draft PR #10572](https://github.com/Luminous-Dynamics/symthaea/pull/10572).
 - Held-out single/divided split predictive model-adequacy checks matched to trial/session/observer generalization — [issue #10582](https://github.com/Luminous-Dynamics/symthaea/issues/10582).
 - Robust indifference-zone selection certificate from simultaneous two-sided utility limits — [issue #10583](https://github.com/Luminous-Dynamics/symthaea/issues/10583), [draft PR #10585](https://github.com/Luminous-Dynamics/symthaea/pull/10585).
+- [Time-uniform Hoeffding score confidence sequences and robust interval-width simulation allocation](https://github.com/Luminous-Dynamics/symthaea/pull/10599), with score-receipt recomputation before selection certification.
+- [Variance-adaptive empirical-Bernstein / betting confidence sequences](https://github.com/Luminous-Dynamics/symthaea/issues/10598) to reduce alpha-spending conservatism.
+- [Paired confidence sequences and robust action ranking](https://github.com/Luminous-Dynamics/symthaea/issues/10597), requiring explicit pairing identities rather than inferring them from equal seeds.
+- [Locked allocation-comparison campaign](https://github.com/Luminous-Dynamics/symthaea/issues/10601) to compare fixed, uniform, robust interval-width, OCBA, robust OCBA and compatible Track-and-Stop / Top Two baselines under equal simulation budgets.
 - Policy interface with deterministic replay and propensity receipts ([draft PR #10493](https://github.com/Luminous-Dynamics/symthaea/pull/10493)).
 - Fixed, QUEST+-style and one-step EIG baselines.
 - Goal-oriented and model-discrimination utilities.
