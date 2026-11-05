@@ -286,6 +286,46 @@
               "Published single repetition."
             ]
           }
+        ],
+        "reported_results": [
+          {
+            "publisher": "OpenAI",
+            "reported_at": "2026-11-03",
+            "model": "Newer internal model (unnamed)",
+            "effort": "not disclosed",
+            "score": 0.875,
+            "harness_version": "not disclosed in OpenAI report",
+            "repeat_count": null,
+            "cost_per_case_usd": null,
+            "median_duration_seconds": null,
+            "tokens_per_case": null,
+            "evidence_class": "vendor_report",
+            "source_url": "https://openai.com/index/accelerating-engineering-for-the-physical-world/",
+            "comparability": "OpenAI-reported score only. The post does not disclose model ID, BenchCAD harness version, task run counts, resource budget, uncertainty, or per-task results. Not a reproducible v2.0/v2.1 leaderboard row and not independently verified.",
+            "notes": [
+              "OpenAI reported mean 0.875 for a newer internal model compared with 0.594 for GPT-6 Astra at its highest reasoning setting.",
+              "This 0.594 comparison is a different report from the 2026-10-12 public v2.0 reference snapshot (0.59 rounded); do not silently replace the earlier row.",
+              "No model release, task content or reproduction protocol is provided in the report."
+            ]
+          },
+          {
+            "publisher": "OpenAI",
+            "reported_at": "2026-11-03",
+            "model": "GPT-6 Astra",
+            "effort": "highest reasoning setting",
+            "score": 0.594,
+            "harness_version": "not disclosed in OpenAI report",
+            "repeat_count": null,
+            "cost_per_case_usd": null,
+            "median_duration_seconds": null,
+            "tokens_per_case": null,
+            "evidence_class": "vendor_report",
+            "source_url": "https://openai.com/index/accelerating-engineering-for-the-physical-world/",
+            "comparability": "Same OpenAI report as the unnamed internal model's 0.875. Exact BenchCAD harness, repeat count and resource budget are not disclosed; do not treat as a fully specified v2.0/v2.1 reproduction.",
+            "notes": [
+              "OpenAI's 2026-11-03 post gives 0.594 at highest reasoning setting; the public 2026-10-12 v2.0 snapshot lists 0.59."
+            ]
+          }
         ]
       },
       "ceb_integration": {
