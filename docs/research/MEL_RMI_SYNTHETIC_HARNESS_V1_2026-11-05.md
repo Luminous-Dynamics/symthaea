@@ -6,7 +6,7 @@
 
 ## Scope
 
-This implementation advances only the preregistered Track A harness milestone. It uses a dependency-free Rust oracle and finite symbolic feature fixtures. It does not run Melothaea, a vendor model, MIDI hardware, a human performer, or a listener study.
+This implementation advances only the preregistered Track A harness milestone. It uses a dependency-minimal Rust harness and finite symbolic feature fixtures. It does not run Melothaea, a vendor model, MIDI hardware, a human performer, or a listener study.
 
 ## Causal separation
 
@@ -43,10 +43,16 @@ A frozen 160-case stress suite now exercises motif, rhythm, tempo, role and text
 
 ## Authored tests
 
-The crate authors 42 deterministic tests covering the positive oracle, fixed, imitation, one-way, yoked and distractor negative controls, sham and unrelated control integrity, intervention isolation, event identity, cross-session yoking, controlled partner influence, manifest validation, modality applicability, and exact replay equality. The 31-test, 160-fixture revision and 40-test artifact-binding revision passed earlier exact-head runs. The current 42-test revision passed its dedicated workflow on exact head 618fa4d719b68c6fe0b401c072e7177e2a2cd3ed (run 42025215684) using Rust 1.96.0 and the committed locked dependency graph: 42 passed, 0 failed. The 160-case positive oracle passed 160/160; fixed, imitation, one-way, yoked and unrelated-feature shortcut controls each passed 0/160; the rule-consistent reciprocal simulator passed 160/160. It re-verified 1,120/1,120 synthetic artifact/receipt sets, emitted 17,920 per-artifact digest rows and passed the 30 agent + 5 partner summary gates. GitHub uploaded all three evidence files as a 90-day artifact (ID 13413217507, SHA-256 316c6a7bfc7966dd8e0f44866215fa65bca52e64299a060c1ff00629eed04c33). The repository-wide CI, governance, benchmark and showroom workflows remain skipped, not passed.
+The crate authors 52 deterministic tests covering the positive oracle, fixed, imitation, one-way, yoked and distractor negative controls, sham and unrelated control integrity, intervention isolation, event identity, cross-session yoking, controlled partner influence, manifest validation, modality applicability, and exact replay equality. Earlier exact-head runs passed the 31-test, 160-fixture revision and the 42-test artifact-binding revision. The 42-test artifact-binding revision passed its dedicated workflow on exact head 618fa4d719b68c6fe0b401c072e7177e2a2cd3ed (run 42025215684) using Rust 1.96.0 and the committed locked dependency graph: 42 passed, 0 failed. The 160-case positive oracle passed 160/160; fixed, imitation, one-way, yoked and unrelated-feature shortcut controls each passed 0/160; the rule-consistent reciprocal simulator passed 160/160. It re-verified 1,120/1,120 synthetic artifact/receipt sets, emitted 17,920 per-artifact digest rows and passed the 30 agent + 5 partner summary gates. GitHub uploaded all three evidence files as a 90-day artifact (ID 13413217507, SHA-256 316c6a7bfc7966dd8e0f44866215fa65bca52e64299a060c1ff00629eed04c33). The repository-wide CI, governance, benchmark and showroom workflows remain skipped, not passed.
+
+## Negotiated response authority
+
+The RMI harness now includes a distinct symbolic interaction contract admitting multiple acceptable response values. A partner may select one option, veto options, or leave preference unresolved. The evaluator distinguishes contract validity from partner-choice compliance: unresolved alternatives must be preserved as a complete branch set or sent for clarification; a premature single commitment fails even if the committed value is contract-valid. Explicit partner selection must be followed; vetoed options are excluded; if no option remains, the valid outcome is abstention.
+
+The executable report now includes nine synthetic negotiation cases with five expected qualified outcomes and four expected rejections. This is a finite conformance suite for interaction/authority semantics, not a human preference test or perceptual-equivalence result. It composes with #9307 / PR #9325 for event/score-level edit validity; the RMI module does not duplicate score-event matching.
 
 ## Qualification and claim ceiling
 
 Passing the finite oracle suite qualifies only the harness's ability to distinguish the declared synthetic policies and reject malformed fixtures. It does not establish actual Melothaea contingency, reciprocal collaboration, musician-valued outcomes, low latency, or commercial competitiveness.
 
-The next step after this harness passes is an adapter against MEL-013A exact artifact transactions, followed by a sealed symbolic task split and only then a separately approved human pilot.
+The expanded negotiation revision (52-test unit suite plus nine executable negotiation cases) is pending its exact-head workflow; the previous 42-test/160-seed/artifact-binding revision remains the last fully qualified exact-head result. The next integration step is an adapter against MEL-013A exact artifact transactions, followed by a sealed symbolic task split and only then a separately approved human pilot.
