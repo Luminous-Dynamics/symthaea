@@ -1,0 +1,459 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_QUERY_CRITICAL_DISCOVERY.schema.json",
+  "title": "Query-critical omitted-hypothesis discovery benchmark input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "analysis_id",
+    "dataset_revision_commit_sha",
+    "query",
+    "baseline",
+    "sampling_binding",
+    "channels",
+    "psus",
+    "proposals",
+    "alternatives",
+    "adjudication_protocol_sha256",
+    "claim_scope"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "analysis_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_revision_commit_sha": {
+      "$ref": "#/$defs/sha40"
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "query_spec_sha256",
+        "decision_rule_sha256",
+        "baseline_decision_met"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_spec_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "decision_rule_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "baseline_decision_met": {
+          "type": "boolean"
+        }
+      }
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_set_sha256",
+        "joint_support_sha256",
+        "action_set_sha256",
+        "adaptive_policy_report_sha256",
+        "adaptive_policy_status",
+        "adaptive_worst_case_effort_units"
+      ],
+      "properties": {
+        "scenario_set_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "joint_support_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "action_set_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "adaptive_policy_report_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "adaptive_policy_status": {
+          "enum": [
+            "POLICY_EXISTS",
+            "NO_POLICY"
+          ]
+        },
+        "adaptive_worst_case_effort_units": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "sampling_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sampling_frame_sha256",
+        "sampling_protocol_sha256",
+        "sample_audit_report_sha256",
+        "psu_population_count",
+        "sampled_psu_count",
+        "design_owner"
+      ],
+      "properties": {
+        "sampling_frame_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "sampling_protocol_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "sample_audit_report_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "psu_population_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sampled_psu_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "design_owner": {
+          "const": "9204"
+        }
+      }
+    },
+    "channels": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/channel"
+      },
+      "uniqueItems": true
+    },
+    "psus": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/psu"
+      },
+      "uniqueItems": true
+    },
+    "proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/proposal"
+      },
+      "uniqueItems": true
+    },
+    "alternatives": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/alternative"
+      },
+      "uniqueItems": true
+    },
+    "adjudication_protocol_sha256": {
+      "$ref": "#/$defs/sha64"
+    },
+    "all_list_missed_sensitivity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "report_sha256",
+        "status"
+      ],
+      "properties": {
+        "owner": {
+          "const": "9248"
+        },
+        "report_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "status": {
+          "enum": [
+            "NOT_RUN",
+            "ESTIMABLE_SENSITIVITY_RANGE",
+            "NOT_IDENTIFIABLE",
+            "NOT_ESTIMABLE"
+          ]
+        }
+      }
+    },
+    "claim_scope": {
+      "enum": [
+        "synthetic_known_truth",
+        "sampled_declared_population"
+      ]
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "sha40": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel_id",
+        "channel_kind",
+        "implementation_sha256",
+        "protocol_sha256",
+        "ancestry_group_ids"
+      ],
+      "properties": {
+        "channel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "channel_kind": {
+          "enum": [
+            "production_candidate_generator",
+            "em_specialist",
+            "morphology_mesh",
+            "skeleton_continuity",
+            "synapse_detection",
+            "blinded_expert_team",
+            "orthogonal_acquisition",
+            "other"
+          ]
+        },
+        "implementation_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "protocol_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "ancestry_group_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "psu": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "psu_id",
+        "stratum_id",
+        "search_disposition",
+        "proposal_ids",
+        "independent_search_receipt_sha256"
+      ],
+      "properties": {
+        "psu_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stratum_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "search_disposition": {
+          "enum": [
+            "COMPLETE_SEARCH",
+            "INCOMPLETE_SEARCH",
+            "SOURCE_INACCESSIBLE"
+          ]
+        },
+        "proposal_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "independent_search_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "proposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proposal_id",
+        "channel_id",
+        "psu_id",
+        "candidate_world_sha256",
+        "source_evidence_sha256",
+        "adjudication_disposition"
+      ],
+      "properties": {
+        "proposal_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "channel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "psu_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_world_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "source_evidence_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "adjudication_disposition": {
+          "enum": [
+            "CONFIRMED_MATCH",
+            "FALSE_POSITIVE",
+            "AMBIGUOUS",
+            "UNADJUDICATED"
+          ]
+        },
+        "matched_alternative_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "adjudication_disposition": {
+                "const": "CONFIRMED_MATCH"
+              }
+            },
+            "required": [
+              "adjudication_disposition"
+            ]
+          },
+          "then": {
+            "required": [
+              "matched_alternative_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "adjudication_disposition": {
+                "enum": [
+                  "FALSE_POSITIVE",
+                  "AMBIGUOUS",
+                  "UNADJUDICATED"
+                ]
+              }
+            },
+            "required": [
+              "adjudication_disposition"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "matched_alternative_id"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "alternative": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alternative_id",
+        "psu_id",
+        "graph_sha256",
+        "source_evidence_sha256",
+        "biological_disposition",
+        "query_consequence",
+        "challenge_report_sha256",
+        "challenge_report_status",
+        "before_worst_case_effort_units",
+        "after_worst_case_effort_units",
+        "impact_weight"
+      ],
+      "properties": {
+        "alternative_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "psu_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "graph_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "source_evidence_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "biological_disposition": {
+          "enum": [
+            "ADMISSIBLE",
+            "INADMISSIBLE",
+            "INDETERMINATE",
+            "DISPUTED",
+            "NOT_ADJUDICATED"
+          ]
+        },
+        "query_consequence": {
+          "enum": [
+            "QUERY_DECISION_FLIP",
+            "ADAPTIVE_POLICY_INVALIDATED",
+            "ADAPTIVE_COST_INCREASED",
+            "NO_QUERY_EFFECT",
+            "NOT_ESTIMABLE"
+          ]
+        },
+        "challenge_report_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "challenge_report_status": {
+          "enum": [
+            "POLICY_EXISTS",
+            "NO_POLICY",
+            "NOT_RUN",
+            "NOT_ESTIMABLE"
+          ]
+        },
+        "before_worst_case_effort_units": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "after_worst_case_effort_units": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "impact_weight": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    }
+  }
+}
