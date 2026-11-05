@@ -90,19 +90,15 @@ The policy and allocator must not receive evaluator-only scenario labels, oracle
 
 ## 6. False-robustness estimand
 
-Let (C) denote the event that the frozen-bank certificate passes. Let (R_H) be the robust regret under the separately generated hidden evaluator distribution or a named hidden stress family. Let (	au) be a material regret threshold fixed before evaluation.
+Let `C` denote the event that the frozen-bank certificate passes. Let `R_H` be robust regret under the separately generated hidden evaluator distribution or a named hidden stress family. Let `tau` be a material regret threshold fixed before evaluation.
 
-Report:
+Report the conditional false-robustness rate:
 
-[
-P(R_H>	au mid C)
-]
+`P(R_H > tau | C)`
 
-as the conditional false-robustness rate, and also report the unconditional joint event:
+and the unconditional joint event:
 
-[
-P(C ;land; R_H>	au).
-]
+`P(C and R_H > tau)`.
 
 Do not report the conditional rate alone: its denominator may be small or zero. Include Monte Carlo uncertainty for both, the certificate rate, and every hidden-scenario family.
 
