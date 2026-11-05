@@ -1,0 +1,110 @@
+name: REA ZIP Fuzz Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "43 3 * * 1"
+  pull_request:
+    paths:
+      - "fuzz/**"
+      - "crates/domains/symthaea-rea-artifact-reader/**"
+      - ".github/workflows/rea-zip-fuzz.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-zip-fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zip-fuzz-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - name: Checkout exact PR head or dispatched revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install pinned nightly Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: nightly-2026-11-03
+      - name: Install pinned cargo-fuzz
+        run: cargo install cargo-fuzz --version 0.13.2 --locked
+      - name: Resolve fuzz and differential-oracle lockfile
+        run: cargo generate-lockfile --manifest-path fuzz/Cargo.toml
+      - name: Audit resolved fuzz dependency graph
+        run: cargo tree --manifest-path fuzz/Cargo.toml --locked -e normal,dev
+      - name: Prepare deterministic content-addressable seed corpus
+        run: |
+          mkdir -p fuzz/corpus/zip_inventory_and_content fuzz/corpus/zip_differential fuzz/artifacts
+          base64 --decode fuzz/seeds/minimal-stored-entry.zip.b64 > fuzz/corpus/zip_inventory_and_content/minimal-stored-entry.zip
+          cp fuzz/corpus/zip_inventory_and_content/minimal-stored-entry.zip fuzz/corpus/zip_differential/minimal-stored-entry.zip
+          cargo +nightly-2026-11-03 run --manifest-path fuzz/Cargo.toml --bin zip_seed_corpus -- \
+            fuzz/corpus/zip_inventory_and_content fuzz/corpus/zip_differential
+          find fuzz/corpus/zip_inventory_and_content fuzz/corpus/zip_differential -type f -name '*.zip' -print0 \
+            | sort -z | xargs -0 sha256sum > fuzz/artifacts/seed-digests.sha256
+          sha256sum fuzz/seeds/minimal-stored-entry.zip.b64 fuzz/artifacts/seed-digests.sha256
+          cat fuzz/artifacts/seed-digests.sha256
+      - name: Record exact fuzz run context
+        run: |
+          pr_head_commit="${{ github.event.pull_request.head.sha || github.sha }}"
+          checked_out_commit="$(git rev-parse HEAD)"
+          test "$checked_out_commit" = "$pr_head_commit"
+          {
+            echo "tested_tree_commit=$checked_out_commit"
+            echo "workflow_event_sha=$GITHUB_SHA"
+            echo "pull_request_head_sha=$pr_head_commit"
+            echo "rust_toolchain=nightly-2026-11-03"
+            rustc +nightly-2026-11-03 --version --verbose
+            cargo +nightly-2026-11-03 --version
+            cargo fuzz --version
+            uname -a
+            sha256sum fuzz/Cargo.lock
+            sha256sum fuzz/seeds/minimal-stored-entry.zip.b64 fuzz/artifacts/seed-digests.sha256
+            cargo tree --manifest-path fuzz/Cargo.toml --locked -e normal,dev
+          } | tee fuzz/artifacts/run-context.txt
+      - name: Run bounded production-reader fuzz smoke
+        run: |
+          set -o pipefail
+          cargo +nightly-2026-11-03 fuzz run zip_inventory_and_content -- \
+            -artifact_prefix=fuzz/artifacts/production- \
+            -max_total_time=180 \
+            -max_len=1048576 \
+            -rss_limit_mb=512 \
+            -print_final_stats=1 2>&1 | tee fuzz/artifacts/production-fuzz-output.txt
+      - name: Run bounded independent differential fuzz smoke
+        run: |
+          set -o pipefail
+          cargo +nightly-2026-11-03 fuzz run zip_differential -- \
+            -artifact_prefix=fuzz/artifacts/differential- \
+            -max_total_time=180 \
+            -max_len=1048576 \
+            -rss_limit_mb=512 \
+            -print_final_stats=1 2>&1 | tee fuzz/artifacts/differential-fuzz-output.txt
+      - name: Bind both fuzz results to exact run context
+        if: always()
+        run: |
+          for arm in production differential; do
+            output="fuzz/artifacts/${arm}-fuzz-output.txt"
+            if test -f "$output"; then
+              sha256sum "$output" | tee -a fuzz/artifacts/run-context.txt
+              grep -E 'Done [0-9]+ runs|stat::number_of_executed_units:|stat::average_exec_per_sec:|stat::peak_rss_mb:|stat::new_units_added:' "$output" > "fuzz/artifacts/${arm}-fuzz-summary.txt" || true
+            fi
+          done
+      - name: Upload committed fuzz lock and artifacts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: rea-zip-fuzz-run
+          path: |
+            fuzz/Cargo.lock
+            fuzz/artifacts/**
+            fuzz/corpus/zip_inventory_and_content/**
+            fuzz/corpus/zip_differential/**
+          if-no-files-found: warn
+          retention-days: 14
