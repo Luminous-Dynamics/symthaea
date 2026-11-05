@@ -264,15 +264,35 @@ mod tests {
     fn complete_bridge_attributes_gaps_and_preserves_unexplained_residual() {
         let components = [
             component("forecast", RevenueComponentKind::ForecastRegret, -100_000),
-            component("availability", RevenueComponentKind::AvailabilityLoss, -50_000),
-            component("execution", RevenueComponentKind::ExecutionDeviation, -70_000),
-            component("balancing", RevenueComponentKind::BalancingSettlement, -20_000),
+            component(
+                "availability",
+                RevenueComponentKind::AvailabilityLoss,
+                -50_000,
+            ),
+            component(
+                "execution",
+                RevenueComponentKind::ExecutionDeviation,
+                -70_000,
+            ),
+            component(
+                "balancing",
+                RevenueComponentKind::BalancingSettlement,
+                -20_000,
+            ),
             component("fees", RevenueComponentKind::MarketFees, -10_000),
-            component("degradation", RevenueComponentKind::DegradationAndWarranty, -25_000),
-            component("finance", RevenueComponentKind::FinancingAndCollateral, -5_000),
+            component(
+                "degradation",
+                RevenueComponentKind::DegradationAndWarranty,
+                -25_000,
+            ),
+            component(
+                "finance",
+                RevenueComponentKind::FinancingAndCollateral,
+                -5_000,
+            ),
         ];
-        let result = evaluate_revenue_realization_bridge(base_inputs(&REQUIRED, &components))
-            .unwrap();
+        let result =
+            evaluate_revenue_realization_bridge(base_inputs(&REQUIRED, &components)).unwrap();
         assert!(result.complete);
         assert_eq!(result.known_adjustments_sum_minor_zar, -280_000);
         assert_eq!(result.partial_reconstructed_net_minor_zar, 720_000);
@@ -287,10 +307,14 @@ mod tests {
             component("forecast", RevenueComponentKind::ForecastRegret, -100_000),
             component("fees", RevenueComponentKind::MarketFees, -10_000),
         ];
-        let result = evaluate_revenue_realization_bridge(base_inputs(&REQUIRED, &components))
-            .unwrap();
+        let result =
+            evaluate_revenue_realization_bridge(base_inputs(&REQUIRED, &components)).unwrap();
         assert!(!result.complete);
-        assert!(result.missing_categories.contains(&RevenueComponentKind::BalancingSettlement));
+        assert!(
+            result
+                .missing_categories
+                .contains(&RevenueComponentKind::BalancingSettlement)
+        );
         assert_eq!(result.partial_reconstructed_net_minor_zar, 890_000);
         assert_eq!(result.reconstructed_net_minor_zar, None);
         assert_eq!(result.unexplained_residual_minor_zar, None);
@@ -305,7 +329,11 @@ mod tests {
         ];
         let components = [
             component("forecast", RevenueComponentKind::ForecastRegret, -50_000),
-            component("contract", RevenueComponentKind::ContractAndCurtailment, 25_000),
+            component(
+                "contract",
+                RevenueComponentKind::ContractAndCurtailment,
+                25_000,
+            ),
         ];
         let result =
             evaluate_revenue_realization_bridge(base_inputs(&required, &components)).unwrap();
@@ -357,10 +385,18 @@ mod tests {
     #[test]
     fn one_source_receipt_cannot_back_two_adjustment_components() {
         let duplicate_sources = [
-            component("forecast-regret", RevenueComponentKind::ForecastRegret, -10_000),
+            component(
+                "forecast-regret",
+                RevenueComponentKind::ForecastRegret,
+                -10_000,
+            ),
             RevenueBridgeComponent {
                 source_ref: "forecast-regret",
-                ..component("execution-loss", RevenueComponentKind::ExecutionDeviation, -5_000)
+                ..component(
+                    "execution-loss",
+                    RevenueComponentKind::ExecutionDeviation,
+                    -5_000,
+                )
             },
         ];
         assert_eq!(
