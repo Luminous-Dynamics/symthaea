@@ -290,11 +290,17 @@ fn validate_plan(plan: &RetrievalPlan) -> ValidationReport {
     }
 }
 
-fn parse_args() -> Result<PathBuf, String> {
+fn parse_args() -> Result<(PathBuf, PathBuf), String> {
     let mut args = env::args().skip(1);
+    let mut schema = None;
     let mut input = None;
     while let Some(arg) = args.next() {
         match arg.as_str() {
+            "--schema" => {
+                schema = Some(PathBuf::from(
+                    args.next().ok_or_else(|| "--schema requires a path".to_string())?,
+                ));
+            }
             "--input" => {
                 input = Some(PathBuf::from(
                     args.next().ok_or_else(|| "--input requires a path".to_string())?,
@@ -302,19 +308,34 @@ fn parse_args() -> Result<PathBuf, String> {
             }
             "--help" | "-h" => {
                 return Err(
-                    "Usage: validate-retrieval-plan --input PLAN.json\nValidates a local candidate plan only; no network or retrieval is performed."
+                    "Usage: validate-retrieval-plan --schema SCHEMA.json --input PLAN.json\nValidates a local candidate plan only; no network or retrieval is performed."
                         .to_string(),
                 );
             }
             other => return Err(format!("unknown argument {other:?}")),
         }
     }
-    input.ok_or_else(|| "--input is required".to_string())
+    Ok((
+        schema.ok_or_else(|| "--schema is required".to_string())?,
+        input.ok_or_else(|| "--input is required".to_string())?,
+    ))
+}
+
+fn schema_has_external_refs(value: &serde_json::Value) -> bool {
+    match value {
+        serde_json::Value::Object(map) => map.iter().any(|(key, child)| {
+            (matches!(key.as_str(), "$ref" | "$dynamicRef" | "$recursiveRef")
+                && !child.as_str().is_some_and(|target| target.starts_with('#')))
+                || schema_has_external_refs(child)
+        }),
+        serde_json::Value::Array(items) => items.iter().any(schema_has_external_refs),
+        _ => false,
+    }
 }
 
 fn main() -> ExitCode {
-    let path = match parse_args() {
-        Ok(path) => path,
+    let (schema_path, path) = match parse_args() {
+        Ok(paths) => paths,
         Err(error) => {
             eprintln!("{error}");
             return ExitCode::from(2);
@@ -335,7 +356,69 @@ fn main() -> ExitCode {
         }
     };
 
-    let report = validate_plan(&plan);
+    let input_value: serde_json::Value = match serde_json::from_slice(&bytes) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("invalid retrieval plan JSON: {error}");
+            return ExitCode::from(2);
+        }
+    };
+    let schema_bytes = match fs::read(&schema_path) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            eprintln!("cannot read schema {}: {error}", schema_path.display());
+            return ExitCode::from(2);
+        }
+    };
+    let schema: serde_json::Value = match serde_json::from_slice(&schema_bytes) {
+        Ok(schema) => schema,
+        Err(error) => {
+            eprintln!("invalid schema JSON: {error}");
+            return ExitCode::from(2);
+        }
+    };
+    if schema.get("$schema").and_then(serde_json::Value::as_str)
+        != Some("https://json-schema.org/draft/2020-12/schema")
+    {
+        eprintln!("schema must declare JSON Schema Draft 2020-12 exactly");
+        return ExitCode::from(2);
+    }
+    if schema_has_external_refs(&schema) {
+        eprintln!("non-local JSON Schema references are refused");
+        return ExitCode::from(2);
+    }
+    let meta_validator = match jsonschema::meta::validator_for(&schema) {
+        Ok(validator) => validator,
+        Err(error) => {
+            eprintln!("cannot build schema meta-validator: {error}");
+            return ExitCode::from(2);
+        }
+    };
+    if !meta_validator.evaluate(&schema).flag().valid {
+        eprintln!("schema does not validate against its detected meta-schema");
+        return ExitCode::from(2);
+    }
+    let validator = match jsonschema::draft202012::options()
+        .should_validate_formats(true)
+        .build(&schema)
+    {
+        Ok(validator) => validator,
+        Err(error) => {
+            eprintln!("cannot compile retrieval plan schema: {error}");
+            return ExitCode::from(2);
+        }
+    };
+
+    let mut report = validate_plan(&plan);
+    report.errors.extend(
+        validator
+            .iter_errors(&input_value)
+            .map(|error| error.to_string()),
+    );
+    report.passed = report.errors.is_empty();
+    if !report.passed {
+        report.recommended_action = "reject_rewrite_and_use_original_query";
+    }
     match serde_json::to_string_pretty(&report) {
         Ok(json) => println!("{json}"),
         Err(error) => {
