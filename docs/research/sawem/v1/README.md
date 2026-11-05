@@ -59,6 +59,9 @@ The raw source digest is intentionally null and the source freeze state is not_f
 
 - [SAWEM BESS Underwriting Profile v1 JSON Schema](sawem-bess-underwriting-profile-v1.schema.json)
 - [Synthetic standalone-BESS profile](sawem-bess-underwriting-profile-v1.synthetic.json)
+- [Comparator run-manifest schema](sawem-bess-comparator-manifest-v1.schema.json)
+- [Synthetic comparator roster](sawem-bess-comparator-manifest-v1.synthetic.json)
+- [Matched-engine benchmark protocol](COMPARATOR_PROTOCOL_V1.md)
 
 The JSON Schema uses Draft 2020-12. The synthetic fixture contains fictional project identifiers, ratings, energy declarations, dispatch, metered response, balancing components and credit-cover amounts. It is only a schema and interface example.
 
