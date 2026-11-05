@@ -576,9 +576,7 @@ fn main() -> ExitCode {
     let input: Input = match serde_json::from_slice(&input_bytes) {
         Ok(input) => input,
         Err(error) => {
-            eprintln!(
-                "connectome-robust-query-disambiguation-audit: invalid JSON input: {error}"
-            );
+            eprintln!("connectome-robust-query-disambiguation-audit: invalid JSON input: {error}");
             return ExitCode::from(2);
         }
     };
@@ -655,7 +653,7 @@ mod tests {
         let synapse = report
             .action_pair_coverage
             .iter()
-            .find(|row| row.action_id == "inspect-synapse" )
+            .find(|row| row.action_id == "inspect-synapse")
             .unwrap();
         assert_eq!(synapse.robustly_separated_decision_conflict_pair_count, 1);
     }
