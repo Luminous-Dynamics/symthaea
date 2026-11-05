@@ -845,9 +845,7 @@ pub fn qualifying_dsu_capacity_for_payment(
             // §§9.8.4(3) / 9.8.6(4), with §9.8.3(6)'s availability ceiling.
             let reducible_mw = (consumption_mw - curve.third_elbow_mw).max(0.0);
             Ok(DsuQualificationResult::Determined {
-                qualifying_capacity_mw: contracted_mw
-                    .min(reducible_mw)
-                    .min(effective_available_mw),
+                qualifying_capacity_mw: contracted_mw.min(reducible_mw).min(effective_available_mw),
             })
         }
         DsuUpwardReserveProduct::TenMinute => {
@@ -940,9 +938,7 @@ pub fn calculate_reserve_capacity_payment(
                     factor_denominator: Some(denominator),
                 } => {
                     if denominator == 0 {
-                        return Err(
-                            ReserveCapacityPaymentError::ZeroPerformanceFactorDenominator,
-                        );
+                        return Err(ReserveCapacityPaymentError::ZeroPerformanceFactorDenominator);
                     }
                     (numerator, denominator)
                 }
@@ -1891,9 +1887,9 @@ mod tests {
                 contracted_capacity_mw: Some(70.0),
                 official_energy_consumption_mw: None,
                 effective_available_capacity_mw: Some(75.0),
-                was_utilized_for_reserve_or_balancing: None,
-                energy_instruction_differed_from_contract: None,
-                acceptable_performance: None,
+            was_utilized_for_reserve_or_balancing: None,
+            energy_instruction_differed_from_contract: None,
+            acceptable_performance: None,
             },
             curve,
         )
@@ -2067,10 +2063,7 @@ mod tests {
 
     #[test]
     fn ten_minute_payment_has_no_performance_adjustment_term_and_retains_fractional_minor_units() {
-        let mut inputs = reserve_payment_inputs(
-            ReserveCapacityPaymentProduct::TenMinute,
-            None,
-        );
+        let mut inputs = reserve_payment_inputs(ReserveCapacityPaymentProduct::TenMinute, None);
         inputs.market_price = Some(ReserveCategoryMarketPrice {
             minor_zar_per_mw_per_trading_period: 12_345,
         });
@@ -2086,8 +2079,7 @@ mod tests {
             ))
         );
 
-        inputs.performance_adjustment =
-            Some(PerformanceAdjustmentEvidence::NoCriteriaEstablished);
+        inputs.performance_adjustment = Some(PerformanceAdjustmentEvidence::NoCriteriaEstablished);
         assert_eq!(
             calculate_reserve_capacity_payment(inputs),
             Err(ReserveCapacityPaymentError::UnexpectedPerformanceAdjustmentForTenMinute)
@@ -2107,11 +2099,10 @@ mod tests {
             })
         );
 
-        inputs.performance_adjustment =
-            Some(PerformanceAdjustmentEvidence::CriteriaEstablished {
-                factor_numerator: Some(1),
-                factor_denominator: None,
-            });
+        inputs.performance_adjustment = Some(PerformanceAdjustmentEvidence::CriteriaEstablished {
+            factor_numerator: Some(1),
+            factor_denominator: None,
+        });
         assert_eq!(
             calculate_reserve_capacity_payment(inputs),
             Ok(ReserveCapacityPaymentResult::Indeterminate {
@@ -2156,11 +2147,10 @@ mod tests {
         );
 
         inputs.qualifying_capacity_milli_mw = Some(500);
-        inputs.performance_adjustment =
-            Some(PerformanceAdjustmentEvidence::CriteriaEstablished {
-                factor_numerator: Some(1),
-                factor_denominator: Some(0),
-            });
+        inputs.performance_adjustment = Some(PerformanceAdjustmentEvidence::CriteriaEstablished {
+            factor_numerator: Some(1),
+            factor_denominator: Some(0),
+        });
         assert_eq!(
             calculate_reserve_capacity_payment(inputs),
             Err(ReserveCapacityPaymentError::ZeroPerformanceFactorDenominator)
