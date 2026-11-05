@@ -1,0 +1,306 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ceb/measurement-matrix-v0.schema.json",
+  "title": "CEB Measurement and Comparative Claim Matrix V0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "matrix_id",
+    "release",
+    "status",
+    "created_at",
+    "claim_policy",
+    "lanes",
+    "sources"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 0
+    },
+    "benchmark_id": {
+      "const": "CEB"
+    },
+    "matrix_id": {
+      "const": "CEB-MEASUREMENT-MATRIX-V0"
+    },
+    "release": {
+      "const": "v0-design-only"
+    },
+    "status": {
+      "const": "design_only"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "claim_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "score_denominator",
+        "superiority_claim_requires",
+        "contextual_comparison_rule",
+        "aggregation_rule",
+        "benchmark_lifecycle_rule"
+      ],
+      "properties": {
+        "score_denominator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "superiority_claim_requires": {
+          "type": "array",
+          "minItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "contextual_comparison_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "aggregation_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "benchmark_lifecycle_rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "lanes": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "$ref": "#/$defs/lane"
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "$ref": "#/$defs/source"
+      }
+    }
+  },
+  "$defs": {
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_id",
+        "definition",
+        "unit",
+        "direction",
+        "prospective_target"
+      ],
+      "properties": {
+        "metric_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "definition": {
+          "type": "string",
+          "minLength": 10
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "direction": {
+          "enum": [
+            "maximize",
+            "minimize",
+            "calibrate"
+          ]
+        },
+        "prospective_target": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "comparator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "sample_scope",
+        "published_reference",
+        "source_url",
+        "comparison_class",
+        "caveats"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "published_reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "comparison_class": {
+          "enum": [
+            "direct_same_protocol",
+            "contextual_reference_until_exact_protocol_match",
+            "historical_contextual_reference",
+            "methodological_reference_not_score_comparison"
+          ]
+        },
+        "caveats": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "evidence_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_artifacts",
+        "independent_adjudication",
+        "unresolved_state_required",
+        "evidence_authority",
+        "execution_gate"
+      ],
+      "properties": {
+        "required_artifacts": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "independent_adjudication": {
+          "type": "boolean"
+        },
+        "unresolved_state_required": {
+          "type": "boolean"
+        },
+        "evidence_authority": {
+          "type": "string",
+          "minLength": 1
+        },
+        "execution_gate": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "lane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lane_id",
+        "capability",
+        "decision_question",
+        "primary_metrics",
+        "comparators",
+        "baseline_arms",
+        "evidence_contract",
+        "hard_gates",
+        "holdout_design"
+      ],
+      "properties": {
+        "lane_id": {
+          "type": "string",
+          "pattern": "^CEB-[A-Z]+$"
+        },
+        "capability": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_question": {
+          "type": "string",
+          "minLength": 10
+        },
+        "primary_metrics": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/metric"
+          }
+        },
+        "comparators": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/comparator"
+          }
+        },
+        "baseline_arms": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence_contract": {
+          "$ref": "#/$defs/evidence_contract"
+        },
+        "hard_gates": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "holdout_design": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_url",
+        "supports"
+      ],
+      "properties": {
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "supports": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^CEB-[A-Z]+$"
+          }
+        }
+      }
+    }
+  }
+}
