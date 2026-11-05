@@ -22,6 +22,8 @@ use super::score_bounds::{
 };
 use super::sequential::OperationalAction;
 
+pub const ALLOCATION_SEED_METHOD_ID: &str = "spectra-splitmix64-seed-v1";
+
 /// How reproducible simulation seeds are assigned to requested score replications.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReplicationSeedMode {
@@ -94,6 +96,7 @@ pub struct AdaptiveAllocationReceipt {
     /// Digest of the exact score snapshot that produced this allocation.
     pub score_receipt_digest: String,
     pub current_cell_sample_counts: Vec<CellSampleCount>,
+    pub seed_method_id: &'static str,
     pub root_seed: u64,
     pub seed_mode: ReplicationSeedMode,
     pub robust_utility: RobustUtility,
@@ -363,6 +366,7 @@ pub fn allocate_next_score_batch(
         scenario_set_digest: receipt.scenario_set_digest.clone(),
         score_receipt_digest: config.score_receipt_digest.clone(),
         current_cell_sample_counts: current_cell_sample_counts(receipt)?,
+        seed_method_id: ALLOCATION_SEED_METHOD_ID,
         root_seed: config.root_seed,
         seed_mode: config.seed_mode,
         robust_utility: config.robust_utility,
@@ -396,6 +400,7 @@ fn build_stop_receipt(
         scenario_set_digest: receipt.scenario_set_digest.clone(),
         score_receipt_digest: config.score_receipt_digest.clone(),
         current_cell_sample_counts: current_cell_sample_counts(receipt)?,
+        seed_method_id: ALLOCATION_SEED_METHOD_ID,
         root_seed: config.root_seed,
         seed_mode: config.seed_mode,
         robust_utility: config.robust_utility,
@@ -820,6 +825,9 @@ mod tests {
             .iter()
             .any(|cell| cell.scenario_id == request.scenario_id
                 && cell.priority == decision.selected_cell_priority.unwrap()));
+        assert_eq!(decision.seed_mode, ReplicationSeedMode::CommonRandomNumbersWithinScenario);
+        assert_eq!(decision.current_cell_sample_counts.len(), 4);
+        assert_eq!(decision.seed_method_id, ALLOCATION_SEED_METHOD_ID);
         assert_eq!(request.cells.len(), 2);
         assert!(request.cells.iter().all(|cell| cell.first_replication_index == 4));
         assert!(request.cells.iter().all(|cell| cell.replication_count == 3));
