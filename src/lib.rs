@@ -290,7 +290,11 @@ compile_error!(
 // Unified Error Types
 // ============================================================================
 
-/// Unified error types for cross-subsystem error handling.
+/// REA Evidence-grounded causal hypothesis and next-experiment planner.
+#[cfg(feature = "rea-investigator")]
+pub mod rea_investigator;
+
+// Unified error types for cross-subsystem error handling.
 pub mod errors;
 pub use errors::{SymthaeaError, SymthaeaResult};
 

@@ -18056,6 +18056,7 @@ dependencies = [
  "symthaea-psych-bench",
  "symthaea-quadruped",
  "symthaea-quantum-chemistry",
+ "symthaea-rea-investigator",
  "symthaea-runtime",
  "symthaea-scavenger",
  "symthaea-sentinel",
@@ -19776,6 +19777,10 @@ dependencies = [
  "proptest",
  "rand 0.8.6",
 ]
+
+[[package]]
+name = "symthaea-rea-investigator"
+version = "0.1.0"
 
 [[package]]
 name = "symthaea-ros-bridge"
