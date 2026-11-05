@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "analysis_id": "synthetic-adaptive-query-policy-no-policy-v1",
+  "dataset_revision_commit_sha": "9999999999999999999999999999999999999999",
+  "query_id": "binary-question-unresolved",
+  "query_spec_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "scenario_set_scope": "exhaustive_declared_scenario_space",
+  "scenario_set_sha256": "7bcd28d0e19a78786d831110d2387e30899f64ef86535cf3206aa81f0de8b00e",
+  "action_set_sha256": "ef6a1074a98af16bc9cda00fc09166440ca341b42aa447578714cac7a013afa0",
+  "joint_support_scope": "exhaustive_declared_joint_support",
+  "joint_support_sha256": "ece2bd67071053e45f0c1442f714fa0a39952dfa49fbc97d499bf8550f7b6d21",
+  "effort_unit": "expert_review_minutes",
+  "max_total_effort_units": 3,
+  "scenarios": [
+    {
+      "scenario_id": "world-positive",
+      "graph_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "decision_met": true
+    },
+    {
+      "scenario_id": "world-negative",
+      "graph_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "decision_met": false
+    }
+  ],
+  "actions": [
+    {
+      "action_id": "inspect-only",
+      "action_kind": "image_inspection",
+      "effort_units": 1,
+      "source_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "observation_model_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "dependence_groups": [
+        "same-volume"
+      ]
+    }
+  ],
+  "joint_world_supports": [
+    {
+      "scenario_id": "world-positive",
+      "source_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "joint_observation_model_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "dependence_groups": [
+        "same-volume"
+      ],
+      "possible_joint_outcomes": [
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-only",
+              "outcome": "shared-category"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "scenario_id": "world-negative",
+      "source_evidence_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "joint_observation_model_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "dependence_groups": [
+        "same-volume"
+      ],
+      "possible_joint_outcomes": [
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-only",
+              "outcome": "shared-category"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "support_challenges": [
+    {
+      "challenge_id": "add-nonshared-outcome-but-retain-shared-outcome",
+      "challenger_evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "challenger_model_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "additions": [
+        {
+          "scenario_id": "world-positive",
+          "source_evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "joint_observation_model_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "dependence_groups": [
+            "challenge-session-2"
+          ],
+          "possible_joint_outcomes": [
+            {
+              "outcomes": [
+                {
+                  "action_id": "inspect-only",
+                  "outcome": "positive-only-alternative"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
