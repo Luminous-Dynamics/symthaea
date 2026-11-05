@@ -24,11 +24,11 @@
 //! Extremely small allocations that underflow binary64 are rejected. They are
 //! never rounded to zero because zero would falsely imply an error-free test.
 
-use std::fmt;
 use super::reuse_confidence_certificate::{
     pass_fail_confidence_certificate, ReuseCertificateError, ReuseConfidenceCertificate,
     MAX_CERTIFICATE_SAMPLE_COUNT,
 };
+use std::fmt;
 
 /// Bound on round indexing for the bounded log-binomial implementation.
 /// Larger histories require a reviewed arbitrary-precision/log-gamma path.
@@ -75,10 +75,16 @@ impl fmt::Display for ReuseBudgetError {
                 write!(f, "paired win/loss counts overflow usize")
             }
             Self::InvalidCandidateEvidence => {
-                write!(f, "candidate evidence requires a non-empty paired outcome vector")
+                write!(
+                    f,
+                    "candidate evidence requires a non-empty paired outcome vector"
+                )
             }
             Self::CandidateSampleTooLarge { actual, maximum } => {
-                write!(f, "candidate sample count {actual} exceeds maximum {maximum}")
+                write!(
+                    f,
+                    "candidate sample count {actual} exceeds maximum {maximum}"
+                )
             }
             Self::InvalidPairedDifference(value) => {
                 write!(f, "paired outcome must be -1, 0 or +1, got {value}")
@@ -152,9 +158,7 @@ impl ReuseCandidateEvidence {
     /// Its rows must represent the independent paired units for REUSE; clustered
     /// task rows must be aggregated to the preregistered independent unit before
     /// constructing this value.
-    pub fn new(
-        paired_differences: impl Into<Vec<i8>>,
-    ) -> Result<Self, ReuseBudgetError> {
+    pub fn new(paired_differences: impl Into<Vec<i8>>) -> Result<Self, ReuseBudgetError> {
         let paired_differences = paired_differences.into();
         if paired_differences.is_empty() {
             return Err(ReuseBudgetError::InvalidCandidateEvidence);
@@ -176,8 +180,7 @@ impl ReuseCandidateEvidence {
                 other => return Err(ReuseBudgetError::InvalidPairedDifference(other)),
             }
         }
-        let empirical_improvement =
-            (wins as f64 - losses as f64) / paired_differences.len() as f64;
+        let empirical_improvement = (wins as f64 - losses as f64) / paired_differences.len() as f64;
 
         Ok(Self {
             paired_differences,
@@ -237,7 +240,10 @@ impl fmt::Display for ReuseRoundError {
                 write!(f, "REUSE confidence certificate failed: {error}")
             }
             Self::InvalidCumulativeLowerBound => {
-                write!(f, "prior cumulative lower bound must be finite and nonnegative")
+                write!(
+                    f,
+                    "prior cumulative lower bound must be finite and nonnegative"
+                )
             }
         }
     }
@@ -310,13 +316,8 @@ pub(crate) fn evaluate_reuse_round_audited(
         }
         .into());
     }
-    let allocation = allocate_reuse_error_budget(
-        alpha,
-        round,
-        prior_promotions,
-        candidates_per_round,
-        rho,
-    )?;
+    let allocation =
+        allocate_reuse_error_budget(alpha, round, prior_promotions, candidates_per_round, rho)?;
 
     let mut best: Option<(usize, usize, f64)> = None;
     for (candidate_index, candidate) in candidates.iter().enumerate() {
@@ -328,11 +329,9 @@ pub(crate) fn evaluate_reuse_round_audited(
             continue;
         }
 
-        let p_value = super::paired_sign_test::exact_sign_test_upper_tail(
-            candidate.wins,
-            candidate.losses,
-        )
-        .ok_or(ReuseBudgetError::ComparisonCountOverflow)?;
+        let p_value =
+            super::paired_sign_test::exact_sign_test_upper_tail(candidate.wins, candidate.losses)
+                .ok_or(ReuseBudgetError::ComparisonCountOverflow)?;
 
         if p_value <= allocation.paired_test_error_budget
             && best.is_none_or(|(_, _, best_improvement)| {
@@ -359,8 +358,7 @@ pub(crate) fn evaluate_reuse_round_audited(
         &candidates[candidate_index].paired_differences,
         allocation.lower_bound_error_budget,
     )?;
-    let cumulative_lower_bound =
-        prior_cumulative_lower_bound + certificate.cumulative_increment();
+    let cumulative_lower_bound = prior_cumulative_lower_bound + certificate.cumulative_increment();
     if !cumulative_lower_bound.is_finite() {
         return Err(ReuseRoundError::InvalidCumulativeLowerBound);
     }
@@ -483,7 +481,7 @@ mod tests {
         assert!(
             (allocation.paired_test_error_budget() + allocation.lower_bound_error_budget()
                 - allocation.total_error_budget())
-                .abs()
+            .abs()
                 < 1e-15
         );
     }
@@ -604,7 +602,9 @@ mod tests {
         ];
         assert_eq!(
             evaluate_reuse_round(0.05, 1, 0, 3, 0.5, &candidates).unwrap(),
-            ReuseRoundDecision::PromoteCandidate { candidate_number: 2 }
+            ReuseRoundDecision::PromoteCandidate {
+                candidate_number: 2
+            }
         );
     }
 
@@ -628,7 +628,9 @@ mod tests {
         let candidates = [evidence(10, 0, 100), evidence(11, 1, 100)];
         assert_eq!(
             evaluate_reuse_round(0.1, 1, 0, 2, 0.5, &candidates).unwrap(),
-            ReuseRoundDecision::PromoteCandidate { candidate_number: 1 }
+            ReuseRoundDecision::PromoteCandidate {
+                candidate_number: 1
+            }
         );
     }
 
@@ -649,8 +651,7 @@ mod tests {
     #[test]
     fn audit_retains_selected_certificate_and_advances_cumulative_lower_bound() {
         let candidates = [evidence(40, 10, 100)];
-        let audit =
-            evaluate_reuse_round_audited(0.05, 1, 0, 1, 0.5, &candidates, 0.25).unwrap();
+        let audit = evaluate_reuse_round_audited(0.05, 1, 0, 1, 0.5, &candidates, 0.25).unwrap();
         assert_eq!(
             audit.decision(),
             ReuseRoundDecision::PromoteCandidate { candidate_number: 1 }
@@ -666,8 +667,7 @@ mod tests {
     #[test]
     fn audit_rejection_keeps_cumulative_lower_bound_and_has_no_certificate() {
         let candidates = [evidence(0, 0, 100)];
-        let audit =
-            evaluate_reuse_round_audited(0.05, 1, 0, 1, 0.5, &candidates, 0.75).unwrap();
+        let audit = evaluate_reuse_round_audited(0.05, 1, 0, 1, 0.5, &candidates, 0.75).unwrap();
         assert_eq!(audit.decision(), ReuseRoundDecision::RejectAll);
         assert!(audit.selected_certificate().is_none());
         assert_eq!(audit.cumulative_lower_bound(), 0.75);
