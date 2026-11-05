@@ -360,6 +360,10 @@ pub enum LedgerError {
     MissingEvidenceDigest,
     /// Evidence is bound to another artifact or output epoch.
     EffectEvidenceBindingMismatch,
+    /// A stable receipt identity was reused with a different payload.
+    ConflictingDuplicateEffectReceipt { receipt_id: String },
+    /// A CONTINUE decision already has a preservation receipt.
+    DuplicateContinueReceipt { decision_id: String },
     /// A clock regressed within its own domain and origin.
     ClockRegression,
     /// Application enqueue/callback frame accounting was absent or inconsistent.
@@ -385,6 +389,7 @@ struct DecisionState {
     response_artifact_sha256: Option<String>,
     current_stage: Option<EffectStage>,
     observed_stages: BTreeSet<EffectStage>,
+    continue_applied: bool,
     revoked: bool,
 }
 
@@ -438,6 +443,7 @@ pub struct ActionEffectLedger {
     decisions: BTreeMap<String, DecisionState>,
     chunk_decisions: BTreeMap<u32, String>,
     clock_times: BTreeMap<(ClockDomain, String), u64>,
+    effect_receipts: BTreeMap<String, EffectReceipt>,
     finalized: bool,
 }
 
@@ -471,6 +477,7 @@ impl ActionEffectLedger {
             decisions: BTreeMap::new(),
             chunk_decisions: BTreeMap::new(),
             clock_times: BTreeMap::new(),
+            effect_receipts: BTreeMap::new(),
             finalized: false,
         })
     }
@@ -535,6 +542,17 @@ impl ActionEffectLedger {
                 })
             };
         }
+        if let EventKind::EffectObserved(receipt) = &event.kind {
+            if let Some(existing) = self.effect_receipts.get(&receipt.receipt_id) {
+                return if existing == receipt {
+                    Ok(())
+                } else {
+                    Err(LedgerError::ConflictingDuplicateEffectReceipt {
+                        receipt_id: receipt.receipt_id.clone(),
+                    })
+                };
+            }
+        }
         if self.finalized {
             return Err(LedgerError::FinalizeMismatch);
         }
@@ -579,6 +597,10 @@ impl ActionEffectLedger {
                 turn_id,
                 chunk_count,
             } => self.apply_finalize(session_id, turn_id, *chunk_count)?,
+        }
+        if let EventKind::EffectObserved(receipt) = &event.kind {
+            self.effect_receipts
+                .insert(receipt.receipt_id.clone(), receipt.clone());
         }
         self.last_order = Some(event.order);
         self.events.insert(event.event_id.clone(), event);
@@ -631,6 +653,16 @@ impl ActionEffectLedger {
             {
                 return Err(LedgerError::InvalidRunnerTime);
             }
+        }
+        let runner_clock_key = (
+            ClockDomain::RunnerMonotonic,
+            self.runner_clock_origin_id.clone(),
+        );
+        if self.clock_times.get(&runner_clock_key).is_some_and(|previous_time| {
+            receipt.chunk_received_at_ns < *previous_time
+                || receipt.decision_at_ns < *previous_time
+        }) {
+            return Err(LedgerError::InvalidRunnerTime);
         }
         match receipt.action {
             TurnAction::Wait | TurnAction::Yield => {
@@ -693,6 +725,7 @@ impl ActionEffectLedger {
                 response_artifact_sha256: None,
                 current_stage: None,
                 observed_stages: BTreeSet::new(),
+                continue_applied: false,
                 revoked: false,
             },
         );
@@ -773,16 +806,21 @@ impl ActionEffectLedger {
         Ok(())
     }
 
-    fn apply_continue(&self, receipt: &ContinueReceipt) -> Result<(), LedgerError> {
+    fn apply_continue(&mut self, receipt: &ContinueReceipt) -> Result<(), LedgerError> {
         let state = self
             .decisions
-            .get(&receipt.decision_id)
+            .get_mut(&receipt.decision_id)
             .ok_or(LedgerError::UnknownDecision)?;
         if state.revoked {
             return Err(LedgerError::RevokedDecision);
         }
         if state.receipt.action != TurnAction::Continue {
             return Err(LedgerError::EffectForNonResponse);
+        }
+        if state.continue_applied {
+            return Err(LedgerError::DuplicateContinueReceipt {
+                decision_id: receipt.decision_id.clone(),
+            });
         }
         if state.receipt.output_epoch != self.state.epoch
             || receipt.before != self.state
@@ -793,6 +831,7 @@ impl ActionEffectLedger {
         {
             return Err(LedgerError::ContinueMutatedState);
         }
+        state.continue_applied = true;
         Ok(())
     }
 
@@ -1614,6 +1653,97 @@ mod tests {
                 received: 0
             })
         );
+    }
+
+    #[test]
+    fn duplicate_continue_effect_is_rejected_for_the_same_decision() {
+        let mut ledger = ledger();
+        commit(&mut ledger, 1, decision(TurnAction::Continue, 0, 1));
+        let before = initial_state();
+        let receipt = ContinueReceipt {
+            decision_id: "decision-0".into(),
+            commitment_id: "active-0".into(),
+            after: before.clone(),
+            before,
+        };
+        ledger
+            .apply(event(2, "continue-first", EventKind::ContinueApplied(receipt.clone())))
+            .unwrap();
+        assert_eq!(
+            ledger.apply(event(3, "continue-second", EventKind::ContinueApplied(receipt))),
+            Err(LedgerError::DuplicateContinueReceipt {
+                decision_id: "decision-0".into()
+            })
+        );
+        assert_eq!(ledger.summary().continue_preserved, 1);
+    }
+
+    #[test]
+    fn effect_receipt_id_is_idempotent_across_event_ids_and_conflicts_fail() {
+        let mut ledger = ledger();
+        commit(&mut ledger, 1, decision(TurnAction::Respond, 0, 1));
+        ledger.apply(respond_event("decision-0", 2)).unwrap();
+        let first = stage_event(
+            "decision-0",
+            "stable-enqueue-receipt",
+            3,
+            EffectStage::EnqueuedToApplicationOutput,
+            ClockDomain::RunnerMonotonic,
+            RUNNER,
+            1_200,
+        );
+        ledger.apply(first.clone()).unwrap();
+        let mut exact_repeat = first.clone();
+        exact_repeat.order = 4;
+        exact_repeat.event_id = "different-event-id".into();
+        ledger.apply(exact_repeat).unwrap();
+        assert_eq!(ledger.state().pending_application_frames, 600);
+
+        let mut conflict = first;
+        conflict.order = 4;
+        conflict.event_id = "conflicting-event-id".into();
+        if let EventKind::EffectObserved(receipt) = &mut conflict.kind {
+            receipt.application_frames += 120;
+        }
+        assert_eq!(
+            ledger.apply(conflict),
+            Err(LedgerError::ConflictingDuplicateEffectReceipt {
+                receipt_id: "stable-enqueue-receipt".into()
+            })
+        );
+        assert_eq!(ledger.state().pending_application_frames, 600);
+    }
+
+    #[test]
+    fn later_chunk_cannot_backdate_before_a_runner_clock_enqueue_receipt() {
+        let mut ledger = ledger();
+        commit(&mut ledger, 1, decision(TurnAction::Respond, 0, 1));
+        ledger.apply(respond_event("decision-0", 2)).unwrap();
+        ledger
+            .apply(stage_event(
+                "decision-0",
+                "enqueue",
+                3,
+                EffectStage::EnqueuedToApplicationOutput,
+                ClockDomain::RunnerMonotonic,
+                RUNNER,
+                1_200,
+            ))
+            .unwrap();
+
+        let mut next = decision(TurnAction::Wait, 1, 2);
+        next.chunk_received_at_ns = 1_150;
+        next.decision_at_ns = 1_300;
+        next.expires_at_ns = 5_500;
+        assert_eq!(
+            ledger.apply(event(
+                4,
+                "backdated-next-chunk",
+                EventKind::DecisionCommitted(next)
+            )),
+            Err(LedgerError::InvalidRunnerTime)
+        );
+        assert_eq!(ledger.summary().decisions, 1);
     }
 
     #[test]
