@@ -737,7 +737,7 @@
       "case_id": "CREDIT-COVER-LIQUIDITY-TIMELINE-001",
       "track": "settlement_and_liquidity",
       "title": "Daily credit-cover recalculation and posting deadline",
-      "scenario": "The kernel reconciles unpaid invoices and statement amounts not yet invoiced into Actual Exposure, adds a separately supplied provenance-bound Undefined Potential Exposure amount, computes required cover and the warning buffer, then evaluates receipt-backed early invoice payments and additional collateral against the source-backed posting deadline. Expected funding is not posted cover; late receipts do not satisfy the earlier deadline. The UEF and live Market Operator exposure calculation remain external. The remediation evaluator also requires each funding action date to resolve inside a source-digested civil calendar, rejects UPE/Actual Exposure source-reference collisions, and rejects reuse of one posting receipt to inflate cover. The calendar oracle also enforces the ten-Business-Day provider-replacement period after the Cover Provider ceases to qualify, and the one-Business-Day advance notice before a Posted Credit Cover change; the provider replacement period is excluded from the Settlement Risk Period.",
+      "scenario": "The kernel calculates the daily Business Day notice and separate second-Working-Day posting deadline; the two-Business-Day Credit Call re-establishment deadline; the ten-Business-Day qualifying-bank replacement deadline after provider cessation; and one-Business-Day advance notice before a Posted Credit Cover change. Separately, a synthetic exposure-component reconciliation sums issued-unpaid invoices and uninvoiced Settlement Statement balances with externally supplied UPE and evaluates receipt-backed remediation. It does not reproduce the MO's full §15.10.3 historical-activity / ASE / UEF calculation.",
       "owner": "Symthaea",
       "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
@@ -774,7 +774,11 @@
         "source-digested civil-date ordinal coverage for funding action timestamps and posting deadline",
         "provider cessation / loss-of-eligibility date and effective status",
         "replacement qualifying bank evidence and re-post receipt",
-        "advance notice to the Market Operator before a Posted Credit Cover change"
+        "advance notice to the Market Operator before a Posted Credit Cover change",
+        "provider cessation / loss-of-eligibility date and effective status",
+        "replacement qualifying bank evidence and re-post receipt",
+        "advance notice to the Market Operator before a Posted Credit Cover change",
+        "approved UEF and other applicable annual parameters before attempting a real Required Credit Cover calculation"
       ],
       "stress_tags": [
         "collateral",
@@ -783,7 +787,8 @@
         "business-day-vs-working-day",
         "calendar-provenance",
         "no-silent-deadline"
-      ]
+      ],
+      "claim_ceiling": "undefined The credit-cover amount calculation is a synthetic sum of exposure components and supplied UPE, not the MO's full §15.10.3 Actual Supplier Exposure / UEF result. New deadline coverage includes provider replacement within ten Business Days and advance notice of Posted Credit Cover changes one Business Day beforehand."
     },
     {
       "case_id": "CREDIT-COVER-FUNDING-OPTION-ECONOMICS-001",
