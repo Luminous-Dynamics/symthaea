@@ -492,7 +492,6 @@ pub fn compare_candidates(
         return Err(ComposerError::MetricSetMismatch);
     }
 
-    let eligible_count = parent.eligible_task_ids.len();
     let mut comparisons = BTreeMap::new();
 
     for (metric_id, parent_metric) in &parent.metrics {
@@ -714,10 +713,11 @@ pub fn compose_candidate(
         let summary = summarize(&parsed.tasks, parsed.eligible_task_ids.len());
         let eligible_task_ids = parsed.eligible_task_ids;
         let cluster_by_task = parsed.projection.cluster_by_task.clone();
+        let projection = parsed.projection;
         metrics.insert(
             metric_id.clone(),
             MetricEvidence {
-                projection: parsed.projection,
+                projection,
                 eligible_task_ids,
                 cluster_by_task,
                 summary,
@@ -1241,6 +1241,21 @@ mod tests {
     }
 
     fn metric(metric_id: &str, benchmark_id: &str, minimum_coverage: f64) -> MetricProjection {
+        let prefix = if metric_id == "retention" {
+            "retention-"
+        } else {
+            ""
+        };
+        let cluster_by_task = [
+            ("task-001", "family-a"),
+            ("task-002", "family-a"),
+            ("task-003", "family-b"),
+            ("task-004", "family-b"),
+            ("task-005", "family-c"),
+        ]
+        .into_iter()
+        .map(|(task_id, family)| (format!("{prefix}{task_id}"), family.to_owned()))
+        .collect();
         MetricProjection {
             metric_id: metric_id.into(),
             benchmark_id: benchmark_id.into(),
@@ -1250,6 +1265,17 @@ mod tests {
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
             scoring_formula_id: "binary-pass-rate-v1".into(),
             grader_version: "fixture-grader-1".into(),
+            budget_caps: json!({
+                "wall_time_ms": 10000,
+                "cpu_time_ms": 10000,
+                "peak_memory_bytes": 100000000,
+                "model_calls": 20,
+                "input_tokens": 20000,
+                "output_tokens": 20000,
+                "tool_calls": 25
+            }),
+            pairing_group_id: None,
+            cluster_by_task,
             transform: ScoreTransform::Binary {
                 true_score: 1.0,
                 false_score: 0.0,
@@ -1259,13 +1285,6 @@ mod tests {
     }
 
     fn plan(metrics: Vec<MetricProjection>) -> CompositionPlan {
-        let cluster_by_task = BTreeMap::from([
-            ("task-001".into(), "family-a".into()),
-            ("task-002".into(), "family-a".into()),
-            ("task-003".into(), "family-b".into()),
-            ("task-004".into(), "family-b".into()),
-            ("task-005".into(), "family-c".into()),
-        ]);
         CompositionPlan {
             experiment_id: "SYM-RSI-SYNTHETIC-COMPOSER-001".into(),
             preregistration_digest:
@@ -1275,11 +1294,77 @@ mod tests {
                 .map(|projection| (projection.metric_id.clone(), projection))
                 .collect(),
             parent_system_identity_digests: BTreeSet::new(),
-            cluster_by_task,
         }
     }
 
+    fn rehash_synthetic_task_ids(mut receipt: Value, prefix: &str) -> Vec<u8> {
+        for row in receipt["task_universe"].as_array_mut().unwrap() {
+            let task_id = row["task_id"].as_str().unwrap().to_owned();
+            row["task_id"] = json!(format!("{prefix}{task_id}"));
+        }
+        for row in receipt["task_results"].as_array_mut().unwrap() {
+            let task_id = row["task_id"].as_str().unwrap().to_owned();
+            row["task_id"] = json!(format!("{prefix}{task_id}"));
+        }
+
+        let mut canonical_universe = receipt["task_universe"].as_array().unwrap().clone();
+        canonical_universe.sort_by(|left, right| {
+            left["task_id"]
+                .as_str()
+                .cmp(&right["task_id"].as_str())
+        });
+        let universe_digest = sha256_hex(
+            &canonical_json_bytes(&Value::Array(canonical_universe)).unwrap()
+        );
+
+        let mut eligible_ids = receipt["task_universe"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|row| row["eligibility"] == "eligible")
+            .map(|row| row["task_id"].as_str().unwrap().to_owned())
+            .collect::<Vec<_>>();
+        eligible_ids.sort();
+        let eligible_digest = sha256_hex(
+            &canonical_json_bytes(&json!(eligible_ids)).unwrap()
+        );
+        receipt["task_universe_sha256"] = json!(universe_digest);
+        receipt["eligible_task_set_sha256"] = json!(eligible_digest);
+        receipt["comparison"]["eligible_task_set_sha256"] = json!(eligible_digest);
+        serde_json::to_vec(&receipt).unwrap()
+    }
+
     fn receipt_set(
+        source_revision: &str,
+        executable_byte: char,
+        run_suffix: &str,
+        network_policy: &str,
+    ) -> BTreeMap<String, Vec<u8>> {
+        let quality = make_receipt(
+            "synthetic-quality",
+            source_revision,
+            executable_byte,
+            &format!("synthetic-quality-{run_suffix}"),
+            network_policy,
+        );
+        let retention = make_receipt(
+            "synthetic-retention",
+            source_revision,
+            executable_byte,
+            &format!("synthetic-retention-{run_suffix}"),
+            network_policy,
+        );
+        let retention_value: Value = serde_json::from_slice(&retention).unwrap();
+        BTreeMap::from([
+            ("quality".into(), quality),
+            (
+                "retention".into(),
+                rehash_synthetic_task_ids(retention_value, "retention-"),
+            ),
+        ])
+    }
+
+    fn paired_receipt_set(
         source_revision: &str,
         executable_byte: char,
         run_suffix: &str,
@@ -1318,7 +1403,11 @@ mod tests {
         let composed =
             compose_candidate(&plan, &receipt_set("candidate-a", 'a', "a", "disabled")).unwrap();
 
-        assert_eq!(composed.eligible_task_ids().len(), 5);
+        assert_eq!(composed.eligible_task_ids("quality").unwrap().len(), 5);
+        assert_eq!(
+            composed.eligible_task_ids("retention").unwrap()[0],
+            "retention-task-001"
+        );
         let quality = composed.metric("quality").unwrap();
         assert_eq!(quality.summary.eligible_count, 5);
         assert_eq!(quality.summary.graded_count, 2);
@@ -1524,19 +1613,63 @@ mod tests {
     }
 
     #[test]
-    fn rejects_same_task_ids_with_different_metric_input_bytes() {
+    fn metric_specific_task_universes_are_allowed_without_pairing_group() {
         let plan = plan(vec![
             metric("quality", "synthetic-quality", 0.0),
             metric("retention", "synthetic-retention", 0.0),
         ]);
-        let mut receipts = receipt_set("candidate-a", 'a', "candidate", "disabled");
+        let composed = compose_candidate(
+            &plan,
+            &receipt_set("candidate-a", 'a', "candidate", "disabled"),
+        )
+        .unwrap();
+        assert_eq!(
+            composed.eligible_task_ids("quality").unwrap()[0],
+            "task-001"
+        );
+        assert_eq!(
+            composed.eligible_task_ids("retention").unwrap()[0],
+            "retention-task-001"
+        );
+    }
+
+    #[test]
+    fn shared_pairing_group_requires_exact_task_cluster_and_input_identity() {
+        let mut plan = plan(vec![
+            metric("quality", "synthetic-quality", 0.0),
+            metric("retention", "synthetic-retention", 0.0),
+        ]);
+        for projection in plan.metrics.values_mut() {
+            projection.pairing_group_id = Some("shared-fixture-cohort".into());
+            projection.cluster_by_task = [
+                ("task-001".into(), "family-a".into()),
+                ("task-002".into(), "family-a".into()),
+                ("task-003".into(), "family-b".into()),
+                ("task-004".into(), "family-b".into()),
+                ("task-005".into(), "family-c".into()),
+            ]
+            .into_iter()
+            .collect();
+        }
+
+        let unpaired_receipts = receipt_set("candidate-a", 'a', "candidate", "disabled");
+        assert_eq!(
+            compose_candidate(&plan, &unpaired_receipts),
+            Err(ComposerError::TaskUniverseMismatch)
+        );
+
+        let mut paired_receipts =
+            paired_receipt_set("candidate-a", 'a', "candidate", "disabled");
         let mut retention: Value =
-            serde_json::from_slice(receipts.get("retention").unwrap()).unwrap();
+            serde_json::from_slice(paired_receipts.get("retention").unwrap()).unwrap();
         retention["task_results"][0]["input_sha256"] =
             json!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
-        receipts.insert("retention".into(), serde_json::to_vec(&retention).unwrap());
+        paired_receipts.insert(
+            "retention".into(),
+            serde_json::to_vec(&retention).unwrap(),
+        );
         assert_eq!(
-            compose_candidate(&plan, &receipts),
+            compose_candidate(&plan, &paired_receipts),
             Err(ComposerError::TaskInputUniverseMismatch)
         );
     }
@@ -1544,7 +1677,11 @@ mod tests {
     #[test]
     fn rejects_cluster_map_that_drops_or_adds_eligible_tasks() {
         let mut plan = plan(vec![metric("quality", "synthetic-quality", 0.0)]);
-        plan.cluster_by_task.remove("task-005");
+        plan.metrics
+            .get_mut("quality")
+            .unwrap()
+            .cluster_by_task
+            .remove("task-005");
         let receipts = BTreeMap::from([(
             "quality".into(),
             make_receipt("synthetic-quality", "candidate-a", 'a', "run-a", "disabled"),
@@ -1554,7 +1691,10 @@ mod tests {
             Err(ComposerError::ClusterMapMismatch)
         );
 
-        plan.cluster_by_task
+        plan.metrics
+            .get_mut("quality")
+            .unwrap()
+            .cluster_by_task
             .insert("extra-task".into(), "family-z".into());
         assert_eq!(
             compose_candidate(&plan, &receipts),
