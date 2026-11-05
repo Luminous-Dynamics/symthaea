@@ -31,10 +31,12 @@ def lifecycle_errors(entry: dict) -> list[str]:
     excluded = entry["task_status"] != "active"
     if excluded and entry["included_in_current_aggregate"]:
         errors.append("non-active task must not be in current aggregate")
+    if not excluded and not entry["included_in_current_aggregate"]:
+        errors.append("active task must remain in current aggregate")
     if not entry["included_in_longitudinal_panel"]:
-        errors.append("all superseded, invalid and saturated tasks must remain in longitudinal panel")
-    if excluded and not entry["historical_denominator_preserved"]:
-        errors.append("excluded task must preserve its historical denominator")
+        errors.append("all active, superseded, invalid and saturated tasks must remain in longitudinal panel")
+    if not entry["historical_denominator_preserved"]:
+        errors.append("task lifecycle transitions must preserve historical denominators")
     return errors
 
 
@@ -81,6 +83,18 @@ def release_semantic_errors(release: dict) -> list[str]:
     classes = {row["change_class"] for row in changes}
     digests = release["artifact_digests"]
 
+    for change in changes:
+        if change["change_class"] == "agent_visible" and change["evaluation_inputs_unchanged"]:
+            errors.append(f"{change['change_id']}: agent-visible change cannot claim evaluation inputs are unchanged")
+        if change["change_class"] == "grader_only" and not change["evaluation_inputs_unchanged"]:
+            errors.append(f"{change['change_id']}: grader-only change must preserve agent-visible evaluation inputs")
+        if change["change_class"] == "metadata_only" and (
+            not change["evaluation_inputs_unchanged"] or change["affected_task_ids"]
+        ):
+            errors.append(f"{change['change_id']}: metadata-only change cannot alter inputs or task membership")
+        if change["change_class"] == "grader_only" and not change["affected_task_ids"]:
+            errors.append(f"{change['change_id']}: grader changes require an explicit affected-task set")
+
     if release["previous_release_id"] is None:
         if previous is not None or action != "initial_design_no_qualified_results":
             errors.append("initial release must have no parent and use initial_design_no_qualified_results")
@@ -125,7 +139,23 @@ def release_semantic_errors(release: dict) -> list[str]:
         release["task_lifecycle_entries"] or release["saturation_observations"]
     ):
         errors.append("design-only release cannot claim task lifecycle or saturation results")
+    for record in release["saturation_observations"]:
+        if record["decision"] == "confirmed_saturated":
+            entries = [e for e in release["task_lifecycle_entries"] if e["task_id"] == record["task_id"]]
+            if not any(e["task_status"] == "saturated_retained" for e in entries):
+                errors.append(f"{record['task_id']}: confirmed saturated task needs a saturated_retained lifecycle entry")
 
+    if release["status"] == "released":
+        required_digests = [
+            digests["task_set_sha256"], digests["prompt_set_sha256"], digests["source_set_sha256"],
+            digests["environment_set_sha256"], digests["agent_tool_policy_sha256"], digests["resource_policy_sha256"],
+            digests["grader_sha256"], digests["rubric_sha256"], digests["reference_control_set_sha256"],
+            digests["metadata_sha256"], digests["evaluation_input_sha256"]
+        ]
+        if any(value is None for value in required_digests):
+            errors.append("released benchmark requires all task, environment, policy, grader and metadata digests")
+        if release["resource_calibration"]["status"] != "qualified":
+            errors.append("released benchmark requires qualified resource calibration")
     if release["resource_calibration"]["status"] == "qualified":
         calibration = release["resource_calibration"]
         if calibration["actual_independent_runs"] < calibration["planned_independent_runs_per_reference_task"]:
@@ -146,10 +176,6 @@ def release_semantic_errors(release: dict) -> list[str]:
                 release["saturation_policy"]["minimum_trials_per_configuration"]
             )
         )
-        if record["decision"] == "confirmed_saturated":
-            entries = [e for e in release["task_lifecycle_entries"] if e["task_id"] == record["task_id"]]
-            if entries and not any(e["task_status"] == "saturated_retained" for e in entries):
-                errors.append(f"{record['task_id']}: confirmed saturated task needs a saturated_retained lifecycle entry")
     if not release["historical_policy"]["immutable_release_records"] or not release["historical_policy"]["no_silent_task_deletion"]:
         errors.append("historical release and task records must be immutable; silent deletion is prohibited")
     return errors
@@ -243,6 +269,22 @@ def self_test(release: dict, schema: dict) -> None:
     })
     if validate_release(mutant,schema):
         raise SystemExit("valid verifier-only regrade fixture unexpectedly failed")
+
+    # Metadata-only release may reuse results when evaluation inputs are identical.
+    reuse=copy.deepcopy(release)
+    reuse.update({
+      "status":"release_candidate","release_id":"ceb-v0.1.1-reuse-test","current_version":"0.1.1",
+      "previous_release_id":"ceb-v0-design","previous_version":"0.1.0","release_action":"reuse",
+      "previous_evaluation_input_sha256":"f"*64,
+      "change_records":[{
+        "change_id":"docs-change-positive-001","change_class":"metadata_only","paths":["docs/CEB.md"],
+        "old_sha256":"a"*64,"new_sha256":"b"*64,"affected_task_ids":[],
+        "raw_execution_artifacts_available":False,"evaluation_inputs_unchanged":True
+      }]
+    })
+    reuse["artifact_digests"]["evaluation_input_sha256"]="f"*64
+    if validate_release(reuse,schema):
+        raise SystemExit("valid metadata-only result reuse unexpectedly failed")
 
     # Metadata changes can reuse results only if evaluation-input digests remain identical.
     mutant=copy.deepcopy(release)
