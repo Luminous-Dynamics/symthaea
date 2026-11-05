@@ -395,7 +395,7 @@ fn csv_option(value: Option<f64>) -> String {
 }
 
 fn emit_csv_row(fields: Vec<String>) {
-    assert_eq!(fields.len(), 41, "CSV row must match the header");
+    assert_eq!(fields.len(), 42, "CSV row must match the header");
     println!("{}", fields.join(","));
 }
 
@@ -490,6 +490,7 @@ fn write_summary_row(case: &ScenarioCase, aggregate: &Accumulator) {
         case.name.to_owned(),
         track.to_owned(),
         "ALL".to_owned(),
+        String::new(),
         String::new(),
         String::new(),
         String::new(),
