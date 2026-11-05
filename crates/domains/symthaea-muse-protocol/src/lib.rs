@@ -540,18 +540,24 @@ pub enum GenealogyRelation {
     ImportedArrangement,
 }
 
-/// One allocated row in the genealogy ledger. `family_id` equals `id` for a
-/// root manifest and equals the root's `id` for every descendant --
-/// "every piece in this family" is `WHERE family_id = ?`, "the ancestry
-/// chain" is a recursive walk up `parent_id`. `manifest_sha256` is a
-/// content commitment over every other field except `id`/`family_id`
-/// (both are ledger-assigned sequence numbers, not content) -- it does not
-/// cover the audio/recipe/score bytes themselves, only their sha256
-/// pointers, which are what this manifest actually asserts.
+/// One allocated row in the genealogy ledger.
+///
+/// For legacy single-parent lineages, `parent_id` and `family_id` preserve
+/// the original tree projection. For a multi-parent merge, `parent_id` is
+/// `None` and `family_id` is the merge manifest's own ID: there is no
+/// honest single root-family ID for a child with parents from separate
+/// families. The authoritative plural lineage is the immutable, ordered set
+/// of `GenealogyParentEdgeV1` records in the existing genealogy store.
+///
+/// `manifest_sha256` commits the manifest and, for v2 derived manifests, the
+/// complete sorted parent-edge-set digest. It is a content commitment, not a
+/// signature or proof of authorship, rights, consent, or musical quality.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GenealogyManifest {
     pub id: i64,
+    /// Legacy family projection; for multi-parent merges this is the merge node itself.
     pub family_id: i64,
+    /// Legacy primary-parent projection; absent on multi-parent merges.
     pub parent_id: Option<i64>,
     /// `"C"` (compositional lineage) for every V1 manifest. `"P"`/`"R"`
     /// (performance/rendition lineage) are reserved for when a rendition
