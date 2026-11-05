@@ -7,6 +7,7 @@ on:
       - "tools/pitb-sorrydb-audit/**"
       - "tools/pitb-sorrydb-evidence-closure/**"
       - "tools/pitb-sorrydb-integrity/**"
+      - "tools/pitb-clustered-benchmark-stats/**"
       - ".github/workflows/pitb-typed-graph-evidence.yml"
   workflow_dispatch:
 
@@ -702,5 +703,100 @@ jobs:
             ${{ runner.temp }}/sorrydb-task-receipt.synthetic.jsonl
             ${{ runner.temp }}/pitb-sorrydb-integrity/src/main.rs
             ${{ runner.temp }}/pitb-sorrydb-integrity/Cargo.lock
+          if-no-files-found: warn
+          retention-days: 30
+
+
+  paired-cluster-bootstrap-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Install JSON Schema validator
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pitb-cluster-venv"
+          "$RUNNER_TEMP/pitb-cluster-venv/bin/pip" install "jsonschema==4.25.1"
+
+      - name: Stage isolated cluster statistics crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/pitb-clustered-benchmark-stats"
+          mkdir -p "$staged/src"
+          cp tools/pitb-clustered-benchmark-stats/Cargo.toml "$staged/Cargo.toml"
+          cp tools/pitb-clustered-benchmark-stats/Cargo.lock "$staged/Cargo.lock"
+          cp tools/pitb-clustered-benchmark-stats/src/main.rs "$staged/src/main.rs"
+          echo "PITB_CLUSTER_STATS_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+          echo "PITB_CLUSTER_STATS_DIR=$staged" >> "$GITHUB_ENV"
+
+      - name: Format and test Rust cluster analyzer
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2021 "$PITB_CLUSTER_STATS_DIR/src/main.rs"
+          cargo fmt --check --manifest-path "$PITB_CLUSTER_STATS_MANIFEST"
+          cargo test --locked --manifest-path "$PITB_CLUSTER_STATS_MANIFEST"
+
+      - name: Generate deterministic synthetic paired comparison
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path "$PITB_CLUSTER_STATS_MANIFEST" -- \
+            --self-test-report "$RUNNER_TEMP/clustered-comparison.synthetic.json"
+
+      - name: Validate paired cluster report schema and controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-cluster-venv/bin/python" - "$RUNNER_TEMP/clustered-comparison.synthetic.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema_path = Path("tools/pitb-clustered-benchmark-stats/schema/clustered-paired-comparison-v0.schema.json")
+          schema = json.loads(schema_path.read_text())
+          Draft202012Validator.check_schema(schema)
+          report = json.loads(Path(sys.argv[1]).read_text())
+          errors = list(Draft202012Validator(schema).iter_errors(report))
+          if errors:
+              raise SystemExit("clustered comparison report schema errors: " + "; ".join(e.message for e in errors))
+          comparison = report["comparison"]
+          if report["synthetic_fixture"] is not True or report["evaluation_task_count"] != 5:
+              raise SystemExit("synthetic report must be explicitly labeled and retain its five-task denominator")
+          if comparison["common_task_count"] != 5:
+              raise SystemExit("paired task denominator changed")
+          if comparison["left_unique_qualified_tasks"] != 3 or comparison["right_unique_qualified_tasks"] != 2:
+              raise SystemExit("synthetic unique qualified task counts changed")
+          if abs(comparison["paired_pass_rate_difference"] - 0.2) > 1e-12:
+              raise SystemExit("synthetic paired pass-rate difference changed")
+          if comparison["repository_cluster_count"] != 2 or comparison["source_file_cluster_count"] != 3:
+              raise SystemExit("nested repository/file cluster counts changed")
+          if comparison["bootstrap_replicates"] != 500 or comparison["bootstrap_seed"] != 12345:
+              raise SystemExit("synthetic bootstrap parameters changed")
+          if comparison["bootstrap_ci_95_low"] > comparison["bootstrap_ci_95_high"]:
+              raise SystemExit("bootstrap confidence interval bounds are reversed")
+          print("PITB_PAIRED_CLUSTER_BOOTSTRAP_REPORT_PASS")
+          PY
+
+      - name: Retain synthetic paired comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-clustered-paired-comparison
+          path: |
+            ${{ runner.temp }}/clustered-comparison.synthetic.json
+            ${{ runner.temp }}/pitb-clustered-benchmark-stats/src/main.rs
+            ${{ runner.temp }}/pitb-clustered-benchmark-stats/Cargo.lock
           if-no-files-found: warn
           retention-days: 30
