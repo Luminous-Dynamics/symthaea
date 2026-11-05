@@ -396,6 +396,9 @@ pub fn generate_synthetic_dataset(
             .iter()
             .map(|criterion| criterion + criterion_offset)
             .collect();
+        if shifted_criteria.iter().any(|criterion| !criterion.is_finite()) {
+            return Err(DgpError::NonFiniteDerivedValue);
+        }
         if !signal_mean.is_finite()
             || !signal_sigma.is_finite()
             || signal_sigma <= 0.0
@@ -684,6 +687,15 @@ mod tests {
                     response_scale_id: 5,
                     rt_deadline_ms: None,
                 },
+                OperationalAction {
+                    action_id: 4,
+                    audit_stratum: 2,
+                    condition_id: 2,
+                    stimulus_class: StimulusClass::Noise,
+                    stimulus_level: 2.0,
+                    response_scale_id: 5,
+                    rt_deadline_ms: None,
+                },
             ],
             "sha256:action-set",
         )
@@ -822,34 +834,43 @@ mod tests {
     #[test]
     fn stimulus_level_affects_signal_mean_but_not_noise_mean() {
         let actions = action_set();
-        let schedule = (0..4_000)
+        let mut spec = scenario();
+        spec.heterogeneity = None;
+        let schedule = (0..12_000)
             .map(|trial| TrialRequest {
-                action_id: if trial % 2 == 0 { 2 } else { 3 },
+                action_id: match trial % 4 {
+                    0 => 1,
+                    1 => 2,
+                    2 => 3,
+                    _ => 4,
+                },
                 participant_id: 0,
                 within_participant_trial: trial,
             })
             .collect::<Vec<_>>();
         let data = generate_synthetic_dataset(
             &actions,
-            &scenario(),
+            &spec,
             &schedule,
             "sha256:scenario",
             2026,
         )
         .unwrap();
-        let means = data
-            .trials
-            .iter()
-            .filter(|trial| trial.stimulus_class == StimulusClass::Signal)
-            .fold(BTreeMap::<u32, (f64, u64)>::new(), |mut acc, trial| {
+        let means = data.trials.iter().fold(
+            BTreeMap::<u32, (f64, u64)>::new(),
+            |mut acc, trial| {
                 let entry = acc.entry(trial.action_id).or_insert((0.0, 0));
                 entry.0 += trial.oracle_evidence;
                 entry.1 += 1;
                 acc
-            });
-        let low = means[&2].0 / means[&2].1 as f64;
-        let high = means[&3].0 / means[&3].1 as f64;
-        assert!(high > low + 0.2);
+            },
+        );
+        let low_signal = means[&2].0 / means[&2].1 as f64;
+        let high_signal = means[&3].0 / means[&3].1 as f64;
+        let low_noise = means[&1].0 / means[&1].1 as f64;
+        let high_noise = means[&4].0 / means[&4].1 as f64;
+        assert!(high_signal > low_signal + 0.2);
+        assert!((high_noise - low_noise).abs() < 0.12);
     }
 
     #[test]
