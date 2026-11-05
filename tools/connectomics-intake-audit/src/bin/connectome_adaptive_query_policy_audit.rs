@@ -1067,6 +1067,18 @@ mod tests {
         assert_eq!(report.minimum_terminal_path_effort_units, Some(3));
         assert_eq!(report.maximum_terminal_path_effort_units, Some(4));
         assert_eq!(report.worst_case_policy_within_budget, Some(true));
+        assert_eq!(
+            report.fixed_non_adaptive_optimum.minimum_effort_units,
+            Some(5)
+        );
+        assert_eq!(
+            report.fixed_non_adaptive_optimum.minimum_action_ids,
+            vec!["inspect-y".to_string(), "inspect-z".to_string()]
+        );
+        assert_eq!(
+            report.fixed_non_adaptive_optimum.adaptive_worst_case_savings_units,
+            Some(1)
+        );
         assert_eq!(report.status, "MINIMUM_WORST_CASE_ADAPTIVE_POLICY");
         let root = report.policy.unwrap();
         assert_eq!(root.action_id.as_deref(), Some("inspect-x"));
@@ -1121,6 +1133,8 @@ mod tests {
         let input = ambiguous_fixture();
         let report = evaluate(&input, &bytes(&input)).unwrap();
         assert_eq!(report.worst_case_effort_units, None);
+        assert_eq!(report.fixed_non_adaptive_optimum.minimum_effort_units, None);
+        assert_eq!(report.fixed_non_adaptive_optimum.minimum_plan_count, 0);
         assert_eq!(report.status, "NO_ADAPTIVE_POLICY_WITHIN_DECLARED_ACTIONS");
         assert!(report.policy.is_none());
     }
