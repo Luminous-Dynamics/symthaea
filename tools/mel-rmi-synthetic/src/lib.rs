@@ -291,7 +291,7 @@ pub trait AgentPolicy {
     ///
     /// Shared telemetry may be retained only when it cannot affect policy
     /// decisions (for example, an external invocation-order recorder).
-    fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy>;
+    fn fork_from_frozen_state(&self, common_random_seed: u64) -> Box<dyn AgentPolicy>;
 
     /// Produce one next action from the observed state.
     fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError>;
@@ -310,7 +310,7 @@ impl AgentPolicy for FixedResponsePolicy {
         &self.id
     }
 
-    fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+    fn fork_from_frozen_state(&self, _common_random_seed: u64) -> Box<dyn AgentPolicy> {
         Box::new(Self {
             id: self.id.clone(),
             value: self.value,
@@ -340,7 +340,7 @@ impl AgentPolicy for ImitationOnlyPolicy {
         &self.id
     }
 
-    fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+    fn fork_from_frozen_state(&self, _common_random_seed: u64) -> Box<dyn AgentPolicy> {
         Box::new(self.clone())
     }
 
@@ -367,7 +367,7 @@ impl AgentPolicy for OneWayPromptPolicy {
         &self.id
     }
 
-    fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+    fn fork_from_frozen_state(&self, _common_random_seed: u64) -> Box<dyn AgentPolicy> {
         Box::new(self.clone())
     }
 
@@ -401,7 +401,7 @@ impl AgentPolicy for YokedReplayPolicy {
         &self.id
     }
 
-    fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+    fn fork_from_frozen_state(&self, _common_random_seed: u64) -> Box<dyn AgentPolicy> {
         Box::new(self.clone())
     }
 
@@ -436,7 +436,7 @@ impl AgentPolicy for RuleBasedPolicy {
         &self.id
     }
 
-    fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+    fn fork_from_frozen_state(&self, _common_random_seed: u64) -> Box<dyn AgentPolicy> {
         Box::new(self.clone())
     }
 
@@ -467,7 +467,7 @@ impl AgentPolicy for UnrelatedFeatureShortcutPolicy {
         &self.id
     }
 
-    fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+    fn fork_from_frozen_state(&self, _common_random_seed: u64) -> Box<dyn AgentPolicy> {
         Box::new(self.clone())
     }
 
@@ -654,7 +654,7 @@ pub fn run_trial(
             Condition::Sham => 2,
             Condition::Unrelated => 3,
         };
-        let isolated_policy = policy.fork_from_frozen_state();
+        let isolated_policy = policy.fork_from_frozen_state(interventions.control.seed);
         if isolated_policy.policy_id() != policy.policy_id() {
             return Err(HarnessError::InvalidPolicy);
         }
@@ -1633,7 +1633,7 @@ mod tests {
             "order-recording"
         }
 
-        fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+        fn fork_from_frozen_state(&self, _common_random_seed: u64) -> Box<dyn AgentPolicy> {
             Box::new(Self {
                 seen: std::sync::Arc::clone(&self.seen),
             })
@@ -1661,6 +1661,7 @@ mod tests {
     struct StatefulCounterPolicy {
         calls: std::sync::atomic::AtomicUsize,
         ordinals: std::sync::Arc<std::sync::Mutex<Vec<usize>>>,
+        fork_seeds: std::sync::Arc<std::sync::Mutex<Vec<u64>>>,
     }
 
     impl AgentPolicy for StatefulCounterPolicy {
@@ -1668,10 +1669,12 @@ mod tests {
             "stateful-counter"
         }
 
-        fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+        fn fork_from_frozen_state(&self, common_random_seed: u64) -> Box<dyn AgentPolicy> {
+            self.fork_seeds.lock().unwrap().push(common_random_seed);
             Box::new(Self {
                 calls: std::sync::atomic::AtomicUsize::new(0),
                 ordinals: std::sync::Arc::clone(&self.ordinals),
+                fork_seeds: std::sync::Arc::clone(&self.fork_seeds),
             })
         }
 
@@ -1699,12 +1702,15 @@ mod tests {
     fn stateful_policy_is_forked_from_frozen_checkpoint_for_every_condition() {
         let (task, interventions) = fixture();
         let ordinals = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let fork_seeds = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let policy = StatefulCounterPolicy {
             calls: std::sync::atomic::AtomicUsize::new(0),
             ordinals: std::sync::Arc::clone(&ordinals),
+            fork_seeds: std::sync::Arc::clone(&fork_seeds),
         };
         let record = run_trial(task, interventions, &policy, config()).unwrap();
         assert_eq!(*ordinals.lock().unwrap(), vec![1, 1, 1, 1]);
+        assert_eq!(*fork_seeds.lock().unwrap(), vec![41, 41, 41, 41]);
         assert_eq!(record.contrast.sham_delta, 0);
         assert_eq!(record.contrast.unrelated_target_delta, 0);
     }
@@ -1843,7 +1849,7 @@ mod tests {
             "cross-bound"
         }
 
-        fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+        fn fork_from_frozen_state(&self, _common_random_seed: u64) -> Box<dyn AgentPolicy> {
             Box::new(Self)
         }
 
