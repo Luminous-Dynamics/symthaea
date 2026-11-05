@@ -1,7 +1,7 @@
 # SWI-001: Symthaea Weight-Space Intelligence
 ## Research programme, implementation contract, and benchmark specification v0.1
 
-**Status:** Research programme approved for implementation; CfC weight-ingestion hardening, asynchronous-update rejection, and an initial named-parameter manifest committed on the working branch.  
+**Status:** Research programme approved for implementation; CfC weight-ingestion hardening, asynchronous-update rejection, an initial named-parameter manifest, and validated named-group replacement committed on the working branch.  
 **Branch:** research/swi-001-weight-space-introspection  
 **Base:** main at ed9d3462e73cd3d435c89f65fe4b5834f34bc184  
 **Scope:** weight-space programming (WSP), weight-space learning (WSL), architecture-aware introspection, controlled repair, and eventually staged substrate evolution.  
@@ -130,10 +130,11 @@ The network has analytic gradient / Adam paths. This gives SWI an unusually usef
 - applies validated values only after all checks;
 - reports typed CfCWeightLoadError variants;
 - exposes a versioned CfC parameter manifest with stable group names, semantic roles, shapes, offsets, and lengths in get_weights() order;
+- exposes try_replace_parameter_group(), which can replace only one declared group, enforces the group length, bounds-checks the manifest range, and routes the full candidate through try_set_weights();
 - routes asynchronous cognitive-loop weight swaps through try_set_weights() and rejects invalid updates without panicking;
 - preserves the legacy set_weights() signature as a compatibility wrapper.
 
-Five tests were added: one for manifest/layout agreement and four for short/overlong vectors, non-finite values, invalid time constants, and valid round-trip replacement. The new tests have not been executed here; do not describe them as passing until run on the exact branch head.
+Seven tests were added: one for manifest/layout agreement, two for named-group replacement, and four for short/overlong vectors, non-finite values, invalid time constants, and valid round-trip replacement. The new tests have not been executed here; do not describe them as passing until run on the exact branch head.
 
 ### 4.2 HDC-LTC: novel representation-space target
 
@@ -494,6 +495,7 @@ H1–H6 are the initial programme. H7 is a later WSL research track and should n
 - Validate exact length, finite values, tau floor, and contiguous storage before mutation.
 - Preserve existing infallible API as a compatibility wrapper.
 - Add a versioned named parameter manifest matching the flat serialization layout.
+- Add bounded named-group replacement through the validated loader.
 - Route asynchronous weight swaps through the fallible API.
 - Add regression tests.
 - Next: execute targeted unit tests and full relevant crate checks on the exact branch head.
