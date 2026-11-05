@@ -1979,6 +1979,31 @@ mod composite_evaluation_tests {
 }
 
 
+#[cfg(test)]
+mod composite_disposition_tests {
+    use super::*;
+    use crate::consciousness::recursive_improvement::candidate_archive::EvaluationPartition;
+
+    fn digest(byte: char) -> String {
+        std::iter::repeat_n(byte, 64).collect()
+    }
+
+    fn context() -> EvaluationContext {
+        EvaluationContext::new(
+            "sym-rsi-composite-dispositions-v1",
+            "v1",
+            EvaluationPartition::Validation,
+            "disposition-split",
+            digest('a'), digest('b'), digest('c'), digest('d'), digest('e'),
+        ).unwrap()
+    }
+
+    fn rows(entries: &[(&str, TaskDisposition, Option<f64>)]) -> Vec<MetricTaskOutcome> {
+        entries.iter().map(|(id, disposition, score)| {
+            MetricTaskOutcome::new(*id, *disposition, *score).unwrap()
+        }).collect()
+    }
+
     #[test]
     fn preserves_all_supported_dispositions_in_the_eligible_denominator() {
         let dispositions = [
@@ -2001,12 +2026,8 @@ mod composite_evaluation_tests {
             digest('f'),
             digest('a'),
             dispositions.iter().map(|(id, _, _)| (*id).to_owned()),
-            [(
-                "quality".to_owned(),
-                rows(&dispositions),
-            )],
-        )
-        .unwrap();
+            [("quality".to_owned(), rows(&dispositions))],
+        ).unwrap();
         let summary = candidate.summary("quality").unwrap();
         assert_eq!(candidate.eligible_task_count(), 10);
         assert_eq!(summary.scored_count(), 2);
@@ -2019,12 +2040,7 @@ mod composite_evaluation_tests {
     #[test]
     fn rejects_duplicate_eligible_ids_and_invalid_composite_digests() {
         let duplicate_ids = CompositeCandidateEvaluationView::new(
-            context(),
-            "candidate",
-            vec![],
-            digest('1'),
-            digest('f'),
-            digest('a'),
+            context(), "candidate", vec![], digest('1'), digest('f'), digest('a'),
             ["task-a", "task-a"].map(str::to_owned),
             [("quality".to_owned(), rows(&[
                 ("task-a", TaskDisposition::Passed, Some(0.9)),
@@ -2036,12 +2052,7 @@ mod composite_evaluation_tests {
         );
 
         let invalid_digest = CompositeCandidateEvaluationView::new(
-            context(),
-            "candidate",
-            vec![],
-            "not-a-digest",
-            digest('f'),
-            digest('a'),
+            context(), "candidate", vec![], "not-a-digest", digest('f'), digest('a'),
             ["task-a"].map(str::to_owned),
             [("quality".to_owned(), rows(&[
                 ("task-a", TaskDisposition::Passed, Some(0.9)),
@@ -2052,3 +2063,4 @@ mod composite_evaluation_tests {
             CompositeEvaluationError::InvalidDigest("source_tree_digest")
         );
     }
+}
