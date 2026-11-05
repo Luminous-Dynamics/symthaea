@@ -1,0 +1,50 @@
+name: Connectome query-critical discovery contract
+
+on:
+  pull_request:
+    paths:
+      - "docs/neuroscience/CONNECTOME_QUERY_CRITICAL_DISCOVERY_V1.md"
+      - "docs/neuroscience/CONNECTOME_QUERY_CRITICAL_DISCOVERY.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_CRITICAL_DISCOVERY.example.json"
+      - ".github/workflows/connectome-query-critical-discovery.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "docs/neuroscience/CONNECTOME_QUERY_CRITICAL_DISCOVERY_V1.md"
+      - "docs/neuroscience/CONNECTOME_QUERY_CRITICAL_DISCOVERY.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_CRITICAL_DISCOVERY.example.json"
+      - ".github/workflows/connectome-query-critical-discovery.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate JSON syntax and fixture invariants
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          schema = json.loads(Path("docs/neuroscience/CONNECTOME_QUERY_CRITICAL_DISCOVERY.schema.json").read_text())
+          fixture = json.loads(Path("docs/neuroscience/examples/CONNECTOME_QUERY_CRITICAL_DISCOVERY.example.json").read_text())
+
+          assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+          assert fixture["schema_version"] == 1
+          assert fixture["claim_scope"] == "synthetic_known_truth"
+          assert len(fixture["psus"]) == 4
+          assert len(fixture["channels"]) == 3
+          assert len(fixture["alternatives"]) == 3
+          assert len(fixture["proposals"]) == 3
+          assert any(not psu["proposal_ids"] for psu in fixture["psus"])
+          omitted = next(a for a in fixture["alternatives"] if a["alternative_id"] == "ALT-OMITTED-HIGH-IMPACT")
+          assert omitted["query_consequence"] == "ADAPTIVE_POLICY_INVALIDATED"
+          assert omitted["challenge_report_status"] == "NO_POLICY"
+          assert all(len(x) in (40, 64) for x in [fixture["dataset_revision_commit_sha"], fixture["query"]["query_spec_sha256"]])
+          print("validated synthetic query-critical discovery fixture structure")
+          PY
