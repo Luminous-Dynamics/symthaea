@@ -1087,7 +1087,7 @@
       "case_id": "REVENUE-REALIZATION-BRIDGE-001",
       "track": "bankability_and_realized_cash",
       "title": "Evidence-attributed bridge from theoretical revenue to realized net cash",
-      "scenario": "Reconcile theoretical gross revenue to realized net cash using source-bound signed adjustments for forecast regret, availability, execution deviation, balancing settlement, market fees, degradation/warranty, financing/collateral and contract/curtailment effects. The caller declares which categories are required for the asset/contract. If any required category is absent, the bridge remains incomplete, only partial reconstructed net is reported, and the unexplained residual/realization ratio are withheld. Future-known evidence, invalid source hashes and duplicate component IDs are rejected. This decomposes effects that aggregate revenue realization haircuts combine.",
+      "scenario": "Reconcile theoretical gross revenue to realized net cash using source-bound signed adjustments for forecast regret, availability, execution deviation, balancing settlement, market fees, degradation/warranty, financing/collateral and contract/curtailment effects. The caller declares which categories are required for the asset/contract. If any required category is absent, the bridge remains incomplete, only partial reconstructed net is reported, and the unexplained residual/realization ratio are withheld. Future-known evidence, invalid source hashes and duplicate component IDs are rejected. This decomposes effects that aggregate revenue realization haircuts combine. One source receipt cannot back two adjustment components under different component IDs.",
       "owner": "Symthaea",
       "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
@@ -1098,7 +1098,8 @@
         "positive_contract_adjustment_can_offset_a_negative_component",
         "future_known_cash_or_adjustment_evidence_is_rejected",
         "duplicate_component_and_required_category_ids_fail_closed",
-        "invalid_hashes_and_negative_theoretical_gross_fail_closed"
+        "invalid_hashes_and_negative_theoretical_gross_fail_closed",
+        "one_source_receipt_cannot_back_two_adjustment_components"
       ],
       "required_evidence": [
         "theoretical gross revenue and exact model/input digest",
@@ -1111,7 +1112,8 @@
         "degradation and warranty cost/obligation evidence",
         "financing and collateral cost evidence",
         "contract, curtailment and compensation evidence",
-        "evaluation-as-of timestamp and source availability time for every component"
+        "evaluation-as-of timestamp and source availability time for every component",
+        "unique source reference for each revenue adjustment component to prevent double-counting"
       ],
       "stress_tags": [
         "revenue-realization",
