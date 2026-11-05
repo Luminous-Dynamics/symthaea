@@ -237,3 +237,12 @@ In addition to exact source, stream/batch and sample-point binding, every suppor
 This prevents an old batch observation or a future sample from being attached to a different claimed service interval. It does not define a universal freshness period: after the stream window check, evidence currentness still follows the applicable standard, risk assessment, monitoring programme, storage/treatment events and declared validity interval.
 
 The Rust adapter includes WQ-015 / WQ-016 regression controls for samples immediately outside the stream window. Software validation of the latest commit remains pending until its exact-head workflow completes.
+
+
+### Complementary international management guidance published in 2026
+
+ISO 18998:2026, *Water reuse in urban areas — Guidelines for decentralized water reuse system — Management of a decentralized water reuse system*, was published in January 2026. Its stated scope spans the decentralized system components, including source water, reclaimed water, treatment, storage, distribution, operation/maintenance, monitoring and emergency response. ISO explicitly says it does **not** provide the monitoring parameters or regulatory values for a decentralized reuse system. Treat it as a useful management-system comparator, not as a substitute for South African law, SANS requirements, source-specific qualification, or numerical reuse-quality limits.
+
+The separate ISO 25446 building-greywater guidance has progressed to the DIS/FDIS-preparation stage but remains under development; keep its status distinct from published ISO 18998:2026.
+
+References: https://www.iso.org/standard/85697.html ; https://www.iso.org/standard/90421.html
