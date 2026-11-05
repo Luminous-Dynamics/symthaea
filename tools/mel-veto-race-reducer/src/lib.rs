@@ -1018,7 +1018,9 @@ mod tests {
     #[test]
     fn producer_cannot_retag_old_render_with_new_epoch() {
         let mut ledger = authorized_ledger();
-        ledger.apply(producer_start_event(2, "producer-7", 0)).unwrap();
+        ledger
+            .apply(producer_start_event(2, "producer-7", 0))
+            .unwrap();
         ledger.apply(veto_event(3)).unwrap();
         // Already-started work may complete, but its captured epoch is fixed.
         ledger
