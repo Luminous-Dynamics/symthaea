@@ -162,6 +162,33 @@ impl std::fmt::Display for GenealogyBundleError {
 
 impl std::error::Error for GenealogyBundleError {}
 
+/// Failure while allocating or independently verifying an immutable
+/// multi-parent genealogy subgraph.
+#[derive(Debug)]
+pub enum GenealogyLineageError {
+    /// SQLite persistence or query failure.
+    Database(rusqlite::Error),
+    /// A parent, relation, idempotency key, or input edge is invalid.
+    InvalidInput(&'static str),
+    /// An idempotency key was reused with a different operation payload.
+    IdempotencyConflict,
+    /// Stored lineage edges or their manifest commitment no longer agree.
+    CorruptLineage,
+}
+
+impl std::fmt::Display for GenealogyLineageError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Database(error) => write!(formatter, "genealogy lineage database error: {error}"),
+            Self::InvalidInput(reason) => write!(formatter, "invalid genealogy lineage input: {reason}"),
+            Self::IdempotencyConflict => write!(formatter, "genealogy lineage idempotency key conflicts with a prior operation"),
+            Self::CorruptLineage => write!(formatter, "genealogy lineage edge set or manifest commitment is corrupt"),
+        }
+    }
+}
+
+impl std::error::Error for GenealogyLineageError {}
+
 /// Read-only result after resolving a keeper's genealogy manifest and
 /// independently re-hashing every artifact currently present in its bundle.
 ///
