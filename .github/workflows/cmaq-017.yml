@@ -40,7 +40,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo run --release --locked > /tmp/cmaq-017-report.json
+          cargo run --release --locked --bin cmaq-017-multistep-exploitability > /tmp/cmaq-017-report.json
           cargo run --release --locked --bin selectable_headroom > /tmp/cmaq-017-selectable-headroom-report.json
           python3 - <<'PY'
           import json
