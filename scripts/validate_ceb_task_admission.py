@@ -247,6 +247,7 @@ def valid_fixture() -> dict:
 
 def self_test(registry: dict, registry_schema: dict, task_schema: dict, format_checker: FormatChecker) -> None:
     fixture = valid_fixture()
+    digest = "a" * 64
     if validate_task(fixture, task_schema, format_checker, {}):
         raise SystemExit("valid synthetic task-manifest fixture unexpectedly failed")
 
