@@ -1,0 +1,313 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/clustered-paired-comparison-v0.schema.json",
+  "title": "PITB paired repository/file-cluster comparison report v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evaluation_split_git_blob_sha1",
+    "evaluation_split_raw_sha256",
+    "proof_runs_jsonl_sha256",
+    "evaluation_task_count",
+    "strategy_summaries",
+    "comparison",
+    "sampling_design",
+    "statistical_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.clustered-paired-comparison.v0"
+    },
+    "evaluation_split_git_blob_sha1": {
+      "const": "af3b663429dc4689ee728d2fb5c7d8d5034476f7"
+    },
+    "evaluation_split_raw_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "proof_runs_jsonl_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "evaluation_task_count": {
+      "const": 1000
+    },
+    "strategy_summaries": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "strategy_id",
+          "strategy",
+          "attempted_tasks",
+          "retries",
+          "unique_verified_tasks",
+          "assurance_adjusted_pass_rate",
+          "total_wall_time_ms",
+          "total_input_tokens",
+          "total_output_tokens",
+          "total_cost_microusd",
+          "cost_per_qualified_task_microusd"
+        ],
+        "properties": {
+          "strategy_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "strategy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "version",
+              "implementation_sha256",
+              "model_id",
+              "model_version"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1
+              },
+              "implementation_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "model_id": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                ]
+              },
+              "model_version": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                ]
+              }
+            }
+          },
+          "attempted_tasks": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "retries": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unique_verified_tasks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "assurance_adjusted_pass_rate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "total_wall_time_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_input_tokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_output_tokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_cost_microusd": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cost_per_qualified_task_microusd": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "number",
+                "minimum": 0
+              }
+            ]
+          }
+        }
+      }
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "left_strategy_id",
+        "right_strategy_id",
+        "common_task_count",
+        "left_unique_qualified_tasks",
+        "right_unique_qualified_tasks",
+        "left_assurance_adjusted_pass_rate",
+        "right_assurance_adjusted_pass_rate",
+        "paired_pass_rate_difference",
+        "paired_pass_rate_difference_percentage_points",
+        "repository_cluster_count",
+        "source_file_cluster_count",
+        "bootstrap_replicates",
+        "bootstrap_seed",
+        "bootstrap_ci_95_low",
+        "bootstrap_ci_95_high",
+        "bootstrap_probability_left_better",
+        "left_cost_per_qualified_task_microusd",
+        "right_cost_per_qualified_task_microusd",
+        "interpretation"
+      ],
+      "properties": {
+        "left_strategy_id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "right_strategy_id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "common_task_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "left_unique_qualified_tasks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "right_unique_qualified_tasks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "left_assurance_adjusted_pass_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "right_assurance_adjusted_pass_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "paired_pass_rate_difference": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "paired_pass_rate_difference_percentage_points": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        },
+        "repository_cluster_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_file_cluster_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "bootstrap_replicates": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200000
+        },
+        "bootstrap_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "bootstrap_ci_95_low": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "bootstrap_ci_95_high": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "bootstrap_probability_left_better": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "left_cost_per_qualified_task_microusd": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0
+            }
+          ]
+        },
+        "right_cost_per_qualified_task_microusd": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0
+            }
+          ]
+        },
+        "interpretation": {
+          "type": "string",
+          "minLength": 50
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "bootstrap_ci_95_low": {
+                "type": "number"
+              },
+              "bootstrap_ci_95_high": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "bootstrap_ci_95_low",
+              "bootstrap_ci_95_high"
+            ]
+          },
+          "then": {
+            "properties": {
+              "bootstrap_ci_95_high": {
+                "minimum": -1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "sampling_design": {
+      "type": "string",
+      "minLength": 60
+    },
+    "statistical_boundary": {
+      "type": "string",
+      "minLength": 80
+    }
+  }
+}
