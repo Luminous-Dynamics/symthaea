@@ -5509,7 +5509,10 @@ mod keeper_readback_tests {
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos();
-        std::env::temp_dir().join(format!("muse-keeper-readback-{}-{nonce}", std::process::id()))
+        std::env::temp_dir().join(format!(
+            "muse-keeper-readback-{}-{nonce}",
+            std::process::id()
+        ))
     }
 
     #[test]
@@ -5537,10 +5540,7 @@ mod keeper_readback_tests {
         assert_eq!(receipt.schema_version, 1);
         assert_eq!(receipt.audio_key, "keeper-v1");
         assert_eq!(receipt.artifact_layout, "keeper-directory-v1");
-        assert_eq!(
-            receipt.digest_scope,
-            "sha256-exact-persisted-file-bytes-v1"
-        );
+        assert_eq!(receipt.digest_scope, "sha256-exact-persisted-file-bytes-v1");
         assert_eq!(receipt.artifacts.len(), 4);
         assert_eq!(
             receipt
@@ -5551,7 +5551,11 @@ mod keeper_readback_tests {
             vec!["audio.wav", "performance.mid", "recipe.json", "score.json"]
         );
         assert_eq!(
-            receipt.artifacts.iter().map(|artifact| artifact.byte_len).sum::<u64>(),
+            receipt
+                .artifacts
+                .iter()
+                .map(|artifact| artifact.byte_len)
+                .sum::<u64>(),
             (audio.len() + midi.len() + recipe.len() + score.len()) as u64
         );
         fs::remove_dir_all(path).unwrap();
