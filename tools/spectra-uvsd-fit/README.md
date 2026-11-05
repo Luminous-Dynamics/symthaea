@@ -166,13 +166,13 @@ The v0.1 DGP does not model correlated participant random effects, sequential le
 
 ## Simultaneous candidate-score confidence bounds (experimental)
 
-The `score_bounds` module converts bounded independent Monte Carlo replicate vectors into simultaneous one-sided confidence bounds for candidate scores. For each action × scenario pair, callers provide replicate vectors for target information, model discrimination, representativeness, target utility and participant burden, with a frozen finite range for each family.
+The `score_bounds` module converts bounded independent Monte Carlo replicate vectors into simultaneous finite-sample score bounds for candidate decisions. For each action × scenario pair, callers provide replicate vectors for target information, model discrimination, representativeness, target utility and participant burden, with a frozen finite range for each family.
 
-For R action × scenario records and five metric claims per record, it sets `delta = familywise_alpha / (5R)) and applies the one-sided Hoeffding radius:
+For R action × scenario records it allocates `familywise_alpha` across six one-sided tail claims per record: lower bounds for target information, model discrimination, representativeness and target utility; an upper bound for participant burden; and a second upper bound for target utility. Thus `delta = familywise_alpha / (6R)`. The one-sided Hoeffding radius is:
 
 `(upper - lower) * sqrt(log(1 / delta) / (2 * n))`.
 
-Information, model-discrimination, representativeness and utility use lower bounds; participant burden uses an upper bound. The resulting point estimates and bounds map directly into `ScenarioOutcome` and can be passed to `aggregate_scenario_assessments`. The batch preserves every raw replicate vector, declared range, familywise/per-claim alpha, seed, source digest, score-contract digest, the frozen action snapshot and the normalized scenario snapshot.
+Information, model-discrimination and representativeness use lower bounds; participant burden uses an upper bound; utility receives both lower and upper bounds so a separate indifference-zone selector can construct a robust-utility interval. The resulting point estimates and bounds map directly into `ScenarioOutcome` and can be passed to `aggregate_scenario_assessments`. The batch preserves every raw replicate vector, declared range, familywise/per-claim alpha, seed, source digest, score-contract digest, the frozen action snapshot and the normalized scenario snapshot.
 
 Bonferroni does not require independence across action/metric claims, but Hoeffding does require independent bounded Monte Carlo replications within each score series. This method is intentionally conservative; it is not an empirical Bernstein estimate. It quantifies Monte Carlo uncertainty about the supplied score-generating process only. It cannot repair a biased simulator, an invalid score definition, a wrong estimand or an incomplete scenario bank. A simultaneous bound around a biased point-generating process is still biased.
 
