@@ -39,15 +39,15 @@ No scalar musical-quality score is produced. A contract-valid alternative may fa
 
 ## Executable conformance
 
-The canonical runner emits eleven negotiation rows and the dedicated workflow gates:
+The canonical runner emits eleven hand-constructed negotiation rows and the dedicated workflow gates:
 - **6 qualified:** complete branch within budget, clarification, veto-compliant branch, following explicit partner selection, abstention after all options are vetoed, and clarification when the viable alternative set exceeds the branch budget.
 - **5 rejected:** premature single commitment, a branch containing a vetoed value, fabricated commitment after all options are removed, incomplete branching, and attempted branch explosion above the configured fan-out limit.
 
-These are finite, hand-constructed synthetic controls. They do not estimate how often real musicians prefer branching or clarification.
+The Rust unit suite also exhaustively enumerates 3,464 dispositions across every non-empty accepted-offset set for cyclic domains of size 2–5, every source value, every veto subset, and unresolved/explicit partner preference. Expected-valid and expected-invalid outcomes are checked separately and the exact state-space count is pinned. These are finite synthetic controls; they do not estimate how often real musicians prefer branching or clarification.
 
 ## Adversarial unit-test coverage
 
-Twelve new Rust tests cover multiple valid witnesses; full branching; clarification; premature single commitment; veto handling; explicit selection; empty-set abstention; duplicate/incomplete branches; no-op/wrong-dimension contracts; clarification after an already explicit partner selection; bounded branch fan-out; and clarification instead of excessive branching.
+Thirteen new Rust tests cover multiple valid witnesses; full branching; clarification; premature single commitment; veto handling; explicit selection; empty-set abstention; duplicate/incomplete branches; no-op/wrong-dimension contracts; clarification after an already explicit partner selection; bounded branch fan-out; clarification instead of excessive branching; and an exhaustive small-state model check of 3,464 dispositions.
 
 ## Relationship to existing work
 
