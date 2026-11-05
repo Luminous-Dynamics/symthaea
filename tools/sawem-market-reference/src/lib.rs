@@ -290,27 +290,21 @@ pub fn sawem_rev_2_3_reserve_requirement(
 ) -> Result<MarketReserveRequirement, Violation> {
     match (product, direction) {
         (ReserveProduct::Regulating, ReserveDirection::Up)
-        | (ReserveProduct::Regulating, ReserveDirection::Down) => {
-            Ok(MarketReserveRequirement {
-                maximum_start_response_seconds: Some(10.0),
-                maximum_full_activation_seconds: Some(600.0),
-                minimum_sustain_seconds: None,
-            })
-        }
-        (ReserveProduct::Instantaneous, ReserveDirection::Up) => {
-            Ok(MarketReserveRequirement {
-                maximum_start_response_seconds: None,
-                maximum_full_activation_seconds: Some(10.0),
-                minimum_sustain_seconds: Some(600.0),
-            })
-        }
-        (ReserveProduct::TenMinute, ReserveDirection::Up) => {
-            Ok(MarketReserveRequirement {
-                maximum_start_response_seconds: None,
-                maximum_full_activation_seconds: Some(600.0),
-                minimum_sustain_seconds: None,
-            })
-        }
+        | (ReserveProduct::Regulating, ReserveDirection::Down) => Ok(MarketReserveRequirement {
+            maximum_start_response_seconds: Some(10.0),
+            maximum_full_activation_seconds: Some(600.0),
+            minimum_sustain_seconds: None,
+        }),
+        (ReserveProduct::Instantaneous, ReserveDirection::Up) => Ok(MarketReserveRequirement {
+            maximum_start_response_seconds: None,
+            maximum_full_activation_seconds: Some(10.0),
+            minimum_sustain_seconds: Some(600.0),
+        }),
+        (ReserveProduct::TenMinute, ReserveDirection::Up) => Ok(MarketReserveRequirement {
+            maximum_start_response_seconds: None,
+            maximum_full_activation_seconds: Some(600.0),
+            minimum_sustain_seconds: None,
+        }),
         _ => Err(Violation::UnsupportedReserveProductDirection),
     }
 }
@@ -421,7 +415,10 @@ fn evaluate_reserve_energy_scenario(
         return Ok(());
     }
 
-    let mut boundaries: Vec<f64> = timed_reserves.iter().map(|(_, duration)| *duration).collect();
+    let mut boundaries: Vec<f64> = timed_reserves
+        .iter()
+        .map(|(_, duration)| *duration)
+        .collect();
     boundaries.sort_by(f64::total_cmp);
     boundaries.dedup_by(|left, right| (*left - *right).abs() <= EPSILON);
 
@@ -451,9 +448,8 @@ fn evaluate_reserve_energy_scenario(
         // Integrate only the incremental energy effect of reserve activation
         // relative to the scheduled operating point. This correctly treats
         // stopping an existing charge/discharge as reserve response.
-        let incremental_energy_rate =
-            (target_charge_mw - base_charge_mw) * charge_efficiency
-                - (target_discharge_mw - base_discharge_mw) / discharge_efficiency;
+        let incremental_energy_rate = (target_charge_mw - base_charge_mw) * charge_efficiency
+            - (target_discharge_mw - base_discharge_mw) / discharge_efficiency;
         let elapsed_hours = (boundary - previous_boundary) / 3_600.0;
         energy += incremental_energy_rate * elapsed_hours;
 
@@ -491,13 +487,14 @@ fn assess_reserves(
             violations.push(Violation::DuplicateReserveProductDirection);
             continue;
         }
-        let requirement = match sawem_rev_2_3_reserve_requirement(reserve.product, reserve.direction) {
-            Ok(value) => value,
-            Err(violation) => {
-                violations.push(violation);
-                continue;
-            }
-        };
+        let requirement =
+            match sawem_rev_2_3_reserve_requirement(reserve.product, reserve.direction) {
+                Ok(value) => value,
+                Err(violation) => {
+                    violations.push(violation);
+                    continue;
+                }
+            };
         validate_reserve_response(
             *reserve,
             requirement,
@@ -1008,28 +1005,22 @@ mod tests {
 
     #[test]
     fn sawem_rev_2_3_reserve_response_and_sustain_requirements_are_product_specific() {
-        let regulating = sawem_rev_2_3_reserve_requirement(
-            ReserveProduct::Regulating,
-            ReserveDirection::Up,
-        )
-        .expect("regulating up is supported");
+        let regulating =
+            sawem_rev_2_3_reserve_requirement(ReserveProduct::Regulating, ReserveDirection::Up)
+                .expect("regulating up is supported");
         assert_eq!(regulating.maximum_start_response_seconds, Some(10.0));
         assert_eq!(regulating.maximum_full_activation_seconds, Some(600.0));
         assert_eq!(regulating.minimum_sustain_seconds, None);
 
-        let instantaneous = sawem_rev_2_3_reserve_requirement(
-            ReserveProduct::Instantaneous,
-            ReserveDirection::Up,
-        )
-        .expect("instantaneous up is supported");
+        let instantaneous =
+            sawem_rev_2_3_reserve_requirement(ReserveProduct::Instantaneous, ReserveDirection::Up)
+                .expect("instantaneous up is supported");
         assert_eq!(instantaneous.maximum_full_activation_seconds, Some(10.0));
         assert_eq!(instantaneous.minimum_sustain_seconds, Some(600.0));
 
-        let ten_minute = sawem_rev_2_3_reserve_requirement(
-            ReserveProduct::TenMinute,
-            ReserveDirection::Up,
-        )
-        .expect("ten-minute up is supported");
+        let ten_minute =
+            sawem_rev_2_3_reserve_requirement(ReserveProduct::TenMinute, ReserveDirection::Up)
+                .expect("ten-minute up is supported");
         assert_eq!(ten_minute.maximum_full_activation_seconds, Some(600.0));
         assert_eq!(ten_minute.minimum_sustain_seconds, None);
 
@@ -1056,7 +1047,10 @@ mod tests {
         let result = evaluate_dispatch(limits(), 100.0, &[step(0.0, 0.0, 0.0, &RESERVES)])
             .expect("fixture inputs are valid");
         let assessment = &result.steps[0].reserve_assessment;
-        assert_eq!(assessment.qualification, ReserveQualification::Indeterminate);
+        assert_eq!(
+            assessment.qualification,
+            ReserveQualification::Indeterminate
+        );
         assert!(
             assessment
                 .indeterminate_reasons
