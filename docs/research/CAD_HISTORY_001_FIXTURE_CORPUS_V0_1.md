@@ -235,3 +235,48 @@ Do not freeze these as success criteria until pilot variance, task difficulty, i
 This corpus is a synthetic design specification only. It establishes no CAD-kernel implementation, geometry equivalence result, parametric reconstruction accuracy, manufacturability, structural adequacy, GD&T compliance, material suitability, product safety, regulatory compliance or physical validation.
 
 A candidate feature history can be a valid editable representation without being the original author's history. A geometry-equivalent solid is not automatically functionally equivalent; a functionally equivalent parametric model is not automatically manufacturable or safe.
+
+
+## 7.2 Scan-to-CAD extension: metrology-aware reconstruction
+
+Add a seventh task family when traceable scan inputs can be materialized. This is not the same task as reconstructing a history-less STEP/BREP solid: the input is a set of **measured observations**, with calibration, uncertainty, registration, surface-interaction and occlusion limitations.
+
+### CADH-P07 — scanned stepped shaft
+
+**Nominal synthetic design:** a stepped shaft matching CADH-P02 (Ø20 × 20 mm, Ø30 × 60 mm, Ø20 × 20 mm; nominal total length 100 mm).
+
+**Measured-input specification:** multi-view scan points covering the accessible outer surface, with a declared instrument profile, calibration state, pointwise or regional uncertainty, exact unit/frame and multi-view registration covariance. The scan must include a masked underside/end-face region in one case variant and a deliberately worn band in another.
+
+**Two separate task targets:**
+- **As-built replica:** reproduce the measured article geometry and preserve the observed wear/deviation.
+- **Nominal design inference:** infer the likely nominal stepped-shaft design from the scan plus explicit design requirements, but report wear/unknown regions and measurement uncertainty separately.
+
+**Required output:** editable feature-based shaft model, semantic parameters, per-feature uncertainty and datum/frame bindings; point-cloud residual distribution and coverage; occluded regions marked UNKNOWN; and the declared target type.
+
+**Intervention:** change the central journal length from 60 to 70 mm while preserving the end-journal dimensions and shared axis. The reconstructed feature history must survive the requested edit. A pure mesh that matches the scan but cannot be edited fails the task.
+
+**Negative controls:** scanner scale bias, multi-view registration drift, surface dropout, reflective/coated patches, hidden bore/underside, point-cloud outliers, synthetic hole filling, and wear mistaken for nominal design.
+
+**Acceptance:** traceable scan profile and coverage; uncertainty-aware feature dimensions; no synthetic/occluded region represented as measured input; successful native-kernel rebuild; semantic edit success; separate as-built vs nominal dispositions. No universal dimensional tolerance is imposed: tolerances must derive from the task's instrument/calibration/reference-artefact/part-scale profile.
+
+### Scan-to-CAD metrics
+
+Report separately:
+- dimensional error by feature/scale and calibrated reference;
+- surface residual distribution, percentile tails, coverage and outlier handling;
+- calibration and registration uncertainty propagation;
+- uncertainty coverage against traceable artefacts;
+- feature/parameter recovery and correct abstention under occlusion;
+- native parametric editability and rebuild success;
+- cost/time per independently accepted editable model and human correction burden.
+
+Hexagon Geomagic Design X and Creaform Scan-to-CAD are industry comparators for point-cloud/mesh processing, registration, feature extraction, editable feature history and CAD transfer. NIST's work on VDI/VDE 2634-2 / ISO 10360-13 underscores calibration/systematic-error effects in structured-light metrology. A 2026 review summarizes uncertainty sources including surface/sensor interaction, calibration, occlusion, registration drift, mesh/surfacing, XCT segmentation and task-specific uncertainty interpretation.
+
+References:
+- OpenAI / Chip Ganassi Racing scan-to-CAD workflow (2026-11-03): https://openai.com/index/accelerating-engineering-for-the-physical-world/
+- Hexagon Geomagic Design X: https://hexagon.com/products/geomagic-design-x
+- Creaform Scan-to-CAD: https://www.creaform3d.com/en/products/software/creaform-metrology-suite/scan-to-cad-software-module
+- NIST (2024): https://www.nist.gov/publications/vdivde-2634-2-and-iso-10360-13-performance-evaluation-tests-and-systematic-errors
+- 2026 scan-based reverse-engineering uncertainty review: https://www.mdpi.com/2076-3417/16/3/1229
+
+Compose ENG-TOL-001 #4883 for dimensional/metrology requirements and ROB-REALIZE-001 #4859 for as-built article lineage; do not create another measurement system or as-built authority.
