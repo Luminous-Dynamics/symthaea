@@ -1064,6 +1064,146 @@
       ],
       "metric_semantics_eligible_for_matched_test": false,
       "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-CONTINUITY",
+      "ceb_metric_id": "sequence_complete_rate",
+      "ceb_metric_definition": "Fraction of repository-evolution sequences for which every required milestone decision is correct and all protected invariants remain satisfied through the final milestone.",
+      "target_statement": "Calibrate in the feasibility pilot; confirmatory improvement over matched stateless and persistent-history baselines must satisfy #10619 paired, cluster-aware claim rules. Do not borrow SWE-Milestone percentages.",
+      "target_intent": "quality_goal",
+      "correspondence_class": "related_but_distinct",
+      "comparison_use": "context_only",
+      "external_observation_ids": [
+        "swemilestone-glm53-resolve"
+      ],
+      "rationale": "SWE-Milestone evaluates continuous repository evolution and provides a useful contextual milestone-resolution reference, but its displayed Resolve aggregation is milestone-based and its denominator is not exposed in the visible row. CEB's primary outcome is sequence-complete evidence validity, not merely test resolution.",
+      "blockers": [
+        "different unit of analysis: milestone versus CEB evidence-governed sequence",
+        "SWE-Milestone leaderboard denominator and aggregation details are not exposed in the visible row",
+        "different task populations, milestone DAGs, models, harnesses and adjudication"
+      ],
+      "normalization_requirements": [
+        "publish and pin the exact SWE-Milestone revision, task set, score revision and per-task outputs",
+        "define a common sequence unit and matched event/evidence transition gold labels",
+        "run both systems on the same frozen sequence tasks and budget",
+        "independently regrade identical retained artifacts"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-CONTINUITY",
+      "ceb_metric_id": "evidence_disposition_macro_f1",
+      "ceb_metric_definition": "Macro-averaged F1 across retain, revalidate, invalidate, supersede and unresolved claim dispositions, with each class also reported separately.",
+      "target_statement": "At least 0.90 after blinded pilot calibration and at least 0.95 on a sealed holdout, with per-class precision/recall and repository/event-family strata.",
+      "target_intent": "measurement_quality_goal",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation currently registered uses an equivalent operational definition for this CEB evidence-continuity metric. This is an explicit comparator gap, not a missing mapping.",
+      "blockers": [
+        "no equivalent external observation is registered with the same decision unit, evidence semantics and denominator"
+      ],
+      "normalization_requirements": [
+        "author and independently qualify a dedicated matched sequence corpus before numerical comparison"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-CONTINUITY",
+      "ceb_metric_id": "stale_evidence_use_rate",
+      "ceb_metric_definition": "Fraction of consequential engineering decisions that rely on evidence already invalidated, revoked, stale or outside its declared applicability scope.",
+      "target_statement": "Zero critical stale-evidence uses in the preregistered challenge suite; report total rate, exact denominator, attack-family clustering and uncertainty. Critical cases are non-compensable hard gates.",
+      "target_intent": "hard_gate",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation currently registered uses an equivalent operational definition for this CEB evidence-continuity metric. This is an explicit comparator gap, not a missing mapping.",
+      "blockers": [
+        "no equivalent external observation is registered with the same decision unit, evidence semantics and denominator"
+      ],
+      "normalization_requirements": [
+        "author and independently qualify a dedicated matched sequence corpus before numerical comparison"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-CONTINUITY",
+      "ceb_metric_id": "false_invalidation_rate",
+      "ceb_metric_definition": "Fraction of independently adjudicated still-valid claims incorrectly invalidated or unnecessarily forced into revalidation by the agent.",
+      "target_statement": "At most 0.05 in the feasibility pilot and 0.02 on a sealed holdout after reviewer agreement and label reliability are established; invalidate-everything must fail.",
+      "target_intent": "measurement_quality_goal",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation currently registered uses an equivalent operational definition for this CEB evidence-continuity metric. This is an explicit comparator gap, not a missing mapping.",
+      "blockers": [
+        "no equivalent external observation is registered with the same decision unit, evidence semantics and denominator"
+      ],
+      "normalization_requirements": [
+        "author and independently qualify a dedicated matched sequence corpus before numerical comparison"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-CONTINUITY",
+      "ceb_metric_id": "revalidation_cost_per_accepted_sequence",
+      "ceb_metric_definition": "Total inference, retrieval, tool, execution, revalidation, human-review and rework cost divided by independently accepted complete sequences.",
+      "target_statement": "At least 20% lower lifecycle cost than reset-and-recheck, without increased critical stale-evidence use, false acceptance or protected-invariant regression.",
+      "target_intent": "efficiency_goal",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation currently registered uses an equivalent operational definition for this CEB evidence-continuity metric. This is an explicit comparator gap, not a missing mapping.",
+      "blockers": [
+        "no equivalent external observation is registered with the same decision unit, evidence semantics and denominator"
+      ],
+      "normalization_requirements": [
+        "author and independently qualify a dedicated matched sequence corpus before numerical comparison"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-CONTINUITY",
+      "ceb_metric_id": "repair_survival_rate",
+      "ceb_metric_definition": "Fraction of independently accepted repairs that remain behaviorally and operationally valid through all later milestones in the declared sequence without recurrence or protected-invariant regression.",
+      "target_statement": "At least 0.90 on a sealed holdout after the sequence depth and fault-family mix are calibrated; report survival by event stratum and horizon.",
+      "target_intent": "quality_goal",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation currently registered uses an equivalent operational definition for this CEB evidence-continuity metric. This is an explicit comparator gap, not a missing mapping.",
+      "blockers": [
+        "no equivalent external observation is registered with the same decision unit, evidence semantics and denominator"
+      ],
+      "normalization_requirements": [
+        "author and independently qualify a dedicated matched sequence corpus before numerical comparison"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-CONTINUITY",
+      "ceb_metric_id": "evidence_lineage_completeness",
+      "ceb_metric_definition": "Fraction of decision-governing claims whose evidence lineage includes exact source/configuration identity, applicability scope, authority level, temporal validity and invalidation dependencies.",
+      "target_statement": "At least 0.98 on a sealed holdout, with missing, unresolved, revoked and out-of-domain evidence kept as distinct states.",
+      "target_intent": "measurement_quality_goal",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "No external observation currently registered uses an equivalent operational definition for this CEB evidence-continuity metric. This is an explicit comparator gap, not a missing mapping.",
+      "blockers": [
+        "no equivalent external observation is registered with the same decision unit, evidence semantics and denominator"
+      ],
+      "normalization_requirements": [
+        "author and independently qualify a dedicated matched sequence corpus before numerical comparison"
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
     }
   ]
 }
