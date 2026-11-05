@@ -911,7 +911,7 @@
       "case_id": "FORECAST-VINTAGE-ASOF-001",
       "track": "forecast_and_decision_replay",
       "title": "Leakage-free as-of forecast vintage reconstruction",
-      "scenario": "For each price/forecast target period and model identity, reconstruct only the forecast vintages and realized observations that were available to the decision workflow at the frozen decision timestamp. Select the latest eligible forecast by issue time, let a realized observation supersede only after the target interval ended and the observation became available, exclude future-known records, report missing coverage, and reject ambiguous latest vintages. Forecast issue time, target valid time and source available-at time are separate.",
+      "scenario": "For each price/forecast target period and model identity, reconstruct only the forecast vintages and realized observations that were available to the decision workflow at the frozen decision timestamp. Select the latest eligible forecast by issue time, let a realized observation supersede only after the target interval ended and the observation became available, exclude future-known records, report missing coverage, and reject ambiguous latest vintages. Forecast issue time, target valid time and source available-at time are separate. A target without a model identity must not silently choose among different forecasting engines; the caller must explicitly scope the target by model.",
       "owner": "Symthaea",
       "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
@@ -924,7 +924,8 @@
         "ambiguous_latest_forecasts_fail_instead_of_choosing_arbitrarily",
         "invalid_source_and_model_digests_are_rejected",
         "observed_period_cannot_be_known_before_it_has_ended",
-        "duplicate_record_ids_and_duplicate_targets_fail_closed"
+        "duplicate_record_ids_and_duplicate_targets_fail_closed",
+        "unscoped_target_with_multiple_forecast_engines_is_rejected"
       ],
       "required_evidence": [
         "frozen historical decision timestamp in UTC",
