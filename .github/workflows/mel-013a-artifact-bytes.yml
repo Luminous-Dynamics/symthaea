@@ -6,6 +6,8 @@ on:
       - "crates/domains/symthaea-muse/src/genealogy.rs"
       - "crates/domains/symthaea-muse-protocol/src/lib.rs"
       - "crates/domains/symthaea-muse/src/bin/muse_studio.rs"
+      - "tools/mel-genealogy-byte-harness/Cargo.toml"
+      - "tools/mel-genealogy-byte-harness/src/lib.rs"
       - ".github/workflows/mel-013a-artifact-bytes.yml"
   workflow_dispatch:
 
