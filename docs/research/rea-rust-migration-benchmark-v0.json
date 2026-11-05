@@ -2068,7 +2068,7 @@
     },
     {
       "id": "zip_cross_parser_differential_fuzz",
-      "status": "implementation_committed_exact_head_run_pending",
+      "status": "implementation_committed_exact_head_compile_awaiting_rerun",
       "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10451",
       "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10451",
       "target": "Zero unresolved high-confidence differential findings in the declared common subset; zero silent occurrence remapping; every confirmed finding becomes a minimized permanent regression fixture.",
@@ -2101,18 +2101,33 @@
       ],
       "protocol": [
         "fuzz both parsers on identical temporary archive bytes, with unique-name and no-prefix/no-ZIP64 restriction for indexed parity",
-        "compare raw names, offsets, flags, methods, sizes and CRC before comparing content",
+        "compare raw names, offsets, methods, explicit encryption state, sizes and CRC before comparing content",
         "if both decoders reach EOF, independently recompute SHA-256 and CRC-32 and compare to each other and declarations",
         "treat parser-only acceptance differences as findings only after common-subset and metadata preconditions hold",
         "skip duplicate-name, ZIP64 and unsupported carrier layouts rather than coercing them into an index match",
         "run independent reader-only smoke and differential target as separate bounded campaigns with separate logs, summaries and artifact digests",
-        "minimize and preserve every confirmed differential crash/disagreement as an immutable content-addressed seed"
+        "minimize and preserve every confirmed differential crash/disagreement as an immutable content-addressed seed",
+        "zip-rs 9.3.0 does not expose the full raw 16-bit general-purpose flag word through the public ZipFileFlags API used here; do not claim raw flag parity until the public API or a separate independent raw central-directory parser is added"
       ],
       "claim_boundaries": {
         "coverage": "LibFuzzer edges/features are harness-specific exploration signals, not a percent of parser correctness.",
         "oracle": "A second implementation is an oracle, not ground truth; each disagreement needs adjudication.",
         "supported_subset": "Only the mutually supported non-prefixed, non-ZIP64, unique-name Stored/Deflate regular-file subset is compared."
-      }
+      },
+      "comparison_fields": [
+        "raw filename bytes",
+        "local-header and data offsets",
+        "compression method",
+        "explicit encryption state",
+        "declared compressed/uncompressed sizes",
+        "declared CRC",
+        "successful stream length",
+        "payload SHA-256",
+        "independent CRC-32"
+      ],
+      "not_compared": [
+        "full raw 16-bit general-purpose flag value, because zip-rs 9.3.0 public API does not expose ZipFileFlags.bits()"
+      ]
     }
   ],
   "promotion_policy": {
