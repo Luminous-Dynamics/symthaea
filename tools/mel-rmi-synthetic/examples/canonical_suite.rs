@@ -330,6 +330,7 @@ fn run_negotiation_conformance() -> Result<(usize, usize), Box<dyn Error>> {
         target_dimension: Dimension::Motif,
         modulus: 12,
         accepted_offsets: [3, 5, 7].into_iter().collect(),
+        max_branch_count: 3,
     };
     let input = Feature {
         dimension: Dimension::Motif,
@@ -430,6 +431,66 @@ fn run_negotiation_conformance() -> Result<(usize, usize), Box<dyn Error>> {
             assessment.qualified,
         );
     }
+    let wide_contract = NegotiatedResponseContractV1 {
+        target_dimension: Dimension::Motif,
+        modulus: 12,
+        accepted_offsets: (1..=10).collect(),
+        max_branch_count: 3,
+    };
+    let wide_input = Feature {
+        dimension: Dimension::Motif,
+        value: 0,
+    };
+    let wide_authority = PartnerAuthorityV1 {
+        selected_value: None,
+        vetoed_values: Default::default(),
+    };
+    let wide_options: Vec<i32> = wide_contract.valid_values(wide_input)?.into_iter().collect();
+    let clarification = assess_negotiation(
+        &wide_contract,
+        wide_input,
+        &wide_authority,
+        &NegotiationChoiceV1::AskClarification,
+    )?;
+    let excessive_branch = assess_negotiation(
+        &wide_contract,
+        wide_input,
+        &wide_authority,
+        &NegotiationChoiceV1::Branch(wide_options),
+    )?;
+    println!(
+        "negotiation,branch_explosion_clarify,{},{},{},{},{},{},{},{}",
+        clarification.available_option_count,
+        clarification.proposed_option_count,
+        clarification.contract_valid,
+        clarification.veto_respected,
+        clarification.preference_respected,
+        clarification.ambiguity_preserved,
+        clarification.action_well_formed,
+        clarification.qualified,
+    );
+    println!(
+        "negotiation,branch_explosion_rejected,{},{},{},{},{},{},{},{}",
+        excessive_branch.available_option_count,
+        excessive_branch.proposed_option_count,
+        excessive_branch.contract_valid,
+        excessive_branch.veto_respected,
+        excessive_branch.preference_respected,
+        excessive_branch.ambiguity_preserved,
+        excessive_branch.action_well_formed,
+        excessive_branch.qualified,
+    );
+    if clarification.qualified {
+        qualified += 1;
+    } else {
+        rejected += 1;
+    }
+    if excessive_branch.qualified {
+        qualified += 1;
+    } else {
+        rejected += 1;
+    }
+
     println!("negotiation_qualified,{qualified}");
     println!("negotiation_rejected,{rejected}");
     Ok((qualified, rejected))
