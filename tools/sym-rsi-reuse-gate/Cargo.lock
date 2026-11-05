@@ -5,3 +5,10 @@ version = 4
 [[package]]
 name = "sym-rsi-reuse-gate"
 version = "0.1.0"
+dependencies = [
+ "symthaea-statistics",
+]
+
+[[package]]
+name = "symthaea-statistics"
+version = "0.1.0"
