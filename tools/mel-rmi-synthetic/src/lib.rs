@@ -311,10 +311,10 @@ impl AgentPolicy for FixedResponsePolicy {
     }
 
     fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
-                Box::new(Self {
-                    id: self.id.clone(),
-                    value: self.value,
-                })
+        Box::new(Self {
+            id: self.id.clone(),
+            value: self.value,
+        })
     }
 
     fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
@@ -341,7 +341,7 @@ impl AgentPolicy for ImitationOnlyPolicy {
     }
 
     fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
-                Box::new(self.clone())
+        Box::new(self.clone())
     }
 
     fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
@@ -368,7 +368,7 @@ impl AgentPolicy for OneWayPromptPolicy {
     }
 
     fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
-                Box::new(self.clone())
+        Box::new(self.clone())
     }
 
     fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
@@ -402,7 +402,7 @@ impl AgentPolicy for YokedReplayPolicy {
     }
 
     fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
-                Box::new(self.clone())
+        Box::new(self.clone())
     }
 
     fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
@@ -437,7 +437,7 @@ impl AgentPolicy for RuleBasedPolicy {
     }
 
     fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
-                Box::new(self.clone())
+        Box::new(self.clone())
     }
 
     fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
@@ -468,7 +468,7 @@ impl AgentPolicy for UnrelatedFeatureShortcutPolicy {
     }
 
     fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
-                Box::new(self.clone())
+        Box::new(self.clone())
     }
 
     fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
