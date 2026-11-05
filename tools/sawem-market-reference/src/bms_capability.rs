@@ -276,8 +276,7 @@ mod tests {
             &DISCHARGE,
         );
         let charge =
-            assess_soc_dependent_capability(profile, PowerDirection::Charge, 5_000, 3_500)
-                .unwrap();
+            assess_soc_dependent_capability(profile, PowerDirection::Charge, 5_000, 3_500).unwrap();
         let discharge =
             assess_soc_dependent_capability(profile, PowerDirection::Discharge, 5_000, 4_000)
                 .unwrap();
@@ -295,8 +294,7 @@ mod tests {
             &DISCHARGE,
         );
         let result =
-            assess_soc_dependent_capability(profile, PowerDirection::Charge, 7_001, 2_000)
-                .unwrap();
+            assess_soc_dependent_capability(profile, PowerDirection::Charge, 7_001, 2_000).unwrap();
         // Between 50% (4,000 W) and 90% (1,000 W): exact value 2,499.25 W.
         assert_eq!(result.maximum_supported_power_w, 2_499);
         assert_eq!(result.disposition, CapabilityDisposition::WithinEnvelope);
@@ -310,8 +308,7 @@ mod tests {
             &DISCHARGE,
         );
         let result =
-            assess_soc_dependent_capability(profile, PowerDirection::Charge, 9_000, 2_000)
-                .unwrap();
+            assess_soc_dependent_capability(profile, PowerDirection::Charge, 9_000, 2_000).unwrap();
         assert_eq!(result.maximum_supported_power_w, 1_000);
         assert_eq!(result.disposition, CapabilityDisposition::DerateRequired);
     }
@@ -369,13 +366,16 @@ mod tests {
             Err(CapabilityEnvelopeError::CurveNotStrictlyIncreasing)
         );
 
-        let above_rated = [CapabilityPoint {
-            soc_bps: 1_000,
-            maximum_power_w: 6_000,
-        }, CapabilityPoint {
-            soc_bps: 9_000,
-            maximum_power_w: 2_000,
-        }];
+        let above_rated = [
+            CapabilityPoint {
+                soc_bps: 1_000,
+                maximum_power_w: 6_000,
+            },
+            CapabilityPoint {
+                soc_bps: 9_000,
+                maximum_power_w: 2_000,
+            },
+        ];
         let bad = envelope(
             CapabilityEvidenceBasis::FieldMeasuredConservative,
             &above_rated,
