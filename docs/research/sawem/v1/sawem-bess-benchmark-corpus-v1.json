@@ -718,7 +718,7 @@
         "constrained_schedule_handles_signed_consumption_axis",
         "constrained_schedule_zero_submission_and_no_change_are_distinct",
         "constrained_schedule_rejects_unknown_and_incomplete_price_evidence",
-        "constrained_schedule_rejects_zero_duration_and_invalid_segments",
+        "constrained_schedule_rejects_invalid_segments",
         "constrained_schedule_handles_full_signed_schedule_range_without_overflow"
       ],
       "required_evidence": [
