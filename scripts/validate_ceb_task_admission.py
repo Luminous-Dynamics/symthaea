@@ -139,11 +139,19 @@ def validate_task(task: dict, schema: dict, format_checker: FormatChecker, conta
         semantic.append("development task must explicitly disclose accepted public fix exposure")
     if task["family_id"] == "performance-correctness" and task["environment"]["workload_sha256"] is None:
         semantic.append("performance task requires a pinned workload digest")
-    if task["acceptance_contract"]["security_review_status"] == "failed":
+    security_review = task["acceptance_contract"]
+    qualification_states = ("static_reviewed", "execution_qualified", "admitted")
+    if security_review["security_review_status"] == "failed":
         semantic.append("failed security review blocks task admission")
-    if task["acceptance_contract"]["security_review_status"] == "passed" and task["task_status"] in ("static_reviewed", "execution_qualified", "admitted"):
-        if not task["acceptance_contract"]["security_review_record_sha256"] or not task["acceptance_contract"]["security_reviewer_id"]:
-            semantic.append("passed security review requires reviewer identity and record digest")
+    if task["task_status"] in qualification_states:
+        if security_review["security_review_status"] not in ("passed", "not_applicable"):
+            semantic.append("qualification requires a passed security review or explicitly justified not-applicable disposition")
+        if not security_review["security_review_record_sha256"] or not security_review["security_reviewer_id"]:
+            semantic.append("security disposition requires reviewer identity and review-record digest")
+        if not security_review["security_review_rationale"].strip():
+            semantic.append("security disposition requires a non-empty scope rationale")
+        if security_review["security_review_status"] == "not_applicable" and task["family_id"] == "security-correctness":
+            semantic.append("security-correctness tasks cannot declare security review not applicable")
     if task["acceptance_contract"]["destructive_side_effects"]:
         semantic.append("tasks with destructive external side effects are excluded from the pilot")
     if task["execution_qualification"]["candidate_code_executed"]:
@@ -228,7 +236,7 @@ def valid_fixture() -> dict:
       "task_spec":{"prompt_sha256":digest,"acceptance_spec_sha256":"d"*64,"authoring_protocol_version":"0.1.0",
        "blind_solve_review":{"status":"passed","reviewer_id":"blind-reviewer-01","review_record_sha256":digest,"instruction_only_sufficient":True}},
       "environment":{"rust_toolchain":"1.96.0","cargo_lock_sha256":digest,"target_triple":"x86_64-unknown-linux-gnu","feature_set":["default"],"environment_image_digest":"sha256:"+"e"*64,"resource_policy_sha256":digest,"network_policy":"disabled","replay_manifest_sha256":digest,"workload_sha256":None},
-      "acceptance_contract":{"contract_sha256":digest,"fail_to_pass_check_ids":["issue-acceptance-001"],"pass_to_pass_check_ids":["existing-regression-001"],"critical_invariants":["trait contract remains sound"],"security_review_status":"passed","destructive_side_effects":False,"security_review_record_sha256":digest,"security_reviewer_id":"security-reviewer-01"},
+      "acceptance_contract":{"contract_sha256":digest,"fail_to_pass_check_ids":["issue-acceptance-001"],"pass_to_pass_check_ids":["existing-regression-001"],"critical_invariants":["trait contract remains sound"],"security_review_status":"passed","security_review_rationale":"Reviewer assessed changed behavior, trust boundaries and relevant security invariants.","destructive_side_effects":False,"security_review_record_sha256":digest,"security_reviewer_id":"security-reviewer-01"},
       "oracle":{"reviewers":[{"reviewer_id":"gold-reviewer-01","role":"gold_reviewer","review_record_sha256":digest,"decision":"accept"},{"reviewer_id":"gold-reviewer-02","role":"gold_reviewer","review_record_sha256":digest,"decision":"accept"}],"blinded_to_candidate_output":True,"llm_only_oracle":False,"disagreement_status":"none","adjudicator_id":None,"adjudication_record_sha256":None,"adjudication_decision":"not_needed","gold_patch_sha256":digest,"semantically_equivalent_repairs_allowed":True,"reference_patch_control":"not_run_blocked","empty_patch_control":"not_run_blocked","oracle_record_sha256":digest},
       "custody":{"partition":"development","custody_domain_id":"dev-custody-01","custodian_id":"custodian-01","custody_manifest_sha256":digest,"holdout_material_outside_agent_workspace":False,"agent_access_before_freeze":False,"public_fix_exposure_accepted":True},
       "execution_qualification":{"candidate_code_executed":False,"isolation_status":"blocked_issue_10064","isolation_profile_sha256":None,"trust_status":"blocked_issue_10369","trust_policy_sha256":None,"independent_regrade_claimed":False},
@@ -242,10 +250,96 @@ def self_test(registry: dict, registry_schema: dict, task_schema: dict, format_c
     if validate_task(fixture, task_schema, format_checker, {}):
         raise SystemExit("valid synthetic task-manifest fixture unexpectedly failed")
 
-    def must_reject(mutant: dict, label: str) -> None:
-        errors = validate_task(mutant, task_schema, format_checker)
+    def must_reject(mutant: dict, label: str, cards: dict[str, dict] | None = None) -> None:
+        errors = validate_task(mutant, task_schema, format_checker, cards or {})
         if not errors:
             raise SystemExit(f"task-admission negative control unexpectedly passed: {label}")
+
+    def synthetic_card(
+        task_id: str,
+        *,
+        fix_visibility: str = "public",
+        reviewer_disposition: str = "development_only",
+        egress_policy: str = "disabled",
+        trajectory_logging: str = "enabled",
+        card_digest: str = "a" * 64,
+    ) -> dict:
+        return {
+            "card_record_sha256": card_digest,
+            "task_id": task_id,
+            "assessment_status": "searched_no_match_found",
+            "reviewer_disposition": reviewer_disposition,
+            "source_visibility": {"fix_visibility": fix_visibility},
+            "agent_access": {
+                "egress_policy": egress_policy,
+                "trajectory_logging": trajectory_logging,
+            },
+        }
+
+    # Security review is a task-admission prerequisite, distinct from runner isolation.
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "static_reviewed"
+    mutant["acceptance_contract"]["security_review_status"] = "not_reviewed"
+    must_reject(mutant, "qualification with unreviewed security disposition")
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "static_reviewed"
+    mutant["acceptance_contract"]["security_review_status"] = "not_applicable"
+    mutant["acceptance_contract"]["security_review_rationale"] = ""
+    must_reject(mutant, "not-applicable security disposition without rationale")
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "static_reviewed"
+    mutant["family_id"] = "security-correctness"
+    mutant["acceptance_contract"]["security_review_status"] = "not_applicable"
+    mutant["acceptance_contract"]["security_review_rationale"] = "This task is incorrectly claimed to have no security-relevant scope."
+    must_reject(mutant, "security-correctness family marked security review not applicable")
+    positive_na = copy.deepcopy(fixture)
+    positive_na["task_status"] = "static_reviewed"
+    positive_na["acceptance_contract"]["security_review_status"] = "not_applicable"
+    positive_na["acceptance_contract"]["security_review_rationale"] = "The reviewed task scope does not alter security-relevant behavior or trust boundaries."
+    if validate_task(positive_na, task_schema, format_checker, {}):
+        raise SystemExit("justified not-applicable security disposition positive control unexpectedly failed")
+
+    # A task beyond proposed must bind its contamination card to the exact task and record digest.
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "static_reviewed"
+    mutant["source"]["contamination_card_id"] = "ceb-leak-fixture-001"
+    mutant["source"]["contamination_card_sha256"] = digest
+    must_reject(mutant, "static review without a registered contamination card", {})
+    valid_card = synthetic_card(fixture["task_id"])
+    cards = {"ceb-leak-fixture-001": valid_card}
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "static_reviewed"
+    mutant["source"]["contamination_card_id"] = "ceb-leak-fixture-001"
+    mutant["source"]["contamination_card_sha256"] = "b" * 64
+    must_reject(mutant, "contamination card digest mismatch", cards)
+    wrong_task_card = synthetic_card("ceb-rust-other-task")
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "static_reviewed"
+    mutant["source"]["contamination_card_id"] = "ceb-leak-fixture-001"
+    mutant["source"]["contamination_card_sha256"] = digest
+    must_reject(mutant, "contamination card belongs to another task", {"ceb-leak-fixture-001": wrong_task_card})
+
+    # A public fix is development-only; it cannot be represented as holdout-eligible.
+    public_card = synthetic_card(fixture["task_id"], reviewer_disposition="eligible_for_holdout_review")
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "static_reviewed"
+    mutant["custody"]["partition"] = "holdout"
+    mutant["custody"]["holdout_material_outside_agent_workspace"] = True
+    mutant["source"]["contamination_card_id"] = "ceb-leak-fixture-001"
+    mutant["source"]["contamination_card_sha256"] = digest
+    must_reject(mutant, "public-fix contamination card represented as holdout eligible", {"ceb-leak-fixture-001": public_card})
+
+    # Execution qualification must use the same egress policy that was assessed on the contamination card.
+    mismatched_egress_card = synthetic_card(fixture["task_id"], egress_policy="allowlisted")
+    mutant = copy.deepcopy(fixture)
+    mutant["task_status"] = "execution_qualified"
+    mutant["oracle"]["reference_patch_control"] = "pass"
+    mutant["oracle"]["empty_patch_control"] = "fail"
+    mutant["execution_qualification"]["isolation_status"] = "qualified"
+    mutant["execution_qualification"]["isolation_profile_sha256"] = "f" * 64
+    mutant["source"]["contamination_card_id"] = "ceb-leak-fixture-001"
+    mutant["source"]["contamination_card_sha256"] = digest
+    must_reject(mutant, "execution egress differs from contamination assessment", {"ceb-leak-fixture-001": mismatched_egress_card})
 
     mutant = copy.deepcopy(fixture)
     mutant["repository"]["source_revision"] = "main"
