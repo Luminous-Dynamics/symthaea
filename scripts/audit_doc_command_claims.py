@@ -21,7 +21,7 @@ UNAVAILABLE = re.compile(
     r"not yet implemented|not implemented|unavailable|"
     r"manifest(?: and binary source)? (?:is |are )?(?:absent|missing)|"
     r"(?:manifest|binary source|executable) (?:is |are )?(?:absent|missing)|"
-    r"not present|does not exist|were not found)\b",
+    r"not present|not in the current checkout|absent from the current checkout|does not exist|were not found)\b",
     re.IGNORECASE,
 )
 DYNAMIC = ("$", chr(96), "*", "?", "{", "}", "<", ">")
@@ -82,10 +82,10 @@ def split_shell_commands(source: str) -> list[str]:
             current.append(char)
             index += 1
             continue
-        if char in {";", "|", "\n"}:
+        if char in {";", "|", "\n"} or (char == "&" and index + 1 < len(flattened) and flattened[index + 1] == "&"):
             commands.append("".join(current))
             current = []
-            if index + 1 < len(flattened) and flattened[index + 1] == char and char in {"|", "&"}:
+            if char in {"|", "&"} and index + 1 < len(flattened) and flattened[index + 1] == char:
                 index += 2
             else:
                 index += 1
@@ -233,9 +233,9 @@ def workspace_package_index(
 ) -> dict[str, list[Path]]:
     """Index packages in the workspace selected by the documented command.
 
-    With no explicit --manifest-path, commands are interpreted from repository
-    root. With an explicit manifest, the nearest ancestor workspace is used;
-    a standalone package manifest is treated as a one-package workspace.
+    With no explicit --manifest-path, use the nearest workspace above the
+    Markdown document containing the command. With an explicit manifest, use
+    its nearest ancestor workspace; a standalone package is one package.
     """
     anchor = (anchor_manifest or (root / "Cargo.toml")).resolve()
     if not anchor.is_file():
