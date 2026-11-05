@@ -331,4 +331,4 @@ Open an issue on GitHub for research discussions.
 
 *"The study of consciousness is the study of what makes us us."*
 
-| [ENG-DESIGN-CHANGE-QUAL Gold Adjudication](ENG_DESIGN_CHANGE_QUAL_GOLD_ADJUDICATION_PROTOCOL_V0_1.md) | Independent claim–evidence applicability labels, reviewer procedure, hard gates and leakage controls |
+| [ENG-DESIGN-CHANGE-QUAL Gold Adjudication](ENG_DESIGN_CHANGE_QUAL_GOLD_ADJUDICATION_PROTOCOL_V0_1.md) | Independent claim–evidence applicability labels, reviewer procedure, hard gates and leakage controls; machine-readable evaluator schema at `benchmarks/engineering-change-impact/gold-record.schema.json` |
