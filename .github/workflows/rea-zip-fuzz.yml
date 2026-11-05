@@ -34,9 +34,9 @@ jobs:
           toolchain: nightly-2026-11-03
       - name: Install pinned cargo-fuzz
         run: cargo install cargo-fuzz --version 0.13.2 --locked
-      - name: Validate committed fuzz dependency lock
-        run: test -f fuzz/Cargo.lock
-      - name: Audit committed fuzz dependency graph
+      - name: Resolve isolated differential fuzz lock
+        run: cargo generate-lockfile --manifest-path fuzz/Cargo.toml
+      - name: Audit resolved fuzz dependency graph
         run: cargo tree --manifest-path fuzz/Cargo.toml --locked -e normal,dev
       - name: Prepare content-addressable seed corpus
         run: |
@@ -61,22 +61,35 @@ jobs:
             sha256sum fuzz/Cargo.lock
             sha256sum fuzz/seeds/minimal-stored-entry.zip.b64 fuzz/corpus/zip_inventory_and_content/minimal-stored-entry.zip
           } | tee fuzz/artifacts/run-context.txt
-      - name: Run bounded coverage-guided fuzz smoke
+      - name: Fuzz production reader admission and content stream
         run: |
           set -o pipefail
           cargo +nightly-2026-11-03 fuzz run zip_inventory_and_content -- \
-            -artifact_prefix=fuzz/artifacts/ \
+            -artifact_prefix=fuzz/artifacts/reader- \
             -max_total_time=180 \
             -max_len=1048576 \
             -rss_limit_mb=512 \
-            -print_final_stats=1 2>&1 | tee fuzz/artifacts/fuzz-output.txt
-      - name: Bind fuzz result to exact run context
+            -print_final_stats=1 2>&1 | tee fuzz/artifacts/reader-fuzz-output.txt
+      - name: Fuzz differential metadata and payload agreement
+        run: |
+          set -o pipefail
+          cargo +nightly-2026-11-03 fuzz run zip_parser_differential -- \
+            -artifact_prefix=fuzz/artifacts/differential- \
+            -max_total_time=180 \
+            -max_len=1048576 \
+            -rss_limit_mb=512 \
+            -print_final_stats=1 2>&1 | tee fuzz/artifacts/differential-fuzz-output.txt
+      - name: Bind fuzz results to exact run context
         if: always()
         run: |
-          if test -f fuzz/artifacts/fuzz-output.txt; then
-            sha256sum fuzz/artifacts/fuzz-output.txt | tee -a fuzz/artifacts/run-context.txt
-            grep -E 'Done [0-9]+ runs|stat::number_of_executed_units:|stat::average_exec_per_sec:|stat::peak_rss_mb:' fuzz/artifacts/fuzz-output.txt > fuzz/artifacts/fuzz-summary.txt || true
-          fi
+          for target in reader differential; do
+            output="fuzz/artifacts/${target}-fuzz-output.txt"
+            summary="fuzz/artifacts/${target}-fuzz-summary.txt"
+            if test -f "$output"; then
+              sha256sum "$output" | tee -a fuzz/artifacts/run-context.txt
+              grep -E 'Done [0-9]+ runs|stat::number_of_executed_units:|stat::average_exec_per_sec:|stat::peak_rss_mb:' "$output" > "$summary" || true
+            fi
+          done
       - name: Upload committed fuzz lock and artifacts
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
