@@ -372,3 +372,45 @@ The currently visible Hugging Face release declares **CC BY-NC 4.0** (non-commer
 | MzansiBench / Uhura / AFROBENCH | Broad language/task and scientific QA coverage | One universal South African score |
 
 Use shared run receipts and identity/provenance fields, but preserve separate labels, metrics, rights and safety thresholds.
+
+
+## 10. Process-level factuality and safety baselines (November 2026)
+
+### PROBE — stage-level hallucination detection
+
+[PROBE (Findings ACL 2026)](https://aclanthology.org/2026.findings-acl.2099/) evaluates claim decomposition, evidence finding, evidence evaluation and hallucination localization across 12,000 summarization, QA and style-transfer cases. Its findings point to evidence finding as a major weakness.
+
+Use it as a method reference for the AfrIFact pipeline and report stage-level metrics; do not rely on final answer accuracy alone.
+
+### TRIVIA+ — long-context RAG and label-noise
+
+[TRIVIA+ (ACL 2026)](https://aclanthology.org/2026.acl-long.680/) supplies long-context RAG hallucination cases, sentence-level human labels and sample-dependent noisy-label variants. Its repository reports 3,224 examples and contexts up to 94K characters.
+
+Use as an optional long-context detector robustness lane, not an African-language benchmark. Pin exact revision, license, provenance and annotation protocol; report clean-label and noise-condition results separately.
+
+### All Languages Matter / LAURA — cross-lingual evidence reranking
+
+[All Languages Matter (ACL 2026)](https://aclanthology.org/2026.acl-long.338/) finds mRAG rerankers favour English and the query's native language, suppressing answer-critical evidence written in other languages. It proposes LAURA, a language-agnostic utility-driven reranker.
+
+Required control: hold the claim fixed while varying the decisive evidence language, including cases where the only correct evidence is non-query-language. Compare BM25, dense, hybrid, conventional reranking, LAURA where reproducible, and evidence-plane + reasoning. Report answer-critical Recall@k / nDCG, evidence-language selection, and downstream fact-check results under matched budgets.
+
+### AfriqueLLM — local open-weight model comparison
+
+[AfriqueLLM (ACL 2026)](https://arxiv.org/abs/2601.06395) adapts open-weight models to 20 African languages using approximately 26B continued-pretraining tokens. The current [AfriqueQwen-4B card](https://huggingface.co/McGill-NLP/AfriqueQwen-4B) explicitly lists Afrikaans, Zulu, Xhosa, Southern Sotho and Tswana. Sepedi is not in the reviewed model-card language list.
+
+Use only the exact supported model/language combinations and pin weights, tokenizer, license and inference settings. A model suite's aggregate language count is not evidence that a particular model supports every language.
+
+### XL-SafetyBench and GSMA/Zindi
+
+- [XL-SafetyBench](https://arxiv.org/abs/2605.05662) evaluates jailbreak and cultural sensitivity across ten country-language pairs using ASR, NSR and CSR. Its current country manifest does not include South Africa; use as a global methodology comparator only.
+- [GSMA/Zindi African Trust & Safety benchmark](https://www.gsma.com/newsroom/blog/african-trust-safety-llm-benchmark-stress-testing-ai-safety-across-africas-languages-and-contexts/) reports 4,216 verified safety stress tests. Top represented languages include Swahili, Hausa, Yoruba, Igbo, Zulu, Afrikaans, Amharic and Akan. Zindi lists CC BY-SA 4.0 sharing terms; verify actual data file access, attribution and split before admitting it: https://zindi.world/competitions/the-african-trust-safety-llm-challenge
+
+Keep safety compliance, benign helpfulness, comprehension/deflection and cultural sensitivity as distinct outcomes.
+
+### M4-RAG — later multimodal evidence track
+
+[M4-RAG (CVPR 2026)](https://openaccess.thecvf.com/content/CVPR2026/html/Anugraha_M4-RAG_A_Massive-Scale_Multilingual_Multi-Cultural_Multimodal_RAG_CVPR_2026_paper.html) spans 42 languages, 56 dialects/registers, 189 countries and 80k+ image-question pairs. Its findings warn that retrieval can degrade larger VLM performance and that non-English prompts/context can harm results. Consider only in a later vision/multimodal track, with image/text conflict controls; do not mix it into text-only factuality scores.
+
+### Competitive retrieval challenge
+
+The most important new retrieval ablation is: **keep the claim constant and vary only the language of the answer-critical evidence**. A multilingual system must retrieve a relevant isiXhosa/Zulu/Sesotho/Afrikaans source even when the query is English or another language. If it suppresses decisive evidence due to language preference, high final-answer accuracy can simply reflect memorization. This is a direct, measurable target for a language-neutral evidence ranker.
