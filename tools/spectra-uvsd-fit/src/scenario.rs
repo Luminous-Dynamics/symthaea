@@ -541,6 +541,7 @@ mod tests {
             &scenario_set,
             &outcomes,
             RobustUtility::Maximin,
+            "sha256:scenario-score-contract",
         )
         .unwrap();
         let mut reversed = outcomes;
@@ -550,6 +551,7 @@ mod tests {
             &scenario_set,
             &reversed,
             RobustUtility::Maximin,
+            "sha256:scenario-score-contract",
         )
         .unwrap();
         assert_eq!(first, second);
@@ -567,6 +569,7 @@ mod tests {
             &scenario_set,
             &outcomes,
             RobustUtility::Maximin,
+            "sha256:scenario-score-contract",
         )
         .unwrap();
         assert!(!batch.assessments[0].operational_mapping_qualified);
@@ -598,7 +601,7 @@ mod tests {
                 &scenario_set,
                 &duplicate,
                 RobustUtility::Maximin,
-            "sha256:scenario-score-contract",
+                "sha256:scenario-score-contract",
             ),
             Err(ScenarioAssessmentError::DuplicateActionScenarioOutcome)
         );
@@ -616,7 +619,7 @@ mod tests {
                 &scenario_set,
                 &unknown_action,
                 RobustUtility::Maximin,
-            "sha256:scenario-score-contract",
+                "sha256:scenario-score-contract",
             ),
             Err(ScenarioAssessmentError::UnknownActionId)
         );
@@ -629,7 +632,7 @@ mod tests {
                 &scenario_set,
                 &unknown_scenario,
                 RobustUtility::Maximin,
-            "sha256:scenario-score-contract",
+                "sha256:scenario-score-contract",
             ),
             Err(ScenarioAssessmentError::UnknownScenarioId)
         );
@@ -642,7 +645,7 @@ mod tests {
                 &scenario_set,
                 &invalid_score,
                 RobustUtility::Maximin,
-            "sha256:scenario-score-contract",
+                "sha256:scenario-score-contract",
             ),
             Err(ScenarioAssessmentError::InvalidOutcomeValue)
         );
@@ -749,6 +752,7 @@ mod tests {
             &make_scenario_set(),
             &reference_outcomes(),
             RobustUtility::LowerTailCvar { tail_mass: 0.5 },
+            "sha256:scenario-score-contract",
         )
         .unwrap();
         assert_eq!(batch.scenario_set_digest, "sha256:scenario-set");
