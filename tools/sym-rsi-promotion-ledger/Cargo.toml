@@ -1,0 +1,15 @@
+[package]
+name = "sym-rsi-promotion-ledger"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Independent append-only, signed history ledger for adaptive RSI promotion decisions"
+
+[workspace]
+members = ["."]
+resolver = "2"
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+symthaea-statistics = { path = "../../crates/domains/symthaea-statistics" }
