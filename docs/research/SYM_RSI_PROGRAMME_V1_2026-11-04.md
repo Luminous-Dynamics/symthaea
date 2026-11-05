@@ -341,3 +341,51 @@ Immediate implications:
 - Compare against the existing deterministic SYM-RSI-001 replay substrate as a low-cost mechanism baseline, then test transfer into real R&D/coding domains. The old replay stack remains a separate draft lineage and is not integrated into `main`.
 
 Source: Qu et al., *RSI-Env: An Open-Ended Environment for Recursive Self-Improvement of Agents*, arXiv:2611.01736v1, 2026-11-01. https://arxiv.org/abs/2611.01736
+
+
+## 12. Generalization ladder and external RSI benchmark matrix
+
+SelfImprove-Bench (Xu et al., arXiv:2611.02797v1, 2026-11-02) gives a useful explicit transfer ladder. Symthaea should preserve its R0–R5 claim ladder but score each system update on the following generalization levels:
+
+- **G0 — Replay:** improvement on the same replayed task instances.
+- **G1 — Same-task transfer:** held-out instances from the same task/game at the training difficulty.
+- **G2 — Difficulty transfer:** harder held-out instances of the same task/game.
+- **G3 — Within-capability transfer:** different tasks in the same capability category.
+- **G4 — Cross-capability transfer:** tasks in a different capability category.
+
+SelfImprove-Bench reports that these levels do not move monotonically: G1 improvement may fail on harder G2 instances; within-category transfer can be directional; and rankings between methods can reverse across transfer sets. Its HCI (Headroom-Closed Index) is HCI = (successor mean − baseline mean) / (reference mean − baseline mean). Always publish raw baseline/successor/reference scores and per-task results alongside HCI. HCI is normalized headroom closed, not an effect size or confidence interval; it can exceed 100% where successor performance surpasses the declared reference. The benchmark's controllable games support causal/mechanism analysis, but do not substitute for engineering or scientific transfer.
+
+### External benchmark tracks — separate scorecards
+
+| Track | What it tests | Use in Symthaea RSI |
+|---|---|---|
+| SelfImprove-Bench G0–G4 | Replay, same-task holdout, harder tasks, within-capability and cross-capability transfer | Primary generalization mechanism track; preserve all G-level results |
+| RSI-Env | Open-General, Capability-Directed and Benchmark-Guided model/harness self-improvement under an external controller | Autonomy-mode and capability-retention comparison |
+| AIDE² selection + held-out R&D tasks | Repeated research-agent rewrites across ML engineering, heuristic algorithms and harness engineering | R3 repeated improvement and independent transfer |
+| AIRS-Bench | 20 research-science tasks from ML papers across language modelling, mathematics, bioinformatics and time series; idea→experiment→analysis→refinement | Broad scientific-research lifecycle track |
+| FIRE-Bench | Rediscovery of established ML research findings through independently designed experiments and evidence-backed conclusions | Scientific correctness/replicability track, not prose-quality judging |
+| AI4AI-Bench | Actual training-algorithm redesign in 10 frozen research repositories under a four-hour design window and clean-start training evaluation | R5 algorithmic RSI; separate algorithm changes from harness, data and hyperparameter changes |
+| Coding Agent Index v2.0 components | FrontierCode v1.1, Terminal-Bench 4.0 and SWE-Atlas-QnA-AA | External software-engineering transfer; report each suite plus cost/reliability, not only index |
+
+### Prospective qualification targets (not measured results)
+
+These are research acceptance targets to preregister before any confirmatory run; they are not claims about current Symthaea performance:
+
+1. **R3 repeated improvement:** at least five successive independently accepted improvements, each evaluated under the same fixed total per-candidate budget; retain all rejected proposals and best-so-far checkpoints.
+2. **Transfer:** positive raw held-out delta at G1 and G2; positive aggregate G3 and G4 with a cluster-aware lower confidence bound above zero across a preregistered minimum of five independent task families/categories. Publish the full distribution; do not claim success from a single aggregate or one lucky domain.
+3. **Capability retention:** every protected metric stays above a pre-registered non-inferiority floor and per-metric regression margin. Example margins must be justified per metric and frozen before selection; do not universalize a 2-point margin across incomparable scales.
+4. **R4 meta-improvement:** more independent, transfer-confirmed improvements per total resource budget than frozen-meta, champion-only, fixed-meta archive, and matched random/human-search baselines. Resource accounting includes failed proposals, evaluations, training, inference, data access and retries.
+5. **R5 algorithmic improvement:** the patch must alter the learning objective, supervision, update rule or another declared learning mechanism; a harness, checkpointing, data-budget or hyperparameter-only change is a separate treatment. Train from a clean start and evaluate with a fixed hidden grader. The initial external aim is to exceed AI4AI-Bench's reported best normalized score of 0.250 under its exact frozen protocol, but no comparison is valid unless tasks, base models, B300-hour budgets and evaluation procedure match.
+6. **Research reliability:** on FIRE-Bench/AIRS-Bench, report experiment validity, independent evidence correctness, replication, uncertainty, unsupported claims and run variance—not only final score or LLM-judge writing quality.
+7. **Engineering transfer:** compare the same foundation model across a frozen baseline harness and Symthaea-enabled harness on FrontierCode, Terminal-Bench 4.0 and SWE-Atlas-QnA-AA, holding model version, reasoning setting, attempts, tools, budget and environment constant. Report per-suite pass@1 and pass@3 as appropriate, cost, tokens, wall-clock, refusals, reward-hack flags and verified patch quality.
+
+### Paradigm shift
+
+Treat improvement as a **causal research process with an audited transfer frontier**, not a chain of increasingly high scores. Each proposal must declare the mechanism it changes, predicted effects and possible regressions before evaluation; retain the complete trajectory, resource use and negative findings; and attribute observed changes to model, harness, memory, algorithm and meta-policy edits using matched ablations. The external controller—not the evolving agent—owns candidate identity, task release, resource caps, evaluator, independent regrade, holdout access and rollback.
+
+Sources:
+- Xu et al., *SelfImprove-Bench: Evaluating Generalization in Self-Improving Agents*, arXiv:2611.02797v1 (2026-11-02): https://arxiv.org/abs/2611.02797
+- Meta AI, *AIRS-Bench* (2026-02-10): https://ai.meta.com/research/publications/airs-bench-a-suite-of-tasks-for-frontier-ai-research-science-agents/
+- Wang et al., *FIRE-Bench*, PMLR 306 (2026): https://proceedings.mlr.press/v306/wang26d.html
+- Chi et al., *AI4AI-Bench*, arXiv:2608.20318 (2026-08-20): https://arxiv.org/abs/2608.20318
+- Artificial Analysis Coding Agent Index v2.0 methodology (2026-10): https://artificialanalysis.ai/methodology/coding-agents-benchmarking/
