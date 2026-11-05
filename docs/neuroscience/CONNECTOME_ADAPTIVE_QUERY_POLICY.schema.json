@@ -110,6 +110,11 @@
         "$ref": "#/$defs/scenarioExpansionChallenge"
       },
       "description": "Optional append-only alternative-world expansions; each is independently evaluated against the same frozen base scenario and joint-support universe."
+    },
+    "require_signed_attestations": {
+      "type": "boolean",
+      "default": false,
+      "description": "Require every support/scenario challenge to contain a verified DSSE envelope under its caller-pinned role-bound trust policy. When false, legacy challenges remain CONTENT_BOUND_UNAUTHENTICATED."
     }
   },
   "$defs": {
@@ -284,6 +289,9 @@
           "items": {
             "$ref": "#/$defs/supportAddition"
           }
+        },
+        "attestation": {
+          "$ref": "#/$defs/challengeAttestationBinding"
         }
       }
     },
@@ -357,6 +365,9 @@
           "items": {
             "$ref": "#/$defs/scenarioWorldAddition"
           }
+        },
+        "attestation": {
+          "$ref": "#/$defs/challengeAttestationBinding"
         }
       }
     },
@@ -373,6 +384,36 @@
         },
         "support": {
           "$ref": "#/$defs/worldSupport"
+        }
+      }
+    },
+    "challengeAttestationBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "envelope_json_base64",
+        "trust_policy_json_base64",
+        "expected_trust_policy_sha256",
+        "verification_time_unix"
+      ],
+      "properties": {
+        "envelope_json_base64": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "minLength": 1
+        },
+        "trust_policy_json_base64": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "minLength": 1
+        },
+        "expected_trust_policy_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "verification_time_unix": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     }
