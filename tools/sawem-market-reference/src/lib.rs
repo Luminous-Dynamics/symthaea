@@ -1193,6 +1193,21 @@ mod tests {
         &[]
     }
 
+    fn generating_price_curve() -> GeneratingPriceCurve {
+        GeneratingPriceCurve {
+            minimum_stable_generation_mw: 20.0,
+            elbow_one_mw: 40.0,
+            elbow_two_mw: 70.0,
+            maximum_continuous_rating_mw: 100.0,
+            emergency_level_one_mw: 110.0,
+            increment_zero_minor_per_mwh: 10,
+            increment_one_minor_per_mwh: 20,
+            increment_two_minor_per_mwh: 30,
+            increment_three_minor_per_mwh: 40,
+            emergency_level_one_minor_per_mwh: 50,
+        }
+    }
+
     fn step(
         charge_mw: f64,
         discharge_mw: f64,
@@ -1208,6 +1223,160 @@ mod tests {
             network_export_limit_mw: 60.0,
             network_import_limit_mw: 50.0,
         }
+    }
+
+    #[test]
+    fn reserve_opportunity_price_uses_product_specific_elbow_rules_and_signs() {
+        let curve = generating_price_curve();
+
+        let regulating_up = reserve_opportunity_price(
+            ReserveProduct::Regulating,
+            ReserveDirection::Up,
+            50,
+            40.0,
+            curve,
+        )
+        .expect("regulating up price is supported");
+        assert_eq!(regulating_up.selected_increment, PriceIncrement::Two);
+        assert_eq!(regulating_up.price_difference_minor_per_mwh, 20);
+
+        let regulating_down = reserve_opportunity_price(
+            ReserveProduct::Regulating,
+            ReserveDirection::Down,
+            15,
+            40.0,
+            curve,
+        )
+        .expect("regulating down price is supported");
+        assert_eq!(regulating_down.selected_increment, PriceIncrement::One);
+        assert_eq!(regulating_down.price_difference_minor_per_mwh, 5);
+
+        let instantaneous = reserve_opportunity_price(
+            ReserveProduct::Instantaneous,
+            ReserveDirection::Up,
+            50,
+            40.0,
+            curve,
+        )
+        .expect("instantaneous up price is supported");
+        assert_eq!(instantaneous.selected_increment, PriceIncrement::Two);
+        assert_eq!(instantaneous.price_difference_minor_per_mwh, 20);
+
+        let ten_minute = reserve_opportunity_price(
+            ReserveProduct::TenMinute,
+            ReserveDirection::Up,
+            20,
+            40.0,
+            curve,
+        )
+        .expect("ten-minute up price is supported");
+        assert_eq!(ten_minute.selected_increment, PriceIncrement::Two);
+        assert_eq!(ten_minute.price_difference_minor_per_mwh, 0);
+    }
+
+    #[test]
+    fn reserve_opportunity_price_uses_mingen_mcr_and_emergency_boundaries() {
+        let curve = generating_price_curve();
+
+        let at_mingen = reserve_opportunity_price(
+            ReserveProduct::Regulating,
+            ReserveDirection::Down,
+            15,
+            20.0,
+            curve,
+        )
+        .expect("mingen boundary is valid");
+        assert_eq!(at_mingen.selected_increment, PriceIncrement::One);
+        assert_eq!(at_mingen.price_difference_minor_per_mwh, 5);
+
+        let at_mcr = reserve_opportunity_price(
+            ReserveProduct::Regulating,
+            ReserveDirection::Up,
+            50,
+            100.0,
+            curve,
+        )
+        .expect("MCR boundary is valid");
+        assert_eq!(at_mcr.selected_increment, PriceIncrement::Three);
+        assert_eq!(at_mcr.price_difference_minor_per_mwh, 10);
+
+        let above_mcr = reserve_opportunity_price(
+            ReserveProduct::Regulating,
+            ReserveDirection::Up,
+            50,
+            105.0,
+            curve,
+        )
+        .expect("emergency curve segment is valid");
+        assert_eq!(
+            above_mcr.selected_increment,
+            PriceIncrement::EmergencyLevelOne
+        );
+        assert_eq!(above_mcr.price_difference_minor_per_mwh, 0);
+    }
+
+    #[test]
+    fn reserve_opportunity_price_selects_lower_regulating_down_elbow_two() {
+        let curve = generating_price_curve();
+        let down = reserve_opportunity_price(
+            ReserveProduct::Regulating,
+            ReserveDirection::Down,
+            35,
+            70.0,
+            curve,
+        )
+        .expect("regulating down is supported");
+        assert_eq!(down.selected_increment, PriceIncrement::Two);
+        assert_eq!(down.price_difference_minor_per_mwh, 5);
+
+        let up = reserve_opportunity_price(
+            ReserveProduct::Regulating,
+            ReserveDirection::Up,
+            50,
+            70.0,
+            curve,
+        )
+        .expect("regulating up is supported");
+        assert_eq!(up.selected_increment, PriceIncrement::Three);
+        assert_eq!(up.price_difference_minor_per_mwh, 10);
+    }
+
+    #[test]
+    fn reserve_opportunity_price_rejects_bad_curves_and_unsupported_directions() {
+        let mut invalid = generating_price_curve();
+        invalid.increment_two_minor_per_mwh = 15;
+        assert_eq!(
+            reserve_opportunity_price(
+                ReserveProduct::Regulating,
+                ReserveDirection::Up,
+                50,
+                40.0,
+                invalid,
+            ),
+            Err(ReservePriceError::NonMonotonicIncrementalPrice)
+        );
+
+        assert_eq!(
+            reserve_opportunity_price(
+                ReserveProduct::Instantaneous,
+                ReserveDirection::Down,
+                50,
+                40.0,
+                generating_price_curve(),
+            ),
+            Err(ReservePriceError::UnsupportedProductDirection)
+        );
+
+        assert_eq!(
+            reserve_opportunity_price(
+                ReserveProduct::Regulating,
+                ReserveDirection::Down,
+                i64::MIN,
+                40.0,
+                generating_price_curve(),
+            ),
+            Err(ReservePriceError::ArithmeticOverflow)
+        );
     }
 
     #[test]
