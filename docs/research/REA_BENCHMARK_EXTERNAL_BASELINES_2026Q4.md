@@ -332,3 +332,27 @@ The clean rebase onto the current receipt validator passed [workflow 42059013582
 
 The reader suite, two fuzz arms, receipt schema validator, and independent replayer qualify different properties. Fuzz executions are not parser correctness percentages. Differential agreement is bounded to the stated shared ZIP subset and two pinned implementations. Sealed replay establishes the content of the captured immutable snapshot, not an atomic point-in-time view of a concurrently changing source or producer authenticity.
 
+## 2026-11-05 update — AgentRE-Bench v3.1 six-model report
+
+The official v3.1 Windows PE report was updated November 5, 2026 after DeepSeek V4.1 Flash joined the existing five-model cohort. The current report contains **600 attempts** across six models, 20 stripped/unstripped binaries from ten programs, and five attempts per binary. Overall remains 90% Main + 10% Bonus; refusals and budget exits score zero. [Official results and method](https://www.agentre-bench.ai/results/v3-1/).
+
+| Model | Overall /100 | Fixed-suite 95% interval | Valid answers |
+|---|---:|---:|---:|
+| Muse Wonder | 87.37 | 85.18–89.56 | 100/100 |
+| GPT-6 Astra | 87.04 | 85.80–88.29 | 100/100 |
+| Grok 4.7 | 79.62 | 76.59–82.65 | 96/100 |
+| DeepSeek V4.1 Flash | 78.31 | 75.01–81.60 | 98/100 |
+| Claude Opus 5.5 | 69.66 | 62.57–76.74 | 78/100 |
+| Gemini 4 Argon | 31.20 | 13.30–49.10 | 36/100 |
+
+Muse's recorded mean exceeds Astra by 0.3243 points, but the simultaneous 95% interval for the difference is -3.8203 to +4.4689. It includes zero: the report does **not** establish repeat-run superiority or equivalence. Intervals are based on five full-suite repetition means, not 100 independent tasks. The 600 attempts are repeated runs on the same 20 public artifacts, not 600 distinct binaries.
+
+The November refresh adds a significant rubric-quality caveat: the site reports that a separate AI reviewer reproduced all 600 versioned score objects and checked the exact-claim mappings, but explicitly does not claim an independent human audit. It also reports 46 source-supported mappings that still receive fixed-rubric penalties and zero fully credited episodes. Therefore quote the official score as a result under rubric v3.4/scorer 6.2.0 plus the exact-claim review—not as a pure factual-accuracy ground truth. Keep valid-answer coverage distinct from conditional answer quality; those quality averages cover different answered subsets.
+
+### Competitive interpretation
+
+This update reinforces why Symthaea should not chase one blended leaderboard. AgentRE measures bounded episode performance on public Windows PE artifacts; SRE-Bench is a distinct contamination-resistant private benchmark with 19 programs, 262 binary instances and 1,572 deterministic tasks across firmware, malware, games, file formats and network protocols. Their artifacts, access conditions, task definitions, budgets and scoring differ. No scores should be pooled.
+
+No Luminous/Symthaea participation or result is claimed here. A defensible comparison requires the exact official protocol, permitted tool access, frozen versions, repeated attempts, complete eligible denominators, refusal/unsupported accounting and uncertainty intervals. Our additional differentiation should be measured through false-entailment rate, scope leakage, correct abstention, dependency-aware corroboration and decision regret—capabilities not reducible to AgentRE or SRE headline scores.
+
+Source checked: AgentRE-Bench v3.1 results, updated November 5, 2026: https://www.agentre-bench.ai/results/v3-1/ . SRE-Bench official page, updated October 2026: https://daplab.cs.columbia.edu/benchmarks/sre-bench/ .
