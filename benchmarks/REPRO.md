@@ -54,6 +54,29 @@ The benchmark contains 85 tasks: structural 10, civil 18, electrical 27 and mech
 
 The dataset card identifies 12 `checks`, 14 `rubric` and 3 `checks-judge` dev tasks. Seventeen tasks require the official evaluation runner to build task-specific verifier images; standalone Harbor is not a full substitute. The official runner requires Harbor 0.20.0, uses `eval/run.py`, and enforces a six-hour per-task limit. The published public development leaderboard reports model results averaged over three runs. The competition submission dev score is different: it grades committed artifacts and runs the harness live on a sample to check reproducibility. The official hidden competition leaderboard also averages three harness runs. A Luminous matched dev comparison should use three independently identified full-set runs to align with the published dev baseline.
 
+### All-85 official leaderboard snapshot (2026-11-05)
+
+The all-task board is a distinct evaluation pathway covering all 85 tasks, three runs per model+harness pair, six-hour per-task limit, highest available reasoning effort, and the official rubric judge. On the captured snapshot:
+
+| Model + harness | Mean score | Cost / task | Median minutes |
+|---|---:|---:|---:|
+| Claude Opus 5.5 / Claude Code | 0.506 | $17.18 | 63 |
+| Claude Opus 5.5 / OpenHands | 0.499 | $14.82 | 65 |
+| Claude Opus 5.5 / Codex | 0.493 | $35.15 | 123 |
+| Claude Opus 5.5 / Hermes | 0.486 | $16.42 | 67 |
+| Claude Opus 5.5 / Agy | 0.484 | approx. $42.32 | 44 |
+| GPT-6 Astra / Codex | 0.483 | $9.15 | 25 |
+
+Source: https://ple-bench.com/leaderboard?set=all
+
+Keep this all-85 board separate from:
+- the 29-task public development board (three runs per pair);
+- the 56-task hidden board (three runs per pair);
+- the paper abstract's strongest-configuration mean, unless its aggregation is proven identical;
+- the competition-entry committed-artifact development score.
+
+Every row is a model+harness system, not a model-only result. The benchmark site also reports that harness changes can shift model performance materially and that discipline leaders vary; use matched model × harness comparisons and preserve per-task outputs, cost and runtime.
+
 ### Required gates before any run
 
 - [ ] PLE dataset access is granted to the authorized account and its exact CC-BY-4.0 terms are accepted.
