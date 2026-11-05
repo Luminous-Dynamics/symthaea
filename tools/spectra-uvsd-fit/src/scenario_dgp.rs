@@ -778,14 +778,13 @@ mod tests {
 
         let noise = dataset.trials.iter().find(|trial| trial.action_id == 1).unwrap();
         let signal = dataset.trials.iter().find(|trial| trial.action_id == 2).unwrap();
-        assert_eq!(noise.oracle_evidence, signal.oracle_evidence);
-        assert_eq!(noise.oracle_lapse, signal.oracle_lapse);
-        assert_eq!(noise.observed_category.is_none(), signal.observed_category.is_none());
-        assert_ne!(
-            noise.oracle_category,
-            signal.oracle_category,
-            "the same latent evidence can map differently because signal/noise actions differ"
+        let standardized_signal_evidence =
+            (signal.oracle_evidence - signal.oracle_signal_mean) / signal.oracle_signal_sigma;
+        assert!(
+            (noise.oracle_evidence - standardized_signal_evidence).abs() < 1.0e-12,
+            "paired actions must reuse the same standardized evidence draw"
         );
+        assert_eq!(noise.oracle_lapse, signal.oracle_lapse);
     }
 
     #[test]
