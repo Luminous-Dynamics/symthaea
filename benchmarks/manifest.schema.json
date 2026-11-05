@@ -888,6 +888,97 @@
                   "minLength": 1
                 }
               }
+            },
+            "all_tasks_leaderboard_snapshot": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "captured_at",
+                "source_url",
+                "scope",
+                "task_count",
+                "run_protocol",
+                "entries",
+                "comparability_warning"
+              ],
+              "properties": {
+                "captured_at": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "source_url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "scope": {
+                  "const": "mean_score_on_all_85_tasks"
+                },
+                "task_count": {
+                  "type": "integer",
+                  "const": 85
+                },
+                "run_protocol": {
+                  "type": "string",
+                  "minLength": 20
+                },
+                "entries": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "model",
+                      "agent_harness",
+                      "score",
+                      "run_count"
+                    ],
+                    "properties": {
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "agent_harness": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "score": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "run_count": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "cost_per_task_usd": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "median_duration_minutes": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "notes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                },
+                "comparability_warning": {
+                  "type": "string",
+                  "minLength": 20
+                }
+              }
             }
           }
         },
