@@ -1,0 +1,1075 @@
+{
+  "schema_version": 0,
+  "benchmark_id": "CEB",
+  "matrix_id": "CEB-MEASUREMENT-MATRIX-V0",
+  "release": "v0-design-only",
+  "status": "design_only",
+  "created_at": "2026-11-05",
+  "claim_policy": {
+    "score_denominator": "Only task instances that pass task qualification, evidence qualification and independent-oracle admission may enter a capability resolution denominator. Invalid or unresolved cases are reported separately, never silently dropped.",
+    "superiority_claim_requires": [
+      "same benchmark version and task split",
+      "same task instructions, source snapshot and oracle semantics",
+      "same primary metric and aggregation rule",
+      "matched model, harness, tools, prompt, turns, tokens, time, compute and cost budgets, or a preregistered controlled ablation",
+      "at least three independent seeds, with five where pilot variance warrants it",
+      "paired confidence interval or preregistered non-inferiority test",
+      "task-level outcomes, unresolved cases, exclusions and raw denominators",
+      "independent pristine regrade and exact evidence digests",
+      "public disclosure of deviations and protocol version"
+    ],
+    "contextual_comparison_rule": "A published result with different tasks, metric definitions, budget, harness or rubric is a contextual reference only. It can motivate a target but cannot support a beat-SOTA claim.",
+    "aggregation_rule": "Do not collapse resolution, security, evaluator integrity, calibration, cost, human review and unresolved states into one weighted score. Report each axis. Critical hard-gate failures cannot be compensated by another metric.",
+    "benchmark_lifecycle_rule": "Version task, instruction, environment, budget, grader and scoring changes. Breaking changes require reruns; verifier semantic changes require regrade; metadata-only changes may reuse prior results only when execution and scoring bytes are unchanged."
+  },
+  "lanes": [
+    {
+      "lane_id": "CEB-RESOLUTION",
+      "capability": "Repository issue resolution and regression-safe repair",
+      "decision_question": "Can the system resolve a real issue while preserving unrelated behavior, under an independently qualified task and evaluator?",
+      "primary_metrics": [
+        {
+          "metric_id": "resolve_rate",
+          "definition": "Fraction of qualified tasks satisfying issue-specific fail-to-pass and existing pass-to-pass requirements.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "Directly exceed the best matched same-version baseline with paired uncertainty; no universal numeric target inferred from public saturation."
+        },
+        {
+          "metric_id": "cost_per_accepted_repair",
+          "definition": "Total inference, tool, execution and review cost divided by independently accepted repairs.",
+          "unit": "USD per accepted repair",
+          "direction": "minimize",
+          "prospective_target": "At least 20% lower cost with no more than 1 percentage point correctness regression, preregistered."
+        },
+        {
+          "metric_id": "regression_rate",
+          "definition": "Fraction of accepted candidate patches that regress pre-existing behavior under qualified pass-to-pass checks.",
+          "unit": "proportion",
+          "direction": "minimize",
+          "prospective_target": "Zero critical regression classes in the declared control set."
+        }
+      ],
+      "comparators": [
+        {
+          "name": "SWE-Bench Pro V2 Full",
+          "version": "2026-09-22 refresh; recheck live board before each run",
+          "sample_scope": "642 tasks across 11 repositories",
+          "published_reference": "Opus 5 + Claude Code 99.40 ± 0.40; Gemini 4 Argon + mini-swe-agent 99.22 ± 0.45; Fable 5.1 + Claude Code 99.10 ± 0.50.",
+          "source_url": "https://labs.scale.com/leaderboard/swe_bench_pro_public_v2",
+          "comparison_class": "contextual_reference_until_exact_protocol_match",
+          "caveats": [
+            "The full set is near ceiling and should not be the only discriminator.",
+            "The HARD subset is a separate 51-task denominator.",
+            "Scale reports the full refresh removed 89 invalid tasks, corrected 69 contradictory task statements, disabled agent web access, and pristine-regraded patches.",
+            "The benchmark page still identifies a trusted endpoint relay and execution of candidate-controlled code by the verifier as residual risks."
+          ]
+        },
+        {
+          "name": "SWE-Bench Pro V2 HARD",
+          "version": "2026-09-22 refresh; recheck live board",
+          "sample_scope": "51-task HARD subset",
+          "published_reference": "Opus 5 + Claude Code 98.00; Fable 5.1 + Claude Code 92.20; Gemini 4 Argon + mini-swe-agent 92.16.",
+          "source_url": "https://labs.scale.com/leaderboard/swe_bench_pro_public_v2",
+          "comparison_class": "contextual_reference_until_exact_protocol_match",
+          "caveats": [
+            "Small split; uncertainty and exact task list must remain visible.",
+            "Do not merge with Full results."
+          ]
+        }
+      ],
+      "baseline_arms": [
+        "deterministic_tools_only",
+        "same_foundation_model_minimal_harness",
+        "same_model_strong_industry_harness",
+        "same_model_plus_one_CEB_component",
+        "Symthaea_native_path_where_applicable",
+        "lesion_sham_rescue_for_causal_claims"
+      ],
+      "evidence_contract": {
+        "required_artifacts": [
+          "task_manifest_digest",
+          "source_tree_digest",
+          "patch_digest",
+          "grader_digest",
+          "toolchain_digest",
+          "runner_policy_digest",
+          "budget_record",
+          "primary_receipt",
+          "pristine_regrade_receipt",
+          "task_level_outcomes"
+        ],
+        "independent_adjudication": true,
+        "unresolved_state_required": true,
+        "evidence_authority": "independent_regrade_and_verified_receipt_pair",
+        "execution_gate": "#10064 and #10369"
+      },
+      "hard_gates": [
+        "reference_patch_pass_and_empty_patch_fail",
+        "no critical regression",
+        "evidence_qualified_before_score_credit",
+        "independent_pristine_regrade"
+      ],
+      "holdout_design": "Repository-disjoint, root-cause-family-disjoint, temporally refreshed holdout. Keep proprietary/private tasks and answer-bearing artifacts outside the agent-visible workspace."
+    },
+    {
+      "lane_id": "CEB-REPO",
+      "capability": "Repository comprehension and source-grounded architecture recovery",
+      "decision_question": "Can the system answer technical questions about a repository with exact source anchors and distinguish static inference from compiler/runtime authority?",
+      "primary_metrics": [
+        {
+          "metric_id": "source_supported_claim_precision",
+          "definition": "Supported factual claims divided by all factual claims, judged against exact source anchors and authority labels.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "At least 0.95 on public replication and 0.98 on sealed holdout."
+        },
+        {
+          "metric_id": "claim_recall",
+          "definition": "Required supported claims correctly recovered, including explicit abstention where evidence is missing.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "At least 0.90 public and 0.95 sealed."
+        },
+        {
+          "metric_id": "unsupported_authority_rate",
+          "definition": "Claims presented as compiler/runtime verified without corresponding independent authority evidence.",
+          "unit": "proportion",
+          "direction": "minimize",
+          "prospective_target": "0."
+        }
+      ],
+      "comparators": [
+        {
+          "name": "SWE Atlas Codebase QnA",
+          "version": "2026-11-05 live leaderboard snapshot",
+          "sample_scope": "124 tasks; 11 repositories; 4 languages",
+          "published_reference": "Opus 5 + Claude Code 63.17 ± 5.01 on Scale's leaderboard.",
+          "source_url": "https://labs.scale.com/leaderboard/sweatlas-qna",
+          "comparison_class": "contextual_reference_until_exact_protocol_match",
+          "caveats": [
+            "The rubric and agentic runtime requirements differ from CEB's source-claim adjudication.",
+            "Third-party aggregators report different subsets and values; use the benchmark owner's page for primary comparisons."
+          ]
+        }
+      ],
+      "baseline_arms": [
+        "grep_and_language_server_tools_only",
+        "model_only_context",
+        "strong_codebase_QA_harness",
+        "CEB_typed_repository_graph",
+        "CEB_graph_lesion_and_stale_fact_controls"
+      ],
+      "evidence_contract": {
+        "required_artifacts": [
+          "question_manifest",
+          "claim_ledger",
+          "source_anchor_set",
+          "authority_labels",
+          "missing_evidence_abstentions",
+          "independent_adjudication"
+        ],
+        "independent_adjudication": true,
+        "unresolved_state_required": true,
+        "evidence_authority": "human_or_independent_static_or_compiler_authority_as_claimed",
+        "execution_gate": "#10064 for runtime-derived claims"
+      },
+      "hard_gates": [
+        "zero fabricated source paths",
+        "zero static_to_compiler_authority_upgrade",
+        "source anchors resolve in pinned tree",
+        "abstentions retained in denominator"
+      ],
+      "holdout_design": "Repository- and language-stratified split. Hold out files, modules and question templates; include deleted/moved symbols and feature/target-specific worlds."
+    },
+    {
+      "lane_id": "CEB-CONTEXT",
+      "capability": "Minimal sufficient context retrieval",
+      "decision_question": "Can the system retrieve enough evidence for a correct decision while minimizing irrelevant context, tokens and retrieval cost?",
+      "primary_metrics": [
+        {
+          "metric_id": "recall_at_10",
+          "definition": "Fraction of gold-relevant context units retrieved in the top ten.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "At least 0.90 on sealed holdout."
+        },
+        {
+          "metric_id": "context_f1",
+          "definition": "Harmonic mean of context precision and recall under the benchmark's exact relevance rubric.",
+          "unit": "F1",
+          "direction": "maximize",
+          "prospective_target": "At least 0.50 on sealed holdout."
+        },
+        {
+          "metric_id": "downstream_task_success",
+          "definition": "Qualified task success after retrieval under fixed downstream agent, prompt and budget.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "Improve against matched retrieval baselines without reducing answer quality."
+        },
+        {
+          "metric_id": "context_cost",
+          "definition": "Tokens and monetary inference/retrieval cost attributable to context acquisition.",
+          "unit": "tokens and USD",
+          "direction": "minimize",
+          "prospective_target": "At least 20% reduction at non-inferior downstream success."
+        }
+      ],
+      "comparators": [
+        {
+          "name": "ContextBench",
+          "version": "2026-10-23 leaderboard",
+          "sample_scope": "1,136 tasks; 66 repositories; 8 languages",
+          "published_reference": "Best reported Recall 0.779 and Pass@1 77.6% for CodeNib; best Context F1 0.389 is reported for a different system. These maxima must not be combined as one system result.",
+          "source_url": "https://contextbench.github.io/",
+          "comparison_class": "contextual_reference_until_exact_protocol_match",
+          "caveats": [
+            "Use exact leaderboard rows; different systems lead on Recall, Pass@1 and F1.",
+            "ContextBench-specific adaptations mean an unadapted CEB score is not a matched comparison."
+          ]
+        }
+      ],
+      "baseline_arms": [
+        "BM25_or_ripgrep",
+        "language_server_retrieval",
+        "embedding_retrieval",
+        "strong_hybrid_retrieval",
+        "CEB_dependency_and_authority_aware_retrieval",
+        "random_and_irrelevant_context_controls"
+      ],
+      "evidence_contract": {
+        "required_artifacts": [
+          "retrieval_query",
+          "ranked_context_ids",
+          "gold_relevance_labels",
+          "context_digest",
+          "token_accounting",
+          "downstream_result",
+          "per_task_cost"
+        ],
+        "independent_adjudication": true,
+        "unresolved_state_required": true,
+        "evidence_authority": "pinned_gold_context_and_independent_task_grader",
+        "execution_gate": "retrieval can be tested statically; runtime claims require #10064"
+      },
+      "hard_gates": [
+        "no answer leakage from hidden labels",
+        "same downstream budget across arms",
+        "report Recall and F1 separately",
+        "no context-quality claim from task resolution alone"
+      ],
+      "holdout_design": "Repository-disjoint and issue-family-disjoint. Hold out paths, symbol aliases and generated code; include decoy files and stale documentation."
+    },
+    {
+      "lane_id": "CEB-TEST",
+      "capability": "Test generation and oracle quality",
+      "decision_question": "Can the system add tests that detect the target defect without overfitting to the reference patch or introducing brittle false failures?",
+      "primary_metrics": [
+        {
+          "metric_id": "mutation_kill_rate",
+          "definition": "Fraction of preregistered behavior-preserving and behavior-breaking mutations correctly distinguished by the test suite.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "At least 0.80 on sealed mutation families."
+        },
+        {
+          "metric_id": "oracle_false_positive_rate",
+          "definition": "Valid implementations incorrectly rejected by generated tests.",
+          "unit": "proportion",
+          "direction": "minimize",
+          "prospective_target": "Below 0.02 with one-sided 95% upper bound reported."
+        },
+        {
+          "metric_id": "behavioral_coverage",
+          "definition": "Distinct preregistered behavior partitions exercised by tests.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "At least 0.90 on task-level contract partitions."
+        }
+      ],
+      "comparators": [
+        {
+          "name": "SWE Atlas Test Writing",
+          "version": "2026-11-05 Scale leaderboard snapshot",
+          "sample_scope": "90 tasks",
+          "published_reference": "Fable 5.1 + Claude Code 67.04 ± 5.33; Opus 5 + Claude Code 62.22 ± 5.58.",
+          "source_url": "https://labs.scale.com/leaderboard/sweatlas-test-writing",
+          "comparison_class": "contextual_reference_until_exact_protocol_match",
+          "caveats": [
+            "Scale rubric includes test usefulness and task-specific quality; it is not identical to mutation kill rate.",
+            "Do not report test-writing score as oracle soundness."
+          ]
+        }
+      ],
+      "baseline_arms": [
+        "existing_tests_only",
+        "test_template_baseline",
+        "same_model_test_generation",
+        "mutation_guided_test_generation",
+        "CEB_spec_and_counterexample_guided_generation"
+      ],
+      "evidence_contract": {
+        "required_artifacts": [
+          "behavior_contract",
+          "test_diff",
+          "mutation_set_digest",
+          "mutation_outcomes",
+          "flakiness_repeats",
+          "independent_oracle_review"
+        ],
+        "independent_adjudication": true,
+        "unresolved_state_required": true,
+        "evidence_authority": "independent_mutation_runner_and_human_oracle_review",
+        "execution_gate": "#10064 before candidate tests or build scripts run"
+      },
+      "hard_gates": [
+        "reference_pass_and_empty_patch_fail",
+        "valid_alternative_solution_positive_controls",
+        "repeatability_threshold",
+        "no hidden-test exposure"
+      ],
+      "holdout_design": "Mutation-family disjoint and API-boundary disjoint. Include alternative correct implementations and deliberately flaky tests."
+    },
+    {
+      "lane_id": "CEB-REFACTOR",
+      "capability": "Architecture-preserving refactoring",
+      "decision_question": "Can the system restructure a multi-file system while preserving behavior and improving maintainability, performance or ownership boundaries?",
+      "primary_metrics": [
+        {
+          "metric_id": "semantic_preservation",
+          "definition": "Fraction of qualified behavioral contracts preserved after refactoring.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "At least 0.99 for critical contracts."
+        },
+        {
+          "metric_id": "maintainability_delta",
+          "definition": "Preregistered expert rubric delta for cohesion, duplication, API clarity and code ownership.",
+          "unit": "rubric delta",
+          "direction": "maximize",
+          "prospective_target": "Positive paired improvement with no semantic regression."
+        },
+        {
+          "metric_id": "collateral_change_ratio",
+          "definition": "Unnecessary changed files or lines divided by all changed files or lines under an independently reviewed diff rubric.",
+          "unit": "proportion",
+          "direction": "minimize",
+          "prospective_target": "At least 20% lower than matched baseline."
+        }
+      ],
+      "comparators": [
+        {
+          "name": "SWE Atlas Refactoring",
+          "version": "2026-11-05 Scale leaderboard snapshot",
+          "sample_scope": "70 tasks; 10 repositories; 6 languages",
+          "published_reference": "GPT-6 Astra + Codex 59.05 ± 6.43; Fable 5.1 + Claude Code 56.67 ± 6.52.",
+          "source_url": "https://labs.scale.com/leaderboard/sweatlas-refactoring",
+          "comparison_class": "contextual_reference_until_exact_protocol_match",
+          "caveats": [
+            "The Scale task rubric and task size differ from any CEB-specific refactoring slice.",
+            "Score alone does not establish lower collateral change or semantic correctness on a new task family."
+          ]
+        }
+      ],
+      "baseline_arms": [
+        "manual_refactor_reference",
+        "mechanical_refactor_tools",
+        "same_model_direct_refactor",
+        "CEB_impact_graph_guided_refactor",
+        "lesion_without_dependency_graph"
+      ],
+      "evidence_contract": {
+        "required_artifacts": [
+          "before_after_tree_digest",
+          "api_compatibility_report",
+          "behavioral_contract_results",
+          "diff_necessity_review",
+          "performance_measurement",
+          "independent_regrade"
+        ],
+        "independent_adjudication": true,
+        "unresolved_state_required": true,
+        "evidence_authority": "independent_tests_and_blind_expert_diff_review",
+        "execution_gate": "#10064"
+      },
+      "hard_gates": [
+        "no public_api_break_without_authorization",
+        "no critical behavior regression",
+        "preserve performance envelope",
+        "human review of high-impact architectural changes"
+      ],
+      "holdout_design": "Repository-disjoint; hold out module boundary, API shape and refactoring transformation family."
+    },
+    {
+      "lane_id": "CEB-DEBUG",
+      "capability": "Precise debugging and minimal repair",
+      "decision_question": "Can the system identify the true fault and make the smallest necessary repair without broad or unrelated edits?",
+      "primary_metrics": [
+        {
+          "metric_id": "bug_recall_at_k",
+          "definition": "Fraction of verified defects found within the top K diagnostic findings.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "At least 0.90 Recall@5 on sealed holdout."
+        },
+        {
+          "metric_id": "edit_precision",
+          "definition": "Necessary correct edit units divided by all edit units under preregistered epsilon and semantic matching.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "At least 0.85 on qualified holdout."
+        },
+        {
+          "metric_id": "regression_free_rate",
+          "definition": "Fraction of repairs with no newly introduced regression.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "At least 0.99 on critical contract set."
+        }
+      ],
+      "comparators": [
+        {
+          "name": "Precise Debugging Benchmark PDB-Single Hard",
+          "version": "published PDB results snapshot",
+          "sample_scope": "5,751 single-line hard tasks",
+          "published_reference": "Opus 4.7: precision 83.3 ± 0.8; recall 89.3 ± 0.6.",
+          "source_url": "https://huggingface.co/datasets/Precise-Debugging-Benchmarking/PDB-Results",
+          "comparison_class": "contextual_reference_until_exact_protocol_match",
+          "caveats": [
+            "Epsilon-relaxed edit matching is part of the PDB metric definition.",
+            "Do not combine PDB-Single and PDB-Wild denominators."
+          ]
+        },
+        {
+          "name": "Precise Debugging Benchmark PDB-Wild",
+          "version": "published PDB results snapshot",
+          "sample_scope": "484 mixed multi-line and repository tasks",
+          "published_reference": "Opus 4.7: precision 77.8 ± 3.1; recall 83.4 ± 2.8.",
+          "source_url": "https://huggingface.co/datasets/Precise-Debugging-Benchmarking/PDB-Results",
+          "comparison_class": "contextual_reference_until_exact_protocol_match",
+          "caveats": [
+            "Different task composition and relaxed edit tolerance from PDB-Single Hard.",
+            "Report precision and recall independently."
+          ]
+        }
+      ],
+      "baseline_arms": [
+        "static_analysis_only",
+        "same_model_react_baseline",
+        "same_model_with_CEB_causal_hypotheses",
+        "CEB_causal_probe_and_minimal_patch",
+        "ablation_without_causal_ledger"
+      ],
+      "evidence_contract": {
+        "required_artifacts": [
+          "fault_manifest",
+          "competing_hypotheses",
+          "pre_registered_probe_forecast",
+          "probe_result",
+          "minimal_patch",
+          "edit_necessity_map",
+          "pristine_regrade"
+        ],
+        "independent_adjudication": true,
+        "unresolved_state_required": true,
+        "evidence_authority": "independent_fault_oracle_and_regrade",
+        "execution_gate": "#10064"
+      },
+      "hard_gates": [
+        "no patch before evidence threshold unless explicitly authorized",
+        "incorrect hypotheses retained in audit ledger",
+        "abstention allowed",
+        "collateral edits reported"
+      ],
+      "holdout_design": "Repository/root-cause-family split; include non-local, configuration-dependent and misleading-nearby-code faults."
+    },
+    {
+      "lane_id": "CEB-REVIEW",
+      "capability": "Pre-merge defect discovery",
+      "decision_question": "Can the system detect actionable defects in proposed changes before they ship, with useful severity and localization?",
+      "primary_metrics": [
+        {
+          "metric_id": "defect_recall_at_5",
+          "definition": "Fraction of human-verified introduced defects present in the top five findings.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "At least 0.85 on sealed holdout."
+        },
+        {
+          "metric_id": "actionable_precision",
+          "definition": "Fraction of submitted findings confirmed as actionable defects by blinded reviewers.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "At least 0.80 on sealed holdout."
+        },
+        {
+          "metric_id": "reviewer_burden",
+          "definition": "Human minutes required to adjudicate findings per reviewed change.",
+          "unit": "minutes per change",
+          "direction": "minimize",
+          "prospective_target": "At least 20% lower burden at non-inferior recall."
+        }
+      ],
+      "comparators": [
+        {
+          "name": "CRBugBench",
+          "version": "October 2026",
+          "sample_scope": "1,000 public PR-review tasks across 98 repositories plus 800 proprietary tasks",
+          "published_reference": "Best reported system surfaced 71.9% of human-verified bugs within its top five comments; exploration prompt gained up to 5.8% at 10% higher cost.",
+          "source_url": "https://www.microsoft.com/en-us/research/publication/when-should-a-software-factory-be-lights-off-benchmarking-code-review-agents-on-bug-detection/",
+          "comparison_class": "contextual_reference_until_exact_protocol_match",
+          "caveats": [
+            "Top-five bug detection is not precision.",
+            "Private repository performance and non-local reasoning remain harder.",
+            "Reviewer adjudication is required; plausible warnings are not confirmed defects."
+          ]
+        }
+      ],
+      "baseline_arms": [
+        "human_only",
+        "model_only",
+        "static_lint_and_analyzers",
+        "strong_review_agent",
+        "human_plus_CEB_agent"
+      ],
+      "evidence_contract": {
+        "required_artifacts": [
+          "diff_digest",
+          "finding_to_line_map",
+          "source_evidence",
+          "severity_rationale",
+          "blind_reviewer_decisions",
+          "review_time_log"
+        ],
+        "independent_adjudication": true,
+        "unresolved_state_required": true,
+        "evidence_authority": "blinded_human_review_panel",
+        "execution_gate": "static review may be authored without candidate execution; dynamic reproductions require #10064"
+      },
+      "hard_gates": [
+        "high_severity_false_negative_rate_reported",
+        "no invented finding",
+        "line_level_localization",
+        "report false-positive reviewer burden"
+      ],
+      "holdout_design": "Repository-disjoint and defect-family-disjoint, with paired human-only, agent-only and assisted arms."
+    },
+    {
+      "lane_id": "CEB-SECURE",
+      "capability": "Joint functional and security correctness",
+      "decision_question": "Can the system produce code that works while also resisting the declared security control set?",
+      "primary_metrics": [
+        {
+          "metric_id": "joint_secure_functional_pass",
+          "definition": "Fraction of tasks passing both functional and security acceptance in the same configuration.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "At least 0.65 on a sealed Rust-heavy holdout; report functional-only pass separately."
+        },
+        {
+          "metric_id": "critical_security_false_accepts",
+          "definition": "Critical vulnerabilities incorrectly accepted as secure by the evaluator.",
+          "unit": "count",
+          "direction": "minimize",
+          "prospective_target": "0."
+        },
+        {
+          "metric_id": "security_functional_noninferiority",
+          "definition": "Difference in functional pass rate between security-hardened and matched baseline arms.",
+          "unit": "percentage points",
+          "direction": "maximize",
+          "prospective_target": "No worse than -2 percentage points under preregistered non-inferiority margin."
+        }
+      ],
+      "comparators": [
+        {
+          "name": "Endor Labs Agent Security League",
+          "version": "live leaderboard checked 2026-11-05",
+          "sample_scope": "34 agent/model configurations; 200 benchmark tasks in published benchmark description",
+          "published_reference": "Highest FuncPass 91.6% (Muse Code + Muse Wonder); highest SecPass 36.9% (Claude Code + Claude Fable 5.1). Different configurations lead the two metrics.",
+          "source_url": "https://www.endorlabs.com/research/ai-code-security-benchmark",
+          "comparison_class": "contextual_reference_until_exact_protocol_match",
+          "caveats": [
+            "Do not combine maxima from different configurations into one joint result.",
+            "Functional success and security success are separate outcomes.",
+            "Leaderboard owner reports it improved anti-cheating controls and rescored results."
+          ]
+        }
+      ],
+      "baseline_arms": [
+        "same_model_functional_only",
+        "same_model_security_scaffold",
+        "CEB_threat_model_and_independent_security_review",
+        "security_ablation",
+        "human_security_review"
+      ],
+      "evidence_contract": {
+        "required_artifacts": [
+          "threat_model",
+          "patch_digest",
+          "functional_test_report",
+          "security_test_report",
+          "static_analysis_report",
+          "adversarial_review",
+          "independent_regrade"
+        ],
+        "independent_adjudication": true,
+        "unresolved_state_required": true,
+        "evidence_authority": "independent_security_tests_and_expert_review",
+        "execution_gate": "#10064"
+      },
+      "hard_gates": [
+        "critical_security_false_accepts_zero",
+        "functional_and_security_passes_from_same_configuration",
+        "no security bypass or hidden-test access",
+        "preserve unresolved findings"
+      ],
+      "holdout_design": "CWE- and repository-family-disjoint; include adversarial prompt/tool boundary controls and safe negative controls."
+    },
+    {
+      "lane_id": "CEB-RUST",
+      "capability": "Rust-specific engineering correctness",
+      "decision_question": "Can the system reason correctly about ownership, traits, lifetimes, feature flags, targets, build scripts and workspace-specific semantics?",
+      "primary_metrics": [
+        {
+          "metric_id": "rust_issue_resolution",
+          "definition": "Fraction of qualified Rust issue tasks resolved and independently regraded.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "Exceed 0.35 in a matched replication before setting a higher sealed-holdout goal."
+        },
+        {
+          "metric_id": "type_and_trait_correctness",
+          "definition": "Fraction of required type, trait, lifetime and API constraints satisfied without unsound escape hatches.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "At least 0.95 on qualified semantic checks."
+        },
+        {
+          "metric_id": "configuration_world_coverage",
+          "definition": "Fraction of preregistered feature/target configurations correctly represented and validated.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "100% of declared worlds represented; no silent fallback."
+        }
+      ],
+      "comparators": [
+        {
+          "name": "Rust-SWE-bench / RUSTFORGER",
+          "version": "February 2026 paper",
+          "sample_scope": "500 tasks across 34 Rust repositories",
+          "published_reference": "RUSTFORGER + Claude Sonnet 3.7 reported 28.6% historical resolution.",
+          "source_url": "https://arxiv.org/abs/2602.22764",
+          "comparison_class": "historical_contextual_reference",
+          "caveats": [
+            "Different model generation and harness; not a current leaderboard ceiling.",
+            "Must replicate exact benchmark version and task split before claiming a direct win."
+          ]
+        }
+      ],
+      "baseline_arms": [
+        "cargo_diagnostics_and_rust_analyzer",
+        "same_model_standard_rust_harness",
+        "same_model_plus_CEB_workspace_model",
+        "configuration_matrix_ablation",
+        "trait_graph_ablation"
+      ],
+      "evidence_contract": {
+        "required_artifacts": [
+          "rust_toolchain_digest",
+          "lockfile_digest",
+          "workspace_member_map",
+          "feature_target_world_manifest",
+          "compiler_diagnostics",
+          "test_results",
+          "patch_digest",
+          "independent_regrade"
+        ],
+        "independent_adjudication": true,
+        "unresolved_state_required": true,
+        "evidence_authority": "pinned_compiler_and_independent_test_runner",
+        "execution_gate": "#10064"
+      },
+      "hard_gates": [
+        "no weakening compiler_or_test_gates",
+        "all_declared_feature_target_worlds_accounted_for",
+        "no silent dependency resolution drift",
+        "unsafe code changes require explicit review"
+      ],
+      "holdout_design": "Repository-disjoint, feature-combination-disjoint and root-cause-family-disjoint. Hold out uncommon trait patterns, procedural macros and cross-target behavior."
+    },
+    {
+      "lane_id": "CEB-OPT",
+      "capability": "Repository-level performance optimization",
+      "decision_question": "Can the system produce a measurable expert-relevant speedup while preserving semantics and avoiding measurement noise?",
+      "primary_metrics": [
+        {
+          "metric_id": "expert_normalized_speedup",
+          "definition": "Candidate speedup divided by expert reference speedup on the same workload and hardware.",
+          "unit": "ratio",
+          "direction": "maximize",
+          "prospective_target": "At least 0.80x on sealed holdout with non-regressing semantics."
+        },
+        {
+          "metric_id": "performance_regression_rate",
+          "definition": "Fraction of optimization patches that regress correctness or critical performance bounds.",
+          "unit": "proportion",
+          "direction": "minimize",
+          "prospective_target": "0 critical regressions."
+        },
+        {
+          "metric_id": "measurement_variance",
+          "definition": "Within-environment variance of repeated benchmark measurements.",
+          "unit": "coefficient of variation",
+          "direction": "minimize",
+          "prospective_target": "Preregistered noise floor per workload; exclude no outliers without an auditable rule."
+        }
+      ],
+      "comparators": [
+        {
+          "name": "SWE-fficiency",
+          "version": "ICML 2026",
+          "sample_scope": "498 tasks across 9 repositories",
+          "published_reference": "Top evaluated agents averaged below 0.23x expert speedup.",
+          "source_url": "https://proceedings.mlr.press/v306/ma26l.html",
+          "comparison_class": "contextual_reference_until_exact_protocol_match",
+          "caveats": [
+            "Workloads, hardware and speedup normalization must match for direct comparison.",
+            "Optimized implementation must pass the same unit tests and semantic checks."
+          ]
+        }
+      ],
+      "baseline_arms": [
+        "unmodified_baseline",
+        "compiler_optimization_flags",
+        "expert_reference_patch",
+        "same_model_optimization_agent",
+        "CEB_profile_and_dependency_guided_optimizer"
+      ],
+      "evidence_contract": {
+        "required_artifacts": [
+          "workload_digest",
+          "hardware_manifest",
+          "compiler_flags",
+          "baseline_measurements",
+          "candidate_measurements",
+          "statistical_analysis",
+          "semantic_test_report",
+          "expert_patch_digest"
+        ],
+        "independent_adjudication": true,
+        "unresolved_state_required": true,
+        "evidence_authority": "repeated_measurements_and_independent_semantic_tests",
+        "execution_gate": "#10064"
+      },
+      "hard_gates": [
+        "same_hardware_and_workload",
+        "semantics_non_regression",
+        "resource_and_cost_accounting",
+        "preregistered_measurement_noise_policy"
+      ],
+      "holdout_design": "Repository, workload and bottleneck-family disjoint; hold out input sizes, data distributions and microarchitecture."
+    },
+    {
+      "lane_id": "CEB-HUMAN",
+      "capability": "Human-agent complementarity and calibrated autonomy",
+      "decision_question": "Does the system improve human decisions or reduce review effort, and can it ask, abstain or escalate at the correct boundary?",
+      "primary_metrics": [
+        {
+          "metric_id": "assisted_defect_recall_gain",
+          "definition": "Paired change in confirmed defect recall for human+agent versus human-only at equal review effort.",
+          "unit": "percentage points",
+          "direction": "maximize",
+          "prospective_target": "At least +5 pp, or non-inferior recall with at least 20% less review time."
+        },
+        {
+          "metric_id": "selective_risk_coverage",
+          "definition": "Risk/accuracy trade-off as the system acts, asks or abstains at different confidence thresholds.",
+          "unit": "risk-coverage curve",
+          "direction": "minimize",
+          "prospective_target": "Lower risk at matched coverage than confidence-only and model-only baselines."
+        },
+        {
+          "metric_id": "escalation_precision",
+          "definition": "Fraction of escalations that independent experts judge necessary and actionable.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "At least 0.85 without suppressing high-impact escalations."
+        }
+      ],
+      "comparators": [
+        {
+          "name": "SWE Atlas HiL-Bench",
+          "version": "2026-11-05 Scale leaderboard snapshot",
+          "sample_scope": "Human-in-loop task benchmark; pin the current task count and version before replication",
+          "published_reference": "Muse Wonder 1.0 79.67 ± 4.17 on the Scale leaderboard.",
+          "source_url": "https://labs.scale.com/leaderboard/hil-bench",
+          "comparison_class": "contextual_reference_until_exact_protocol_match",
+          "caveats": [
+            "Leaderboard score is not the same as paired human productivity or review-time benefit.",
+            "Human cohort design and time budget must be preregistered."
+          ]
+        }
+      ],
+      "baseline_arms": [
+        "human_only",
+        "agent_only",
+        "human_plus_agent",
+        "confidence_only_abstention",
+        "CEB_evidence_and_authority_gated_escalation"
+      ],
+      "evidence_contract": {
+        "required_artifacts": [
+          "human_cohort_protocol",
+          "randomization_seed",
+          "time_logs",
+          "agent_outputs",
+          "human_decisions",
+          "adjudication",
+          "risk_coverage_curve"
+        ],
+        "independent_adjudication": true,
+        "unresolved_state_required": true,
+        "evidence_authority": "blinded_human_adjudication",
+        "execution_gate": "No OS sandbox qualification is required for static review; code execution and reproductions remain gated by #10064"
+      },
+      "hard_gates": [
+        "equalized_effort",
+        "no_information_leak_between_arms",
+        "report cohort and attrition",
+        "calibration based on heldout outcomes"
+      ],
+      "holdout_design": "Reviewer-disjoint and defect-family-disjoint paired study; counterbalance order and measure learning effects."
+    },
+    {
+      "lane_id": "CEB-EVAL",
+      "capability": "Benchmark and evaluator integrity",
+      "decision_question": "Can the measurement pipeline reject compromised evidence without rejecting valid evidence or misclassifying a genuinely failing candidate?",
+      "primary_metrics": [
+        {
+          "metric_id": "false_accept_rate",
+          "definition": "Negative/adversarial controls incorrectly marked qualifying.",
+          "unit": "proportion",
+          "direction": "minimize",
+          "prospective_target": "0 critical false accepts; one-sided 95% exact upper bound below 1% on the preregistered independent campaign."
+        },
+        {
+          "metric_id": "false_reject_rate",
+          "definition": "Positive/valid controls incorrectly marked non-qualifying.",
+          "unit": "proportion",
+          "direction": "minimize",
+          "prospective_target": "One-sided 95% exact upper bound below 1% on the preregistered independent campaign."
+        },
+        {
+          "metric_id": "unresolved_rate",
+          "definition": "Controls returned unresolved due to insufficient or contradictory evidence.",
+          "unit": "proportion",
+          "direction": "minimize",
+          "prospective_target": "0 unresolved critical controls at qualification."
+        },
+        {
+          "metric_id": "regrade_disagreement",
+          "definition": "Independent regrade pairs with different normalized outcomes.",
+          "unit": "proportion",
+          "direction": "minimize",
+          "prospective_target": "0 for exact immutable input replays; explain all other disagreement."
+        }
+      ],
+      "comparators": [
+        {
+          "name": "Epoch AI review of Terminal-Bench 4.0.0",
+          "version": "reviewed 2026-09-04",
+          "sample_scope": "66 tasks inspected; publicly noted scoring defects in 30 tasks (45.5%)",
+          "published_reference": "Verdict: Flawed; defects include writable pass signal, answer leakage and false negatives.",
+          "source_url": "https://epoch.ai/benchmarks/terminal-bench-4/review",
+          "comparison_class": "methodological_reference_not_score_comparison",
+          "caveats": [
+            "This is an independent benchmark review, not an evaluator accuracy leaderboard.",
+            "It demonstrates concrete failure classes, not a common denominator with the CEB control catalog."
+          ]
+        },
+        {
+          "name": "Terminal-Bench 4.0 maintainer lifecycle",
+          "version": "4.0; 4.1 verifier roadmap",
+          "sample_scope": "Continuous public benchmark with semantic versioning",
+          "published_reference": "Maintainers name tamper-resistant verifiers as a 4.1 improvement and define version changes that require reruns, regrades or reuse.",
+          "source_url": "https://www.tbench.ai/news/terminal-bench-4-0",
+          "comparison_class": "methodological_reference_not_score_comparison",
+          "caveats": [
+            "Roadmap statement is not evidence that 4.1 verifier improvements are already released.",
+            "Keep version semantics tied to actual benchmark artifacts."
+          ]
+        }
+      ],
+      "baseline_arms": [
+        "current_verifier",
+        "negative_controls",
+        "positive_controls",
+        "independent_verifier_implementation",
+        "primary_vs_pristine_regrade"
+      ],
+      "evidence_contract": {
+        "required_artifacts": [
+          "attack_catalog_digest",
+          "positive_control_digest",
+          "task_and_grader_digests",
+          "runner_policy_attestation",
+          "signer_custody_record",
+          "failure_domain_graph",
+          "primary_receipt",
+          "regrade_receipt",
+          "control_outcomes"
+        ],
+        "independent_adjudication": true,
+        "unresolved_state_required": true,
+        "evidence_authority": "independent_verifier_and_external_custody_attestation",
+        "execution_gate": "#10064 and #10369"
+      },
+      "hard_gates": [
+        "zero critical false accepts",
+        "positive controls must pass",
+        "task qualification requires reference pass and empty-patch fail",
+        "independent pristine regrade",
+        "common_mode custody failures block qualification"
+      ],
+      "holdout_design": "Rotating private controls held outside agent-visible repositories. Publish commitments before the run; reveal retired control definitions only after version retirement."
+    },
+    {
+      "lane_id": "CEB-DOCS",
+      "capability": "Documentation executability and source-claim integrity",
+      "decision_question": "Do documented commands identify tracked, selectable packages and actual targets in the stated workspace, without implying unrun behavior?",
+      "primary_metrics": [
+        {
+          "metric_id": "unannotated_missing_target_rate",
+          "definition": "Missing manifest, package or binary target references without an exact, explicit unavailable/design-only disclosure.",
+          "unit": "proportion",
+          "direction": "minimize",
+          "prospective_target": "0."
+        },
+        {
+          "metric_id": "static_reference_coverage",
+          "definition": "Documented static Cargo manifest/package/binary references checked divided by all statically resolvable references within V0 scope.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "100% of in-scope static references; dynamic and unsupported syntax separately reported."
+        },
+        {
+          "metric_id": "false_verified_reference_rate",
+          "definition": "References reported as verified despite selecting a different workspace or non-existent target.",
+          "unit": "proportion",
+          "direction": "minimize",
+          "prospective_target": "0 on adversarial parser fixtures."
+        }
+      ],
+      "comparators": [],
+      "baseline_arms": [
+        "manual_spot_check",
+        "explicit_manifest_only_audit",
+        "workspace_aware_package_selector_audit",
+        "adversarial_parser_fixtures"
+      ],
+      "evidence_contract": {
+        "required_artifacts": [
+          "tracked_markdown_manifest",
+          "tracked_cargo_manifest_inventory",
+          "workspace_member_exclusion_map",
+          "command_parse_records",
+          "unresolved_reference_report",
+          "audit_commit_sha"
+        ],
+        "independent_adjudication": true,
+        "unresolved_state_required": true,
+        "evidence_authority": "Git tracked tree and static Cargo TOML parsing",
+        "execution_gate": "Static only; does not claim cargo build/test"
+      },
+      "hard_gates": [
+        "zero unannotated missing references",
+        "dynamic references remain explicit gaps",
+        "unavailable references are never counted as executable",
+        "no Cargo command is executed by the checker"
+      ],
+      "holdout_design": "Fixture workspaces with globs, excludes, nested workspaces, quoted shell operators, placeholders, multiple commands and misleading nearest manifests."
+    }
+  ],
+  "sources": [
+    {
+      "source_url": "https://labs.scale.com/leaderboard/swe_bench_pro_public_v2",
+      "supports": [
+        "CEB-RESOLUTION"
+      ]
+    },
+    {
+      "source_url": "https://labs.scale.com/leaderboard/sweatlas-qna",
+      "supports": [
+        "CEB-REPO"
+      ]
+    },
+    {
+      "source_url": "https://labs.scale.com/leaderboard/sweatlas-test-writing",
+      "supports": [
+        "CEB-TEST"
+      ]
+    },
+    {
+      "source_url": "https://labs.scale.com/leaderboard/sweatlas-refactoring",
+      "supports": [
+        "CEB-REFACTOR"
+      ]
+    },
+    {
+      "source_url": "https://contextbench.github.io/",
+      "supports": [
+        "CEB-CONTEXT"
+      ]
+    },
+    {
+      "source_url": "https://huggingface.co/datasets/Precise-Debugging-Benchmarking/PDB-Results",
+      "supports": [
+        "CEB-DEBUG"
+      ]
+    },
+    {
+      "source_url": "https://www.microsoft.com/en-us/research/publication/when-should-a-software-factory-be-lights-off-benchmarking-code-review-agents-on-bug-detection/",
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_url": "https://www.endorlabs.com/research/ai-code-security-benchmark",
+      "supports": [
+        "CEB-SECURE"
+      ]
+    },
+    {
+      "source_url": "https://arxiv.org/abs/2602.22764",
+      "supports": [
+        "CEB-RUST"
+      ]
+    },
+    {
+      "source_url": "https://proceedings.mlr.press/v306/ma26l.html",
+      "supports": [
+        "CEB-OPT"
+      ]
+    },
+    {
+      "source_url": "https://labs.scale.com/leaderboard/hil-bench",
+      "supports": [
+        "CEB-HUMAN"
+      ]
+    },
+    {
+      "source_url": "https://epoch.ai/benchmarks/terminal-bench-4/review",
+      "supports": [
+        "CEB-EVAL"
+      ]
+    },
+    {
+      "source_url": "https://www.tbench.ai/news/terminal-bench-4-0",
+      "supports": [
+        "CEB-EVAL"
+      ]
+    }
+  ]
+}
