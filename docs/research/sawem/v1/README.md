@@ -141,7 +141,21 @@ Every forecast record carries:
 
 Every realized price carries the target interval, observation timestamp and source availability timestamp. At a frozen decision timestamp, the replay selects the latest forecast issue that was available at that time. Forecast issue time and source availability time are separate: a forecast issued before the decision but published after it is still excluded. A realized observation can supersede a forecast only after the target interval has ended and the observation has become available. Future-known records are counted only when they match a requested target; missing target coverage stays missing. Multiple engines require an explicit model scope, and that scope binds both the model label and its exact SHA-256 build digest. Selected-vintage receipts preserve source ref/digest, source availability timestamp, model ID and model digest. A known realized observation is model-independent; ambiguous latest vintages fail closed.
 
-This does not claim to improve Chronos or HOMER forecasting accuracy. It supplies a reconstructible information set for fair model comparison and historical underwriting replay. The initial case `FORECAST-VINTAGE-ASOF-001` contains synthetic timestamps and price values only; real calibration, rolling-origin backtests, forecast coverage and realised value-capture comparisons remain `not_run`.
+This does not claim to improve Chronos or HOMER forecasting accuracy. It supplies a reconstructible information set for fair model comparison and historical underwriting replay. The initial case `FORECAST-VINTAGE-ASOF-001` contains synthetic timestamps and price values only; real-market calibration, rolling-origin backtests and realized value-capture comparisons remain `not_run`.
+
+### Probabilistic forecast calibration with exact scoring
+
+The new `forecast_metrics.rs` module evaluates a single immutable model build against realized prices that became available by a later evaluation timestamp. It consumes q10/q50/q90 forecasts in minor ZAR/MWh, the frozen decision time, forecast issue/available-at times, target Trading Period, realized observation/available-at times, and exact model/source digests.
+
+The output retains exact integer accumulators rather than rounding early:
+- median absolute error sum, signed bias sum and squared-error sum;
+- pinball-loss numerators for q10, q50 and q90;
+- actual observations at/below each forecast quantile;
+- empirical coverage error numerators and central-80% interval coverage;
+- central-80% interval width sum; and
+- weighted interval score for median plus the central 80% interval.
+
+Forecasts that were not available at the decision time, realized data not available at evaluation time, decisions after the target interval began, target periods with invalid timing, quantile crossing, mixed model builds and duplicate targets are rejected. Each build must be evaluated separately. The module does not train a forecasting model and does not claim a measured calibration improvement. The new case `FORECAST-CALIBRATION-EXACT-001` is a synthetic known-answer/hostile-control benchmark; real rolling-origin and project/time holdout comparisons against Chronos, HOMER and baselines remain `not_run`.
 
 ### South African market phase as of 5 November 2026
 
