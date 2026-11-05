@@ -21,11 +21,11 @@ The validator rejects cross-session/history/seed leakage, duplicate event IDs, u
 
 ## Policy controls
 
-The crate implements fixed-response, imitation-only, one-way-prompt and cross-session yoked controls. A rule-based positive oracle applies the task's declared response transformation. The evaluator reports target-action delta, sham delta, unrelated-feature delta, input sensitivity, target specificity and synthetic response-rule agreement separately.
+The crate implements fixed-response, imitation-only, one-way-prompt and cross-session yoked controls. A rule-based positive oracle applies the task's declared response transformation. The evaluator reports target-action delta, sham delta, unrelated-feature delta, input sensitivity, target specificity and synthetic response-rule agreement separately. Policy calls execute in the recorded seeded condition order, while output records are restored to canonical condition slots for paired comparison.
 
 The imitation control is intentionally important: copying the current partner can be input-sensitive but is not automatically considered musically complementary. The oracle relation is deliberately narrow and task-defined; it must not be presented as a human judgment or a general metric of musicality.
 
-A second, controlled-partner path now runs all four matched agent-action conditions and reports targeted, sham and unrelated effects separately. It distinguishes a fixed partner from a responsive simulator. A joint synthetic record requires both partner-to-agent and agent-to-partner gates; its result is simulator-only evidence, not proof of influence over musicians.
+A second, controlled-partner path now runs all four matched agent-action conditions and reports targeted, sham and unrelated effects separately. It distinguishes a fixed partner from a responsive simulator. A joint synthetic record requires both partner-to-agent and agent-to-partner gates, including a declared reverse-direction response-rule match; input-sensitive but rule-inconsistent partner behavior fails. These results are controlled-simulator evidence, not proof of influence over musicians.
 
 ## Evidence boundary and next integration seam
 
@@ -35,11 +35,11 @@ The crate also represents unsupported modality metrics explicitly as NotApplicab
 
 ## Canonical runnable fixture suite
 
-A frozen five-case suite now exercises motif, rhythm, tempo, role and texture dimensions. `canonical_suite` emits a CSV of fixed, imitation, one-way, yoked and rule-based policy results, plus the reverse-direction four-condition controlled-partner contrast. The dedicated workflow asserts that the rule-based positive control passes all five cases, the fixed and imitation controls pass none, and the responsive-partner reciprocal oracle passes all five. These are finite synthetic control counts—not SOTA results or estimates of performance with musicians.
+A frozen five-case suite now exercises motif, rhythm, tempo, role and texture dimensions. `canonical_suite` emits a CSV of fixed, imitation, one-way, yoked and rule-based policy results, plus the reverse-direction four-condition controlled-partner contrast. It includes an unrelated-feature shortcut baseline that changes the target action for the wrong reason. The dedicated workflow asserts: rule-based positive control 5/5; fixed, imitation, one-way, yoked and distractor-shortcut controls 0/5; and the rule-consistent responsive-partner reciprocal oracle 5/5. These are finite synthetic control counts—not SOTA results or estimates of performance with musicians.
 
 ## Authored tests
 
-The crate authors 27 deterministic tests covering the positive oracle, all four negative-control families, sham and unrelated control integrity, intervention isolation, event identity, cross-session yoking, controlled partner influence, manifest validation, modality applicability, and exact replay equality. These are authored tests, not executed results until the dedicated GitHub Actions workflow completes on the exact head.
+The crate authors 29 deterministic tests covering the positive oracle, fixed, imitation, one-way, yoked and distractor negative controls, sham and unrelated control integrity, intervention isolation, event identity, cross-session yoking, controlled partner influence, manifest validation, modality applicability, and exact replay equality. The exact-head workflow on `806df7d5651df2a7edd44b8d94a033589ebe1ef2` completed successfully: rustfmt passed, 29/29 tests passed, and the canonical CSV suite passed all positive/negative-control gates. Repository-wide CI/governance/benchmark/showroom checks were skipped, not passed.
 
 ## Qualification and claim ceiling
 
