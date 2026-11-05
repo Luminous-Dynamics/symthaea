@@ -1076,7 +1076,9 @@ mod tests {
             vec!["inspect-y".to_string(), "inspect-z".to_string()]
         );
         assert_eq!(
-            report.fixed_non_adaptive_optimum.adaptive_worst_case_savings_units,
+            report
+                .fixed_non_adaptive_optimum
+                .adaptive_worst_case_savings_units,
             Some(1)
         );
         assert_eq!(report.status, "MINIMUM_WORST_CASE_ADAPTIVE_POLICY");
