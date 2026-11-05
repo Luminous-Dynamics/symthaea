@@ -127,6 +127,22 @@ The event engine is designed to expose an important failure hidden by single-sna
 
 Benchmark case: `CREDIT-COVER-LIQUIDITY-WATERFALL-001`. The initial tests use synthetic values and do not establish source authenticity, transfer cut-off certainty, cash availability, or a real project's ability to meet a Market Operator deadline.
 
+### Forecast-vintage replay and historical decision integrity
+
+The new `asof_replay.rs` module addresses a different problem from forecast accuracy: **could this forecast or realized value actually have been known when the investment decision was made?**
+
+Every forecast record carries:
+- target valid-time interval;
+- forecast issue timestamp;
+- source available-at timestamp;
+- model identity and model digest;
+- source identity and source-content digest;
+- the forecast value.
+
+Every realized price carries the target interval, observation timestamp and source availability timestamp. At a frozen decision timestamp, the replay selects the latest forecast issue that was available at that time. A realized observation can supersede a forecast only after the target interval has ended and the observation has become available. Future-known records are excluded and counted; missing target coverage stays missing. Multiple engines require an explicit model scope; ambiguous latest vintages fail closed.
+
+This does not claim to improve Chronos or HOMER forecasting accuracy. It supplies a reconstructible information set for fair model comparison and historical underwriting replay. The initial case `FORECAST-VINTAGE-ASOF-001` contains synthetic timestamps and price values only; real calibration, rolling-origin backtests, forecast coverage and realised value-capture comparisons remain `not_run`.
+
 ### South African market phase as of 5 November 2026
 
 Engineering News reported on 30 October that invitations had been issued to 85 external entities for pre-launch simulation/testing, while broader launch was scheduled for April 2027. On 5 November, the Energy News Network interviewed the Acting NERSA CEO, who described finalisation of the market rules as a priority ahead of external market opening in April 2027. Both are secondary reporting; neither proves that any specific participant is admitted or commercially trading. The profile therefore records `pre_launch_testing_reported`, `participant_admission_state=unknown` and `commercial_trading_state=unknown`, with a null raw-source digest and `source_freeze_state=not_frozen`.
