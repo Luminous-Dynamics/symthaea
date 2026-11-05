@@ -72,6 +72,7 @@ pub enum RobustSelectionError {
     UnknownMetricScenario,
     MissingMetricRecord,
     InvalidUtilityInterval,
+    InvalidScoreReceiptProvenance,
     NumericFailure,
 }
 
@@ -90,6 +91,7 @@ impl fmt::Display for RobustSelectionError {
             Self::UnknownMetricScenario => "utility interval references a scenario outside the frozen scenario set",
             Self::MissingMetricRecord => "utility interval is missing for a frozen action × scenario pair",
             Self::InvalidUtilityInterval => "target-utility interval must be finite, ordered and inside its declared range",
+            Self::InvalidScoreReceiptProvenance => "score receipt method, digests, multiplicity or familywise confidence are inconsistent",
             Self::NumericFailure => "robust utility aggregation or selection certificate was not finite",
         };
         f.write_str(message)
@@ -124,6 +126,18 @@ pub fn certify_epsilon_optimal_action(
     {
         return Err(RobustSelectionError::InvalidFamilywiseConfidence);
     }
+    if receipt.method_id != SCORE_BOUND_METHOD_ID
+        || receipt.action_set_digest.trim().is_empty()
+        || receipt.scenario_set_digest.trim().is_empty()
+        || receipt.score_contract_digest.trim().is_empty()
+        || receipt.source_digest.trim().is_empty()
+        || !receipt.familywise_alpha.is_finite()
+        || receipt.familywise_alpha <= 0.0
+        || receipt.familywise_alpha >= 1.0
+        || (receipt.familywise_confidence - (1.0 - receipt.familywise_alpha)).abs() > 1.0e-12
+    {
+        return Err(RobustSelectionError::InvalidScoreReceiptProvenance);
+    }
     if !epsilon.is_finite() || epsilon < 0.0 {
         return Err(RobustSelectionError::InvalidIndifferenceZone);
     }
@@ -155,8 +169,18 @@ pub fn certify_epsilon_optimal_action(
         .len()
         .checked_mul(scenario_ids.len())
         .ok_or(RobustSelectionError::MetricCountMismatch)?;
-    if receipt.metrics.len() != expected_metrics {
-        return Err(RobustSelectionError::MetricCountMismatch);
+    let expected_claim_count = expected_metrics
+        .checked_mul(6)
+        .ok_or(RobustSelectionError::MetricCountMismatch)?;
+    let expected_per_claim_alpha =
+        receipt.familywise_alpha / expected_claim_count as f64;
+    if receipt.metrics.len() != expected_metrics
+        || receipt.claim_count != expected_claim_count
+        || !receipt.per_claim_alpha.is_finite()
+        || receipt.per_claim_alpha <= 0.0
+        || (receipt.per_claim_alpha - expected_per_claim_alpha).abs() > 1.0e-12
+    {
+        return Err(RobustSelectionError::InvalidScoreReceiptProvenance);
     }
 
     let mut by_pair = BTreeMap::new();
@@ -178,6 +202,7 @@ pub fn certify_epsilon_optimal_action(
             || !utility.declared_range.lower.is_finite()
             || !utility.declared_range.upper.is_finite()
             || utility.declared_range.lower > utility.declared_range.upper
+            || !(utility.declared_range.upper - utility.declared_range.lower).is_finite()
         {
             return Err(RobustSelectionError::InvalidUtilityInterval);
         }
@@ -326,7 +351,7 @@ mod tests {
     use super::*;
     use super::super::score_bounds::{
         bound_candidate_score_samples, BoundedScoreSamples, ScoreBoundsConfig, ScoreRange,
-        ScoreRanges,
+        ScoreRanges, ScoreBoundsReceipt,
     };
     use super::super::scenario::ScenarioSet;
     use super::super::sequential::{
