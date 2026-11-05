@@ -35,6 +35,22 @@ exclude = [
     # a workspace member; its examples must be moved into an owning crate
     # before this path can be reintroduced.
     "crates/core/symthaea",
+    # Source-only cryptographic attestation prototype; no manifest and imports
+    # an observation_fabric API not exposed by the current core crate. Keep
+    # unqualified until its core contract and production integration are real.
+    "crates/core/symthaea-observation-attestation",
+    # IIT research namespace currently has no package manifest. Keep its
+    # research artifacts out of the workspace until a buildable crate exists.
+    "crates/core/symthaea-iit",
+    # Research source tree with no Cargo package manifest/module ownership
+    # contract yet. Preserve files; restore as a package in a separate change.
+    "crates/domains/symthaea-architecture-engineering",
+    # InstantClean design namespace has no package manifest. Active
+    # implementation work is tracked in the existing culinary package/issues.
+    "crates/domains/symthaea-dishwasher-design",
+    # README-only verifier handoff; its claimed Rust CLI source is not yet
+    # present. Do not let a documentation stub become a workspace package.
+    "crates/domains/symthaea-rea-evidence-verifier",
 ]
 default-members = [
     "xtask",
