@@ -738,47 +738,319 @@ impl GenealogyStore {
         .optional()
     }
 
-    /// Roll back a manifest allocated by [`Self::allocate_root`] whose
-    /// *keep* ultimately failed downstream (e.g. the JSONL index append
-    /// failed after genealogy allocation already committed). Genealogy
-    /// allocation is an enrichment that must not block a keep on failure;
-    /// symmetrically, a keep that itself ultimately fails must not leave a
-    /// dangling manifest referencing an audio_key whose bundle directory
-    /// the caller is about to delete. Safe to call on an id that was never
-    /// allocated (e.g. genealogy was already `None`) -- deletes zero rows.
+    /// Read the distinct source manifests for this result. This combines the
+    /// legacy single-parent projection with all immutable parent-edge rows.
+    pub fn parents(&self, child_id: i64) -> rusqlite::Result<Vec<GenealogyManifest>> {
+        let conn = self.conn.lock().unwrap();
+        let mut parent_ids = BTreeSet::new();
+        if let Some(parent_id) = conn
+            .query_row(
+                "SELECT parent_id FROM genealogy_manifests WHERE id = ?1",
+                params![child_id],
+                |row| row.get::<_, Option<i64>>(0),
+            )
+            .optional()?
+            .flatten()
+        {
+            parent_ids.insert(parent_id);
+        }
+        {
+            let mut statement = conn.prepare(
+                "SELECT parent_manifest_id FROM genealogy_parent_edges
+                 WHERE child_manifest_id = ?1 ORDER BY parent_manifest_id",
+            )?;
+            let rows = statement.query_map(params![child_id], |row| row.get::<_, i64>(0))?;
+            for row in rows {
+                parent_ids.insert(row?);
+            }
+        }
+        parent_ids
+            .into_iter()
+            .map(|parent_id| {
+                conn.query_row(
+                    &format!("SELECT {SELECT_COLUMNS} FROM genealogy_manifests WHERE id = ?1"),
+                    params![parent_id],
+                    row_to_manifest,
+                )
+            })
+            .collect()
+    }
+
+    /// Return all explicitly persisted parent edges for a derived manifest.
+    /// Legacy single-parent manifests have no edge rows and remain readable
+    /// through `parents()` and the `parent_id` projection.
+    pub fn parent_edges(
+        &self,
+        child_id: i64,
+    ) -> rusqlite::Result<Vec<GenealogyParentEdgeV1>> {
+        let conn = self.conn.lock().unwrap();
+        let mut statement = conn.prepare(&format!(
+            "SELECT {EDGE_SELECT_COLUMNS} FROM genealogy_parent_edges
+             WHERE child_manifest_id = ?1 ORDER BY parent_manifest_id, idempotency_key"
+        ))?;
+        statement
+            .query_map(params![child_id], stored_edge_from_row)?
+            .collect()
+    }
+
+    /// Independently verify the stored parent graph and its content
+    /// commitments. Legacy manifests retain their v1 hash and single-parent
+    /// projection. Derived v2 manifests must have an exact, non-empty edge set
+    /// whose digest is committed by the child manifest.
+    pub fn verify_lineage(
+        &self,
+        child_id: i64,
+    ) -> Result<GenealogyLineageVerificationV1, GenealogyLineageError> {
+        let conn = self.conn.lock().map_err(|_| {
+            GenealogyLineageError::InvalidInput("genealogy database mutex is poisoned")
+        })?;
+        let manifest = conn
+            .query_row(
+                &format!("SELECT {SELECT_COLUMNS} FROM genealogy_manifests WHERE id = ?1"),
+                params![child_id],
+                row_to_manifest,
+            )
+            .optional()
+            .map_err(GenealogyLineageError::Database)?
+            .ok_or(GenealogyLineageError::InvalidInput(
+                "child manifest does not exist",
+            ))?;
+        let (relation_json, origin_json, stored_lineage_sha256): (String, String, String) = conn
+            .query_row(
+                "SELECT relation_json, origin_json, lineage_sha256
+                 FROM genealogy_manifests WHERE id = ?1",
+                params![child_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .map_err(GenealogyLineageError::Database)?;
+
+        let mut statement = conn
+            .prepare(&format!(
+                "SELECT {EDGE_SELECT_COLUMNS} FROM genealogy_parent_edges
+                 WHERE child_manifest_id = ?1 ORDER BY parent_manifest_id, idempotency_key"
+            ))
+            .map_err(GenealogyLineageError::Database)?;
+        let edges: Vec<GenealogyParentEdgeV1> = statement
+            .query_map(params![child_id], stored_edge_from_row)
+            .map_err(GenealogyLineageError::Database)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(GenealogyLineageError::Database)?;
+
+        if stored_lineage_sha256.is_empty() {
+            if !edges.is_empty() {
+                return Err(GenealogyLineageError::CorruptLineage);
+            }
+            let expected_manifest_sha256 = manifest_content_hash(
+                &manifest.namespace,
+                &relation_json,
+                &origin_json,
+                &manifest.audio_key,
+                &manifest.recipe_sha256,
+                manifest.score_sha256.as_deref(),
+                &manifest.audio_sha256,
+            );
+            if expected_manifest_sha256 != manifest.manifest_sha256 {
+                return Err(GenealogyLineageError::CorruptLineage);
+            }
+            if let Some(parent_id) = manifest.parent_id {
+                if parent_id >= manifest.id {
+                    return Err(GenealogyLineageError::CorruptLineage);
+                }
+                let parent_family_id: i64 = conn
+                    .query_row(
+                        "SELECT family_id FROM genealogy_manifests WHERE id = ?1",
+                        params![parent_id],
+                        |row| row.get(0),
+                    )
+                    .map_err(GenealogyLineageError::Database)?;
+                if parent_family_id != manifest.family_id {
+                    return Err(GenealogyLineageError::CorruptLineage);
+                }
+            } else if manifest.family_id != manifest.id {
+                return Err(GenealogyLineageError::CorruptLineage);
+            }
+            return Ok(GenealogyLineageVerificationV1 {
+                manifest,
+                parent_edges: Vec::new(),
+                lineage_sha256: String::new(),
+            });
+        }
+
+        if edges.is_empty() {
+            return Err(GenealogyLineageError::CorruptLineage);
+        }
+        let mut resolved: Vec<(GenealogyParentInputV1, GenealogyManifest)> =
+            Vec::with_capacity(edges.len());
+        for edge in &edges {
+            if edge.child_manifest_id != manifest.id
+                || edge.parent_manifest_id >= manifest.id
+                || edge.idempotency_key.trim().is_empty()
+            {
+                return Err(GenealogyLineageError::CorruptLineage);
+            }
+            let parent = conn
+                .query_row(
+                    &format!(
+                        "SELECT {SELECT_COLUMNS} FROM genealogy_manifests WHERE id = ?1"
+                    ),
+                    params![edge.parent_manifest_id],
+                    row_to_manifest,
+                )
+                .optional()
+                .map_err(GenealogyLineageError::Database)?
+                .ok_or(GenealogyLineageError::CorruptLineage)?;
+            let kind_json = serde_json::to_string(&edge.kind)
+                .map_err(|_| GenealogyLineageError::CorruptLineage)?;
+            let expected_edge_sha256 = genealogy_edge_content_hash(
+                edge.parent_manifest_id,
+                edge.child_manifest_id,
+                &parent.manifest_sha256,
+                &manifest.manifest_sha256,
+                &kind_json,
+                edge.source_event_id.as_deref(),
+                edge.contributor_ref.as_deref(),
+                edge.authority_receipt_ref.as_deref(),
+                &edge.idempotency_key,
+            );
+            if expected_edge_sha256 != edge.edge_sha256 {
+                return Err(GenealogyLineageError::CorruptLineage);
+            }
+            resolved.push((
+                GenealogyParentInputV1 {
+                    parent_manifest_id: edge.parent_manifest_id,
+                    kind: edge.kind.clone(),
+                    source_event_id: edge.source_event_id.clone(),
+                    contributor_ref: edge.contributor_ref.clone(),
+                    authority_receipt_ref: edge.authority_receipt_ref.clone(),
+                    idempotency_key: edge.idempotency_key.clone(),
+                },
+                parent,
+            ));
+        }
+        resolved.sort_by(|left, right| {
+            (
+                left.1.id,
+                &left.0.idempotency_key,
+                &left.0.source_event_id,
+            )
+                .cmp(&(
+                    right.1.id,
+                    &right.0.idempotency_key,
+                    &right.0.source_event_id,
+                ))
+        });
+        let computed_lineage_sha256 = lineage_content_hash(&resolved);
+        let expected_manifest_sha256 = derived_manifest_content_hash(
+            &manifest.namespace,
+            &relation_json,
+            &origin_json,
+            &manifest.audio_key,
+            &manifest.recipe_sha256,
+            manifest.score_sha256.as_deref(),
+            &manifest.audio_sha256,
+            &computed_lineage_sha256,
+        );
+        if computed_lineage_sha256 != stored_lineage_sha256
+            || expected_manifest_sha256 != manifest.manifest_sha256
+        {
+            return Err(GenealogyLineageError::CorruptLineage);
+        }
+
+        if resolved.len() == 1 {
+            if manifest.parent_id != Some(resolved[0].1.id)
+                || manifest.family_id != resolved[0].1.family_id
+            {
+                return Err(GenealogyLineageError::CorruptLineage);
+            }
+        } else if manifest.parent_id.is_some() || manifest.family_id != manifest.id {
+            return Err(GenealogyLineageError::CorruptLineage);
+        }
+
+        Ok(GenealogyLineageVerificationV1 {
+            manifest,
+            parent_edges: edges,
+            lineage_sha256: computed_lineage_sha256,
+        })
+    }
+
+    /// Roll back a manifest allocated by a keep operation. Parent edges and
+    /// operation idempotency entries cascade only when the derived child is
+    /// deleted; a manifest referenced as a parent is protected by RESTRICT.
     pub fn delete(&self, id: i64) -> rusqlite::Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute("DELETE FROM genealogy_manifests WHERE id = ?1", params![id])?;
         Ok(())
     }
 
-    /// Direct children only (not full descendants) -- V1 has no non-root
-    /// relation live yet, so this is always empty today; kept as a real
-    /// query rather than a stub so it needs no changes once one exists.
+    /// Direct children, including children connected through the plural edge
+    /// table. Results are unique and ordered by the result manifest ID.
     pub fn children(&self, id: i64) -> rusqlite::Result<Vec<GenealogyManifest>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(&format!(
-            "SELECT {SELECT_COLUMNS} FROM genealogy_manifests WHERE parent_id = ?1 ORDER BY id"
+        let mut statement = conn.prepare(&format!(
+            "SELECT {SELECT_COLUMNS} FROM genealogy_manifests m
+             WHERE m.parent_id = ?1
+                OR EXISTS (
+                    SELECT 1 FROM genealogy_parent_edges e
+                    WHERE e.child_manifest_id = m.id AND e.parent_manifest_id = ?1
+                )
+             ORDER BY m.id"
         ))?;
-        stmt.query_map(params![id], row_to_manifest)?.collect()
+        statement
+            .query_map(params![id], row_to_manifest)?
+            .collect()
     }
 
-    /// This manifest plus every ancestor, closest-first, via a recursive
-    /// walk up `parent_id`.
+    /// This manifest plus every ancestor, closest-first, across both legacy
+    /// single-parent projections and plural source edges. Shared ancestors in
+    /// a diamond are returned once; the visited set also prevents traversal
+    /// from looping if an externally corrupted database contains a cycle.
     pub fn ancestry(&self, id: i64) -> rusqlite::Result<Vec<GenealogyManifest>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(&format!(
-            "WITH RECURSIVE ancestors({SELECT_COLUMNS}) AS (
-                SELECT {SELECT_COLUMNS} FROM genealogy_manifests WHERE id = ?1
-                UNION ALL
-                SELECT m.id, m.family_id, m.parent_id, m.namespace, m.relation_json,
-                       m.origin_json, m.audio_key, m.recipe_sha256, m.score_sha256,
-                       m.audio_sha256, m.manifest_sha256, m.created_at_unix_ms
-                FROM genealogy_manifests m JOIN ancestors a ON m.id = a.parent_id
-             )
-             SELECT {SELECT_COLUMNS} FROM ancestors"
-        ))?;
-        stmt.query_map(params![id], row_to_manifest)?.collect()
+        let mut pending = std::collections::VecDeque::from([(id, 0usize)]);
+        let mut seen = BTreeSet::new();
+        let mut found: Vec<(usize, GenealogyManifest)> = Vec::new();
+
+        while let Some((current_id, depth)) = pending.pop_front() {
+            if !seen.insert(current_id) {
+                continue;
+            }
+            let manifest = match conn
+                .query_row(
+                    &format!("SELECT {SELECT_COLUMNS} FROM genealogy_manifests WHERE id = ?1"),
+                    params![current_id],
+                    row_to_manifest,
+                )
+                .optional()?
+            {
+                Some(manifest) => manifest,
+                None if depth == 0 => return Ok(Vec::new()),
+                None => continue,
+            };
+            found.push((depth, manifest));
+
+            if let Some(parent_id) = conn
+                .query_row(
+                    "SELECT parent_id FROM genealogy_manifests WHERE id = ?1",
+                    params![current_id],
+                    |row| row.get::<_, Option<i64>>(0),
+                )
+                .optional()?
+                .flatten()
+            {
+                pending.push_back((parent_id, depth + 1));
+            }
+            let mut statement = conn.prepare(
+                "SELECT parent_manifest_id FROM genealogy_parent_edges
+                 WHERE child_manifest_id = ?1 ORDER BY parent_manifest_id",
+            )?;
+            let rows = statement.query_map(params![current_id], |row| row.get::<_, i64>(0))?;
+            for row in rows {
+                pending.push_back((row?, depth + 1));
+            }
+        }
+
+        found.sort_by_key(|(depth, manifest)| (*depth, manifest.id));
+        Ok(found.into_iter().map(|(_, manifest)| manifest).collect())
     }
 }
 
