@@ -563,6 +563,7 @@ fn validate_pairs(pairs: &[PairMeta]) -> Result<BTreeMap<String, PairMeta>, Stri
     ];
     let mut by_id = BTreeMap::new();
     let mut composite_keys = HashSet::new();
+    let mut observed_languages = BTreeSet::new();
 
     for pair in pairs {
         if pair.schema_version != "multi-hall-sa-pair-v0" {
@@ -586,6 +587,7 @@ fn validate_pairs(pairs: &[PairMeta]) -> Result<BTreeMap<String, PairMeta>, Stri
                 pair.pair_id, pair.hallucination_type
             ));
         }
+        observed_languages.insert(pair.language.clone());
         // pair_id is not globally unique in the released builder: fact_index is
         // reset for each source document, while file_id is assigned per document.
         // Keep the complete source/fact/language/type tuple as the identity.
@@ -598,6 +600,16 @@ fn validate_pairs(pairs: &[PairMeta]) -> Result<BTreeMap<String, PairMeta>, Stri
         }
         by_id.insert(key, pair.clone());
     }
+
+    let required_languages: BTreeSet<String> =
+        allowed_languages.iter().map(|language| language.to_string()).collect();
+    if observed_languages != required_languages {
+        return Err(format!(
+            "pair manifest must include all four Multi-Hall-SA languages {:?}; observed {:?}",
+            required_languages, observed_languages
+        ));
+    }
+
     Ok(by_id)
 }
 
@@ -1600,6 +1612,22 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pair_manifest_rejects_missing_target_language_tracks() {
+        let pair = PairMeta {
+            schema_version: "multi-hall-sa-pair-v0".into(),
+            pair_id: "p1".into(),
+            file_id: "f1".into(),
+            fact_index: 0,
+            language: "isiZulu".into(),
+            hallucination_type: "temporal shift".into(),
+        };
+        let result = validate_pairs(&[pair]);
+        assert!(result
+            .expect_err("a partial language manifest is not the complete benchmark")
+            .contains("must include all four Multi-Hall-SA languages"));
+    }
 
     #[test]
     fn duplicate_pair_ids_are_disambiguated_by_source_document() {
