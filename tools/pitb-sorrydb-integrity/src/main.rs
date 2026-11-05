@@ -13,6 +13,7 @@ use std::{
 const PROVENANCE_SCHEMA: &str = "pitb.sorrydb-snapshot-provenance.v0";
 const RECEIPT_SCHEMA: &str = "pitb.sorrydb-task-reproduction.v0";
 const REPORT_SCHEMA: &str = "pitb.sorrydb-integrity-report.v0";
+const SNAPSHOT_REPORT_SCHEMA: &str = "pitb.sorrydb-snapshot-integrity-report.v0";
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct Database {
@@ -102,6 +103,42 @@ struct TaskReceipt {
     vacuity_audit_receipt_sha256: Option<String>,
     assumption_audit_status: String,
     assumption_audit_receipt_sha256: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct SnapshotAuditReport {
+    schema_version: String,
+    snapshot_id: String,
+    upstream_repository: String,
+    upstream_repository_commit: String,
+    database_git_blob_sha1: String,
+    evaluation_split_git_blob_sha1: String,
+    database_raw_sha256: String,
+    evaluation_split_raw_sha256: String,
+    documented_database_task_count: usize,
+    database_task_count: usize,
+    evaluation_task_count: usize,
+    full_unique_task_ids: usize,
+    full_unique_goal_strings: usize,
+    full_unique_repositories: usize,
+    full_unique_repository_commit_pairs: usize,
+    evaluation_unique_repositories: usize,
+    evaluation_unique_repository_commit_pairs: usize,
+    evaluation_repository_file_clusters: usize,
+    evaluation_repository_overlap_count: usize,
+    project_disjoint_evaluation_split: bool,
+    max_tasks_per_evaluation_repository: usize,
+    max_tasks_per_evaluation_repository_file: usize,
+    evaluation_unique_lean_versions: usize,
+    full_zero_based_start_column_count: usize,
+    evaluation_zero_based_start_column_count: usize,
+    full_task_ids_recomputed: usize,
+    evaluation_task_ids_recomputed: usize,
+    evaluation_ids_subset_of_full: bool,
+    evaluation_records_identical_to_full: bool,
+    license: String,
+    scheduler_admission: bool,
+    interpretation_boundary: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
