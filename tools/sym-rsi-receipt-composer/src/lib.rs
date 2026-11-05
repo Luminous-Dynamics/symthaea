@@ -629,12 +629,16 @@ pub fn compose_candidate(
 
     let mut parsed_runs = BTreeMap::new();
     let mut seen_receipt_digests = BTreeSet::new();
-    let mut shared_eligible_task_ids: Option<Vec<String>> = None;
-    let mut shared_universe_digest: Option<String> = None;
-    let mut shared_eligible_digest: Option<String> = None;
     let mut shared_candidate_identity: Option<Value> = None;
-    let mut shared_compatibility_context: Option<Value> = None;
-    let mut shared_input_digests: Option<BTreeMap<String, String>> = None;
+    // Only metrics that explicitly declare the same pairing group share task units.
+    let mut pairing_group_contracts: BTreeMap<
+        String,
+        (
+            Vec<String>,
+            BTreeMap<String, String>,
+            BTreeMap<String, String>,
+        ),
+    > = BTreeMap::new();
 
     for (metric_id, projection) in &plan.metrics {
         let bytes = receipt_bytes_by_metric
@@ -645,27 +649,6 @@ pub fn compose_candidate(
             return Err(ComposerError::DuplicateEvidenceDigest);
         }
 
-        match &shared_eligible_task_ids {
-            Some(task_ids) if task_ids != &parsed.eligible_task_ids => {
-                return Err(ComposerError::TaskUniverseMismatch);
-            }
-            None => shared_eligible_task_ids = Some(parsed.eligible_task_ids.clone()),
-            _ => {}
-        }
-        match &shared_universe_digest {
-            Some(digest) if digest != &parsed.universe_digest => {
-                return Err(ComposerError::TaskUniverseMismatch);
-            }
-            None => shared_universe_digest = Some(parsed.universe_digest.clone()),
-            _ => {}
-        }
-        match &shared_eligible_digest {
-            Some(digest) if digest != &parsed.eligible_digest => {
-                return Err(ComposerError::TaskUniverseMismatch);
-            }
-            None => shared_eligible_digest = Some(parsed.eligible_digest.clone()),
-            _ => {}
-        }
         match &shared_candidate_identity {
             Some(identity) if identity != &parsed.candidate_identity => {
                 return Err(ComposerError::CandidateIdentityMismatch);
@@ -673,37 +656,36 @@ pub fn compose_candidate(
             None => shared_candidate_identity = Some(parsed.candidate_identity.clone()),
             _ => {}
         }
-        match &shared_compatibility_context {
-            Some(context) if context != &parsed.compatibility_context => {
-                return Err(ComposerError::IncompatibleMetricRunContext);
+
+        if let Some(group_id) = &parsed.projection.pairing_group_id {
+            let input_digests = parsed
+                .tasks
+                .iter()
+                .map(|(task_id, outcome)| (task_id.clone(), outcome.input_sha256.clone()))
+                .collect::<BTreeMap<_, _>>();
+            let pairing_contract = (
+                parsed.eligible_task_ids.clone(),
+                parsed.projection.cluster_by_task.clone(),
+                input_digests,
+            );
+            match pairing_group_contracts.get(group_id) {
+                Some(expected) if expected.0 != pairing_contract.0 => {
+                    return Err(ComposerError::TaskUniverseMismatch);
+                }
+                Some(expected) if expected.1 != pairing_contract.1 => {
+                    return Err(ComposerError::ClusterMapMismatch);
+                }
+                Some(expected) if expected.2 != pairing_contract.2 => {
+                    return Err(ComposerError::TaskInputUniverseMismatch);
+                }
+                Some(_) => {}
+                None => {
+                    pairing_group_contracts.insert(group_id.clone(), pairing_contract);
+                }
             }
-            None => shared_compatibility_context = Some(parsed.compatibility_context.clone()),
-            _ => {}
-        }
-        let input_digests: BTreeMap<String, String> = parsed
-            .tasks
-            .iter()
-            .map(|(task_id, outcome)| (task_id.clone(), outcome.input_sha256.clone()))
-            .collect();
-        match &shared_input_digests {
-            Some(expected) if expected != &input_digests => {
-                return Err(ComposerError::TaskInputUniverseMismatch);
-            }
-            None => shared_input_digests = Some(input_digests),
-            _ => {}
         }
 
         parsed_runs.insert(metric_id.clone(), parsed);
-    }
-
-    let eligible_task_ids = shared_eligible_task_ids.ok_or(ComposerError::TaskUniverseMismatch)?;
-    if eligible_task_ids.is_empty() {
-        return Err(ComposerError::TaskUniverseMismatch);
-    }
-    let eligible_set: BTreeSet<String> = eligible_task_ids.iter().cloned().collect();
-    let cluster_set: BTreeSet<String> = plan.cluster_by_task.keys().cloned().collect();
-    if eligible_set != cluster_set {
-        return Err(ComposerError::ClusterMapMismatch);
     }
 
     let mut metric_contexts = Map::new();
@@ -715,6 +697,12 @@ pub fn compose_candidate(
             metric_id.clone(),
             json!({
                 "receipt_context": parsed.metric_context,
+                "eligible_task_ids": parsed.eligible_task_ids,
+                "universe_digest": parsed.universe_digest,
+                "eligible_task_set_digest": parsed.eligible_digest,
+                "pairing_group_id": parsed.projection.pairing_group_id,
+                "cluster_by_task": parsed.projection.cluster_by_task,
+                "budget_caps": parsed.projection.budget_caps,
                 "transform": parsed.projection.transform.manifest_value(),
                 "minimum_graded_coverage": parsed.projection.minimum_graded_coverage
             }),
@@ -723,24 +711,30 @@ pub fn compose_candidate(
             metric_id.clone(),
             Value::String(parsed.verified.canonical_receipt_sha256.clone()),
         );
-        let summary = summarize(&parsed.tasks, eligible_task_ids.len());
+        let summary = summarize(&parsed.tasks, parsed.eligible_task_ids.len());
+        let eligible_task_ids = parsed.eligible_task_ids;
+        let cluster_by_task = parsed.projection.cluster_by_task.clone();
         metrics.insert(
             metric_id.clone(),
             MetricEvidence {
                 projection: parsed.projection,
+                eligible_task_ids,
+                cluster_by_task,
                 summary,
                 tasks: parsed.tasks,
             },
         );
     }
 
+    let candidate_identity =
+        shared_candidate_identity.ok_or(ComposerError::CandidateIdentityMismatch)?;
+    let system_arm =
+        required_value_from_value(&candidate_identity, "arm", "system identity")?;
     let context_manifest = json!({
         "experiment_id": plan.experiment_id.clone(),
         "preregistration_digest": plan.preregistration_digest.clone(),
-        "compatibility_context": shared_compatibility_context,
-        "metric_contexts": Value::Object(metric_contexts),
-        "eligible_task_ids": eligible_task_ids.clone(),
-        "cluster_by_task": plan.cluster_by_task.clone()
+        "system_arm": system_arm,
+        "metric_contexts": Value::Object(metric_contexts)
     });
     let evidence_manifest = Value::Object(evidence_digests);
     let lineage_manifest = json!({
@@ -749,8 +743,6 @@ pub fn compose_candidate(
     let context_digest = digest_value(&context_manifest)?;
     let evidence_set_digest = digest_value(&evidence_manifest)?;
     let lineage_manifest_digest = digest_value(&lineage_manifest)?;
-    let candidate_identity =
-        shared_candidate_identity.ok_or(ComposerError::CandidateIdentityMismatch)?;
     let candidate_system_identity_digest = digest_value(&candidate_identity)?;
 
     Ok(ComposedCandidateEvidence {
@@ -759,8 +751,6 @@ pub fn compose_candidate(
         evidence_set_digest,
         lineage_manifest_digest,
         parent_system_identity_digests: plan.parent_system_identity_digests.clone(),
-        eligible_task_ids,
-        cluster_by_task: plan.cluster_by_task.clone(),
         metrics,
     })
 }
