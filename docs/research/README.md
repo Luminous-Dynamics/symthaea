@@ -19,6 +19,7 @@ Symthaea is not just software - it's a research platform exploring fundamental q
 | [Validation Studies](#validation-studies) | Empirical validation approaches |
 | [Publications](#publications) | Papers and manuscripts |
 | [Research Roadmap](#research-roadmap) | Future research directions |
+| [CAD-HISTORY-001 Fixture Corpus](CAD_HISTORY_001_FIXTURE_CORPUS_V0_1.md) | Synthetic edit-preserving parametric reconstruction fixtures and adversarial controls |
 
 ---
 
