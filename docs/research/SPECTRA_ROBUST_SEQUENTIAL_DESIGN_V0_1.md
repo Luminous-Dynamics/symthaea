@@ -266,8 +266,10 @@ No status may be promoted solely because a local Fisher-information score is fav
 
 - Typed, frozen `OperationalActionSet` and action-to-observation qualification status ([draft PR #10493](https://github.com/Luminous-Dynamics/symthaea/pull/10493)).
 - Conservative scenario aggregation across a complete action × scenario matrix, including lower/upper score bounds, maximin/CVaR and fail-closed coverage ([issue #10509](https://github.com/Luminous-Dynamics/symthaea/issues/10509), [draft PR #10511](https://github.com/Luminous-Dynamics/symthaea/pull/10511)).
-- Scenario registry with Gaussian, lapse, drift, heterogeneity, RT/confidence channel and MNAR generators.
-- Policy interface with deterministic replay and propensity receipts.
+- Known-truth observer and measurement-channel DGP (Gaussian / variance-standardized Student-t, lapse, criterion drift, independent participant effects, evidence-dependent missingness and quantized RT) — [issue #10555](https://github.com/Luminous-Dynamics/symthaea/issues/10555), [draft PR #10559](https://github.com/Luminous-Dynamics/symthaea/pull/10559).
+- Simultaneous bounded-score Monte Carlo uncertainty with one-sided Hoeffding bounds and Bonferroni familywise control — [issue #10557](https://github.com/Luminous-Dynamics/symthaea/issues/10557), [draft PR #10560](https://github.com/Luminous-Dynamics/symthaea/pull/10560).
+- Per-participant fail-closed conversion of observed categories to UVSD fitter tables, with explicit missingness dispositions — [issue #10561](https://github.com/Luminous-Dynamics/symthaea/issues/10561), [draft PR #10562](https://github.com/Luminous-Dynamics/symthaea/pull/10562).
+- Policy interface with deterministic replay and propensity receipts ([draft PR #10493](https://github.com/Luminous-Dynamics/symthaea/pull/10493)).
 - Fixed, QUEST+-style and one-step EIG baselines.
 - Goal-oriented and model-discrimination utilities.
 - Robust ambiguity-set / maximin scoring and prior-sensitivity analysis.
