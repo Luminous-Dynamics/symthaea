@@ -67,6 +67,8 @@ Consider two scenarios under Maximin:
 | A (incumbent) | [0.80, 0.85] | [0.82, 0.92] | [0.80, 0.85] |
 | B (competitor) | [0.20, 0.90] | [0.35, 0.84] | [0.20, 0.84] |
 
+For the radius-only thought experiment, take the current point estimates to be the interval midpoints and hold them fixed while shrinking radii.
+
 Action A is selected because its robust lower bound is 0.80. The maximum robust upper bound is 0.85, so the current certificate gap is 0.05. With epsilon 0.25, B passes the current competitive-action filter because 0.84 >= 0.80 - 0.25.
 
 However, shrinking B's intervals alone cannot change the current gap under radius-only contraction:
