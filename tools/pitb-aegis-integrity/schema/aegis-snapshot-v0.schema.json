@@ -23,7 +23,8 @@
     "paper_reference",
     "task_manifest_sha256",
     "sample_manifest_sha256",
-    "environment_policy_sha256"
+    "environment_policy_sha256",
+    "sample_protocol"
   ],
   "properties": {
     "schema_version": {
@@ -205,6 +206,12 @@
           "const": 1800
         }
       }
+    },
+    "sample_protocol": {
+      "enum": [
+        "paper_v1_hold_only",
+        "custom_polarity_balanced"
+      ]
     }
   },
   "allOf": [
