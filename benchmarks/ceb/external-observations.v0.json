@@ -1015,7 +1015,9 @@
           "applies_to_task_count": 5751
         }
       },
-      "notes": "Published mean ± 95% interval."
+      "notes": [
+        "Published mean ± 95% interval."
+      ]
     },
     {
       "observation_id": "pdb-single-opus-recall",
