@@ -162,6 +162,9 @@ pub struct EffectReceipt {
     pub clock_origin_id: String,
     /// Timestamp in the declared clock domain.
     pub observed_at: u64,
+    /// Exact frame count added to the application queue at enqueue or consumed
+    /// from it at callback admission. Zero at later evidence stages.
+    pub application_frames: u64,
     /// Output epoch attached to the artifact.
     pub output_epoch: u64,
     /// Required for predicted playback.
@@ -333,6 +336,8 @@ pub enum LedgerError {
     EffectEvidenceBindingMismatch,
     /// A clock regressed within its own domain and origin.
     ClockRegression,
+    /// Application enqueue/callback frame accounting was absent or inconsistent.
+    InvalidFrameAccounting,
     /// Turn close found missing or extra chunk decisions.
     IncompleteTurn { expected: u32, observed: usize },
     /// Turn close did not match the ledger session/turn.
@@ -353,6 +358,7 @@ struct DecisionState {
     response_applied: bool,
     response_artifact_sha256: Option<String>,
     current_stage: Option<EffectStage>,
+    observed_stages: BTreeSet<EffectStage>,
     revoked: bool,
 }
 
@@ -618,6 +624,7 @@ impl ActionEffectLedger {
                 response_applied: false,
                 response_artifact_sha256: None,
                 current_stage: None,
+                observed_stages: BTreeSet::new(),
                 revoked: false,
             },
         );
@@ -692,6 +699,7 @@ impl ActionEffectLedger {
         state.response_applied = true;
         state.response_artifact_sha256 = Some(artifact_sha256.to_owned());
         state.current_stage = Some(EffectStage::AppliedAtNoteQueue);
+        state.observed_stages.insert(EffectStage::AppliedAtNoteQueue);
         self.state.active_commitment_id = Some(commitment_id.to_owned());
         self.state.active_plan_sha256 = Some(plan_sha256.to_owned());
         Ok(())
@@ -868,6 +876,35 @@ impl ActionEffectLedger {
         {
             return Err(LedgerError::MissingEvidenceDigest);
         }
+
+        match receipt.stage {
+            EffectStage::EnqueuedToApplicationOutput => {
+                if receipt.application_frames == 0 {
+                    return Err(LedgerError::InvalidFrameAccounting);
+                }
+                self.state.pending_application_frames = self
+                    .state
+                    .pending_application_frames
+                    .checked_add(receipt.application_frames)
+                    .ok_or(LedgerError::InvalidFrameAccounting)?;
+            }
+            EffectStage::CallbackObserved => {
+                if receipt.application_frames == 0 {
+                    return Err(LedgerError::InvalidFrameAccounting);
+                }
+                self.state.pending_application_frames = self
+                    .state
+                    .pending_application_frames
+                    .checked_sub(receipt.application_frames)
+                    .ok_or(LedgerError::InvalidFrameAccounting)?;
+            }
+            _ => {
+                if receipt.application_frames != 0 {
+                    return Err(LedgerError::InvalidFrameAccounting);
+                }
+            }
+        }
+
         let key = (receipt.clock_domain, receipt.clock_origin_id.clone());
         if self
             .clock_times
@@ -878,6 +915,7 @@ impl ActionEffectLedger {
         }
         self.clock_times.insert(key, receipt.observed_at);
         state.current_stage = Some(receipt.stage);
+        state.observed_stages.insert(receipt.stage);
         Ok(())
     }
 
@@ -952,32 +990,22 @@ impl ActionEffectLedger {
         summary.enqueued = self
             .decisions
             .values()
-            .filter(|decision| {
-                decision
-                    .current_stage
-                    .map(|stage| stage >= EffectStage::EnqueuedToApplicationOutput)
-                    .unwrap_or(false)
-            })
+            .filter(|decision| decision.observed_stages.contains(&EffectStage::EnqueuedToApplicationOutput))
             .count();
         summary.callback_observed = self
             .decisions
             .values()
-            .filter(|decision| {
-                decision
-                    .current_stage
-                    .map(|stage| stage >= EffectStage::CallbackObserved)
-                    .unwrap_or(false)
-            })
+            .filter(|decision| decision.observed_stages.contains(&EffectStage::CallbackObserved))
             .count();
         summary.cpal_predicted = self
             .decisions
             .values()
-            .filter(|decision| decision.current_stage == Some(EffectStage::CpalPredictedPlayback))
+            .filter(|decision| decision.observed_stages.contains(&EffectStage::CpalPredictedPlayback))
             .count();
         summary.loopback_observed = self
             .decisions
             .values()
-            .filter(|decision| decision.current_stage == Some(EffectStage::LoopbackObserved))
+            .filter(|decision| decision.observed_stages.contains(&EffectStage::LoopbackObserved))
             .count();
         summary
     }
@@ -1149,6 +1177,10 @@ mod tests {
                 clock_domain: domain,
                 clock_origin_id: origin.into(),
                 observed_at: at,
+                application_frames: match stage {
+                    EffectStage::EnqueuedToApplicationOutput | EffectStage::CallbackObserved => 120,
+                    _ => 0,
+                },
                 output_epoch: 0,
                 clock_bridge_sha256: (stage == EffectStage::CpalPredictedPlayback)
                     .then_some(BRIDGE.into()),
@@ -1735,8 +1767,8 @@ mod tests {
                     control_sequence: 2,
                     before,
                     after,
-                    discarded_unconsumed_notes: 0,
-                    discarded_application_frames: 0,
+                    discarded_unconsumed_notes: 5,
+                    discarded_application_frames: 480,
                 }),
             ))
             .unwrap();
@@ -1784,8 +1816,8 @@ mod tests {
                     control_sequence: 2,
                     before,
                     after,
-                    discarded_unconsumed_notes: 0,
-                    discarded_application_frames: 0,
+                    discarded_unconsumed_notes: 5,
+                    discarded_application_frames: 600,
                 }),
             ))
             .unwrap();
