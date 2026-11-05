@@ -19,6 +19,8 @@ The governing principle is:
 | Metrology and evidence strata | [HOME-SVC-METROLOGY-001 #10341](https://github.com/Luminous-Dynamics/symthaea/issues/10341) | Repeatability, reproducibility, production variation and household validity |
 
 ## Current research specifications under review
+- [WaterLoop machine-readable competitor ledger v0.1](waterloop-competitive-comparator-ledger-v0.1.json) — source-level claims, exact model/class scope, converted listing units, unresolved discrepancies and functional-unit boundaries; includes JoJo, Moen, Hydraloop, AQUALOOP and Phyn.
+- [WaterLoop competitive evidence v0.1](waterloop-competitive-evidence-v0.1.md) — separates outage backup, greywater source substitution and leak containment; reconciles manufacturer capacity with certification listing scope, source-stream classes, local jurisdiction and offline connectivity.
 
 - [#10342 — household water/energy/thermal coordination](https://github.com/Luminous-Dynamics/symthaea/issues/10342): [household-resource-arbitration-contract-v0.1.md](household-resource-arbitration-contract-v0.1.md) defines non-compensatory safety/quality/consent gates, local appliance authority, uncertainty-bounded resource planning and 14 adversarial HRA scenarios. Design-only; no live control.
 - [Network-nonadverse household refill benchmark v0.1](household-network-nonadverse-refill-benchmark-v0.1.md) with [RFL-001…014 + RFL-POS-001…003](household-network-refill-scenarios-v0.1.json); synthetic design only, no physical feeder test.
