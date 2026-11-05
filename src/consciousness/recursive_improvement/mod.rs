@@ -86,7 +86,8 @@ pub use reuse_confidence_certificate::{
 };
 pub use reuse_error_budget::{
     allocate_reuse_error_budget, evaluate_reuse_round, ReuseBudgetError,
-    ReuseCandidateEvidence, ReuseErrorAllocation, ReuseRoundDecision, MAX_REUSE_ROUND,
+    ReuseCandidateEvidence, ReuseErrorAllocation, ReuseRoundDecision, ReuseRoundError,
+    MAX_REUSE_ROUND,
 };
 
 pub use core::{
