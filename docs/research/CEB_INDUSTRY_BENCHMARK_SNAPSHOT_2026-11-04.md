@@ -154,6 +154,8 @@ The benchmark landscape now exposes nine separable gaps between coding success a
 
 SRE-Bench remains a separate optional source-free reverse-engineering capability, not a substitute for source-based repository comprehension.
 
+A tenth gap is benchmark trustworthiness itself. Epoch AI's September 4, 2026 review rated Terminal-Bench 4.0.0 flawed, reporting publicly noted scoring defects in 30 of 66 tasks (45.5%); the maintainer roadmap names tamper-resistant verifiers as a Terminal-Bench 4.1 focus. CEB should evaluate verifier integrity, custody, answer-leakage resistance, false-accept/false-reject behavior and regrade independence as first-class capabilities, not hidden assumptions.
+
 ## 4. CEB strategy
 
 ### Primary research claims to pursue
@@ -213,6 +215,8 @@ Suggested first gates already tracked in #10385 / #10400:
 - secure-task pass >= 0.55 initially, >= 0.65 on sealed holdout, while functional correctness remains within a preregistered 2 pp non-inferiority margin;
 - context retrieval Recall@10 >= 0.85 initially, >= 0.90 sealed; Context F1 >= 0.45 initially, >= 0.50 sealed, with downstream task success and retrieval cost reported;
 - Rust-SWE-bench issue resolution >30% in a matched replication before pursuing >35%; do not compare this directly with the February 2026 RUSTFORGER/Claude Sonnet 3.7 result without matched harness and model controls.
+- evaluator integrity: zero critical false accepts; at least 300 distinct negative and 300 distinct positive control instantiations across at least 30 negative fault families; report false-accept and false-reject uncertainty separately, plus unresolved rate and regrade disagreement;
+- documentation executability: zero unannotated missing Cargo manifest, package or binary references in tracked Markdown; report manifest, package-selector and dynamic/out-of-scope denominators separately.
 
 These are prospective CEB goals, not current Symthaea results. Final sample sizes and confidence bounds must be set from pilot variance and repository/fault-family clustering.
 
