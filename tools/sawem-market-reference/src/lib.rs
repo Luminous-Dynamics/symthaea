@@ -10,6 +10,7 @@ use std::fmt;
 
 pub mod asof_replay;
 pub mod bms_capability;
+pub mod bms_capability_surface;
 pub mod credit_cover;
 pub mod execution_fidelity;
 pub mod forecast_metrics;
