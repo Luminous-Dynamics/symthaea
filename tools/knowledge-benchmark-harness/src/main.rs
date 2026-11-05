@@ -2176,6 +2176,7 @@ mod tests {
             include_str!("../../../benchmarks/esoterica-bench/v0/cases.jsonl"),
             include_str!("../../../benchmarks/mythology-bench/v0/cases.jsonl"),
         ];
+        let mut seen_case_ids = HashSet::new();
         for (set_index, cases) in case_sets.iter().enumerate() {
             for (line_index, line) in cases.lines().enumerate() {
                 let case: Value = serde_json::from_str(line).unwrap_or_else(|error| {
@@ -2185,34 +2186,11 @@ mod tests {
                         line_index + 1
                     )
                 });
-                if let Some(source_refs) = case.get("source_refs").and_then(Value::as_array) {
-                    for source_ref in source_refs {
-                        let source_id = string_field(source_ref, "source_id").unwrap_or("");
-                        let uri = string_field(source_ref, "uri").unwrap_or("");
-                        let (catalog_uri, source_split) = catalog.get(source_id).unwrap_or_else(|| {
-                            panic!(
-                                "case {} references source ID {source_id:?} absent from catalog",
-                                string_field(&case, "id").unwrap_or("<unknown>")
-                            )
-                        });
-                        assert_eq!(
-                            uri,
-                            catalog_uri.as_str(),
-                            "case {} source URI differs from catalog for {source_id:?}",
-                            string_field(&case, "id").unwrap_or("<unknown>")
-                        );
-                        assert_eq!(
-                            string_field(&case, "split").unwrap_or(""),
-                            source_split,
-                            "case {} split differs from source family split for {source_id:?}",
-                            string_field(&case, "id").unwrap_or("<unknown>")
-                        );
-                    }
-                }
-                let errors = validate_case_catalog_refs(&case);
+                let errors =
+                    validate_domain_contract(Kind::Case, &case, &mut seen_case_ids);
                 assert!(
                     errors.is_empty(),
-                    "case {} failed runtime catalog validation: {}",
+                    "case {} failed runtime case validation: {}",
                     string_field(&case, "id").unwrap_or("<unknown>"),
                     errors.join("; ")
                 );
