@@ -48,6 +48,7 @@
 // Core infrastructure for MAGI Loop
 pub mod candidate_archive;
 pub mod paired_evaluation;
+pub mod paired_sign_test;
 pub mod reuse_error_budget;
 pub mod core;
 pub mod types;
