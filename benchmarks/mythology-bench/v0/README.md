@@ -8,7 +8,7 @@ Mythology deserves a first-class module in the shared knowledge fabric, but myth
 
 - [`case.schema.json`](case.schema.json): versioned evaluation case contract.
 - [Shared source catalog](../../source-catalog/v0/README.md): source IDs, source-family grouping, split governance and rights-review status. Every case source reference must resolve to this metadata catalog.
-- [`cases.jsonl`](cases.jsonl): **26** development cases (Egypt-first + synthetic transfer/metamorphic controls).
+- [`cases.jsonl`](cases.jsonl): **30** development cases (Egypt-first + synthetic transfer/metamorphic controls).
 - [`narrative-graph.schema.json`](narrative-graph.schema.json): a source-grounded narrative-graph shape contract.
 - [`narrative-graph-fixtures.jsonl`](narrative-graph-fixtures.jsonl): four explicitly synthetic graph fixtures.
 - [`TRANSFER_PROTOCOL.md`](TRANSFER_PROTOCOL.md): cross-source splits, transfer metrics, metamorphic tests, baselines and nonclaims.
@@ -16,7 +16,11 @@ Mythology deserves a first-class module in the shared knowledge fabric, but myth
 - [`STRUCTURAL_TRANSFER_SCORE.md`](STRUCTURAL_TRANSFER_SCORE.md): proposed evidence-bounded structural-transfer scorecard, controls, SOTA comparison protocol and provisional targets.
 - [Preregistered comparison protocol](../../benchmark-runs/v0/README.md): baseline ladder, shared evidence/compute budgets, held-out split requirements, source-family confidence intervals and non-compensatory release gates.
 - [Multi-answer annotation contract](../../knowledge-annotation/v0/README.md): blinded claim-level review, alternative interpretations, abstention and disagreement preservation.
-- [Validator harness](../../../tools/knowledge-benchmark-harness/): offline Rust JSON Schema validation, source-reference checks, paired intervention contracts, and digest-bound reports.
+- [Validator harness](../../../tools/knowledge-benchmark-harness/): offline Rust JSON Schema and domain validation, source-catalog split/URI/rights binding for cases, paired intervention contracts, and digest-bound reports (validator v0.13.0).
+
+
+
+Case validation resolves every `source_refs[].source_id` against the bundled catalog, requires URI and rights metadata to match, and enforces the catalog split. Non-synthetic evidence-pack entries must declare `source_ids` that point to rights-reviewed content; `synthetic_control` entries remain explicitly synthetic. The current 30 cases are all development-only; this validation does not create or qualify a held-out split.
 
 Schema validation checks data structure only. A separate domain validator must verify graph endpoint/source references, relation-specific evidence, interval consistency, permissions, and variant isolation.
 
