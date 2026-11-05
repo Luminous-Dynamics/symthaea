@@ -927,8 +927,8 @@ mod tests {
         let input = fixture();
         let report = evaluate(&input, &fixture_bytes()).unwrap();
         assert_eq!(report.decision_conflict_pair_count, 1);
-        assert_eq!(report.marginally_separable_pair_count, 1);
-        assert_eq!(report.marginally_undiscriminable_pairs.len(), 0);
+        assert_eq!(report.marginally_separable_pair_count, 0);
+        assert_eq!(report.marginally_undiscriminable_pairs.len(), 1);
         assert_eq!(
             report.minimum_joint_disambiguation_effort_units,
             Some(5)
@@ -951,7 +951,9 @@ mod tests {
         assert!(!pair_separated_for_mask(left, right, 0b001));
         assert!(!pair_separated_for_mask(left, right, 0b010));
         assert!(pair_separated_for_mask(left, right, 0b011));
-        assert!(pair_separated_for_mask(left, right, 0b100));
+        assert!(!pair_separated_for_mask(left, right, 0b100));
+        assert!(pair_separated_for_mask(left, right, 0b101));
+        assert!(!pair_separated_for_mask(left, right, 0b110));
     }
 
     #[test]
@@ -969,7 +971,7 @@ mod tests {
                 },
                 JointOutcome {
                     action_id: "orthogonal-z".into(),
-                    value: "A".into(),
+                    value: "0".into(),
                 },
             ],
         });
@@ -1006,7 +1008,7 @@ mod tests {
                 },
                 JointOutcome {
                     action_id: "orthogonal-z".into(),
-                    value: "B".into(),
+                    value: "1".into(),
                 },
             ],
         });
@@ -1018,7 +1020,7 @@ mod tests {
         assert_eq!(report.status, "MINIMUM_COST_JOINT_ROBUST_PLAN_EXCEEDS_BUDGET");
         assert_eq!(
             report.minimum_joint_plans[0].action_ids,
-            vec!["orthogonal-z".to_string()]
+            vec!["inspect-x".to_string(), "orthogonal-z".to_string()]
         );
     }
 
