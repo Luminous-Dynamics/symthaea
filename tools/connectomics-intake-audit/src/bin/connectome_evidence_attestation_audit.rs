@@ -14,8 +14,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-const EXPECTED_PAYLOAD_TYPE: &str =
-    "application/vnd.luminous.connectome-evidence+json;version=1";
+const EXPECTED_PAYLOAD_TYPE: &str = "application/vnd.luminous.connectome-evidence+json;version=1";
 
 #[derive(Debug, Parser)]
 #[command(
@@ -162,7 +161,10 @@ fn dsse_pae(payload_type: &str, payload: &[u8]) -> Vec<u8> {
     pae
 }
 
-fn validate_statement(statement: &EvidenceStatement, verification_time_unix: i64) -> Result<(), String> {
+fn validate_statement(
+    statement: &EvidenceStatement,
+    verification_time_unix: i64,
+) -> Result<(), String> {
     if statement.schema_version != 1 {
         return Err("attestation payload schema_version must equal 1".into());
     }
@@ -183,7 +185,9 @@ fn validate_statement(statement: &EvidenceStatement, verification_time_unix: i64
         || !valid_hex(&statement.evidence_sha256, 64)
         || !valid_hex(&statement.protocol_sha256, 64)
     {
-        return Err("attestation contains malformed dataset/evidence/protocol SHA-256 binding".into());
+        return Err(
+            "attestation contains malformed dataset/evidence/protocol SHA-256 binding".into(),
+        );
     }
     if statement.issued_at_unix <= 0 || statement.issued_at_unix > verification_time_unix {
         return Err("attestation issue time is invalid or later than verification time".into());
@@ -202,7 +206,9 @@ fn validate_trust_policy(policy: &TrustPolicy) -> Result<BTreeMap<&str, &Trusted
         return Err("trust policy schema_version or policy_id is invalid".into());
     }
     if policy.minimum_signatures == 0 || policy.trusted_keys.is_empty() {
-        return Err("trust policy requires at least one signer and a positive signature threshold".into());
+        return Err(
+            "trust policy requires at least one signer and a positive signature threshold".into(),
+        );
     }
     let mut required_roles = BTreeSet::new();
     for role in &policy.required_roles {
@@ -223,7 +229,10 @@ fn validate_trust_policy(policy: &TrustPolicy) -> Result<BTreeMap<&str, &Trusted
                 .revoked_at_unix
                 .is_some_and(|revoked_at| revoked_at <= 0)
         {
-            return Err(format!("trust key {} has malformed identity, role, key, or validity", key.key_id));
+            return Err(format!(
+                "trust key {} has malformed identity, role, key, or validity",
+                key.key_id
+            ));
         }
         if keys.insert(key.key_id.as_str(), key).is_some() {
             return Err(format!("trust policy repeats key ID {}", key.key_id));
@@ -274,30 +283,45 @@ fn verify_envelope(
 
     for entry in &envelope.signatures {
         if !nonempty(&entry.keyid) || !seen_key_ids.insert(entry.keyid.as_str()) {
-            return Err(format!("DSSE signature key ID is empty or duplicated: {}", entry.keyid));
+            return Err(format!(
+                "DSSE signature key ID is empty or duplicated: {}",
+                entry.keyid
+            ));
         }
-        let key = key_map
-            .get(entry.keyid.as_str())
-            .ok_or_else(|| format!("DSSE signer {} is not in the pinned trust policy", entry.keyid))?;
+        let key = key_map.get(entry.keyid.as_str()).ok_or_else(|| {
+            format!(
+                "DSSE signer {} is not in the pinned trust policy",
+                entry.keyid
+            )
+        })?;
         if verification_time_unix < key.valid_from_unix
             || key
                 .valid_until_unix
                 .is_some_and(|valid_until| verification_time_unix > valid_until)
         {
-            return Err(format!("trusted signing key {} is outside its validity interval", key.key_id));
+            return Err(format!(
+                "trusted signing key {} is outside its validity interval",
+                key.key_id
+            ));
         }
         if key
             .revoked_at_unix
             .is_some_and(|revoked_at| verification_time_unix >= revoked_at)
         {
-            return Err(format!("trusted signing key {} is revoked at verification time", key.key_id));
+            return Err(format!(
+                "trusted signing key {} is revoked at verification time",
+                key.key_id
+            ));
         }
         if statement.issued_at_unix < key.valid_from_unix
             || key
                 .valid_until_unix
                 .is_some_and(|valid_until| statement.issued_at_unix > valid_until)
         {
-            return Err(format!("statement issue time is outside key {} validity interval", key.key_id));
+            return Err(format!(
+                "statement issue time is outside key {} validity interval",
+                key.key_id
+            ));
         }
 
         let public_key_bytes = hex::decode(&key.public_key_hex)
@@ -305,12 +329,19 @@ fn verify_envelope(
         let public_key_array: [u8; 32] = public_key_bytes
             .try_into()
             .map_err(|_| format!("trusted key {} is not 32 bytes", key.key_id))?;
-        let verifying_key = VerifyingKey::from_bytes(&public_key_array)
-            .map_err(|error| format!("trusted key {} is not a valid Ed25519 public key: {error}", key.key_id))?;
+        let verifying_key = VerifyingKey::from_bytes(&public_key_array).map_err(|error| {
+            format!(
+                "trusted key {} is not a valid Ed25519 public key: {error}",
+                key.key_id
+            )
+        })?;
 
-        let signature_bytes = STANDARD
-            .decode(&entry.sig)
-            .map_err(|error| format!("signature from {} is not valid standard base64: {error}", key.key_id))?;
+        let signature_bytes = STANDARD.decode(&entry.sig).map_err(|error| {
+            format!(
+                "signature from {} is not valid standard base64: {error}",
+                key.key_id
+            )
+        })?;
         let signature = Signature::from_slice(&signature_bytes)
             .map_err(|error| format!("signature from {} is not 64 bytes: {error}", key.key_id))?;
         verifying_key
@@ -345,7 +376,10 @@ fn verify_envelope(
     }
 
     verified_signers.sort_by(|left, right| left.key_id.cmp(&right.key_id));
-    let mut covered_roles = covered_roles.into_iter().map(str::to_string).collect::<Vec<_>>();
+    let mut covered_roles = covered_roles
+        .into_iter()
+        .map(str::to_string)
+        .collect::<Vec<_>>();
     covered_roles.sort();
 
     Ok(Report {
@@ -413,7 +447,9 @@ fn main() -> ExitCode {
     let rendered = match serde_json::to_string_pretty(&report) {
         Ok(json) => json + "\n",
         Err(error) => {
-            eprintln!("connectome-evidence-attestation-audit: report serialization failed: {error}");
+            eprintln!(
+                "connectome-evidence-attestation-audit: report serialization failed: {error}"
+            );
             return ExitCode::from(2);
         }
     };
@@ -447,12 +483,7 @@ mod tests {
     }
 
     fn verify(envelope: &[u8], policy: &[u8]) -> Result<Report, String> {
-        verify_envelope(
-            envelope,
-            policy,
-            &sha256(policy),
-            1_793_900_000,
-        )
+        verify_envelope(envelope, policy, &sha256(policy), 1_793_900_000)
     }
 
     #[test]
@@ -482,8 +513,7 @@ mod tests {
 
     #[test]
     fn tampered_signed_payload_is_rejected() {
-        let mut envelope: DsseEnvelope =
-            serde_json::from_slice(&fixture_envelope()).unwrap();
+        let mut envelope: DsseEnvelope = serde_json::from_slice(&fixture_envelope()).unwrap();
         let mut payload = STANDARD.decode(&envelope.payload).unwrap();
         payload.push(b' ');
         envelope.payload = STANDARD.encode(payload);
@@ -512,8 +542,7 @@ mod tests {
     #[test]
     fn missing_required_role_is_rejected() {
         let envelope = fixture_envelope();
-        let mut policy: TrustPolicy =
-            serde_json::from_slice(&fixture_policy()).unwrap();
+        let mut policy: TrustPolicy = serde_json::from_slice(&fixture_policy()).unwrap();
         policy.required_roles.push("functional_validator".into());
         let policy = serde_json::to_vec(&policy).unwrap();
         assert!(verify(&envelope, &policy).is_err());
@@ -557,9 +586,6 @@ mod tests {
     fn dsse_pae_binds_type_and_exact_payload_bytes() {
         let payload = br#"{"x":1}"#;
         let pae = dsse_pae("application/test", payload);
-        assert_eq!(
-            pae,
-            b"DSSEv1 16 application/test 7 {\"x\":1}".to_vec()
-        );
+        assert_eq!(pae, b"DSSEv1 16 application/test 7 {\"x\":1}".to_vec());
     }
 }
