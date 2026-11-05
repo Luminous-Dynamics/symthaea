@@ -118,23 +118,16 @@ fn valid_sha256(value: &str) -> bool {
 }
 
 fn abs_i64(value: i64) -> Result<u128, ExecutionFidelityError> {
-    u128::try_from(i128::from(value).abs())
-        .map_err(|_| ExecutionFidelityError::ArithmeticOverflow)
+    u128::try_from(i128::from(value).abs()).map_err(|_| ExecutionFidelityError::ArithmeticOverflow)
 }
 
-fn checked_sum_u128(
-    current: u128,
-    add: u128,
-) -> Result<u128, ExecutionFidelityError> {
+fn checked_sum_u128(current: u128, add: u128) -> Result<u128, ExecutionFidelityError> {
     current
         .checked_add(add)
         .ok_or(ExecutionFidelityError::ArithmeticOverflow)
 }
 
-fn checked_sum_i128(
-    current: i128,
-    add: i128,
-) -> Result<i128, ExecutionFidelityError> {
+fn checked_sum_i128(current: i128, add: i128) -> Result<i128, ExecutionFidelityError> {
     current
         .checked_add(add)
         .ok_or(ExecutionFidelityError::ArithmeticOverflow)
@@ -161,15 +154,12 @@ fn signed_directional_energy(
         - directional_metered)
         .max(0);
     let overdelivery = (directional_metered
-        - i128::try_from(scheduled_abs)
-            .map_err(|_| ExecutionFidelityError::ArithmeticOverflow)?)
-        .max(0);
+        - i128::try_from(scheduled_abs).map_err(|_| ExecutionFidelityError::ArithmeticOverflow)?)
+    .max(0);
     Ok((
         deviation,
-        u128::try_from(unfulfilled)
-            .map_err(|_| ExecutionFidelityError::ArithmeticOverflow)?,
-        u128::try_from(overdelivery)
-            .map_err(|_| ExecutionFidelityError::ArithmeticOverflow)?,
+        u128::try_from(unfulfilled).map_err(|_| ExecutionFidelityError::ArithmeticOverflow)?,
+        u128::try_from(overdelivery).map_err(|_| ExecutionFidelityError::ArithmeticOverflow)?,
     ))
 }
 
@@ -202,10 +192,9 @@ pub fn evaluate_execution_fidelity<'a>(
         return Err(ExecutionFidelityError::EmptyExecutionTrace);
     }
 
-    let horizon_seconds = u128::try_from(
-        i128::from(inputs.horizon_end_utc) - i128::from(inputs.horizon_start_utc),
-    )
-    .map_err(|_| ExecutionFidelityError::ArithmeticOverflow)?;
+    let horizon_seconds =
+        u128::try_from(i128::from(inputs.horizon_end_utc) - i128::from(inputs.horizon_start_utc))
+            .map_err(|_| ExecutionFidelityError::ArithmeticOverflow)?;
     let mut previous_interval_start: Option<i64> = None;
     let mut previous_interval_end = inputs.horizon_start_utc;
     let mut scheduled_seconds = 0_u128;
@@ -244,9 +233,7 @@ pub fn evaluate_execution_fidelity<'a>(
         {
             return Err(ExecutionFidelityError::ScheduleWasNotAvailableAtDelivery);
         }
-        if previous_interval_start.is_some_and(|previous| {
-            interval.interval_start_utc < previous
-        }) {
+        if previous_interval_start.is_some_and(|previous| interval.interval_start_utc < previous) {
             return Err(ExecutionFidelityError::IntervalsOutOfOrder);
         }
         if interval.interval_start_utc < previous_interval_end {
@@ -259,8 +246,10 @@ pub fn evaluate_execution_fidelity<'a>(
         .map_err(|_| ExecutionFidelityError::ArithmeticOverflow)?;
         previous_interval_start = Some(interval.interval_start_utc);
         scheduled_seconds = checked_sum_u128(scheduled_seconds, duration)?;
-        scheduled_energy_abs =
-            checked_sum_u128(scheduled_energy_abs, abs_i64(interval.scheduled_energy_milli_wh)?)?;
+        scheduled_energy_abs = checked_sum_u128(
+            scheduled_energy_abs,
+            abs_i64(interval.scheduled_energy_milli_wh)?,
+        )?;
         previous_interval_end = interval.interval_end_utc;
 
         match (interval.meter, interval.settlement) {
@@ -339,12 +328,10 @@ pub fn evaluate_execution_fidelity<'a>(
     let missing_meter_count = interval_count - metered_interval_count;
     let missing_settlement_count = interval_count - settlement_interval_count;
     let schedule_coverage_complete = schedule_coverage == 10_000;
-    let meter_evidence_complete = schedule_coverage_complete
-        && missing_meter_count == 0
-        && meter_coverage == 10_000;
-    let settlement_evidence_complete = meter_evidence_complete
-        && missing_settlement_count == 0
-        && settlement_coverage == 10_000;
+    let meter_evidence_complete =
+        schedule_coverage_complete && missing_meter_count == 0 && meter_coverage == 10_000;
+    let settlement_evidence_complete =
+        meter_evidence_complete && missing_settlement_count == 0 && settlement_coverage == 10_000;
 
     let schedule_fulfilment_bps = if meter_evidence_complete && scheduled_energy_abs > 0 {
         let fulfilled_energy = scheduled_energy_abs.saturating_sub(unfulfilled_energy);
@@ -528,7 +515,14 @@ mod tests {
     #[test]
     fn missing_meter_or_settlement_is_not_silently_zero() {
         let missing_meter = [
-            interval("observed", 100, 200, 10_000, Some(meter("meter-1", 9_000)), None),
+            interval(
+                "observed",
+                100,
+                200,
+                10_000,
+                Some(meter("meter-1", 9_000)),
+                None,
+            ),
             interval("missing", 200, 300, 10_000, None, None),
         ];
         let result = evaluate_execution_fidelity(inputs(&missing_meter)).unwrap();
@@ -554,8 +548,22 @@ mod tests {
     #[test]
     fn schedule_gaps_reduce_time_coverage_and_withhold_complete_fulfilment() {
         let intervals = [
-            interval("first", 100, 180, 5_000, Some(meter("meter-first", 5_000)), Some(settlement("settle-first", 0))),
-            interval("second", 220, 300, 5_000, Some(meter("meter-second", 4_000)), Some(settlement("settle-second", 5))),
+            interval(
+                "first",
+                100,
+                180,
+                5_000,
+                Some(meter("meter-first", 5_000)),
+                Some(settlement("settle-first", 0)),
+            ),
+            interval(
+                "second",
+                220,
+                300,
+                5_000,
+                Some(meter("meter-second", 4_000)),
+                Some(settlement("settle-second", 5)),
+            ),
         ];
         let result = evaluate_execution_fidelity(inputs(&intervals)).unwrap();
         assert_eq!(result.schedule_time_coverage_bps, 8_000);
@@ -624,8 +632,22 @@ mod tests {
     #[test]
     fn duplicate_records_overlapping_intervals_and_future_meter_data_fail_closed() {
         let duplicate_meter = [
-            interval("first", 100, 200, 5_000, Some(meter("same-meter", 5_000)), None),
-            interval("second", 200, 300, 5_000, Some(meter("same-meter", 5_000)), None),
+            interval(
+                "first",
+                100,
+                200,
+                5_000,
+                Some(meter("same-meter", 5_000)),
+                None,
+            ),
+            interval(
+                "second",
+                200,
+                300,
+                5_000,
+                Some(meter("same-meter", 5_000)),
+                None,
+            ),
         ];
         assert_eq!(
             evaluate_execution_fidelity(inputs(&duplicate_meter)),
@@ -633,8 +655,22 @@ mod tests {
         );
 
         let overlapping = [
-            interval("first", 100, 250, 5_000, Some(meter("meter-a", 5_000)), None),
-            interval("second", 200, 300, 5_000, Some(meter("meter-b", 5_000)), None),
+            interval(
+                "first",
+                100,
+                250,
+                5_000,
+                Some(meter("meter-a", 5_000)),
+                None,
+            ),
+            interval(
+                "second",
+                200,
+                300,
+                5_000,
+                Some(meter("meter-b", 5_000)),
+                None,
+            ),
         ];
         assert_eq!(
             evaluate_execution_fidelity(inputs(&overlapping)),
