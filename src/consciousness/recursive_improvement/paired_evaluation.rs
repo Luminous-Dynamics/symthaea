@@ -1754,7 +1754,11 @@ impl CompositePairedComparison {
                 candidate_only_scored_count: candidate_only,
                 both_unscored_count: both_unscored,
                 wins, losses, ties,
-                mean_paired_delta: (paired_scored > 0).then_some(delta_sum / paired_scored as f64),
+                mean_paired_delta: if paired_scored > 0 {
+                    Some(delta_sum / paired_scored as f64)
+                } else {
+                    None
+                },
                 parent_coverage,
                 candidate_coverage,
                 coverage_delta: candidate_coverage - parent_coverage,
@@ -1902,8 +1906,8 @@ mod composite_evaluation_tests {
         assert_eq!(metric.parent_only_scored_count(), 0);
         assert_eq!(metric.candidate_only_scored_count(), 1);
         assert_eq!(metric.both_unscored_count(), 1);
-        assert_eq!(metric.wins(), 2);
-        assert_eq!(metric.losses(), 0);
+        assert_eq!(metric.wins(), 1);
+        assert_eq!(metric.losses(), 1);
         assert_eq!(metric.ties(), 0);
         assert!((metric.mean_paired_delta().unwrap() - 0.0).abs() < 1e-12);
         assert!((metric.parent_coverage() - 0.5).abs() < 1e-12);
@@ -1973,3 +1977,78 @@ mod composite_evaluation_tests {
             }));
     }
 }
+
+
+    #[test]
+    fn preserves_all_supported_dispositions_in_the_eligible_denominator() {
+        let dispositions = [
+            ("passed", TaskDisposition::Passed, Some(0.9)),
+            ("failed", TaskDisposition::Failed, Some(0.1)),
+            ("refused", TaskDisposition::Refused, None),
+            ("abstained", TaskDisposition::Abstained, None),
+            ("unsupported", TaskDisposition::Unsupported, None),
+            ("timed-out", TaskDisposition::TimedOut, None),
+            ("tool-failed", TaskDisposition::ToolFailed, None),
+            ("ungraded", TaskDisposition::Ungraded, None),
+            ("not-attempted", TaskDisposition::NotAttempted, None),
+            ("in-progress", TaskDisposition::InProgress, None),
+        ];
+        let candidate = CompositeCandidateEvaluationView::new(
+            context(),
+            "candidate",
+            vec![],
+            digest('1'),
+            digest('f'),
+            digest('a'),
+            dispositions.iter().map(|(id, _, _)| (*id).to_owned()),
+            [(
+                "quality".to_owned(),
+                rows(&dispositions),
+            )],
+        )
+        .unwrap();
+        let summary = candidate.summary("quality").unwrap();
+        assert_eq!(candidate.eligible_task_count(), 10);
+        assert_eq!(summary.scored_count(), 2);
+        for (_, disposition, _) in dispositions {
+            assert_eq!(summary.disposition_count(disposition), 1);
+        }
+        assert_eq!(summary.score_coverage(), 0.2);
+    }
+
+    #[test]
+    fn rejects_duplicate_eligible_ids_and_invalid_composite_digests() {
+        let duplicate_ids = CompositeCandidateEvaluationView::new(
+            context(),
+            "candidate",
+            vec![],
+            digest('1'),
+            digest('f'),
+            digest('a'),
+            ["task-a", "task-a"].map(str::to_owned),
+            [("quality".to_owned(), rows(&[
+                ("task-a", TaskDisposition::Passed, Some(0.9)),
+            ]))],
+        );
+        assert_eq!(
+            duplicate_ids.unwrap_err(),
+            CompositeEvaluationError::DuplicateEligibleTask("task-a".into())
+        );
+
+        let invalid_digest = CompositeCandidateEvaluationView::new(
+            context(),
+            "candidate",
+            vec![],
+            "not-a-digest",
+            digest('f'),
+            digest('a'),
+            ["task-a"].map(str::to_owned),
+            [("quality".to_owned(), rows(&[
+                ("task-a", TaskDisposition::Passed, Some(0.9)),
+            ]))],
+        );
+        assert_eq!(
+            invalid_digest.unwrap_err(),
+            CompositeEvaluationError::InvalidDigest("source_tree_digest")
+        );
+    }
