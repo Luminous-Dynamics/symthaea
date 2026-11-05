@@ -830,6 +830,101 @@
       "direct_superiority_claim_allowed": false
     },
     {
+      "lane_id": "CEB-HUMAN",
+      "ceb_metric_id": "question_precision",
+      "ceb_metric_definition": "Fraction of questions that target genuine, task-blocking information gaps. A question that is unnecessary, already answered by available evidence, or irrelevant to acceptance is a false question.",
+      "target_statement": "At least 0.80 on sealed pilot holdout; publish total questions and the independently adjudicated true-blocker denominator. Calibrate from the pilot.",
+      "target_intent": "quality_goal",
+      "correspondence_class": "not_comparable",
+      "comparison_use": "not_comparable",
+      "external_observation_ids": [],
+      "rationale": "HiL-Bench defines Question Precision as the fraction of questions that target genuine blockers, but the current published overview does not provide a standalone numeric Question Precision observation.",
+      "blockers": [
+        "No standalone Question Precision result is published in the normalized snapshot."
+      ],
+      "normalization_requirements": [
+        "Collect per-question judgments and the exact count of genuine blockers on a common task set."
+      ],
+      "metric_semantics_eligible_for_matched_test": false,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-HUMAN",
+      "ceb_metric_id": "blocker_recall",
+      "ceb_metric_definition": "Fraction of independently registered task-blocking information gaps that are identified and asked about before the agent takes an action that depends on them.",
+      "target_statement": "At least 0.80 on sealed pilot holdout; report blocker counts, task/domain strata and the number of questions separately.",
+      "target_intent": "sealed_holdout_goal",
+      "correspondence_class": "exact_semantics",
+      "comparison_use": "replication_candidate",
+      "external_observation_ids": [
+        "hil-swe-blocker-recall",
+        "hil-sql-blocker-recall"
+      ],
+      "rationale": "Both metrics count independently registered task blockers that the agent discovers and asks about. Domain maxima remain separate; task and help protocols are not matched.",
+      "blockers": [
+        "SWE and SQL domain populations differ from CEB Rust tasks",
+        "Exact blocker denominators and winning system identities are not reported",
+        "Help tool and adjudication differ"
+      ],
+      "normalization_requirements": [
+        "Use the same blocker registry and definition",
+        "Preserve domain strata and task-level denominators",
+        "Use a common help protocol and blinded adjudication"
+      ],
+      "metric_semantics_eligible_for_matched_test": true,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-HUMAN",
+      "ceb_metric_id": "selective_escalation_f1",
+      "ceb_metric_definition": "Harmonic mean of Question Precision and Blocker Recall: 2 × precision × recall / (precision + recall). This penalizes both question spam and failure to surface genuine blockers.",
+      "target_statement": "At least 0.60 on sealed pilot holdout, subject to calibration; report Question Precision and Blocker Recall alongside the derived F1.",
+      "target_intent": "sealed_holdout_goal",
+      "correspondence_class": "exact_semantics",
+      "comparison_use": "replication_candidate",
+      "external_observation_ids": [
+        "hil-best-ask-f1"
+      ],
+      "rationale": "Both use the harmonic mean of Question Precision and Blocker Recall. The best system identity is not stated in the HiL overview, and the task/harness are unmatched.",
+      "blockers": [
+        "HiL task set and CEB Rust task set differ",
+        "Winning system identity not reported",
+        "Question and blocker adjudication protocols must match"
+      ],
+      "normalization_requirements": [
+        "Use the same question precision and blocker recall definitions",
+        "Match aggregation and blocker/task strata",
+        "Publish component scores alongside F1"
+      ],
+      "metric_semantics_eligible_for_matched_test": true,
+      "direct_superiority_claim_allowed": false
+    },
+    {
+      "lane_id": "CEB-HUMAN",
+      "ceb_metric_id": "help_enabled_pass_at_3",
+      "ceb_metric_definition": "Fraction of tasks for which at least one of three independent runs completes the task after the agent is allowed to ask and receive a blocker-specific answer. Report no-help and full-information controls separately.",
+      "target_statement": "At least 0.70 on sealed pilot holdout, with three independent runs, fixed help budget, no-help necessity control and all-blockers-provided sufficiency control.",
+      "target_intent": "pilot_and_holdout_goal",
+      "correspondence_class": "exact_semantics",
+      "comparison_use": "replication_candidate",
+      "external_observation_ids": [
+        "hil-opus-pass3"
+      ],
+      "rationale": "Both define Pass@3 as at least one successful task completion in three independent runs when help is available; CEB must still match the help channel and trial independence.",
+      "blockers": [
+        "Different task population and harness",
+        "Help source and budget differ",
+        "Three-run independence and aggregation need matching"
+      ],
+      "normalization_requirements": [
+        "Match the three-run protocol and assistance policy",
+        "Report no-help and all-information controls separately",
+        "Use identical task denominator and success contract"
+      ],
+      "metric_semantics_eligible_for_matched_test": true,
+      "direct_superiority_claim_allowed": false
+    },
+    {
       "lane_id": "CEB-EVAL",
       "ceb_metric_id": "false_accept_rate",
       "ceb_metric_definition": "Negative/adversarial controls incorrectly marked qualifying.",

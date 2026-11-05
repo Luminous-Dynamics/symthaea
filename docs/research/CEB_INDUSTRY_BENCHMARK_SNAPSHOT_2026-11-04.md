@@ -265,7 +265,7 @@ The current Scale consolidated leaderboard adds an important capability comparis
 
 These are different tasks and rubrics. They are not combined into a single agent score. Use the Scale consolidated page as the source index and pin the exact task leaderboard/revision when conducting any replication: https://labs.scale.com/leaderboard
 
-The CEB machine-readable measurement matrix now has 13 lanes, 45 primary metrics, 15 comparator records and 13 registered source URLs. Its comparator registry uses the consolidated Scale source for Test Writing and HiL-Bench rather than unverified deep links. This matrix is a design artifact, not a Symthaea result.
+The CEB machine-readable measurement matrix now has 13 lanes, 49 primary metrics, 15 comparator records and 13 registered source URLs. Its comparator registry uses the consolidated Scale source for Test Writing and HiL-Bench rather than unverified deep links. This matrix is a design artifact, not a Symthaea result.
 
 
 ## 2026-11-05 normalized-comparator refresh
@@ -285,3 +285,15 @@ No CEB performance result is implied by these external observations.
 ## 2026-11-05 selective-autonomy metric expansion
 
 The CEB-HUMAN lane now explicitly separates four paired-act/abstain outcomes: paired accuracy (both variants correct), act-side accuracy, abstain-side accuracy and conditioned abstention rate (CAR). This mirrors the useful metric separation in AgentAbstain without claiming identical tasks or a matched comparison. Prospective CEB targets are 0.70 paired accuracy in the pilot and 0.75 on a sealed holdout, with separate act/abstain guardrails. These remain unmeasured design targets.
+
+
+## 2026-11-05 HiL-Bench metric-semantics refresh
+
+Scale's HiL-Bench overview reports 300 tasks (150 software engineering, 150 text-to-SQL), 200 public and 100 private held-out, and 1,131 injected blockers. It defines:
+- ASK-F1 as the harmonic mean of Question Precision and Blocker Recall;
+- Pass@3 as task success in at least one of three independent runs after help;
+- blocker-recall maxima separately by domain (36% SWE; 61% SQL).
+
+The overview reports highest combined ASK-F1 of 44% and combined Pass@3 of 24% (Claude Opus 4.6). The identities behind the ASK-F1 and blocker-recall maxima are not stated in the overview. These observations are stored separately; no system-level composite is constructed. The consolidated Muse Wonder 1.0 score of 79.67 ± 4.17 remains unlabeled. Source: https://labs.scale.com/leaderboard/hil
+
+The CEB-HUMAN lane now has 11 primary metrics, including independent question precision, blocker recall, ASK-F1 and help-enabled Pass@3. The numeric targets are prospective and require pilot calibration.

@@ -91,6 +91,23 @@ def semantic_errors(crosswalk: dict, matrix: dict, registry: dict) -> list[str]:
             "abstain_side_accuracy": ("agentabstain-gemini-abstain", "abstain_accuracy"),
             "conditioned_abstention_rate": ("agentabstain-gemini-car", "conditioned_abstention_rate"),
         }
+        hil_expected = {
+            "selective_escalation_f1": (["hil-best-ask-f1"], ["ask_f1"]),
+            "help_enabled_pass_at_3": (["hil-opus-pass3"], ["pass_at_3"]),
+            "blocker_recall": (["hil-swe-blocker-recall", "hil-sql-blocker-recall"], ["blocker_recall", "blocker_recall"]),
+        }
+        if row["ceb_metric_id"] == "question_precision":
+            if row["external_observation_ids"] or row["correspondence_class"] != "not_comparable":
+                errors.append("standalone CEB question_precision requires a published standalone numeric observation; ASK-F1 is not a substitute")
+        if row["ceb_metric_id"] in hil_expected:
+            expected_ids, expected_metrics = hil_expected[row["ceb_metric_id"]]
+            if row["external_observation_ids"] != expected_ids or external_metrics != expected_metrics or not exact:
+                errors.append(f"{key}: HiL-Bench question/blocker/ASK-F1/Pass@3 mapping was altered or conflated")
+        if row["ceb_metric_id"] == "blocker_recall":
+            for observation_id in row["external_observation_ids"]:
+                observation = observations.get(observation_id)
+                if observation and observation["comparator_id"] not in ("hil-bench-swe", "hil-bench-sql"):
+                    errors.append("CEB blocker_recall must retain separate HiL SWE/SQL domain denominators")
         if row["ceb_metric_id"] in agent_expected:
             expected_id, expected_metric = agent_expected[row["ceb_metric_id"]]
             if row["external_observation_ids"] != [expected_id]:
@@ -141,6 +158,29 @@ def self_test(crosswalk: dict, schema: dict, matrix: dict, registry: dict) -> No
     row = next(x for x in mutant["metric_mappings"] if x["ceb_metric_id"] == "joint_secure_functional_pass")
     row["external_observation_ids"].append("als-fable-funcpass")
     must_reject(mutant, "joint secure pass mapped to FuncPass")
+
+    mutant = copy.deepcopy(crosswalk)
+    row = next(x for x in mutant["metric_mappings"] if x["ceb_metric_id"] == "question_precision")
+    row["external_observation_ids"] = ["hil-best-ask-f1"]
+    row["correspondence_class"] = "exact_semantics"
+    row["comparison_use"] = "replication_candidate"
+    row["metric_semantics_eligible_for_matched_test"] = True
+    must_reject(mutant, "Question Precision inferred from aggregate ASK-F1")
+
+    mutant = copy.deepcopy(crosswalk)
+    row = next(x for x in mutant["metric_mappings"] if x["ceb_metric_id"] == "selective_escalation_f1")
+    row["external_observation_ids"] = ["hil-opus-pass3"]
+    must_reject(mutant, "ASK-F1 mapped to Pass@3")
+
+    mutant = copy.deepcopy(crosswalk)
+    row = next(x for x in mutant["metric_mappings"] if x["ceb_metric_id"] == "help_enabled_pass_at_3")
+    row["external_observation_ids"] = ["hil-best-ask-f1"]
+    must_reject(mutant, "Pass@3 mapped to ASK-F1")
+
+    mutant = copy.deepcopy(crosswalk)
+    row = next(x for x in mutant["metric_mappings"] if x["ceb_metric_id"] == "blocker_recall")
+    row["external_observation_ids"] = ["hil-swe-blocker-recall"]
+    must_reject(mutant, "blocker recall silently drops SQL domain denominator")
 
     mutant = copy.deepcopy(crosswalk)
     row = next(x for x in mutant["metric_mappings"] if x["ceb_metric_id"] == "paired_act_abstain_accuracy")

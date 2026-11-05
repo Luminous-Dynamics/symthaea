@@ -824,19 +824,50 @@
           "unit": "proportion",
           "direction": "maximize",
           "prospective_target": "At least 0.75 on sealed holdout; report the conditioning denominator and scenario-level rates."
+        },
+        {
+          "metric_id": "question_precision",
+          "definition": "Fraction of questions that target genuine, task-blocking information gaps. A question that is unnecessary, already answered by available evidence, or irrelevant to acceptance is a false question.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "At least 0.80 on sealed pilot holdout; publish total questions and the independently adjudicated true-blocker denominator. Calibrate from the pilot."
+        },
+        {
+          "metric_id": "blocker_recall",
+          "definition": "Fraction of independently registered task-blocking information gaps that are identified and asked about before the agent takes an action that depends on them.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "At least 0.80 on sealed pilot holdout; report blocker counts, task/domain strata and the number of questions separately."
+        },
+        {
+          "metric_id": "selective_escalation_f1",
+          "definition": "Harmonic mean of Question Precision and Blocker Recall: 2 × precision × recall / (precision + recall). This penalizes both question spam and failure to surface genuine blockers.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "At least 0.60 on sealed pilot holdout, subject to calibration; report Question Precision and Blocker Recall alongside the derived F1."
+        },
+        {
+          "metric_id": "help_enabled_pass_at_3",
+          "definition": "Fraction of tasks for which at least one of three independent runs completes the task after the agent is allowed to ask and receive a blocker-specific answer. Report no-help and full-information controls separately.",
+          "unit": "proportion",
+          "direction": "maximize",
+          "prospective_target": "At least 0.70 on sealed pilot holdout, with three independent runs, fixed help budget, no-help necessity control and all-blockers-provided sufficiency control."
         }
       ],
       "comparators": [
         {
           "name": "SWE Atlas HiL-Bench",
-          "version": "2026-11-05 Scale leaderboard snapshot",
-          "sample_scope": "Human-in-loop task benchmark; pin the current task count and version before replication",
-          "published_reference": "Muse Wonder 1.0 79.67 ± 4.17 on the Scale leaderboard.",
-          "source_url": "https://labs.scale.com/leaderboard",
+          "version": "2026-11-05 HiL-Bench methodology and leaderboard snapshot",
+          "sample_scope": "300 tasks: 150 software engineering and 150 text-to-SQL; 200 public and 100 private held-out; 1,131 injected blockers (3–5 per task).",
+          "published_reference": "Highest combined ASK-F1 44%; highest combined Pass@3 24% (Claude Opus 4.6); domain-specific blocker-recall maxima 36% SWE and 61% SQL. Muse Wonder 1.0's consolidated 79.67 ± 4.17 row remains explicitly unlabeled.",
+          "source_url": "https://labs.scale.com/leaderboard/hil",
           "comparison_class": "contextual_reference_until_exact_protocol_match",
           "caveats": [
-            "Leaderboard score is not the same as paired human productivity or review-time benefit.",
-            "Human cohort design and time budget must be preregistered."
+            "ASK-F1 is the harmonic mean of Question Precision and Blocker Recall; Pass@3 measures task success in at least one of three independent runs after help.",
+            "Question Precision and Blocker Recall are independently adjudicated; do not infer a standalone Question Precision result from an ASK-F1 maximum.",
+            "SWE and SQL blocker-recall maxima are separate domain results; do not combine them as one system observation because the best-system identity is not stated in the overview.",
+            "The consolidated Muse Wonder 79.67 ± 4.17 leaderboard value is not explicitly labeled ASK-F1 or Pass@3.",
+            "HiL-Bench uses a frozen semantic help tool and a SWE-Agent scaffold; CEB's tasks, help protocol, model/harness and budgets remain unmatched."
           ]
         },
         {
@@ -851,6 +882,32 @@
             "The leaderboard macro-averages over eight scenarios; preserve per-scenario outcomes where available.",
             "Do not treat abstention-side accuracy as paired accuracy or as human productivity.",
             "AgentAbstain is a contextual reference until CEB task semantics, tools, budgets and scoring are matched."
+          ]
+        },
+        {
+          "name": "HiL-Bench SWE domain — blocker recall",
+          "version": "2026-11-05 methodology snapshot",
+          "sample_scope": "150 software-engineering tasks; 3–5 injected blockers per task; exact blocker denominator not separately stated.",
+          "published_reference": "Highest reported SWE-domain Blocker Recall 36%; model/configuration identity not stated in the overview.",
+          "source_url": "https://labs.scale.com/leaderboard/hil",
+          "comparison_class": "contextual_reference_until_exact_protocol_match",
+          "caveats": [
+            "Domain-specific maximum; not necessarily the same model as the SQL-domain maximum.",
+            "The exact number of blockers in this domain is not stated in the overview.",
+            "Do not compare directly to CEB without matching blocker registration, tool, task, model and adjudication protocol."
+          ]
+        },
+        {
+          "name": "HiL-Bench SQL domain — blocker recall",
+          "version": "2026-11-05 methodology snapshot",
+          "sample_scope": "150 text-to-SQL tasks; 3–5 injected blockers per task; exact blocker denominator not separately stated.",
+          "published_reference": "Highest reported SQL-domain Blocker Recall 61%; model/configuration identity not stated in the overview.",
+          "source_url": "https://labs.scale.com/leaderboard/hil",
+          "comparison_class": "contextual_reference_until_exact_protocol_match",
+          "caveats": [
+            "Domain-specific maximum; not necessarily the same model as the SWE-domain maximum.",
+            "The exact number of blockers in this domain is not stated in the overview.",
+            "Do not compare directly to CEB without matching blocker registration, tool, task, model and adjudication protocol."
           ]
         }
       ],

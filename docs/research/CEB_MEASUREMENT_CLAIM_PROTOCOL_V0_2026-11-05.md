@@ -27,7 +27,7 @@ These results are not directly rankable. Their exact sources, metrics, task scop
 
 The machine-readable matrix defines 13 lanes: repository resolution, repository comprehension, context retrieval, test generation, refactoring, precise debugging, pre-merge review, secure correctness, Rust engineering, optimization, human-agent complementarity, evaluator integrity and documentation executability.
 
-Each lane records its decision question, primary metrics, external comparators, baseline arms, evidence artifacts, independent authority, hard gates and holdout design. It contains 45 primary metrics, 16 comparator records and 16 registered source URLs. The registry includes 15 external benchmark/methodology sources plus one internal documentation-audit implementation reference; the normalized external-observation registry records the 15 external sources separately. The matrix is design-only and contains no CEB performance score.
+Each lane records its decision question, primary metrics, external comparators, baseline arms, evidence artifacts, independent authority, hard gates and holdout design. It contains 49 primary metrics, 16 comparator records and 16 registered source URLs. The registry includes 15 external benchmark/methodology sources plus one internal documentation-audit implementation reference; the normalized external-observation registry records the 15 external sources separately. The matrix is design-only and contains no CEB performance score.
 
 ### Selective autonomy comparator — AgentAbstain
 
@@ -111,3 +111,8 @@ Quarantine tasks after a confirmed answer leak, pass-channel shortcut, invalid r
 - Scale consolidated leaderboard (HiL-Bench): https://labs.scale.com/leaderboard
 - Epoch AI Terminal-Bench 4.0.0 review: https://epoch.ai/benchmarks/terminal-bench-4/review
 - Terminal-Bench lifecycle and verifier roadmap: https://www.tbench.ai/news/terminal-bench-4-0
+
+
+## HiL-Bench selective-escalation metrics
+
+The CEB-HUMAN lane now separates Question Precision, Blocker Recall, selective-escalation F1 (ASK-F1) and help-enabled Pass@3. HiL-Bench defines ASK-F1 as the harmonic mean of Question Precision and Blocker Recall; Pass@3 is success in at least one of three independent runs after help. These are not interchangeable. Its 44% combined ASK-F1 and 24% combined Pass@3 are separate observations; domain blocker-recall maxima of 36% SWE and 61% SQL retain separate 150-task denominators. The consolidated Muse Wonder 79.67 ± 4.17 value remains unlabeled and is not assigned to either metric. Source: https://labs.scale.com/leaderboard/hil .

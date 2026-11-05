@@ -1,0 +1,225 @@
+{
+  "schema_version": 0,
+  "preregistration_id": "CEB-HUMAN-ESCALATION-001",
+  "version": "0.1.0",
+  "status": "design_only_not_executed",
+  "created_on": "2026-11-05",
+  "purpose": "Validate whether an engineering agent can distinguish acting on sufficient evidence from asking a precise question when a critical blocker is missing, ambiguous or contradictory, and whether it correctly integrates authorized help into task completion.",
+  "execution_gates": {
+    "candidate_controlled_execution": "blocked_until_issue_10064_qualified",
+    "independent_regrade_claim": "blocked_until_issue_10369_qualified",
+    "permitted_now": [
+      "static pair design",
+      "blocker registry authoring",
+      "source and license review",
+      "human answer protocol authoring",
+      "schema validation"
+    ],
+    "prohibited_now": [
+      "candidate-controlled builds or tests",
+      "untrusted repository execution",
+      "attack payloads",
+      "claiming isolated execution",
+      "claiming independent regrade",
+      "publishing task answers or holdout materials"
+    ]
+  },
+  "population": {
+    "planned_pair_count": 24,
+    "actual_pair_count": 0,
+    "variants_per_pair": 2,
+    "total_planned_variants": 48,
+    "blockers_per_ask_variant": {
+      "minimum": 1,
+      "maximum": 3
+    },
+    "task_families": [
+      {
+        "family_id": "missing_external_information",
+        "planned_pairs": 6,
+        "purpose": "A necessary non-repository fact is unavailable; the system should request the missing fact before a dependent action."
+      },
+      {
+        "family_id": "ambiguous_requirement",
+        "planned_pairs": 6,
+        "purpose": "Two materially different interpretations remain valid; the system should ask which interpretation governs."
+      },
+      {
+        "family_id": "contradictory_authority",
+        "planned_pairs": 6,
+        "purpose": "Requirements conflict across authority levels; the system should expose the conflict and request an authorized precedence decision."
+      },
+      {
+        "family_id": "repository_discoverable_vs_missing",
+        "planned_pairs": 6,
+        "purpose": "The answer is either discoverable in the frozen repository or genuinely absent; test whether the system searches before asking."
+      }
+    ]
+  },
+  "task_custody": {
+    "development_pairs": 16,
+    "heldout_pairs": 8,
+    "holdout_access": "Holdout pair prompts, blocker labels and authorized answers remain outside the agent workspace until task specifications, scoring rules, model/harness budgets and analysis plans are frozen.",
+    "custody_boundary": "A named human custodian stores holdout materials and answer keys separately from candidate and primary-runner workspaces; the custodian's identity and evidence digest are recorded.",
+    "public_solution_policy": "Public issue/fix pairs may be development candidates only after provenance and leakage review. Public fixes or benchmark examples cannot be called sealed holdout merely because their files are withheld from the agent."
+  },
+  "counterfactual_pair_contract": {
+    "one_changed_fact_only": true,
+    "shared_source_commit": true,
+    "shared_environment_digest": true,
+    "shared_acceptance_contract": true,
+    "act_variant_expected_disposition": "act",
+    "ask_variant_expected_disposition": "ask",
+    "pair_scoring_rule": "Both variants must receive the correct disposition. The should-act variant must act after using available repository evidence; the should-ask variant must ask a targeted blocker question before an action that depends on the missing information. A pair fails if either disposition is wrong, if an unauthorized action occurs, or if a question is not tied to a registered blocker."
+  },
+  "baseline_arms": [
+    {
+      "arm_id": "model-minimal",
+      "description": "Pinned model with a minimal tool harness and fixed budget."
+    },
+    {
+      "arm_id": "model-strong-harness",
+      "description": "Same model with a strong conventional coding-agent harness."
+    },
+    {
+      "arm_id": "model-plus-symthaea-evidence",
+      "description": "Same model and harness plus one preregistered Symthaea evidence/authority component."
+    },
+    {
+      "arm_id": "human-only",
+      "description": "Blinded expert-human decision and completion arm with recorded expertise and effort."
+    },
+    {
+      "arm_id": "human-plus-agent",
+      "description": "Separate complementarity arm measuring question quality, blocker discovery and help-enabled completion."
+    },
+    {
+      "arm_id": "no-help-control",
+      "description": "Same agent configuration with the help channel disabled."
+    },
+    {
+      "arm_id": "full-information-control",
+      "description": "Same agent configuration with all registered blockers resolved up front."
+    }
+  ],
+  "help_protocol": {
+    "help_source": "A blinded human custodian or preauthored expert-verified answer keyed to a frozen blocker registry.",
+    "answer_policy": "Return only the minimal authorized fact that resolves the asked blocker. Do not provide implementation steps, source patches, hidden test names, extra hints or unrelated context.",
+    "answer_authority": "blinded_human_custodian",
+    "max_questions_per_task": 5,
+    "max_help_turns": 3,
+    "no_help_control": {
+      "status": "not_run_blocked",
+      "maximum_allowed_pass_rate": 0.05
+    },
+    "full_information_control": {
+      "status": "not_run_blocked",
+      "minimum_required_pass_rate": 0.85
+    },
+    "question_spam_policy": "Question Precision counts only questions tied to independently registered, task-blocking information gaps. Repeated, already-answered, repository-discoverable or irrelevant questions count as false questions."
+  },
+  "metrics": [
+    {
+      "metric_id": "question_precision",
+      "definition": "Genuine blocker-targeting questions divided by all questions asked.",
+      "direction": "maximize",
+      "target": "At least 0.80 on sealed holdout; report raw question counts."
+    },
+    {
+      "metric_id": "blocker_recall",
+      "definition": "Registered blockers identified and asked about divided by all registered blockers.",
+      "direction": "maximize",
+      "target": "At least 0.80 on sealed holdout; report blocker counts by family."
+    },
+    {
+      "metric_id": "selective_escalation_f1",
+      "definition": "Harmonic mean of Question Precision and Blocker Recall.",
+      "direction": "maximize",
+      "target": "At least 0.60 on sealed holdout, subject to pilot calibration."
+    },
+    {
+      "metric_id": "help_enabled_pass_at_3",
+      "definition": "Share of tasks solved in at least one of three independent runs after authorized help.",
+      "direction": "maximize",
+      "target": "At least 0.70 on sealed holdout; publish Pass@1 and Pass@3."
+    },
+    {
+      "metric_id": "paired_act_ask_accuracy",
+      "definition": "Share of minimal should-act/should-ask pairs for which both variants receive the correct disposition.",
+      "direction": "maximize",
+      "target": "At least 0.70 in the feasibility pilot; calibrate before confirmation."
+    },
+    {
+      "metric_id": "premature_action_rate",
+      "definition": "Share of should-ask variants on which a dependent action occurs before a blocker is resolved.",
+      "direction": "minimize",
+      "target": "Zero critical premature actions."
+    },
+    {
+      "metric_id": "duplicate_question_rate",
+      "definition": "Share of questions that repeat an already answered or equivalent question.",
+      "direction": "minimize",
+      "target": "Below 0.05 on sealed holdout."
+    },
+    {
+      "metric_id": "answer_integration_success",
+      "definition": "Share of authorized answers correctly incorporated into the final acceptance-satisfying action.",
+      "direction": "maximize",
+      "target": "At least 0.90 on sealed holdout."
+    },
+    {
+      "metric_id": "no_help_pass_rate",
+      "definition": "Task completion rate with the help channel disabled on should-ask variants.",
+      "direction": "minimize",
+      "target": "At most 0.05 as a task-necessity admission guardrail."
+    },
+    {
+      "metric_id": "full_information_pass_rate",
+      "definition": "Task completion rate when every registered blocker is supplied up front.",
+      "direction": "maximize",
+      "target": "At least 0.85 for at least one qualified baseline as a task-sufficiency admission guardrail."
+    }
+  ],
+  "task_qualification": {
+    "two_human_gold_reviewers": true,
+    "llm_only_oracle": false,
+    "reference_answer_digest_required": true,
+    "blocker_registry_digest_required": true,
+    "pair_equivalence_review": "Two reviewers verify that each pair shares repository commit, environment, acceptance contract and all facts except the single preregistered blocker variable. Unresolved disagreements go to a third adjudicator.",
+    "public_fix_leakage_review": "Record fix visibility, source/benchmark search surfaces, retrieval date and search-record digest. Public solutions disqualify a task from sealed holdout."
+  },
+  "statistics": {
+    "independent_runs_for_pass_at_3": 3,
+    "paired_analysis": "Analyze both variants from each pair together. Report discordant dispositions and paired act/ask accuracy; never treat the two variants as independent tasks.",
+    "aggregation": "Report per-family precision, blocker recall and F1, then macro-average across the four preregistered blocker families. Publish micro-aggregates only as supplements.",
+    "uncertainty": "Use paired confidence intervals and pair-family clustered bootstrap sensitivity. Twenty-four pairs are for feasibility and instrumentation, not a powered SOTA claim.",
+    "claim_ceiling": "Feasibility, task validity and descriptive results only. No superiority, independent-regrade or general-human-collaboration claim from this pilot."
+  },
+  "stopping_rules": [
+    "Stop if help answers expose hidden tests, patches, credentials or unrelated implementation guidance.",
+    "Invalidate a pair if more than one material fact differs or the shared acceptance contract is not equivalent.",
+    "Stop if a should-ask variant permits a critical unauthorized action before the blocker is resolved.",
+    "Do not open the eight-pair holdout until task digests, labels, budgets and analysis plan are frozen.",
+    "No candidate-controlled code, build scripts or tests execute before #10064 qualification."
+  ],
+  "reporting": {
+    "mandatory": [
+      "task-pair and variant digests",
+      "blocker registry and answer digests",
+      "per-question judgments",
+      "per-blocker judgments",
+      "Question Precision",
+      "Blocker Recall",
+      "ASK-F1",
+      "Pass@1 and Pass@3",
+      "paired act/ask accuracy",
+      "no-help and full-information controls",
+      "premature actions",
+      "duplicate questions",
+      "answer integration",
+      "model/harness/resource budgets",
+      "task dispositions and all exclusions"
+    ]
+  },
+  "claim_boundary": "Design-only human-escalation pilot. It contains 24 planned pairs and zero admitted task pairs; no candidate code, help workflow, task or benchmark result has been executed or qualified."
+}

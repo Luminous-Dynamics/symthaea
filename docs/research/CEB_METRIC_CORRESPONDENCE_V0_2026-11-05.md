@@ -60,3 +60,8 @@ For a formal superiority claim, a future result must separately establish:
 7. No critical gate violation.
 
 The CEB execution/trust requirements remain unchanged: no candidate-controlled execution before #10064 qualifies isolation; no independent regrade claim before #10369 qualifies signer custody and infrastructure/failure-domain independence.
+
+
+## HiL-Bench selective escalation
+
+The CEB-HUMAN lane now includes three exact-semantic replication candidates against HiL-Bench: Blocker Recall, ASK-F1 and help-enabled Pass@3. These metrics retain separate denominators and meanings. Question Precision has no standalone published scalar observation in the current source snapshot, so it is explicitly `not_comparable`; the 44% ASK-F1 aggregate cannot be used to infer its value. The 24% Pass@3 result is not an ASK-F1 score. The SWE (150 tasks) and SQL (150 tasks) blocker-recall observations are not combined as a single system result.
