@@ -172,6 +172,14 @@ pub struct MetricProjection {
     pub dataset_manifest_sha256: String,
     pub scoring_formula_id: String,
     pub grader_version: String,
+    /// The benchmark's exact per-run resource caps.
+    pub budget_caps: Value,
+    /// Optional group declaring that this metric shares the exact experimental units
+    /// with other metrics in the same group. Without a group, task universes are
+    /// metric-specific and must not be joined across benchmarks.
+    pub pairing_group_id: Option<String>,
+    /// Exact eligible task ID -> independent cluster ID assignment for this metric.
+    pub cluster_by_task: BTreeMap<String, String>,
     pub transform: ScoreTransform,
     /// Minimum fraction of eligible tasks that must have a grade before this metric can
     /// enter a candidate capability vector. Missing rows are never removed to satisfy it.
@@ -187,6 +195,27 @@ impl MetricProjection {
         validate_sha256(&self.dataset_manifest_sha256, "dataset_manifest_sha256")?;
         validate_label(&self.scoring_formula_id, "scoring_formula_id")?;
         validate_label(&self.grader_version, "grader_version")?;
+        if self.budget_caps.as_object().is_none() {
+            return Err(ComposerError::InvalidPlan(
+                "budget_caps must be an object pinned from the benchmark receipt".into(),
+            ));
+        }
+        if let Some(group_id) = &self.pairing_group_id {
+            validate_identifier(group_id, "pairing_group_id")?;
+        }
+        if self.cluster_by_task.is_empty()
+            || self.cluster_by_task.iter().any(|(task_id, cluster_id)| {
+                task_id.trim().is_empty()
+                    || cluster_id.trim().is_empty()
+                    || task_id.chars().any(char::is_control)
+                    || cluster_id.chars().any(char::is_control)
+            })
+        {
+            return Err(ComposerError::InvalidPlan(
+                "metric cluster map must have non-empty, control-free task and cluster IDs"
+                    .into(),
+            ));
+        }
         self.transform.validate()?;
         if !self.minimum_graded_coverage.is_finite()
             || !(0.0..=1.0).contains(&self.minimum_graded_coverage)
@@ -210,8 +239,6 @@ pub struct CompositionPlan {
     /// multiple entries represent a hybrid. These are in-memory lineage claims supplied
     /// by the frozen experiment plan, not authenticated by the receipt validator.
     pub parent_system_identity_digests: BTreeSet<String>,
-    /// Exact eligible task ID -> independent cluster ID assignment.
-    pub cluster_by_task: BTreeMap<String, String>,
 }
 
 impl CompositionPlan {
@@ -261,18 +288,6 @@ impl CompositionPlan {
                 }
             }
         }
-        if self.cluster_by_task.is_empty()
-            || self.cluster_by_task.iter().any(|(task_id, cluster_id)| {
-                task_id.trim().is_empty()
-                    || cluster_id.trim().is_empty()
-                    || task_id.chars().any(char::is_control)
-                    || cluster_id.chars().any(char::is_control)
-            })
-        {
-            return Err(ComposerError::InvalidPlan(
-                "cluster map must have non-empty, control-free task and cluster IDs".into(),
-            ));
-        }
         Ok(())
     }
 }
@@ -308,6 +323,8 @@ pub struct MetricSummary {
 #[derive(Debug, Clone, PartialEq)]
 pub struct MetricEvidence {
     pub projection: MetricProjection,
+    pub eligible_task_ids: Vec<String>,
+    pub cluster_by_task: BTreeMap<String, String>,
     pub summary: MetricSummary,
     pub tasks: BTreeMap<String, TaskMetricOutcome>,
 }
@@ -319,8 +336,6 @@ pub struct ComposedCandidateEvidence {
     evidence_set_digest: String,
     lineage_manifest_digest: String,
     parent_system_identity_digests: BTreeSet<String>,
-    eligible_task_ids: Vec<String>,
-    cluster_by_task: BTreeMap<String, String>,
     metrics: BTreeMap<String, MetricEvidence>,
 }
 
@@ -345,12 +360,19 @@ impl ComposedCandidateEvidence {
         &self.parent_system_identity_digests
     }
 
-    pub fn eligible_task_ids(&self) -> &[String] {
-        &self.eligible_task_ids
+    pub fn eligible_task_ids(&self, metric_id: &str) -> Option<&[String]> {
+        self.metrics
+            .get(metric_id)
+            .map(|evidence| evidence.eligible_task_ids.as_slice())
     }
 
-    pub fn cluster_by_task(&self) -> &BTreeMap<String, String> {
-        &self.cluster_by_task
+    pub fn cluster_by_task(
+        &self,
+        metric_id: &str,
+    ) -> Option<&BTreeMap<String, String>> {
+        self.metrics
+            .get(metric_id)
+            .map(|evidence| &evidence.cluster_by_task)
     }
 
     pub fn metric(&self, metric_id: &str) -> Option<&MetricEvidence> {
@@ -394,19 +416,20 @@ impl ComposedCandidateEvidence {
         Ok(dimensions)
     }
 
-    /// Returns complete per-task score vectors only when every eligible task has a grade
-    /// for every metric. It never silently complete-case-filters the task universe.
+    /// Returns a complete task-score map separately for each metric. Metric-specific
+    /// task universes are deliberately not joined unless their plans declare a pairing
+    /// group. It never silently complete-case-filters a metric's task universe.
     pub fn complete_case_scores(
         &self,
     ) -> Result<BTreeMap<String, BTreeMap<String, f64>>, ComposerError> {
-        let mut rows = BTreeMap::new();
-        for task_id in &self.eligible_task_ids {
-            let mut scores = BTreeMap::new();
-            for (metric_id, evidence) in &self.metrics {
+        let mut rows_by_metric = BTreeMap::new();
+        for (metric_id, evidence) in &self.metrics {
+            let mut task_scores = BTreeMap::new();
+            for task_id in &evidence.eligible_task_ids {
                 let outcome = evidence
                     .tasks
                     .get(task_id)
-                    .ok_or_else(|| ComposerError::TaskUniverseMismatch)?;
+                    .ok_or(ComposerError::TaskUniverseMismatch)?;
                 let score = outcome.normalized_score.ok_or_else(|| {
                     ComposerError::IncompleteMetricCoverage {
                         metric_id: metric_id.clone(),
@@ -417,11 +440,11 @@ impl ComposedCandidateEvidence {
                             .unwrap_or_else(|| outcome.attempt_state.clone()),
                     }
                 })?;
-                scores.insert(metric_id.clone(), score);
+                task_scores.insert(task_id.clone(), score);
             }
-            rows.insert(task_id.clone(), scores);
+            rows_by_metric.insert(metric_id.clone(), task_scores);
         }
-        Ok(rows)
+        Ok(rows_by_metric)
     }
 }
 
@@ -465,11 +488,6 @@ pub fn compare_candidates(
     {
         return Err(ComposerError::ParentLineageMismatch);
     }
-    if parent.eligible_task_ids != candidate.eligible_task_ids
-        || parent.cluster_by_task != candidate.cluster_by_task
-    {
-        return Err(ComposerError::TaskUniverseMismatch);
-    }
     if parent.metrics.keys().ne(candidate.metrics.keys()) {
         return Err(ComposerError::MetricSetMismatch);
     }
@@ -483,6 +501,14 @@ pub fn compare_candidates(
             .get(metric_id)
             .ok_or(ComposerError::MetricSetMismatch)?;
 
+        if parent_metric.eligible_task_ids != candidate_metric.eligible_task_ids {
+            return Err(ComposerError::TaskUniverseMismatch);
+        }
+        if parent_metric.cluster_by_task != candidate_metric.cluster_by_task {
+            return Err(ComposerError::ClusterMapMismatch);
+        }
+        let eligible_count = parent_metric.eligible_task_ids.len();
+
         let mut parent_graded_count = 0usize;
         let mut candidate_graded_count = 0usize;
         let mut jointly_graded_count = 0usize;
@@ -492,7 +518,7 @@ pub fn compare_candidates(
         let mut delta_sum = 0.0_f64;
         let mut cluster_accumulators: BTreeMap<String, (f64, usize)> = BTreeMap::new();
 
-        for task_id in &parent.eligible_task_ids {
+        for task_id in &parent_metric.eligible_task_ids {
             let parent_task = parent_metric
                 .tasks
                 .get(task_id)
@@ -519,7 +545,7 @@ pub fn compare_candidates(
                     jointly_graded_count += 1;
                     let delta = candidate_score - parent_score;
                     delta_sum += delta;
-                    let cluster_id = parent
+                    let cluster_id = parent_metric
                         .cluster_by_task
                         .get(task_id)
                         .ok_or(ComposerError::ClusterMapMismatch)?;
@@ -586,7 +612,6 @@ struct ParsedRun {
     universe_digest: String,
     eligible_digest: String,
     candidate_identity: Value,
-    compatibility_context: Value,
     metric_context: Value,
     tasks: BTreeMap<String, TaskMetricOutcome>,
 }
