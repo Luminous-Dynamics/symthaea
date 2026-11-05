@@ -157,6 +157,42 @@ The output retains exact integer accumulators rather than rounding early:
 
 Forecasts that were not available at the decision time, realized data not available at evaluation time, decisions after the target interval began, target periods with invalid timing, quantile crossing, mixed model builds and duplicate targets are rejected. Each build must be evaluated separately. The module does not train a forecasting model and does not claim a measured calibration improvement. The new case `FORECAST-CALIBRATION-EXACT-001` is a synthetic known-answer/hostile-control benchmark; real rolling-origin and project/time holdout comparisons against Chronos, HOMER and baselines remain `not_run`.
 
+### Dispatch execution: from optimal schedules to delivered energy
+
+The new `execution_fidelity.rs` module reconciles a frozen signed schedule (positive export, negative import) with interval meter evidence and booked balancing settlement lines. It reports schedule-time, meter-time and settlement-time coverage independently; absolute energy deviation; unfulfilled scheduled energy; overdelivery; schedule fulfilment; and booked balancing charges. It withholds a complete fulfilment ratio if any interval is missing meter evidence or the schedule does not cover the full horizon. It withholds a complete balancing-cost total if any interval lacks a booked settlement record. This module does not invent a balancing tariff or calculate Market Operator settlement.
+
+**Public field benchmark discovered:** Celi Cortés et al., *Improving real-world execution of optimized trading schedules for large-scale battery storage systems through data-driven component parametrization*, Applied Energy 407 (15 March 2026), DOI 10.1016/j.apenergy.2025.127340. The article validates the M5Use linear scheduling workflow on the LMO subsystem of the M5BAT 5 MW / 7.5 MWh hybrid BESS in Aachen. The associated RWTH dataset (DOI 10.18154/RWTH-2025-06555) contains two field tests, optimized delivery profiles, one-second inverter AC/DC power, individual-unit and system SOC, and grid-connection power. The supplementary dataset note identifies the package as CC BY 4.0.
+
+The article reports:
+- unfulfilled delivery fell from 1,094 kWh in the reference test to 238 kWh in the improved parametrization test;
+- a 78.2% reduction in unfulfilled energy and 71.7% reduction in balancing-energy costs versus the reference test;
+- balancing energy costs of 1.8% of total trading revenue in the improved test;
+- modeled system round-trip efficiency within 2.2 percentage points of measured value; and
+- inverter-efficiency deviation of 0.55 percentage points.
+
+These are results from one field system and study design, not universal industry limits. They are our first public replication target, not performance already achieved by Symthaea.
+
+**Proposed head-to-head gates on the identical public test data:**
+
+| Measure | Published reference | Initial Symthaea target |
+|---|---:|---:|
+| Unfulfilled delivery over the 61-hour validation | 238 kWh | ≤ 120 kWh |
+| Reduction vs. the paper's 1,094 kWh reference | 78.2% | ≥ 89% |
+| Balancing energy cost / trading revenue | 1.8% | ≤ 1.0% |
+| System RTE absolute model error | 2.2 pp | ≤ 1.0 pp |
+| Inverter efficiency absolute error | 0.55 pp | ≤ 0.30 pp |
+
+Targets are stretch acceptance criteria. The comparison is only meaningful after reproducing the article's schedule, energy boundary, initial SOC, LMO subsystem selection, time alignment, tariff/price inputs and reference model. We must report both the article's aggregation and one-second / 15-minute diagnostics; otherwise the comparison is not matched.
+
+**Paradigm shift:** do not optimize a theoretical battery and patch the result after execution. Optimize an *execution-qualified asset* whose deliverable envelope is learned from synchronized measurements and bounded by meter evidence. The loop is: immutable forecast vintage -> dispatch optimization -> component/BMS capability envelope -> signed schedule -> metered execution -> booked settlement -> residual calibration -> next schedule. This links the forecast-vintage replay, exact calibration scorer, physical constraints and execution reconciliation already present in the research profile.
+
+The first new synthetic case is `DISPATCH-EXECUTION-FIDELITY-001`. It does not replace the M5BAT replay. The dataset is publicly indexed, but the actual ZIP has not yet been staged into this branch and no field-data metrics have been computed. The field replay, load-dependent inverter/transformer parametrization, SOC-dependent power derating, and any revenue comparison remain `not_run`.
+
+References:
+- Article: https://doi.org/10.1016/j.apenergy.2025.127340
+- Public field dataset and supplementary file: https://publications.rwth-aachen.de/record/1015732
+- Dataset DOI: https://doi.org/10.18154/RWTH-2025-06555
+
 ### South African market phase as of 5 November 2026
 
 Engineering News reported on 30 October that invitations had been issued to 85 external entities for pre-launch simulation/testing, while broader launch was scheduled for April 2027. On 5 November, the Energy News Network interviewed the Acting NERSA CEO, who described finalisation of the market rules as a priority ahead of external market opening in April 2027. Both are secondary reporting; neither proves that any specific participant is admitted or commercially trading. The profile therefore records `pre_launch_testing_reported`, `participant_admission_state=unknown` and `commercial_trading_state=unknown`, with a null raw-source digest and `source_freeze_state=not_frozen`.
