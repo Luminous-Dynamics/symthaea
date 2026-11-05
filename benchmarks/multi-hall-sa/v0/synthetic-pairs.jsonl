@@ -2,3 +2,4 @@
 {"schema_version":"multi-hall-sa-pair-v0","pair_id":"synthetic-pair-002","file_id":"synthetic-document-b","fact_index":1,"language":"isiXhosa","hallucination_type":"entity error"}
 {"schema_version":"multi-hall-sa-pair-v0","pair_id":"synthetic-pair-003","file_id":"synthetic-document-c","fact_index":2,"language":"Sepedi","hallucination_type":"numerical inaccuracy"}
 {"schema_version":"multi-hall-sa-pair-v0","pair_id":"synthetic-pair-004","file_id":"synthetic-document-d","fact_index":3,"language":"Sesotho","hallucination_type":"location mistake"}
+{"schema_version":"multi-hall-sa-pair-v0","pair_id":"synthetic-pair-001","file_id":"synthetic-document-e","fact_index":0,"language":"isiZulu","hallucination_type":"temporal shift"}
