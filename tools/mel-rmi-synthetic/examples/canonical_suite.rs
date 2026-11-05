@@ -1,9 +1,10 @@
 use mel_rmi_synthetic::{
-    ActionMechanism, AgentAction, AgentPolicy, ArtifactFormatV1, ArtifactPayloadSetV1,
+    ActionMechanism, AgentAction, AgentPolicy, ArtifactFormatV1, ArtifactPayloadSetV1, Condition,
     ArtifactPayloadV1, ArtifactSetEvidenceV1, Dimension, Feature, FixedResponsePolicy,
     HarnessError, ImitationOnlyPolicy, NegotiatedResponseContractV1, NegotiationChoiceV1,
     Observation, OneWayPromptPolicy, PartnerAuthorityEventV1, PartnerAuthorityV1,
-    ReciprocalTrialRecordV1, ResponsivePartnerPolicy, RuleBasedPolicy, TaskSpec, TrialRecordV1,
+    PartnerCausalContrast, ReciprocalTrialRecordV1, ResponsivePartnerPolicy, RuleBasedPolicy, TaskSpec,
+    TrialRecordV1,
     TrialRunConfig, UnrelatedFeatureShortcutPolicy, assess_negotiation, assess_scoped_negotiation,
     bind_verified_artifacts, canonical_fixture_replicates_v1, run_policy_suite_v1,
     run_reciprocal_suite_v1, validate_partner_authority_event, verify_trial_artifact_bindings,
@@ -113,6 +114,133 @@ fn bind_and_verify_synthetic_artifacts(record: &mut TrialRecordV1) -> Result<(),
 
 fn csv_cell(value: &str) -> String {
     format!("\"{}\"", value.replace('"', "\"\""))
+}
+
+fn condition_label(condition: Condition) -> &'static str {
+    match condition {
+        Condition::Control => "control",
+        Condition::Targeted => "targeted",
+        Condition::Sham => "sham",
+        Condition::Unrelated => "unrelated",
+    }
+}
+
+fn mechanism_label(mechanism: ActionMechanism) -> &'static str {
+    match mechanism {
+        ActionMechanism::Fixed => "fixed",
+        ActionMechanism::Imitation => "imitation",
+        ActionMechanism::OneWay => "one_way",
+        ActionMechanism::Yoked => "yoked",
+        ActionMechanism::RuleBased => "rule_based",
+        ActionMechanism::DistractorDependent => "distractor_dependent",
+    }
+}
+
+/// Write one self-contained row per randomized condition, with exact event
+/// links and observed feature values. Four rows reconstruct one paired trial.
+fn write_trial_event_rows<W: Write>(
+    writer: &mut W,
+    record_kind: &str,
+    record: &TrialRecordV1,
+    partner: Option<&PartnerCausalContrast>,
+    reciprocal_qualified: Option<bool>,
+) -> std::io::Result<usize> {
+    let observations = [
+        &record.interventions.control,
+        &record.interventions.targeted,
+        &record.interventions.sham,
+        &record.interventions.unrelated,
+    ];
+    let partner_outputs = partner.map(|contrast| {
+        [
+            contrast.control_next,
+            contrast.targeted_next,
+            contrast.sham_next,
+            contrast.unrelated_next,
+        ]
+    });
+    let mut rows = 0;
+    for index in 0..4 {
+        let condition = [
+            Condition::Control,
+            Condition::Targeted,
+            Condition::Sham,
+            Condition::Unrelated,
+        ][index];
+        let order_index = record
+            .interventions
+            .condition_order
+            .iter()
+            .position(|candidate| *candidate == condition)
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "condition absent from validated assignment order",
+                )
+            })?;
+        let observation = observations[index];
+        let action = &record.actions[index];
+        let partner_output = partner_outputs.map(|outputs| outputs[index]);
+        let contrast = record.contrast;
+        let mut fields = vec![
+            csv_cell(record_kind),
+            csv_cell(&record.task.task_id),
+            csv_cell(&record.manifest.session_id),
+            record.manifest.task_seed.to_string(),
+            record.manifest.randomization_seed.to_string(),
+            csv_cell(&record.manifest.policy_id),
+            csv_cell(&record.manifest.policy_version),
+            csv_cell(&record.manifest.code_revision),
+            csv_cell(&record.manifest.metric_version),
+            csv_cell(record.task.target_dimension.as_str()),
+            csv_cell(observation.unrelated_feature.dimension.as_str()),
+            record.task.expected_response.modulus.to_string(),
+            record.task.expected_response.offset.to_string(),
+            order_index.to_string(),
+            csv_cell(condition_label(condition)),
+            csv_cell(&observation.event_id),
+            observation.initial_partner_feature.value.to_string(),
+            observation.current_partner_feature.value.to_string(),
+            observation.unrelated_feature.value.to_string(),
+            csv_cell(&action.event_id),
+            csv_cell(&action.source_event_id),
+            csv_cell(action.feature.dimension.as_str()),
+            action.feature.value.to_string(),
+            csv_cell(mechanism_label(action.mechanism)),
+            contrast.targeted_delta.to_string(),
+            contrast.sham_delta.to_string(),
+            contrast.unrelated_target_delta.to_string(),
+            contrast.input_sensitive.to_string(),
+            contrast.target_specific.to_string(),
+            contrast.oracle_rule_match.to_string(),
+            contrast.qualified_synthetic_contingency.to_string(),
+            partner_output
+                .map(|feature| csv_cell(feature.dimension.as_str()))
+                .unwrap_or_default(),
+            partner_output
+                .map(|feature| feature.value.to_string())
+                .unwrap_or_default(),
+            partner.map(|value| value.targeted_delta.to_string()).unwrap_or_default(),
+            partner.map(|value| value.sham_delta.to_string()).unwrap_or_default(),
+            partner.map(|value| value.unrelated_delta.to_string()).unwrap_or_default(),
+            partner.map(|value| value.input_sensitive.to_string()).unwrap_or_default(),
+            partner.map(|value| value.target_specific.to_string()).unwrap_or_default(),
+            partner.map(|value| value.oracle_rule_match.to_string()).unwrap_or_default(),
+            reciprocal_qualified
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+        ];
+        // Keep a fixed column contract even when the reverse direction is N/A.
+        if fields.len() != 41 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "trial event row column count mismatch",
+            ));
+        }
+        writeln!(writer, "{}", fields.join(","))?;
+        rows += 1;
+    }
+    Ok(rows)
 }
 
 fn write_artifact_set_evidence<W: Write>(
@@ -664,6 +792,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         artifact_report,
         "task_id,session_id,task_seed,randomization_seed,policy_id,policy_version,code_revision,metric_version,dimension,direction,condition,event_id,transaction_receipt_sha256,artifact_format,artifact_sha256,byte_len,verifier_id,verifier_version"
     )?;
+    let trial_event_report_path = std::env::var("MEL_RMI_TRIAL_EVENT_REPORT")?;
+    let trial_event_report_file = File::create(trial_event_report_path)?;
+    let mut trial_event_report = BufWriter::new(trial_event_report_file);
+    writeln!(
+        trial_event_report,
+        "record_kind,task_id,session_id,task_seed,randomization_seed,policy_id,policy_version,code_revision,metric_version,target_dimension,unrelated_dimension,response_modulus,response_offset,condition_order_index,condition,input_event_id,initial_target_value,input_target_value,input_unrelated_value,output_event_id,output_source_event_id,output_dimension,output_value,action_mechanism,agent_targeted_delta,agent_sham_delta,agent_unrelated_delta,agent_input_sensitive,agent_target_specific,agent_oracle_rule_match,agent_qualified,partner_next_dimension,partner_next_value,partner_targeted_delta,partner_sham_delta,partner_unrelated_delta,partner_input_sensitive,partner_target_specific,partner_oracle_rule_match,reciprocal_qualified"
+    )?;
+    let mut trial_event_rows = 0usize;
     let mut artifact_report_rows = 0usize;
     let policies: Vec<Box<dyn AgentPolicy>> = vec![
         Box::new(RuleBasedPolicy {
@@ -698,6 +834,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             bind_and_verify_synthetic_artifacts(record)?;
             artifact_bindings_verified += 1;
             artifact_report_rows += write_record_artifact_evidence(&mut artifact_report, record)?;
+            trial_event_rows += write_trial_event_rows(
+                &mut trial_event_report,
+                "trial",
+                record,
+                None,
+                None,
+            )?;
             let contrast = record.contrast;
             println!(
                 "trial,{},{},{},{},{},{},{},{},{},{},,,,,,,",
@@ -731,6 +874,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         artifact_bindings_verified += 1;
         artifact_report_rows +=
             write_record_artifact_evidence(&mut artifact_report, &record.agent)?;
+        trial_event_rows += write_trial_event_rows(
+            &mut trial_event_report,
+            "reciprocal",
+            &record.agent,
+            Some(&record.partner),
+            Some(record.qualified_synthetic_reciprocity),
+        )?;
         let agent = record.agent.contrast;
         let partner = record.partner;
         println!(
@@ -766,7 +916,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     artifact_report.flush()?;
+    trial_event_report.flush()?;
     println!("artifact_verified,{artifact_bindings_verified}");
     println!("artifact_digest_rows,{artifact_report_rows}");
+    println!("trial_event_rows,{trial_event_rows}");
     Ok(())
 }
