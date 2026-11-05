@@ -756,36 +756,36 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         policy_branches,
         status,
     ) = match solution {
-            Some(solution) => {
-                let within = solution.worst_case_cost <= input.max_total_effort_units;
-                let (nodes, branches) = count_policy_nodes(&solution.node);
-                let status = if within {
-                    "MINIMUM_WORST_CASE_ADAPTIVE_POLICY"
-                } else {
-                    "MINIMUM_WORST_CASE_ADAPTIVE_POLICY_EXCEEDS_BUDGET"
-                };
-                (
-                    Some(solution.worst_case_cost),
-                    Some(solution.minimum_path_cost),
-                    Some(solution.maximum_path_cost),
-                    Some(within),
-                    Some(solution.node),
-                    nodes,
-                    branches,
-                    status,
-                )
-            }
-            None => (
-                None,
-                None,
-                None,
-                None,
-                None,
-                0,
-                0,
-                "NO_ADAPTIVE_POLICY_WITHIN_DECLARED_ACTIONS",
-            ),
-        };
+        Some(solution) => {
+            let within = solution.worst_case_cost <= input.max_total_effort_units;
+            let (nodes, branches) = count_policy_nodes(&solution.node);
+            let status = if within {
+                "MINIMUM_WORST_CASE_ADAPTIVE_POLICY"
+            } else {
+                "MINIMUM_WORST_CASE_ADAPTIVE_POLICY_EXCEEDS_BUDGET"
+            };
+            (
+                Some(solution.worst_case_cost),
+                Some(solution.minimum_path_cost),
+                Some(solution.maximum_path_cost),
+                Some(within),
+                Some(solution.node),
+                nodes,
+                branches,
+                status,
+            )
+        }
+        None => (
+            None,
+            None,
+            None,
+            None,
+            None,
+            0,
+            0,
+            "NO_ADAPTIVE_POLICY_WITHIN_DECLARED_ACTIONS",
+        ),
+    };
 
     Ok(Report {
         schema_version: 1,
