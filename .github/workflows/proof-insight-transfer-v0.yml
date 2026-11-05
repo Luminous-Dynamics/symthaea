@@ -2,6 +2,7 @@ name: Proof Insight Transfer Indexer V0
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
@@ -17,6 +18,7 @@ permissions:
 jobs:
   proof-insight-indexer:
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
         with:

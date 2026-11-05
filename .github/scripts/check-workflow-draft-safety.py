@@ -192,7 +192,10 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
             )
         draft_guarded += 1
 
-    if runner_jobs:
+    # Only a runner job that can execute for pull_request needs the
+    # ready_for_review event. Jobs explicitly guarded to workflow_dispatch,
+    # push, or another non-PR event cannot allocate a PR runner.
+    if draft_guarded:
         require_ready_event(path, pr_block)
     return runner_jobs, draft_guarded
 
