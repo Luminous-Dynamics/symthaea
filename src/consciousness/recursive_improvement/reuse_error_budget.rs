@@ -173,10 +173,10 @@ pub fn allocate_reuse_error_budget(
     candidates_per_round: usize,
     rho: f64,
 ) -> Result<ReuseErrorAllocation, ReuseBudgetError> {
-    if !alpha.is_finite() || !(0.0..1.0).contains(&alpha) {
+    if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
         return Err(ReuseBudgetError::InvalidAlpha);
     }
-    if !rho.is_finite() || !(0.0..1.0).contains(&rho) {
+    if !rho.is_finite() || rho <= 0.0 || rho >= 1.0 {
         return Err(ReuseBudgetError::InvalidRho);
     }
     if round == 0 {
@@ -290,11 +290,19 @@ mod tests {
             Err(ReuseBudgetError::InvalidAlpha)
         );
         assert_eq!(
+            allocate_reuse_error_budget(1.0, 1, 0, 1, 0.5),
+            Err(ReuseBudgetError::InvalidAlpha)
+        );
+        assert_eq!(
             allocate_reuse_error_budget(f64::NAN, 1, 0, 1, 0.5),
             Err(ReuseBudgetError::InvalidAlpha)
         );
         assert_eq!(
             allocate_reuse_error_budget(0.05, 1, 0, 1, 0.0),
+            Err(ReuseBudgetError::InvalidRho)
+        );
+        assert_eq!(
+            allocate_reuse_error_budget(0.05, 1, 0, 1, 1.0),
             Err(ReuseBudgetError::InvalidRho)
         );
         assert_eq!(
