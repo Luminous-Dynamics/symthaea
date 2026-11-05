@@ -305,7 +305,40 @@ fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
-fn read_jsonl<T: DeserializeOwned>(bytes: &[u8], label: &str) -> Result<Vec<T>, String> {
+fn compile_schema(schema_raw: &str, label: &str) -> Result<jsonschema::Validator, String> {
+    let schema: Value = serde_json::from_str(schema_raw)
+        .map_err(|error| format!("{label} schema is invalid JSON: {error}"))?;
+    let meta_validator = jsonschema::meta::validator_for(&schema)
+        .map_err(|error| format!("cannot compile {label} meta-schema validator: {error}"))?;
+    if !meta_validator.evaluate(&schema).flag().valid {
+        return Err(format!("{label} schema is invalid against its declared meta-schema"));
+    }
+    draft202012::options()
+        .should_validate_formats(true)
+        .build(&schema)
+        .map_err(|error| format!("cannot compile {label} schema: {error}"))
+}
+
+fn validate_value(
+    value: &Value,
+    validator: &jsonschema::Validator,
+    label: &str,
+) -> Result<(), String> {
+    let errors: Vec<String> = validator.iter_errors(value)
+        .map(|error| error.to_string())
+        .collect();
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(format!("{label} violates its schema: {}", errors.join("; ")))
+    }
+}
+
+fn read_jsonl<T: DeserializeOwned>(
+    bytes: &[u8],
+    label: &str,
+    validator: &jsonschema::Validator,
+) -> Result<Vec<T>, String> {
     let text =
         std::str::from_utf8(bytes).map_err(|error| format!("{label} is not UTF-8: {error}"))?;
     let mut rows = Vec::new();
@@ -314,8 +347,11 @@ fn read_jsonl<T: DeserializeOwned>(bytes: &[u8], label: &str) -> Result<Vec<T>, 
         if line.trim().is_empty() {
             return Err(format!("{label} contains an empty line at {}", index + 1));
         }
-        let row = serde_json::from_str::<T>(line)
+        let value: Value = serde_json::from_str(line)
             .map_err(|error| format!("{label} line {} is invalid JSON: {error}", index + 1))?;
+        validate_value(&value, validator, &format!("{label} line {}", index + 1))?;
+        let row = serde_json::from_value::<T>(value)
+            .map_err(|error| format!("{label} line {} does not match its typed contract: {error}", index + 1))?;
         rows.push(row);
     }
 
@@ -1340,8 +1376,15 @@ fn run() -> Result<(), String> {
     let result_bytes = fs::read(&args.results)
         .map_err(|error| format!("cannot read results {}: {error}", args.results.display()))?;
 
-    let plan: Plan = serde_json::from_slice(&plan_bytes)
+    let plan_schema = compile_schema(PLAN_SCHEMA, "plan")?;
+    let pair_schema = compile_schema(PAIR_SCHEMA, "pair")?;
+    let result_schema = compile_schema(RESULT_SCHEMA, "result")?;
+
+    let plan_value: Value = serde_json::from_slice(&plan_bytes)
         .map_err(|error| format!("plan is invalid JSON: {error}"))?;
+    validate_value(&plan_value, &plan_schema, "plan")?;
+    let plan: Plan = serde_json::from_value(plan_value)
+        .map_err(|error| format!("plan does not match its typed contract: {error}"))?;
     validate_plan(&plan)?;
 
     let actual_pair_digest = sha256_hex(&pair_bytes);
@@ -1352,9 +1395,9 @@ fn run() -> Result<(), String> {
         ));
     }
 
-    let pairs: Vec<PairMeta> = read_jsonl(&pair_bytes, "pair manifest")?;
+    let pairs: Vec<PairMeta> = read_jsonl(&pair_bytes, "pair manifest", &pair_schema)?;
     let pair_map = validate_pairs(&pairs)?;
-    let result_rows: Vec<Prediction> = read_jsonl(&result_bytes, "prediction results")?;
+    let result_rows: Vec<Prediction> = read_jsonl(&result_bytes, "prediction results", &result_schema)?;
     let prediction_map = validate_predictions(&plan, &pair_map, &result_rows)?;
 
     let mut observed = Vec::with_capacity(result_rows.len());
