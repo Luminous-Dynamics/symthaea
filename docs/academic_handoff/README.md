@@ -1,5 +1,7 @@
 # Symthaea Academic Handoff: Morphogenetic Modeling Engine
 
+**Execution status (2026-11-05):** The referenced `symthaea-morphogenesis` Cargo package and `planarian_tas_sim` example are not in the current checkout. The `cargo run -p symthaea-morphogenesis --example planarian_tas_sim` command below is an intended interface only, not a runnable command or evidence of an implemented package.
+
 ## 1. Overview
 Symthaea is an implementation-independent "steering wheel" for multi-scale agential systems. This package provides a high-performance computational framework designed to bridge bioelectric spatial patterns with formal active inference.
 
