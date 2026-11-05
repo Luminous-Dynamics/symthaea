@@ -703,7 +703,15 @@ fn instrument_sorry_span(
     // record can point to an inline by-sorry; appending trace on that line
     // followed by an indented continuation makes Lean's tactic layout depend
     // on the surrounding term's line structure.
-    if !instrumented.ends_with('\n') {
+    let last_line_start = instrumented
+        .rfind('\n')
+        .map(|index| index + 1)
+        .unwrap_or(0);
+    if instrumented[last_line_start..].trim().is_empty() {
+        // Remove whitespace-only indentation already present before the sorry.
+        // The inserted tactic block supplies exactly one copy of that indent.
+        instrumented.truncate(last_line_start);
+    } else if !instrumented.ends_with('\n') {
         instrumented.push('\n');
     }
     instrumented.push_str(&format!(
