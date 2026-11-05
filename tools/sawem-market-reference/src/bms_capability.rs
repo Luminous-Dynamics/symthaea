@@ -297,7 +297,7 @@ mod tests {
         let result =
             assess_soc_dependent_capability(profile, PowerDirection::Charge, 7_001, 2_000)
                 .unwrap();
-        // Between 50% (4,000 W) and 90% (1,000 W): exact value 2,499.925 W.
+        // Between 50% (4,000 W) and 90% (1,000 W): exact value 2,499.25 W.
         assert_eq!(result.maximum_supported_power_w, 2_499);
         assert_eq!(result.disposition, CapabilityDisposition::WithinEnvelope);
     }
