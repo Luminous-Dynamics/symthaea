@@ -14,11 +14,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
-const NEGATIVE_CASE_IDS: [&str; 14] = [
+const NEGATIVE_CASE_IDS: [&str; 15] = [
     "HRA-001", "HRA-002", "HRA-003", "HRA-004", "HRA-005", "HRA-006", "HRA-007", "HRA-008",
-    "HRA-009", "HRA-010", "HRA-011", "HRA-012", "HRA-013", "HRA-014",
+    "HRA-009", "HRA-010", "HRA-011", "HRA-012", "HRA-013", "HRA-014", "HRA-015",
 ];
-const POSITIVE_CASE_IDS: [&str; 3] = ["HRA-POS-001", "HRA-POS-002", "HRA-POS-003"];
+const POSITIVE_CASE_IDS: [&str; 4] = ["HRA-POS-001", "HRA-POS-002", "HRA-POS-003", "HRA-POS-004"];
 const ARBITRATION_MANIFEST: &str = include_str!(
     "../../../docs/research/household-services/household-resource-arbitration-scenarios-v0.1.json"
 );
@@ -1044,8 +1044,8 @@ mod tests {
     #[test]
     fn bundled_manifest_has_exact_negative_and_positive_case_sets() {
         let validation = validate_bundled_arbitration_manifest().unwrap();
-        assert_eq!(validation.negative_case_count, 14);
-        assert_eq!(validation.positive_control_count, 3);
+        assert_eq!(validation.negative_case_count, 15);
+        assert_eq!(validation.positive_control_count, 4);
         assert!(validation.synthetic_only);
         assert!(!validation.live_actuation_authorized);
         for id in NEGATIVE_CASE_IDS {
@@ -1200,6 +1200,49 @@ mod tests {
     fn explicit_not_required_profile_does_not_invent_permission_requirement() {
         let result = evaluate(&valid_request(), &valid_snapshot());
         assert_eq!(result.decision, HouseholdActionDecision::EligibleForLocalControllerEvaluation);
+    }
+
+    #[test]
+    fn hra_015_missing_municipal_permission_blocks_quality_qualified_borehole() {
+        assert_eq!(
+            fixture_expected("HRA-015"),
+            "BlockUnknownRegulatoryAuthority"
+        );
+        let mut request = valid_request();
+        request.requested_water_use = Some(WaterUseClass::Drinking);
+        request.regulatory_requirement = required_coj_borehole_requirement();
+        let mut snapshot = valid_snapshot();
+        snapshot.water_qualification = Some(WaterQualificationEvidence {
+            status: WaterQualificationStatus::QualifiedForDeclaredUse,
+            declared_use: WaterUseClass::Drinking,
+        });
+        snapshot.regulatory_authorization = None;
+        let result = evaluate(&request, &snapshot);
+        assert_eq!(
+            result.decision,
+            HouseholdActionDecision::RegulatoryAuthorizationUnknown
+        );
+        assert!(!result.local_request_eligible);
+    }
+
+    #[test]
+    fn hra_pos_004_uses_exact_regulatory_permission_before_local_evaluation() {
+        assert_eq!(
+            fixture_expected("HRA-POS-004"),
+            "EligibleForLocalControllerEvaluation"
+        );
+        let mut request = valid_request();
+        request.requested_water_use = Some(WaterUseClass::Drinking);
+        request.regulatory_requirement = required_coj_borehole_requirement();
+        let mut snapshot = valid_snapshot();
+        snapshot.water_qualification = Some(WaterQualificationEvidence {
+            status: WaterQualificationStatus::QualifiedForDeclaredUse,
+            declared_use: WaterUseClass::Drinking,
+        });
+        snapshot.regulatory_authorization = Some(approved_coj_borehole_evidence());
+        let result = evaluate(&request, &snapshot);
+        assert!(result.local_request_eligible);
+        assert!(!result.actuator_command_emitted);
     }
 
     #[test]
