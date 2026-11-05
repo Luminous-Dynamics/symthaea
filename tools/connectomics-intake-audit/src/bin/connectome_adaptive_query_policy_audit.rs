@@ -50,6 +50,8 @@ struct Input {
     scenarios: Vec<Scenario>,
     actions: Vec<ObservationAction>,
     joint_world_supports: Vec<JointWorldSupport>,
+    #[serde(default)]
+    support_challenges: Vec<SupportChallenge>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -96,6 +98,25 @@ struct ObservationAction {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct JointWorldSupport {
+    scenario_id: String,
+    source_evidence_sha256: String,
+    joint_observation_model_sha256: String,
+    dependence_groups: Vec<String>,
+    possible_joint_outcomes: Vec<JointOutcome>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct SupportChallenge {
+    challenge_id: String,
+    challenger_evidence_sha256: String,
+    challenger_model_sha256: String,
+    additions: Vec<JointSupportAddition>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct JointSupportAddition {
     scenario_id: String,
     source_evidence_sha256: String,
     joint_observation_model_sha256: String,
@@ -156,6 +177,25 @@ struct FixedPlanSummary {
 }
 
 #[derive(Debug, Serialize)]
+struct SupportChallengeResult {
+    challenge_id: String,
+    challenge_sha256: String,
+    expanded_joint_support_sha256: String,
+    added_joint_tuple_count: usize,
+    adaptive_worst_case_effort_before: Option<u64>,
+    adaptive_worst_case_effort_after: Option<u64>,
+    adaptive_status_before: String,
+    adaptive_status_after: String,
+    adaptive_effort_non_decreasing: bool,
+    fixed_minimum_effort_before: Option<u64>,
+    fixed_minimum_effort_after: Option<u64>,
+    fixed_status_before: String,
+    fixed_status_after: String,
+    fixed_effort_non_decreasing: bool,
+    monotonicity_passed: bool,
+}
+
+#[derive(Debug, Serialize)]
 struct Report {
     schema_version: u32,
     tool: &'static str,
@@ -181,6 +221,8 @@ struct Report {
     maximum_terminal_path_effort_units: Option<u64>,
     worst_case_policy_within_budget: Option<bool>,
     fixed_non_adaptive_optimum: FixedPlanSummary,
+    support_challenge_count: usize,
+    support_challenges: Vec<SupportChallengeResult>,
     policy: Option<PolicyNode>,
     out_of_model_observation_disposition: &'static str,
     expected_cost_claim: &'static str,
