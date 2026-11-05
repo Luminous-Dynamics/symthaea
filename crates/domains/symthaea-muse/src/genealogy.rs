@@ -38,7 +38,9 @@ use std::sync::Mutex;
 
 use rusqlite::{Connection, OptionalExtension, Row, params};
 use sha2::{Digest, Sha256};
-use symthaea_muse_protocol::{GenealogyManifest, GenealogyOrigin, GenealogyRelation};
+use symthaea_muse_protocol::{
+    GenealogyManifest, GenealogyOrigin, GenealogyRelation, RmiArtifactBindingV1,
+};
 
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS genealogy_manifests (
@@ -74,6 +76,8 @@ pub enum GenealogyBundleError {
     ManifestMismatch { artifact: &'static str },
     /// The keeper has no genealogy manifest.
     MissingManifest { audio_key: String },
+    /// RMI event IDs or the reference shape are invalid.
+    InvalidRmiBinding(&'static str),
     /// The verified content hashes could not be committed to SQLite.
     Database(rusqlite::Error),
 }
@@ -90,6 +94,9 @@ impl std::fmt::Display for GenealogyBundleError {
             }
             Self::MissingManifest { audio_key } => {
                 write!(formatter, "keeper has no genealogy manifest: {audio_key}")
+            }
+            Self::InvalidRmiBinding(reason) => {
+                write!(formatter, "invalid RMI artifact binding: {reason}")
             }
             Self::Database(error) => write!(formatter, "genealogy database operation failed: {error}"),
         }
@@ -120,6 +127,32 @@ pub struct VerifiedArtifactBundleV1 {
     pub score_bytes_len: Option<u64>,
     /// Number of bytes in audio.wav.
     pub audio_bytes_len: u64,
+}
+
+impl VerifiedArtifactBundleV1 {
+    /// Bind this independently verified keeper bundle to one RMI source event
+    /// and one action event. The returned DTO carries the genealogy manifest
+    /// commitment and exact byte lengths; it remains a reference, not a
+    /// signature or a consent/authorship assertion.
+    pub fn bind_rmi_events(
+        &self,
+        source_event_id: &str,
+        action_event_id: &str,
+    ) -> Result<RmiArtifactBindingV1, GenealogyBundleError> {
+        let binding = RmiArtifactBindingV1 {
+            schema_version: 1,
+            source_event_id: source_event_id.to_owned(),
+            action_event_id: action_event_id.to_owned(),
+            genealogy: self.manifest.clone(),
+            recipe_bytes_len: self.recipe_bytes_len,
+            score_bytes_len: self.score_bytes_len,
+            audio_bytes_len: self.audio_bytes_len,
+        };
+        binding
+            .validate_reference()
+            .map_err(GenealogyBundleError::InvalidRmiBinding)?;
+        Ok(binding)
+    }
 }
 
 pub struct GenealogyStore {
@@ -742,6 +775,90 @@ mod tests {
             Err(GenealogyBundleError::ManifestMismatch {
                 artifact: "audio.wav"
             })
+        ));
+
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn verified_bundle_binds_exact_manifest_to_distinct_rmi_events() {
+        let store = store();
+        let directory = std::env::temp_dir().join(format!(
+            "muse-genealogy-rmi-binding-{}-{}",
+            std::process::id(),
+            line!()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+
+        let recipe = b"rmi-bound-recipe";
+        let score = b"rmi-bound-score";
+        let audio = b"rmi-bound-audio";
+        std::fs::write(directory.join("recipe.json"), recipe).unwrap();
+        std::fs::write(directory.join("score.json"), score).unwrap();
+        std::fs::write(directory.join("audio.wav"), audio).unwrap();
+        store
+            .allocate_root_from_bundle(
+                &origin(),
+                "rmi-binding-key",
+                &directory,
+                recipe,
+                score,
+                audio,
+                1008,
+            )
+            .unwrap();
+
+        let verified = store.verify_bundle("rmi-binding-key", &directory).unwrap();
+        let binding = verified
+            .bind_rmi_events("partner-input-17", "agent-action-18")
+            .unwrap();
+        assert_eq!(binding.genealogy.audio_key, "rmi-binding-key");
+        assert_eq!(binding.genealogy.recipe_sha256, artifact_sha256_hex(recipe));
+        assert_eq!(binding.genealogy.score_sha256, Some(artifact_sha256_hex(score)));
+        assert_eq!(binding.genealogy.audio_sha256, artifact_sha256_hex(audio));
+        assert_eq!(binding.source_event_id, "partner-input-17");
+        assert_eq!(binding.action_event_id, "agent-action-18");
+        binding.validate_reference().unwrap();
+
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn verified_bundle_refuses_ambiguous_rmi_event_binding() {
+        let store = store();
+        let directory = std::env::temp_dir().join(format!(
+            "muse-genealogy-rmi-invalid-binding-{}-{}",
+            std::process::id(),
+            line!()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+
+        let recipe = b"recipe";
+        let score = b"score";
+        let audio = b"audio";
+        std::fs::write(directory.join("recipe.json"), recipe).unwrap();
+        std::fs::write(directory.join("score.json"), score).unwrap();
+        std::fs::write(directory.join("audio.wav"), audio).unwrap();
+        store
+            .allocate_root_from_bundle(
+                &origin(),
+                "rmi-invalid-key",
+                &directory,
+                recipe,
+                score,
+                audio,
+                1009,
+            )
+            .unwrap();
+
+        let verified = store.verify_bundle("rmi-invalid-key", &directory).unwrap();
+        assert!(matches!(
+            verified.bind_rmi_events("same-event", "same-event"),
+            Err(GenealogyBundleError::InvalidRmiBinding(
+                "RMI source/action event IDs must be distinct and non-empty"
+            ))
         ));
 
         let _ = std::fs::remove_dir_all(directory);
