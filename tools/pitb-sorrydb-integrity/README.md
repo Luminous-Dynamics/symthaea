@@ -6,7 +6,7 @@ A standalone Rust validator for frozen SorryDB datasets and exact per-task repro
 
 SorryDB is a live benchmark of open proof obligations taken from real Lean repositories. Its task identity includes the upstream repository, branch, commit, Lean version, source path and coordinates. A repository change can alter a task's meaning or available context even when the local theorem text does not change. PITB therefore treats the benchmark snapshot and the source checkout as part of the task—not as incidental metadata.
 
-SorryDB's paper reports a 1,000-task evaluation snapshot drawn from 78 real-world projects. The official paper reports that approaches are complementary; its public results include a combined 35.7% result and a 30.3% single agentic result on that evaluation slice. These results are not directly comparable to isolated theorem benchmarks or formalization benchmarks; model, scaffold, source access, resource budgets and stopping policy matter.
+SorryDB's paper reports a 1,000-task evaluation snapshot drawn from 78 real-world projects. The official paper reports that approaches are complementary; its public results include a combined 35.7% result and a 30.3% single agentic result on that evaluation slice. These results are not directly comparable to isolated theorem benchmarks or formalization benchmarks; model, scaffold, source access, resource budgets and stopping policy matter. The evaluation split is clustered (78 repositories, 339 repository/file pairs, with up to 21 tasks per repository and 20 per file), so paired model comparisons should use repository/file-clustered resampling rather than treating all 1,000 task rows as IID.
 
 ## Frozen SorryDB-2601 identities
 
@@ -18,6 +18,10 @@ The checked-in provenance manifest pins:
 - README-documented full database task count: 2,601
 - observed full dataset task count at the pinned blob: 5,663
 - held-out evaluation task count: 1,000
+- evaluation coverage: 78 repositories, 107 repository-commit pairs and 339 repository/file clusters
+- evaluation Lean toolchains: 14 distinct version strings
+- zero-based start columns: 2 evaluation rows (19 in the full snapshot)
+- maximum cluster sizes: 21 tasks per repository, 20 per source file
 - source license: Apache-2.0
 - evaluation role: test
 
