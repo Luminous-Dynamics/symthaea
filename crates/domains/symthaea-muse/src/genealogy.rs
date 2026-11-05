@@ -33,13 +33,15 @@
 //! -- it is not promised or written by any code path yet, so it isn't
 //! named here as an active namespace.
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::sync::Mutex;
 
 use rusqlite::{Connection, OptionalExtension, Row, params};
 use sha2::{Digest, Sha256};
 use symthaea_muse_protocol::{
-    GenealogyManifest, GenealogyOrigin, GenealogyRelation, RmiArtifactBindingV1,
+    GenealogyEdgeKindV1, GenealogyLineageVerificationV1, GenealogyManifest, GenealogyOrigin,
+    GenealogyParentEdgeV1, GenealogyParentInputV1, GenealogyRelation, RmiArtifactBindingV1,
 };
 
 const SCHEMA: &str = "
@@ -55,11 +57,61 @@ CREATE TABLE IF NOT EXISTS genealogy_manifests (
     score_sha256       TEXT,
     audio_sha256       TEXT NOT NULL,
     manifest_sha256    TEXT NOT NULL UNIQUE,
-    created_at_unix_ms INTEGER NOT NULL
+    created_at_unix_ms INTEGER NOT NULL,
+    lineage_sha256     TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_genealogy_parent ON genealogy_manifests(parent_id);
 CREATE INDEX IF NOT EXISTS idx_genealogy_family ON genealogy_manifests(family_id);
 ";
+
+const EDGE_SCHEMA: &str = "
+CREATE TABLE IF NOT EXISTS genealogy_parent_edges (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    child_manifest_id   INTEGER NOT NULL REFERENCES genealogy_manifests(id) ON DELETE CASCADE,
+    parent_manifest_id  INTEGER NOT NULL REFERENCES genealogy_manifests(id) ON DELETE RESTRICT,
+    kind_json           TEXT NOT NULL,
+    source_event_id     TEXT,
+    contributor_ref     TEXT,
+    authority_receipt_ref TEXT,
+    idempotency_key     TEXT NOT NULL UNIQUE,
+    edge_sha256         TEXT NOT NULL UNIQUE,
+    created_at_unix_ms  INTEGER NOT NULL,
+    CHECK (child_manifest_id <> parent_manifest_id)
+);
+CREATE INDEX IF NOT EXISTS idx_genealogy_edge_parent ON genealogy_parent_edges(parent_manifest_id);
+CREATE INDEX IF NOT EXISTS idx_genealogy_edge_child ON genealogy_parent_edges(child_manifest_id);
+CREATE TABLE IF NOT EXISTS genealogy_lineage_operations (
+    idempotency_key   TEXT PRIMARY KEY,
+    child_manifest_id INTEGER NOT NULL UNIQUE REFERENCES genealogy_manifests(id) ON DELETE CASCADE,
+    operation_sha256  TEXT NOT NULL
+);
+";
+
+/// Apply the current schema and additive migrations while preserving existing
+/// single-parent manifests. A blank lineage digest marks a legacy/v1 manifest.
+fn initialize_schema(conn: &Connection) -> rusqlite::Result<()> {
+    conn.execute_batch(SCHEMA)?;
+    let mut has_lineage_column = false;
+    {
+        let mut statement = conn.prepare("PRAGMA table_info(genealogy_manifests)")?;
+        let mut rows = statement.query([])?;
+        while let Some(row) = rows.next()? {
+            let column_name: String = row.get(1)?;
+            if column_name == "lineage_sha256" {
+                has_lineage_column = true;
+                break;
+            }
+        }
+    }
+    if !has_lineage_column {
+        conn.execute_batch(
+            "ALTER TABLE genealogy_manifests
+             ADD COLUMN lineage_sha256 TEXT NOT NULL DEFAULT '';",
+        )?;
+    }
+    conn.execute_batch(EDGE_SCHEMA)?;
+    Ok(())
+}
 
 const SELECT_COLUMNS: &str = "id, family_id, parent_id, namespace, relation_json, origin_json,
      audio_key, recipe_sha256, score_sha256, audio_sha256, manifest_sha256, created_at_unix_ms";
@@ -323,7 +375,7 @@ impl GenealogyStore {
              PRAGMA synchronous = NORMAL;
              PRAGMA busy_timeout = 5000;",
         )?;
-        conn.execute_batch(SCHEMA)?;
+        initialize_schema(&conn)?;
         Ok(Self {
             conn: Mutex::new(conn),
         })
@@ -556,7 +608,7 @@ mod tests {
         // via `open()`'s own file-creation logic in `muse_studio`'s
         // integration; unit tests here only need schema + query behavior.
         let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch(SCHEMA).unwrap();
+        initialize_schema(&conn).unwrap();
         GenealogyStore {
             conn: Mutex::new(conn),
         }
