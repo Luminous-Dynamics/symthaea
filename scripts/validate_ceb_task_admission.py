@@ -296,7 +296,10 @@ def self_test(registry: dict, registry_schema: dict, task_schema: dict, format_c
     positive_na["task_status"] = "static_reviewed"
     positive_na["acceptance_contract"]["security_review_status"] = "not_applicable"
     positive_na["acceptance_contract"]["security_review_rationale"] = "The reviewed task scope does not alter security-relevant behavior or trust boundaries."
-    if validate_task(positive_na, task_schema, format_checker, {}):
+    positive_na["source"]["contamination_card_id"] = "ceb-leak-fixture-001"
+    positive_na["source"]["contamination_card_sha256"] = digest
+    positive_na_card = synthetic_card(positive_na["task_id"])
+    if validate_task(positive_na, task_schema, format_checker, {"ceb-leak-fixture-001": positive_na_card}):
         raise SystemExit("justified not-applicable security disposition positive control unexpectedly failed")
 
     # A task beyond proposed must bind its contamination card to the exact task and record digest.
