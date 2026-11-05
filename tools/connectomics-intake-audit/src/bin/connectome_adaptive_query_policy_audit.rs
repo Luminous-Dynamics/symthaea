@@ -142,6 +142,7 @@ struct PolicySolution {
     worst_case_cost: u64,
     minimum_path_cost: u64,
     maximum_path_cost: u64,
+    optimal_policy_count: u128,
     node: PolicyNode,
 }
 
@@ -175,6 +176,7 @@ struct Report {
     policy_node_count: usize,
     policy_branch_count: usize,
     worst_case_effort_units: Option<u64>,
+    optimal_policy_count: u128,
     minimum_terminal_path_effort_units: Option<u64>,
     maximum_terminal_path_effort_units: Option<u64>,
     worst_case_policy_within_budget: Option<bool>,
@@ -564,6 +566,7 @@ impl<'a> Solver<'a> {
             worst_case_cost: 0,
             minimum_path_cost: 0,
             maximum_path_cost: 0,
+            optimal_policy_count: 1,
             node: PolicyNode {
                 action_id: None,
                 action_cost_units: 0,
@@ -668,6 +671,14 @@ impl<'a> Solver<'a> {
                 .max()
                 .unwrap_or_default();
             let action_cost = self.action_effort[action_index];
+            let candidate_policy_count = child_solutions.iter().try_fold(
+                1_u128,
+                |count, child| {
+                    count.checked_mul(child.optimal_policy_count).ok_or_else(|| {
+                        "adaptive optimal-policy count overflows u128".to_string()
+                    })
+                },
+            )?;
             let candidate = PolicySolution {
                 worst_case_cost: action_cost
                     .checked_add(child_worst)
@@ -678,6 +689,7 @@ impl<'a> Solver<'a> {
                 maximum_path_cost: action_cost
                     .checked_add(child_max_path)
                     .ok_or_else(|| "adaptive maximum path effort overflows u64".to_string())?,
+                optimal_policy_count: candidate_policy_count,
                 node: PolicyNode {
                     action_id: Some(self.action_ids[action_index].clone()),
                     action_cost_units: action_cost,
@@ -690,6 +702,19 @@ impl<'a> Solver<'a> {
                 candidate.worst_case_cost < best_solution.worst_case_cost
             }) {
                 best = Some(candidate);
+            } else if best
+                .as_ref()
+                .is_some_and(|best_solution| candidate.worst_case_cost == best_solution.worst_case_cost)
+            {
+                let total_count = best
+                    .as_ref()
+                    .expect("equal-cost best policy exists")
+                    .optimal_policy_count
+                    .checked_add(candidate.optimal_policy_count)
+                    .ok_or_else(|| "adaptive optimal-policy count overflows u128".to_string())?;
+                best.as_mut()
+                    .expect("equal-cost best policy exists")
+                    .optimal_policy_count = total_count;
             }
         }
 
@@ -926,6 +951,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         policy,
         policy_nodes,
         policy_branches,
+        optimal_policy_count,
         status,
     ) = match solution {
         Some(solution) => {
@@ -945,6 +971,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
                 Some(solution.node),
                 nodes,
                 branches,
+                solution.optimal_policy_count,
                 status,
             )
         }
@@ -954,6 +981,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
             None,
             None,
             None,
+            0,
             0,
             0,
             "NO_ADAPTIVE_POLICY_WITHIN_DECLARED_ACTIONS",
@@ -980,6 +1008,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         policy_node_count: policy_nodes,
         policy_branch_count: policy_branches,
         worst_case_effort_units: worst_case,
+        optimal_policy_count,
         minimum_terminal_path_effort_units: min_path,
         maximum_terminal_path_effort_units: max_path,
         worst_case_policy_within_budget: within_budget,
@@ -1064,6 +1093,7 @@ mod tests {
         let input = adaptive_fixture();
         let report = evaluate(&input, &bytes(&input)).unwrap();
         assert_eq!(report.worst_case_effort_units, Some(4));
+        assert_eq!(report.optimal_policy_count, 1);
         assert_eq!(report.minimum_terminal_path_effort_units, Some(3));
         assert_eq!(report.maximum_terminal_path_effort_units, Some(4));
         assert_eq!(report.worst_case_policy_within_budget, Some(true));
@@ -1171,6 +1201,37 @@ mod tests {
             resolve_policy_branch(&root, "not-in-declared-support").unwrap_err(),
             "OUT_OF_MODEL_OBSERVATION"
         );
+    }
+
+    #[test]
+    fn exact_count_of_tied_optimal_policy_roots_is_reported() {
+        let mut input = adaptive_fixture();
+        input.scenarios.truncate(2);
+        input.actions.truncate(2);
+        input.actions[0].effort_units = 1;
+        input.actions[1].effort_units = 1;
+        input.joint_world_supports.truncate(2);
+        input.joint_world_supports[1].possible_joint_outcomes[0].outcomes[0].outcome =
+            "x-right".into();
+        for support in &mut input.joint_world_supports {
+            support.possible_joint_outcomes[0]
+                .outcomes
+                .retain(|outcome| outcome.action_id != "inspect-z");
+        }
+        input.scenario_set_sha256 = canonical_scenario_set_sha256(&input.scenarios);
+        input.action_set_sha256 = canonical_action_set_sha256(&input.actions);
+        input.joint_support_sha256 = canonical_joint_support_sha256(
+            &input.scenarios,
+            &input.actions,
+            &input.joint_world_supports,
+        )
+        .unwrap();
+        input.max_total_effort_units = 1;
+
+        let report = evaluate(&input, &bytes(&input)).unwrap();
+        assert_eq!(report.worst_case_effort_units, Some(1));
+        assert_eq!(report.optimal_policy_count, 2);
+        assert!(report.policy.is_some());
     }
 
     #[test]
