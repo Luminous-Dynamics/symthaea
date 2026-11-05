@@ -48,7 +48,7 @@ pub use gradients::{AdamState, CfCCellCache, CfCGradients, OutputAdamState};
 // Network
 pub use network::{
     CfCNetwork, CfCNetworkConfig, CfCNetworkFingerprint, CfCParameterGroup, CfCParameterGroupId,
-    CfCParameterManifest,
+    CfCParameterGroupReplacement, CfCParameterManifest,
     CfCParameterRole,
     CfCWeightLoadError,
 };
