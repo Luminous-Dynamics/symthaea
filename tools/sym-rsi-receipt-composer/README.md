@@ -38,8 +38,9 @@ not authenticate the external manifest.
 From this directory:
 
 ```sh
-cargo fmt --check
-cargo test
+cargo fmt --manifest-path Cargo.toml -- --check
+cargo test --locked
+cargo clippy --all-targets --locked -- -D warnings
 ```
 
 Tests use the shared validator's explicitly synthetic example. They qualify composition
