@@ -46,6 +46,7 @@ Metrics:
 - network export/import and congestion-limit violations;
 - model-to-meter energy deviation, unfulfilled scheduled energy and overdelivery, with schedule/meter/settlement coverage reported separately;
 - SOC-dependent charge/discharge capability-envelope error across the calibrated SOC range; never extrapolate beyond field-measured or manufacturer-guaranteed breakpoints;
+- multi-dimensional SOC × temperature × SOH cell coverage, per-cell sample-count adequacy and lower-quantile calibration; no operational use outside evidenced cells;
 - load-dependent inverter/transformer efficiency and BMS curtailment residuals, once synchronized field measurements exist;
 - source-bound meter record and settlement line-item reconciliation, with incomplete coverage withheld rather than scored as zero.
 
@@ -227,6 +228,8 @@ Start with a small, exact, hand-auditable corpus before scaling to thousands of 
 - **NON-ANTICIPATIVITY-POLICY-AUDIT-001:** enforce identical actions across scenario paths sharing a source-digested decision-time information set; diverge only after the information tree branches.
 - **DISPATCH-EXECUTION-FIDELITY-001:** compare signed scheduled export/import energy with meter records and booked balancing settlement lines over a complete horizon.
 - **BMS-SOC-CAPABILITY-ENVELOPE-001:** assess charge/discharge power against separate conservative SOC-dependent capability curves; reject extrapolation and synthetic operational claims.
+- **BMS-MULTIDIM-CAPABILITY-SURFACE-001:** evaluate direction-specific power in a complete SOC × temperature × SOH cell grid; reject missing cells, duplicate evidence, out-of-range states and unsupported sample counts.
+- **BMS-CAPABILITY-CELL-CALIBRATION-001:** fit a deterministic lower empirical order statistic per cell from BMS available-power telemetry or explicit capability tests; reject ordinary delivered power and future-known samples.
 - **REVENUE-REALIZATION-BRIDGE-001:** reconcile theoretical gross revenue to realized net cash using source-bound adjustments by forecast regret, availability, execution, balancing, market fees, degradation/warranty, financing/collateral and contract/curtailment; withhold a complete residual when a required category is missing.
 
 For each case, freeze expected feasible/infeasible state, violated constraint IDs, settlement direction, exposure and evidence disposition. Independent reviewers adjudicate the golden expected outcome.
@@ -253,9 +256,11 @@ These are **research targets**, not measured current performance or industry-cer
 | System RTE model error | Reproduce published 2.2 percentage-point deviation | ≤ 1.0 pp |
 | Inverter efficiency error | Reproduce published 0.55 percentage-point deviation | ≤ 0.30 pp |
 | SOC capability extrapolation | 0 | 0; all decisions stay inside measured/certified coverage |
+| Multi-dimensional capability cell coverage | 100% of states scored must map to an evidenced cell | 100%; no unmeasured state fallback |
+| BMS per-cell sample sufficiency | 100% of field cells meet declared minimum sample count | 100%, with separate calibration/validation campaigns |
 | Revenue bridge required-category coverage | 100% of declared applicable categories or incomplete status | 100% on source-complete historical case |
 | Revenue adjustment source duplication | 0 | 0 |
-| Revenue bridge unexplained residual | Always report in currency and % gross | Explain ≥ 95% of absolute gross-to-net difference; residual remains visible
+| Revenue bridge unexplained residual | Always report in currency and % gross | Explain ≥ 95% of absolute gross-to-net difference; residual remains visible |
 | Independent receipt reproduction | 100% | 100% |
 | Source/authority coverage | 100% of material claims | 100%, with stale-source invalidation |
 | Reviewer time | Establish baseline | 50% reduction without reduced risk recall |
@@ -288,6 +293,6 @@ Never turn indeterminate, not_comparable or not_run into a numerical zero or a p
 
 ## 10. Current status
 
-The synthetic vendor roster remains **not executed**. Product capability claims are literature/documentation signals, not independent feature verification. Product versions, vendor access, solver builds and common adapters are not yet fully pinned. The benchmark corpus currently contains 43 cases; the latest source/test mapping audit must be rerun on the exact current head. The public M5BAT field dataset is identified (RWTH DOI 10.18154/RWTH-2025-06555), but its ZIP has not yet been staged, so the field replay and all M5BAT performance targets remain `not_run`. The Modo revenue-realization comparison is methodology-only; no same-cohort backtest has been executed. The current SAWEM rule profile keeps effective status, participant admission and commercial trading unknown.
+The synthetic vendor roster remains **not executed**. Product capability claims are literature/documentation signals, not independent feature verification. Product versions, vendor access, solver builds and common adapters are not yet fully pinned. The benchmark corpus currently contains 44 cases; the exact-head source/test mapping and conformance receipt should be refreshed after each module addition. The public M5BAT field dataset is identified (RWTH DOI 10.18154/RWTH-2025-06555), but its ZIP has not yet been staged, so the field replay and all M5BAT performance targets remain `not_run`. The Modo revenue-realization comparison is methodology-only; no same-cohort backtest has been executed. The current SAWEM rule profile keeps effective status, participant admission and commercial trading unknown.
 
 The next useful result is a complete, independently hand-verified open reference case—not an ungrounded claim that one platform beats the market.
