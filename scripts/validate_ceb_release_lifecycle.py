@@ -86,6 +86,8 @@ def release_semantic_errors(release: dict) -> list[str]:
     for change in changes:
         if change["change_class"] == "agent_visible" and change["evaluation_inputs_unchanged"]:
             errors.append(f"{change['change_id']}: agent-visible change cannot claim evaluation inputs are unchanged")
+        if change["change_class"] == "agent_visible" and not change["affected_task_ids"]:
+            errors.append(f"{change['change_id']}: agent-visible change requires an explicit affected-task set")
         if change["change_class"] == "grader_only" and not change["evaluation_inputs_unchanged"]:
             errors.append(f"{change['change_id']}: grader-only change must preserve agent-visible evaluation inputs")
         if change["change_class"] == "metadata_only" and (
@@ -102,7 +104,7 @@ def release_semantic_errors(release: dict) -> list[str]:
             errors.append("initial release cannot claim to be qualified or released")
         if changes or release["task_lifecycle_entries"] or release["saturation_observations"]:
             errors.append("initial design-only release cannot contain unqualified changes, lifecycle decisions or saturation observations")
-        if release["resource_calibration"]["status"] != "not_run_blocked" or release["resource_calibration"]["actual_independent_runs"] != 0:
+        if release["resource_calibration"]["status"] != "not_run_blocked" or release["resource_calibration"]["actual_reference_task_count"] != 0 or release["resource_calibration"]["minimum_trials_observed_per_reference_task"] != 0:
             errors.append("initial design-only release cannot claim resource calibration")
         if any(value is not None for value in digests.values()) or release["previous_evaluation_input_sha256"] is not None:
             errors.append("initial design-only release cannot invent qualified artifact digests")
@@ -158,8 +160,10 @@ def release_semantic_errors(release: dict) -> list[str]:
             errors.append("released benchmark requires qualified resource calibration")
     if release["resource_calibration"]["status"] == "qualified":
         calibration = release["resource_calibration"]
-        if calibration["actual_independent_runs"] < calibration["planned_independent_runs_per_reference_task"]:
-            errors.append("qualified resource calibration has insufficient independent runs")
+        if calibration["actual_reference_task_count"] < calibration["planned_reference_task_count"]:
+            errors.append("qualified resource calibration has too few representative reference tasks")
+        if calibration["minimum_trials_observed_per_reference_task"] < calibration["planned_independent_runs_per_reference_task"]:
+            errors.append("qualified resource calibration has fewer than the planned repeated runs per reference task")
         if calibration["observed_infrastructure_failure_rate"] is None or calibration["observed_infrastructure_failure_rate"] > calibration["infrastructure_failure_rate_target"]:
             errors.append("qualified resource calibration exceeds its infrastructure-failure target")
         if not calibration["resource_policy_sha256"] or not calibration["calibration_record_sha256"] or not calibration["agent_timeout_policy_sha256"]:
@@ -218,7 +222,8 @@ def self_test(release: dict, schema: dict) -> None:
 
     mutant = copy.deepcopy(release)
     mutant["resource_calibration"]["status"] = "qualified"
-    mutant["resource_calibration"]["actual_independent_runs"] = 0
+    mutant["resource_calibration"]["actual_reference_task_count"] = 0
+    mutant["resource_calibration"]["minimum_trials_observed_per_reference_task"] = 0
     must_reject(mutant, "resource calibration qualified without trials")
 
     mutant = copy.deepcopy(release)
@@ -269,6 +274,20 @@ def self_test(release: dict, schema: dict) -> None:
     })
     if validate_release(mutant,schema):
         raise SystemExit("valid verifier-only regrade fixture unexpectedly failed")
+
+    # Agent-visible changes cannot be marked unaffected.
+    mutant=copy.deepcopy(release)
+    mutant.update({
+      "status":"release_candidate","release_id":"ceb-v1-test","current_version":"1.0.0",
+      "previous_release_id":"ceb-v0-design","previous_version":"0.1.0","release_action":"full_rerun",
+      "change_records":[{
+        "change_id":"environment-change-001","change_class":"agent_visible","paths":["benchmarks/ceb/environments/image.json"],
+        "old_sha256":"a"*64,"new_sha256":"b"*64,"affected_task_ids":["task-001"],
+        "raw_execution_artifacts_available":False,"evaluation_inputs_unchanged":False
+      }]
+    })
+    if validate_release(mutant,schema):
+        raise SystemExit("valid major/full-rerun release fixture unexpectedly failed")
 
     # Metadata-only release may reuse results when evaluation inputs are identical.
     reuse=copy.deepcopy(release)
@@ -355,7 +374,7 @@ def main() -> int:
         f"changes={len(release['change_records'])} "
         f"task_lifecycle_entries={len(release['task_lifecycle_entries'])} "
         f"saturation_observations={len(release['saturation_observations'])} "
-        f"resource_runs={release['resource_calibration']['actual_independent_runs']} "
+        f"reference_tasks={release['resource_calibration']['actual_reference_task_count']} "
         f"status={release['status']}"
     )
     return 0
