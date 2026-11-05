@@ -703,10 +703,9 @@ fn instrument_sorry_span(
     // The info view emitted by trace_state is not guaranteed to reach batch
     // compiler stdout/stderr. Define a task-unique tactic that renders the
     // actual metavariable goal and emits it with dbg_trace.
-    let import_block_end = source
-        .find("\n\n")
-        .map(|index| index + 2)
-        .ok_or("cannot locate the import preamble boundary in Lean source")?;
+    // When the source has no explicit import block (as in the synthetic
+    // fixtures), place the temporary Lean import at byte zero.
+    let import_block_end = source.find("\n\n").map(|index| index + 2).unwrap_or(0);
     let tactic_declaration = format!(
         "elab \"{capture_tactic}\" : tactic => do\n\
          \x20 let goal ← Lean.Elab.Tactic.getMainGoal\n\
