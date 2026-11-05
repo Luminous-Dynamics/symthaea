@@ -19,6 +19,7 @@ The governing principle is:
 | Metrology and evidence strata | [HOME-SVC-METROLOGY-001 #10341](https://github.com/Luminous-Dynamics/symthaea/issues/10341) | Repeatability, reproducibility, production variation and household validity |
 
 ## Current research specifications under review
+- [#10500 — source-to-use water qualification](https://github.com/Luminous-Dynamics/symthaea/issues/10500) and its draft contract/schema: [water-use-qualification-contract-v0.1.md](water-use-qualification-contract-v0.1.md) / [water-use-qualification-v1.schema.json](water-use-qualification-v1.schema.json). Binds quality evidence to source, batch, treatment, sample point, intended use, delivery boundary and monitoring-programme revision; design-only, no water quality test claimed.
 
 - [#10342 — household water/energy/thermal coordination](https://github.com/Luminous-Dynamics/symthaea/issues/10342): [household-resource-arbitration-contract-v0.1.md](household-resource-arbitration-contract-v0.1.md) defines non-compensatory safety/quality/consent gates, local appliance authority, uncertainty-bounded resource planning and 14 adversarial HRA scenarios. Design-only; no live control.
 - [Household resource arbitration scenarios v0.1](household-resource-arbitration-scenarios-v0.1.json) — machine-readable HRA-001…014 challenge manifest; synthetic-only and not executed.

@@ -1,0 +1,653 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/research/water-use-qualification-v0-1/docs/research/household-services/water-use-qualification-v1.schema.json",
+  "title": "WaterUseQualificationV1",
+  "description": "Source-to-use water qualification contract. Schema validity does not establish water quality or standards compliance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "qualification_id",
+    "source",
+    "stream",
+    "treatment",
+    "intended_use",
+    "delivery_boundary",
+    "quality_profile",
+    "sample_observations",
+    "decision",
+    "event_history",
+    "evidence_lineage"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "qualification_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "source_class",
+        "system_id",
+        "system_revision"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_class": {
+          "enum": [
+            "municipal",
+            "borehole",
+            "tanker",
+            "rainwater",
+            "greywater",
+            "surface_water",
+            "other",
+            "unknown"
+          ]
+        },
+        "system_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "system_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "upstream_source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "provider_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "stream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stream_id",
+        "stream_kind",
+        "observed_from",
+        "storage_state"
+      ],
+      "properties": {
+        "stream_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stream_kind": {
+          "enum": [
+            "discrete_batch",
+            "continuous_stream",
+            "derived_blend",
+            "unknown"
+          ]
+        },
+        "observed_from": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "observed_until": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "storage_vessel_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "residence_seconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "storage_state": {
+          "enum": [
+            "known",
+            "partially_known",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "blend_parent_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "treatment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "train_id",
+        "configuration_revision",
+        "operating_state"
+      ],
+      "properties": {
+        "train_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operating_state": {
+          "enum": [
+            "qualified_state",
+            "unqualified_state",
+            "bypassed",
+            "faulted",
+            "maintenance",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "media_or_component_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_maintenance_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "active_alarm_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "intended_use": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "use_class",
+        "use_profile_id",
+        "use_profile_revision"
+      ],
+      "properties": {
+        "use_class": {
+          "enum": [
+            "drinking",
+            "food_preparation",
+            "bathing",
+            "laundry",
+            "toilet_flushing",
+            "irrigation",
+            "cleaning",
+            "industrial_nonpotable",
+            "other_declared"
+          ]
+        },
+        "use_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "use_profile_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "jurisdiction": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "delivery_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "boundary_id",
+        "boundary_kind",
+        "sample_point_relationship",
+        "sample_point_id"
+      ],
+      "properties": {
+        "boundary_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "boundary_kind": {
+          "enum": [
+            "raw_source",
+            "treatment_inlet",
+            "treatment_outlet",
+            "storage_outlet",
+            "distribution_point",
+            "household_fixture",
+            "designated_emergency_point",
+            "other"
+          ]
+        },
+        "sample_point_relationship": {
+          "enum": [
+            "same_physical_point",
+            "validated_transfer",
+            "different_point_no_transfer",
+            "unknown"
+          ]
+        },
+        "transfer_validation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sample_point_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "quality_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "standard_id",
+        "standard_edition",
+        "risk_assessment_id",
+        "risk_assessment_revision",
+        "monitoring_programme_id",
+        "monitoring_programme_revision",
+        "monitoring_status"
+      ],
+      "properties": {
+        "standard_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "standard_edition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "risk_assessment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "risk_assessment_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "monitoring_programme_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "monitoring_programme_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "monitoring_status": {
+          "enum": [
+            "current",
+            "due",
+            "overdue",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "required_parameter_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "next_required_review_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    },
+    "sample_observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sample_id",
+          "sample_point_id",
+          "collected_at",
+          "method_id",
+          "parameter_results",
+          "source_id",
+          "stream_id"
+        ],
+        "properties": {
+          "sample_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sample_point_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "collected_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "collector_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "laboratory_or_provider_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "method_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "method_revision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "chain_of_custody_digest_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-fA-F0-9]{64}$"
+          },
+          "parameter_results": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "parameter_id",
+                "result_state",
+                "unit"
+              ],
+              "properties": {
+                "parameter_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "result_state": {
+                  "enum": [
+                    "numeric",
+                    "below_detection",
+                    "above_range",
+                    "qualitative",
+                    "not_tested",
+                    "invalid"
+                  ]
+                },
+                "value": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "detection_or_reporting_limit": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "uncertainty": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "qualifier": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "quality_control_flags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "result_state": {
+                        "const": "numeric"
+                      }
+                    },
+                    "required": [
+                      "result_state"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "value"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "stream_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "reason_codes",
+        "decided_at",
+        "supporting_sample_ids"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "QualifiedForDeclaredUse",
+            "KnownNonCompliance",
+            "UnknownEvidenceInsufficient",
+            "ExpiredOrMonitoringOverdue",
+            "SourceOrSamplePointMismatch",
+            "TreatmentStateUnqualified",
+            "CorrectiveActionPending"
+          ]
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "decided_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "valid_from": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "valid_until": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "supporting_sample_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "incident_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "corrective_action_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "event_history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event_id",
+          "event_type",
+          "occurred_at"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "event_type": {
+            "enum": [
+              "source_switch",
+              "blend_created",
+              "treatment_bypass",
+              "treatment_fault",
+              "maintenance",
+              "media_replacement",
+              "storage_stagnation",
+              "sample_point_change",
+              "monitoring_overdue",
+              "non_compliant_result",
+              "corrective_action_started",
+              "corrective_action_completed",
+              "risk_profile_changed",
+              "other"
+            ]
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "affected_stream_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "details_digest_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-fA-F0-9]{64}$"
+          }
+        }
+      }
+    },
+    "evidence_lineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_record_ids",
+        "evaluator_id",
+        "evaluator_revision",
+        "synthetic_only"
+      ],
+      "properties": {
+        "source_record_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "evaluator_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evaluator_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_repository_commit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-fA-F0-9]{40}$"
+        },
+        "synthetic_only": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
