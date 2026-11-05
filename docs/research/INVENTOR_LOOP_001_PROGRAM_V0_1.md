@@ -346,3 +346,26 @@ No Luminous physical article, CAD/ECAD kernel, BenchCAD task, manufacturing rout
 
 The 2026 NIST manufacturing traceability framework (IR 8536) provides an interoperability comparator for product/supply-chain lineage, while NASA Phase E guidance reinforces impact assessment and fidelity-appropriate thread verification. These inform benchmark design, not Luminous qualification. References: https://csrc.nist.gov/pubs/ir/8536/final and https://www.nasa.gov/reference/appendix-t-systems-engineering-in-phase-e/.
 
+
+
+### 2026-11-05 benchmark refresh: PLE cross-harness and BenchCAD 2.1
+
+The external registry [PR #10458](https://github.com/Luminous-Dynamics/symthaea/pull/10458) now captures current distinct evaluation pathways:
+
+- PLE public development: 29 tasks, three runs per model/harness pair; Opus 5.5/Claude Code 0.551, Opus/Codex 0.549, GPT-6 Astra/Codex 0.530.
+- PLE hidden: 56 tasks, three runs per model/harness pair; Opus 5.5/OpenHands 0.486, Opus/Claude Code 0.483, Opus/Agy 0.477, Astra/Codex 0.458.
+- PLE's 85-task partner/paper summaries, 29-task public development and 56-task hidden leaderboard are distinct and must not be collapsed.
+
+An important competitive observation: the same Opus 5.5 model shifts by up to 0.022 across the top hidden-test harness pairings in this snapshot; other models in the same study show larger harness ranges (e.g. DeepSeek V4.1 Flash up to 0.184). The highest-score-per-model is not automatically the most economical workflow; score, model, harness, token/runtime cost and discipline must all be recorded.
+
+BenchCAD 2.1 was released on November 5. It keeps the same 100 Core cases but changes 30 to 60 rounds, adds 500,000 output tokens per case, carries reasoning across rounds, and tightens Task 6 component matching. Standard 2.1 and customized-harness boards are explicitly separate and not comparable with v2.0. The registry therefore has a separate BenchCAD 2.1 entry and distinguishes the standard 0.490 Opus 5.5 result from customized-harness results and OpenAI's v2.0-scorer internal-model 0.875 vendor report. The Vision2Code Kimi 0.927/0.728 1,000-file subset is explicitly not a BenchCAD Core score.
+
+### Engineering change impact: independent gold labels
+
+The engineering change-impact work [#10543](https://github.com/Luminous-Dynamics/symthaea/issues/10543) now has:
+- 24 public blueprint scenarios in [PR #10546](https://github.com/Luminous-Dynamics/symthaea/pull/10546);
+- a machine-readable public blueprint manifest in [PR #10547](https://github.com/Luminous-Dynamics/symthaea/pull/10547);
+- an independent claim–evidence gold-label adjudication protocol in [PR #10581](https://github.com/Luminous-Dynamics/symthaea/pull/10581).
+
+The evaluation's differentiator is two-sided: zero false-current / missed critical impact, while measuring unnecessary requalification separately. The new protocol defines identity/equivalence preservation, exact recalculation, review, verification, physical evidence, external approval, not-preserved, unknown and unsupported states. All 24 public blueprints remain unadjudicated and unscored until independent assessors establish gold labels; no candidate evaluation or physical process has run.
+
