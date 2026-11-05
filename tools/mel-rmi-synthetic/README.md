@@ -14,6 +14,7 @@ It is a benchmark-integrity oracle, not a Melothaea evaluation. Its positive con
 - A four-condition controlled-partner response path with separate targeted/sham/unrelated contrasts and a declared reverse-direction response-rule oracle.
 - Exact event-ID, seeded condition-order execution, policy-version and Git-revision binding.
 - SHA-256 binding of exact supplied source/output bytes and serialized transaction-receipt bytes, plus a second-call digest comparison over caller-supplied payload sets. The helper itself does not fetch durable Studio storage or prove that a read-back occurred.
+- A typed `CommittedArtifactReadbackV1` boundary that asks an adapter to fetch each of the eight event IDs from committed storage before digest comparison. Two tests check exact event lookup and post-commit byte substitution rejection using a fake read-back provider. The fake provider tests the contract only; it is not proof that Studio storage has been reopened.
 - Pinned `sha2 = 0.10.9` dependency and minimal committed lockfile; all test/run commands use `--locked`.
 - A fresh policy fork restored from one frozen pre-intervention checkpoint for every condition; mutable policy state cannot leak between counterfactual arms. The same explicit common-random-number seed is passed to every arm so stochastic adapters can pair random draws.
 - Explicit NotApplicable metric state for unsupported modalities.
