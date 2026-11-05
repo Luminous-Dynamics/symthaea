@@ -43,6 +43,8 @@ pub enum NonAnticipativityError {
     NonAnticipativityViolation,
     ArithmeticOverflow,
     EmptyScenarioSet,
+    EmptyDecisionSet,
+    ScenarioWithoutDecisions,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,6 +76,10 @@ pub fn audit_non_anticipative_policy<'a>(
         return Err(NonAnticipativityError::EmptyScenarioSet);
     }
 
+    if decisions.is_empty() {
+        return Err(NonAnticipativityError::EmptyDecisionSet);
+    }
+
     let mut declared = BTreeSet::new();
     for scenario_id in declared_scenario_ids.iter().copied() {
         if !nonempty(scenario_id) {
@@ -85,6 +91,7 @@ pub fn audit_non_anticipative_policy<'a>(
     }
 
     let mut node_ids = BTreeSet::new();
+    let mut scenarios_with_decisions = BTreeSet::new();
     for (index, decision) in decisions.iter().copied().enumerate() {
         if !nonempty(decision.scenario_id) || !nonempty(decision.information_node_id) {
             return Err(NonAnticipativityError::InvalidEvidenceReference);
@@ -102,6 +109,7 @@ pub fn audit_non_anticipative_policy<'a>(
             return Err(NonAnticipativityError::FutureInformationUsed);
         }
         node_ids.insert(decision.information_node_id);
+        scenarios_with_decisions.insert(decision.scenario_id);
         if decisions[..index].iter().any(|previous| {
             previous.scenario_id == decision.scenario_id
                 && previous.decision_time_utc == decision.decision_time_utc
@@ -109,6 +117,13 @@ pub fn audit_non_anticipative_policy<'a>(
         }) {
             return Err(NonAnticipativityError::DuplicateScenarioDecision);
         }
+    }
+
+    if declared
+        .iter()
+        .any(|scenario_id| !scenarios_with_decisions.contains(scenario_id))
+    {
+        return Err(NonAnticipativityError::ScenarioWithoutDecisions);
     }
 
     let mut shared_information_set_count = 0_u64;
@@ -315,6 +330,19 @@ mod tests {
         assert_eq!(
             audit_non_anticipative_policy(&scenarios, &duplicate),
             Err(NonAnticipativityError::DuplicateScenarioDecision)
+        );
+    }
+
+    #[test]
+    fn empty_decisions_and_scenarios_without_actions_do_not_pass() {
+        assert_eq!(
+            audit_non_anticipative_policy(&["case-a"], &[]),
+            Err(NonAnticipativityError::EmptyDecisionSet)
+        );
+        let decisions = [decision("case-a", "root", INFO_SHA_A, 90, 100, ACTION_A)];
+        assert_eq!(
+            audit_non_anticipative_policy(&["case-a", "case-b"], &decisions),
+            Err(NonAnticipativityError::ScenarioWithoutDecisions)
         );
     }
 
