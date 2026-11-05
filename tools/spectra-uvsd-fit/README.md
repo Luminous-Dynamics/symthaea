@@ -196,3 +196,34 @@ Because the score-bound intervals are simultaneous over all action × scenario u
 A failed certificate still identifies the most conservative candidate (highest robust lower bound), but returns `NoSelectionCertificate`; it does not pretend the candidate is proven best. Epsilon is measured in the caller's declared utility units and must be fixed before opening the evaluation seed bank.
 
 This is not a guarantee that the frozen scenarios cover reality, a participant-sampling interval, a causal effect estimate, or an automatic authorization to run the recommended experiment. The score model, scenario bank, objective and utility ranges remain external scientific assumptions.
+
+
+## Anytime-valid robust simulation allocation (experimental)
+
+The `score_bounds` module exposes `bound_candidate_score_samples_anytime` in addition to the fixed-look Hoeffding estimator.
+
+For each action × scenario cell, the six one-sided tails (four lower score bounds, upper utility, upper burden) receive base per-claim alpha `delta = familywise_alpha / (6 × actions × scenarios)`. At replication count n, the look-specific tail budget is
+
+```text
+delta_n = delta / (n * (n + 1))
+radius_n = range_width * sqrt(log(n * (n + 1) / delta) / (2 * n))
+```
+
+Since `sum_{n>=1} 1/(n(n+1)) = 1`, a union bound over every look and every claim gives time-uniform coverage under independent bounded replication streams within each action × scenario cell. This allows the score allocator to request data-dependent new replications and stop on a robust certificate without reusing fixed-look intervals as though they were anytime-valid. Cross-cell dependence from common random numbers is allowed for the union-bound statement; this module does not estimate paired action-difference intervals.
+
+The `allocation` module provides a first deterministic **robust interval-width heuristic**:
+- it requires the time-uniform receipt, a frozen robust objective and a preregistered epsilon;
+- it stops when the existing robust indifference-zone certificate succeeds;
+- otherwise it considers actions whose robust upper bound can still be within epsilon of the selected robust lower bound;
+- it allocates more score simulations to the competitive action/scenario cell with the largest contribution to unresolved maximin or CVaR utility uncertainty;
+- it returns `NO_SELECTION_CERTIFICATE` when the compute budget is exhausted or cannot fund an atomic paired batch.
+
+Common-random-number mode requests every action in the selected scenario at the same replication indices and with the same per-index seed. It requires equal current sample counts across actions in that scenario and will not issue a partial paired batch when the remaining budget cannot fund all actions. Independent-per-cell mode permits unequal per-cell counts. The caller supplies a digest of the complete current score receipt; the allocation receipt stores that caller commitment, action/scenario digests, per-cell sample counts, allocation policy, root seed, seed mode, seed-method ID (`spectra-splitmix64-seed-v1`), chosen cell priorities, current certificate and all next-batch seeds. The allocator does not compute or authenticate the digest.
+
+
+
+The `verify_score_bounds_receipt` function independently reconstructs a fixed-look or anytime receipt from its raw score vectors, frozen action/scenario snapshots, declared ranges and method schedule. The robust ranking certificate calls this verifier before it accepts the score intervals. It detects changed bounds, output rows, multiplicity, method metadata or raw values outside the declared ranges. Caller-supplied source, score-contract and snapshot digest strings remain opaque commitments, not cryptographic signatures.
+
+The current Hoeffding alpha-spending schedule is a safe baseline but can be conservative at moderate sample counts. Compare it with betting / empirical-Bernstein confidence sequences in [#10598](https://github.com/Luminous-Dynamics/symthaea/issues/10598). For common-random-number runs, the current DGP reuses the action-independent trial seed stream for a shared scenario/participant/trial identity. Do not turn that fact into paired action-difference inference until explicit replication identities and pair-integrity receipts exist; that is tracked separately in [#10597](https://github.com/Luminous-Dynamics/symthaea/issues/10597).
+
+This is **not OCBA, Track-and-Stop, Top Two or a sample-optimal ranking-and-selection algorithm**. It is a transparent baseline to benchmark against robust OCBA, fixed allocation, sequential elimination, Track-and-Stop where assumptions apply, and Top Two where assumptions apply. Seeds are deterministic research-simulation seeds, not cryptographic randomization. The policy does not run human-subject experiments.

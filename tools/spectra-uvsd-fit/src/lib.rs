@@ -1756,3 +1756,6 @@ pub mod score_bounds;
 
 /// Robust indifference-zone certificates for Monte Carlo design selection.
 pub mod ranking;
+
+/// Time-uniform score bounds and adaptive robust simulation allocation.
+pub mod allocation;

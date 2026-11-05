@@ -16,6 +16,14 @@ use super::scenario::{ScenarioDefinition, ScenarioOutcome, ScenarioSet};
 use super::sequential::{OperationalAction, OperationalActionSet};
 
 pub const SCORE_BOUND_METHOD_ID: &str = "hoeffding-bonferroni-one-sided-v1";
+pub const ANYTIME_SCORE_BOUND_METHOD_ID: &str = "anytime-hoeffding-alpha-spending-v1";
+pub const ANYTIME_ALPHA_SPENDING_RULE_ID: &str = "n-times-n-plus-one-summable-v1";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BoundSchedule {
+    FixedLook,
+    Anytime,
+}
 
 /// A declared finite range for one Monte Carlo score family.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -118,6 +126,10 @@ pub struct MetricScoreBound {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScoreBoundsReceipt {
     pub method_id: &'static str,
+    /// Whether bounds are simultaneous over every replication count.
+    pub time_uniform: bool,
+    /// "none" for fixed-look intervals; a stable rule ID for anytime bounds.
+    pub alpha_spending_rule: &'static str,
     /// Canonical action inputs addressed by action_set_digest.
     pub action_set_digest: String,
     pub action_snapshot: Vec<OperationalAction>,
@@ -165,6 +177,8 @@ pub enum ScoreBoundError {
     NonFiniteScoreSample,
     ScoreSampleOutsideDeclaredRange,
     BoundComputationNonFinite,
+    InvalidReceiptSnapshot,
+    ReceiptRecomputationMismatch,
 }
 
 impl fmt::Display for ScoreBoundError {
@@ -186,6 +200,8 @@ impl fmt::Display for ScoreBoundError {
             Self::NonFiniteScoreSample => "score samples must be finite",
             Self::ScoreSampleOutsideDeclaredRange => "score sample lies outside its frozen range",
             Self::BoundComputationNonFinite => "finite-sample score bound was not representable",
+            Self::InvalidReceiptSnapshot => "score-bound receipt contains an invalid action or scenario snapshot",
+            Self::ReceiptRecomputationMismatch => "score-bound receipt outputs do not reproduce from its raw samples and frozen configuration",
         };
         f.write_str(message)
     }
@@ -206,6 +222,44 @@ pub fn bound_candidate_score_samples(
     scenario_set: &ScenarioSet,
     samples: &[BoundedScoreSamples],
     config: &ScoreBoundsConfig,
+) -> Result<ScoreBoundsReceipt, ScoreBoundError> {
+    bound_candidate_score_samples_with_schedule(
+        action_set,
+        scenario_set,
+        samples,
+        config,
+        BoundSchedule::FixedLook,
+    )
+}
+
+/// Construct a time-uniform score confidence sequence for every action × scenario.
+///
+/// For base per-claim alpha delta = familywise_alpha/(6R), the look-n tail
+/// probability is delta_n = delta/[n(n+1)]. Since the sum over n >= 1 of
+/// 1/[n(n+1)] is one, a union bound over all six claims, all cells and all
+/// sample counts gives simultaneous coverage at every look. The radius is
+/// range_width * sqrt(log(n(n+1)/delta)/(2n)).
+pub fn bound_candidate_score_samples_anytime(
+    action_set: &OperationalActionSet,
+    scenario_set: &ScenarioSet,
+    samples: &[BoundedScoreSamples],
+    config: &ScoreBoundsConfig,
+) -> Result<ScoreBoundsReceipt, ScoreBoundError> {
+    bound_candidate_score_samples_with_schedule(
+        action_set,
+        scenario_set,
+        samples,
+        config,
+        BoundSchedule::Anytime,
+    )
+}
+
+fn bound_candidate_score_samples_with_schedule(
+    action_set: &OperationalActionSet,
+    scenario_set: &ScenarioSet,
+    samples: &[BoundedScoreSamples],
+    config: &ScoreBoundsConfig,
+    schedule: BoundSchedule,
 ) -> Result<ScoreBoundsReceipt, ScoreBoundError> {
     validate_config(config)?;
 
@@ -272,26 +326,31 @@ pub fn bound_candidate_score_samples(
                 &record.target_information,
                 config.ranges.target_information,
                 per_claim_alpha,
+                schedule,
             )?;
             let model_discrimination_information = lower_metric_bound(
                 &record.model_discrimination_information,
                 config.ranges.model_discrimination_information,
                 per_claim_alpha,
+                schedule,
             )?;
             let representativeness = lower_metric_bound(
                 &record.representativeness,
                 config.ranges.representativeness,
                 per_claim_alpha,
+                schedule,
             )?;
             let target_utility_lower = lower_metric_bound(
                 &record.target_utility,
                 config.ranges.target_utility,
                 per_claim_alpha,
+                schedule,
             )?;
             let target_utility_upper = upper_metric_bound(
                 &record.target_utility,
                 config.ranges.target_utility,
                 per_claim_alpha,
+                schedule,
             )?;
             let target_utility = MetricScoreBound {
                 point_estimate: target_utility_lower.point_estimate,
@@ -304,6 +363,7 @@ pub fn bound_candidate_score_samples(
                 &record.participant_burden_seconds,
                 config.ranges.participant_burden_seconds,
                 per_claim_alpha,
+                schedule,
             )?;
 
             metrics.push(ActionScenarioMetricBounds {
@@ -336,8 +396,19 @@ pub fn bound_candidate_score_samples(
         }
     }
 
+    let (method_id, time_uniform, alpha_spending_rule) = match schedule {
+        BoundSchedule::FixedLook => (SCORE_BOUND_METHOD_ID, false, "none"),
+        BoundSchedule::Anytime => (
+            ANYTIME_SCORE_BOUND_METHOD_ID,
+            true,
+            ANYTIME_ALPHA_SPENDING_RULE_ID,
+        ),
+    };
+
     Ok(ScoreBoundsReceipt {
-        method_id: SCORE_BOUND_METHOD_ID,
+        method_id,
+        time_uniform,
+        alpha_spending_rule,
         action_set_digest: action_set.digest().to_owned(),
         action_snapshot: action_set.actions().to_vec(),
         scenario_set_digest: scenario_set.digest().to_owned(),
@@ -355,6 +426,95 @@ pub fn bound_candidate_score_samples(
         metrics,
         scenario_outcomes,
     })
+}
+
+/// Independently reconstruct and validate a public score-bound receipt.
+///
+/// This verifies that every stored bound, metric row, scenario outcome and
+/// multiplicity value is exactly reproduced from the receipt's raw samples,
+/// frozen action/scenario snapshots and declared configuration. Caller-supplied
+/// digests remain opaque commitments; this function does not authenticate them.
+pub fn verify_score_bounds_receipt(
+    receipt: &ScoreBoundsReceipt,
+) -> Result<(), ScoreBoundError> {
+    if receipt.action_snapshot.is_empty() || receipt.scenarios.is_empty() {
+        return Err(ScoreBoundError::InvalidReceiptSnapshot);
+    }
+    let action_set = OperationalActionSet::new(
+        receipt.action_snapshot.clone(),
+        receipt.action_set_digest.clone(),
+    )
+    .map_err(|_| ScoreBoundError::InvalidReceiptSnapshot)?;
+    if action_set.actions() != receipt.action_snapshot.as_slice() {
+        return Err(ScoreBoundError::InvalidReceiptSnapshot);
+    }
+    let scenario_set = ScenarioSet::new(
+        receipt.scenarios.clone(),
+        receipt.scenario_set_digest.clone(),
+    )
+    .map_err(|_| ScoreBoundError::InvalidReceiptSnapshot)?;
+    if scenario_set.scenarios().len() != receipt.scenarios.len()
+        || scenario_set
+            .scenarios()
+            .iter()
+            .zip(&receipt.scenarios)
+            .any(|(normalized, stored)| {
+                normalized.scenario_id != stored.scenario_id
+                    || (normalized.weight - stored.weight).abs() > 1.0e-12
+            })
+    {
+        return Err(ScoreBoundError::InvalidReceiptSnapshot);
+    }
+
+    let schedule = match receipt.method_id {
+        SCORE_BOUND_METHOD_ID if !receipt.time_uniform && receipt.alpha_spending_rule == "none" => {
+            BoundSchedule::FixedLook
+        }
+        ANYTIME_SCORE_BOUND_METHOD_ID
+            if receipt.time_uniform
+                && receipt.alpha_spending_rule == ANYTIME_ALPHA_SPENDING_RULE_ID =>
+        {
+            BoundSchedule::Anytime
+        }
+        _ => return Err(ScoreBoundError::InvalidReceiptSnapshot),
+    };
+    let config = ScoreBoundsConfig {
+        familywise_alpha: receipt.familywise_alpha,
+        minimum_replicates: receipt.minimum_replicates,
+        ranges: receipt.ranges,
+        score_contract_digest: receipt.score_contract_digest.clone(),
+        source_digest: receipt.source_digest.clone(),
+        root_seed: receipt.root_seed,
+    };
+    let reproduced = bound_candidate_score_samples_with_schedule(
+        &action_set,
+        &scenario_set,
+        &receipt.samples,
+        &config,
+        schedule,
+    )?;
+    if reproduced.method_id != receipt.method_id
+        || reproduced.time_uniform != receipt.time_uniform
+        || reproduced.alpha_spending_rule != receipt.alpha_spending_rule
+        || reproduced.action_set_digest != receipt.action_set_digest
+        || reproduced.action_snapshot != receipt.action_snapshot
+        || reproduced.scenario_set_digest != receipt.scenario_set_digest
+        || reproduced.familywise_alpha != receipt.familywise_alpha
+        || reproduced.per_claim_alpha != receipt.per_claim_alpha
+        || reproduced.familywise_confidence != receipt.familywise_confidence
+        || reproduced.claim_count != receipt.claim_count
+        || reproduced.minimum_replicates != receipt.minimum_replicates
+        || reproduced.ranges != receipt.ranges
+        || reproduced.score_contract_digest != receipt.score_contract_digest
+        || reproduced.source_digest != receipt.source_digest
+        || reproduced.root_seed != receipt.root_seed
+        || reproduced.samples != receipt.samples
+        || reproduced.metrics != receipt.metrics
+        || reproduced.scenario_outcomes != receipt.scenario_outcomes
+    {
+        return Err(ScoreBoundError::ReceiptRecomputationMismatch);
+    }
+    Ok(())
 }
 
 fn validate_config(config: &ScoreBoundsConfig) -> Result<(), ScoreBoundError> {
@@ -429,12 +589,24 @@ fn hoeffding_radius(
     range: ScoreRange,
     sample_count: usize,
     delta: f64,
+    schedule: BoundSchedule,
 ) -> Result<f64, ScoreBoundError> {
     let width = range.width();
     if width == 0.0 {
         return Ok(0.0);
     }
-    let factor = (-delta.ln() / (2.0 * sample_count as f64)).sqrt();
+    let log_inverse_delta = match schedule {
+        BoundSchedule::FixedLook => -delta.ln(),
+        BoundSchedule::Anytime => {
+            let next_count = sample_count
+                .checked_add(1)
+                .ok_or(ScoreBoundError::BoundComputationNonFinite)?;
+            -delta.ln()
+                + (sample_count as f64).ln()
+                + (next_count as f64).ln()
+        }
+    };
+    let factor = (log_inverse_delta / (2.0 * sample_count as f64)).sqrt();
     if !factor.is_finite() || factor < 0.0 {
         return Err(ScoreBoundError::BoundComputationNonFinite);
     }
@@ -447,9 +619,10 @@ fn lower_metric_bound(
     values: &[f64],
     range: ScoreRange,
     delta: f64,
+    schedule: BoundSchedule,
 ) -> Result<MetricScoreBound, ScoreBoundError> {
     let point_estimate = mean(values);
-    let radius = hoeffding_radius(range, values.len(), delta)?;
+    let radius = hoeffding_radius(range, values.len(), delta, schedule)?;
     let lower_bound = (point_estimate - radius).max(range.lower);
     if !point_estimate.is_finite() || !lower_bound.is_finite() {
         return Err(ScoreBoundError::BoundComputationNonFinite);
@@ -467,9 +640,10 @@ fn upper_metric_bound(
     values: &[f64],
     range: ScoreRange,
     delta: f64,
+    schedule: BoundSchedule,
 ) -> Result<MetricScoreBound, ScoreBoundError> {
     let point_estimate = mean(values);
-    let radius = hoeffding_radius(range, values.len(), delta)?;
+    let radius = hoeffding_radius(range, values.len(), delta, schedule)?;
     let upper_bound = (point_estimate + radius).min(range.upper);
     if !point_estimate.is_finite() || !upper_bound.is_finite() {
         return Err(ScoreBoundError::BoundComputationNonFinite);
@@ -571,6 +745,52 @@ mod tests {
             record(2, 10, 0.2),
             record(2, 20, 0.3),
         ]
+    }
+
+    #[test]
+    fn fixed_and_anytime_receipts_verify_from_frozen_raw_samples() {
+        let actions = action_set();
+        let scenarios = scenario_set();
+        let fixed = bound_candidate_score_samples(&actions, &scenarios, &records(), &config())
+            .unwrap();
+        let anytime = bound_candidate_score_samples_anytime(&actions, &scenarios, &records(), &config())
+            .unwrap();
+        assert_eq!(verify_score_bounds_receipt(&fixed), Ok(()));
+        assert_eq!(verify_score_bounds_receipt(&anytime), Ok(()));
+    }
+
+    #[test]
+    fn receipt_verifier_rejects_tampered_metric_bounds_and_provenance() {
+        let actions = action_set();
+        let scenarios = scenario_set();
+        let receipt = bound_candidate_score_samples_anytime(
+            &actions,
+            &scenarios,
+            &records(),
+            &config(),
+        )
+        .unwrap();
+
+        let mut bad_metric = receipt.clone();
+        bad_metric.metrics[0].target_utility.lower_bound += 0.01;
+        assert_eq!(
+            verify_score_bounds_receipt(&bad_metric),
+            Err(ScoreBoundError::ReceiptRecomputationMismatch)
+        );
+
+        let mut bad_schedule = receipt.clone();
+        bad_schedule.alpha_spending_rule = "wrong-schedule";
+        assert_eq!(
+            verify_score_bounds_receipt(&bad_schedule),
+            Err(ScoreBoundError::InvalidReceiptSnapshot)
+        );
+
+        let mut bad_sample = receipt.clone();
+        bad_sample.samples[0].target_utility[0] = 9_999.0;
+        assert_eq!(
+            verify_score_bounds_receipt(&bad_sample),
+            Err(ScoreBoundError::ScoreSampleOutsideDeclaredRange)
+        );
     }
 
     #[test]
@@ -718,6 +938,96 @@ mod tests {
             bound_candidate_score_samples(&action_set, &scenario_set, &unknown, &config()),
             Err(ScoreBoundError::UnknownActionId)
         );
+    }
+
+    #[test]
+    fn anytime_bounds_use_summable_alpha_spending_and_variable_cell_counts() {
+        let action_set = action_set();
+        let scenario_set = scenario_set();
+        let mut adaptive_records = records();
+        for (index, record) in adaptive_records.iter_mut().enumerate() {
+            let desired = 6 + index * 2;
+            let extra = desired - record.target_information.len();
+            for offset in 0..extra {
+                let shift = (offset as f64 + 1.0) * 0.001;
+                record.target_information.push(1.0 + shift);
+                record.model_discrimination_information.push(0.55 + shift);
+                record.representativeness.push(0.8 - shift);
+                record.target_utility.push(-1.5 + shift);
+                record.participant_burden_seconds.push(20.0 + shift);
+            }
+        }
+        let cfg = config();
+        let fixed = bound_candidate_score_samples(
+            &action_set,
+            &scenario_set,
+            &adaptive_records,
+            &cfg,
+        )
+        .unwrap();
+        let anytime = bound_candidate_score_samples_anytime(
+            &action_set,
+            &scenario_set,
+            &adaptive_records,
+            &cfg,
+        )
+        .unwrap();
+
+        assert_eq!(anytime.method_id, ANYTIME_SCORE_BOUND_METHOD_ID);
+        assert!(anytime.time_uniform);
+        assert_eq!(anytime.alpha_spending_rule, ANYTIME_ALPHA_SPENDING_RULE_ID);
+        assert_eq!(anytime.claim_count, 24);
+        assert!((anytime.per_claim_alpha - 0.05 / 24.0).abs() < 1.0e-12);
+        assert_eq!(
+            anytime.metrics.iter().map(|metric| metric.target_information.sample_count).collect::<Vec<_>>(),
+            vec![6, 8, 10, 12]
+        );
+
+        // Sum_{n=1}^infinity 1/[n(n+1)] = 1, so all look-specific
+        // one-sided tail probabilities spend no more than per_claim_alpha.
+        let partial_spend: f64 = (1..=10_000)
+            .map(|n| anytime.per_claim_alpha / ((n * (n + 1)) as f64))
+            .sum();
+        assert!(partial_spend <= anytime.per_claim_alpha + 1.0e-12);
+        assert!(partial_spend > anytime.per_claim_alpha * 0.999);
+
+        let count = anytime.metrics[0].target_information.sample_count;
+        let range = anytime.metrics[0].target_information.declared_range;
+        let expected_radius = range.width()
+            * (((count * (count + 1)) as f64 / anytime.per_claim_alpha).ln()
+                / (2.0 * count as f64))
+                .sqrt();
+        let expected_lower = (anytime.metrics[0].target_information.point_estimate
+            - expected_radius)
+            .max(range.lower);
+        assert!(
+            (anytime.metrics[0].target_information.lower_bound - expected_lower).abs()
+                < 1.0e-12
+        );
+        // The anytime radius pays for all future looks and is wider than the
+        // fixed-look radius at the same sample count.
+        assert!(
+            anytime.metrics[0].target_information.lower_bound
+                <= fixed.metrics[0].target_information.lower_bound
+        );
+    }
+
+    #[test]
+    fn fixed_and_anytime_receipts_have_distinct_provenance_dispositions() {
+        let action_set = action_set();
+        let scenario_set = scenario_set();
+        let cfg = config();
+        let fixed = bound_candidate_score_samples(&action_set, &scenario_set, &records(), &cfg)
+            .unwrap();
+        let anytime =
+            bound_candidate_score_samples_anytime(&action_set, &scenario_set, &records(), &cfg)
+                .unwrap();
+        assert_eq!(fixed.method_id, SCORE_BOUND_METHOD_ID);
+        assert!(!fixed.time_uniform);
+        assert_eq!(fixed.alpha_spending_rule, "none");
+        assert_eq!(anytime.method_id, ANYTIME_SCORE_BOUND_METHOD_ID);
+        assert!(anytime.time_uniform);
+        assert_ne!(fixed, anytime);
     }
 
     #[test]

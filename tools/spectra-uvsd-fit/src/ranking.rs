@@ -18,7 +18,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use super::scenario::{RobustUtility, ScenarioDefinition};
-use super::score_bounds::{ScoreBoundsReceipt, SCORE_BOUND_METHOD_ID};
+use super::score_bounds::{
+    verify_score_bounds_receipt, ScoreBoundsReceipt, ANYTIME_ALPHA_SPENDING_RULE_ID,
+    ANYTIME_SCORE_BOUND_METHOD_ID, SCORE_BOUND_METHOD_ID,
+};
 
 /// Robust-utility interval for one operational action.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -73,6 +76,7 @@ pub enum RobustSelectionError {
     MissingMetricRecord,
     InvalidUtilityInterval,
     InvalidScoreReceiptProvenance,
+    ScoreReceiptRecomputationFailed,
     NumericFailure,
 }
 
@@ -92,6 +96,7 @@ impl fmt::Display for RobustSelectionError {
             Self::MissingMetricRecord => "utility interval is missing for a frozen action × scenario pair",
             Self::InvalidUtilityInterval => "target-utility interval must be finite, ordered and inside its declared range",
             Self::InvalidScoreReceiptProvenance => "score receipt method, digests, multiplicity or familywise confidence are inconsistent",
+            Self::ScoreReceiptRecomputationFailed => "score receipt bounds or outputs do not reproduce from its raw Monte Carlo samples",
             Self::NumericFailure => "robust utility aggregation or selection certificate was not finite",
         };
         f.write_str(message)
@@ -126,7 +131,15 @@ pub fn certify_epsilon_optimal_action(
     {
         return Err(RobustSelectionError::InvalidFamilywiseConfidence);
     }
-    if receipt.method_id != SCORE_BOUND_METHOD_ID
+    let score_method_is_valid = match receipt.method_id {
+        SCORE_BOUND_METHOD_ID => !receipt.time_uniform && receipt.alpha_spending_rule == "none",
+        ANYTIME_SCORE_BOUND_METHOD_ID => {
+            receipt.time_uniform
+                && receipt.alpha_spending_rule == ANYTIME_ALPHA_SPENDING_RULE_ID
+        }
+        _ => false,
+    };
+    if !score_method_is_valid
         || receipt.action_set_digest.trim().is_empty()
         || receipt.scenario_set_digest.trim().is_empty()
         || receipt.score_contract_digest.trim().is_empty()
@@ -221,6 +234,8 @@ pub fn certify_epsilon_optimal_action(
     if by_pair.len() != expected_metrics {
         return Err(RobustSelectionError::MissingMetricRecord);
     }
+    verify_score_bounds_receipt(receipt)
+        .map_err(|_| RobustSelectionError::ScoreReceiptRecomputationFailed)?;
 
     let mut action_intervals = Vec::with_capacity(action_ids.len());
     for action_id in action_ids.iter().copied() {
@@ -355,8 +370,9 @@ fn aggregate_robust_utility(
 mod tests {
     use super::*;
     use super::super::score_bounds::{
-        bound_candidate_score_samples, BoundedScoreSamples, ScoreBoundsConfig, ScoreRange,
-        ScoreRanges, ScoreBoundsReceipt,
+        bound_candidate_score_samples, bound_candidate_score_samples_anytime,
+        BoundedScoreSamples, ScoreBoundsConfig, ScoreRange, ScoreRanges, ScoreBoundsReceipt,
+        ANYTIME_SCORE_BOUND_METHOD_ID,
     };
     use super::super::scenario::ScenarioSet;
     use super::super::sequential::{
@@ -546,6 +562,66 @@ mod tests {
         )
         .unwrap();
         assert_eq!(certificate.selected_action_id, 2);
+    }
+
+    #[test]
+    fn accepts_time_uniform_receipt_for_data_dependent_robust_stopping() {
+        let (fixed_receipt, scenarios) = bounded_receipt(
+            &[
+                (1, 10, 0.9),
+                (1, 20, 0.9),
+                (2, 10, 0.1),
+                (2, 20, 0.1),
+            ],
+            500,
+        );
+        let actions = action_set();
+        let config = ScoreBoundsConfig {
+            familywise_alpha: fixed_receipt.familywise_alpha,
+            minimum_replicates: fixed_receipt.minimum_replicates,
+            ranges: fixed_receipt.ranges,
+            score_contract_digest: fixed_receipt.score_contract_digest.clone(),
+            source_digest: fixed_receipt.source_digest.clone(),
+            root_seed: fixed_receipt.root_seed,
+        };
+        let anytime = bound_candidate_score_samples_anytime(
+            &actions,
+            &scenarios,
+            &fixed_receipt.samples,
+            &config,
+        )
+        .unwrap();
+        assert_eq!(anytime.method_id, ANYTIME_SCORE_BOUND_METHOD_ID);
+        assert!(anytime.time_uniform);
+        let certificate = certify_epsilon_optimal_action(
+            &anytime,
+            RobustUtility::Maximin,
+            0.25,
+        )
+        .unwrap();
+        assert_eq!(certificate.selected_action_id, 1);
+        assert_eq!(
+            certificate.status,
+            RobustSelectionStatus::CertifiedWithinIndifferenceZone
+        );
+    }
+
+    #[test]
+    fn selection_refuses_tampered_utility_interval_even_when_ordered() {
+        let (mut receipt, _) = bounded_receipt(
+            &[
+                (1, 10, 0.9),
+                (1, 20, 0.9),
+                (2, 10, 0.1),
+                (2, 20, 0.1),
+            ],
+            500,
+        );
+        receipt.metrics[0].target_utility.lower_bound += 0.01;
+        assert_eq!(
+            certify_epsilon_optimal_action(&receipt, RobustUtility::Maximin, 0.2),
+            Err(RobustSelectionError::ScoreReceiptRecomputationFailed)
+        );
     }
 
     #[test]
