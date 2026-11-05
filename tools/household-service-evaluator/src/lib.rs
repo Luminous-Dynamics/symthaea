@@ -7,6 +7,7 @@
 //! quality, certify a repair, control actuators, or make safety decisions.
 
 pub mod batch;
+pub mod household_arbitration;
 pub mod service_deficit;
 pub mod water_quality;
 
