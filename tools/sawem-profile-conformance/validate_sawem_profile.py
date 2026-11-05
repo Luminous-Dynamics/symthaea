@@ -252,6 +252,46 @@ def assert_case_corpus_negative_controls(
     return 2
 
 
+def validate_operational_status(operations: dict[str, Any]) -> None:
+    """Keep market-wide test access distinct from production admission/trading."""
+    if operations["market_operations_state"] != "pre_launch_testing_reported":
+        raise ValueError("pre-launch status must remain reported, not promoted to live")
+    if operations["participant_admission_state"] != "unknown":
+        raise ValueError("pre-launch invitations do not prove this participant is admitted")
+    if operations["commercial_trading_state"] != "unknown":
+        raise ValueError("pre-launch simulation does not prove commercial trading is live")
+
+    source = operations["status_source"]
+    if source["source_class"] != "secondary_report":
+        raise ValueError("pre-launch status must retain its secondary-report source class")
+    if source["raw_artifact_sha256"] is not None or source["source_freeze_state"] != "not_frozen":
+        raise ValueError("secondary status report cannot claim a frozen source artifact")
+    if parse_utc(source["retrieved_at"]) < parse_utc(operations["status_as_of"]):
+        raise ValueError("market status cannot be retrieved before its stated as-of time")
+    note = operations["qualification_note"].lower()
+    if "does not establish" not in note or "commercial" not in note:
+        raise ValueError("pre-launch status must retain an explicit commercial-access qualification")
+
+
+def assert_operational_status_negative_controls(
+    operations: dict[str, Any],
+) -> int:
+    mutations = [
+        ("participant-admission-promoted", "participant_admission_state", "admitted"),
+        ("commercial-trading-promoted", "commercial_trading_state", "live"),
+    ]
+    for name, field, value in mutations:
+        changed = copy.deepcopy(operations)
+        changed[field] = value
+        try:
+            validate_operational_status(changed)
+        except (ValueError, KeyError, TypeError):
+            continue
+        raise ValueError(f"operational-status negative control did not fail closed: {name}")
+    validate_operational_status(operations)
+    return len(mutations)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
@@ -364,7 +404,7 @@ def main() -> None:
     except (ValueError, KeyError, TypeError) as exc:
         fail(f"benchmark corpus traceability/negative controls failed: {exc}")
 
-    # Status is intentionally non-authoritative in the first public profile.
+    # Market phase, individual admission and commercial trading are separate.
     if fixture["profile_state"] != "research_profile_not_authoritative":
         fail("synthetic sample must remain research_profile_not_authoritative")
     market = fixture["market_rule_profile"]
@@ -373,12 +413,11 @@ def main() -> None:
         fail("the source profile should preserve the Code's published state")
     if market["effective_status"] != "unknown" or market["effective_date"] is not None:
         fail("published Code text must not imply that every rule is effective")
-    if operations["participant_admission_state"] != "unknown":
-        fail("secondary pre-launch reporting must not imply participant admission")
-    if operations["commercial_trading_state"] != "unknown":
-        fail("secondary pre-launch reporting must not imply commercial trading")
-    if operations["market_operations_state"] != "pre_launch_testing_reported":
-        fail("pre-launch status must remain explicitly reported, not promoted to live")
+    try:
+        validate_operational_status(operations)
+        market_status_negative_control_count = assert_operational_status_negative_controls(operations)
+    except (ValueError, KeyError, TypeError) as exc:
+        fail(f"market operational status / negative controls failed: {exc}")
     for source in (market["source"], operations["status_source"]):
         if source["raw_artifact_sha256"] is not None or source["source_freeze_state"] != "not_frozen":
             fail("this initial profile must not claim source-byte freeze before exact source ingestion")
@@ -532,6 +571,7 @@ def main() -> None:
         "comparator_run_state": comparator_fixture["run_state"],
         "comparator_engine_count": len(comparator_fixture["engine_roster"]),
         "comparator_negative_control_count": negative_control_count,
+        "market_status_negative_control_count": market_status_negative_control_count,
         "comparator_reported_metric_count": len(comparator_fixture["reported_metrics"]),
         "market_code_publication_state": market["publication_state"],
         "market_code_effective_status": market["effective_status"],
