@@ -50,32 +50,76 @@ def fenced_blocks(markdown: str):
             body.append(line)
 
 
-def cargo_references(source: str):
-    # Preserve shell line continuations, then separate distinct commands so
-    # flags from one Cargo invocation are never applied to another.
+def split_shell_commands(source: str) -> list[str]:
+    """Split shell control operators only when they occur outside quotes."""
     flattened = re.sub(r"\\\r?\n", " ", source)
-    commands = re.split(r"&&|\|\||[;|\n]", flattened)
+    commands = []
+    current = []
+    quote = None
+    escaped = False
+    index = 0
+
+    while index < len(flattened):
+        char = flattened[index]
+        if escaped:
+            current.append(char)
+            escaped = False
+            index += 1
+            continue
+        if char == "\\" and quote != "'":
+            current.append(char)
+            escaped = True
+            index += 1
+            continue
+        if quote is not None:
+            current.append(char)
+            if char == quote:
+                quote = None
+            index += 1
+            continue
+        if char in {"'", '"', chr(96)}:
+            quote = char
+            current.append(char)
+            index += 1
+            continue
+        if char in {";", "|", "\n"}:
+            commands.append("".join(current))
+            current = []
+            if index + 1 < len(flattened) and flattened[index + 1] == char and char in {"|", "&"}:
+                index += 2
+            else:
+                index += 1
+            continue
+        current.append(char)
+        index += 1
+
+    if current:
+        commands.append("".join(current))
+    return commands
+
+
+def cargo_references(source: str):
+    # Preserve command scope: flags after -- belong to the invoked program.
     manifest_refs = []
     package_refs = []
     errors = []
 
-    for command in commands:
+    for command in split_shell_commands(source):
         try:
             tokens = shlex.split(command, comments=True, posix=True)
         except ValueError as error:
-            if "--manifest-path" in command or re.search(r"(?<!\w)-p(?:\s|=)", command):
+            if re.search(r"\bcargo(?=\s|$)", command):
                 errors.append(f"cannot tokenize Cargo command: {error}")
             continue
 
         if "cargo" not in tokens:
             continue
-
-        # Cargo options after -- belong to the invoked program, not Cargo.
         cargo_tokens = tokens[:tokens.index("--")] if "--" in tokens else tokens
         bins = []
         manifests = []
         packages = []
         index = 0
+
         while index < len(cargo_tokens):
             token = cargo_tokens[index]
             if token == "--manifest-path":
