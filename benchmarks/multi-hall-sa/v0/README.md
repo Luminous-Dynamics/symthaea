@@ -63,6 +63,8 @@ The scorer reports per system and per language condition:
 
 For each target language it compares target-language and English missed-hallucination rates on the same `pair_id` values. It reports the paired difference and a deterministic cluster bootstrap interval over `file_id`. All four statements in a pair remain together. All pairs sharing a `file_id` are resampled as one cluster.
 
+It also computes paired candidate-minus-baseline accuracy comparisons for English and each target language separately. The pair-balanced accuracy is the mean of the factual and hallucinated statement decisions for that fact; abstentions count as incorrect for this strict accuracy endpoint and are reported separately through coverage/selective-risk metrics. System comparisons are matched on identical pair IDs and use the same document-cluster bootstrap. Confidence intervals are emitted only for qualifying held-out runs; synthetic and development runs get point estimates only.
+
 A held-out comparison requires a preregistered, rights-approved, source-family-disjoint split, confirmed cluster semantics, at least 30 independent clusters, at least 1,000 bootstrap replicates and a sealed/independent evaluation process. Smaller synthetic/development runs remain exploratory and report no qualifying confidence interval.
 
 ## Commands
