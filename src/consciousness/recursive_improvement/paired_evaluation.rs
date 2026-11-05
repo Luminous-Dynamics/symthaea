@@ -29,6 +29,7 @@
 use super::candidate_archive::{
     CandidateArchiveError, CandidateRecord, CapabilityVector, EvaluationContext,
 };
+use super::paired_sign_test::exact_sign_test_upper_tail;
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -384,47 +385,6 @@ impl PairedComparison {
 /// cases require a group-level or cluster-aware confirmation outside this helper.
 /// The recurrence is evaluated relative to its boundary
 /// term, avoiding direct integer binomial coefficients and their overflow.
-fn exact_sign_test_upper_tail(wins: usize, losses: usize) -> Option<f64> {
-    let n = wins.checked_add(losses)?;
-    if n == 0 {
-        return None;
-    }
-    if wins == 0 {
-        return Some(1.0);
-    }
-
-    let log_probability_at = |k: usize| -> f64 {
-        let terms = k.min(n - k);
-        let mut log_choose = 0.0f64;
-        for i in 1..=terms {
-            log_choose += ((n - terms + i) as f64).ln() - (i as f64).ln();
-        }
-        log_choose - (n as f64) * std::f64::consts::LN_2
-    };
-
-    if wins > n / 2 {
-        // Sum the upper tail from P(X = wins), then scale by its log probability.
-        let mut relative_term = 1.0f64;
-        let mut relative_sum = 1.0f64;
-        for k in wins..n {
-            relative_term *= (n - k) as f64 / (k + 1) as f64;
-            relative_sum += relative_term;
-        }
-        Some((log_probability_at(wins).exp() * relative_sum).clamp(0.0, 1.0))
-    } else {
-        // The requested tail is at least one half. Compute its complement
-        // from P(X = wins - 1), which is in the lower half of the distribution.
-        let boundary = wins - 1;
-        let mut relative_term = 1.0f64;
-        let mut relative_sum = 1.0f64;
-        for k in (1..=boundary).rev() {
-            relative_term *= k as f64 / (n - k + 1) as f64;
-            relative_sum += relative_term;
-        }
-        let lower_tail = log_probability_at(boundary).exp() * relative_sum;
-        Some((1.0 - lower_tail).clamp(0.0, 1.0))
-    }
-}
 
 #[cfg(test)]
 mod tests {

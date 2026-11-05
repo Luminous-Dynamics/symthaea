@@ -474,3 +474,227 @@ For Symthaea, reproduce the Data-only, Harness-only and Joint tracks, add an exp
 Sources:
 - Chen, Zhu & Zheng, *Auditing the Product, Not the Recursion*, arXiv:2610.27610 (2026-10-20): https://arxiv.org/abs/2610.27610
 - Meng et al., *RSIGym: A Flexible Environment for Recursive Self-Improvement*, arXiv:2610.10310 (2026-10-07): https://arxiv.org/abs/2610.10310
+
+
+## 15. Adaptive holdout reuse and decision-only feedback — issue #10573
+
+A new failure mode remains even after receipt verification, exact task accounting, source identity and cluster-aware statistics: the proposer can overfit to a reused audit set if it sees the scores. A cryptographically valid evaluation result can still become statistically invalid evidence after enough adaptive reuse.
+
+Sun et al., *Which Self-Improvements Should We Trust? Reliable Self-Improvement When Agents Reuse Their Benchmarks*, arXiv:2609.33180 (2026-09-27), formalizes this as adaptive overfitting. REUSE allocates a global error budget over round t and prior promotion count p, and requires the proposer to receive only the promotion decision. It reports zero false promotions in its Covertype experiments versus 75 / 71 for empirical best-of-K at evaluation pool sizes 2,000 / 10,000, while retaining comparable final population performance. These are author-reported results for one tabular binary-classification setting, with 30 seeds, 200 rounds and up to eight proposals per round; they are not proof that the exact procedure transfers to coding, scientific research, multi-metric capability retention or every benchmark distribution.
+
+### New Rust allocation, round selector and pass/fail confidence certificate
+
+The branch adds:
+- \`reuse_error_budget.rs\`: \`allocate_reuse_error_budget\`, the one-based round selector \`evaluate_reuse_round\`, and a crate-private audit path that retains the selected certificate and cumulative lower bound;
+- \`paired_sign_test.rs\`: one shared exact one-sided paired sign-test implementation;
+- \`reuse_confidence_certificate.rs\`: the pass/fail certificate from Lemma A3 of Sun et al., arXiv:2609.33180v2.
+
+The adaptive allocation is
+
+\[
+\delta_{t,p} =
+\frac{\alpha w_t v_p}
+{\binom{t-1}{p} K^{p+1}},
+\qquad
+w_t=\frac{1}{t(t+1)},\quad
+v_p=\frac{1}{(p+1)(p+2)}.
+\]
+
+The implementation computes the binomial term and candidate factor in log space, then splits the allocation into a paired-test budget \`rho * delta\` and confidence-bound budget \`delta_c = (1-rho) * delta\`. It rejects invalid parameters, impossible promotion histories, histories beyond the reviewed maximum, binary64 underflow and invalid candidate outcomes.
+
+### Round selector and evidence binding
+
+\`ReuseCandidateEvidence\` is constructed from the **complete matched paired-outcome vector** \(Z_i \in \{-1,0,+1\}\). The candidate win count, loss count and empirical mean are all derived from this same vector; callers cannot supply unrelated summary statistics. The selector evaluates exactly K candidates at the shared sign-test threshold, selects the passing candidate with the highest empirical mean, and uses stable proposal order for exact ties.
+
+The proposer-facing API returns only the paper's single \(y_t \in \{0,\ldots,K\}\): \`RejectAll\` represents zero, while \`PromoteCandidate { candidate_number }\` is one-based in \(1..=K\). The selected certificate and cumulative lower bound are retained by a crate-private evaluator audit result, not returned through the proposer-facing function.
+
+The caller must ensure the paired units are independent under the benchmark's preregistered sampling unit. If rows are clustered by repository, project, family or run, the unit of analysis must be defined and frozen before the sign test; treating correlated rows as independent is pseudo-replication.
+
+### Pass/fail confidence certificate
+
+For selected candidate paired outcomes \(Z_{1:n}\), the code computes:
+- the conditional-win Clopper–Pearson lower limit \(q_{\rm lo}=\theta(n_+,M,\delta_c/4)\);
+- the discordance-rate lower limit \(d_{\rm lo}=\theta(M,n,\delta_c/4)\);
+- the sign-based lower bound \(\ell_{\rm sign}=(2q_{\rm lo}-1)d_{\rm lo}\) when \(q_{\rm lo}>1/2\), and \(-\infty\) otherwise;
+- the paper's paired empirical-Bernstein lower bound using \(L=\ln(4/\delta_c)\), the KL-inverted upper bound on \(E[Z^2]\), and the stated Bernstein deviation;
+- the combined bound \(\ell^\star=\max(\ell_{\rm sign},\ell_{\rm Bernstein})\);
+- the nonnegative cumulative increment \(\max(\ell^\star,0)\).
+
+The two Clopper–Pearson bounds each use \(\delta_c/4\), while the paired empirical-Bernstein bound uses failure allocation \(\delta_c/2\). This gives the Lemma A3 certificate failure probability at most \(\delta_c\). The beta inverse uses monotone bisection over the repository's existing \`symthaea_statistics::special::betai\`; no second special-function implementation or external runtime dependency is added.
+
+The independent reference fixtures use SciPy beta quantiles for sample sizes through 10,000, plus an end-to-end pass/fail vector with 40 wins, 10 losses and 50 ties. All-tie input produces zero cumulative increment rather than a fabricated positive certificate.
+
+### Qualification boundary
+
+The branch adds \`tools/sym-rsi-reuse-gate\`, a small standalone Cargo workspace that imports the exact production Rust files by path and depends on the existing pure-Rust statistics crate. Its focused workflow runs pinned Rust 1.96.0, metadata, rustfmt, the source-backed tests and Clippy. It avoids loading unrelated root-workspace members; it does **not** prove the full root Symthaea crate integration.
+
+Twenty-three focused tests are authored across the allocation/round selector, confidence certificate and shared sign-test modules. Exact-head runner results are tracked separately from authored tests.
+
+This is still **not** a qualified REUSE service or proof of the simultaneous theorem. It does not persist/authenticate adaptive history, freeze alpha/K/rho in an independent authority, enforce process/network-level decision-only information flow, independently protect the holdout, bind source/build artifacts to the evaluated executable, or grant release authority. Those responsibilities remain with the separate evaluator-service / feedback-firewall work under #10573, the canonical receipt work #10314/#10533, the source/build provenance adapter #10569, the isolation control #10064 and trust-root work #10369. No measured RSI improvement or SOTA superiority is claimed.
+
+### Required external evaluation boundary
+
+Tracked in [#10573 — adaptive evaluation and holdout-feedback firewall](https://github.com/Luminous-Dynamics/symthaea/issues/10573). The proposer may inspect development results, but its only active-search feedback from the independent audit service is a predeclared coarse decision such as promoted / not promoted / insufficient evidence. The detailed task results, scores, cluster means and certificates remain private to the independent service and authorized auditors until search is complete or a separate disclosure rule permits release.
+
+The service must persist every proposal and every attempted comparison, bind the current incumbent and full promotion history, freeze the global error budget, and prevent resets across restarts or experiment-ID changes. A new experiment name cannot mint a fresh alpha budget. The proposer cannot change the audit corpus, grader, error allocation, service, trust roots or signer keys.
+
+### What is needed before claiming an adaptive guarantee
+
+1. Review the REUSE theorem and code line-by-line, including the exact hypotheses for the paired test, cumulative lower-bound certificate and candidate-history accounting.
+2. Implement the private decision service and a canary-tested feedback firewall. A Rust enum or instruction not to reveal scores is not access control.
+3. Verify the audit sample is independent of proposer randomness, development data and the initial system; preserve task-family/project clusters and task-input identity.
+4. Simulate known-null adaptive histories with varying noise, K, promotion histories, correlated task clusters and multi-metric guardrails. Report empirical coverage and Monte Carlo uncertainty.
+5. Keep #8438 cluster-bootstrap intervals and #9433 population inference separate from the sequential promotion theorem. The theorem does not automatically solve multi-metric non-inferiority.
+6. Audit the final selected system on a fresh independent population after the adaptive sequence. Report product quality, false-promotion rate, capability regressions and resource cost separately.
+7. Run independent full-loop replications from identical initial artifacts and use the R4 same-start improver swap test. A single successful long chain is not evidence that the improvement process itself improved.
+
+### Benchmark comparison
+
+The closest comparison is not a raw accuracy leaderboard. Run best-of-K, Bonferroni/fixed non-adaptive testing, REUSE-style decision-only adaptation and frozen/evolved improver arms on the same candidate pool, resource budget, task distribution and private audit. Compare:
+- false-promotion rate and simultaneous error control;
+- true population improvement and final capability-retention vector;
+- number of accepted improvements and time/resource cost per accepted improvement;
+- sensitivity to evaluation-pool size, K, round count, promotion history and cluster correlation;
+- audit leakage under process, credential, filesystem and network canaries.
+
+REUSE's result is a strong methodological comparator, not a performance target to copy uncritically. The Symthaea target is to retain the statistical guarantee while supporting multiple independently measured capability dimensions and real engineering/science tasks, without exposing their audit scores to the evolving proposer.
+
+Source: Sun et al., *Which Self-Improvements Should We Trust? Reliable Self-Improvement When Agents Reuse Their Benchmarks*, arXiv:2609.33180 (2026-09-27): https://arxiv.org/abs/2609.33180
+
+
+
+## 16. Generalization ladder: from benchmark fit to transferable capability
+
+Xu et al., *SelfImprove-Bench: Evaluating Generalization in Self-Improving Agents*, arXiv:2611.02797 (2026-11-02), makes a useful distinction: an improved score on the scenario used during search is not evidence that the improvement transfers. Its G0–G4 ladder measures progressively more distant transfer:
+- **G0 — seen-instance replay:** evaluate on previously seen instances. This is a regression/retention diagnostic only; it is not generalization evidence.
+- **G1 — fresh same-difficulty instances:** new instances from the same task family and difficulty distribution.
+- **G2 — harder same-family instances:** shift difficulty while preserving the task family.
+- **G3 — sibling-task transfer:** transfer to a different task/game within the same capability family.
+- **G4 — cross-capability transfer:** transfer to a different capability family.
+
+The paper instantiates Exploring, Planning and Reasoning on six games and reports that improvement patterns are inconsistent across levels. Its specific G3 groupings and game tasks are useful controlled exemplars, but they are not a universal definition of capability. For Symthaea, use the structure while defining independent domain families and frozen transfer mappings appropriate to code, systems engineering and science.
+
+### Symthaea-adapted transfer matrix
+
+| Domain | G1: fresh IID-like instances | G2: harder same-family | G3: sibling task | G4: cross-capability |
+|---|---|---|---|---|
+| Software engineering | New issue instances from held-out repositories | Larger/less documented changes, more tests, deeper dependency surfaces | Transfer among bug fixing, refactoring, API migration, dependency and build debugging | Transfer from code work to systems diagnosis or scientific method tasks |
+| Systems / cyber | New hosts, configs, incident traces and control-plane states | Multi-stage incidents, partial evidence, adversarial noise, constrained permissions | Transfer among identity, networking, endpoint, cloud and recovery tasks | Transfer from cyber diagnosis to software reliability or operational planning |
+| Scientific research | New seeds / initial conditions / held-out parameter regimes | Stiffer, more coupled, higher-dimensional or multi-physics regimes | Transfer among adjacent physical models or experimental-design problems | Transfer from physics to materials, energy or biological inference |
+| Tool/harness engineering | New tasks on held-out tool schemas and repositories | Longer action chains, stateful tools, constrained resources | Transfer among new harness / tool APIs / execution models | Transfer from tool use to research planning and algorithm design |
+
+G0 stays in the report because regressions on seen tasks still matter, but never count it as evidence of generalization. The benchmark must keep instance generation, family assignments and difficulty tiers frozen outside the proposer. New task templates and G4 mappings cannot be authored by the evaluated agent and then scored by its own evaluator.
+
+### Metrics and acceptance
+
+Do not collapse the ladder to one HCI/RSI-Index. Report, per domain and level:
+- absolute task success / official benchmark score;
+- paired change versus the initial system and the matched frozen-improver baseline;
+- capability retention and catastrophic-regression rate;
+- resource and time cost per independently confirmed gain;
+- cluster-level uncertainty, task count, independent cluster count and coverage;
+- the fraction of improvements surviving each successive level (G1→G2→G3→G4);
+- improvement attribution: source artifact, edit surface (data, harness, algorithm, meta-procedure), parentage and exact run/evaluator identities.
+
+A useful ladder-retention statistic is a vector, not a scalar:
+`[G1_retention, G2_retention, G3_retention, G4_retention]`, where each coordinate is the independently audited improvement retained at that level relative to its own frozen baseline. If a scalar is needed for resource allocation, preregister its formula and keep the raw vector; do not use it for universal ranking.
+
+### New target
+
+The target is not merely to outperform SelfImprove-Bench's game results. The target is to demonstrate that improvements discovered in one software/science family remain beneficial on fresh instances, harder conditions, sibling tasks and cross-capability tasks—under equal budgets, independent evaluation and full-loop replications. The first benchmark release should include at least two independently held-out task families per level and enough independent clusters for the uncertainty analysis; exact sample size must be set by a pre-study power/precision analysis, not an arbitrary task count.
+
+Source: Xu et al., *SelfImprove-Bench: Evaluating Generalization in Self-Improving Agents*, arXiv:2611.02797 (2026-11-02): https://arxiv.org/abs/2611.02797
+
+
+## 17. Matched-protocol SOTA scoreboard and challenge targets
+
+R4 execution template: [SYM-RSI same-start swap preregistration v1](SYM_RSI_R4_SAME_START_SWAP_PREREG_V1_2026-11-05.md). This is a protocol template only; no experiment has been executed.
+
+
+The RSI landscape now has several strong comparators, but each measures a different intervention surface. Symthaea must reproduce each under its original protocol before claiming to exceed it. Do not average these scores into one leaderboard.
+
+| Comparator | Published result (authors' report) | What it identifies | Symthaea challenge target |
+|---|---|---|---|
+| RSIGym (arXiv:2610.10310) | RSI-Index 0.4809 for Opus 5 in independent Joint runs; $500 platform-service budget per benchmark run; five task domains | End-to-end Data / Harness / Joint improvement under shared services and budget | Reproduce on the same base model, task set, budget and controller; then target RSI-Index > 0.4809 with positive audited gains on every benchmark and G1–G4 transfer reported separately |
+| AI4AI-Bench (arXiv:2608.20318; independent audit reviewed 2026-11-03) | Paper reports best system 0.250 and mean 0.166; an independent full audit flags the benchmark as flawed: score-changing defects in 4/10 tasks and best-of-three checkpoint selection on the final test metric across all tasks | Whether an agent changes the training algorithm itself, not merely data or harness—but the published aggregate is not a clean score target | Treat 0.250 as a historical comparator only. First reproduce the published protocol, then publish an audit-clean corrected subset/version with frozen checkpoint selection, no exposed final seeds, reachable score anchors and independent multi-seed final evaluation. Compare algorithm changes only on that corrected protocol; do not claim superiority over 0.250 on the flawed aggregate |
+| AIRA₂ / MLE-bench-30 (Meta publication, 2026-04-16) | Mean percentile rank 81.5% at 24h and 83.1% at 72h; strongest reported baseline 72.7%; exceeds human SOTA on 6/20 AIRS-Bench tasks | Research-agent throughput, evaluation noise control and multi-agent/interactive experimentation | Under the same benchmark subset, backbone, 24h/72h budgets and scoring protocol, target >83.1% at 72h and >6/20 AIRS-Bench tasks above the named human reference; report compute and worker parallelism separately |
+| SelfImprove-Bench (arXiv:2611.02797) | G0–G4 generalization ladder; authors report inconsistent gains across levels | Whether improvements transfer beyond seen scenarios and difficulty | Positive independently audited improvement at G1–G4; no G0-only success counts as generalization. Report the complete per-domain transfer vector, not only endpoint score |
+| REUSE (arXiv:2609.33180) | Simultaneous error control across adaptive promotion histories; authors report 0 false promotions in their Covertype experiments, versus up to 20.7% false promotions in comparators | Whether the improvement procedure can reuse a finite audit set without adaptive false promotion, given independence and decision-only feedback | Match the theorem's assumptions and implement the full service/certificate; demonstrate empirical family-wise error control across null adaptive histories and report Monte Carlo confidence bounds, power and cost—not just observed zero |
+| RSI process audit (arXiv:2610.27610) | In 90 RSI-labelled studies, only 22% audit ≥2 full-loop reruns; only 4/26 improver-gain claims use the same-start, matched-budget swap test | Whether a better final product is evidence of a repeatable or improved improver | At least 3 independent full-loop replications for exploratory screening; preregister confirmatory run count by power/precision analysis; require the same-start old-vs-new improver swap test for R4 |
+
+These are *challenge targets*, not claims that the current Symthaea branch has achieved them. The published results are paper-reported and protocol-specific. A target becomes a valid comparison only after reproducing the same benchmark revisions, task splits, model identities, budgets, evaluator and scoring procedures.
+
+### Benchmark integrity gate (must pass before SOTA claims)
+
+Every benchmark used for an RSI claim must pass these checks before its score enters the challenge table:
+
+1. **Split/seed separation:** final task IDs, inputs, seeds, solutions and generator state are inaccessible to the proposer, all editable harnesses and all development tools. Verify with a source audit and canary tests, not a statement in the task README.
+2. **Evaluator independence:** the candidate cannot train directly against the scoring model or edit the final grader. Report construct validity, proxy-to-target alignment, reward-hacking tests and evaluator version.
+3. **Score-domain validity:** every baseline and optimum must be reachable under the actual metric; score clipping, unit conversion, directionality and aggregation must be independently recomputed from raw outputs.
+4. **Selection separation:** choose checkpoints only on development/selection data. The final audit evaluates exactly one frozen, predeclared checkpoint per run. Never report the best of multiple checkpoints selected on the final test metric.
+5. **Noise and replication:** use multiple independent seeds and full-loop runs; disclose between-run variance and task-family clusters. A task whose baseline noise is comparable to the claimed gain cannot support a superiority claim without more replication.
+6. **Artifact/trace reproducibility:** publish source patches, executable identities, raw score rows, all checkpoint dispositions, budgets, retries and analysis code, subject to safe handling of genuinely sensitive data.
+7. **Independent red-team audit:** have a reviewer who did not author the benchmark or the candidate verify the first six checks and replay a sample of raw tasks.
+
+The AI4AI-Bench audit illustrates why this gate matters. The independent review of arXiv:2608.20318 v1 and its 290 published case pages labels the benchmark **Flawed**: it reports score-changing defects in 4 of 10 tasks (RAGEN held-out seed exposure/training overlap; DDPO scorer-optimisation/construct-validity issues; an unreachable NPO optimum; and a BTRM baseline inside seed noise), and identifies best-of-three checkpoint selection on the final metric across all tasks. Its reported 0.250/0.166 aggregates are therefore useful historical references, not clean SOTA targets. Correct the benchmark first and rerun; do not silently adjust the published score.
+
+### Revised R5 benchmark objective
+
+Do not ask merely "can Symthaea beat AI4AI-Bench's 0.250?". Ask:
+
+- Does the system actually change the learning/update algorithm (not just data, prompt, hyperparameters or harness)?
+- Does the change improve a clean-start training run under the same compute and training-data budget?
+- Does the gain survive at least two held-out algorithm families and the G0–G4 transfer protocol?
+- Does the learning rule's gain persist when the produced model is evaluated with a frozen external evaluator and a fresh final checkpoint?
+- Does the gain reproduce over independent training seeds and improve the compute-capability exchange rate rather than only one endpoint score?
+
+Primary R5 measure: independently confirmed improvement in produced-model capability per matched all-in training budget. Keep training algorithm changes, data changes and harness changes in separate factorial arms.
+
+### Primary productivity metric
+
+The primary programme-level productivity metric should be:
+
+`independent generalized improvements / all-in resource budget`
+
+An improvement counts in the numerator only if it:
+1. is supported by the correct evidence layer and independent evaluator;
+2. survives the preregistered audit and source/build identity checks;
+3. exceeds the preregistered practical-improvement threshold;
+4. does not violate protected capability non-inferiority floors; and
+5. transfers at least to G2, with G3/G4 reported as separate stronger transfer achievements.
+
+The denominator includes proposer inference, data generation, training, sandbox execution, evaluator calls, retries, failed candidates, audit compute, service fees and human review. Report GPU-hours, wall-clock, dollars, CPU time, energy, tokens and tool calls separately; do not hide one resource in another.
+
+### Pareto objectives, not one composite score
+
+Maintain a vector of objectives:
+- independently confirmed capability gain;
+- G1/G2/G3/G4 transfer retention;
+- protected-capability regressions;
+- false-promotion risk and evidence coverage;
+- cost per independently confirmed generalized improvement;
+- time to first independently confirmed generalized improvement;
+- repeated-run variance and improvement survival after a clean rerun.
+
+Do not scalarize this vector for scientific claims. A budget allocator may use a preregistered utility function for scheduling, but the raw vector and Pareto frontier remain the reportable outcome.
+
+### Factorial attribution
+
+Run the following intervention arms under an identical external controller and matched all-in budgets:
+- Frozen: no changes.
+- Data-only.
+- Harness-only.
+- Algorithm-only (the R5-critical arm).
+- Meta-improvement-only (the R4-critical arm).
+- Joint: allow all declared edit surfaces.
+- Negative controls: shuffled feedback, placebo edits, and candidates that cannot affect the measured capability.
+
+Cross each arm with the G0–G4 transfer ladder and at least two task families. Keep development, selection, confirmation and final population audit disjoint at the independent-cluster level. Use common random numbers / matched task inputs only where the benchmark contract allows paired comparisons; do not equate different tasks by matching their IDs.
+
+Sources:
+- Meng et al., *RSIGym: A Flexible Environment for Recursive Self-Improvement*, arXiv:2610.10310 (2026-10-07): https://arxiv.org/abs/2610.10310
+- Chi et al., *AI4AI-Bench: Benchmarking LLM Agents in Algorithmic Design for Recursive Self-Improvement*, arXiv:2608.20318 (2026-08-20): https://arxiv.org/abs/2608.20318
+- Meta, *AIRA₂: Overcoming Bottlenecks in AI Research Agents* (2026-04-16): https://ai.meta.com/research/publications/aira-overcoming-bottlenecks-in-ai-research-agents/
+- Xu et al., *SelfImprove-Bench: Evaluating Generalization in Self-Improving Agents*, arXiv:2611.02797 (2026-11-02): https://arxiv.org/abs/2611.02797
+- Sun et al., *Which Self-Improvements Should We Trust?*, arXiv:2609.33180 (2026-09-27): https://arxiv.org/abs/2609.33180
+- Chen et al., *Auditing the Product, Not the Recursion*, arXiv:2610.27610 (2026-10-20): https://arxiv.org/abs/2610.27610
