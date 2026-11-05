@@ -247,6 +247,82 @@
               "items": {
                 "type": "string"
               }
+            },
+            "leaderboard_snapshot": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "captured_at",
+                "source_url",
+                "scope",
+                "task_count",
+                "run_protocol",
+                "displayed_uncertainty_semantics",
+                "entries",
+                "comparability_warning"
+              ],
+              "properties": {
+                "captured_at": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "source_url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "scope": {
+                  "const": "mean_score_on_56_hidden_test_tasks"
+                },
+                "task_count": {
+                  "type": "integer",
+                  "const": 56
+                },
+                "run_protocol": {
+                  "type": "string",
+                  "minLength": 20
+                },
+                "displayed_uncertainty_semantics": {
+                  "type": "string",
+                  "minLength": 20
+                },
+                "comparability_warning": {
+                  "type": "string",
+                  "minLength": 20
+                },
+                "entries": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "model",
+                      "agent_harness",
+                      "score_percent",
+                      "displayed_pm"
+                    ],
+                    "properties": {
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "agent_harness": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "score_percent": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "displayed_pm": {
+                        "type": "string",
+                        "pattern": "^±[0-9]+(\\\\.[0-9]+)?%$"
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         },
