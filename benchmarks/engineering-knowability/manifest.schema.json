@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/engineering-knowability/manifest.schema.json",
+  "title": "ENG-KNOW-QUAL-001 Blueprint Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "programme_id",
+    "source_issue",
+    "status",
+    "canonical_owners",
+    "fixture_sources",
+    "cases",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "programme_id": {
+      "const": "ENG-KNOW-QUAL-001"
+    },
+    "source_issue": {
+      "type": "string",
+      "format": "uri"
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "corpus",
+        "gold_adjudication",
+        "scoring",
+        "candidate_execution_authorized",
+        "physical_testing_authorized"
+      ],
+      "properties": {
+        "corpus": {
+          "const": "blueprint_only"
+        },
+        "gold_adjudication": {
+          "const": "not_yet_adjudicated"
+        },
+        "scoring": {
+          "const": "not_scored"
+        },
+        "candidate_execution_authorized": {
+          "const": false
+        },
+        "physical_testing_authorized": {
+          "const": false
+        }
+      }
+    },
+    "canonical_owners": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "issue",
+          "url"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "issue": {
+            "type": "integer"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    },
+    "fixture_sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "programme",
+          "url"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "programme": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "fixture_refs",
+          "claim_family",
+          "intent",
+          "required_semantics",
+          "seeded_fault"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^KNOW-(P|N)[0-9]{2}$"
+          },
+          "kind": {
+            "enum": [
+              "positive_blueprint",
+              "negative_control_blueprint"
+            ]
+          },
+          "fixture_refs": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "claim_family": {
+            "type": "string",
+            "minLength": 1
+          },
+          "intent": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required_semantics": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "seeded_fault": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
