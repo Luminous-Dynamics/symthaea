@@ -383,6 +383,240 @@ impl GenealogyStore {
         )
     }
 
+    /// Allocate one derived artifact with an immutable set of source parents.
+    ///
+    /// A single parent keeps the legacy `parent_id`/`family_id` projection.
+    /// Multiple parents produce a merge node with `parent_id = NULL` and
+    /// `family_id = child.id`; the edge table is then authoritative. The
+    /// operation is atomic across the manifest, all edges, and idempotency
+    /// record. Exact retries return the same manifest; a changed payload under
+    /// the same idempotency key fails closed.
+    pub fn allocate_derived_from_bytes(
+        &self,
+        relation: &GenealogyRelation,
+        origin: &GenealogyOrigin,
+        audio_key: &str,
+        recipe_bytes: &[u8],
+        score_bytes: Option<&[u8]>,
+        audio_bytes: &[u8],
+        parents: &[GenealogyParentInputV1],
+        allocation_idempotency_key: &str,
+        created_at_unix_ms: u64,
+    ) -> Result<GenealogyManifest, GenealogyLineageError> {
+        if matches!(relation, GenealogyRelation::Root) {
+            return Err(GenealogyLineageError::InvalidInput(
+                "derived allocations cannot use the Root relation",
+            ));
+        }
+        if audio_key.trim().is_empty()
+            || allocation_idempotency_key.trim().is_empty()
+            || recipe_bytes.is_empty()
+            || audio_bytes.is_empty()
+            || parents.is_empty()
+        {
+            return Err(GenealogyLineageError::InvalidInput(
+                "audio key, idempotency key, recipe/audio bytes, and parents are required",
+            ));
+        }
+
+        let mut parent_ids = BTreeSet::new();
+        let mut edge_keys = BTreeSet::new();
+        for parent in parents {
+            if parent.parent_manifest_id <= 0
+                || parent.idempotency_key.trim().is_empty()
+                || !edge_keys.insert(parent.idempotency_key.as_str())
+                || !parent_ids.insert(parent.parent_manifest_id)
+                || parent.source_event_id.as_deref().is_some_and(|value| value.trim().is_empty())
+                || parent.contributor_ref.as_deref().is_some_and(|value| value.trim().is_empty())
+                || parent.authority_receipt_ref.as_deref().is_some_and(|value| value.trim().is_empty())
+            {
+                return Err(GenealogyLineageError::InvalidInput(
+                    "parent IDs and edge keys must be unique and all optional references non-empty",
+                ));
+            }
+        }
+
+        let recipe_sha256 = artifact_sha256_hex(recipe_bytes);
+        let score_sha256 = score_bytes.map(artifact_sha256_hex);
+        let audio_sha256 = artifact_sha256_hex(audio_bytes);
+        let namespace = "C".to_owned();
+        let relation_json = serde_json::to_string(relation)
+            .map_err(|_| GenealogyLineageError::InvalidInput("relation serialization failed"))?;
+        let origin_json = serde_json::to_string(origin)
+            .map_err(|_| GenealogyLineageError::InvalidInput("origin serialization failed"))?;
+
+        let mut conn = self.conn.lock().map_err(|_| {
+            GenealogyLineageError::InvalidInput("genealogy database mutex is poisoned")
+        })?;
+        let tx = conn.transaction().map_err(GenealogyLineageError::Database)?;
+
+        let mut resolved: Vec<(GenealogyParentInputV1, GenealogyManifest)> =
+            Vec::with_capacity(parents.len());
+        for parent in parents {
+            let manifest = tx
+                .query_row(
+                    &format!("SELECT {SELECT_COLUMNS} FROM genealogy_manifests WHERE id = ?1"),
+                    params![parent.parent_manifest_id],
+                    row_to_manifest,
+                )
+                .optional()
+                .map_err(GenealogyLineageError::Database)?
+                .ok_or(GenealogyLineageError::InvalidInput(
+                    "a referenced parent manifest does not exist",
+                ))?;
+            resolved.push((parent.clone(), manifest));
+        }
+        resolved.sort_by(|left, right| {
+            (
+                left.1.id,
+                &left.0.idempotency_key,
+                &left.0.source_event_id,
+            )
+                .cmp(&(
+                    right.1.id,
+                    &right.0.idempotency_key,
+                    &right.0.source_event_id,
+                ))
+        });
+
+        let lineage_sha256 = lineage_content_hash(&resolved);
+        let manifest_sha256 = derived_manifest_content_hash(
+            &namespace,
+            &relation_json,
+            &origin_json,
+            audio_key,
+            &recipe_sha256,
+            score_sha256.as_deref(),
+            &audio_sha256,
+            &lineage_sha256,
+        );
+        let operation_sha256 = manifest_sha256.clone();
+
+        if let Some((existing_child_id, existing_operation_sha256)) = tx
+            .query_row(
+                "SELECT child_manifest_id, operation_sha256
+                 FROM genealogy_lineage_operations WHERE idempotency_key = ?1",
+                params![allocation_idempotency_key],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+            )
+            .optional()
+            .map_err(GenealogyLineageError::Database)?
+        {
+            if existing_operation_sha256 != operation_sha256 {
+                return Err(GenealogyLineageError::IdempotencyConflict);
+            }
+            let existing = tx
+                .query_row(
+                    &format!("SELECT {SELECT_COLUMNS} FROM genealogy_manifests WHERE id = ?1"),
+                    params![existing_child_id],
+                    row_to_manifest,
+                )
+                .optional()
+                .map_err(GenealogyLineageError::Database)?
+                .ok_or(GenealogyLineageError::CorruptLineage)?;
+            tx.commit().map_err(GenealogyLineageError::Database)?;
+            return Ok(existing);
+        }
+
+        let parent_projection = (resolved.len() == 1).then_some(resolved[0].1.id);
+        let legacy_family_projection = if resolved.len() == 1 {
+            resolved[0].1.family_id
+        } else {
+            0
+        };
+        tx.execute(
+            "INSERT INTO genealogy_manifests
+             (family_id, parent_id, namespace, relation_json, origin_json, audio_key,
+              recipe_sha256, score_sha256, audio_sha256, manifest_sha256,
+              created_at_unix_ms, lineage_sha256)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            params![
+                legacy_family_projection,
+                parent_projection,
+                namespace,
+                relation_json,
+                origin_json,
+                audio_key,
+                recipe_sha256,
+                score_sha256,
+                audio_sha256,
+                manifest_sha256,
+                created_at_unix_ms as i64,
+                lineage_sha256,
+            ],
+        )
+        .map_err(GenealogyLineageError::Database)?;
+        let child_id = tx.last_insert_rowid();
+        let family_id = if resolved.len() == 1 {
+            legacy_family_projection
+        } else {
+            child_id
+        };
+        tx.execute(
+            "UPDATE genealogy_manifests SET family_id = ?1 WHERE id = ?1",
+            params![family_id],
+        )
+        .map_err(GenealogyLineageError::Database)?;
+
+        for (parent, manifest) in &resolved {
+            let kind_json = serde_json::to_string(&parent.kind)
+                .map_err(|_| GenealogyLineageError::InvalidInput("edge kind serialization failed"))?;
+            let edge_sha256 = genealogy_edge_content_hash(
+                manifest.id,
+                child_id,
+                &manifest.manifest_sha256,
+                &manifest_sha256,
+                &kind_json,
+                parent.source_event_id.as_deref(),
+                parent.contributor_ref.as_deref(),
+                parent.authority_receipt_ref.as_deref(),
+                &parent.idempotency_key,
+            );
+            tx.execute(
+                "INSERT INTO genealogy_parent_edges
+                 (child_manifest_id, parent_manifest_id, kind_json, source_event_id,
+                  contributor_ref, authority_receipt_ref, idempotency_key, edge_sha256,
+                  created_at_unix_ms)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                params![
+                    child_id,
+                    manifest.id,
+                    kind_json,
+                    parent.source_event_id,
+                    parent.contributor_ref,
+                    parent.authority_receipt_ref,
+                    parent.idempotency_key,
+                    edge_sha256,
+                    created_at_unix_ms as i64,
+                ],
+            )
+            .map_err(GenealogyLineageError::Database)?;
+        }
+        tx.execute(
+            "INSERT INTO genealogy_lineage_operations
+             (idempotency_key, child_manifest_id, operation_sha256)
+             VALUES (?1, ?2, ?3)",
+            params![allocation_idempotency_key, child_id, operation_sha256],
+        )
+        .map_err(GenealogyLineageError::Database)?;
+
+        tx.commit().map_err(GenealogyLineageError::Database)?;
+        Ok(GenealogyManifest {
+            id: child_id,
+            family_id,
+            parent_id: parent_projection,
+            namespace,
+            relation: relation.clone(),
+            origin: origin.clone(),
+            audio_key: audio_key.to_owned(),
+            recipe_sha256,
+            score_sha256,
+            audio_sha256,
+            manifest_sha256,
+            created_at_unix_ms,
+        })
+    }
+
     /// Opens (creating if absent) the genealogy ledger at `path`, applying
     /// the schema. A fresh file gets the schema for free; re-opening an
     /// existing one is idempotent (`CREATE ... IF NOT EXISTS`).
