@@ -56,13 +56,13 @@ jobs:
         run: |
           set -euo pipefail
           cargo run --locked --manifest-path "$PITB_SORRYDB_MANIFEST" -- \
-            --self-test-report "$RUNNER_TEMP/sorrydb-integrity-report.synthetic.json"
+            --self-test-report "$RUNNER_TEMP/sorrydb-integrity-report.synthetic.json" "$RUNNER_TEMP/sorrydb-task-receipt.synthetic.jsonl"
 
       - name: Validate provenance, receipt and report schemas
         shell: bash
         run: |
           set -euo pipefail
-          "$RUNNER_TEMP/pitb-sorrydb-venv/bin/python" - "$RUNNER_TEMP/sorrydb-integrity-report.synthetic.json" <<'PY'
+          "$RUNNER_TEMP/pitb-sorrydb-venv/bin/python" - "$RUNNER_TEMP/sorrydb-integrity-report.synthetic.json" "$RUNNER_TEMP/sorrydb-task-receipt.synthetic.jsonl" <<'PY'
           import json
           import sys
           from pathlib import Path
@@ -85,6 +85,14 @@ jobs:
           if errors:
               raise SystemExit("pinned SorryDB provenance schema errors: " + "; ".join(e.message for e in errors))
 
+          receipt_lines = [line for line in Path(sys.argv[2]).read_text().splitlines() if line.strip()]
+          if len(receipt_lines) != 1:
+              raise SystemExit("synthetic task receipt denominator changed")
+          receipt = json.loads(receipt_lines[0])
+          errors = list(Draft202012Validator(schemas[names[1]]).iter_errors(receipt))
+          if errors:
+              raise SystemExit("synthetic SorryDB task receipt schema errors: " + "; ".join(e.message for e in errors))
+
           report = json.loads(Path(sys.argv[1]).read_text())
           errors = list(Draft202012Validator(schemas[names[2]]).iter_errors(report))
           if errors:
@@ -103,6 +111,7 @@ jobs:
           name: pitb-sorrydb-integrity-report
           path: |
             ${{ runner.temp }}/sorrydb-integrity-report.synthetic.json
+            ${{ runner.temp }}/sorrydb-task-receipt.synthetic.jsonl
             ${{ runner.temp }}/pitb-sorrydb-integrity/src/main.rs
             ${{ runner.temp }}/pitb-sorrydb-integrity/Cargo.lock
           if-no-files-found: warn
