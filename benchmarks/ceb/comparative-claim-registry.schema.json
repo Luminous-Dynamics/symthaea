@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ceb/comparative-claim-registry-v0.schema.json",
+  "title": "CEB Comparative Claim Registry V0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "registry_id",
+    "status",
+    "created_on",
+    "claim_schema_id",
+    "protocol",
+    "claims",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 0
+    },
+    "registry_id": {
+      "const": "CEB-COMPARATIVE-CLAIM-V0"
+    },
+    "status": {
+      "const": "design_only_no_empirical_claims"
+    },
+    "created_on": {
+      "type": "string",
+      "format": "date"
+    },
+    "claim_schema_id": {
+      "type": "string",
+      "format": "uri"
+    },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pilot_claim_ceiling",
+        "confirmatory_repository_cluster_floor",
+        "one_primary_endpoint",
+        "primary_alpha",
+        "target_power",
+        "small_discordance_rule",
+        "cluster_inference_rule",
+        "multiplicity_rule",
+        "noninferiority_rule",
+        "hard_gate_rule",
+        "pareto_rule",
+        "seed_pseudoreplication_rule",
+        "zero_failure_rule"
+      ],
+      "properties": {
+        "pilot_claim_ceiling": {
+          "type": "string",
+          "minLength": 40
+        },
+        "confirmatory_repository_cluster_floor": {
+          "const": 13
+        },
+        "one_primary_endpoint": {
+          "const": true
+        },
+        "primary_alpha": {
+          "const": 0.05
+        },
+        "target_power": {
+          "const": 0.9
+        },
+        "small_discordance_rule": {
+          "type": "string",
+          "minLength": 40
+        },
+        "cluster_inference_rule": {
+          "type": "string",
+          "minLength": 40
+        },
+        "multiplicity_rule": {
+          "type": "string",
+          "minLength": 40
+        },
+        "noninferiority_rule": {
+          "type": "string",
+          "minLength": 40
+        },
+        "hard_gate_rule": {
+          "type": "string",
+          "minLength": 40
+        },
+        "pareto_rule": {
+          "type": "string",
+          "minLength": 40
+        },
+        "seed_pseudoreplication_rule": {
+          "type": "string",
+          "minLength": 40
+        },
+        "zero_failure_rule": {
+          "type": "string",
+          "minLength": 40
+        }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 50
+    }
+  }
+}
