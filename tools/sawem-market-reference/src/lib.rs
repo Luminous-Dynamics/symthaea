@@ -1018,8 +1018,7 @@ pub fn calculate_constrained_schedule_adjustment(
                 if overlap_upper <= overlap_lower {
                     continue;
                 }
-                let delta_milli_mwh =
-                    i128::from(overlap_upper) - i128::from(overlap_lower);
+                let delta_milli_mwh = i128::from(overlap_upper) - i128::from(overlap_lower);
                 let price_energy_product = delta_milli_mwh
                     .checked_mul(i128::from(segment.price_minor_zar_per_mwh))
                     .ok_or(ConstrainedScheduleAdjustmentError::ArithmeticOverflow)?;
@@ -2206,14 +2205,13 @@ mod tests {
     #[test]
     fn constrained_purchase_integrates_each_incremental_price_segment() {
         let curve = constrained_price_curve();
-        let result = calculate_constrained_schedule_adjustment(
-            ConstrainedScheduleAdjustmentInputs {
+        let result =
+            calculate_constrained_schedule_adjustment(ConstrainedScheduleAdjustmentInputs {
                 unconstrained_schedule_milli_mwh: 10_000,
                 constrained_schedule_milli_mwh: 15_000,
                 price_submission: IncrementalPriceSubmission::Submitted(&curve),
-            },
-        )
-        .expect("synthetic constrained purchase is valid");
+            })
+            .expect("synthetic constrained purchase is valid");
         assert_eq!(
             result,
             ConstrainedScheduleAdjustmentResult::Determined {
@@ -2230,14 +2228,13 @@ mod tests {
     #[test]
     fn constrained_sales_charge_is_the_opposite_signed_cashflow() {
         let curve = constrained_price_curve();
-        let result = calculate_constrained_schedule_adjustment(
-            ConstrainedScheduleAdjustmentInputs {
+        let result =
+            calculate_constrained_schedule_adjustment(ConstrainedScheduleAdjustmentInputs {
                 unconstrained_schedule_milli_mwh: 15_000,
                 constrained_schedule_milli_mwh: 10_000,
                 price_submission: IncrementalPriceSubmission::Submitted(&curve),
-            },
-        )
-        .expect("synthetic constrained sale is valid");
+            })
+            .expect("synthetic constrained sale is valid");
         assert_eq!(
             result,
             ConstrainedScheduleAdjustmentResult::Determined {
@@ -2257,14 +2254,13 @@ mod tests {
             upper_schedule_milli_mwh: -2_000,
             price_minor_zar_per_mwh: 40,
         }];
-        let result = calculate_constrained_schedule_adjustment(
-            ConstrainedScheduleAdjustmentInputs {
+        let result =
+            calculate_constrained_schedule_adjustment(ConstrainedScheduleAdjustmentInputs {
                 unconstrained_schedule_milli_mwh: -5_000,
                 constrained_schedule_milli_mwh: -2_000,
                 price_submission: IncrementalPriceSubmission::Submitted(&curve),
-            },
-        )
-        .expect("signed consumption-axis interval is covered");
+            })
+            .expect("signed consumption-axis interval is covered");
         assert_eq!(
             result,
             ConstrainedScheduleAdjustmentResult::Determined {
@@ -2279,14 +2275,13 @@ mod tests {
 
     #[test]
     fn constrained_schedule_zero_submission_and_no_change_are_distinct() {
-        let no_price = calculate_constrained_schedule_adjustment(
-            ConstrainedScheduleAdjustmentInputs {
+        let no_price =
+            calculate_constrained_schedule_adjustment(ConstrainedScheduleAdjustmentInputs {
                 unconstrained_schedule_milli_mwh: 10_000,
                 constrained_schedule_milli_mwh: 15_000,
                 price_submission: IncrementalPriceSubmission::NotSubmitted,
-            },
-        )
-        .expect("explicit no-price submission is a zero-price rule");
+            })
+            .expect("explicit no-price submission is a zero-price rule");
         assert_eq!(
             no_price,
             ConstrainedScheduleAdjustmentResult::Determined {
@@ -2298,14 +2293,13 @@ mod tests {
             }
         );
 
-        let unchanged = calculate_constrained_schedule_adjustment(
-            ConstrainedScheduleAdjustmentInputs {
+        let unchanged =
+            calculate_constrained_schedule_adjustment(ConstrainedScheduleAdjustmentInputs {
                 unconstrained_schedule_milli_mwh: -10_000,
                 constrained_schedule_milli_mwh: -10_000,
                 price_submission: IncrementalPriceSubmission::Unknown,
-            },
-        )
-        .expect("unchanged schedules require no price curve");
+            })
+            .expect("unchanged schedules require no price curve");
         assert_eq!(
             unchanged,
             ConstrainedScheduleAdjustmentResult::Determined {
@@ -2320,14 +2314,13 @@ mod tests {
 
     #[test]
     fn constrained_schedule_rejects_unknown_and_incomplete_price_evidence() {
-        let unknown = calculate_constrained_schedule_adjustment(
-            ConstrainedScheduleAdjustmentInputs {
+        let unknown =
+            calculate_constrained_schedule_adjustment(ConstrainedScheduleAdjustmentInputs {
                 unconstrained_schedule_milli_mwh: 10_000,
                 constrained_schedule_milli_mwh: 15_000,
                 price_submission: IncrementalPriceSubmission::Unknown,
-            },
-        )
-        .expect("unknown price state is indeterminate");
+            })
+            .expect("unknown price state is indeterminate");
         assert_eq!(
             unknown,
             ConstrainedScheduleAdjustmentResult::Indeterminate {
@@ -2378,14 +2371,13 @@ mod tests {
             upper_schedule_milli_mwh: i32::MAX,
             price_minor_zar_per_mwh: 1,
         }];
-        let result = calculate_constrained_schedule_adjustment(
-            ConstrainedScheduleAdjustmentInputs {
+        let result =
+            calculate_constrained_schedule_adjustment(ConstrainedScheduleAdjustmentInputs {
                 unconstrained_schedule_milli_mwh: i32::MIN,
                 constrained_schedule_milli_mwh: i32::MAX,
                 price_submission: IncrementalPriceSubmission::Submitted(&curve),
-            },
-        )
-        .expect("full signed schedule interval is represented safely");
+            })
+            .expect("full signed schedule interval is represented safely");
         assert_eq!(
             result,
             ConstrainedScheduleAdjustmentResult::Determined {
