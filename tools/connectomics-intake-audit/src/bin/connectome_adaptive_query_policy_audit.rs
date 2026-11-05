@@ -869,12 +869,20 @@ mod tests {
         let input = adaptive_fixture();
         let report = evaluate(&input, &bytes(&input)).unwrap();
         let root = report.policy.unwrap();
-        let terminal = root
+        let right_branch = root
             .branches
             .iter()
-            .find(|branch| branch.observed_outcome == "x-left")
+            .find(|branch| branch.observed_outcome == "x-right")
             .unwrap();
-        assert_eq!(terminal.child.action_id.as_deref(), Some("inspect-y"));
+        assert_eq!(right_branch.child.action_id.as_deref(), Some("inspect-z"));
+        let shared = right_branch
+            .child
+            .branches
+            .iter()
+            .find(|branch| branch.observed_outcome == "z-c")
+            .unwrap();
+        assert_eq!(shared.child.terminal_query_decision, Some(true));
+        assert_eq!(shared.child.compatible_world_ids.len(), 2);
     }
 
     #[test]
