@@ -671,14 +671,12 @@ impl<'a> Solver<'a> {
                 .max()
                 .unwrap_or_default();
             let action_cost = self.action_effort[action_index];
-            let candidate_policy_count = child_solutions.iter().try_fold(
-                1_u128,
-                |count, child| {
-                    count.checked_mul(child.optimal_policy_count).ok_or_else(|| {
-                        "adaptive optimal-policy count overflows u128".to_string()
-                    })
-                },
-            )?;
+            let candidate_policy_count =
+                child_solutions.iter().try_fold(1_u128, |count, child| {
+                    count
+                        .checked_mul(child.optimal_policy_count)
+                        .ok_or_else(|| "adaptive optimal-policy count overflows u128".to_string())
+                })?;
             let candidate = PolicySolution {
                 worst_case_cost: action_cost
                     .checked_add(child_worst)
@@ -702,10 +700,9 @@ impl<'a> Solver<'a> {
                 candidate.worst_case_cost < best_solution.worst_case_cost
             }) {
                 best = Some(candidate);
-            } else if best
-                .as_ref()
-                .is_some_and(|best_solution| candidate.worst_case_cost == best_solution.worst_case_cost)
-            {
+            } else if best.as_ref().is_some_and(|best_solution| {
+                candidate.worst_case_cost == best_solution.worst_case_cost
+            }) {
                 let total_count = best
                     .as_ref()
                     .expect("equal-cost best policy exists")
