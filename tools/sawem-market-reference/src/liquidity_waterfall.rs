@@ -99,7 +99,7 @@ pub struct LiquidityPathAssessment<'a> {
     pub cash_at_cover_deadline_minor_zar: i128,
     pub cash_headroom_at_cover_deadline_minor_zar: u64,
     pub first_operating_floor_breach: Option<LiquidityBreachPoint<'a>>,
-    pub minimum_cover_shortfall_minor_zar: Option<u64>,
+    pub maximum_cover_shortfall_minor_zar: Option<u64>,
     pub cover_shortfall_at_deadline_minor_zar: Option<u64>,
     /// This is cash that could fit above the floor in the scenario only. It
     /// is not Posted Credit Cover and is not proof that cash can be transferred.
@@ -165,7 +165,7 @@ fn assess_path<'a>(
     let mut minimum_before_deadline = cash;
     let mut cash_at_deadline = cash;
     let mut deadline_cover = inputs.market_required_credit_cover_minor_zar;
-    let mut minimum_cover_shortfall: Option<u64> = deadline_cover
+    let mut maximum_cover_shortfall: Option<u64> = deadline_cover
         .map(|required| required.saturating_sub(inputs.posted_credit_cover_minor_zar));
     let mut first_breach = None;
     let mut included = 0_u32;
@@ -204,9 +204,17 @@ fn assess_path<'a>(
                 });
             }
             minimum_cash = minimum_cash.min(cash);
-            minimum_cover_shortfall = deadline_cover
-                .map(|required| required.saturating_sub(inputs.posted_credit_cover_minor_zar))
-                .or(minimum_cover_shortfall);
+            maximum_cover_shortfall = match (
+                maximum_cover_shortfall,
+                deadline_cover.map(|required| {
+                    required.saturating_sub(inputs.posted_credit_cover_minor_zar)
+                }),
+            ) {
+                (Some(previous), Some(current)) => Some(previous.max(current)),
+                (Some(previous), None) => Some(previous),
+                (None, Some(current)) => Some(current),
+                (None, None) => None,
+            };
             cash_at_deadline = cash;
             deadline_reached = true;
         } else {
@@ -251,7 +259,7 @@ fn assess_path<'a>(
         cash_at_cover_deadline_minor_zar: cash_at_deadline,
         cash_headroom_at_cover_deadline_minor_zar: headroom_u64,
         first_operating_floor_breach: first_breach,
-        minimum_cover_shortfall_minor_zar: minimum_cover_shortfall,
+        maximum_cover_shortfall_minor_zar: minimum_cover_shortfall,
         cover_shortfall_at_deadline_minor_zar: shortfall_at_deadline,
         potentially_fundable_cover_at_deadline_minor_zar: potentially_fundable,
         external_funding_gap_at_deadline_minor_zar: external_gap,
@@ -296,6 +304,8 @@ pub fn evaluate_liquidity_waterfall<'a>(
         || inputs.horizon_end_day_ordinal < inputs.start_day_ordinal
         || inputs.credit_cover_deadline_day_ordinal < inputs.start_day_ordinal
         || inputs.credit_cover_deadline_day_ordinal > inputs.horizon_end_day_ordinal
+        || (inputs.start_day_ordinal == inputs.credit_cover_deadline_day_ordinal
+            && inputs.start_minute_of_day > inputs.credit_cover_deadline_minute_of_day)
     {
         return Err(LiquidityWaterfallError::InvalidHorizon);
     }
@@ -315,7 +325,10 @@ pub fn evaluate_liquidity_waterfall<'a>(
 
     let mut previous: Option<(i32, u16, u32)> = None;
     for (index, event) in inputs.events.iter().enumerate() {
-        if !nonempty(event.event_id) || !nonempty(event.source_ref) || event.amount_minor_zar == 0
+        if !nonempty(event.event_id)
+            || !nonempty(event.source_ref)
+            || (event.amount_minor_zar == 0
+                && event.kind != LiquidityCashEventKind::RequiredCoverReassessment)
             || event.minute_of_day >= 24 * 60
             || event.day_ordinal < inputs.start_day_ordinal
             || event.day_ordinal > inputs.horizon_end_day_ordinal
