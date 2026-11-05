@@ -162,7 +162,10 @@ fn target_matches(vintage: PriceVintage<'_>, target: AsOfReplayTarget<'_>) -> bo
             model_sha256,
             ..
         } => {
-            target.model_id.map(|expected| expected == model_id).unwrap_or(true)
+            target
+                .model_id
+                .map(|expected| expected == model_id)
+                .unwrap_or(true)
                 && target
                     .model_sha256
                     .map(|expected| expected == model_sha256)
@@ -198,11 +201,7 @@ pub fn replay_prices_as_of<'a>(
         if target.model_id.is_some() != target.model_sha256.is_some() {
             return Err(AsOfReplayError::InvalidModelScope);
         }
-        if target
-            .model_sha256
-            .map(valid_sha256)
-            == Some(false)
-        {
+        if target.model_sha256.map(valid_sha256) == Some(false) {
             return Err(AsOfReplayError::InvalidModelDigest);
         }
         for previous in &targets[..index] {
@@ -501,8 +500,7 @@ mod tests {
 
     #[test]
     fn same_model_label_with_different_build_digests_requires_exact_scope() {
-        let other_model_sha =
-            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
+        let other_model_sha = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
         let vintages = [
             forecast("build-a", 90, 95, 600, "chronos-v1"),
             PriceVintage {
