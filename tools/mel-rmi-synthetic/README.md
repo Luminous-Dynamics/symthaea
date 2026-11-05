@@ -31,7 +31,10 @@ MEL_RMI_CODE_REVISION="$(git rev-parse HEAD)" cargo run --locked --example canon
 The example emits a CSV over 160 paired fixtures (32 deterministic seeds per
 feature dimension) for fixed, imitation, one-way, yoked, unrelated-feature-
 shortcut and rule-based policies, followed by 160 four-condition reciprocal
-controlled-partner trials. The repository workflow
+controlled-partner trials. Every one of the 960 policy trials and 160 reciprocal
+trials also receives four input and four output synthetic score/MIDI payload
+sets plus exact receipt bytes; the example hashes and re-verifies all 1,120
+trial records before reporting `artifact_verified,1120`. The repository workflow
 stages this crate outside the root Cargo workspace, tests the exact pull-request
 head, and gates all expected positive/negative-control counts.
 
