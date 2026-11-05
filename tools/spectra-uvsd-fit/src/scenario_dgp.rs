@@ -379,7 +379,7 @@ pub fn generate_synthetic_dataset(
         } else {
             0.0
         };
-        let signal_sigma = (scenario.signal_sigma * effects.log_signal_sigma.exp()).max(f64::MIN_POSITIVE);
+        let signal_sigma = scenario.signal_sigma * effects.log_signal_sigma.exp();
         let evidence_noise = sample_unit_evidence(&mut rng, scenario.evidence_family)?;
         let oracle_evidence = match action.stimulus_class {
             StimulusClass::Noise => evidence_noise,
@@ -396,7 +396,10 @@ pub fn generate_synthetic_dataset(
             .iter()
             .map(|criterion| criterion + criterion_offset)
             .collect();
-        if !signal_mean.is_finite() || !signal_sigma.is_finite() || !criterion_offset.is_finite()
+        if !signal_mean.is_finite()
+            || !signal_sigma.is_finite()
+            || signal_sigma <= 0.0
+            || !criterion_offset.is_finite()
             || !oracle_evidence.is_finite()
         {
             return Err(DgpError::NonFiniteDerivedValue);
@@ -623,7 +626,8 @@ impl SplitMix64 {
 
     /// Uniform variate strictly inside (0, 1), avoiding log(0) in Box-Muller.
     fn uniform(&mut self) -> f64 {
-        (((self.next_u64() >> 11) as f64) + 0.5) * (1.0 / 9_007_199_254_740_992.0)
+        (((self.next_u64() >> 12) as f64) + 0.5)
+            * (1.0 / 4_503_599_627_370_496.0)
     }
 
     fn normal(&mut self) -> f64 {
@@ -849,6 +853,62 @@ mod tests {
     }
 
     #[test]
+    fn gaussian_generator_recovers_known_standard_normal_moments() {
+        let mut rng = SplitMix64::new(12345);
+        let draws = (0..80_000).map(|_| rng.normal()).collect::<Vec<_>>();
+        let mean = draws.iter().sum::<f64>() / draws.len() as f64;
+        let variance = draws
+            .iter()
+            .map(|value| (value - mean).powi(2))
+            .sum::<f64>()
+            / (draws.len() - 1) as f64;
+        assert!(mean.abs() < 0.02);
+        assert!((variance - 1.0).abs() < 0.04);
+    }
+
+    #[test]
+    fn criterion_drift_is_a_latent_process_and_shifts_observed_categories() {
+        let actions = action_set();
+        let mut spec = scenario();
+        spec.criterion_drift_per_100_trials = 0.15;
+        spec.lapse_probability = 0.0;
+        spec.confidence_missing_probability = 0.0;
+        spec.confidence_missing_evidence_slope = 0.0;
+        spec.heterogeneity = None;
+        let schedule = (0..4_000)
+            .map(|trial| TrialRequest {
+                action_id: 1,
+                participant_id: 0,
+                within_participant_trial: trial,
+            })
+            .collect::<Vec<_>>();
+        let data = generate_synthetic_dataset(
+            &actions,
+            &spec,
+            &schedule,
+            "sha256:scenario",
+            90210,
+        )
+        .unwrap();
+        let early = data.trials.iter()
+            .filter(|trial| trial.within_participant_trial < 500)
+            .map(|trial| trial.oracle_category as f64)
+            .sum::<f64>() / 500.0;
+        let late = data.trials.iter()
+            .filter(|trial| trial.within_participant_trial >= 3_500)
+            .map(|trial| trial.oracle_category as f64)
+            .sum::<f64>() / 500.0;
+        assert!(late < early);
+        let first = data.trials.iter()
+            .find(|trial| trial.within_participant_trial == 0)
+            .unwrap();
+        let last = data.trials.iter()
+            .find(|trial| trial.within_participant_trial == 3_999)
+            .unwrap();
+        assert!(last.oracle_criterion_offset > first.oracle_criterion_offset);
+    }
+
+    #[test]
     fn participant_effects_are_stable_within_identity() {
         let actions = action_set();
         let schedule = (0..200)
@@ -923,17 +983,8 @@ mod tests {
     }
 
     #[test]
-    fn rt_quantization_creates_ties_and_deadline_produces_timeouts() {
+    fn rt_quantization_creates_ties_and_deadlines_preserve_timeouts() {
         let actions = action_set();
-        let mut spec = scenario();
-        spec.rt_channel = Some(RtChannelSpec {
-            base_latency_ms: 2_500.0,
-            evidence_speed_gain: 0.0,
-            log_noise_sd: 0.0,
-            non_decision_time_ms: 0.0,
-            quantization_ms: 100,
-            default_deadline_ms: Some(800),
-        });
         let schedule = (0..100)
             .map(|trial| TrialRequest {
                 action_id: if trial % 2 == 0 { 1 } else { 2 },
@@ -941,16 +992,49 @@ mod tests {
                 within_participant_trial: trial,
             })
             .collect::<Vec<_>>();
-        let data = generate_synthetic_dataset(
+
+        let mut quantized = scenario();
+        quantized.rt_channel = Some(RtChannelSpec {
+            base_latency_ms: 900.0,
+            evidence_speed_gain: 0.0,
+            log_noise_sd: 0.0,
+            non_decision_time_ms: 0.0,
+            quantization_ms: 100,
+            default_deadline_ms: None,
+        });
+        let observed = generate_synthetic_dataset(
             &actions,
-            &spec,
+            &quantized,
             &schedule,
             "sha256:scenario",
             5,
         )
         .unwrap();
-        assert!(data.trials.iter().all(|trial| trial.rt_status == RtStatus::TimedOut));
-        assert_eq!(data.trials.len(), 100);
+        let unique_rt = observed.trials.iter()
+            .filter_map(|trial| trial.rt_ms)
+            .collect::<BTreeSet<_>>();
+        assert_eq!(unique_rt.len(), 1);
+        assert!(observed.trials.iter().all(|trial| trial.rt_status == RtStatus::Observed));
+
+        let mut timeout = quantized;
+        timeout.rt_channel = Some(RtChannelSpec {
+            base_latency_ms: 2_500.0,
+            evidence_speed_gain: 0.0,
+            log_noise_sd: 0.0,
+            non_decision_time_ms: 0.0,
+            quantization_ms: 100,
+            default_deadline_ms: Some(800),
+        });
+        let timed_out = generate_synthetic_dataset(
+            &actions,
+            &timeout,
+            &schedule,
+            "sha256:scenario",
+            5,
+        )
+        .unwrap();
+        assert!(timed_out.trials.iter().all(|trial| trial.rt_status == RtStatus::TimedOut));
+        assert_eq!(timed_out.trials.len(), 100);
     }
 
     #[test]
