@@ -252,3 +252,17 @@ The immediate route is runner-independent authoring, static source/manifest chec
 - Epoch AI independent review of Terminal-Bench 4.0.0 (2026-09-04): https://epoch.ai/benchmarks/terminal-bench-4/review
 
 **Snapshot limitation:** this is a dated source audit. Re-read the cited pages before future claims; live score tables, model identities, harness settings and benchmark revisions can change.
+
+
+## 2026-11-05 leaderboard delta
+
+The current Scale consolidated leaderboard adds an important capability comparison alongside SWE-Bench Pro V2:
+
+- SWE Atlas Test Writing: Fable 5.1 + Claude Code 67.04 ± 5.33; Opus 5 + Claude Code 62.22 ± 5.58.
+- SWE Atlas Refactoring: GPT-6 Astra + Codex 59.05 ± 6.43; Fable 5.1 + Claude Code 56.67 ± 6.52.
+- SWE Atlas Codebase QnA: Opus 5 + Claude Code 63.17 ± 5.01; Fable 5.1 + Claude Code 59.95 ± 4.85; GPT-6 Astra + Codex 59.14 ± 4.88.
+- HiL-Bench: Muse Wonder 1.0 79.67 ± 4.17.
+
+These are different tasks and rubrics. They are not combined into a single agent score. Use the Scale consolidated page as the source index and pin the exact task leaderboard/revision when conducting any replication: https://labs.scale.com/leaderboard
+
+The CEB machine-readable measurement matrix now has 13 lanes, 41 primary metrics, 15 comparator records and 13 registered source URLs. Its comparator registry uses the consolidated Scale source for Test Writing and HiL-Bench rather than unverified deep links. This matrix is a design artifact, not a Symthaea result.
