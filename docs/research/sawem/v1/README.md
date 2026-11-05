@@ -112,7 +112,26 @@ Forecast prices, synthetic balancing components and modeled credit cover do not 
 
 The market profile should not become a fifth simulator. It is a typed rule/obligation layer consumed by the existing systems.
 
-## 5. Required next conformance work
+## 5. Dependency-free Rust reference kernel
+
+The first executable open reference is in [tools/sawem-market-reference](../../../../tools/sawem-market-reference/). It is a standalone Cargo workspace with no third-party dependencies.
+
+It currently implements and tests:
+- charge/discharge energy balance using an explicitly documented symmetric square-root round-trip-efficiency assumption;
+- minimum stable charge and continuous charge/discharge power limits;
+- explicit transition downtime and mode-switch timing;
+- SOC minimum/maximum feasibility;
+- upward and downward reserve power and energy headroom;
+- duplicate reserve product/direction detection and aggregation rather than silent double-counting;
+- network import/export caps;
+- seven-day declaration, next-six-days aggregate and seven-day energy caps;
+- checked integer arithmetic for credit cover and multiple signed balancing-payment components.
+
+The kernel is a deterministic feasibility auditor, not a market optimizer. Its simplified symmetric efficiency assumption must be replaced by boundary-specific measured charge/discharge/auxiliary-loss models before engineering performance claims. It does not model temperature, electrochemical dynamics, degradation, warranty, power flow, market price formation, unit commitment, stochastic policies, SAWEM legal interpretation, authenticated dispatch/meter data or settlement integration.
+
+The first CI run executes its formatting and dependency-locked unit tests in isolation from the repository root workspace. The open reference is intended to become the hand-auditable feasibility oracle for the 20-case benchmark corpus, not a replacement for PLEXOS, Chronos or EnCompass.
+
+## 6. Required next conformance work
 
 The next implementation slice should validate:
 1. market-code publication status and effective status are separate;
@@ -129,7 +148,7 @@ The next implementation slice should validate:
 12. credit cover includes actual and undefined potential exposure;
 13. synthetic, vendor-declared, registered, operator-certified and measured quantities never silently promote one another.
 
-## 6. Nonclaims
+## 7. Nonclaims
 
 This profile does not establish:
 - that a particular SAWEM rule or product is in force;
