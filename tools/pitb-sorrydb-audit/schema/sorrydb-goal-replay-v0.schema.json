@@ -24,6 +24,10 @@
     "replay_command",
     "replay_command_sha256",
     "replay_log_sha256",
+    "captured_goal_sha256",
+    "goal_capture_status",
+    "goal_capture_end_marker",
+    "goal_capture_begin_marker",
     "replay_exit_code",
     "goal_reproduced",
     "scoring_admission",
@@ -117,6 +121,24 @@
     "limitation": {
       "type": "string",
       "minLength": 50
+    },
+    "goal_capture_begin_marker": {
+      "type": "string",
+      "pattern": "^PITB_SORRYDB_GOAL_BEGIN_[a-f0-9]{16}$"
+    },
+    "goal_capture_end_marker": {
+      "type": "string",
+      "pattern": "^PITB_SORRYDB_GOAL_END_[a-f0-9]{16}$"
+    },
+    "goal_capture_status": {
+      "enum": [
+        "captured",
+        "missing_or_ambiguous"
+      ]
+    },
+    "captured_goal_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
     }
   },
   "allOf": [
@@ -135,6 +157,25 @@
         "properties": {
           "replay_exit_code": {
             "const": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "goal_reproduced": {
+            "const": true
+          }
+        },
+        "required": [
+          "goal_reproduced"
+        ]
+      },
+      "then": {
+        "properties": {
+          "goal_capture_status": {
+            "const": "captured"
           }
         }
       }
