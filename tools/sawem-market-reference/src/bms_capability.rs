@@ -75,7 +75,7 @@ pub struct CapabilityAssessment<'a> {
     pub disposition: CapabilityDisposition,
     /// False for synthetic assumptions. Such a result is a scenario only and
     /// must not be used to authorize a real dispatch.
-    pub operationally_qualified: bool,
+    pub evidence_basis_is_non_synthetic: bool,
     pub evidence_basis: CapabilityEvidenceBasis,
     pub source_ref: &'a str,
     pub source_sha256: &'a str,
@@ -206,7 +206,7 @@ pub fn assess_soc_dependent_capability<'a>(
         } else {
             CapabilityDisposition::DerateRequired
         },
-        operationally_qualified: envelope.evidence_basis
+        evidence_basis_is_non_synthetic: envelope.evidence_basis
             != CapabilityEvidenceBasis::SyntheticAssumption,
         evidence_basis: envelope.evidence_basis,
         source_ref: envelope.source_ref,
@@ -330,7 +330,7 @@ mod tests {
     }
 
     #[test]
-    fn synthetic_assumptions_are_never_operationally_qualified() {
+    fn synthetic_assumptions_are_never_evidence_basis_is_non_synthetic() {
         let profile = envelope(
             CapabilityEvidenceBasis::SyntheticAssumption,
             &CHARGE,
@@ -339,7 +339,7 @@ mod tests {
         let result =
             assess_soc_dependent_capability(profile, PowerDirection::Discharge, 5_000, 1_000)
                 .unwrap();
-        assert!(!result.operationally_qualified);
+        assert!(!result.evidence_basis_is_non_synthetic);
         assert_eq!(result.disposition, CapabilityDisposition::WithinEnvelope);
     }
 
