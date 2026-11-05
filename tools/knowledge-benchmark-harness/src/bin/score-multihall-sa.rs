@@ -391,10 +391,7 @@ fn is_git_sha(value: &str) -> bool {
 }
 
 fn validate_budget(budget: &BudgetPlan) -> Result<(), String> {
-    if budget.max_input_tokens == 0
-        || budget.max_output_tokens == 0
-        || budget.max_latency_ms == 0
-    {
+    if budget.max_input_tokens == 0 || budget.max_output_tokens == 0 || budget.max_latency_ms == 0 {
         return Err("input-token, output-token and latency budgets must be positive".into());
     }
     // Zero evidence tokens and zero retrieval calls are valid: they represent a
@@ -1633,8 +1630,8 @@ mod tests {
         budget.insert("max_evidence_tokens".into(), Value::from(0));
         budget.insert("max_retrieval_calls".into(), Value::from(0));
 
-        let schema = compile_schema(PLAN_SCHEMA, "plan")
-            .expect("the checked-in plan schema compiles");
+        let schema =
+            compile_schema(PLAN_SCHEMA, "plan").expect("the checked-in plan schema compiles");
         assert!(
             validate_value(&plan, &schema, "zero-retrieval plan").is_ok(),
             "closed-book comparison plans must be admitted by the schema"
