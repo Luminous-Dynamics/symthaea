@@ -707,7 +707,7 @@
       "case_id": "CONSTRAINED-SCHEDULE-COMPENSATION-001",
       "track": "settlement_and_liquidity",
       "title": "Unconstrained-to-constrained schedule adjustment",
-      "scenario": "The Market Operator integrates the submitted piecewise incremental price curve over the exact signed-MW interval between the Unconstrained and Constrained Schedules; schedule increase is a payment and reduction is a charge. Explicit no-price-submission is R0/MWh; unknown source state and gaps in the curve remain indeterminate or invalid.",
+      "scenario": "The Market Operator integrates the submitted stepwise incremental price curve over the exact signed-MWh-per-Trading-Period interval between the Unconstrained and Constrained Schedules; schedule increase is a payment and reduction is a charge. Explicit no-price-submission is R0/MWh; unknown source state and gaps in the curve remain indeterminate or invalid. The schedule is energy per Trading Period, not an inferred MW value.",
       "owner": "Symthaea",
       "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
@@ -723,10 +723,10 @@
       "required_evidence": [
         "exact Trading Unit and Trading Period",
         "Unconstrained Schedule and Constrained Schedule revisions",
-        "Trading Period duration in minutes",
         "authoritative day-ahead incremental price submission state",
         "complete signed-MW incremental price curve covering the schedule delta",
-        "price-curve segment units and source revision"
+        "price-curve segment units and source revision",
+        "Trading Period identity and schedule revision pair"
       ],
       "stress_tags": [
         "congestion",
