@@ -207,6 +207,16 @@ pub fn replay_prices_as_of<'a>(
         .copied()
         .filter(|target| target.model_id.is_none())
     {
+        let has_realized_observation = vintages.iter().copied().any(|vintage| {
+            target_matches(vintage, target)
+                && vintage.available_at_utc <= decision_time_utc
+                && matches!(vintage.kind, PriceVintageKind::Realized { .. })
+        });
+        // A known realized price is model-independent. If no such observation
+        // exists, competing forecast engines require an explicit target scope.
+        if has_realized_observation {
+            continue;
+        }
         let mut forecast_model: Option<&str> = None;
         for vintage in vintages.iter().copied() {
             if !target_matches(vintage, target) || vintage.available_at_utc > decision_time_utc {
@@ -433,6 +443,33 @@ mod tests {
             replay_prices_as_of(100, &[target(None)], &vintages),
             Err(AsOfReplayError::ModelScopeRequired)
         );
+    }
+
+    #[test]
+    fn forecast_issued_before_decision_but_published_after_is_excluded() {
+        let vintages = [
+            forecast("earlier-known", 70, 80, 500, "chronos-v1"),
+            forecast("late-published", 90, 101, 900, "chronos-v1"),
+        ];
+        let result = replay_prices_as_of(100, &[target(Some("chronos-v1"))], &vintages).unwrap();
+        assert_eq!(result.selected[0].record_id, "earlier-known");
+        assert_eq!(result.selected[0].value_minor_zar_per_mwh, 500);
+        assert_eq!(result.future_known_excluded_count, 1);
+        assert_eq!(result.superseded_vintage_count, 0);
+    }
+
+    #[test]
+    fn known_realized_price_is_model_independent_even_with_multiple_forecasts() {
+        let vintages = [
+            forecast("chronos", 90, 95, 600, "chronos-v1"),
+            forecast("homer", 92, 96, 900, "homer-v1"),
+            realized("actual", 205, 210, 700),
+        ];
+        let result = replay_prices_as_of(220, &[target(None)], &vintages).unwrap();
+        assert!(result.is_complete());
+        assert_eq!(result.selected[0].record_id, "actual");
+        assert_eq!(result.selected[0].kind, SelectedVintageKind::Realized);
+        assert_eq!(result.future_known_excluded_count, 0);
     }
 
     #[test]
