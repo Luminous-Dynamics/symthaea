@@ -1,0 +1,160 @@
+{
+  "schema_version": 1,
+  "analysis_id": "synthetic-joint-support-xor-v1",
+  "dataset_revision_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "query_id": "joint-observation-distinguishes-worlds",
+  "query_spec_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "scenario_set_scope": "exhaustive_declared_scenario_space",
+  "scenario_set_sha256": "e6ea3b6ce647bce5e37867b1282547977f65fb3e0c97dc0523982fe28584ee36",
+  "action_set_sha256": "4ed5cfd9d9764dfa4efcf0adc86d99308163e5ebd0a4a0dac92455c6d0716a3d",
+  "joint_support_scope": "exhaustive_declared_joint_support",
+  "joint_support_set_sha256": "7781ff153ec88ae2d12ab07cacb435628d8d0481ee4840be396e5c0423c23a45",
+  "effort_unit": "expert_review_minutes",
+  "max_total_effort_units": 5,
+  "scenarios": [
+    {
+      "scenario_id": "world-alpha",
+      "graph_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision_met": true
+    },
+    {
+      "scenario_id": "world-beta",
+      "graph_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "decision_met": false
+    }
+  ],
+  "actions": [
+    {
+      "action_id": "inspect-x",
+      "action_kind": "image_inspection",
+      "effort_units": 2,
+      "source_evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "dependence_groups": [
+        "raw-em-volume-01"
+      ]
+    },
+    {
+      "action_id": "inspect-y",
+      "action_kind": "morphology_review",
+      "effort_units": 3,
+      "source_evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "dependence_groups": [
+        "raw-em-volume-01",
+        "mesh-review-family"
+      ]
+    },
+    {
+      "action_id": "orthogonal-z",
+      "action_kind": "orthogonal_measurement",
+      "effort_units": 5,
+      "source_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "dependence_groups": [
+        "orthogonal-acquisition-01"
+      ]
+    }
+  ],
+  "joint_supports": [
+    {
+      "scenario_id": "world-alpha",
+      "joint_observation_model_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "dependence_groups": [
+        "shared-volume-01",
+        "joint-review-rubric-A"
+      ],
+      "rows": [
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-x",
+              "value": "0"
+            },
+            {
+              "action_id": "inspect-y",
+              "value": "0"
+            },
+            {
+              "action_id": "orthogonal-z",
+              "value": "0"
+            }
+          ]
+        },
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-x",
+              "value": "1"
+            },
+            {
+              "action_id": "inspect-y",
+              "value": "1"
+            },
+            {
+              "action_id": "orthogonal-z",
+              "value": "1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "scenario_id": "world-beta",
+      "joint_observation_model_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "source_evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "dependence_groups": [
+        "shared-volume-01",
+        "joint-review-rubric-B"
+      ],
+      "rows": [
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-x",
+              "value": "0"
+            },
+            {
+              "action_id": "inspect-y",
+              "value": "1"
+            },
+            {
+              "action_id": "orthogonal-z",
+              "value": "1"
+            }
+          ]
+        },
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-x",
+              "value": "1"
+            },
+            {
+              "action_id": "inspect-y",
+              "value": "0"
+            },
+            {
+              "action_id": "orthogonal-z",
+              "value": "0"
+            }
+          ]
+        },
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-x",
+              "value": "0"
+            },
+            {
+              "action_id": "inspect-y",
+              "value": "0"
+            },
+            {
+              "action_id": "orthogonal-z",
+              "value": "0"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
