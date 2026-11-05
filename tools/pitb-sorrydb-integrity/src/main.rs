@@ -1056,11 +1056,26 @@ fn run_self_tests() -> Result<(), String> {
     println!("SELF_TEST_PASS non-Prop targets remain unqualified");
 
     let mut bad_receipt = receipts[0].clone();
+    bad_receipt.elaborated_goal_sha256 = fake_hash("different elaborated proposition");
+    if validate_receipt(&bad_receipt, &split.sorries[0], 1).is_err() {
+        return Err("structural goal mismatch should be retained as a disqualifying finding".into());
+    }
     bad_receipt.goal_alignment = "mismatch".into();
     if validate_receipt(&bad_receipt, &split.sorries[0], 1).unwrap() {
         return Err("mismatched extracted goal was treated as qualified".into());
     }
     println!("SELF_TEST_PASS mismatched elaborated goal remains unqualified");
+
+    let mut bad_receipt = receipts[0].clone();
+    bad_receipt.goal_alignment = "normalized".into();
+    if validate_receipt(&bad_receipt, &split.sorries[0], 1).is_ok() {
+        return Err("normalized goal alignment without equivalence evidence was accepted".into());
+    }
+    bad_receipt.goal_alignment_review_sha256 = Some(fake_hash("normalization-equivalence-receipt"));
+    if !validate_receipt(&bad_receipt, &split.sorries[0], 1)? {
+        return Err("normalized goal alignment with equivalence evidence should remain reproducible".into());
+    }
+    println!("SELF_TEST_PASS normalized goal alignment requires digest-bound equivalence evidence");
 
     let mut duplicate = receipts.clone();
     duplicate.push(receipts[0].clone());
