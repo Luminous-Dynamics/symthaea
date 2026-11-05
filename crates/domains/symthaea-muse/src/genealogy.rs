@@ -860,6 +860,130 @@ fn manifest_content_hash(
         .collect()
 }
 
+const LINEAGE_HASH_DOMAIN: &str = "symthaea-muse-genealogy-lineage-v1";
+const DERIVED_MANIFEST_HASH_DOMAIN: &str = "symthaea-muse-genealogy-manifest-v2";
+const EDGE_HASH_DOMAIN: &str = "symthaea-muse-genealogy-parent-edge-v1";
+
+fn hash_field(hasher: &mut Sha256, value: &[u8]) {
+    hasher.update((value.len() as u64).to_le_bytes());
+    hasher.update(value);
+}
+
+fn hash_optional_field(hasher: &mut Sha256, value: Option<&str>) {
+    match value {
+        Some(value) => {
+            hasher.update([1u8]);
+            hash_field(hasher, value.as_bytes());
+        }
+        None => hasher.update([0u8]),
+    }
+}
+
+fn hash_finish(hasher: Sha256) -> String {
+    hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn lineage_content_hash(
+    resolved: &[(GenealogyParentInputV1, GenealogyManifest)],
+) -> String {
+    let mut hasher = Sha256::new();
+    hash_field(&mut hasher, LINEAGE_HASH_DOMAIN.as_bytes());
+    for (input, parent) in resolved {
+        hash_field(&mut hasher, parent.manifest_sha256.as_bytes());
+        let kind_json = serde_json::to_string(&input.kind).unwrap_or_default();
+        hash_field(&mut hasher, kind_json.as_bytes());
+        hash_optional_field(&mut hasher, input.source_event_id.as_deref());
+        hash_optional_field(&mut hasher, input.contributor_ref.as_deref());
+        hash_optional_field(&mut hasher, input.authority_receipt_ref.as_deref());
+        hash_field(&mut hasher, input.idempotency_key.as_bytes());
+    }
+    hash_finish(hasher)
+}
+
+fn derived_manifest_content_hash(
+    namespace: &str,
+    relation_json: &str,
+    origin_json: &str,
+    audio_key: &str,
+    recipe_sha256: &str,
+    score_sha256: Option<&str>,
+    audio_sha256: &str,
+    lineage_sha256: &str,
+) -> String {
+    let mut hasher = Sha256::new();
+    hash_field(&mut hasher, DERIVED_MANIFEST_HASH_DOMAIN.as_bytes());
+    for field in [
+        namespace,
+        relation_json,
+        origin_json,
+        audio_key,
+        recipe_sha256,
+        score_sha256.unwrap_or(""),
+        audio_sha256,
+        lineage_sha256,
+    ] {
+        hash_field(&mut hasher, field.as_bytes());
+    }
+    hash_finish(hasher)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn genealogy_edge_content_hash(
+    parent_manifest_id: i64,
+    child_manifest_id: i64,
+    parent_manifest_sha256: &str,
+    child_manifest_sha256: &str,
+    kind_json: &str,
+    source_event_id: Option<&str>,
+    contributor_ref: Option<&str>,
+    authority_receipt_ref: Option<&str>,
+    idempotency_key: &str,
+) -> String {
+    let mut hasher = Sha256::new();
+    hash_field(&mut hasher, EDGE_HASH_DOMAIN.as_bytes());
+    hash_field(&mut hasher, &parent_manifest_id.to_le_bytes());
+    hash_field(&mut hasher, &child_manifest_id.to_le_bytes());
+    hash_field(&mut hasher, parent_manifest_sha256.as_bytes());
+    hash_field(&mut hasher, child_manifest_sha256.as_bytes());
+    hash_field(&mut hasher, kind_json.as_bytes());
+    hash_optional_field(&mut hasher, source_event_id);
+    hash_optional_field(&mut hasher, contributor_ref);
+    hash_optional_field(&mut hasher, authority_receipt_ref);
+    hash_field(&mut hasher, idempotency_key.as_bytes());
+    hash_finish(hasher)
+}
+
+#[derive(Clone)]
+struct ResolvedStoredEdge {
+    edge: GenealogyParentEdgeV1,
+    parent_manifest: GenealogyManifest,
+}
+
+fn stored_edge_from_row(row: &Row) -> rusqlite::Result<GenealogyParentEdgeV1> {
+    let kind_json: String = row.get(3)?;
+    let created_at_unix_ms: i64 = row.get(9)?;
+    Ok(GenealogyParentEdgeV1 {
+        id: row.get(0)?,
+        child_manifest_id: row.get(1)?,
+        parent_manifest_id: row.get(2)?,
+        kind: serde_json::from_str(&kind_json).unwrap_or(GenealogyEdgeKindV1::ReferenceOnly),
+        source_event_id: row.get(4)?,
+        contributor_ref: row.get(5)?,
+        authority_receipt_ref: row.get(6)?,
+        idempotency_key: row.get(7)?,
+        edge_sha256: row.get(8)?,
+        created_at_unix_ms: created_at_unix_ms as u64,
+    })
+}
+
+const EDGE_SELECT_COLUMNS: &str = "id, child_manifest_id, parent_manifest_id, kind_json,
+    source_event_id, contributor_ref, authority_receipt_ref, idempotency_key, edge_sha256,
+    created_at_unix_ms";
+
 #[cfg(test)]
 mod tests {
     use super::*;
