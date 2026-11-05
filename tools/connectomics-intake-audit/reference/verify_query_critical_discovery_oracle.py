@@ -200,6 +200,7 @@ def verify(raw: bytes, data: dict, actual: dict) -> None:
         "zero_proposal_psu_count": zero_proposal,
         "channel_count": len(channels),
         "proposal_count": len(proposal_rows),
+        "note_count": len(data.get("notes", [])),
         "confirmed_match_count": sum(
             1 for row in proposal_rows if row["adjudication_disposition"] == "CONFIRMED_MATCH"
         ),
