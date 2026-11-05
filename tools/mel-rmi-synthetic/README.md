@@ -45,6 +45,8 @@ The same executable emits eleven `negotiation` rows. Six are expected to qualify
 
 The Rust unit suite additionally exhaustively checks 3,464 dispositions across all non-empty accepted-offset sets for cyclic domains of size 2–5, every source value, every veto subset, and unresolved/explicit partner choices. It checks both expected-valid and expected-invalid outcomes and pins the exact enumeration count.
 
+The runner also emits seven scoped-authority cases: one valid event and six rejected cases covering wrong source event, stale sequence, wrong clock origin, not-yet-effective event, expiry, and missing receipt reference. These checks bind the decision state to the current session/task/observation and time context. They do **not** authenticate the referenced actor or signed receipt. Production use must first verify the opaque receipt, actor and purpose-specific authorization through the MEL-013A trust boundary.
+
 ## Interpretation boundary
 
 Passing these tests means only that this finite synthetic harness detects its known positive and negative controls. The manifest stores exact event identities and a caller-supplied code revision; it does not cryptographically hash arbitrary audio or MIDI payloads. Real artifact digests and Studio transaction receipts must be supplied by the MEL-013A adapter before external or human-session claims.
