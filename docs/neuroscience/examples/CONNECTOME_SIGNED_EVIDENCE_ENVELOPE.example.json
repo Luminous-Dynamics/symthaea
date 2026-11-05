@@ -1,0 +1,18 @@
+{
+  "payload": "ewogICJzY2hlbWFfdmVyc2lvbiI6IDEsCiAgInN0YXRlbWVudF9pZCI6ICJzeW50aGV0aWMtY29ubmVjdG9tZS1vYnNlcnZhdGlvbi0yMDI2LTAwMSIsCiAgInN0YXRlbWVudF90eXBlIjogImNvbm5lY3RvbWUub2JzZXJ2YXRpb24udjEiLAogICJjbGFpbV9zY29wZSI6ICJzeW50aGV0aWMgZml4dHVyZSBvbmx5OyBubyBiaW9sb2dpY2FsIGFzc2VydGlvbiIsCiAgImRhdGFzZXRfcmV2aXNpb25fY29tbWl0X3NoYSI6ICJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwKICAicXVlcnlfaWQiOiAic3ludGhldGljLXF1ZXJ5IiwKICAicXVlcnlfc3BlY19zaGEyNTYiOiAiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYiIsCiAgInN1YmplY3Rfc2hhMjU2IjogImNjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2MiLAogICJldmlkZW5jZV9zaGEyNTYiOiAiZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZCIsCiAgInByb3RvY29sX3NoYTI1NiI6ICJlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlIiwKICAib2JzZXJ2ZXJfcmVjb3JkX2lkIjogIm9ic2VydmVyLWZpeHR1cmUtMDAxIiwKICAiaXNzdWVkX2F0X3VuaXgiOiAxNzkzODkwMDAwLAogICJleHBpcmVzX2F0X3VuaXgiOiAxNzk0OTAwMDAwCn0K",
+  "payload_type": "application/vnd.luminous.connectome-evidence+json;version=1",
+  "signatures": [
+    {
+      "keyid": "fixture-observer-key-v1",
+      "sig": "SmyFLrbv3xFNJKK7ZCq3NV0TwE4HGzTg2Azqs0Dz0KZ/mxm2Il5JN/QZOHgNW0FQs5avBM7xFQyQNC1p+nd7Aw=="
+    },
+    {
+      "keyid": "fixture-independent_reviewer-key-v1",
+      "sig": "N4LEfA1hhh5E3EbVsxWjezrv7/Ez9t0Avgqw+HZl+ttHUGX0Mbe+m3LX8F+rDf5Q7MfEviMlFTSGXD8PIoGJAw=="
+    },
+    {
+      "keyid": "fixture-data_steward-key-v1",
+      "sig": "fTQj/VCaHhWr9y8gNlVh0mQPumXE63WXcBkze8IjwJ3rIVE0PAUW+acqis9CXm1dFIbroW3hjthJiPCqKv+zBw=="
+    }
+  ]
+}
