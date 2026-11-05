@@ -10,6 +10,7 @@ use std::fmt;
 
 pub mod asof_replay;
 pub mod credit_cover;
+pub mod forecast_metrics;
 pub mod liquidity_options;
 pub mod liquidity_stress;
 pub mod liquidity_waterfall;
