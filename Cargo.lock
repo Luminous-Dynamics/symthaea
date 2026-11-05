@@ -18571,7 +18571,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha3",
- "symtropy-math 0.1.0",
+ "symtropy-math 0.2.1",
  "thiserror 1.0.69",
  "tokenizers 0.21.4",
  "tokio",
