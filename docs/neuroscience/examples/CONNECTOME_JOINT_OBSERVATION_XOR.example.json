@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "analysis_id": "synthetic-correlated-joint-observation-v1",
+  "dataset_revision_commit_sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "query_id": "joint-pattern-excludes-refuting-world",
+  "query_spec_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "scenario_set_scope": "exhaustive_declared_scenario_space",
+  "scenario_set_sha256": "92eab799460babeba4a9c917e0e932313e6071a0b0185628cf8cce59e6c0f032",
+  "action_set_sha256": "ff7c0f0548f36ee354a73c9c067622f09c3c21d8667638762089162203bb1fd9",
+  "joint_support_scope": "exhaustive_declared_joint_support",
+  "effort_unit": "expert_review_minutes",
+  "max_total_effort_units": 3,
+  "scenarios": [
+    {
+      "scenario_id": "world-a-supports",
+      "graph_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision_met": true
+    },
+    {
+      "scenario_id": "world-b-refutes",
+      "graph_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "decision_met": false
+    }
+  ],
+  "actions": [
+    {
+      "action_id": "inspect-x",
+      "action_kind": "image_inspection",
+      "effort_units": 1,
+      "source_evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "observation_model_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "dependence_groups": [
+        "microscope-session-A"
+      ]
+    },
+    {
+      "action_id": "inspect-y",
+      "action_kind": "morphology_review",
+      "effort_units": 2,
+      "source_evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "observation_model_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "dependence_groups": [
+        "mesh-review-B"
+      ]
+    }
+  ],
+  "joint_support_sha256": "7302dafc8c340b2b1d1125684f4a10058cbaf1ed299b9913cddbfd4cf4d9165d",
+  "joint_world_supports": [
+    {
+      "scenario_id": "world-a-supports",
+      "source_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "joint_observation_model_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "dependence_groups": [
+        "shared-volume-01"
+      ],
+      "possible_joint_outcomes": [
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-x",
+              "outcome": "x0"
+            },
+            {
+              "action_id": "inspect-y",
+              "outcome": "y0"
+            }
+          ]
+        },
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-x",
+              "outcome": "x1"
+            },
+            {
+              "action_id": "inspect-y",
+              "outcome": "y1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "scenario_id": "world-b-refutes",
+      "source_evidence_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "joint_observation_model_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "dependence_groups": [
+        "shared-volume-01"
+      ],
+      "possible_joint_outcomes": [
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-x",
+              "outcome": "x0"
+            },
+            {
+              "action_id": "inspect-y",
+              "outcome": "y1"
+            }
+          ]
+        },
+        {
+          "outcomes": [
+            {
+              "action_id": "inspect-x",
+              "outcome": "x1"
+            },
+            {
+              "action_id": "inspect-y",
+              "outcome": "y0"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
