@@ -229,7 +229,11 @@ fn variance_decomposition(candidate_count: usize) -> VarianceDecomposition {
 fn population_variance(values: &[f64]) -> f64 {
     assert!(!values.is_empty());
     let mean = values.iter().sum::<f64>() / values.len() as f64;
-    values.iter().map(|value| (value - mean).powi(2)).sum::<f64>() / values.len() as f64
+    values
+        .iter()
+        .map(|value| (value - mean).powi(2))
+        .sum::<f64>()
+        / values.len() as f64
 }
 
 #[derive(Clone, Copy, Debug)]
