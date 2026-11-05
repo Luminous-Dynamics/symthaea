@@ -6,7 +6,7 @@
 
 use std::fs;
 use std::io::{Cursor, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
@@ -61,10 +61,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     save_both("deflate-repeated", &deflated, &destinations)?;
 
+    let stored_payload = (0u8..=127).collect::<Vec<_>>();
     let mixed_payload = b"mixed Stored and Deflate content ".repeat(32);
     let mixed = archive(
         &[
-            ("first.bin", &(0u8..=127).collect::<Vec<_>>(), CompressionMethod::Stored),
+            ("first.bin", &stored_payload, CompressionMethod::Stored),
             ("second.txt", &mixed_payload, CompressionMethod::Deflated),
         ],
         &[],
