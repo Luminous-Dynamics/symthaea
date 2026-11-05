@@ -735,17 +735,18 @@ mod tests {
         assert!(decision
             .cell_priorities
             .iter()
-            .any(|cell| cell.action_id == request.action_id
-                && cell.scenario_id == request.scenario_id
+            .any(|cell| cell.scenario_id == request.scenario_id
                 && cell.priority == decision.selected_cell_priority.unwrap()));
-        assert_eq!(request.first_replication_index, 4);
-        assert_eq!(request.replication_count, 3);
-        assert_eq!(request.seeds.len(), 3);
+        assert_eq!(request.cells.len(), 2);
+        assert!(request.cells.iter().all(|cell| cell.first_replication_index == 4));
+        assert!(request.cells.iter().all(|cell| cell.replication_count == 3));
+        assert!(request.cells.iter().all(|cell| cell.seeds.len() == 3));
+        assert_eq!(request.cells[0].seeds, request.cells[1].seeds);
         assert_eq!(
-            request.seeds[0],
+            request.cells[0].seeds[0],
             derive_replication_seed(
                 77,
-                request.action_id,
+                request.cells[0].action_id,
                 request.scenario_id,
                 4,
                 ReplicationSeedMode::CommonRandomNumbersWithinScenario,
@@ -776,6 +777,33 @@ mod tests {
         assert_eq!(
             decision.certificate.status,
             RobustSelectionStatus::NoSelectionCertificate
+        );
+        assert!(decision.next_batch.is_none());
+    }
+
+    #[test]
+    fn independent_mode_allocates_only_one_action_cell() {
+        let receipt = score_receipt(4, [0.8, 0.7], true);
+        let mut cfg = config(0.01, 40, 2);
+        cfg.seed_mode = ReplicationSeedMode::IndependentPerCell;
+        let decision = allocate_next_score_batch(&receipt, &cfg).unwrap();
+        assert_eq!(decision.disposition, AllocationDisposition::AllocateMore);
+        let request = decision.next_batch.unwrap();
+        assert_eq!(request.cells.len(), 1);
+        assert_eq!(request.cells[0].replication_count, 2);
+        assert_ne!(
+            derive_replication_seed(77, 1, request.scenario_id, 4, ReplicationSeedMode::IndependentPerCell),
+            derive_replication_seed(77, 2, request.scenario_id, 4, ReplicationSeedMode::IndependentPerCell)
+        );
+    }
+
+    #[test]
+    fn common_random_number_batch_is_atomic_under_compute_budget() {
+        let receipt = score_receipt(4, [0.8, 0.7], true);
+        let decision = allocate_next_score_batch(&receipt, &config(0.01, 17, 4)).unwrap();
+        assert_eq!(
+            decision.disposition,
+            AllocationDisposition::BudgetInsufficientForAtomicBatch
         );
         assert!(decision.next_batch.is_none());
     }
