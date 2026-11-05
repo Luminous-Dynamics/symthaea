@@ -600,7 +600,11 @@ fn run_authority_scope_conformance() -> Result<(usize, usize), Box<dyn Error>> {
     }
 
     let not_effective = validate_partner_authority_event(
-        &event, &observation, 7, "runner-clock-authority-session", 99,
+        &event,
+        &observation,
+        7,
+        "runner-clock-authority-session",
+        99,
     );
     let passed = not_effective.is_err();
     println!("authority_scope,not_yet_effective_rejected,{passed}");
@@ -611,7 +615,11 @@ fn run_authority_scope_conformance() -> Result<(usize, usize), Box<dyn Error>> {
     }
 
     let expired = validate_partner_authority_event(
-        &event, &observation, 7, "runner-clock-authority-session", 200,
+        &event,
+        &observation,
+        7,
+        "runner-clock-authority-session",
+        200,
     );
     let passed = expired.is_err();
     println!("authority_scope,expired_rejected,{passed}");
