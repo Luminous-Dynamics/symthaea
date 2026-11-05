@@ -44,7 +44,7 @@ impl Scenario {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Policy {
-    DirectPolicy,
+    Direct,
     DirectSearchControl,
     RandomPointSearch,
     AdaptivePointCem,
@@ -56,7 +56,7 @@ enum Policy {
 
 impl Policy {
     const ALL: [Self; 8] = [
-        Self::DirectPolicy,
+        Self::Direct,
         Self::DirectSearchControl,
         Self::RandomPointSearch,
         Self::AdaptivePointCem,
@@ -68,7 +68,7 @@ impl Policy {
 
     fn name(self) -> &'static str {
         match self {
-            Self::DirectPolicy => "direct_policy",
+            Self::Direct => "direct_policy",
             Self::DirectSearchControl => "direct_search_control",
             Self::RandomPointSearch => "random_point_search",
             Self::AdaptivePointCem => "adaptive_point_cem",
@@ -100,7 +100,7 @@ impl Policy {
             Self::RandomPointSearch
             | Self::AdaptivePointCem
             | Self::ShuffledFutureNegativeControl => 1,
-            Self::DirectPolicy | Self::DirectSearchControl | Self::OracleCem => 0,
+            Self::Direct | Self::DirectSearchControl | Self::OracleCem => 0,
         }
     }
 }
@@ -202,9 +202,8 @@ fn initial_state(seed: u64) -> State {
 }
 
 fn disturbance(seed: u64, step: usize) -> f64 {
-    let mut rng = SplitMix64::new(
-        seed ^ (step as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0xD157_0B5A,
-    );
+    let mut rng =
+        SplitMix64::new(seed ^ (step as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0xD157_0B5A);
     (rng.unit() * 2.0 - 1.0) * 0.005
 }
 
@@ -226,10 +225,7 @@ fn transition_core(
 ) -> Transition {
     let action = clamp_action(action);
 
-    let gain = if (truth || oracle)
-        && scenario == Scenario::RegimeMigration
-        && step >= 6
-    {
+    let gain = if (truth || oracle) && scenario == Scenario::RegimeMigration && step >= 6 {
         -0.12
     } else if !truth && !oracle && scenario == Scenario::CompoundingDrift {
         // Small action-correlated model bias; repeated planning compounds it.
@@ -247,8 +243,7 @@ fn transition_core(
     let next_v = (0.86 * state.v + gain * action + process_noise).clamp(-1.2, 1.2);
     let next_x = state.x + 0.10 * next_v;
 
-    let mut reward =
-        1.0 - (next_x - 0.42).powi(2) - 0.10 * next_v.powi(2) - 0.02 * action.powi(2);
+    let mut reward = 1.0 - (next_x - 0.42).powi(2) - 0.10 * next_v.powi(2) - 0.02 * action.powi(2);
 
     if !truth && !oracle && scenario == Scenario::StateActionPocket && action > 0.55 {
         let center = ENSEMBLE_CENTERS[head.min(ENSEMBLE_CENTERS.len() - 1)];
@@ -352,9 +347,7 @@ fn aggregate_scores(values: &[(f64, f64, usize)], policy: Policy) -> CandidateSc
     match policy {
         Policy::PessimisticEnsembleCem => CandidateScore {
             ranking_score: full.iter().copied().fold(f64::INFINITY, f64::min),
-            predicted_prefix_return: Some(
-                prefix.iter().copied().fold(f64::INFINITY, f64::min),
-            ),
+            predicted_prefix_return: Some(prefix.iter().copied().fold(f64::INFINITY, f64::min)),
             model_transition_evaluations,
             oracle_transition_evaluations,
         },
@@ -432,7 +425,12 @@ fn evaluate_candidate(
 
 #[allow(clippy::needless_range_loop)]
 fn update_cem_distribution(candidates: &mut [Candidate], mean: &mut [f64], std_dev: &mut [f64]) {
-    candidates.sort_by(|left, right| right.score.ranking_score.total_cmp(&left.score.ranking_score));
+    candidates.sort_by(|left, right| {
+        right
+            .score
+            .ranking_score
+            .total_cmp(&left.score.ranking_score)
+    });
     let elite_count = (candidates.len() / 5).max(1).min(candidates.len());
 
     for (index, (mean_value, std_value)) in mean.iter_mut().zip(std_dev.iter_mut()).enumerate() {
@@ -462,7 +460,7 @@ fn plan_actions(
     candidate_budget: usize,
     decision_seed: u64,
 ) -> Plan {
-    if policy == Policy::DirectPolicy {
+    if policy == Policy::Direct {
         return Plan {
             actions: vec![direct_action(state); horizon],
             predicted_prefix_return: None,
@@ -473,7 +471,11 @@ fn plan_actions(
         };
     }
 
-    let rounds = if policy == Policy::RandomPointSearch { 1 } else { 3 };
+    let rounds = if policy == Policy::RandomPointSearch {
+        1
+    } else {
+        3
+    };
     let mut rng = SplitMix64::new(decision_seed);
     let first_target = direct_action(state);
     let mut mean: Vec<f64> = (0..horizon)
@@ -495,26 +497,16 @@ fn plan_actions(
 
         for _ in 0..count {
             let actions: Vec<f64> = if policy == Policy::RandomPointSearch {
-                (0..horizon)
-                    .map(|_| rng.unit() * 2.0 - 1.0)
-                    .collect()
+                (0..horizon).map(|_| rng.unit() * 2.0 - 1.0).collect()
             } else {
                 mean.iter()
                     .zip(std_dev.iter())
-                    .map(|(mean_value, spread)| {
-                        clamp_action(*mean_value + *spread * rng.normal())
-                    })
+                    .map(|(mean_value, spread)| clamp_action(*mean_value + *spread * rng.normal()))
                     .collect()
             };
 
-            let score = evaluate_candidate(
-                scenario,
-                policy,
-                state,
-                &actions,
-                start_step,
-                block_len,
-            );
+            let score =
+                evaluate_candidate(scenario, policy, state, &actions, start_step, block_len);
             model_transition_evaluations += score.model_transition_evaluations;
             oracle_transition_evaluations += score.oracle_transition_evaluations;
             let candidate = Candidate { actions, score };
@@ -556,7 +548,11 @@ fn in_training_support(state: State) -> bool {
 fn structured_probe_indices(index: usize) -> (usize, usize, usize) {
     const PROBE_COUNT: usize = 201;
     assert!(index < PROBE_COUNT);
-    (index, (index * 37) % PROBE_COUNT, (index * 73) % PROBE_COUNT)
+    (
+        index,
+        (index * 37) % PROBE_COUNT,
+        (index * 73) % PROBE_COUNT,
+    )
 }
 
 fn structured_probe_one_step_state_rmse(scenario: Scenario) -> f64 {
@@ -578,7 +574,6 @@ fn structured_probe_one_step_state_rmse(scenario: Scenario) -> f64 {
     }
     (squared_error / PROBE_COUNT as f64).sqrt()
 }
-
 
 fn run_episode(
     scenario: Scenario,
@@ -626,7 +621,7 @@ fn run_episode(
 
         let mut actual_block_return = 0.0;
         for index in 0..block_len {
-            let action = if policy == Policy::DirectPolicy {
+            let action = if policy == Policy::Direct {
                 direct_action(state)
             } else {
                 plan.actions[index]
@@ -880,8 +875,8 @@ fn render_report() -> String {
                     for policy in Policy::ALL {
                         let mut results = Vec::with_capacity(EPISODES);
                         for episode in 0..EPISODES {
-                            let episode_seed = BASE_SEED
-                                ^ (episode as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+                            let episode_seed =
+                                BASE_SEED ^ (episode as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
                             results.push(run_episode(
                                 scenario,
                                 policy,
@@ -894,22 +889,14 @@ fn render_report() -> String {
                         all_results.push(results);
                     }
 
-                    let direct_returns: Vec<f64> = all_results[0]
-                        .iter()
-                        .map(|row| row.total_return)
-                        .collect();
-                    let direct_search_control_returns: Vec<f64> = all_results[1]
-                        .iter()
-                        .map(|row| row.total_return)
-                        .collect();
-                    let shuffled_returns: Vec<f64> = all_results[6]
-                        .iter()
-                        .map(|row| row.total_return)
-                        .collect();
-                    let oracle_returns: Vec<f64> = all_results[7]
-                        .iter()
-                        .map(|row| row.total_return)
-                        .collect();
+                    let direct_returns: Vec<f64> =
+                        all_results[0].iter().map(|row| row.total_return).collect();
+                    let direct_search_control_returns: Vec<f64> =
+                        all_results[1].iter().map(|row| row.total_return).collect();
+                    let shuffled_returns: Vec<f64> =
+                        all_results[6].iter().map(|row| row.total_return).collect();
+                    let oracle_returns: Vec<f64> =
+                        all_results[7].iter().map(|row| row.total_return).collect();
 
                     for (index, policy) in Policy::ALL.iter().enumerate() {
                         if !first {
@@ -947,7 +934,6 @@ fn main() {
 mod tests {
     use super::*;
 
-
     #[test]
     fn structured_probe_design_has_uniform_marginal_coverage() {
         use std::collections::BTreeSet;
@@ -976,14 +962,7 @@ mod tests {
     #[test]
     fn state_action_pocket_is_localized_to_a_state_action_conjunction() {
         let state = State { x: 0.20, v: 0.0 };
-        let optimistic = model_step(
-            state,
-            0.85,
-            2,
-            Scenario::StateActionPocket,
-            1,
-            false,
-        );
+        let optimistic = model_step(state, 0.85, 2, Scenario::StateActionPocket, 1, false);
         let outside_state = model_step(
             State { x: -0.45, v: 0.0 },
             0.85,
@@ -992,31 +971,28 @@ mod tests {
             1,
             false,
         );
-        let low_action = model_step(
-            state,
-            0.10,
-            2,
-            Scenario::StateActionPocket,
-            1,
-            false,
-        );
+        let low_action = model_step(state, 0.10, 2, Scenario::StateActionPocket, 1, false);
         let actual = true_step(state, 0.85, 2, Scenario::StateActionPocket, BASE_SEED);
         assert!(optimistic.reward - actual.reward > 0.30);
-        assert!((outside_state.reward
-            - true_step(
-                State { x: -0.45, v: 0.0 },
-                0.85,
-                2,
-                Scenario::StateActionPocket,
-                BASE_SEED,
-            )
-            .reward)
-            .abs()
-            < 0.01);
-        assert!((low_action.reward
-            - true_step(state, 0.10, 2, Scenario::StateActionPocket, BASE_SEED).reward)
-            .abs()
-            < 0.01);
+        assert!(
+            (outside_state.reward
+                - true_step(
+                    State { x: -0.45, v: 0.0 },
+                    0.85,
+                    2,
+                    Scenario::StateActionPocket,
+                    BASE_SEED,
+                )
+                .reward)
+                .abs()
+                < 0.01
+        );
+        assert!(
+            (low_action.reward
+                - true_step(state, 0.10, 2, Scenario::StateActionPocket, BASE_SEED).reward)
+                .abs()
+                < 0.01
+        );
     }
 
     #[test]
@@ -1047,7 +1023,6 @@ mod tests {
         assert!(predicted.state.v > 0.0);
     }
 
-
     #[test]
     fn rollout_transition_count_stops_at_the_predicted_terminal() {
         let (_, _, counted) = rollout_model(
@@ -1077,7 +1052,7 @@ mod tests {
     fn direct_policy_has_no_candidate_or_model_query_cost() {
         let plan = plan_actions(
             Scenario::Benign,
-            Policy::DirectPolicy,
+            Policy::Direct,
             State { x: -0.2, v: 0.0 },
             0,
             4,

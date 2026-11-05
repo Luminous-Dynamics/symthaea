@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CMAQ-017 selectable headroom report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "seed",
+    "replicates",
+    "candidate_counts",
+    "selection_continuation_counts",
+    "conditions",
+    "variance_decomposition",
+    "coupling_variance",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-017-selectable-headroom-v0.1"
+    },
+    "seed": {
+      "type": "integer"
+    },
+    "replicates": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "candidate_counts": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "selection_continuation_counts": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "conditions": {
+      "type": "array",
+      "minItems": 30,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate_count",
+          "selection_continuations",
+          "heldout_continuations",
+          "replicate_count",
+          "naive_best_estimate",
+          "heldout_selected_value",
+          "selected_candidate_true_value",
+          "oracle_best_expected_value",
+          "baseline_expected_value",
+          "naive_optimism_gap",
+          "heldout_score_bias",
+          "true_selectable_headroom",
+          "captured_headroom",
+          "selection_regret",
+          "capture_fraction",
+          "mean_selected_candidate_id",
+          "candidate_continuation_runs",
+          "heldout_continuation_runs"
+        ],
+        "properties": {
+          "candidate_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "selection_continuations": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "heldout_continuations": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "replicate_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "naive_best_estimate": {
+            "type": "number"
+          },
+          "heldout_selected_value": {
+            "type": "number"
+          },
+          "selected_candidate_true_value": {
+            "type": "number"
+          },
+          "oracle_best_expected_value": {
+            "type": "number"
+          },
+          "baseline_expected_value": {
+            "type": "number"
+          },
+          "naive_optimism_gap": {
+            "type": "number"
+          },
+          "heldout_score_bias": {
+            "type": "number"
+          },
+          "true_selectable_headroom": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "captured_headroom": {
+            "type": "number"
+          },
+          "selection_regret": {
+            "type": "number"
+          },
+          "capture_fraction": {
+            "type": "number"
+          },
+          "mean_selected_candidate_id": {
+            "type": "number",
+            "minimum": 0
+          },
+          "candidate_continuation_runs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "heldout_continuation_runs": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "variance_decomposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_mean_variance",
+        "shared_continuation_variance",
+        "candidate_continuation_interaction_variance"
+      ],
+      "properties": {
+        "candidate_mean_variance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "shared_continuation_variance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "candidate_continuation_interaction_variance": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "coupling_variance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "independent_pair_difference_variance",
+        "shared_invariant_same_sensitivity_variance",
+        "shared_invariant_opposite_sensitivity_variance"
+      ],
+      "properties": {
+        "independent_pair_difference_variance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "shared_invariant_same_sensitivity_variance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "shared_invariant_opposite_sensitivity_variance": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
