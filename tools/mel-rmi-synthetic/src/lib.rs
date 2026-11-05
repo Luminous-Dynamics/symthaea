@@ -762,26 +762,25 @@ pub fn canonical_fixture_suite_v1() -> Vec<SyntheticFixtureV1> {
                 unrelated_dimension,
                 expected_response: ResponseRule { modulus, offset },
             };
-            let observation =
-                |suffix: &str, target_value: i32, unrelated_value: i32| Observation {
-                    event_id: format!("{task_id}-{suffix}"),
-                    session_id: format!("synthetic-session-{index}"),
-                    history_id: format!("synthetic-history-{index}"),
-                    task_id: task_id.clone(),
-                    seed: 10_000 + index as u64,
-                    initial_partner_feature: Feature {
-                        dimension: target_dimension,
-                        value: baseline,
-                    },
-                    current_partner_feature: Feature {
-                        dimension: target_dimension,
-                        value: target_value,
-                    },
-                    unrelated_feature: Feature {
-                        dimension: unrelated_dimension,
-                        value: unrelated_value,
-                    },
-                };
+            let observation = |suffix: &str, target_value: i32, unrelated_value: i32| Observation {
+                event_id: format!("{task_id}-{suffix}"),
+                session_id: format!("synthetic-session-{index}"),
+                history_id: format!("synthetic-history-{index}"),
+                task_id: task_id.clone(),
+                seed: 10_000 + index as u64,
+                initial_partner_feature: Feature {
+                    dimension: target_dimension,
+                    value: baseline,
+                },
+                current_partner_feature: Feature {
+                    dimension: target_dimension,
+                    value: target_value,
+                },
+                unrelated_feature: Feature {
+                    dimension: unrelated_dimension,
+                    value: unrelated_value,
+                },
+            };
             let randomization_seed = 20_000 + index as u64;
             SyntheticFixtureV1 {
                 task,
