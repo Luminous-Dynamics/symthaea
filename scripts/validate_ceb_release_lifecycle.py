@@ -272,8 +272,9 @@ def self_test(release: dict, schema: dict) -> None:
         "raw_execution_artifacts_available":True,"evaluation_inputs_unchanged":True
       }]
     })
-    if validate_release(mutant,schema):
-        raise SystemExit("valid verifier-only regrade fixture unexpectedly failed")
+    verifier_errors=validate_release(mutant,schema)
+    if verifier_errors:
+        raise SystemExit("valid verifier-only regrade fixture unexpectedly failed: " + "; ".join(verifier_errors))
 
     # Agent-visible changes cannot be marked unaffected.
     mutant=copy.deepcopy(release)
