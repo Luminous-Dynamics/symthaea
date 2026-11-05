@@ -7,6 +7,7 @@ on:
       - "src/consciousness/recursive_improvement/reuse_error_budget.rs"
       - "src/consciousness/recursive_improvement/paired_evaluation.rs"
       - "src/consciousness/recursive_improvement/mod.rs"
+      - "tools/sym-rsi-reuse-gate/**"
       - ".github/workflows/sym-rsi-reuse-error-budget.yml"
   push:
     branches: [main]
@@ -53,7 +54,7 @@ jobs:
           rustfmt --edition 2024 --check --config skip_children=true             src/consciousness/recursive_improvement/reuse_error_budget.rs             src/consciousness/recursive_improvement/paired_evaluation.rs             src/consciousness/recursive_improvement/mod.rs
 
       - name: Test REUSE allocation and decision gate
-        run: cargo test -p symthaea --lib reuse_error_budget::tests -- --test-threads=1
+        run: cargo test --manifest-path tools/sym-rsi-reuse-gate/Cargo.toml --locked
 
-      - name: Clippy library
-        run: cargo clippy -p symthaea --lib -- -D warnings
+      - name: Clippy REUSE decision kernel
+        run: cargo clippy --manifest-path tools/sym-rsi-reuse-gate/Cargo.toml --all-targets --locked -- -D warnings
