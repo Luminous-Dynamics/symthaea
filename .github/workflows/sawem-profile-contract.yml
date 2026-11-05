@@ -1,0 +1,71 @@
+name: SAWEM BESS profile schema and synthetic-fixture contract
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "docs/research/sawem/**"
+      - "tools/sawem-profile-conformance/**"
+      - ".github/workflows/sawem-profile-contract.yml"
+  push:
+    paths:
+      - "docs/research/sawem/**"
+      - "tools/sawem-profile-conformance/**"
+      - ".github/workflows/sawem-profile-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sawem-profile-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  schema-fixture-contract:
+    name: schema-fixture-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact event commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Capture and verify checked-out commit
+        env:
+          EXPECTED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          ACTUAL_COMMIT="$(git rev-parse HEAD)"
+          echo "SAWEM_SOURCE_COMMIT=$ACTUAL_COMMIT" >> "$GITHUB_ENV"
+          echo "Expected commit: $EXPECTED_COMMIT"
+          echo "Actual commit:   $ACTUAL_COMMIT"
+          test "$ACTUAL_COMMIT" = "$EXPECTED_COMMIT"
+
+      - name: Set up isolated Python validator runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: tools/sawem-profile-conformance/requirements.txt
+
+      - name: Install pinned JSON Schema validator
+        run: |
+          python -m pip install --disable-pip-version-check --requirement tools/sawem-profile-conformance/requirements.txt
+          python -c "from importlib.metadata import version; assert version('jsonschema') == '4.26.0'"
+
+      - name: Validate Draft 2020-12 schema and profile invariants
+        env:
+          PYTHONHASHSEED: "0"
+        run: |
+          python tools/sawem-profile-conformance/validate_sawem_profile.py \
+            --output artifacts/sawem-bess-profile-conformance.json
+
+      - name: Preserve conformance receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: sawem-bess-profile-conformance
+          path: artifacts/sawem-bess-profile-conformance.json
+          if-no-files-found: error
+          retention-days: 90
