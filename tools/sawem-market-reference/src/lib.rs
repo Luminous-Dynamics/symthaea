@@ -115,6 +115,7 @@ pub enum InputError {
     NonFiniteValue(&'static str),
     NegativeValue(&'static str),
     InvalidEnergyBounds,
+    InvalidChargingBounds,
     InvalidEfficiency,
     InvalidInitialEnergy,
     InvalidSevenDayDeclarationCount,
@@ -127,6 +128,7 @@ impl fmt::Display for InputError {
             Self::NonFiniteValue(field) => write!(f, "{field} must be finite"),
             Self::NegativeValue(field) => write!(f, "{field} must be nonnegative"),
             Self::InvalidEnergyBounds => write!(f, "minimum energy must be below maximum energy"),
+            Self::InvalidChargingBounds => write!(f, "minimum stable charge must not exceed maximum charge power"),
             Self::InvalidEfficiency => write!(f, "round-trip efficiency must be in (0, 1]"),
             Self::InvalidInitialEnergy => write!(f, "initial energy is outside asset limits"),
             Self::InvalidSevenDayDeclarationCount => {
@@ -185,7 +187,7 @@ impl AssetLimits {
         }
 
         if self.min_stable_charge_mw > self.max_charge_mw + EPSILON {
-            return Err(InputError::InvalidEnergyBounds);
+            return Err(InputError::InvalidChargingBounds);
         }
         if self.min_energy_mwh < 0.0 || self.min_energy_mwh >= self.max_energy_mwh {
             return Err(InputError::InvalidEnergyBounds);
@@ -253,7 +255,11 @@ fn sum_reserves(
             ReserveDirection::Down => downward += reserve.mw,
         }
     }
-    Ok((upward, downward)).map_err(|_| violations)
+    if violations.is_empty() {
+        Ok((upward, downward))
+    } else {
+        Err(violations)
+    }
 }
 
 pub fn evaluate_dispatch(
@@ -440,15 +446,12 @@ pub fn validate_seven_day_energy_declarations(
     if declarations_mwh.len() != 7 {
         return Err(InputError::InvalidSevenDayDeclarationCount);
     }
-    for (index, value) in declarations_mwh.iter().enumerate() {
+    for value in declarations_mwh {
         if !value.is_finite() {
             return Err(InputError::NonFiniteValue("daily_declaration_mwh"));
         }
         if *value < 0.0 {
             return Err(InputError::NegativeValue("daily_declaration_mwh"));
-        }
-        if *value > limits.daily_limit_mwh + EPSILON {
-            let _ = index;
         }
     }
     let caps = [
