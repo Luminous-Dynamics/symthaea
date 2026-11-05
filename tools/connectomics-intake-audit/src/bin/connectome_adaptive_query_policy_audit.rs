@@ -1648,6 +1648,13 @@ mod tests {
         .expect("adaptive no-policy fixture must parse")
     }
 
+    fn hypothesis_expansion_fixture() -> Input {
+        serde_json::from_str(include_str!(
+            "../../../../docs/neuroscience/examples/CONNECTOME_ADAPTIVE_HYPOTHESIS_EXPANSION.example.json"
+        ))
+        .expect("hypothesis-space expansion fixture must parse")
+    }
+
     fn support_expansion_fixture() -> Input {
         serde_json::from_str(include_str!(
             "../../../../docs/neuroscience/examples/CONNECTOME_ADAPTIVE_SUPPORT_EXPANSION.example.json"
@@ -1810,6 +1817,51 @@ mod tests {
         assert_eq!(report.worst_case_effort_units, Some(1));
         assert_eq!(report.optimal_policy_count, 2);
         assert!(report.policy.is_some());
+    }
+
+    #[test]
+    fn appending_an_opposing_world_can_destroy_a_previously_valid_policy() {
+        let input = hypothesis_expansion_fixture();
+        let report = evaluate(&input, &bytes(&input)).unwrap();
+        assert_eq!(report.worst_case_effort_units, Some(4));
+        assert_eq!(report.scenario_challenge_count, 2);
+        let opposing = report
+            .scenario_challenges
+            .iter()
+            .find(|challenge| challenge.challenge_id == "append-refuting-world-sharing-observation-tuple")
+            .unwrap();
+        assert_eq!(opposing.added_scenario_count, 1);
+        assert_eq!(opposing.adaptive_worst_case_effort_before, Some(4));
+        assert_eq!(opposing.adaptive_worst_case_effort_after, None);
+        assert_eq!(opposing.adaptive_status_after, "NO_POLICY");
+        assert!(opposing.adaptive_effort_non_decreasing);
+        assert!(opposing.monotonicity_passed);
+    }
+
+    #[test]
+    fn appending_a_same_decision_world_preserves_the_query_policy() {
+        let input = hypothesis_expansion_fixture();
+        let report = evaluate(&input, &bytes(&input)).unwrap();
+        let same_decision = report
+            .scenario_challenges
+            .iter()
+            .find(|challenge| challenge.challenge_id == "append-supporting-world-with-covered-observation")
+            .unwrap();
+        assert_eq!(same_decision.adaptive_worst_case_effort_before, Some(4));
+        assert_eq!(same_decision.adaptive_worst_case_effort_after, Some(4));
+        assert_eq!(same_decision.fixed_minimum_effort_before, Some(5));
+        assert_eq!(same_decision.fixed_minimum_effort_after, Some(5));
+        assert!(same_decision.monotonicity_passed);
+        assert!(report.hypothesis_expansion_monotonicity_passed);
+    }
+
+    #[test]
+    fn hypothesis_expansion_rejects_a_base_world_id_reuse() {
+        let mut input = hypothesis_expansion_fixture();
+        input.scenario_challenges[0].additions[0].scenario.scenario_id = "world-a".into();
+        input.scenario_challenges[0].additions[0].support.scenario_id = "world-a".into();
+        let error = evaluate(&input, &bytes(&input)).unwrap_err();
+        assert!(error.contains("duplicate/invalid new world"));
     }
 
     #[test]
