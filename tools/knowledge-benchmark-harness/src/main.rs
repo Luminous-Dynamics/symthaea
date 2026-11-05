@@ -993,9 +993,9 @@ fn validate_case_catalog_refs(case: &Value) -> Vec<String> {
             }
         };
 
-        let source_id = string_field(&source, "source_id").unwrap_or("");
-        let family_id = string_field(&source, "source_family_id").unwrap_or("");
-        let split = string_field(&source, "split").unwrap_or("");
+        let source_id = string_field(&source, "source_id").unwrap_or("").to_string();
+        let family_id = string_field(&source, "source_family_id").unwrap_or("").to_string();
+        let split = string_field(&source, "split").unwrap_or("").to_string();
 
         if source_id.is_empty() || family_id.is_empty() || split.is_empty() {
             errors.push(format!(
@@ -1005,18 +1005,18 @@ fn validate_case_catalog_refs(case: &Value) -> Vec<String> {
             continue;
         }
 
-        if catalog.insert(source_id.to_string(), source).is_some() {
+        if catalog.insert(source_id.clone(), source).is_some() {
             errors.push(format!("duplicate bundled source_id {source_id:?}"));
         }
 
-        if let Some(previous_split) = family_splits.get(family_id) {
-            if previous_split != split {
+        if let Some(previous_split) = family_splits.get(&family_id) {
+            if previous_split != &split {
                 errors.push(format!(
                     "source family {family_id:?} spans multiple evaluation splits"
                 ));
             }
         } else {
-            family_splits.insert(family_id.to_string(), split.to_string());
+            family_splits.insert(family_id, split);
         }
     }
 
