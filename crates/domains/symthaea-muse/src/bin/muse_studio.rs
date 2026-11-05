@@ -2833,7 +2833,15 @@ fn read_verified_keeper_file(
     filename: &str,
     expected_sha256: &str,
 ) -> std::io::Result<KeeperArtifactFileV1> {
-    let bytes = std::fs::read(bundle_path.join(filename))?;
+    let path = bundle_path.join(filename);
+    let metadata = std::fs::symlink_metadata(&path)?;
+    if !metadata.file_type().is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("keeper artifact is not a regular file: {filename}"),
+        ));
+    }
+    let bytes = std::fs::read(path)?;
     let actual_sha256 = sha256_hex(&bytes);
     if actual_sha256 != expected_sha256 {
         return Err(std::io::Error::new(
@@ -2860,6 +2868,43 @@ fn verify_keeper_bundle_readback(
     expected_score_sha256: &str,
     expected_midi_sha256: Option<&str>,
 ) -> std::io::Result<KeeperArtifactReadbackReceiptV1> {
+    let mut expected_files = vec![
+        "audio.wav",
+        "recipe.json",
+        "score.json",
+    ];
+    if expected_midi_sha256.is_some() {
+        expected_files.push("performance.mid");
+    }
+    expected_files.sort_unstable();
+
+    let mut actual_files = std::fs::read_dir(bundle_path)?
+        .map(|entry| {
+            let entry = entry?;
+            if !entry.file_type()?.is_file() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "keeper bundle contains a non-regular entry",
+                ));
+            }
+            entry.file_name().into_string().map_err(|_| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "keeper bundle contains a non-UTF-8 filename",
+                )
+            })
+        })
+        .collect::<std::io::Result<Vec<_>>>()?;
+    actual_files.sort_unstable();
+    if actual_files.iter().map(String::as_str).collect::<Vec<_>>()
+        != expected_files
+    {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("keeper bundle file set mismatch: {actual_files:?}"),
+        ));
+    }
+
     let mut artifacts = vec![
         read_verified_keeper_file(bundle_path, "audio.wav", expected_audio_sha256)?,
         read_verified_keeper_file(bundle_path, "recipe.json", expected_recipe_sha256)?,
@@ -5583,6 +5628,59 @@ mod keeper_readback_tests {
         );
         assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::InvalidData);
         fs::remove_dir_all(path).unwrap();
+    }
+
+    #[test]
+    fn readback_rejects_unexpected_extra_files() {
+        let path = test_bundle_path();
+        fs::create_dir_all(&path).unwrap();
+        let audio = b"committed wav bytes";
+        let recipe = b"{ \"schema_version\": 1 }";
+        let score = b"{\"notes\":[]}";
+        fs::write(path.join("audio.wav"), audio).unwrap();
+        fs::write(path.join("recipe.json"), recipe).unwrap();
+        fs::write(path.join("score.json"), score).unwrap();
+        fs::write(path.join("unreceipted.txt"), b"untracked artifact").unwrap();
+
+        let result = verify_keeper_bundle_readback(
+            &path,
+            "keeper-v1",
+            &sha256_hex(audio),
+            &sha256_hex(recipe),
+            &sha256_hex(score),
+            None,
+        );
+        assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::InvalidData);
+        fs::remove_dir_all(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn readback_rejects_symlinked_artifacts() {
+        use std::os::unix::fs::symlink;
+
+        let path = test_bundle_path();
+        fs::create_dir_all(&path).unwrap();
+        let external = path.with_extension("external");
+        let audio = b"committed wav bytes";
+        let recipe = b"{ \"schema_version\": 1 }";
+        let score = b"{\"notes\":[]}";
+        fs::write(&external, audio).unwrap();
+        symlink(&external, path.join("audio.wav")).unwrap();
+        fs::write(path.join("recipe.json"), recipe).unwrap();
+        fs::write(path.join("score.json"), score).unwrap();
+
+        let result = verify_keeper_bundle_readback(
+            &path,
+            "keeper-v1",
+            &sha256_hex(audio),
+            &sha256_hex(recipe),
+            &sha256_hex(score),
+            None,
+        );
+        assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::InvalidData);
+        fs::remove_dir_all(path).unwrap();
+        fs::remove_file(external).unwrap();
     }
 
     #[test]
