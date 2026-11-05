@@ -4,8 +4,9 @@
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use std::ffi::CString;
 use std::fs::File;
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use zip::CompressionMethod;
 
@@ -65,10 +66,10 @@ pub fn replay_member_claim(
     let archive_limit =
         decimal_at(receipt, &["limits", "max_archive_bytes"])?.min(HARD_ARCHIVE_LIMIT);
     let archive_size = decimal_at(receipt, &["source", "archive_size_bytes"])?;
-    // Keep one opened object for the entire operation. The parser receives a cloned handle
-    // to this same object, not a second path open that could resolve to a replacement file.
-    let mut source = File::open(path.as_ref()).map_err(io_error)?;
-    let (archive_sha, actual_size) = hash_open_file(&mut source, archive_limit)?;
+    // Copy once into a sealed, content-addressed snapshot. Every parser and digest below
+    // consumes this immutable object; the mutable source path is never reopened.
+    let (mut snapshot, archive_sha, actual_size) =
+        sealed_snapshot(path.as_ref(), archive_limit)?;
     if actual_size != archive_size {
         return Err(ReplayError::Rejected(
             "archive size differs from receipt".into(),
@@ -84,9 +85,9 @@ pub fn replay_member_claim(
         .min(HARD_CENTRAL_DIRECTORY_LIMIT);
     let max_entries = decimal_at(receipt, &["limits", "max_entries"])?.min(HARD_ENTRY_LIMIT);
     let preflight_entries =
-        preflight_regular_zip(&mut source, actual_size, max_central_directory, max_entries)?;
+        preflight_regular_zip(&mut snapshot, actual_size, max_central_directory, max_entries)?;
 
-    let parser_handle = source.try_clone().map_err(io_error)?;
+    let parser_handle = snapshot.try_clone().map_err(io_error)?;
     let mut archive = zip::ZipArchive::new(parser_handle)
         .map_err(|e| ReplayError::Unsupported(format!("zip-rs cannot parse this layout: {e}")))?;
     if archive.has_duplicate_names() {
@@ -274,7 +275,7 @@ pub fn replay_member_claim(
         ));
     }
 
-    let (archive_sha_after, size_after) = hash_open_file(&mut source, archive_limit)?;
+    let (archive_sha_after, size_after) = hash_open_file(&mut snapshot, archive_limit)?;
     if archive_sha_after != archive_sha || size_after != actual_size {
         return Err(ReplayError::Rejected(
             "archive changed during replay".into(),
@@ -393,6 +394,97 @@ fn read_u32(bytes: &[u8], offset: usize) -> u32 {
         bytes[offset + 2],
         bytes[offset + 3],
     ])
+}
+
+/// Create an immutable replay source whose digest names the exact byte sequence parsed below.
+#[cfg(target_os = "linux")]
+fn sealed_snapshot(path: &Path, limit: u64) -> Result<(File, String, u64), ReplayError> {
+    use std::os::fd::{AsRawFd, FromRawFd};
+
+    let mut input = File::open(path).map_err(io_error)?;
+    let initial_length = input.metadata().map_err(io_error)?.len();
+    if initial_length > limit {
+        return Err(ReplayError::Rejected(
+            "archive exceeds receipt or replay byte limit".into(),
+        ));
+    }
+
+    let name = CString::new("rea-member-replay").expect("static memfd name has no NUL");
+    // SAFETY: name is a valid NUL-terminated C string and flags are Linux memfd flags.
+    // On success, syscall returns a new owned file descriptor.
+    let raw_fd = unsafe {
+        libc::syscall(
+            libc::SYS_memfd_create,
+            name.as_ptr(),
+            libc::MFD_CLOEXEC | libc::MFD_ALLOW_SEALING,
+        )
+    };
+    if raw_fd < 0 {
+        return Err(ReplayError::Unsupported(format!(
+            "cannot create Linux sealed memfd snapshot: {}",
+            std::io::Error::last_os_error()
+        )));
+    }
+    // SAFETY: raw_fd is a newly created descriptor owned by this function; File takes ownership.
+    let mut snapshot = unsafe { File::from_raw_fd(raw_fd as i32) };
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    let mut copied = 0u64;
+    loop {
+        let read = input.read(&mut buffer).map_err(io_error)?;
+        if read == 0 {
+            break;
+        }
+        copied = copied.checked_add(read as u64).ok_or_else(|| {
+            ReplayError::Rejected("archive copy byte count overflow".into())
+        })?;
+        if copied > limit || copied > initial_length {
+            return Err(ReplayError::Rejected(
+                "source grew or exceeded the archive byte limit while snapshotting".into(),
+            ));
+        }
+        snapshot.write_all(&buffer[..read]).map_err(io_error)?;
+        hasher.update(&buffer[..read]);
+    }
+    let final_source_length = input.metadata().map_err(io_error)?.len();
+    if copied != initial_length || copied != final_source_length {
+        return Err(ReplayError::Rejected(
+            "source length changed while making immutable replay snapshot".into(),
+        ));
+    }
+    snapshot.flush().map_err(io_error)?;
+
+    let required_seals = libc::F_SEAL_WRITE
+        | libc::F_SEAL_GROW
+        | libc::F_SEAL_SHRINK
+        | libc::F_SEAL_SEAL;
+    // SAFETY: fcntl operates on the owned memfd, with a bitmask of Linux file seals.
+    let seal_result = unsafe {
+        libc::fcntl(snapshot.as_raw_fd(), libc::F_ADD_SEALS, required_seals)
+    };
+    if seal_result < 0 {
+        return Err(ReplayError::Unsupported(format!(
+            "kernel/filesystem refused required memfd seals: {}",
+            std::io::Error::last_os_error()
+        )));
+    }
+    // SAFETY: F_GET_SEALS is a read-only query on the owned memfd descriptor.
+    let actual_seals = unsafe { libc::fcntl(snapshot.as_raw_fd(), libc::F_GET_SEALS) };
+    if actual_seals < 0 || actual_seals & required_seals != required_seals {
+        return Err(ReplayError::Rejected(
+            "sealed snapshot does not report the complete immutable seal set".into(),
+        ));
+    }
+
+    snapshot.seek(SeekFrom::Start(0)).map_err(io_error)?;
+    Ok((snapshot, format!("{:x}", hasher.finalize()), copied))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn sealed_snapshot(_path: &Path, _limit: u64) -> Result<(File, String, u64), ReplayError> {
+    Err(ReplayError::Unsupported(
+        "immutable replay snapshot backend is not implemented on this platform".into(),
+    ))
 }
 
 fn hash_open_file(file: &mut File, limit: u64) -> Result<(String, u64), ReplayError> {
