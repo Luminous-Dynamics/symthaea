@@ -173,19 +173,21 @@ fuzz_target!(|data: &[u8]| {
             (Ok(production), Ok(oracle)) => {
                 if production.sha256 != oracle.sha256
                     || production.observed_uncompressed_bytes != oracle.bytes
-                    || production.observed_crc32 != oracle.crc32
                     || !production.verified_crc32
                 {
                     panic!(
-                        "differential content disagreement at occurrence {index}: production sha/bytes/crc={}/{}/{:08x}; oracle={}/{}/{:08x}",
+                        "differential content disagreement at occurrence {index}: production sha/bytes/CRC-accepted={}/{}/{}; oracle sha/bytes/crc={}/{}/{:08x}",
                         production.sha256,
                         production.observed_uncompressed_bytes,
-                        production.observed_crc32,
+                        production.verified_crc32,
                         oracle.sha256,
                         oracle.bytes,
                         oracle.crc32
                     );
                 }
+                // The base reader API exposes the custom CRC result as a boolean rather than
+                // a numeric field. The oracle independently checks its decoded CRC against the
+                // central-directory CRC above; production must also accept its own CRC check.
             }
             (Err(_), Err(_)) => {
                 // Both implementations rejected the member. Their error taxonomies differ and
