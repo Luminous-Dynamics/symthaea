@@ -213,7 +213,9 @@
       "minItems": 2,
       "items": {
         "$ref": "#/$defs/assessorRecord"
-      }
+      },
+      "uniqueItems": true,
+      "description": "At least two assessor records are required. The evaluator must additionally enforce unique assessor_ref identities and independence; JSON Schema alone cannot establish distinct people or independent access."
     },
     "adjudication": {
       "type": "object",
