@@ -205,3 +205,62 @@ Treat this as **secondary industry-style context only**. The page says it ranks 
 | Cultural/narrative interpretation | Can it preserve source context, event structure and multiple valid interpretations? | NarraBench, LitVISTA, LitBench |
 
 Do not create one pooled “African intelligence score”. Keep task constructs, source lineage, language, annotation origin and license visible. The portfolio is intentionally multi-dimensional: factuality, evidence quality, task competence, safety, cultural interpretation and efficiency are separate capabilities.
+
+
+## 9. Industry-style African-language model snapshot (DataLens Africa, Version 1.5)
+
+The [DataLens Africa LLM leaderboard](https://www.datalens.africa/llm-leaderboard) currently displays a Version 1.5 snapshot last updated **16 October 2026**. Its four visible benchmark columns are:
+- AfriMCQA — multimodal culturally grounded MCQ, accuracy;
+- AfriMMLU — human-translated MMLU across African languages, accuracy;
+- MasakhaNEWS — news topic classification, macro-F1;
+- AfriMedQA v2 — clinical QA, macro-accuracy.
+
+The current published ranking shown on that page is:
+
+| Rank | Model | Overall score |
+|---:|---|---:|
+| 1 | Gemini 3.8 Flash | 85.32% |
+| 2 | Gemini 3.6 Flash | 83.66% |
+| 3 | GPT-6.1 Sol | 81.56% |
+| 4 | GPT-5.6 Sol | 80.33% |
+| 5 | Grok 4.6 | 77.27% |
+| 6 | Claude Opus 4.6 | 77.19% |
+| 7 | DeepSeek-V4-Pro | 76.26% |
+
+This is a **market context snapshot**, not a definitive scientific SOTA ranking. The page explicitly says it ranks models selected by the publisher, and that these four benchmark columns are one of seven dimensions. The other listed dimensions are token efficiency/cost-to-serve, cultural appropriateness, factuality/hallucination, safety, instruction-following/reasoning, and dialect/code-switch robustness. It reports 15k+ questions, 16+ languages and 32 specialties, but the visible page does not supply enough information to independently reproduce every model result (exact model revision, prompt, full split manifest, decoding, provider access and raw per-case outputs).
+
+The four reported metrics are not one common statistical construct. Averages across subtask scores are useful for an overview but can obscure poor clinical, cultural or language-specific performance. We should:
+- reproduce individual benchmark slices where the data and licenses permit;
+- record exact language/task coverage and per-language outcomes;
+- ask for / inspect model identifiers, inference date, prompt/config, raw outputs and cost/latency receipts;
+- report score by benchmark and worst-language slice, not just overall average;
+- use this leaderboard as one external comparator, not as the held-out research benchmark;
+- compare our source-grounded factuality and safety work on Multi-Hall-SA / AfrIFact / TukaBench separately, because the DataLens four-column overview is not a substitute for those task-specific evaluations.
+
+## 10. What the MzansiBench project actually contributes
+
+The [UCT showcase description](https://showcase.sit.uct.ac.za/event/showcase-2026/mzansibench-36) clarifies MzansiBench's implementation and reported status:
+- a modular evaluation library, central dataset repository and public leaderboard;
+- 13 tasks across 16 datasets spanning the 11 official written languages, with special attention to nine low-resource Niger-Congo B languages;
+- a prompt pipeline validated against AfroBench and reported to closely reproduce published results in a matched environment;
+- a separate encoder-only fine-tuning pipeline for sequence classification, paired-text classification and token classification, validated with functional testing, published baseline comparisons and repeated seeds;
+- reported substantial gaps between English/Afrikaans and low-resource Niger-Congo B languages, including serious dataset coverage gaps for Tshivenda and isiNdebele.
+
+This materially improves its value as an external South African evaluation-integration reference. It is not proof that every one of the 13 tasks appears in every one of the 11 languages; the exact task × dataset × language × split matrix still has to be admitted and pinned. Nor does its prompt-based reproduction establish that it covers source-grounded retrieval, narrative interpretation, rights, provenance or abstention.
+
+Project references:
+- UCT showcase: https://showcase.sit.uct.ac.za/event/showcase-2026/mzansibench-36
+- Technical project website: https://projects.cs.uct.ac.za/honsproj/cgi-bin/view/2026/karriem_vondoorze.zip/index.html
+
+## 11. Competitive strategy against industry
+
+We should not try to beat frontier models by making one pooled accuracy number higher. The programme's competitive thesis should be:
+
+1. **Quality parity:** reduce the worst-language and worst-domain gaps without reducing strong-language absolute accuracy.
+2. **Evidence-grounded factuality:** improve exact retrieval, evidence localization, provenance independence, temporal applicability, supported verdicts and useful abstention.
+3. **Safety parity:** reduce harmful compliance in local languages without falsely treating misunderstanding or blanket refusal as safety success.
+4. **Cultural and interpretive competence:** use source-native, locally authored and expert-adjudicated data; preserve multiple legitimate interpretations.
+5. **Efficiency:** publish accuracy/calibration/safety against tokens, calls, latency, energy or hardware budget and cost-to-serve.
+6. **Governance:** rights, authority, consent, update/retraction and auditable evidence lineage are hard gates, not tradeable score weights.
+
+The initial industry-facing comparison should pin one current frontier API baseline, one open-weight multilingual baseline and one locally relevant South African baseline per task where possible. We must match data split, evidence budget, prompt exposure, context, decoding and tool access, and publish per-case outputs plus confidence intervals. A claim of superiority is allowed only for the exact task, split, language and budget tested.
