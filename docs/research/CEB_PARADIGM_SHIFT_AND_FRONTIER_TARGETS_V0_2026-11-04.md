@@ -103,6 +103,22 @@ Use repository-family and time-based splits, rotating fresh tasks, mutation sequ
 
 **Breakthrough hypothesis:** demonstrate retention and transfer across new repository families, not just performance on a static public snapshot.
 
+
+### H. From trusting the benchmark to continuously qualifying the evaluator
+
+An engineering benchmark is also software, and its evaluator has attack surfaces, ambiguity and version drift. Epoch AI's independent Terminal-Bench 4.0.0 review reported publicly noted scoring defects in 30/66 tasks (45.5%), including grader-channel shortcuts, answer leakage and false negatives. The maintainers explicitly list tamper-resistant verifiers as a Terminal-Bench 4.1 focus.
+
+The paradigm shift is to treat the benchmark owner, grader, runner, artifact store, task registry and regrader as distinct trust domains that need evidence:
+- qualify every task with reference-patch pass and empty-patch fail;
+- keep candidate correctness separate from evidence qualification;
+- include both adversarial negative controls and legitimate positive controls;
+- report false accepts, false rejects and unresolved cases independently;
+- require pristine regrades with identical input digests and independently administered custody;
+- version task, oracle, runner, budgets and scoring changes, and quarantine affected historical scores after a material defect;
+- statically check that documented commands refer to real manifests, packages and targets before they become operational instructions.
+
+A verifier that rejects everything must fail on positive controls. A valid run with an incorrect candidate is a candidate failure, not an integrity failure. An ambiguous oracle is unresolved, not a model error. No aggregate resolution score can compensate for a critical false accept.
+
 ## 4. Matched evaluation protocol
 
 Every component claim should be supported by the same comparison design:
@@ -134,6 +150,8 @@ These are research gates, not standards or achieved results. For direct “beat 
 | Expert-relative optimization | SWE-fficiency reports top evaluated agents below 0.23x expert speedup in its studied suite | >0.5x expert-normalized speedup on matched tasks | >=0.8x with equivalent solution quality and semantic correctness |
 
 **Interpretation:** The ContextBench and PDB matched targets are specific public reproduction goals, not claims that the same numbers transfer automatically to Rust tasks. CRBugBench's top-five detection rate is not precision. The ASL FuncPass and SecPass maxima are separate configurations, not a joint score. Small leaderboard gaps need paired uncertainty intervals before claiming a win.
+
+**Evaluator qualification targets:** 0 critical false accepts; at least 300 distinct negative and 300 positive control instantiations across at least 30 negative fault families; one-sided 95% exact upper bounds below 1% for false accepts and false rejects, with cluster-aware sensitivity analysis; 100% of scored runs receive a pristine independent regrade; 0 unresolved critical controls at qualification. Publish all denominators. A separate documentation gate requires zero unannotated missing Cargo manifest, package or binary references.
 
 ## 6. Engineering priorities
 
@@ -176,3 +194,6 @@ Build and benchmark those capabilities as separable modules, then show that thei
 - [PDB results and per-task evidence](https://huggingface.co/datasets/Precise-Debugging-Benchmarking/PDB-Results)
 - [PDB paper](https://arxiv.org/abs/2604.17338)
 - [Rust-SWE-bench / RUSTFORGER paper](https://arxiv.org/abs/2602.22764)
+- [Terminal-Bench 4.0 maintainer release notes and 4.1 verifier roadmap](https://www.tbench.ai/news/terminal-bench-4-0)
+- [Epoch AI independent review of Terminal-Bench 4.0.0](https://epoch.ai/benchmarks/terminal-bench-4/review)
+- [CEB benchmark-integrity corpus and protocol, draft PR #10479](https://github.com/Luminous-Dynamics/symthaea/pull/10479)
