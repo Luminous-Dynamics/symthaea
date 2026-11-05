@@ -518,6 +518,9 @@ fn validate_input(input: &Input, input_bytes: &[u8]) -> Result<Value, String> {
     let mut confirmed_matches_by_channel: BTreeMap<&str, usize> = BTreeMap::new();
     let mut captured_alternatives_by_channel: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
     let mut captured_alternatives_union = BTreeSet::new();
+    let mut false_positive_proposal_count = 0usize;
+    let mut ambiguous_proposal_count = 0usize;
+    let mut unadjudicated_proposal_count = 0usize;
 
     for proposal in &input.proposals {
         require_sha(
@@ -596,6 +599,12 @@ fn validate_input(input: &Input, input_bytes: &[u8]) -> Result<Value, String> {
                         proposal.proposal_id
                     ));
                 }
+                match proposal.adjudication_disposition.as_str() {
+                    "FALSE_POSITIVE" => false_positive_proposal_count += 1,
+                    "AMBIGUOUS" => ambiguous_proposal_count += 1,
+                    "UNADJUDICATED" => unadjudicated_proposal_count += 1,
+                    _ => unreachable!(),
+                }
             }
             other => {
                 return Err(format!(
@@ -623,9 +632,17 @@ fn validate_input(input: &Input, input_bytes: &[u8]) -> Result<Value, String> {
     let mut query_critical_ids = BTreeSet::new();
     let mut query_critical_captured_ids = BTreeSet::new();
     let mut non_query_critical_admissible_count = 0usize;
+    let mut not_estimable_admissible_count = 0usize;
     let mut admissible_alternative_count = 0usize;
+    let mut unresolved_biological_alternative_count = 0usize;
     for alternative in &input.alternatives {
         if alternative.biological_disposition != "ADMISSIBLE" {
+            if matches!(
+                alternative.biological_disposition.as_str(),
+                "INDETERMINATE" | "DISPUTED" | "NOT_ADJUDICATED"
+            ) {
+                unresolved_biological_alternative_count += 1;
+            }
             continue;
         }
         admissible_alternative_count += 1;
@@ -634,6 +651,8 @@ fn validate_input(input: &Input, input_bytes: &[u8]) -> Result<Value, String> {
             if captured_alternatives_union.contains(alternative.alternative_id.as_str()) {
                 query_critical_captured_ids.insert(alternative.alternative_id.as_str());
             }
+        } else if alternative.query_consequence == "NOT_ESTIMABLE" {
+            not_estimable_admissible_count += 1;
         } else {
             non_query_critical_admissible_count += 1;
         }
@@ -706,6 +725,10 @@ fn validate_input(input: &Input, input_bytes: &[u8]) -> Result<Value, String> {
 
     let status = if incomplete_search_psu_count > 0 || inaccessible_psu_count > 0 {
         "NOT_PROMOTABLE_INCOMPLETE_OR_INACCESSIBLE_SEARCH"
+    } else if ambiguous_proposal_count > 0 || unadjudicated_proposal_count > 0 {
+        "NOT_PROMOTABLE_UNRESOLVED_PROPOSAL_ADJUDICATION"
+    } else if unresolved_biological_alternative_count > 0 || not_estimable_admissible_count > 0 {
+        "NOT_PROMOTABLE_UNRESOLVED_OR_NOT_ESTIMABLE_ALTERNATIVES"
     } else if input.claim_scope == "synthetic_known_truth" {
         "SYNTHETIC_OBSERVED_SAMPLE_VALIDATED"
     } else {
@@ -738,6 +761,9 @@ fn validate_input(input: &Input, input_bytes: &[u8]) -> Result<Value, String> {
         "proposal_count": input.proposals.len(),
         "note_count": input.notes.len(),
         "confirmed_match_count": confirmed_matches_by_channel.values().sum::<usize>(),
+        "false_positive_proposal_count": false_positive_proposal_count,
+        "ambiguous_proposal_count": ambiguous_proposal_count,
+        "unadjudicated_proposal_count": unadjudicated_proposal_count,
         "alternative_count": input.alternatives.len(),
         "admissible_alternative_count": admissible_alternative_count,
         "query_critical_alternative_count": query_critical_ids.len(),
@@ -745,6 +771,8 @@ fn validate_input(input: &Input, input_bytes: &[u8]) -> Result<Value, String> {
         "missed_query_critical_alternative_ids": query_critical_missed_ids,
         "query_critical_alternative_ids": query_critical_ids.iter().map(|value| (*value).to_string()).collect::<Vec<_>>(),
         "non_query_critical_admissible_alternative_count": non_query_critical_admissible_count,
+        "not_estimable_admissible_alternative_count": not_estimable_admissible_count,
+        "unresolved_biological_alternative_count": unresolved_biological_alternative_count,
         "channel_summaries": channel_summaries,
         "shared_ancestry_overlaps": shared_ancestry_overlaps,
         "all_list_missed_sensitivity_owner": "9248",
