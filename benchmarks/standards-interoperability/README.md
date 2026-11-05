@@ -29,19 +29,19 @@ A successful import/export is not sufficient. The evaluator must detect when a c
 |---|---|---|
 | Product definition | STEP AP242, ISO 10303-242:2025, Edition 4 | Geometry, product structure, assemblies, semantic PMI, supported electrical/product data |
 | Quality/inspection | QIF, ISO 23952:2020 | Characteristics, inspection plans/results and quality workflow information |
-| Manufacturing devices | MTConnect 2.5 (February 2025) | Device identity, data items, units, time and process context |
+| Manufacturing devices | MTConnect 2.7 (February 2025) | Device identity, data items, units, time and process context |
 | Traceability principles | NIST IR 8536 (September 2026) | Interoperable product pedigree, verifiable linkage and selective disclosure principles |
 
 References:
 - [ISO 10303-242:2025, Edition 4](https://www.iso.org/standard/84300.html)
 - [ISO 23952:2020 — Quality Information Framework](https://committee.iso.org/standard/77461.html)
-- [MTConnect standards and Version 2.5 release](https://mtconnect.squarespace.com/standard-download20181)
+- [MTConnect standards and Version 2.5 release](https://github.com/mtconnect/mtconnect_sysml_model/releases)
 - [NIST IR 8536 final](https://csrc.nist.gov/pubs/ir/8536/final)
 - [NIST Digital Thread for Manufacturing](https://www.nist.gov/programs-projects/digital-thread-manufacturing)
 
 **QIF identifier correction:** use ISO 23952:2020. One NIST project-page sentence currently labels QIF as ISO 23953; the ISO standard record identifies QIF as ISO 23952.
 
-Standards and schemas must be pinned by edition, schema/profile digest, and exact implementation version for every run. “STEP”, “QIF”, or “MTConnect” without a version/profile is not a reproducible test declaration.
+Standards and schemas must be pinned by edition, schema/profile digest, and exact implementation version for every run. “STEP”, “QIF”, or “MTConnect” without a version/profile is not a reproducible test declaration. STEP AP242 Edition 5 is under development (committee draft); the initial AP242 profile remains Edition 4, the latest published edition. MTConnect 2.7 (February 2026) supersedes 2.5 as the current published model baseline; do not silently accept mixed-version payloads.
 
 ## Ownership and composition
 
