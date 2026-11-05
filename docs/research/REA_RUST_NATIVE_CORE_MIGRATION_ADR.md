@@ -1131,3 +1131,47 @@ The draft schema is now at `docs/research/rea-package-signature-evaluation-v0.sc
 
 The schema intentionally defines no generic `trusted` boolean. Its scheme enumeration distinguishes Android APK v1/v2/v3/v3.1/v4 from Apple CodeDirectory, CMS, resource-envelope, DER-entitlement and provisioning-profile observations. It is a draft data contract only; no parser, cryptographic verifier or platform-equivalent acceptance is claimed yet. The existing #10508 issue owns implementation and adversarial corpus.
 
+## 27. 2026-11-05 — replay qualification, differential fuzzing and immutable snapshot gate
+
+### Independent replay exact-head qualification
+
+Draft [PR #10507](https://github.com/Luminous-Dynamics/symthaea/pull/10507) now passes its dedicated receipt workflow at exact head `08818dd4162a37b980c27a7b6c56a57950855b1c`: [run 41944635509](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41944635509). All 20 library tests passed; formatting and Clippy with warnings denied passed. Tests include:
+- Stored member replay;
+- Deflate replay through zip-rs 9.3.0 / zlib-rs;
+- wrong whole-archive digest rejection;
+- metadata-offset mismatch rejection;
+- duplicate-name archive abstention rather than occurrence collapse.
+
+The CLI is compiled as an all-target Clippy target; the tests synthesize their own archive/receipt fixtures. A real external archive/receipt replay campaign has not yet been performed. ZIP64, prefixed carriers, multi-disk and duplicate-name cases remain explicit Unsupported. This validates the harness, not full-format equivalence.
+
+### Source snapshot limitation
+
+The current replay uses one opened source object for pre-hash, cloned-handle parsing, and post-hash. This closes the straightforward pathname-replacement gap and detects persistent source changes. It does not rule out a hostile writer changing bytes while the parser reads and restoring them before the post-hash. [Issue #10526](https://github.com/Luminous-Dynamics/symthaea/issues/10526) now defines a stricter sealed-snapshot contract: parse only a private, bounded, immutable snapshot; hash that exact snapshot; on Linux qualify sealed memfd behavior; distinguish exact copied bytes from an atomic point-in-time snapshot of a concurrently changing source. No Verified claim may rely on an unsealed mutable path if strict snapshot mode is required.
+
+### Differential fuzzing across parser/codec arms
+
+[PR #10520](https://github.com/Luminous-Dynamics/symthaea/pull/10520) and [issue #10520](https://github.com/Luminous-Dynamics/symthaea/issues/10520) add a second libFuzzer target. It compares the production `ZipArtifactReader / zipcore / miniz_oxide` with `zip 9.3.0 / flate2-zlib-rs` over a deliberately narrow shared subset: complete ordinary single-disk ZIPs, no ZIP64, no prefix, no duplicate raw names. It checks occurrence order, raw name bytes, flags, method, sizes, CRC, offsets, and then streams Stored/Deflate payloads through fixed buffers to compare SHA-256, observed length and independently computed bitwise CRC-32.
+
+The workflow runs separate 180-second production and differential campaigns, preserves separate raw logs and summaries, binds both arms to one source/toolchain/dependency/seed receipt, and uploads the generated fuzz Cargo.lock and corpora. The first differential workflow is [run 41944499722](https://github.com/Luminous-Dynamics/symthaea/actions/runs/41944499722), still in progress at this ADR update; no differential fuzz pass or mismatch-free claim is made yet.
+
+The differential target intentionally does not majority-vote. A one-sided accept, parser disagreement or payload digest/size/CRC mismatch becomes a minimized finding. Duplicate-name, prefixed, ZIP64 and partial-traversal inputs abstain in this first shared-subset arm and remain separately testable families.
+
+### Updated industry evaluation context
+
+The official SRE-Bench page now reports a released, contamination-resistant benchmark with 19 private programs, 262 binaries, 1,572 deterministic tasks, five RE domains, four source languages and 44 in-house anti-analysis mechanisms. Public-facing GPT-6-Astra is graded on 181/262 and solves 149 of those; 82.3% is conditional on graded instances, equivalent to 56.9% of the full eligible corpus. The separate unconstrained run reports 88.0% pass@1 and 99.2% pass@4. These settings must never be pooled. [SRE-Bench](https://daplab.cs.columbia.edu/benchmarks/sre-bench/).
+
+AgentRE-Bench v3.1 evaluates 20 Windows PE artifacts across 500 attempts. Muse Wonder scored 87.37 and GPT-6 Astra 87.04; the reported simultaneous 95% difference interval includes zero. It is distinct from SRE-Bench and does not measure archive parser correctness. [AgentRE-Bench v3.1](https://www.agentre-bench.ai/results/v3-1/).
+
+OWASP MASTG v2.0.0 is its first stable non-beta v2 release. REA should map test evidence explicitly through `MASVS → MASWE → MASTG test → tool/platform observation → raw evidence → versioned evaluation → qualified claim`. A single static test does not imply a control pass. [OWASP MASTG v2.0.0](https://github.com/OWASP/MASTG/releases/tag/v2.0.0).
+
+### Next benchmark boundary
+
+Do not collapse reader tests, receipt validation, independent replay, fuzz smoke, differential fuzz, Android/iOS signature verification and agentic reverse-engineering scores into one metric. They measure different propositions. Promotion gates should remain:
+1. Exact-head parser tests and Clippy.
+2. Fuzz campaign run receipt + minimized crash/disagreement corpus.
+3. Independent replay exact-head tests.
+4. Sealed snapshot qualification.
+5. Scheme/platform-specific Android and Apple signature tests.
+6. Mobile test evidence mapping to MASTG/MASVS with explicit platform oracle.
+7. Agent-level SRE/AgentRE evaluation only when actually run under benchmark rules.
+
