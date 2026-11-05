@@ -482,7 +482,7 @@ fn validate_record(record: &SorryRecord, label: &str) -> Result<(), String> {
         return Err(format!("{label} debug goal and source URL must be non-empty"));
     }
     let expected_url_prefix = format!(
-        "{}/blob/{}/{}/",
+        "{}/blob/{}/{}",
         record.repo.remote, record.repo.commit, record.location.path
     );
     if !record.debug_info.url.starts_with(&expected_url_prefix)
@@ -741,8 +741,8 @@ fn fake_hash(label: &str) -> String {
     sha256(label.as_bytes())
 }
 
-fn synthetic_record(id: &str, commit: &str) -> SorryRecord {
-    SorryRecord {
+fn synthetic_record(label: &str, commit: &str) -> SorryRecord {
+    let mut record = SorryRecord {
         repo: RepoInfo {
             remote: "https://github.com/example/lean-project".into(),
             branch: "main".into(),
@@ -757,16 +757,18 @@ fn synthetic_record(id: &str, commit: &str) -> SorryRecord {
             end_column: 6,
         },
         debug_info: DebugInfo {
-            goal: "⊢ True".into(),
+            goal: format!("⊢ True -- {label}"),
             url: format!("https://github.com/example/lean-project/blob/{commit}/Example/Theorem.lean#L12"),
         },
         metadata: serde_json::json!({
-            "blame_email_hash":"aabbccdd",
+            "blame_email_hash":"aabbccddeeff",
             "blame_date":"2025-01-01T00:00:00+00:00",
-            "inclusion_date":"2025-02-01T00:00:00+00:00"
+            "inclusion_date":"2025-02-01T00:00:00.000000+00:00"
         }),
-        id: id.into(),
-    }
+        id: String::new(),
+    };
+    record.id = expected_sorry_id(&record).expect("synthetic SorryDB task has a deterministic canonical ID");
+    record
 }
 
 fn synthetic_receipt(record: &SorryRecord) -> TaskReceipt {
