@@ -17,27 +17,9 @@ const BASE_SAMPLES: usize = 8_192;
 
 fn ishigami_problem() -> salib::Problem {
     ProblemBuilder::new()
-        .factor(
-            "x1",
-            Distribution::Uniform {
-                lo: -PI,
-                hi: PI,
-            },
-        )
-        .factor(
-            "x2",
-            Distribution::Uniform {
-                lo: -PI,
-                hi: PI,
-            },
-        )
-        .factor(
-            "x3",
-            Distribution::Uniform {
-                lo: -PI,
-                hi: PI,
-            },
-        )
+        .factor("x1", Distribution::Uniform { lo: -PI, hi: PI })
+        .factor("x2", Distribution::Uniform { lo: -PI, hi: PI })
+        .factor("x3", Distribution::Uniform { lo: -PI, hi: PI })
         .build()
         .expect("valid three-factor Ishigami problem")
 }
@@ -70,7 +52,10 @@ fn saltelli_design_has_expected_evaluation_budget() {
         .expect("valid Saltelli design");
 
     // First/total-order Saltelli design: N * (d + 2), no second-order blocks.
-    assert_eq!(design.total_evaluations(), BASE_SAMPLES * (problem.dim() + 2));
+    assert_eq!(
+        design.total_evaluations(),
+        BASE_SAMPLES * (problem.dim() + 2)
+    );
 }
 
 #[test]
