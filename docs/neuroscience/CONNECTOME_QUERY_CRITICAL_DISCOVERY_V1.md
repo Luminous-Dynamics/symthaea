@@ -188,9 +188,19 @@ Recall gates require a design-aware lower confidence bound and adequate effectiv
 
 ## 9. Industry comparison
 
-ConnectomeBench2 V2 remains the direct predictive proofreading baseline for split/merge error identification, calibration, and species/region transfer. NEURD, RoboEM and specialist VLMs remain relevant candidate-generation or reconstruction comparators.
+The benchmark must maintain separate scorecards because the leading systems solve different problems.
 
-This benchmark measures a different contribution: whether the full investigation workflow finds omitted alternatives that matter to a scientific conclusion, including alternatives missed by every production channel. It must not claim classifier superiority or pool its recall denominator with ConnectomeBench2's labelled decisions.
+| System | Published evidence / strength | Correct comparator role here |
+|---|---|---|
+| ConnectomeBench2 V2 | Multimodal ViT reaches human-level performance on its evaluated split/merge proofreading tasks; >716k expert-labelled decisions and >4.5M images are reported across four species. The V2 dataset revision must be pinned; the published expert-decision count and the current dataset-card row count are different denominators. | Primary predictive proofreading baseline; reproduce task accuracy, calibration, species/region transfer and label efficiency. |
+| NEURD | Morphology/mesh graph rules report 99% and 95% agreement with human split operations on two high-confidence merge subsets, nearly 150k high-confidence edits in MICrONS, and >3x speedup for a semi-supervised multi-soma split workflow. These are scoped rule/workflow results, not a global accuracy estimate. | Specialist morphology candidate generator and an edit/provenance integration baseline. |
+| RoboEM | Self-steering 3D neurite tracing reports approximately 400-fold lower computational annotation cost for the studied cortical analyses. This is computational annotation cost, not a 400-fold end-to-end whole-connectome labor reduction. | Independent neurite-continuation / alternative-reconstruction generator. |
+| Adapted VLMs | A 2026 preprint reports LoRA-adapted VLMs approaching specialist performance on parts of ConnectomeBench2 and stronger merge-error transfer in selected unseen-species conditions. | Candidate-generation and cross-species shift baseline; maintain the preprint status and reproduce its task definitions. |
+| SynAnno | A guided neuron-centric synapse-proofreading interface was evaluated with seven neuroscience experts and reports faster review with reduced cognitive load and annotation errors. | Human-workflow baseline for reviewer time, navigation burden, omissions and adjudication quality; not a classifier score. |
+
+Sources: [ConnectomeBench2 project and paper](https://synthneuro.org/publications/connectomebench2-a-unified-benchmark-for-automated-connectomic-proofreading/); [NEURD, Nature 2025](https://www.nature.com/articles/s41586-025-08660-5); [RoboEM, Nature Methods 2024](https://www.nature.com/articles/s41592-024-02226-5); [VLM proofreading preprint, arXiv:2609.36492](https://arxiv.org/abs/2609.36492); [SynAnno, IEEE TVCG 2026](https://pubmed.ncbi.nlm.nih.gov/41396767/).
+
+This benchmark measures a different endpoint: whether the full investigation workflow finds omitted alternatives that matter to a frozen scientific conclusion, including alternatives missed by every production channel. Do not claim classifier superiority or pool this benchmark's denominator with ConnectomeBench2's labelled decisions, NEURD's selected edits, RoboEM's computational annotation cost, or SynAnno's expert-study time. Compare each against its matched task and protocol.
 
 ## 10. Claim ceiling and staged execution
 
