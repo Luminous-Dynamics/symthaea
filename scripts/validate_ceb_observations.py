@@ -162,6 +162,29 @@ def semantic_errors(payload: dict) -> list[str]:
     ):
         errors.append("HiL-Bench unlabeled score was assigned named metric semantics")
 
+    # HiL-Bench has four separate headline observations; none may be
+    # reconstructed from the unlabeled consolidated Muse Wonder row.
+    expected_hil = {
+        "hil-best-ask-f1": ("hil-bench", "ask_f1", 44.0, 300),
+        "hil-opus-pass3": ("hil-bench", "pass_at_3", 24.0, 300),
+        "hil-swe-blocker-recall": ("hil-bench-swe", "blocker_recall", 36.0, 150),
+        "hil-sql-blocker-recall": ("hil-bench-sql", "blocker_recall", 61.0, 150),
+    }
+    for observation_id, (comparator_id, metric_id, value, denominator) in expected_hil.items():
+        row = next((x for x in observations if x["observation_id"] == observation_id), None)
+        if row is None:
+            errors.append(f"missing HiL-Bench observation {observation_id}")
+            continue
+        comparator = comparators.get(comparator_id)
+        if row["comparator_id"] != comparator_id or row["metric"]["metric_id"] != metric_id or row["metric"]["value"] != value:
+            errors.append(f"HiL-Bench observation {observation_id} has incorrect metric identity or value")
+        if comparator is None or comparator["sample_denominator"]["value"] != denominator:
+            errors.append(f"HiL-Bench observation {observation_id} has incorrect task denominator")
+    for comparator_id in ("hil-bench-swe", "hil-bench-sql"):
+        comparator = comparators.get(comparator_id)
+        if comparator is None or comparator["lane_id"] != "CEB-HUMAN":
+            errors.append(f"HiL-Bench domain comparator {comparator_id} missing or assigned to wrong lane")
+
     return errors
 
 
@@ -206,6 +229,18 @@ def self_test(payload: dict, schema: dict, format_checker: FormatChecker) -> Non
     interval = next(row for row in mutant["observations"] if row["observation_id"] == "pdb-single-opus-precision")
     interval["metric"]["uncertainty"]["applies_to_task_count"] = 484
     must_reject(mutant, "confidence interval attached to a different denominator")
+
+    # The 79.67 leaderboard value remains unlabeled even after ASK-F1/Pass@3 were normalized.
+    mutant = copy.deepcopy(payload)
+    hil_row = next(row for row in mutant["observations"] if row["observation_id"] == "hil-muse-unlabeled-score")
+    hil_row["metric"]["metric_id"] = "ask_f1"
+    must_reject(mutant, "HiL unlabeled consolidated score mapped to ASK-F1")
+
+    # The separate HiL task metrics must not be confused.
+    mutant = copy.deepcopy(payload)
+    ask_row = next(row for row in mutant["observations"] if row["observation_id"] == "hil-best-ask-f1")
+    ask_row["metric"]["metric_id"] = "pass_at_3"
+    must_reject(mutant, "HiL ASK-F1 relabeled as Pass@3")
 
     # An unlabeled number cannot be relabeled as ASK-F1 or Pass@3.
     mutant = copy.deepcopy(payload)
