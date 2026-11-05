@@ -35,7 +35,6 @@
   "resource_calibration": {
     "status": "not_run_blocked",
     "planned_independent_runs_per_reference_task": 10,
-    "actual_independent_runs": 0,
     "infrastructure_failure_rate_target": 0.01,
     "observed_infrastructure_failure_rate": null,
     "p95_runtime_seconds": null,
@@ -43,7 +42,10 @@
     "calibration_record_sha256": null,
     "agent_and_infrastructure_failures_separated": true,
     "agent_timeout_policy_sha256": null,
-    "claim_boundary": "No runner calibration has been executed; this is a planned protocol only."
+    "claim_boundary": "No runner calibration has been executed; this is a planned protocol only.",
+    "planned_reference_task_count": 3,
+    "actual_reference_task_count": 0,
+    "minimum_trials_observed_per_reference_task": 0
   },
   "historical_policy": {
     "immutable_release_records": true,
