@@ -656,12 +656,18 @@ pub fn calculate_contrast(
         &interventions.sham,
         &interventions.unrelated,
     ];
-    if actions.iter().zip(observations.iter()).any(|(action, observation)| {
-        action.feature.dimension != task.target_dimension
-            || action.source_event_id != observation.event_id
-            || !action.event_id.starts_with(&format!("{}::", observation.event_id))
-            || action.event_id.trim().is_empty()
-    }) {
+    if actions
+        .iter()
+        .zip(observations.iter())
+        .any(|(action, observation)| {
+            action.feature.dimension != task.target_dimension
+                || action.source_event_id != observation.event_id
+                || !action
+                    .event_id
+                    .starts_with(&format!("{}::", observation.event_id))
+                || action.event_id.trim().is_empty()
+        })
+    {
         return Err(HarnessError::InvalidPolicy);
     }
 
