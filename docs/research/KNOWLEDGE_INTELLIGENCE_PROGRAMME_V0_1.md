@@ -316,3 +316,17 @@ Before any external benchmark is run, bind:
 - known overlap, contamination and source-family leakage checks.
 
 The programme's immediate data priority is now more specific: evaluate licensed/public AFROBENCH components for task-language fit; treat Afri-MCQA as non-commercial evaluation material unless a separate license is obtained; use its Sesotho, Setswana and Zulu-labelled subsets as possible pilot inputs subject to native-speaker review; and commission a separately governed isiXhosa cohort rather than pretending it is covered.
+
+
+## 12. Mycelix DKG adapter findings — 2026-11-05
+
+A source-level follow-up on Mycelix current `main@9e12dd46bdd8371e8ed9626a17bc06f21c141a52` found concrete reasons not to interpret the legacy DKG score as a calibrated evidential assessment:
+
+1. **Attester identity is misattributed in `get_weighted_claim`.** The current loop reads `att.claim_hash` and uses that record's action author as the attester. `AttestationEntry.claim_hash` identifies the claim being attested, so this returns the claim author's reputation rather than the author of the attestation action. The attestation action author is reachable through the `ClaimToAttestation` link, but `get_claim_attestations` currently discards it.
+2. **Source-quality factor is neutral on the current DKG path.** The DKG adapter creates the SDK `VerifiableTriple` without any source URI. The SDK's `source_quality_confidence` explicitly returns 0.50 when the source list is empty.
+3. **Domain-specific behavior is not propagated.** The DKG adapter calls `.with_timestamp()` but not `.with_domain()`, despite `ClaimEntry` carrying an optional domain. The SDK therefore receives `None`, uses its default 365-day half-life, and does not apply its domain-specific adjustments.
+4. **Attestation free text is not a source record.** `AttestClaimInput.evidence` is plain optional text. It must not be coerced into a source URI, authenticated evidence artifact or independent corroboration.
+
+These findings are tracked in [Mycelix #5824](https://github.com/Luminous-Dynamics/mycelix/issues/5824). The immediate implementation repair should preserve actual attestation authors and pass an explicitly declared claim domain. Source URI/evidence support requires a separate, versioned integration with the shared Mycelix evidence plane; do not invent source references.
+
+**Implication for Symthaea:** any consumed Mycelix confidence value must be treated as a legacy, pre-alpha ranking/social signal with these known construction defects. It is not a calibrated probability, source-quality assessment or truth verdict. Symthaea should receive the underlying evidence/lineage/status dimensions once available, not infer them from this scalar.
