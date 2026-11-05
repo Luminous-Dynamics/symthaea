@@ -231,7 +231,9 @@ pub fn evaluate_reuse_round(
     }
 
     match best {
-        Some((candidate_number, _)) => Ok(ReuseRoundDecision::PromoteCandidate { candidate_number }),
+        Some((candidate_number, _)) => {
+            Ok(ReuseRoundDecision::PromoteCandidate { candidate_number })
+        }
         None => Ok(ReuseRoundDecision::RejectAll),
     }
 }
@@ -438,7 +440,9 @@ mod tests {
         ];
         assert_eq!(
             evaluate_reuse_round(0.05, 1, 0, 3, 0.5, &candidates).unwrap(),
-            ReuseRoundDecision::PromoteCandidate { candidate_number: 2 }
+            ReuseRoundDecision::PromoteCandidate {
+                candidate_number: 2
+            }
         );
     }
 
@@ -471,7 +475,9 @@ mod tests {
         ];
         assert_eq!(
             evaluate_reuse_round(0.05, 1, 0, 2, 0.5, &candidates).unwrap(),
-            ReuseRoundDecision::PromoteCandidate { candidate_number: 1 }
+            ReuseRoundDecision::PromoteCandidate {
+                candidate_number: 1
+            }
         );
     }
 
