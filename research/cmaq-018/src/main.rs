@@ -492,13 +492,15 @@ struct DacsOraclePredictor {
 impl CandidateBranchPredictor for DacsOraclePredictor {
     fn predict(
         &self,
-        _observed_history: &ObservedHistory,
+        observed_history: &ObservedHistory,
         hypothetical_action: Intervention,
         forecast_kind: ForecastKind,
     ) -> Option<CandidateForecast> {
         // DACS isolates action response in a deterministic zero-disturbance
         // analytic profile. Exogenous disturbance/coupling is tested elsewhere.
+        // The oracle follows the current autoregressive state at every horizon.
         let deterministic_case = EpisodeCase {
+            history: *observed_history,
             common_disturbance: 0.0,
             ..self.case
         };
