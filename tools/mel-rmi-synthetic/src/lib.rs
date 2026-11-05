@@ -1638,11 +1638,8 @@ mod tests {
             artifacts: vec![
                 ArtifactPayloadV1 {
                     format: ArtifactFormatV1::ScoreJson,
-                    bytes: format!(
-                        r#"{{"fixture":"{}"}}"#,
-                        String::from_utf8_lossy(marker)
-                    )
-                    .into_bytes(),
+                    bytes: format!(r#"{{"fixture":"{}"}}"#, String::from_utf8_lossy(marker))
+                        .into_bytes(),
                 },
                 ArtifactPayloadV1 {
                     format: ArtifactFormatV1::Midi,
