@@ -129,9 +129,11 @@ Benchmark case: `CREDIT-COVER-LIQUIDITY-WATERFALL-001`. The initial tests use sy
 
 ### South African market phase as of 5 November 2026
 
-Engineering News reported on 30 October that invitations had been issued to 85 external entities for pre-launch simulation/testing, while broader launch was scheduled for April 2027; the report described regulatory instruments still being finalised in parallel. This is secondary reporting, not proof of participant admission, commercial bidding or settlement. The profile therefore records `pre_launch_testing_reported`, `participant_admission_state=unknown` and `commercial_trading_state=unknown`, with a null raw-source digest and `source_freeze_state=not_frozen`.
+Engineering News reported on 30 October that invitations had been issued to 85 external entities for pre-launch simulation/testing, while broader launch was scheduled for April 2027. On 5 November, the Energy News Network interviewed the Acting NERSA CEO, who described finalisation of the market rules as a priority ahead of external market opening in April 2027. Both are secondary reporting; neither proves that any specific participant is admitted or commercially trading. The profile therefore records `pre_launch_testing_reported`, `participant_admission_state=unknown` and `commercial_trading_state=unknown`, with a null raw-source digest and `source_freeze_state=not_frozen`.
 
-Source: https://www.engineeringnews.co.za/article/sawem-trading-platform-opens-to-85-external-entities-for-pre-launch-testing-2026-10-30
+Sources:
+- 30 October 2026 pre-launch invitation report: https://www.engineeringnews.co.za/article/sawem-trading-platform-opens-to-85-external-entities-for-pre-launch-testing-2026-10-30
+- 5 November 2026 NERSA leadership interview: https://energy-news-network.com/industry-news/exclusive-nomfundo-maseti-takes-nersa-into-south-africas-competitive-power-market/
 
 ## 3. Machine-readable contract
 
