@@ -430,8 +430,6 @@
         "official_hidden_test_repeat_count": null,
         "official_development_baseline_repeat_count": 1,
         "repeat_policy": "The official run page specifies a fresh 100-task cohort, one attempt per task, four-way concurrency and zero retries; each complete public Harbor job backs one official leaderboard row. Model runs and costs are complete-system totals, not per-task unit cost. The task dataset has an immutable digest that must be recorded from the exact official Harbor run; no such digest has been captured or independently replayed by Luminous.",
-        "max_rounds_per_task": 1,
-        "max_output_tokens_per_task": 9000,
         "reasoning_carried_across_rounds": false,
         "task_attempts_per_case": 1,
         "concurrency": 4,
@@ -447,7 +445,7 @@
       },
       "baseline_context": {
         "hidden_test_leaderboard_score": null,
-        "paper_abstract_mean_score": 0.6103,
+        "paper_abstract_mean_score": null,
         "all_hard_checks_clearance": null,
         "notes": [
           "Live official leaderboard retrieved 2026-11-05; its public rows are backed by complete 100-task Harbor jobs. Overall values are mean continuous reward on a 0–100 scale; stored as 0–1 fractions.",
