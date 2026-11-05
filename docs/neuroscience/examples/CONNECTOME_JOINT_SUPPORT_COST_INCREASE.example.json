@@ -8,7 +8,7 @@
   "scenario_set_sha256": "e6ea3b6ce647bce5e37867b1282547977f65fb3e0c97dc0523982fe28584ee36",
   "action_set_sha256": "ba311ebba615a2916ae556fc62723367c3432d2eca9cc1866ea39a3a3b532cfc",
   "joint_support_scope": "exhaustive_declared_joint_support",
-  "joint_support_set_sha256": "3591111c5094d69d3df415d2b62af29d2ed68351453a5034ca54f562e7654359",
+  "joint_support_set_sha256": "a5495ffffcf8081d5abb08251c13eb26fd1a713b9ae56a06d28102bef9044cbc",
   "effort_unit": "expert_review_minutes",
   "max_total_effort_units": 5,
   "scenarios": [
@@ -46,7 +46,7 @@
     {
       "action_id": "orthogonal-z",
       "action_kind": "orthogonal_measurement",
-      "effort_units": 7,
+      "effort_units": 5,
       "source_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
       "dependence_groups": [
         "orthogonal-acquisition-01"
@@ -75,7 +75,7 @@
             },
             {
               "action_id": "orthogonal-z",
-              "value": "A"
+              "value": "0"
             }
           ]
         },
@@ -91,7 +91,7 @@
             },
             {
               "action_id": "orthogonal-z",
-              "value": "A"
+              "value": "1"
             }
           ]
         }
@@ -118,7 +118,7 @@
             },
             {
               "action_id": "orthogonal-z",
-              "value": "B"
+              "value": "1"
             }
           ]
         },
@@ -134,7 +134,7 @@
             },
             {
               "action_id": "orthogonal-z",
-              "value": "B"
+              "value": "0"
             }
           ]
         },
@@ -150,7 +150,7 @@
             },
             {
               "action_id": "orthogonal-z",
-              "value": "B"
+              "value": "1"
             }
           ]
         }
