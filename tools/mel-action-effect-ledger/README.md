@@ -17,14 +17,14 @@ It consumes already-committed decision and downstream receipts. It does not run 
 A response artifact can accumulate separate observations:
 
 1. Applied at note queue.
-2. Enqueued to application output.
-3. Observed/admitted by a CPAL callback.
+2. Enqueued to application output with the exact number of application frames appended.
+3. Observed/admitted by a CPAL callback with the exact number of application frames consumed.
 4. CPAL predicted playback (requires a clock-bridge digest).
 5. Independently loopback-observed audio (requires a separate evidence digest).
 
 CPAL callback observation is not predicted DAC time. Predicted playback is not independent acoustic measurement. Loopback is a separate clock domain; timestamps from different domains are never subtracted without a qualified mapping.
 
-The ledger does not infer physical silence from YIELD or VETO. It reports only queue/frame invalidation receipts supplied to it.
+The ledger updates pending application-frame counts only from exact enqueue and callback receipts; callback consumption cannot exceed the pending queue, and rejected clock/frame receipts do not partially mutate state. The ledger does not infer physical silence from YIELD or VETO. It reports only queue/frame invalidation receipts supplied to it.
 
 ## Run
 
