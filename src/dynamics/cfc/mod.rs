@@ -46,7 +46,10 @@ pub use cell::CfCCell;
 pub use gradients::{AdamState, CfCCellCache, CfCGradients, OutputAdamState};
 
 // Network
-pub use network::{CfCNetwork, CfCNetworkConfig, CfCWeightLoadError};
+pub use network::{
+    CfCNetwork, CfCNetworkConfig, CfCParameterGroup, CfCParameterManifest, CfCParameterRole,
+    CfCWeightLoadError,
+};
 
 // Phi-gated attention
 pub use phi_gated::{PhiGatedConfig, compute_phi_attention_weights};
