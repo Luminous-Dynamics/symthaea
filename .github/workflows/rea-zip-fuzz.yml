@@ -24,9 +24,10 @@ jobs:
     env:
       CARGO_BUILD_JOBS: 2
     steps:
-      - name: Checkout exact triggering revision
+      - name: Checkout exact PR head or dispatched revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Install pinned nightly Rust
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
@@ -40,15 +41,15 @@ jobs:
         run: cargo tree --manifest-path fuzz/Cargo.toml --locked -e normal,dev
       - name: Prepare content-addressable seed corpus
         run: |
-          mkdir -p fuzz/corpus/zip_inventory_and_content fuzz/artifacts
+          mkdir -p fuzz/corpus/zip_inventory_and_content fuzz/corpus/zip_parser_differential fuzz/artifacts
           base64 --decode fuzz/seeds/minimal-stored-entry.zip.b64 > fuzz/corpus/zip_inventory_and_content/minimal-stored-entry.zip
           sha256sum fuzz/seeds/minimal-stored-entry.zip.b64 fuzz/corpus/zip_inventory_and_content/minimal-stored-entry.zip
           echo "dd8a2bd8c16d808363a1d1e7560a4cc86494393c1a202a478db00f00ae53d099  fuzz/corpus/zip_inventory_and_content/minimal-stored-entry.zip" | sha256sum --check -
       - name: Record exact fuzz run context
         run: |
-          checked_out_commit="$(git rev-parse HEAD)"
-          test "$checked_out_commit" = "$GITHUB_SHA"
           pr_head_commit="${{ github.event.pull_request.head.sha || github.sha }}"
+          checked_out_commit="$(git rev-parse HEAD)"
+          test "$checked_out_commit" = "$pr_head_commit"
           {
             echo "tested_tree_commit=$checked_out_commit"
             echo "workflow_event_sha=$GITHUB_SHA"
@@ -99,5 +100,6 @@ jobs:
             fuzz/Cargo.lock
             fuzz/artifacts/**
             fuzz/corpus/zip_inventory_and_content/**
+            fuzz/corpus/zip_parser_differential/**
           if-no-files-found: warn
           retention-days: 14
