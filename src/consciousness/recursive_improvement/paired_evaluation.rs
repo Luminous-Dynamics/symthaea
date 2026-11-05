@@ -1002,7 +1002,10 @@ impl ClusteredPairedComparison {
                     .map(|p_value| (metric_id.clone(), p_value))
             })
             .collect();
-        let adjusted = holm_adjust_p_values(&raw_p_values);
+        // The family size is the full frozen metric schema, not only metrics
+        // with enough non-tied clusters to produce a p-value. Unavailable tests
+        // therefore count conservatively as p=1 for the step-down family size.
+        let adjusted = holm_adjust_p_values(&raw_p_values, metrics.len());
         for (metric_id, result) in &mut metrics {
             result.holm_adjusted_p_value = adjusted.get(metric_id).copied();
         }
@@ -1050,10 +1053,14 @@ impl ClusteredPairedComparison {
     }
 }
 
-/// Holm step-down correction. The input is the family of valid metric-level
-/// p-values from one candidate-vs-parent comparison. Sorting ties by metric ID
-/// makes the output deterministic.
-fn holm_adjust_p_values(p_values: &BTreeMap<String, f64>) -> BTreeMap<String, f64> {
+/// Holm step-down correction for one predeclared metric family. The supplied
+/// family_size is the full metric-schema size, including metrics without a
+/// testable p-value (which conservatively occupy the p=1 end of the family).
+/// Sorting ties by metric ID makes the output deterministic.
+fn holm_adjust_p_values(
+    p_values: &BTreeMap<String, f64>,
+    family_size: usize,
+) -> BTreeMap<String, f64> {
     let mut ordered: Vec<(String, f64)> = p_values
         .iter()
         .map(|(metric_id, p_value)| (metric_id.clone(), *p_value))
@@ -1064,7 +1071,7 @@ fn holm_adjust_p_values(p_values: &BTreeMap<String, f64>) -> BTreeMap<String, f6
             .then_with(|| left.0.cmp(&right.0))
     });
 
-    let family_size = ordered.len();
+    debug_assert!(family_size >= ordered.len());
     let mut previous_adjusted = 0.0_f64;
     let mut adjusted = BTreeMap::new();
 
@@ -1310,10 +1317,23 @@ mod clustered_tests {
             ("metric-b".to_owned(), 0.04),
             ("metric-c".to_owned(), 0.03),
         ]);
-        let adjusted = holm_adjust_p_values(&raw);
+        let adjusted = holm_adjust_p_values(&raw, 3);
         assert!((adjusted["metric-a"] - 0.03).abs() < 1e-12);
         assert!((adjusted["metric-c"] - 0.06).abs() < 1e-12);
         assert!((adjusted["metric-b"] - 0.06).abs() < 1e-12);
+    }
+
+    #[test]
+    fn unavailable_metric_still_counts_in_declared_holm_family() {
+        let raw = BTreeMap::from([
+            ("metric-a".to_owned(), 0.01),
+            ("metric-b".to_owned(), 0.02),
+        ]);
+        // A third preregistered metric has too few independent clusters and
+        // therefore no raw p-value; it still belongs to the family as p=1.
+        let adjusted = holm_adjust_p_values(&raw, 3);
+        assert!((adjusted["metric-a"] - 0.03).abs() < 1e-12);
+        assert!((adjusted["metric-b"] - 0.04).abs() < 1e-12);
     }
 
     #[test]
