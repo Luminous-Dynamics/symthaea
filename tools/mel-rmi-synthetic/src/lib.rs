@@ -670,61 +670,133 @@ pub struct SyntheticFixtureV1 {
 /// These are deterministic evaluator fixtures, not licensed or human-authored
 /// musical examples and not representative samples of world music.
 pub fn canonical_fixture_suite_v1() -> Vec<SyntheticFixtureV1> {
+    struct FixtureSpec {
+        name: &'static str,
+        target_dimension: Dimension,
+        unrelated_dimension: Dimension,
+        modulus: i32,
+        offset: i32,
+        baseline: i32,
+        treated: i32,
+        unrelated_before: i32,
+        unrelated_after: i32,
+    }
+
     let specs = [
-        ("motif-transform", Dimension::Motif, Dimension::Texture, 12, 7, 2, 5, 3, 8),
-        ("rhythm-response", Dimension::Rhythm, Dimension::Motif, 8, 3, 1, 4, 2, 5),
-        ("tempo-drift", Dimension::Tempo, Dimension::Role, 16, 5, 3, 9, 0, 2),
-        ("role-exchange", Dimension::Role, Dimension::Rhythm, 4, 2, 0, 1, 1, 2),
-        ("texture-change", Dimension::Texture, Dimension::Tempo, 8, 1, 2, 6, 4, 7),
+        FixtureSpec {
+            name: "motif-transform",
+            target_dimension: Dimension::Motif,
+            unrelated_dimension: Dimension::Texture,
+            modulus: 12,
+            offset: 7,
+            baseline: 2,
+            treated: 5,
+            unrelated_before: 3,
+            unrelated_after: 8,
+        },
+        FixtureSpec {
+            name: "rhythm-response",
+            target_dimension: Dimension::Rhythm,
+            unrelated_dimension: Dimension::Motif,
+            modulus: 8,
+            offset: 3,
+            baseline: 1,
+            treated: 4,
+            unrelated_before: 2,
+            unrelated_after: 5,
+        },
+        FixtureSpec {
+            name: "tempo-drift",
+            target_dimension: Dimension::Tempo,
+            unrelated_dimension: Dimension::Role,
+            modulus: 16,
+            offset: 5,
+            baseline: 3,
+            treated: 9,
+            unrelated_before: 0,
+            unrelated_after: 2,
+        },
+        FixtureSpec {
+            name: "role-exchange",
+            target_dimension: Dimension::Role,
+            unrelated_dimension: Dimension::Rhythm,
+            modulus: 4,
+            offset: 2,
+            baseline: 0,
+            treated: 1,
+            unrelated_before: 1,
+            unrelated_after: 2,
+        },
+        FixtureSpec {
+            name: "texture-change",
+            target_dimension: Dimension::Texture,
+            unrelated_dimension: Dimension::Tempo,
+            modulus: 8,
+            offset: 1,
+            baseline: 2,
+            treated: 6,
+            unrelated_before: 4,
+            unrelated_after: 7,
+        },
     ];
+
     specs
         .into_iter()
         .enumerate()
-        .map(
-            |(index, (name, target_dimension, unrelated_dimension, modulus, offset, baseline, treated, unrelated_before, unrelated_after))| {
-                let task_id = format!("rmi-{name}-v1");
-                let task = TaskSpec {
+        .map(|(index, spec)| {
+            let FixtureSpec {
+                name,
+                target_dimension,
+                unrelated_dimension,
+                modulus,
+                offset,
+                baseline,
+                treated,
+                unrelated_before,
+                unrelated_after,
+            } = spec;
+            let task_id = format!("rmi-{name}-v1");
+            let task = TaskSpec {
+                task_id: task_id.clone(),
+                target_dimension,
+                unrelated_dimension,
+                expected_response: ResponseRule { modulus, offset },
+            };
+            let observation =
+                |suffix: &str, target_value: i32, unrelated_value: i32| Observation {
+                    event_id: format!("{task_id}-{suffix}"),
+                    session_id: format!("synthetic-session-{index}"),
+                    history_id: format!("synthetic-history-{index}"),
                     task_id: task_id.clone(),
-                    target_dimension,
-                    unrelated_dimension,
-                    expected_response: ResponseRule { modulus, offset },
-                };
-                let observation = |suffix: &str, target_value: i32, unrelated_value: i32| Observation {
-                        event_id: format!("{task_id}-{suffix}"),
-                        session_id: format!("synthetic-session-{index}"),
-                        history_id: format!("synthetic-history-{index}"),
-                        task_id: task_id.clone(),
-                        seed: 10_000 + index as u64,
-                        initial_partner_feature: Feature {
-                            dimension: target_dimension,
-                            value: baseline,
-                        },
-                        current_partner_feature: Feature {
-                            dimension: target_dimension,
-                            value: target_value,
-                        },
-                        unrelated_feature: Feature {
-                            dimension: unrelated_dimension,
-                            value: unrelated_value,
-                        },
-                    };
-                let randomization_seed = 20_000 + index as u64;
-                SyntheticFixtureV1 {
-                    task,
-                    interventions: InterventionSet {
-                        control: observation("control", baseline, unrelated_before),
-                        targeted: observation("targeted", treated, unrelated_before),
-                        sham: observation("sham", baseline, unrelated_before),
-                        unrelated: observation("unrelated", baseline, unrelated_after),
-                        randomization_seed,
-                        condition_order: condition_order_for_seed(randomization_seed),
+                    seed: 10_000 + index as u64,
+                    initial_partner_feature: Feature {
+                        dimension: target_dimension,
+                        value: baseline,
                     },
-                }
-            },
-        )
+                    current_partner_feature: Feature {
+                        dimension: target_dimension,
+                        value: target_value,
+                    },
+                    unrelated_feature: Feature {
+                        dimension: unrelated_dimension,
+                        value: unrelated_value,
+                    },
+                };
+            let randomization_seed = 20_000 + index as u64;
+            SyntheticFixtureV1 {
+                task,
+                interventions: InterventionSet {
+                    control: observation("control", baseline, unrelated_before),
+                    targeted: observation("targeted", treated, unrelated_before),
+                    sham: observation("sham", baseline, unrelated_before),
+                    unrelated: observation("unrelated", baseline, unrelated_after),
+                    randomization_seed,
+                    condition_order: condition_order_for_seed(randomization_seed),
+                },
+            }
+        })
         .collect()
 }
-
 /// Run one policy across a frozen fixture collection in deterministic order.
 pub fn run_policy_suite_v1(
     fixtures: &[SyntheticFixtureV1],
