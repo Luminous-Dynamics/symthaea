@@ -116,7 +116,15 @@ fn csv_cell(value: &str) -> String {
 fn write_artifact_set_evidence<W: Write>(
     writer: &mut W,
     task_id: &str,
+    session_id: &str,
+    task_seed: u64,
+    randomization_seed: u64,
     policy_id: &str,
+    policy_version: &str,
+    code_revision: &str,
+    metric_version: &str,
+    verifier_id: &str,
+    verifier_version: &str,
     dimension: Dimension,
     direction: &str,
     condition: &str,
@@ -132,9 +140,15 @@ fn write_artifact_set_evidence<W: Write>(
         };
         writeln!(
             writer,
-            "{},{},{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
             csv_cell(task_id),
+            csv_cell(session_id),
+            task_seed,
+            randomization_seed,
             csv_cell(policy_id),
+            csv_cell(policy_version),
+            code_revision,
+            metric_version,
             dimension.as_str(),
             direction,
             condition,
@@ -143,6 +157,8 @@ fn write_artifact_set_evidence<W: Write>(
             format,
             artifact.sha256_hex,
             artifact.byte_len,
+            csv_cell(verifier_id),
+            csv_cell(verifier_version),
         )?;
         rows += 1;
     }
@@ -160,24 +176,28 @@ fn write_record_artifact_evidence<W: Write>(
     let conditions = ["control", "targeted", "sham", "unrelated"];
     let mut rows = 0;
     for (index, condition) in conditions.iter().enumerate() {
-        rows += write_artifact_set_evidence(
-            writer,
-            &record.task.task_id,
-            &record.manifest.policy_id,
-            record.task.target_dimension,
-            "input",
-            condition,
-            &bindings.inputs[index],
-        )?;
-        rows += write_artifact_set_evidence(
-            writer,
-            &record.task.task_id,
-            &record.manifest.policy_id,
-            record.task.target_dimension,
-            "output",
-            condition,
-            &bindings.outputs[index],
-        )?;
+        for (direction, evidence) in [
+            ("input", &bindings.inputs[index]),
+            ("output", &bindings.outputs[index]),
+        ] {
+            rows += write_artifact_set_evidence(
+                writer,
+                &record.task.task_id,
+                &record.manifest.session_id,
+                record.manifest.task_seed,
+                record.manifest.randomization_seed,
+                &record.manifest.policy_id,
+                &record.manifest.policy_version,
+                &record.manifest.code_revision,
+                &record.manifest.metric_version,
+                &bindings.verifier_id,
+                &bindings.verifier_version,
+                record.task.target_dimension,
+                direction,
+                condition,
+                evidence,
+            )?;
+        }
     }
     Ok(rows)
 }
@@ -315,7 +335,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut artifact_report = BufWriter::new(artifact_report_file);
     writeln!(
         artifact_report,
-        "task_id,policy_id,dimension,direction,condition,event_id,transaction_receipt_sha256,artifact_format,artifact_sha256,byte_len"
+        "task_id,session_id,task_seed,randomization_seed,policy_id,policy_version,code_revision,metric_version,dimension,direction,condition,event_id,transaction_receipt_sha256,artifact_format,artifact_sha256,byte_len,verifier_id,verifier_version"
     )?;
     let mut artifact_report_rows = 0usize;
     let policies: Vec<Box<dyn AgentPolicy>> = vec![
