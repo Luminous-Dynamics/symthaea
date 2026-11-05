@@ -292,9 +292,9 @@
         {
           "name": "SWE Atlas Test Writing",
           "version": "2026-11-05 Scale leaderboard snapshot",
-          "sample_scope": "90 tasks",
+          "sample_scope": "Scale SWE Atlas Test Writing leaderboard; pin the exact task-count and release revision before replication",
           "published_reference": "Fable 5.1 + Claude Code 67.04 ± 5.33; Opus 5 + Claude Code 62.22 ± 5.58.",
-          "source_url": "https://labs.scale.com/leaderboard/sweatlas-test-writing",
+          "source_url": "https://labs.scale.com/leaderboard",
           "comparison_class": "contextual_reference_until_exact_protocol_match",
           "caveats": [
             "Scale rubric includes test usefulness and task-specific quality; it is not identical to mutation kill rate.",
@@ -804,7 +804,7 @@
           "version": "2026-11-05 Scale leaderboard snapshot",
           "sample_scope": "Human-in-loop task benchmark; pin the current task count and version before replication",
           "published_reference": "Muse Wonder 1.0 79.67 ± 4.17 on the Scale leaderboard.",
-          "source_url": "https://labs.scale.com/leaderboard/hil-bench",
+          "source_url": "https://labs.scale.com/leaderboard",
           "comparison_class": "contextual_reference_until_exact_protocol_match",
           "caveats": [
             "Leaderboard score is not the same as paired human productivity or review-time benefit.",
@@ -1006,12 +1006,6 @@
       ]
     },
     {
-      "source_url": "https://labs.scale.com/leaderboard/sweatlas-test-writing",
-      "supports": [
-        "CEB-TEST"
-      ]
-    },
-    {
       "source_url": "https://labs.scale.com/leaderboard/sweatlas-refactoring",
       "supports": [
         "CEB-REFACTOR"
@@ -1054,12 +1048,6 @@
       ]
     },
     {
-      "source_url": "https://labs.scale.com/leaderboard/hil-bench",
-      "supports": [
-        "CEB-HUMAN"
-      ]
-    },
-    {
       "source_url": "https://epoch.ai/benchmarks/terminal-bench-4/review",
       "supports": [
         "CEB-EVAL"
@@ -1075,6 +1063,13 @@
       "source_url": "https://github.com/Luminous-Dynamics/symthaea/blob/research/ceb-benchmark-integrity-2026-11-04/scripts/audit_doc_command_claims.py",
       "supports": [
         "CEB-DOCS"
+      ]
+    },
+    {
+      "source_url": "https://labs.scale.com/leaderboard",
+      "supports": [
+        "CEB-TEST",
+        "CEB-HUMAN"
       ]
     }
   ]
