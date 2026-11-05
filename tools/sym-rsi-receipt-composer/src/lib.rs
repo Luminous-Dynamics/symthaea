@@ -1623,11 +1623,46 @@ mod tests {
 
     #[test]
     fn shared_pairing_group_requires_exact_task_cluster_and_input_identity() {
-        let mut plan = plan(vec![
+        // First isolate the task-universe assertion: the metric-specific cluster maps
+        // must each be valid for their own eligible task IDs before pairing is checked.
+        let mut unpaired_plan = plan(vec![
             metric("quality", "synthetic-quality", 0.0),
             metric("retention", "synthetic-retention", 0.0),
         ]);
-        for projection in plan.metrics.values_mut() {
+        for (metric_id, projection) in &mut unpaired_plan.metrics {
+            projection.pairing_group_id = Some("shared-fixture-cohort".into());
+            let prefix = if metric_id == "retention" {
+                "retention-"
+            } else {
+                ""
+            };
+            projection.cluster_by_task = [
+                ("task-001", "family-a"),
+                ("task-002", "family-a"),
+                ("task-003", "family-b"),
+                ("task-004", "family-b"),
+                ("task-005", "family-c"),
+            ]
+            .into_iter()
+            .map(|(task_id, family)| {
+                (format!("{prefix}{task_id}"), family.to_owned())
+            })
+            .collect();
+        }
+
+        let unpaired_receipts = receipt_set("candidate-a", 'a', "candidate", "disabled");
+        assert_eq!(
+            compose_candidate(&unpaired_plan, &unpaired_receipts),
+            Err(ComposerError::TaskUniverseMismatch)
+        );
+
+        // Then isolate input identity on a pairing group whose task universe and
+        // cluster map are exactly aligned on both metrics.
+        let mut paired_plan = plan(vec![
+            metric("quality", "synthetic-quality", 0.0),
+            metric("retention", "synthetic-retention", 0.0),
+        ]);
+        for projection in paired_plan.metrics.values_mut() {
             projection.pairing_group_id = Some("shared-fixture-cohort".into());
             projection.cluster_by_task = [
                 ("task-001".into(), "family-a".into()),
@@ -1640,20 +1675,18 @@ mod tests {
             .collect();
         }
 
-        let unpaired_receipts = receipt_set("candidate-a", 'a', "candidate", "disabled");
-        assert_eq!(
-            compose_candidate(&plan, &unpaired_receipts),
-            Err(ComposerError::TaskUniverseMismatch)
-        );
-
-        let mut paired_receipts = paired_receipt_set("candidate-a", 'a', "candidate", "disabled");
+        let mut paired_receipts =
+            paired_receipt_set("candidate-a", 'a', "candidate", "disabled");
         let mut retention: Value =
             serde_json::from_slice(paired_receipts.get("retention").unwrap()).unwrap();
         retention["task_results"][0]["input_sha256"] =
             json!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
-        paired_receipts.insert("retention".into(), serde_json::to_vec(&retention).unwrap());
+        paired_receipts.insert(
+            "retention".into(),
+            serde_json::to_vec(&retention).unwrap(),
+        );
         assert_eq!(
-            compose_candidate(&plan, &paired_receipts),
+            compose_candidate(&paired_plan, &paired_receipts),
             Err(ComposerError::TaskInputUniverseMismatch)
         );
     }
