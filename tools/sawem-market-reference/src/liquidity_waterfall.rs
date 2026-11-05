@@ -536,7 +536,9 @@ mod tests {
             Some(10_000_000)
         );
         assert_eq!(
-            result.committed.potentially_fundable_cover_at_deadline_minor_zar,
+            result
+                .committed
+                .potentially_fundable_cover_at_deadline_minor_zar,
             Some(10_000_000)
         );
     }
