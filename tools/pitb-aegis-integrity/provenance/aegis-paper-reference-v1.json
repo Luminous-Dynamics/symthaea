@@ -27,5 +27,6 @@
   },
   "task_manifest_sha256": null,
   "sample_manifest_sha256": null,
-  "environment_policy_sha256": null
+  "environment_policy_sha256": null,
+  "sample_protocol": "paper_v1_hold_only"
 }
