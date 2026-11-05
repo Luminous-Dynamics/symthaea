@@ -90,6 +90,21 @@ The strict JSON Schema 2020-12 counterpart is maintained separately at:
 
 It is evaluator-only, not part of the public 24-blueprint manifest and must not be mounted into a candidate workspace. It constrains the disposition vocabulary, source/target generation digests, dependency paths, equivalence-witness scope, follow-up obligations, criticality, assessor records, adjudication state, seal state and claim ceiling. The schema does not create gold labels or seal any record; the current public corpus remains unadjudicated.
 
+### Evaluator-side independence checks (not JSON-Schema guarantees)
+
+The schema's `minItems: 2` constraint is necessary but does not establish assessor independence. Before a record can be sealed, the evaluator must also verify:
+
+- Every `assessor_ref` is unique within the gold record and resolves to a distinct authorized assessor identity.
+- The assessor's domain qualification covers the claim/evidence pair being adjudicated.
+- Each assessor created the initial disposition without access to the candidate output, the other assessor's label, or evaluator-only material beyond the authorized case evidence.
+- Authorship, organizational, financial and other declared conflicts are recorded and assessed; the same person using two credentials is not two independent assessors.
+- For `consensus`, the initial independent dispositions are exactly equal and all mandatory supporting references are present.
+- For `third_party_resolved`, the initial labels differ, a distinct authorized adjudicator is recorded, and the resolution preserves both original labels and the written rationale.
+- For `unknown_impact_retained` and `not_adjudicable`, the unresolved facts and reason are explicit; these states must not be coerced into a binary outcome.
+- Sealing binds the canonical gold-record bytes, schema revision, evaluator profile and source/target artifact digests. A subsequent change creates a superseding record; it must not overwrite a sealed record.
+
+The evaluator must reject a structurally valid record that fails any of these semantic checks. JSON Schema is a structural contract, not an identity provider, access-control system, conflict-of-interest adjudicator or cryptographic seal verifier.
+
 ## 5. Gold record format
 
 The evaluator-only gold record for each claim–evidence pair should contain:
