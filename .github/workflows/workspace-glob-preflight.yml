@@ -1,0 +1,39 @@
+name: Workspace glob preflight
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "tools/check_workspace_members.sh"
+      - "tools/tests/check_workspace_members_test.sh"
+      - "crates/core/**"
+      - "crates/domains/**"
+      - "crates/bridges/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  workspace-member-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.ref || github.ref_name }}
+          persist-credentials: false
+      - name: Verify exact pull request head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+      - name: Check every root workspace glob match
+        run: bash tools/check_workspace_members.sh "$GITHUB_WORKSPACE"
+      - name: Test fail-closed preflight on temporary fixtures
+        run: bash tools/tests/check_workspace_members_test.sh
+      - name: Confirm Cargo metadata resolves the workspace
+        run: cargo metadata --locked --format-version 1 --no-deps
