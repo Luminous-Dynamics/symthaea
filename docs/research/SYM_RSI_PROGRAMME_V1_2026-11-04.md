@@ -307,3 +307,37 @@ This does not replace the original per-case results. It exposes a second analysi
 - Holm adjustment is local to one metric family and one comparison. Sequential candidate selection and generation-level inference remain a separate preregistered confirmation problem.
 - No p-value is a practical-effect threshold, non-inferiority result, or promotion authorization.
 - Tests are authored in the PR but remain unexecuted until exact-head Rust qualification is available.
+
+
+## 11. Newest field comparator: RSI-Env (arXiv:2611.01736, 2026-11-01)
+
+RSI-Env is the newest directly relevant public comparator located for this research pass. It models a system as model parameters, executable harness, and persistent research state, with resources managed by an external Host Controller. The evolving target system itself becomes the Improver in subsequent rounds. It varies research autonomy across Open-General, Capability-Directed, and Benchmark-Guided settings, and keeps controller-side validity, versioning, and final capability evaluation outside the editable environment.
+
+The paper reports seven tasks from Qwen3.8-27B with a 30-hour allocation split into ten three-hour rounds. Self's Open-General run changes GPQA Diamond from 65.2% to 73.2% and AIME 2026 from 53.3% to 56.7%, but also changes SimpleQA from 82.0% to 77.2% and Terminal-Bench 2.1 pass@3 from 12.4% to 9.0%. The Capability-Directed Knowledge run raises SimpleQA from 82.0% to 88.0% while GPQA Diamond falls from 65.2% to 53.0%. The paper's Knowledge Self case study reports successive SimpleQA versions at 82.0%, 85.0%, and 88.0%.
+
+These are author-reported preprint results, not independently reproduced measurements. The authors explicitly report uneven cross-capability retention. The Self runs use roughly 25–29 hours in the Open-General and Capability-Directed cases, while the external Teacher runs use roughly 1–7 hours under the same 30-hour allocation; the improvers are also different models. Therefore the paper is a strong architecture/evaluation comparator, but its Self-vs-Teacher scores are not a clean compute-matched leaderboard. Its three-trial avg@3/pass@3 summaries also do not substitute for clustered, multi-seed uncertainty estimates. The reported H1/M1 Knowledge continuation shows a successor doing further work and being followed by a further gain; it is not a controlled no-recursion ablation proving recursion caused the second gain.
+
+### RSI evaluation should be a matrix, not a single ladder
+
+Keep the R0–R5 claim ladder for claim discipline, but organize experiments across orthogonal axes:
+
+1. **Editable system surface:** harness/scaffold; memory and tool policy; model weights; training objective/update algorithm; experiment-selection and meta-improvement procedure.
+2. **Research autonomy:** Benchmark-Guided; Capability-Directed; Open-General. Freeze the autonomy condition independently of the task domain.
+3. **Inheritance depth:** one accepted update; successive inherited updates; inherited changes to the improvement process; changes to the algorithm that trains successor models.
+4. **Evidence sovereignty:** external controller; exact candidate/source/evaluator identities; access-controlled confirmation; independent regrade; matched total resource accounting.
+
+This prevents conflating harness improvement with algorithmic RSI and prevents a benchmark-specific gain from being called general RSI. It also makes direct comparison to RSI-Env, HyperAgents, AIDE², and AI4AI-Bench more precise: each should be compared only on the overlapping system surface, autonomy condition, inheritance depth, and budget regime.
+
+### Symthaea's differentiating target
+
+Do not try to beat RSI-Env by maximizing one headline benchmark. Target **capability-preserving open-ended research autonomy**: an evolving model/harness/meta-process that can formulate goals, propose falsifiable interventions, retain failed and successful research state, and independently transfer gains while keeping every protected capability above its pre-registered floor. Report the full vector, worst regression, best-so-far and final checkpoint, per-generation cost, and independently confirmed discoveries per matched total budget.
+
+Immediate implications:
+
+- Add the three autonomy settings to the R4 meta-RSI protocol, with identical infrastructure and controlled evaluation permissions.
+- Treat model-weight updates and harness edits as separate treatments and as a coupled treatment; do not attribute a gain to the wrong edit surface.
+- Preserve a frozen external Host Controller for candidate registration, source identity, resource limits, sealed evaluation, and rollback. The candidate must not modify that controller.
+- Evaluate full capability retention on independent units and fresh task families. Use the cluster-aware view from issue #10513 as an analysis adapter, not as authentication.
+- Compare against the existing deterministic SYM-RSI-001 replay substrate as a low-cost mechanism baseline, then test transfer into real R&D/coding domains. The old replay stack remains a separate draft lineage and is not integrated into `main`.
+
+Source: Qu et al., *RSI-Env: An Open-Ended Environment for Recursive Self-Improvement of Agents*, arXiv:2611.01736v1, 2026-11-01. https://arxiv.org/abs/2611.01736
