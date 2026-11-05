@@ -194,3 +194,28 @@ A group is fit-eligible only when:
 Otherwise the adapter returns a non-ready disposition (`MissingCategoryResponses`, `MissingSignalClass`, `MissingNoiseClass`, `CategoryOrderOverflow` or `InvalidCategoryTable`) and **no table**. Missing counts, requested class totals, observed class totals and RT timeout dispositions remain explicit. In particular, the adapter does not assume missing-at-random or silently remove missing rows; the current UVSD fitter has no missingness model.
 
 This is a synthetic-data adapter, not a missingness correction or model-adequacy test. It must be reviewed before being used with human datasets.
+
+
+## End-to-end known-truth recovery runner (exploratory)
+
+The `observer_scenario_recovery` binary runs the first end-to-end known-answer campaign:
+
+```bash
+cargo run --release --manifest-path tools/spectra-uvsd-fit/Cargo.toml --bin observer_scenario_recovery -- \
+  --outer 100 --trials-per-class 500 --seed-root 0x5350454354524101 > spectra-recovery.csv
+```
+
+The defaults (10 outer campaigns × 250 signal + 250 noise trials) are a smoke setting. The command above is a larger research campaign, not a coverage certification. The binary emits one `REPLICATE` CSV row for every scenario/seed and one `SUMMARY` row per scenario. It records all adapter abstentions and fit statuses, and computes mu/sigma/d_a bias and RMSE only for `FitStatus::Converged` fits. It reports fit availability both over all campaigns and conditional on adapter-ready campaigns.
+
+The scenario ladder includes:
+- Gaussian equal-variance null and Gaussian UVSD alternatives on both sides of sigma=1;
+- variance-standardized Student-t heavy-tail stress;
+- uniform lapse contamination;
+- criterion drift;
+- between-observer random effects while retaining one participant-session per fit;
+- evidence-independent missing-category abstention;
+- a quantized response-time channel (the current fitter uses category outcomes only).
+
+Signal/noise trials are interleaved and balanced at the same experimenter-controlled stimulus level, condition and response scale. Each generated dataset contains one participant-session. The adapter keeps that participant as the fit unit; it never pools participants. Oracle mu/sigma are extracted only after fitting (or after a missingness abstention) for known-truth scoring and are never input to the adapter or fitter.
+
+This runner is a first recovery/smoke harness. It does not calibrate Wald intervals, equal-vs-unequal likelihood-ratio tests, familywise false-positive rates or sequential stopping. Heavy tails, lapses and criterion drift are explicit misspecification tracks; their RMSE must not be mixed into the correctly specified Gaussian recovery aggregate. Missing-category scenarios are expected to abstain, not to fit a complete-case subset. All results remain synthetic and exploratory until exact-head Rust verification and larger held-out campaigns are run.
