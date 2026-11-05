@@ -149,6 +149,26 @@ fn ap(a: &mut AllpassFilter, input: f32) -> f32 {
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────────
+/// Per-note evidence for a requested sample style. Decisions explain whether
+/// the style was selected or how the established renderer handled a fallback.
+#[derive(Debug, Clone)]
+pub struct SampleStyleRenderReceipt {
+    pub voice_index: usize,
+    pub note_index: Option<usize>,
+    pub instrument: Option<Instrument>,
+    pub requested_style: String,
+    pub decision: &'static str,
+    pub rendered_path: &'static str,
+}
+
+/// Audio plus deterministic receipts for every requested voice/style.
+pub struct StyledArrangementRender {
+    pub audio: AudioData,
+    pub style_receipts: Vec<SampleStyleRenderReceipt>,
+}
+
+/// Render with the legacy policy. No request means no style receipts, and the
+/// existing renderer selection policy is retained.
 pub fn render_arrangement(
     arrangement: &Arrangement,
     sample_rate: u32,
@@ -156,6 +176,59 @@ pub fn render_arrangement(
     state: &MusicalState,
     config: &MuseConfig,
 ) -> AudioData {
+    render_arrangement_internal(
+        arrangement,
+        sample_rate,
+        total_samples,
+        state,
+        config,
+        &std::collections::HashMap::new(),
+    )
+    .audio
+}
+
+/// Render with explicit named sample-style overrides keyed by stable voice index.
+/// One style is applied to every note in that voice. Missing/invalid assets fall
+/// back through the normal renderer and are explained in the returned receipts.
+pub fn render_arrangement_with_sample_styles(
+    arrangement: &Arrangement,
+    sample_rate: u32,
+    total_samples: usize,
+    state: &MusicalState,
+    config: &MuseConfig,
+    styles_by_voice_index: &std::collections::HashMap<usize, String>,
+) -> StyledArrangementRender {
+    render_arrangement_internal(
+        arrangement,
+        sample_rate,
+        total_samples,
+        state,
+        config,
+        styles_by_voice_index,
+    )
+}
+
+fn render_arrangement_internal(
+    arrangement: &Arrangement,
+    sample_rate: u32,
+    total_samples: usize,
+    state: &MusicalState,
+    config: &MuseConfig,
+    styles_by_voice_index: &std::collections::HashMap<usize, String>,
+) -> StyledArrangementRender {
+    let mut style_receipts = Vec::new();
+    for (&voice_index, style_name) in styles_by_voice_index {
+        if voice_index >= arrangement.voices.len() {
+            style_receipts.push(SampleStyleRenderReceipt {
+                voice_index,
+                note_index: None,
+                instrument: None,
+                requested_style: style_name.clone(),
+                decision: "voice_index_out_of_range",
+                rendered_path: "not_rendered",
+            });
+        }
+    }
     let sr = sample_rate as f32;
     // At high arousal, use FEWER partials to reduce intermodulation distortion
     // when many voices play simultaneously. User feedback: high-arousal + chord
@@ -197,7 +270,20 @@ pub fn render_arrangement(
     let mut bl = vec![0.0f32; total_samples];
     let mut br = vec![0.0f32; total_samples];
 
-    for voice in &arrangement.voices {
+    for (voice_index, voice) in arrangement.voices.iter().enumerate() {
+        let requested_style = styles_by_voice_index.get(&voice_index);
+        if let Some(style_name) = requested_style
+            && voice.notes.is_empty()
+        {
+            style_receipts.push(SampleStyleRenderReceipt {
+                voice_index,
+                note_index: None,
+                instrument: voice.instrument,
+                requested_style: style_name.clone(),
+                decision: "voice_has_no_notes",
+                rendered_path: "not_rendered",
+            });
+        }
         let theta = (voice.pan + 1.0) * std::f32::consts::FRAC_PI_4;
         let (gl, gr) = (theta.cos(), theta.sin());
 
@@ -249,6 +335,71 @@ pub fn render_arrangement(
                     .instrument
                     .map(instrument_benefits_from_legato)
                     .unwrap_or(false);
+            let mut style_decision: Option<&'static str> = None;
+            let mut rendered_path = "additive_synthesis";
+            if let Some(style_name) = requested_style {
+                if let Some(instrument) = voice.instrument {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        match crate::vcsl::sample_style_kind(instrument, style_name) {
+                            None => {
+                                style_decision =
+                                    Some("unknown_style_for_instrument_fell_back");
+                            }
+                            Some("release_articulation") => {
+                                style_decision =
+                                    Some("release_style_requires_note_off_path");
+                            }
+                            Some(_) => match crate::vcsl::library() {
+                                None => {
+                                    style_decision =
+                                        Some("sample_library_unavailable_fell_back");
+                                }
+                                Some(lib) => match lib.style_bank(instrument, style_name) {
+                                    None => {
+                                        style_decision =
+                                            Some("style_bank_not_loaded_fell_back");
+                                    }
+                                    Some(bank) => {
+                                        if render_vcsl_note(
+                                            &mut bl,
+                                            &mut br,
+                                            sr,
+                                            note,
+                                            voice.volume,
+                                            gl,
+                                            gr,
+                                            bank,
+                                            false,
+                                            false,
+                                        ) {
+                                            style_receipts.push(SampleStyleRenderReceipt {
+                                                voice_index,
+                                                note_index: Some(ni),
+                                                instrument: Some(instrument),
+                                                requested_style: style_name.clone(),
+                                                decision: "style_selected",
+                                                rendered_path: "named_sample_style",
+                                            });
+                                            continue;
+                                        } else {
+                                            style_decision =
+                                                Some("style_sample_unavailable_fell_back");
+                                        }
+                                    }
+                                },
+                            },
+                        }
+                    }
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        style_decision =
+                            Some("sample_library_unavailable_on_target_fell_back");
+                    }
+                } else {
+                    style_decision = Some("voice_has_no_instrument_fell_back");
+                }
+            }
             if let Some(instrument) = voice.instrument {
                 // Sampled instruments first: when the VCSL library is active
                 // (SYMTHAEA_VCSL_DIR or vcsl::init) and has a bank for this
@@ -284,6 +435,9 @@ pub fn render_arrangement(
                             false,
                             false,
                         );
+                        if done {
+                            rendered_path = "default_short_articulation_sample";
+                        }
                     }
                     if !done && let Some(bank) = lib.bank(instrument) {
                         done = render_vcsl_note(
@@ -298,8 +452,23 @@ pub fn render_arrangement(
                             legato_from_prev,
                             sustained_shape,
                         );
+                        if done {
+                            rendered_path = "default_sustain_sample";
+                        }
                     }
                     if done {
+                        if let (Some(style_name), Some(decision)) =
+                            (requested_style, style_decision)
+                        {
+                            style_receipts.push(SampleStyleRenderReceipt {
+                                voice_index,
+                                note_index: Some(ni),
+                                instrument: voice.instrument,
+                                requested_style: style_name.clone(),
+                                decision,
+                                rendered_path,
+                            });
+                        }
                         continue;
                     }
                 }
@@ -314,6 +483,19 @@ pub fn render_arrangement(
                         gr,
                         instrument,
                     );
+                    rendered_path = "karplus_strong";
+                    if let (Some(style_name), Some(decision)) =
+                        (requested_style, style_decision)
+                    {
+                        style_receipts.push(SampleStyleRenderReceipt {
+                            voice_index,
+                            note_index: Some(ni),
+                            instrument: voice.instrument,
+                            requested_style: style_name.clone(),
+                            decision,
+                            rendered_path,
+                        });
+                    }
                     continue;
                 }
                 if instrument.uses_fm() {
@@ -327,6 +509,19 @@ pub fn render_arrangement(
                         gr,
                         instrument,
                     );
+                    rendered_path = "frequency_modulation";
+                    if let (Some(style_name), Some(decision)) =
+                        (requested_style, style_decision)
+                    {
+                        style_receipts.push(SampleStyleRenderReceipt {
+                            voice_index,
+                            note_index: Some(ni),
+                            instrument: voice.instrument,
+                            requested_style: style_name.clone(),
+                            decision,
+                            rendered_path,
+                        });
+                    }
                     continue;
                 }
             }
@@ -400,6 +595,18 @@ pub fn render_arrangement(
                     }
                 }
             }
+            if let (Some(style_name), Some(decision)) =
+                (requested_style, style_decision)
+            {
+                style_receipts.push(SampleStyleRenderReceipt {
+                    voice_index,
+                    note_index: Some(ni),
+                    instrument: voice.instrument,
+                    requested_style: style_name.clone(),
+                    decision,
+                    rendered_path,
+                });
+            }
         }
     }
     if config.noise_mix > 0.0 {
@@ -463,7 +670,7 @@ pub fn render_arrangement(
         }
     }
 
-    match config.output_format {
+    let audio = match config.output_format {
         OutputFormat::StereoF32 => {
             AudioData::StereoF32(bl.iter().zip(br.iter()).map(|(&l, &r)| [l, r]).collect())
         }
@@ -479,6 +686,20 @@ pub fn render_arrangement(
                 .map(|(&l, &r)| (soft_clip((l + r) * 0.5) * i16::MAX as f32) as i16)
                 .collect(),
         ),
+    };
+    style_receipts.sort_by(|a, b| {
+        a.voice_index
+            .cmp(&b.voice_index)
+            .then_with(|| {
+                a.note_index
+                    .unwrap_or(usize::MAX)
+                    .cmp(&b.note_index.unwrap_or(usize::MAX))
+            })
+            .then_with(|| a.requested_style.cmp(&b.requested_style))
+    });
+    StyledArrangementRender {
+        audio,
+        style_receipts,
     }
 }
 
@@ -1227,6 +1448,49 @@ mod tests {
     use super::*;
     use crate::voice::{Arrangement, Voice, VoiceRole};
     use crate::{MuseConfig, MusicalState, Note, OutputFormat};
+
+    #[test]
+    fn styled_render_receipts_explain_unknown_style_and_invalid_voice() {
+        let arrangement = Arrangement {
+            voices: vec![Voice {
+                role: VoiceRole::Lead,
+                notes: vec![Note {
+                    frequency: 440.0,
+                    start_time: 0.0,
+                    duration: 0.04,
+                    velocity: 0.7,
+                }],
+                pitch_range: (220.0, 880.0),
+                volume: 1.0,
+                pan: 0.0,
+                instrument: Some(Instrument::Violin),
+            }],
+        };
+        let styles = std::collections::HashMap::from([
+            (0usize, "not a declared violin style".to_string()),
+            (7usize, "also unreachable".to_string()),
+        ]);
+        let rendered = render_arrangement_with_sample_styles(
+            &arrangement,
+            22050,
+            2205,
+            &MusicalState::default(),
+            &MuseConfig::default(),
+            &styles,
+        );
+        assert_eq!(rendered.style_receipts.len(), 2);
+        assert_eq!(rendered.style_receipts[0].voice_index, 0);
+        assert_eq!(
+            rendered.style_receipts[0].decision,
+            "unknown_style_for_instrument_fell_back"
+        );
+        assert_eq!(rendered.style_receipts[1].voice_index, 7);
+        assert_eq!(
+            rendered.style_receipts[1].decision,
+            "voice_index_out_of_range"
+        );
+        assert_eq!(rendered.style_receipts[1].rendered_path, "not_rendered");
+    }
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
