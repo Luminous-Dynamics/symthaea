@@ -253,9 +253,15 @@ fn category_probabilities(
     }
     let probability_sum: f64 = probabilities.iter().sum();
     if !probability_sum.is_finite()
+        || probability_sum <= 0.0
         || (probability_sum - 1.0).abs() > PROBABILITY_SUM_TOLERANCE
     {
         return Err(GoodnessOfFitError::ProbabilityMassDoesNotSumToOne);
+    }
+    // Correct only floating-point summation drift after verifying that the
+    // unnormalized model mass is already within the declared tolerance.
+    for probability in &mut probabilities {
+        *probability /= probability_sum;
     }
     Ok(probabilities)
 }
