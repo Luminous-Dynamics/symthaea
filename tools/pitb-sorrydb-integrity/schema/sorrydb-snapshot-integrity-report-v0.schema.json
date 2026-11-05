@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-snapshot-integrity-report-v0.schema.json",
+  "title": "PITB SorryDB snapshot-only integrity report v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "snapshot_id",
+    "upstream_repository",
+    "upstream_repository_commit",
+    "database_git_blob_sha1",
+    "evaluation_split_git_blob_sha1",
+    "database_raw_sha256",
+    "evaluation_split_raw_sha256",
+    "documented_database_task_count",
+    "database_task_count",
+    "evaluation_task_count",
+    "full_unique_task_ids",
+    "full_unique_goal_strings",
+    "full_unique_repositories",
+    "full_unique_repository_commit_pairs",
+    "evaluation_unique_repositories",
+    "evaluation_unique_repository_commit_pairs",
+    "evaluation_repository_file_clusters",
+    "evaluation_repository_overlap_count",
+    "project_disjoint_evaluation_split",
+    "max_tasks_per_evaluation_repository",
+    "max_tasks_per_evaluation_repository_file",
+    "evaluation_unique_lean_versions",
+    "full_zero_based_start_column_count",
+    "evaluation_zero_based_start_column_count",
+    "full_task_ids_recomputed",
+    "evaluation_task_ids_recomputed",
+    "evaluation_ids_subset_of_full",
+    "evaluation_records_identical_to_full",
+    "license",
+    "scheduler_admission",
+    "interpretation_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-snapshot-integrity-report.v0"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "upstream_repository": {
+      "const": "https://github.com/SorryDB/SorryDB"
+    },
+    "upstream_repository_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "database_git_blob_sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "evaluation_split_git_blob_sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "database_raw_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "evaluation_split_raw_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "documented_database_task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "database_task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evaluation_task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "full_unique_task_ids": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "full_unique_goal_strings": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "full_unique_repositories": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "full_unique_repository_commit_pairs": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evaluation_unique_repositories": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evaluation_unique_repository_commit_pairs": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evaluation_repository_file_clusters": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evaluation_repository_overlap_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "project_disjoint_evaluation_split": {
+      "type": "boolean"
+    },
+    "max_tasks_per_evaluation_repository": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "max_tasks_per_evaluation_repository_file": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evaluation_unique_lean_versions": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "full_zero_based_start_column_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "evaluation_zero_based_start_column_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "full_task_ids_recomputed": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evaluation_task_ids_recomputed": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evaluation_ids_subset_of_full": {
+      "const": true
+    },
+    "evaluation_records_identical_to_full": {
+      "const": true
+    },
+    "license": {
+      "const": "Apache-2.0"
+    },
+    "scheduler_admission": {
+      "const": false
+    },
+    "interpretation_boundary": {
+      "type": "string",
+      "minLength": 40
+    }
+  }
+}
