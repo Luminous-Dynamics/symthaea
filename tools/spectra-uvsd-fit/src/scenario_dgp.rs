@@ -236,6 +236,7 @@ pub struct ActionCategorySummary {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SyntheticDataset {
     pub scenario: ObserverScenario,
+    pub scenario_digest: String,
     pub action_set_digest: String,
     pub root_seed: u64,
     pub prng_version: &'static str,
@@ -247,6 +248,7 @@ pub struct SyntheticDataset {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DgpError {
     NonFiniteScenarioParameter,
+    NonFiniteDerivedValue,
     InvalidSignalSigma,
     InvalidLapseProbability,
     InvalidMissingnessProbability,
@@ -255,6 +257,7 @@ pub enum DgpError {
     TooManyResponseScales,
     DuplicateResponseScaleId,
     InvalidCriterionCount,
+    TooManyCategories,
     InvalidLatentCriteria,
     InvalidParticipantHeterogeneity,
     InvalidRtChannel,
@@ -271,6 +274,7 @@ impl fmt::Display for DgpError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
             Self::NonFiniteScenarioParameter => "scenario parameters must be finite",
+            Self::NonFiniteDerivedValue => "derived observer or evidence parameter is non-finite",
             Self::InvalidSignalSigma => "signal sigma must be positive",
             Self::InvalidLapseProbability => "lapse probability must be in [0, 1)",
             Self::InvalidMissingnessProbability => "missingness probabilities must define a valid [0, 1] bound",
@@ -279,6 +283,7 @@ impl fmt::Display for DgpError {
             Self::TooManyResponseScales => "too many response scales",
             Self::DuplicateResponseScaleId => "response-scale IDs must be unique",
             Self::InvalidCriterionCount => "each response scale needs at least two criteria",
+            Self::TooManyCategories => "response category index exceeds u16 capacity",
             Self::InvalidLatentCriteria => "latent criteria must be finite and strictly increasing",
             Self::InvalidParticipantHeterogeneity => "heterogeneity standard deviations must be finite and nonnegative",
             Self::InvalidRtChannel => "RT channel parameters are invalid",
@@ -391,8 +396,15 @@ pub fn generate_synthetic_dataset(
             .iter()
             .map(|criterion| criterion + criterion_offset)
             .collect();
-        let category_count = shifted_criteria.partition_point(|criterion| oracle_evidence >= *criterion);
-        let oracle_category = u16::try_from(category_count).map_err(|_| DgpError::TrialCountOverflow)?;
+        if !signal_mean.is_finite() || !signal_sigma.is_finite() || !criterion_offset.is_finite()
+            || !oracle_evidence.is_finite()
+        {
+            return Err(DgpError::NonFiniteDerivedValue);
+        }
+        let category_count =
+            shifted_criteria.partition_point(|criterion| oracle_evidence >= *criterion);
+        let oracle_category =
+            u16::try_from(category_count).map_err(|_| DgpError::TooManyCategories)?;
         let oracle_lapse = rng.uniform() < scenario.lapse_probability;
         let oracle_category = if oracle_lapse {
             rng.uniform_index(scale.latent_criteria.len() + 1) as u16
@@ -432,6 +444,7 @@ pub fn generate_synthetic_dataset(
     let summaries = summarize_trials(action_set, scenario, &trials)?;
     Ok(SyntheticDataset {
         scenario: scenario.clone(),
+        scenario_digest,
         action_set_digest: action_set.digest().to_owned(),
         root_seed,
         prng_version: "splitmix64-v1",
@@ -446,12 +459,10 @@ fn participant_effects(
     root_seed: u64,
     participant_id: u32,
 ) -> ParticipantEffects {
-    let mut rng = SplitMix64::new(mix64(
-        root_seed
-            ^ ((scenario.scenario_id as u64) << 48)
-            ^ ((participant_id as u64) << 16)
-            ^ 0xA076_1D64_78BD_642F,
-    ));
+    let participant_key = mix64(root_seed ^ scenario.scenario_id as u64);
+    let participant_key =
+        mix64(participant_key ^ (participant_id as u64).wrapping_mul(0xA076_1D64_78BD_642F));
+    let mut rng = SplitMix64::new(participant_key);
     let heterogeneity = scenario.heterogeneity.unwrap_or(ParticipantHeterogeneity {
         signal_mean_sd: 0.0,
         log_signal_sigma_sd: 0.0,
@@ -579,13 +590,11 @@ fn trial_seed(
     participant_id: u32,
     trial_index: u32,
 ) -> u64 {
-    mix64(
-        root_seed
-            ^ ((scenario_id as u64) << 48)
-            ^ ((participant_id as u64) << 16)
-            ^ (trial_index as u64).rotate_left(29)
-            ^ 0xE703_7ED1_A0B4_28DB,
-    )
+    let scenario_key = mix64(root_seed ^ scenario_id as u64);
+    let participant_key = mix64(
+        scenario_key ^ (participant_id as u64).wrapping_mul(0xE703_7ED1_A0B4_28DB),
+    );
+    mix64(participant_key ^ (trial_index as u64).wrapping_mul(0x8EBC_6AF0_9C88_C6E3))
 }
 
 fn mix64(mut value: u64) -> u64 {
@@ -784,18 +793,20 @@ mod tests {
         .unwrap();
         let total: u64 = data.summaries.iter().map(|summary| summary.requested_trials).sum();
         assert_eq!(total, 40);
-        assert!(data
+        let noise_trials = data
             .summaries
             .iter()
-            .find(|summary| summary.action_id == 1)
-            .unwrap()
-            .requested_trials
-            > data
-                .summaries
-                .iter()
-                .find(|summary| summary.action_id == 2)
-                .unwrap()
-                .requested_trials);
+            .filter(|summary| summary.stimulus_class == StimulusClass::Noise)
+            .map(|summary| summary.requested_trials)
+            .sum::<u64>();
+        let signal_trials = data
+            .summaries
+            .iter()
+            .filter(|summary| summary.stimulus_class == StimulusClass::Signal)
+            .map(|summary| summary.requested_trials)
+            .sum::<u64>();
+        assert_eq!(noise_trials, 10);
+        assert_eq!(signal_trials, 30);
         for summary in data.summaries {
             assert_eq!(
                 summary.category_counts.iter().sum::<u64>() + summary.missing_category,
@@ -916,7 +927,7 @@ mod tests {
         let actions = action_set();
         let mut spec = scenario();
         spec.rt_channel = Some(RtChannelSpec {
-            base_latency_ms: 1_500.0,
+            base_latency_ms: 2_500.0,
             evidence_speed_gain: 0.0,
             log_noise_sd: 0.0,
             non_decision_time_ms: 0.0,
