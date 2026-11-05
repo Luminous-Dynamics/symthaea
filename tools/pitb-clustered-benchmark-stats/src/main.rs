@@ -551,8 +551,8 @@ fn paired_difference(
                     .ok_or_else(|| format!("left strategy missing task {task_id}"))?;
                 let r = right.outcomes.get(task_id)
                     .ok_or_else(|| format!("right strategy missing task {task_id}"))?;
-                left_solved += f64::from(l.solved as u8);
-                right_solved += f64::from(r.solved as u8);
+                left_solved += if l.solved { 1.0 } else { 0.0 };
+                right_solved += if r.solved { 1.0 } else { 0.0 };
                 weight += 1.0;
             }
         }
@@ -700,7 +700,7 @@ fn synthetic_run(task: &Task, strategy: &Strategy, run_id: &str, solved: bool) -
         end_column: task.location.end_column,
         goal_sha256: sha256(task.debug_info.goal.as_bytes()),
         declaration_signature_before_sha256: fake_hash(&format!("before:{}", task.id)),
-        declaration_signature_after_sha256: fake_hash(&format!("after:{}", task.id)),
+        declaration_signature_after_sha256: fake_hash(&format!("before:{}", task.id)),
         target_is_prop: true,
         source_file_sha256: fake_hash(&format!("source:{}", task.id)),
         replacement_patch_sha256: fake_hash(&format!("patch:{h}")),
@@ -821,6 +821,24 @@ fn run_self_tests() -> Result<(), String> {
         return Err("kernel-failing run counted as assurance-qualified".into());
     }
     println!("SELF_TEST_PASS all proof and semantic gates are required");
+
+    let (synthetic_tasks, _, synthetic_runs, _, _) = synthetic_inputs()?;
+    let parsed_runs = load_runs(synthetic_runs.as_bytes(), &synthetic_tasks)?;
+    if parsed_runs.len() != 2 {
+        return Err("synthetic paired strategy ledger did not load two strategies".into());
+    }
+    let mut changed_context = Vec::new();
+    for line in synthetic_runs.lines() {
+        let mut run: ProofRun = serde_json::from_str(line).map_err(|e| e.to_string())?;
+        if run.strategy.name == "right" && run.task_id == "t1" {
+            run.source_file_sha256 = fake_hash("mutated source bytes for only one method");
+        }
+        changed_context.push(serde_json::to_string(&run).map_err(|e| e.to_string())?);
+    }
+    if load_runs(changed_context.join("\n").as_bytes(), &synthetic_tasks).is_ok() {
+        return Err("cross-strategy source-byte drift was accepted".into());
+    }
+    println!("SELF_TEST_PASS matched strategies must bind identical source, goal and target signature");
 
     Ok(())
 }
