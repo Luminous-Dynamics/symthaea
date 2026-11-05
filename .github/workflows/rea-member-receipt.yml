@@ -32,12 +32,19 @@ jobs:
         with:
           toolchain: 1.96.0
           components: clippy
-      - name: Resolve isolated receipt harness lock
-        run: cargo generate-lockfile --manifest-path tools/rea-receipt-harness/Cargo.toml
+      - name: Resolve and pin isolated receipt harness lock
+        run: |
+          cargo generate-lockfile --manifest-path tools/rea-receipt-harness/Cargo.toml
+          echo "3ee6650c71cec05aed87e36dc64f4c26713c5dc0ef60e1c95b1da02c2d686f59  tools/rea-receipt-harness/Cargo.lock" | sha256sum --check -
       - name: Record schema and dependency provenance
         run: |
+          checked_out_commit="$(git rev-parse HEAD)"
+          test "$checked_out_commit" = "$GITHUB_SHA"
+          pr_head_commit="${{ github.event.pull_request.head.sha || github.sha }}"
           {
-            echo "source_commit=$GITHUB_SHA"
+            echo "tested_tree_commit=$checked_out_commit"
+            echo "workflow_event_sha=$GITHUB_SHA"
+            echo "pull_request_head_sha=$pr_head_commit"
             rustc --version --verbose
             cargo --version
             sha256sum docs/research/rea-zip-content-verification-receipt-v0.schema.json
