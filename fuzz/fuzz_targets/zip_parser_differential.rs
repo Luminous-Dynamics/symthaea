@@ -38,6 +38,21 @@ fn mismatch(message: &str) -> ! {
     panic!("REA/zip-rs differential disagreement: {message}");
 }
 
+fn crc32(bytes: &[u8]) -> u32 {
+    let mut state = u32::MAX;
+    for byte in bytes {
+        state ^= *byte as u32;
+        for _ in 0..8 {
+            state = if state & 1 == 1 {
+                (state >> 1) ^ 0xedb8_8320
+            } else {
+                state >> 1
+            };
+        }
+    }
+    !state
+}
+
 fuzz_target!(|data: &[u8]| {
     if data.len() > MAX_INPUT_BYTES {
         return;
@@ -82,7 +97,10 @@ fuzz_target!(|data: &[u8]| {
         return;
     }
 
-    let Ok(mut oracle) = zip::ZipArchive::new(File::open(&path).unwrap()) else {
+    let Ok(oracle_file) = File::open(&path) else {
+        return;
+    };
+    let Ok(mut oracle) = zip::ZipArchive::new(oracle_file) else {
         return;
     };
     if oracle.has_duplicate_names() || oracle.len() != inventory.entries.len() {
@@ -145,28 +163,38 @@ fuzz_target!(|data: &[u8]| {
             continue;
         }
         let oracle_sha256 = format!("{:x}", Sha256::digest(&oracle_payload));
+        let oracle_observed_crc32 = crc32(&oracle_payload);
+        if oracle_observed_crc32 != oracle_crc32 {
+            mismatch("zip-rs decoded bytes do not match its own central-directory CRC");
+        }
 
-        let verification = reader.verify_entry_content(
-            expected.occurrence_index,
-            ContentVerificationLimits {
-                max_uncompressed_bytes: MAX_MEMBER_OUTPUT_BYTES,
-                read_buffer_bytes: ORACLE_BUFFER_BYTES,
-            },
-        );
+        let verified = reader
+            .verify_entry_content(
+                expected.occurrence_index,
+                ContentVerificationLimits {
+                    max_uncompressed_bytes: MAX_MEMBER_OUTPUT_BYTES,
+                    read_buffer_bytes: ORACLE_BUFFER_BYTES,
+                },
+            )
+            .unwrap_or_else(|error| {
+                mismatch(&format!(
+                    "zip-rs reached valid EOF but Symthaea rejected the same common-subset entry: {error}"
+                ));
+            });
 
-        if let Ok(verified) = verification {
-            if verified.observed_uncompressed_bytes != oracle_payload.len() as u64 {
-                mismatch("successful decoders produced different uncompressed lengths");
-            }
-            if verified.sha256 != oracle_sha256 {
-                mismatch("successful decoders produced different member SHA-256 digests");
-            }
-            if !verified.verified_crc32 {
-                mismatch("custom reader reported success without independent CRC acceptance");
-            }
-            if verified.observed_crc32 != oracle_crc32 {
-                mismatch("custom streaming CRC differs from zip-rs central-directory CRC");
-            }
+        if verified.observed_uncompressed_bytes != oracle_payload.len() as u64 {
+            mismatch("successful decoders produced different uncompressed lengths");
+        }
+        if verified.sha256 != oracle_sha256 {
+            mismatch("successful decoders produced different member SHA-256 digests");
+        }
+        if !verified.verified_crc32 {
+            mismatch("custom reader reported success without independent CRC acceptance");
+        }
+        if verified.observed_crc32 != oracle_crc32
+            || verified.observed_crc32 != oracle_observed_crc32
+        {
+            mismatch("custom streaming CRC differs from the independent oracle CRC");
         }
     }
 });
