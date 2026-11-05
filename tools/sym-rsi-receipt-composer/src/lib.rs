@@ -1208,7 +1208,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     const SYNTHETIC_RECEIPT: &str = include_str!(
-        "../../benchmark-run-receipt-harness/examples/benchmark-run-receipt-v1.synthetic.json"
+        "../../../examples/benchmark-run-receipt-v1.synthetic.json"
     );
 
     fn make_receipt(
