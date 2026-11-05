@@ -61,11 +61,14 @@ pub enum CreditCoverExposureResult {
 pub enum CreditCoverExposureError {
     InvalidEvidenceReference,
     DuplicateExposureReference,
+    UndefinedPotentialExposureReferenceCollision,
     DuplicateInvoiceReference,
     InvoiceAndUninvoicedStatementDoubleCount,
     InvoiceNotOutstanding,
     InvoicePaymentExceedsOutstanding,
     DuplicateActionReference,
+    DuplicateReceiptReference,
+    InvalidCivilCalendar,
     InvalidFundingAction,
     ArithmeticOverflow,
 }
@@ -116,6 +119,32 @@ pub struct CreditCoverRemediationResult {
     pub late_action_count: u32,
 }
 
+/// Source-backed civil-date coverage for action timestamps. This calendar
+/// supplies date identity only; Business Day and Working Day eligibility remain
+/// separate calendars used by the §15.10 deadline functions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CivilDateCalendarEvidence<'a> {
+    pub day_ordinals: &'a [i32],
+    pub complete_through_day: i32,
+    pub source_digest: &'a str,
+}
+
+fn validate_civil_date_calendar(
+    calendar: &CivilDateCalendarEvidence<'_>,
+) -> Result<(), CreditCoverExposureError> {
+    if calendar.source_digest.trim().is_empty()
+        || calendar.day_ordinals.is_empty()
+        || calendar.day_ordinals.iter().any(|day| *day > calendar.complete_through_day)
+        || calendar
+            .day_ordinals
+            .windows(2)
+            .any(|pair| pair[0].checked_add(1) != Some(pair[1]))
+    {
+        return Err(CreditCoverExposureError::InvalidCivilCalendar);
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CreditCoverRemediationEvaluation {
     Determined(CreditCoverRemediationResult),
@@ -144,6 +173,14 @@ pub fn calculate_credit_cover_exposure(
     };
     if !nonempty_reference(undefined_potential_ref) {
         return Err(CreditCoverExposureError::InvalidEvidenceReference);
+    }
+
+    if inputs
+        .actual_exposure_entries
+        .iter()
+        .any(|entry| entry.source_ref == undefined_potential_ref)
+    {
+        return Err(CreditCoverExposureError::UndefinedPotentialExposureReferenceCollision);
     }
 
     let mut actual_exposure = 0_u64;
@@ -232,8 +269,16 @@ pub fn calculate_credit_cover_exposure(
 pub fn evaluate_credit_cover_remediation(
     inputs: CreditCoverExposureInputs<'_>,
     deadline: CreditCoverDeadline,
+    civil_calendar: CivilDateCalendarEvidence<'_>,
     actions: &[CreditCoverFundingAction<'_>],
 ) -> Result<CreditCoverRemediationEvaluation, CreditCoverExposureError> {
+    validate_civil_date_calendar(&civil_calendar)?;
+    if deadline.minute_of_day >= 24 * 60
+        || !civil_calendar.day_ordinals.contains(&deadline.day_ordinal)
+    {
+        return Err(CreditCoverExposureError::InvalidCivilCalendar);
+    }
+
     let position = match calculate_credit_cover_exposure(inputs)? {
         CreditCoverExposureResult::Determined(position) => position,
         CreditCoverExposureResult::Indeterminate { reason } => {
@@ -253,9 +298,19 @@ pub fn evaluate_credit_cover_remediation(
         {
             return Err(CreditCoverExposureError::InvalidFundingAction);
         }
+        if !civil_calendar.day_ordinals.contains(&action.day_ordinal) {
+            return Err(CreditCoverExposureError::InvalidCivilCalendar);
+        }
         for previous in &actions[..index] {
             if previous.action_ref == action.action_ref {
                 return Err(CreditCoverExposureError::DuplicateActionReference);
+            }
+            if action.state == CreditCoverFundingActionState::Confirmed
+                && previous.state == CreditCoverFundingActionState::Confirmed
+                && previous.receipt_ref.is_some()
+                && previous.receipt_ref == action.receipt_ref
+            {
+                return Err(CreditCoverExposureError::DuplicateReceiptReference);
             }
         }
         if action.state == CreditCoverFundingActionState::Confirmed
@@ -461,6 +516,19 @@ mod tests {
     }
 
     #[test]
+    fn exposure_rejects_upe_reference_collision_with_actual_exposure() {
+        let entries = exposure_entries();
+        let inputs = CreditCoverExposureInputs {
+            undefined_potential_source_ref: Some("invoice/INV-001"),
+            ..exposure_inputs(&entries)
+        };
+        assert_eq!(
+            calculate_credit_cover_exposure(inputs),
+            Err(CreditCoverExposureError::UndefinedPotentialExposureReferenceCollision)
+        );
+    }
+
+    #[test]
     fn early_invoice_payment_and_new_collateral_can_satisfy_the_same_increase_notice() {
         let entries = exposure_entries();
         let inputs = exposure_inputs(&entries);
@@ -491,6 +559,11 @@ mod tests {
             CreditCoverDeadline {
                 day_ordinal: 12,
                 minute_of_day: 1_020,
+            },
+            CivilDateCalendarEvidence {
+                day_ordinals: &[10, 11, 12, 13],
+                complete_through_day: 13,
+                source_digest: "sha256:civil-days-test",
             },
             &actions,
         )
@@ -530,6 +603,11 @@ mod tests {
                 day_ordinal: 12,
                 minute_of_day: 1_020,
             },
+            CivilDateCalendarEvidence {
+                day_ordinals: &[10, 11, 12, 13],
+                complete_through_day: 13,
+                source_digest: "sha256:civil-days-test",
+            },
             &expected,
         )
         .expect("expected cover remains a pending action");
@@ -561,6 +639,11 @@ mod tests {
                 day_ordinal: 12,
                 minute_of_day: 1_020,
             },
+            CivilDateCalendarEvidence {
+                day_ordinals: &[10, 11, 12, 13],
+                complete_through_day: 13,
+                source_digest: "sha256:civil-days-test",
+            },
             &late,
         )
         .expect("late collateral does not satisfy the earlier deadline");
@@ -569,6 +652,74 @@ mod tests {
         };
         assert_eq!(missed.status, CreditCoverRemediationStatus::DeadlineMissed);
         assert_eq!(missed.posted_credit_cover_after_actions_minor_units, 10_000);
+    }
+
+    #[test]
+    fn remediation_rejects_reused_posting_receipt_and_unmapped_action_date() {
+        let entries = exposure_entries();
+        let inputs = exposure_inputs(&entries);
+        let reused_receipt = [
+            CreditCoverFundingAction {
+                action_ref: "collateral-action/001",
+                kind: CreditCoverFundingActionKind::AdditionalCollateralPosted,
+                amount_minor_units: 1_000,
+                day_ordinal: 11,
+                minute_of_day: 900,
+                state: CreditCoverFundingActionState::Confirmed,
+                receipt_ref: Some("receipt/same"),
+            },
+            CreditCoverFundingAction {
+                action_ref: "collateral-action/002",
+                kind: CreditCoverFundingActionKind::AdditionalCollateralPosted,
+                amount_minor_units: 1_000,
+                day_ordinal: 11,
+                minute_of_day: 901,
+                state: CreditCoverFundingActionState::Confirmed,
+                receipt_ref: Some("receipt/same"),
+            },
+        ];
+        assert_eq!(
+            evaluate_credit_cover_remediation(
+                inputs,
+                CreditCoverDeadline {
+                    day_ordinal: 12,
+                    minute_of_day: 1_020,
+                },
+                CivilDateCalendarEvidence {
+                    day_ordinals: &[10, 11, 12, 13],
+                    complete_through_day: 13,
+                    source_digest: "sha256:civil-days-test",
+                },
+                &reused_receipt,
+            ),
+            Err(CreditCoverExposureError::DuplicateReceiptReference)
+        );
+
+        let unmapped_date = [CreditCoverFundingAction {
+            action_ref: "collateral-action/003",
+            kind: CreditCoverFundingActionKind::AdditionalCollateralPosted,
+            amount_minor_units: 1_000,
+            day_ordinal: 14,
+            minute_of_day: 900,
+            state: CreditCoverFundingActionState::Confirmed,
+            receipt_ref: Some("receipt/unmapped"),
+        }];
+        assert_eq!(
+            evaluate_credit_cover_remediation(
+                inputs,
+                CreditCoverDeadline {
+                    day_ordinal: 12,
+                    minute_of_day: 1_020,
+                },
+                CivilDateCalendarEvidence {
+                    day_ordinals: &[10, 11, 12, 13],
+                    complete_through_day: 13,
+                    source_digest: "sha256:civil-days-test",
+                },
+                &unmapped_date,
+            ),
+            Err(CreditCoverExposureError::InvalidCivilCalendar)
+        );
     }
 
     #[test]
@@ -593,6 +744,11 @@ mod tests {
                     day_ordinal: 12,
                     minute_of_day: 1_020,
                 },
+                CivilDateCalendarEvidence {
+                    day_ordinals: &[10, 11, 12, 13],
+                    complete_through_day: 13,
+                    source_digest: "sha256:civil-days-test",
+                },
                 &overpayment,
             ),
             Err(CreditCoverExposureError::InvoicePaymentExceedsOutstanding)
@@ -613,6 +769,11 @@ mod tests {
                 CreditCoverDeadline {
                     day_ordinal: 12,
                     minute_of_day: 1_020,
+                },
+                CivilDateCalendarEvidence {
+                    day_ordinals: &[10, 11, 12, 13],
+                    complete_through_day: 13,
+                    source_digest: "sha256:civil-days-test",
                 },
                 &missing_receipt,
             ),
