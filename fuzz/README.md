@@ -30,4 +30,12 @@ The fuzz step captures combined stdout/stderr in `fuzz/artifacts/fuzz-output.txt
 
 The workflow uses the committed `fuzz/Cargo.lock` with `--locked`, records the lock SHA-256, and runs a bounded 180-second smoke campaign. It is not a security certification. Every crash must be minimized, checked into the permanent regression corpus and assigned an exact source/toolchain/lockfile receipt. Fuzz-clean means only that no crash was found in the exercised build, seed corpus and time budget.
 
-Follow-on targets should separate archive admission, local/central mismatch handling, occurrence mapping, decompression/CRC verification and cross-parser differential behavior. Keep zipcore, zip, rawzip and pinned REA provenance separate; do not treat parser-name diversity as independent codec or checksum evidence.
+## Differential oracle target
+
+The second target, `zip_differential`, compares the production `ZipArtifactReader` with `zip 9.3.0` and its `flate2 / zlib-rs` Deflate backend. It is intentionally scoped to complete, ordinary single-disk ZIPs with no ZIP64, no leading stub, no duplicate raw names and bounded entry count.
+
+For that shared subset it compares central-directory occurrence order, raw name bytes, flags, compression method, declared compressed/uncompressed sizes, CRC-32, local-header offset and data offset. For eligible Stored/Deflate files it streams both readers through a fixed buffer, computes SHA-256 and independent bitwise CRC-32, and requires exact agreement on output size and content. A one-sided accept or any metadata/content mismatch becomes a libFuzzer finding for minimization.
+
+The target abstains outside the shared subset. ZIP64, prefixed carriers, duplicate names, partial traversal and unsupported methods are different compatibility families, not implicit pass/fail outcomes. A zip-rs parse rejection after production admission inside this declared subset is itself preserved as a differential finding.
+
+The workflow runs two separate 180-second campaigns, one for the production reader and one for the independent differential target. Each arm has its own raw output, summary and artifact prefix. The run context binds both arms to the exact source commit, nightly toolchain, cargo-fuzz version, fuzz lockfile digest, seed digests and runner platform. The resolved `fuzz/Cargo.lock` is uploaded and must be committed after lock resolution before the branch is promoted.
