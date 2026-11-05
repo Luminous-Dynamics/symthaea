@@ -177,3 +177,22 @@ Information, model-discrimination and representativeness use lower bounds; parti
 Bonferroni does not require independence across action/metric claims, but Hoeffding does require independent bounded Monte Carlo replications within each score series. This method is intentionally conservative; it is not an empirical Bernstein estimate. It quantifies Monte Carlo uncertainty about the supplied score-generating process only. It cannot repair a biased simulator, an invalid score definition, a wrong estimand or an incomplete scenario bank. A simultaneous bound around a biased point-generating process is still biased.
 
 All bounds and ranges are caller-contractual: the implementation validates sample membership and range ordering, but it does not prove that the declared ranges or independent-replication assumptions are scientifically correct. The method ID is `hoeffding-bonferroni-one-sided-v1`. The module is experimental and is not authorized for live adaptive experiments.
+
+
+## Robust indifference-zone selection certificate (experimental)
+
+The crate also exports an experimental `ranking` module. It consumes the target-utility lower and upper bounds in a `ScoreBoundsReceipt`, aggregates them over the frozen scenario set using maximin or weighted lower-tail CVaR, and chooses the action with the largest robust lower bound.
+
+It reports a certificate only when
+
+```text
+max_action(robust_utility_upper_bound)
+  - selected_action(robust_utility_lower_bound)
+  <= epsilon
+```
+
+Because the score-bound intervals are simultaneous over all action × scenario utility tails, this inequality provides a familywise-confidence statement that the selected action is within the preregistered indifference-zone epsilon of the best action **over the frozen scenario set**, conditional on the bounded-IID Monte Carlo assumptions and declared score ranges.
+
+A failed certificate still identifies the most conservative candidate (highest robust lower bound), but returns `NoSelectionCertificate`; it does not pretend the candidate is proven best. Epsilon is measured in the caller's declared utility units and must be fixed before opening the evaluation seed bank.
+
+This is not a guarantee that the frozen scenarios cover reality, a participant-sampling interval, a causal effect estimate, or an automatic authorization to run the recommended experiment. The score model, scenario bank, objective and utility ranges remain external scientific assumptions.
