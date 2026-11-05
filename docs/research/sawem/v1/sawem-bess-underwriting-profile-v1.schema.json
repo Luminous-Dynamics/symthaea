@@ -330,9 +330,11 @@
           "additionalProperties": false,
           "required": [
             "standstill_to_charging",
+            "standstill_to_discharging",
+            "charging_to_standstill",
+            "discharging_to_standstill",
             "charging_to_discharging",
-            "discharging_to_charging",
-            "standstill_to_discharging"
+            "discharging_to_charging"
           ],
           "properties": {
             "standstill_to_charging": {
@@ -348,6 +350,14 @@
               "minimum": 0
             },
             "standstill_to_discharging": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "charging_to_standstill": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "discharging_to_standstill": {
               "type": "integer",
               "minimum": 0
             }
