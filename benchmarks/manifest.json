@@ -171,6 +171,67 @@
             }
           ],
           "comparability_warning": "This 29-task public development leaderboard is not the 56-task hidden leaderboard snapshot or the committed-artifact competition-entry dev score. It also varies both model and harness; use matched pairs and preserve the three-run protocol."
+        },
+        "cross_harness_leaderboard_snapshot": {
+          "captured_at": "2026-11-05",
+          "source_url": "https://ple-bench.com/leaderboard",
+          "scope": "mean_score_on_56_hidden_test_tasks_by_model_and_harness",
+          "task_count": 56,
+          "run_protocol": "The official PLE leaderboard reports three runs per model+harness pair, six-hour task limit per task. Each row is a distinct model-agent harness pairing, not a model-only score.",
+          "top_pairs": [
+            {
+              "model": "Claude Opus 5.5",
+              "agent_harness": "OpenHands",
+              "score": 0.486,
+              "run_count": 3,
+              "cost_per_task_usd": 14.87,
+              "median_duration_minutes": 66,
+              "notes": [
+                "Highest displayed hidden-test model/harness pair in the 2026-11-05 snapshot."
+              ]
+            },
+            {
+              "model": "Claude Opus 5.5",
+              "agent_harness": "Claude Code",
+              "score": 0.483,
+              "run_count": 3,
+              "cost_per_task_usd": 17.12,
+              "median_duration_minutes": 63,
+              "notes": [
+                "Same model as the leading pair; harness variation is within reported run-to-run variation."
+              ]
+            },
+            {
+              "model": "Claude Opus 5.5",
+              "agent_harness": "Agy",
+              "score": 0.477,
+              "run_count": 3,
+              "cost_per_task_usd": 42.32,
+              "median_duration_minutes": 45,
+              "notes": []
+            },
+            {
+              "model": "GPT-6 Astra",
+              "agent_harness": "Codex",
+              "score": 0.458,
+              "run_count": 3,
+              "cost_per_task_usd": 9.53,
+              "median_duration_minutes": 26,
+              "notes": [
+                "Official page displays Codex as the available harness for this model."
+              ]
+            },
+            {
+              "model": "Claude Sonnet 5.5",
+              "agent_harness": "Hermes",
+              "score": 0.451,
+              "run_count": 3,
+              "cost_per_task_usd": 14.71,
+              "median_duration_minutes": 87,
+              "notes": []
+            }
+          ],
+          "comparability_warning": "The partner page's 48.3% Opus/Claude Code summary is one native pairing; the official cross-harness leaderboard currently shows Opus/OpenHands at 48.6%. Keep the model+harness pair explicit. These 56 hidden-test runs are not comparable with the 29 public-dev snapshot or the 85-task paper mean."
         }
       },
       "ceb_integration": {
@@ -320,7 +381,8 @@
           "BenchCAD 2.0 scoring does not measure manufacturability or physical performance. Do not equate geometric/placement/connectivity score with engineering safety or production readiness.",
           "Published v2.0 results and current v2.1 are different harness protocols. The current v2.1 protocol carries reasoning between rounds and allows 60 rounds / 500k output tokens per case; these are not comparable to v2.0.",
           "The 2026-10-23 Kimi K3.1 Pro result of 0.927 with tools / 0.728 without is for a random 1,000-file Vision2Code subset using voxel IoU, not the 100-case BenchCAD 2.0 Core professional engineering task set. It must not be ranked against the 0.59 Core score.",
-          "BenchCAD published v2.1 on 2026-11-05; it changes rounds, output-token budget, reasoning carry, and Task 6 scoring. See separate benchcad-2.1 registry entry. v2.1 scores are not comparable to this v2.0 entry."
+          "BenchCAD published v2.1 on 2026-11-05; it changes rounds, output-token budget, reasoning carry, and Task 6 scoring. See separate benchcad-2.1 registry entry. v2.1 scores are not comparable to this v2.0 entry.",
+          "BenchCAD 2.1 was released on 2026-11-05. It keeps the same Core case files but changes the evaluation protocol, Task 6 matching, reasoning carry and token budget. Its scores are explicitly not comparable with v2.0; see the separate benchcad-2.1 registry entry."
         ],
         "published_results": [
           {
