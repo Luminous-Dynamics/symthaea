@@ -1,0 +1,94 @@
+{
+  "schema": "symthaea.science_bench_refresh_task_set.v1",
+  "generation_id": "example-only-not-for-scoring-0001",
+  "tasks": [
+    {
+      "task_id": "dev-001",
+      "family_id": "semantic_invariance",
+      "policy_input": {
+        "instruction": "Recover the relationship from visible observations.",
+        "observations": []
+      },
+      "evaluator_only": {
+        "expected_law": "fixture-law-A"
+      }
+    },
+    {
+      "task_id": "dev-002",
+      "family_id": "semantic_invariance",
+      "policy_input": {
+        "instruction": "Recover the relationship under a reparameterization.",
+        "observations": []
+      },
+      "evaluator_only": {
+        "expected_law": "fixture-law-B"
+      }
+    },
+    {
+      "task_id": "dev-003",
+      "family_id": "sampling_noise_shift",
+      "policy_input": {
+        "instruction": "Infer the relationship under the declared sampling regime.",
+        "observations": []
+      },
+      "evaluator_only": {
+        "expected_law": "fixture-law-C"
+      }
+    },
+    {
+      "task_id": "dev-004",
+      "family_id": "sampling_noise_shift",
+      "policy_input": {
+        "instruction": "Report uncertainty under noisy observations.",
+        "observations": []
+      },
+      "evaluator_only": {
+        "expected_law": "fixture-law-D"
+      }
+    },
+    {
+      "task_id": "dev-005",
+      "family_id": "confounding_null",
+      "policy_input": {
+        "instruction": "Check whether the apparent relationship survives a null control.",
+        "observations": []
+      },
+      "evaluator_only": {
+        "expected_law": "null"
+      }
+    },
+    {
+      "task_id": "dev-006",
+      "family_id": "confounding_null",
+      "policy_input": {
+        "instruction": "Avoid claiming a causal law from the confounded observations.",
+        "observations": []
+      },
+      "evaluator_only": {
+        "expected_law": "null"
+      }
+    },
+    {
+      "task_id": "dev-007",
+      "family_id": "identifiability_abstention",
+      "policy_input": {
+        "instruction": "State the identifiable equivalence class or abstain.",
+        "observations": []
+      },
+      "evaluator_only": {
+        "expected_law": "equivalence-class-fixture"
+      }
+    },
+    {
+      "task_id": "dev-008",
+      "family_id": "identifiability_abstention",
+      "policy_input": {
+        "instruction": "Explain whether the available observations identify a unique law.",
+        "observations": []
+      },
+      "evaluator_only": {
+        "expected_law": "not-identifiable"
+      }
+    }
+  ]
+}

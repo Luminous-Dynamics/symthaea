@@ -1,0 +1,315 @@
+name: Science Benchmark Refresh Manifest Validator
+
+on:
+  pull_request:
+    paths:
+      - "research/science-bench-refresh/**"
+      - "docs/research/SCI-BENCH-REFRESH-001.md"
+      - ".github/workflows/science-bench-refresh-validator.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: science-bench-refresh-validator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validator:
+    name: Manifest contract and hostile controls
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SBR_GENERATOR_SOURCE_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact generator source revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install stable Rust with quality tools
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Formatting
+        run: cargo fmt --manifest-path research/science-bench-refresh/Cargo.toml -- --check
+
+      - name: Unit tests
+        run: cargo test --locked --manifest-path research/science-bench-refresh/Cargo.toml
+
+      - name: Clippy
+        run: cargo clippy --locked --manifest-path research/science-bench-refresh/Cargo.toml --all-targets -- -D warnings
+
+      - name: Independent Python reference unit tests
+        run: python3 -m unittest discover -s research/science-bench-refresh/tools -p 'test_*.py' -v
+
+      - name: Fixture is valid but never eligible for scoring
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- research/science-bench-refresh/fixtures/generation-manifest.example.json > /tmp/science-bench-refresh-report.json
+          grep -q '"valid": true' /tmp/science-bench-refresh-report.json
+          grep -q '"manifest_declares_scoring_eligible": false' /tmp/science-bench-refresh-report.json
+          grep -q '"manifest_declares_sealed_generalization_profile": false' /tmp/science-bench-refresh-report.json
+          set +e
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- research/science-bench-refresh/fixtures/generation-manifest.example.json --require-scoring > /tmp/science-bench-refresh-required.json
+          scoring_exit=$?
+          set -e
+          test "$scoring_exit" -eq 3
+          set +e
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- research/science-bench-refresh/fixtures/generation-manifest.example.json --require-sealed > /tmp/science-bench-refresh-sealed.json
+          sealed_exit=$?
+          set -e
+          test "$sealed_exit" -eq 4
+
+      - name: Commit-reveal round trip and mutation controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="research/science-bench-refresh/fixtures/generation-manifest.example.json"
+          zero="$(printf '%064d' 0)"
+          a="$(printf '%064d' 0 | tr '0' 'a')"
+          b="$(printf '%064d' 0 | tr '0' 'b')"
+          c_hash="$(printf '%064d' 0 | tr '0' 'c')"
+          d="$(printf '%064d' 0 | tr '0' 'd')"
+          e="$(printf '%064d' 0 | tr '0' 'e')"
+          f="$(printf '%064d' 0 | tr '0' 'f')"
+          revision="$(git rev-parse HEAD)"
+
+          jq \
+            --arg zero "$zero" --arg a "$a" --arg b "$b" \
+            --arg c "$c_hash" --arg d "$d" --arg e "$e" --arg f "$f" \
+            --arg revision "$revision" '
+              .purpose = "qualified_run" |
+              .generator.revision = $revision |
+              .generator.configuration_sha256 = $a |
+              .evaluator.source_sha256 = $b |
+              .evaluator.oracle_separation = "independent_evaluator_boundary_verified" |
+              .policy_freeze.source_or_policy_sha256 = $c |
+              .policy_freeze.prompt_sha256 = $d |
+              .policy_freeze.configuration_sha256 = $e |
+              .policy_freeze.tool_manifest_sha256 = $a |
+              .analysis_plan_sha256 = $f |
+              .protocol_commitment_sha256 = $zero |
+              .seed_commitment_sha256 = $zero |
+              .task_set_commitment_sha256 = $zero
+            ' "$manifest" > /tmp/sbr-draft-manifest.json
+
+          # This known, low-entropy seed is strictly an integration-test vector.
+          # Real sealed runs must use >=256 bits from a cryptographically secure source.
+          printf 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' > /tmp/sbr-seed.bin
+          jq -n '{
+            schema: "symthaea.science_bench_refresh_task_set.v1",
+            generation_id: "example-only-not-for-scoring-0001",
+            tasks: [
+              {task_id:"t01",family_id:"semantic_invariance",policy_input:{observations:[]},evaluator_only:{expected_law:"fixture"}},
+              {task_id:"t02",family_id:"semantic_invariance",policy_input:{observations:[]},evaluator_only:{expected_law:"fixture"}},
+              {task_id:"t03",family_id:"sampling_noise_shift",policy_input:{observations:[]},evaluator_only:{expected_law:"fixture"}},
+              {task_id:"t04",family_id:"sampling_noise_shift",policy_input:{observations:[]},evaluator_only:{expected_law:"fixture"}},
+              {task_id:"t05",family_id:"confounding_null",policy_input:{observations:[]},evaluator_only:{expected_law:"fixture"}},
+              {task_id:"t06",family_id:"confounding_null",policy_input:{observations:[]},evaluator_only:{expected_law:"fixture"}},
+              {task_id:"t07",family_id:"identifiability_abstention",policy_input:{observations:[]},evaluator_only:{expected_law:"fixture"}},
+              {task_id:"t08",family_id:"identifiability_abstention",policy_input:{observations:[]},evaluator_only:{expected_law:"fixture"}}
+            ]
+          }' > /tmp/sbr-task-set.json
+
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            protocol-commit /tmp/sbr-draft-manifest.json > /tmp/sbr-protocol.json
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            artifact-commit /tmp/sbr-draft-manifest.json seed /tmp/sbr-seed.bin > /tmp/sbr-seed-commit.json
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            artifact-commit /tmp/sbr-draft-manifest.json task-set /tmp/sbr-task-set.json > /tmp/sbr-task-commit.json
+
+          protocol="$(jq -r '.protocol_commitment_sha256' /tmp/sbr-protocol.json)"
+          seed_commit="$(jq -r '.artifact_commitment_sha256' /tmp/sbr-seed-commit.json)"
+          task_commit="$(jq -r '.artifact_commitment_sha256' /tmp/sbr-task-commit.json)"
+          jq --arg protocol "$protocol" --arg seed "$seed_commit" --arg tasks "$task_commit" '
+            .protocol_commitment_sha256 = $protocol |
+            .seed_commitment_sha256 = $seed |
+            .task_set_commitment_sha256 = $tasks
+          ' /tmp/sbr-draft-manifest.json > /tmp/sbr-final-manifest.json
+
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            /tmp/sbr-final-manifest.json --require-sealed > /tmp/sbr-validation.json
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            verify-reveal /tmp/sbr-final-manifest.json /tmp/sbr-seed.bin /tmp/sbr-task-set.json > /tmp/sbr-reveal.json
+          grep -q '"verified": true' /tmp/sbr-reveal.json
+          grep -q '"task_set_contract_valid": true' /tmp/sbr-reveal.json
+
+          cp /tmp/sbr-seed.bin /tmp/sbr-mutated-seed.bin
+          printf 'B' | dd of=/tmp/sbr-mutated-seed.bin bs=1 seek=0 conv=notrunc status=none
+          set +e
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            verify-reveal /tmp/sbr-final-manifest.json /tmp/sbr-mutated-seed.bin /tmp/sbr-task-set.json > /tmp/sbr-mutated-seed-report.json
+          seed_exit=$?
+          set -e
+          test "$seed_exit" -eq 5
+          grep -q '"seed_commitment_matches": false' /tmp/sbr-mutated-seed-report.json
+
+          jq '.tasks[0].policy_input.observations = [{"x": 1, "y": 999}]' \
+            /tmp/sbr-task-set.json > /tmp/sbr-mutated-task-set.json
+          set +e
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            verify-reveal /tmp/sbr-final-manifest.json /tmp/sbr-seed.bin /tmp/sbr-mutated-task-set.json > /tmp/sbr-mutated-task-report.json
+          task_exit=$?
+          set -e
+          test "$task_exit" -eq 5
+          grep -q '"task_set_commitment_matches": false' /tmp/sbr-mutated-task-report.json
+
+          jq '.budget.max_total_tokens += 1' /tmp/sbr-final-manifest.json > /tmp/sbr-mutated-manifest.json
+          set +e
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            /tmp/sbr-mutated-manifest.json > /tmp/sbr-mutated-manifest-report.json
+          manifest_exit=$?
+          set -e
+          test "$manifest_exit" -eq 2
+          grep -q 'does not match the frozen manifest context' /tmp/sbr-mutated-manifest-report.json
+
+      - name: Regenerate deterministic task set from revealed seed and pinned config
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="research/science-bench-refresh/fixtures/generation-manifest.example.json"
+          config="research/science-bench-refresh/fixtures/generator-config.example.json"
+          config_sha="$(sha256sum "$config" | cut -d ' ' -f 1)"
+          zero="$(printf '%064d' 0)"
+          a="$(printf '%064d' 0 | tr '0' 'a')"
+          revision="$(printf '%040d' 0 | tr '0' 'b')"
+
+          jq --arg config_sha "$config_sha" --arg zero "$zero" --arg a "$a" --arg revision "$revision" '
+            .purpose = "qualified_run" |
+            .generator.revision = $revision |
+            .generator.configuration_sha256 = $config_sha |
+            .evaluator.source_sha256 = $a |
+            .evaluator.oracle_separation = "independent_evaluator_boundary_verified" |
+            .policy_freeze.source_or_policy_sha256 = $a |
+            .policy_freeze.prompt_sha256 = $a |
+            .policy_freeze.configuration_sha256 = $a |
+            .policy_freeze.tool_manifest_sha256 = $a |
+            .analysis_plan_sha256 = $a |
+            .protocol_commitment_sha256 = $zero |
+            .seed_commitment_sha256 = $zero |
+            .task_set_commitment_sha256 = $zero
+          ' "$manifest" > /tmp/sbr-gen-draft.json
+
+          # Fixed seed is a public integration-test vector only, never a real secret.
+          printf 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' > /tmp/sbr-gen-seed.bin
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            protocol-commit /tmp/sbr-gen-draft.json > /tmp/sbr-gen-protocol.json
+          protocol="$(jq -r '.protocol_commitment_sha256' /tmp/sbr-gen-protocol.json)"
+          jq --arg protocol "$protocol" '.protocol_commitment_sha256 = $protocol' \
+            /tmp/sbr-gen-draft.json > /tmp/sbr-gen-protocol-bound.json
+
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            artifact-commit /tmp/sbr-gen-protocol-bound.json seed /tmp/sbr-gen-seed.bin \
+            > /tmp/sbr-gen-seed-commit.json
+          seed_commit="$(jq -r '.artifact_commitment_sha256' /tmp/sbr-gen-seed-commit.json)"
+          jq --arg seed_commit "$seed_commit" '.seed_commitment_sha256 = $seed_commit' \
+            /tmp/sbr-gen-protocol-bound.json > /tmp/sbr-gen-seed-bound.json
+
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            generate-task-set /tmp/sbr-gen-seed-bound.json /tmp/sbr-gen-seed.bin "$config" \
+            /tmp/sbr-generated-task-set.json > /tmp/sbr-generation-report.json
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            artifact-commit /tmp/sbr-gen-seed-bound.json task-set /tmp/sbr-generated-task-set.json \
+            > /tmp/sbr-gen-task-commit.json
+          task_commit="$(jq -r '.artifact_commitment_sha256' /tmp/sbr-gen-task-commit.json)"
+          jq --arg task_commit "$task_commit" '.task_set_commitment_sha256 = $task_commit' \
+            /tmp/sbr-gen-seed-bound.json > /tmp/sbr-gen-final-manifest.json
+
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            /tmp/sbr-gen-final-manifest.json --require-sealed > /tmp/sbr-gen-validation.json
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            verify-reveal /tmp/sbr-gen-final-manifest.json /tmp/sbr-gen-seed.bin \
+            /tmp/sbr-generated-task-set.json > /tmp/sbr-gen-reveal.json
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            verify-regeneration /tmp/sbr-gen-final-manifest.json /tmp/sbr-gen-seed.bin "$config" \
+            /tmp/sbr-generated-task-set.json > /tmp/sbr-regeneration-report.json
+          grep -q '"verified": true' /tmp/sbr-regeneration-report.json
+          grep -q '"byte_exact_match": true' /tmp/sbr-regeneration-report.json
+          grep -q '"task_set_contract_valid": true' /tmp/sbr-regeneration-report.json
+          grep -q '"synthetic_semantics_valid": true' /tmp/sbr-regeneration-report.json
+          test "$(jq '.tasks | length' /tmp/sbr-generated-task-set.json)" -eq 8
+
+          # Independent stdlib-only reference implementation, not production code.
+          python3 research/science-bench-refresh/tools/reference_replay.py \
+            /tmp/sbr-gen-final-manifest.json /tmp/sbr-gen-seed.bin "$config" \
+            /tmp/sbr-generated-task-set.json > /tmp/sbr-reference-replay.json
+          grep -q '"independent_semantic_match": true' /tmp/sbr-reference-replay.json
+          grep -q '"task_count": 8' /tmp/sbr-reference-replay.json
+
+          # The independent oracle must reject a valid-JSON but altered task set.
+          set +e
+          python3 research/science-bench-refresh/tools/reference_replay.py \
+            /tmp/sbr-gen-final-manifest.json /tmp/sbr-gen-seed.bin "$config" \
+            /tmp/sbr-mutated-generated-task-set.json > /tmp/sbr-reference-mutated-task.json 2> /tmp/sbr-reference-mutated-task.stderr
+          python_task_exit=$?
+          set -e
+          test "$python_task_exit" -eq 2
+          grep -q 'independent semantic replay differs' /tmp/sbr-reference-mutated-task.stderr
+
+          # A different revealed seed must not reproduce the same Rust artifact.
+          cp /tmp/sbr-gen-seed.bin /tmp/sbr-reference-other-seed.bin
+          printf 'C' | dd of=/tmp/sbr-reference-other-seed.bin bs=1 seek=0 conv=notrunc status=none
+          set +e
+          python3 research/science-bench-refresh/tools/reference_replay.py \
+            /tmp/sbr-gen-final-manifest.json /tmp/sbr-reference-other-seed.bin "$config" \
+            /tmp/sbr-generated-task-set.json > /tmp/sbr-reference-mutated-seed.json 2> /tmp/sbr-reference-mutated-seed.stderr
+          python_seed_exit=$?
+          set -e
+          test "$python_seed_exit" -eq 2
+          grep -q 'independent semantic replay differs' /tmp/sbr-reference-mutated-seed.stderr
+
+          # A changed generator-config file must fail the independent oracle's digest check.
+          cp "$config" /tmp/sbr-reference-mutated-config.json
+          printf ' ' >> /tmp/sbr-reference-mutated-config.json
+          set +e
+          python3 research/science-bench-refresh/tools/reference_replay.py \
+            /tmp/sbr-gen-final-manifest.json /tmp/sbr-gen-seed.bin \
+            /tmp/sbr-reference-mutated-config.json /tmp/sbr-generated-task-set.json \
+            > /tmp/sbr-reference-mutated-config.json.out 2> /tmp/sbr-reference-mutated-config.stderr
+          python_config_exit=$?
+          set -e
+          test "$python_config_exit" -eq 2
+          grep -q 'generator config bytes do not match manifest digest' /tmp/sbr-reference-mutated-config.stderr
+
+          # Mutation 1: changing the pinned generator config must fail closed.
+          cp "$config" /tmp/sbr-mutated-config.json
+          printf ' ' >> /tmp/sbr-mutated-config.json
+          set +e
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            verify-regeneration /tmp/sbr-gen-final-manifest.json /tmp/sbr-gen-seed.bin \
+            /tmp/sbr-mutated-config.json /tmp/sbr-generated-task-set.json \
+            > /tmp/sbr-config-mutation-report.json 2> /tmp/sbr-config-mutation-stderr.txt
+          config_exit=$?
+          set -e
+          test "$config_exit" -eq 2
+          grep -q 'generator config bytes do not match' /tmp/sbr-config-mutation-stderr.txt
+
+          # Mutation 2: a different seed cannot reproduce or validate the committed run.
+          cp /tmp/sbr-gen-seed.bin /tmp/sbr-gen-mutated-seed.bin
+          printf 'B' | dd of=/tmp/sbr-gen-mutated-seed.bin bs=1 seek=0 conv=notrunc status=none
+          set +e
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            verify-regeneration /tmp/sbr-gen-final-manifest.json /tmp/sbr-gen-mutated-seed.bin \
+            "$config" /tmp/sbr-generated-task-set.json \
+            > /tmp/sbr-seed-regeneration-report.json 2> /tmp/sbr-seed-regeneration-stderr.txt
+          regenerated_seed_exit=$?
+          set -e
+          test "$regenerated_seed_exit" -eq 2
+          grep -q 'seed bytes do not match' /tmp/sbr-seed-regeneration-stderr.txt
+
+          # Mutation 3: reordering/altering one task without changing the commitment must fail.
+          jq '.tasks[0].policy_input.observations = [{"x":1,"y":999}]' \
+            /tmp/sbr-generated-task-set.json > /tmp/sbr-mutated-generated-task-set.json
+          set +e
+          cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+            verify-regeneration /tmp/sbr-gen-final-manifest.json /tmp/sbr-gen-seed.bin \
+            "$config" /tmp/sbr-mutated-generated-task-set.json \
+            > /tmp/sbr-task-regeneration-report.json
+          task_regen_exit=$?
+          set -e
+          test "$task_regen_exit" -eq 5
+          grep -q '"byte_exact_match": false' /tmp/sbr-task-regeneration-report.json

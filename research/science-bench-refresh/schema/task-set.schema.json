@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/task-set.schema.json",
+  "title": "Symthaea Science Benchmark Refresh Task Set v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generation_id",
+    "tasks"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_task_set.v1"
+    },
+    "generation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "family_id",
+          "policy_input",
+          "evaluator_only"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "family_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "policy_input": {
+            "type": "object",
+            "propertyNames": {
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          "evaluator_only": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "description": "Evaluator-held full task-set artifact. A runner must explicitly pass only each task's policy_input to the evaluated policy; evaluator_only data remain isolated until the reveal is authorized. Runtime isolation is not established by this schema."
+}
