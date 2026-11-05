@@ -577,6 +577,9 @@ Source: Xu et al., *SelfImprove-Bench: Evaluating Generalization in Self-Improvi
 
 ## 17. Matched-protocol SOTA scoreboard and challenge targets
 
+R4 execution template: [SYM-RSI same-start swap preregistration v1](SYM_RSI_R4_SAME_START_SWAP_PREREG_V1_2026-11-05.md). This is a protocol template only; no experiment has been executed.
+
+
 The RSI landscape now has several strong comparators, but each measures a different intervention surface. Symthaea must reproduce each under its original protocol before claiming to exceed it. Do not average these scores into one leaderboard.
 
 | Comparator | Published result (authors' report) | What it identifies | Symthaea challenge target |
