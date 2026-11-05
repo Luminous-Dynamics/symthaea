@@ -23,6 +23,14 @@ The 85% figure is a result within the paper's own tasks and protocol. It is not 
 
 ## 3. AEPsych: maintained psychophysics framework
 
+[AEPsych's current documentation](https://aepsych.org/docs/introduction) describes a human-in-the-loop framework with flexible GP psychometric models, active-learning objectives and high-dimensional psychometric-field estimation. However, the current PyPI metadata lists version 0.8.0, released 11 April 2025. Therefore, treat the tagged package and the moving upstream GitHub branch as distinct comparator artifacts: pin both the package version and the exact source commit used, and report API/dependency differences. Do not assume that current documentation implies a recent PyPI release cadence.
+
+## 3A. Psyphy (Flatiron Institute): JAX/GPU Bayesian active learning
+
+[Psyphy](https://github.com/flatironinstitute/psyphy) is an open-source JAX framework for psychophysics, using GPU acceleration and approximate inference for Bayesian active-learning experiments. Its current focus is human color perception, with stated adaptation potential to other modalities. Its documentation includes examples on recovering Weber's law, Wishart psychophysical-process modeling and reproducing a 2025 study.
+
+Include Psyphy as a serious contemporary comparator on its supported color-perception / spatially varying psychophysical tasks. Pin its exact source commit, `uv.lock`, JAX/CUDA stack and data. Its GPU-oriented inference architecture makes it a useful compute/latency comparator against NEST, AEPsych and SPECTRA. Do not assume its present color-perception model or evaluation applies directly to UVSD parameter recovery.
+
 [AEPsych](https://aepsych.org/docs/introduction) is a psychophysics framework with flexible GP models, active-learning objectives, a benchmark suite, a client/server presentation architecture, and integrations for PsychToolbox/PsychoPy and BoTorch/GPyTorch.
 
 Its documentation describes applications with six or eight stimulus dimensions and positions its models as flexible alternatives to parametric procedures such as QUEST+ and psignifit.
@@ -34,7 +42,8 @@ Pin exact package release, model, acquisition function, inference method, config
 Include only on tasks where the method's assumptions and estimands apply:
 
 - NEST v0.9.1.
-- AEPsych with pinned model and acquisition function.
+- AEPsych 0.8.0 (PyPI package) and a separately pinned upstream source commit, with pinned model and acquisition function.
+- Psyphy with a pinned source commit, `uv.lock`, JAX version and CPU/GPU configuration.
 - QUEST+ and other parametric Bayesian threshold procedures.
 - Psi, Psi-marginal, Psi-grid and Psi-marg-grid.
 - ZEST and standard adaptive staircases.
@@ -113,7 +122,7 @@ Reproduce NEST's AUC-based measures using the same task definitions and integrat
 
 ## 8. Fairness, versioning and reproducibility
 
-- Pin NEST v0.9.1, exact AEPsych release, QUEST+/Psi implementation and all transitive dependencies.
+- Pin NEST v0.9.1, AEPsych 0.8.0 plus exact upstream commit, Psyphy source commit / `uv.lock` / JAX and CUDA configuration, QUEST+/Psi implementation and all transitive dependencies.
 - Give every comparator equal access to development data and comparable tuning budgets.
 - Do not use oracle parameters, test seeds or evaluator-only stress worlds in model selection or hyperparameter tuning.
 - Preserve numerical failures, convergence failures, timeouts and unsupported settings in denominators.
