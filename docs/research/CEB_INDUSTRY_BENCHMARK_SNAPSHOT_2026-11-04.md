@@ -297,3 +297,27 @@ Scale's HiL-Bench overview reports 300 tasks (150 software engineering, 150 text
 The overview reports highest combined ASK-F1 of 44% and combined Pass@3 of 24% (Claude Opus 4.6). The identities behind the ASK-F1 and blocker-recall maxima are not stated in the overview. These observations are stored separately; no system-level composite is constructed. The consolidated Muse Wonder 1.0 score of 79.67 ± 4.17 remains unlabeled. Source: https://labs.scale.com/leaderboard/hil
 
 The CEB-HUMAN lane now has 11 primary metrics, including independent question precision, blocker recall, ASK-F1 and help-enabled Pass@3. The numeric targets are prospective and require pilot calibration.
+
+
+## 2026-11-05 evidence-continuity benchmark update
+
+The official SWE-Milestone v1.0.2 benchmark is now a central contextual comparator for CEB's continuous-evolution work. It evaluates agents carrying real repositories through milestone DAGs in one unbroken session, and scores milestones using fail-to-pass progress and preservation of previously passing tests. Its ICML 2026 paper reports that performance above 80% on isolated tasks fell to at most 38% in continuous settings across 12 models and four agent frameworks. The live website's top listed GLM-5.3 + Claude Code row displays Resolve 29.75%, Precision 60.30% and Recall 75.07%; these board values have distinct aggregation and denominator caveats and are not directly comparable to CEB.
+
+CEB's intended research contribution is narrower and deeper: whether engineering claims remain valid over time, and whether the system can selectively retain, invalidate, supersede or revalidate their evidence. The formal CEB-CONTINUITY lane has seven metrics:
+- sequence-complete rate;
+- evidence-disposition macro-F1;
+- stale-evidence use rate;
+- false-invalidation rate;
+- revalidation cost per accepted sequence;
+- repair survival rate;
+- evidence-lineage completeness.
+
+Only sequence-complete rate currently has a related-but-distinct external mapping to SWE-Milestone Resolve. The other six are explicitly not comparable in the external crosswalk. No superiority claim is licensed.
+
+The CEB matrix now contains 14 lanes and 56 primary metrics. Its external-observation registry contains 17 external sources, 19 comparators and 41 atomic observations. The matrix remains design-only; no sequence tasks are admitted and no candidate performance is claimed.
+
+Sources:
+- SWE-Milestone v1.0.2: https://swe-milestone.com/
+- Deng et al., SWE-Milestone: Evaluating AI Agents on Continuous Software Evolution, ICML 2026: https://proceedings.mlr.press/v306/deng26d.html
+
+The SWE-Milestone site notes that wall-clock varies with agent prompts and API latency; retain its displayed efficiency values as contextual only until a matched measurement protocol is available.
