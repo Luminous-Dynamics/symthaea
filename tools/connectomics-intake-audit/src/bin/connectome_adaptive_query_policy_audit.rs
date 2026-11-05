@@ -241,6 +241,7 @@ struct SupportChallengeResult {
     fixed_status_after: String,
     fixed_effort_non_decreasing: bool,
     monotonicity_passed: bool,
+    attestation: AttestationSummary,
 }
 
 #[derive(Debug, Serialize)]
@@ -295,6 +296,11 @@ struct Report {
     scenario_challenge_count: usize,
     scenario_challenges: Vec<ScenarioExpansionResult>,
     hypothesis_expansion_monotonicity_passed: bool,
+    require_signed_attestations: bool,
+    support_challenges_authenticated: usize,
+    support_challenges_unauthenticated: usize,
+    scenario_challenges_authenticated: usize,
+    scenario_challenges_unauthenticated: usize,
     policy: Option<PolicyNode>,
     out_of_model_observation_disposition: &'static str,
     expected_cost_claim: &'static str,
