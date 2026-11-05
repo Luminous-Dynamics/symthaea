@@ -147,3 +147,61 @@ The current viewer exposes `pair_id`, `file_id`, `fact_index`, `language`, `hall
 Each row contains four aligned statements. A full evaluation records four model predictions per pair row, distinguishing statement language (English/target) from statement kind (factual/hallucinated). `pair_id` is the matched fact identifier; `file_id` is a provisional source-document cluster key that must be confirmed against the exact underlying release metadata before clustered inference.
 
 The current viewer shows four splits and 11.4k total rows, with 2.87k displayed in the selected isiZulu split; its file statistics list 127 `file_id` values. These are mutable viewer values, not a frozen versioned manifest. Pin the dataset revision and hash the exact files before using any row count as a benchmark denominator.
+
+
+## 8. New EMNLP 2026 African-language resources and industry-style comparator
+
+### 8.1 AfrIFact — end-to-end evidence-grounded fact checking
+
+[ AfrIFact (EMNLP 2026) ](https://aclanthology.org/2026.emnlp-main.133/) covers ten African languages and English, with an explicit pipeline for information retrieval, evidence extraction and fact checking. The authors report weak cross-lingual retrieval even for leading embedding models, and greater difficulty retrieving healthcare documents than cultural/news documents. Their reported few-shot prompting gain reaches 43% for AfriqueQwen-14B; task-specific fine-tuning improves fact-checking accuracy by up to 26%.
+
+This is the most important new companion to Multi-Hall-SA because it evaluates the **whole evidence chain**, not only detection of controlled statement perturbations. Exact language lists, South African language overlap, release revision, splits and license still require direct dataset admission.
+
+Execution: [AFR-FACT-001 / #10544](https://github.com/Luminous-Dynamics/symthaea/issues/10544).
+
+### 8.2 TukaBench — culturally grounded multilingual safety
+
+[TukaBench (EMNLP 2026)](https://aclanthology.org/2026.emnlp-main.692/) evaluates jailbreak robustness across seven African languages and distinguishes:
+- human-translated prompts;
+- prompts adapted to African contexts then translated;
+- locally authored culturally grounded prompts;
+- code-switched prompts.
+
+It labels responses Jailbroken, Refused and Deflected; the Deflected class helps separate unsafe compliance from language-comprehension failure. The paper also reports lower LLM-judge/human agreement in lower-resource languages and less commonly supported scripts. Prompt data is accessed separately from the code repository; exact language, dataset revision, access and license need admission review.
+
+Execution: [AFR-SAFE-001 / #10545](https://github.com/Luminous-Dynamics/symthaea/issues/10545).
+
+Safety is a distinct evaluation dimension. Do not combine jailbreak/refusal results with factuality, evidence support or confidence scores. A system that refuses everything is not a safe/helpful winner.
+
+### 8.3 MzansiBench: clarify its coverage and maturity
+
+The UCT project page describes 13 tasks across 16 datasets spanning all 11 South African official written languages; it includes zero-/few-shot prompting via LM Evaluation Harness and a separate encoder fine-tuning pipeline. The project reports eight fine-tuning datasets tested end-to-end and prompt-based AfroBench result reproduction under a matched setup.
+
+- Main project: https://projects.cs.uct.ac.za/honsproj/cgi-bin/view/2026/karriem_vondoorze.zip/index.html
+- UCT showcase: https://showcase.sit.uct.ac.za/event/showcase-2026/mzansibench-36
+
+Coverage is dataset/pipeline-dependent, not a complete 13-task × 11-language Cartesian product. Treat it as a valuable South African evaluation and integration project, with an external implementation review before depending on its leaderboard outputs.
+
+### 8.4 DataLens Africa: useful market context, not a gold SOTA scoreboard
+
+The [DataLens Africa LLM Leaderboard](https://www.datalens.africa/llm-leaderboard) shows four benchmark columns—AfriMCQA, AfriMMLU, MasakhaNEWS and AfriMedQA—and publishes a Version 1.5 snapshot last updated 16 October 2026. The displayed ranking lists Gemini 3.8 Flash at 85.32% overall and GPT-6.1 Sol at 81.56%, among other provider-labelled systems.
+
+Treat this as **secondary industry-style context only**. The page says it ranks models selected by the publisher and that the four displayed benchmarks form one of seven evaluation dimensions; the open page does not expose enough of the exact prompts, revisions, scoring code, inference settings and independent replication protocol to establish a definitive SOTA result. We should:
+- reproduce its benchmark slices where source data and licensing permit;
+- compare exact model identities and dated API versions;
+- publish matched cost/token/latency and per-language metrics;
+- never treat the leaderboard's pooled score as an independent scientific benchmark result.
+
+### 8.5 Current evaluation portfolio
+
+| Lane | Core evaluation question | Reference |
+|---|---|---|
+| Controlled hallucination detection | Can the system detect temporal, entity, numerical and location errors across aligned languages? | Multi-Hall-SA |
+| Evidence retrieval and verification | Can it find, localize and correctly interpret supporting/contradicting evidence? | AfrIFact |
+| Scientific knowledge and truthfulness | Can it answer scientific questions safely in low-resource languages? | Uhura |
+| Broad South African task coverage | Which languages and tasks work, and where are data/quality gaps? | MzansiBench, AFROBENCH |
+| Safety and comprehension parity | Does it avoid harmful compliance without mistaking incomprehension for refusal? | TukaBench |
+| Local small-model comparison | What is achievable with locally focused small models and corpora? | MzansiLM |
+| Cultural/narrative interpretation | Can it preserve source context, event structure and multiple valid interpretations? | NarraBench, LitVISTA, LitBench |
+
+Do not create one pooled “African intelligence score”. Keep task constructs, source lineage, language, annotation origin and license visible. The portfolio is intentionally multi-dimensional: factuality, evidence quality, task competence, safety, cultural interpretation and efficiency are separate capabilities.
