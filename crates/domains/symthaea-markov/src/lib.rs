@@ -13,8 +13,9 @@
 //! absorption).
 //!
 //! ## Contents
-//! - [`chain::MarkovChain`] — validated transition matrix, n-step and
-//!   stationary distributions
+//! - [`distribution::FiniteDistribution`] — validated finite probability vectors
+//! - [`chain::MarkovChain`] — validated transition matrix, typed fallible
+//!   propagation, n-step and stationary distributions
 //! - [`absorbing`] — absorbing-chain analysis: expected steps to absorption and
 //!   absorption probabilities, via the fundamental matrix N = (I − Q)⁻¹
 //!
