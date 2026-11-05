@@ -1,0 +1,55 @@
+name: Connectome joint observation support and robust disambiguation
+
+on:
+  pull_request:
+    paths:
+      - "tools/connectomics-intake-audit/src/bin/connectome_joint_support_audit.rs"
+      - "tools/connectomics-intake-audit/reference/verify_joint_support_oracle.py"
+      - "docs/neuroscience/CONNECTOME_JOINT_OBSERVATION_SUPPORT.schema.json"
+      - "docs/neuroscience/CONNECTOME_JOINT_OBSERVATION_SUPPORT_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_JOINT_SUPPORT_*.example.json"
+      - ".github/workflows/connectome-joint-observation-support.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "tools/connectomics-intake-audit/src/bin/connectome_joint_support_audit.rs"
+      - "tools/connectomics-intake-audit/reference/verify_joint_support_oracle.py"
+      - "docs/neuroscience/CONNECTOME_JOINT_OBSERVATION_SUPPORT.schema.json"
+      - "docs/neuroscience/CONNECTOME_JOINT_OBSERVATION_SUPPORT_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_JOINT_SUPPORT_*.example.json"
+      - ".github/workflows/connectome-joint-observation-support.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-joint-support-disambiguation:
+    name: Exact joint projection planner and independent oracle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Check joint-support tool formatting
+        run: rustfmt --edition 2024 --check tools/connectomics-intake-audit/src/bin/connectome_joint_support_audit.rs
+      - name: Run strict Clippy for joint-support tool
+        run: cargo clippy --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_joint_support_audit -- -D warnings
+      - name: Run Rust joint-support unit tests
+        run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_joint_support_audit
+      - name: Evaluate XOR complementarity fixture
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_joint_support_audit -- --input docs/neuroscience/examples/CONNECTOME_JOINT_SUPPORT_XOR.example.json --output "$RUNNER_TEMP/joint-xor.json"
+          python3 tools/connectomics-intake-audit/reference/verify_joint_support_oracle.py --input docs/neuroscience/examples/CONNECTOME_JOINT_SUPPORT_XOR.example.json --report "$RUNNER_TEMP/joint-xor.json"
+      - name: Evaluate add-only support cost-increase fixture
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_joint_support_audit -- --input docs/neuroscience/examples/CONNECTOME_JOINT_SUPPORT_COST_INCREASE.example.json --output "$RUNNER_TEMP/joint-cost-increase.json"
+          python3 tools/connectomics-intake-audit/reference/verify_joint_support_oracle.py --input docs/neuroscience/examples/CONNECTOME_JOINT_SUPPORT_COST_INCREASE.example.json --report "$RUNNER_TEMP/joint-cost-increase.json"
+      - name: Evaluate shared-full-tuple negative control
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_joint_support_audit -- --input docs/neuroscience/examples/CONNECTOME_JOINT_SUPPORT_SHARED_TUPLE.example.json --output "$RUNNER_TEMP/joint-shared-tuple.json"
+          python3 tools/connectomics-intake-audit/reference/verify_joint_support_oracle.py --input docs/neuroscience/examples/CONNECTOME_JOINT_SUPPORT_SHARED_TUPLE.example.json --report "$RUNNER_TEMP/joint-shared-tuple.json"
+      - name: Verify independent oracle syntax
+        run: python3 -m py_compile tools/connectomics-intake-audit/reference/verify_joint_support_oracle.py
