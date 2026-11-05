@@ -213,6 +213,9 @@ pub fn bound_scenario_scores(
     if config.replications_per_cell < 2 {
         return Err(ScoreBoundsError::TooFewReplications);
     }
+    if config.replications_per_cell - 1 > u32::MAX as usize {
+        return Err(ScoreBoundsError::ReplicationIndexOutOfRange);
+    }
     if config.score_contract_digest.trim().is_empty() {
         return Err(ScoreBoundsError::MissingScoreContractDigest);
     }
@@ -442,8 +445,7 @@ mod tests {
         aggregate_scenario_assessments, RobustUtility, ScenarioDefinition,
     };
     use super::super::sequential::{
-        CandidateAssessment, OperationalAction, PolicyHistory, SequentialPolicyConfig,
-        StimulusClass,
+        OperationalAction, PolicyHistory, SequentialPolicyConfig, StimulusClass,
     };
     use std::collections::BTreeMap;
 
@@ -536,7 +538,7 @@ mod tests {
     }
 
     #[test]
-    fn computes_one_sided_hoeﬀding_reference_bounds() {
+    fn computes_one_sided_hoeffding_reference_bounds() {
         let action_set = actions();
         let scenario_set = ScenarioSet::new(
             vec![ScenarioDefinition { scenario_id: 1, weight: 1.0 }],
@@ -648,10 +650,11 @@ mod tests {
             Err(ScoreBoundsError::IncompleteReplicationGrid)
         );
 
-        let duplicate = vec![valid[0], valid[0]];
+        let mut duplicate = valid.clone();
+        duplicate[1] = duplicate[0];
         assert_eq!(
             bound_scenario_scores(&action_set, &scenario_set, &duplicate, &config(4)),
-            Err(ScoreBoundsError::IncompleteReplicationGrid)
+            Err(ScoreBoundsError::DuplicateReplication)
         );
 
         let mut unknown = valid.clone();
