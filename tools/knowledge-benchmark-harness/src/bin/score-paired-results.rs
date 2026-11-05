@@ -335,10 +335,10 @@ fn macro_f1(pairs: &[PairCase], observations: &[&Observation]) -> f64 {
         for (pair, observation) in pairs.iter().zip(observations.iter()) {
             let expected = pair.expected_relation.as_str();
             let observed = observation.observed_relation.as_str();
-            if expected == label.as_str() && observed == label.as_str() {
+            if expected == label && observed == label {
                 true_positive += 1;
             } else {
-                if expected != label.as_str() && observed == label.as_str() {
+                if expected != label && observed == label {
                     false_positive += 1;
                 }
                 if expected == label && observed != label {
@@ -777,10 +777,10 @@ fn metric_for_sample(
                 for &index in sample_indices {
                     let expected = pairs[index].expected_relation.as_str();
                     let observed = observation_for(index)?.observed_relation.as_str();
-                    if expected == label.as_str() && observed == label.as_str() {
+                    if expected == label && observed == label {
                         true_positive += 1;
                     } else {
-                        if expected != label.as_str() && observed == label.as_str() {
+                        if expected != label && observed == label {
                             false_positive += 1;
                         }
                         if expected == label && observed != label {
@@ -988,6 +988,7 @@ fn compute_pairwise_comparisons(
             confidence_interval_high,
             confidence_level: plan.bootstrap.confidence_level,
             source_family_cluster_count: clusters.len(),
+            minimum_independent_clusters: plan.bootstrap.minimum_independent_clusters,
             bootstrap_replicates: plan.bootstrap.replicates,
             bootstrap_seed: plan.bootstrap.seed,
             multiple_comparison_correction: plan.bootstrap.multiple_comparison_correction.clone(),
