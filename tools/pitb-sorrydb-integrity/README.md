@@ -6,7 +6,7 @@ A standalone Rust validator for frozen SorryDB datasets and exact per-task repro
 
 SorryDB is a live benchmark of open proof obligations taken from real Lean repositories. Its task identity includes the upstream repository, branch, commit, Lean version, source path and coordinates. A repository change can alter a task's meaning or available context even when the local theorem text does not change. PITB therefore treats the benchmark snapshot and the source checkout as part of the task—not as incidental metadata.
 
-SorryDB's paper reports a 1,000-task evaluation snapshot drawn from 78 real-world projects. The official paper reports that approaches are complementary; its public results include a combined 35.7% result and a 30.3% single agentic result on that evaluation slice. These results are not directly comparable to isolated theorem benchmarks or formalization benchmarks; model, scaffold, source access, resource budgets and stopping policy matter. The evaluation split is clustered (78 repositories, 339 repository/file pairs, with up to 21 tasks per repository and 20 per file), so paired model comparisons should use repository/file-clustered resampling rather than treating all 1,000 task rows as IID.
+SorryDB's paper reports a 1,000-task evaluation snapshot drawn from 78 real-world projects. The official paper reports that approaches are complementary; its public results include a combined 35.7% result and a 30.3% single agentic result on that evaluation slice. These results are not directly comparable to isolated theorem benchmarks or formalization benchmarks; model, scaffold, source access, resource budgets and stopping policy matter. The evaluation split is clustered (78 repositories, 107 repository/commit pairs and 339 repository/file pairs, with up to 21 tasks per repository and 20 per file). All 78 repositories from the full snapshot appear in the evaluation slice: this is a task-level held-out split, **not** a project-disjoint generalization test. Paired model comparisons should use repository and repository/file-clustered resampling rather than treating all 1,000 task rows as IID.
 
 ## Frozen SorryDB-2601 identities
 
@@ -27,6 +27,8 @@ The checked-in provenance manifest pins:
 
 The data files are not duplicated in this crate. Supply the exact upstream JSON files when running the validator; it recomputes Git blob IDs with `git hash-object --stdin` and rejects mismatched bytes. The pinned blob contains 5,663 records even though the README says 2,601; the report records this documentation drift explicitly rather than silently changing either value. The manifest is an identity record, not a claim that the tasks were reproduced.
 
+The validator also recomputes each SorryDB task ID. The upstream Python `Sorry.__post_init__` hashes a sorted, ASCII-escaped `json.dumps` representation containing repository identity, source coordinates, debug goal/URL, `blame_email_hash` and `blame_date`; it intentionally excludes `inclusion_date`. PITB reproduces that serialization byte-for-byte and checks every ID in both files.
+
 ## Run
 
 ```sh
@@ -34,6 +36,15 @@ cargo fmt --check --manifest-path tools/pitb-sorrydb-integrity/Cargo.toml
 cargo test --locked --manifest-path tools/pitb-sorrydb-integrity/Cargo.toml
 cargo run --locked --manifest-path tools/pitb-sorrydb-integrity/Cargo.toml -- --self-test
 
+# Audit the real pinned dataset and split without claiming task reproduction:
+cargo run --locked --manifest-path tools/pitb-sorrydb-integrity/Cargo.toml -- \
+  --audit-snapshot \
+  /data/SorryDB_2601.json \
+  /data/SorryDB_2601_1000_evaluation_split.json \
+  tools/pitb-sorrydb-integrity/fixtures/sorrydb-2601-provenance.json \
+  /reports/sorrydb-snapshot-integrity-report.json
+
+# Add one separately authenticated reproduction receipt per evaluation task:
 cargo run --locked --manifest-path tools/pitb-sorrydb-integrity/Cargo.toml -- \
   --verify \
   /data/SorryDB_2601.json \
