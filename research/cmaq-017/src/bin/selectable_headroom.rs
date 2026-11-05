@@ -160,7 +160,7 @@ fn evaluate_condition(
     let naive_best_estimate = naive_best_total / denominator;
     let heldout_selected_value = heldout_total / denominator;
     let selected_candidate_true_value = selected_true_total / denominator;
-    
+
     let captured_headroom = selected_candidate_true_value - BASELINE_VALUE;
 
     ConditionResult {
