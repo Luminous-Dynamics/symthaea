@@ -507,6 +507,21 @@ pub struct CreditCallReestablishmentDeadline {
     pub deadline_day_ordinal: i32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CreditCoverProviderReplacementDeadline {
+    pub deadline_day_ordinal: i32,
+    /// §15.10.3(5) expressly excludes the ten-day replacement period from
+    /// the Settlement Risk Period.
+    pub excluded_from_settlement_risk_period: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CreditCoverChangeNoticeTimeliness {
+    OnTime,
+    Late,
+    Missing,
+}
+
 /// Reserve-capacity categories with separate payment clauses in Code §§9.8.4–9.8.7.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReserveCapacityPaymentProduct {
@@ -1227,6 +1242,80 @@ pub fn calculate_credit_call_reestablishment_deadline(
     Ok(CreditCallReestablishmentDeadline {
         deadline_day_ordinal: due_day,
     })
+}
+
+/// Resolve the §15.10.3(5) ten-Business-Day period to replace a Credit Cover
+/// Provider that has ceased to qualify. Count begins with the first Business Day
+/// strictly after the cessation date, including when cessation occurs on a
+/// weekend or public holiday.
+pub fn calculate_credit_cover_provider_replacement_deadline(
+    provider_cessation_day_ordinal: i32,
+    business_calendar: BusinessDayCalendarEvidence<'_>,
+) -> Result<CreditCoverProviderReplacementDeadline, CreditCoverCalendarError> {
+    validate_calendar_days(
+        business_calendar.business_day_ordinals,
+        business_calendar.complete_through_day,
+        business_calendar.source_digest,
+    )?;
+    if provider_cessation_day_ordinal > business_calendar.complete_through_day {
+        return Err(CreditCoverCalendarError::DayOutsideCalendarCoverage);
+    }
+    let mut count = 0_u8;
+    for day in business_calendar
+        .business_day_ordinals
+        .iter()
+        .copied()
+        .filter(|day| *day > provider_cessation_day_ordinal)
+    {
+        count += 1;
+        if count == 10 {
+            return Ok(CreditCoverProviderReplacementDeadline {
+                deadline_day_ordinal: day,
+                excluded_from_settlement_risk_period: true,
+            });
+        }
+    }
+    Err(CreditCoverCalendarError::InsufficientFutureCalendarCoverage)
+}
+
+/// Check the §15.10.7(d) requirement to notify the MO at least one Business Day
+/// before a change to Posted Credit Cover. The notification day counts as the
+/// one advance Business Day when the change takes effect on the following day.
+pub fn assess_credit_cover_change_notice_timeliness(
+    notification_day_ordinal: Option<i32>,
+    change_day_ordinal: i32,
+    business_calendar: BusinessDayCalendarEvidence<'_>,
+) -> Result<CreditCoverChangeNoticeTimeliness, CreditCoverCalendarError> {
+    validate_calendar_days(
+        business_calendar.business_day_ordinals,
+        business_calendar.complete_through_day,
+        business_calendar.source_digest,
+    )?;
+    if change_day_ordinal > business_calendar.complete_through_day {
+        return Err(CreditCoverCalendarError::DayOutsideCalendarCoverage);
+    }
+    let Some(notification_day) = notification_day_ordinal else {
+        return Ok(CreditCoverChangeNoticeTimeliness::Missing);
+    };
+    if !business_calendar
+        .business_day_ordinals
+        .contains(&notification_day)
+    {
+        return Err(CreditCoverCalendarError::RequiredDayIsNotBusinessDay);
+    }
+    if notification_day >= change_day_ordinal {
+        return Ok(CreditCoverChangeNoticeTimeliness::Late);
+    }
+    let advance_business_days = business_calendar
+        .business_day_ordinals
+        .iter()
+        .filter(|day| **day >= notification_day && **day < change_day_ordinal)
+        .count();
+    if advance_business_days >= 1 {
+        Ok(CreditCoverChangeNoticeTimeliness::OnTime)
+    } else {
+        Ok(CreditCoverChangeNoticeTimeliness::Late)
+    }
 }
 
 /// Calculate the product-specific reserve-capacity payment formula in Code §§9.8.4–9.8.7.
@@ -2737,6 +2826,52 @@ mod tests {
                 // Day 13 is not a Business Day; 15 and 16 are the next two.
                 deadline_day_ordinal: 16
             }
+        );
+    }
+
+    #[test]
+    fn provider_replacement_deadline_is_ten_business_days_after_cessation() {
+        let calendar = BusinessDayCalendarEvidence {
+            business_day_ordinals: &[10, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27],
+            complete_through_day: 27,
+            source_digest: "sha256:provider-replacement-calendar",
+        };
+        assert_eq!(
+            calculate_credit_cover_provider_replacement_deadline(10, calendar),
+            Ok(CreditCoverProviderReplacementDeadline {
+                // Ten eligible days after day 10: 11, 12, 14, 15, 16, 17, 18, 19, 20, 21.
+                deadline_day_ordinal: 21,
+                excluded_from_settlement_risk_period: true,
+            })
+        );
+        assert_eq!(
+            calculate_credit_cover_provider_replacement_deadline(13, calendar),
+            Ok(CreditCoverProviderReplacementDeadline {
+                // Cessation on a non-Business Day: 15 is day one, 27 is day ten.
+                deadline_day_ordinal: 27,
+                excluded_from_settlement_risk_period: true,
+            })
+        );
+    }
+
+    #[test]
+    fn change_to_posted_cover_requires_one_business_day_advance_notice() {
+        let calendar = business_calendar_for_test();
+        assert_eq!(
+            assess_credit_cover_change_notice_timeliness(Some(10), 11, calendar),
+            Ok(CreditCoverChangeNoticeTimeliness::OnTime)
+        );
+        assert_eq!(
+            assess_credit_cover_change_notice_timeliness(Some(10), 10, calendar),
+            Ok(CreditCoverChangeNoticeTimeliness::Late)
+        );
+        assert_eq!(
+            assess_credit_cover_change_notice_timeliness(None, 11, calendar),
+            Ok(CreditCoverChangeNoticeTimeliness::Missing)
+        );
+        assert_eq!(
+            assess_credit_cover_change_notice_timeliness(Some(13), 14, calendar),
+            Err(CreditCoverCalendarError::RequiredDayIsNotBusinessDay)
         );
     }
 
