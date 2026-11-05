@@ -81,8 +81,9 @@ The production integration must reuse MEL-013A: resolve Studio-owned artifacts, 
 
 The standalone example writes:
 
-- a trial CSV for six policies across 160 fixtures (960 policy trials);
-- a four-condition reciprocal CSV for 160 rule-based-agent / responsive-partner simulator trials;
+- a trial summary CSV for six policies across 160 fixtures (960 policy trials);
+- a four-condition reciprocal summary for 160 rule-based-agent / responsive-partner simulator trials;
+- a **4,480-row condition-level event CSV**, with four rows for every policy and reciprocal trial. Each row binds task/session/seed, registered condition order, input/output event IDs, initial/target/unrelated feature values, action value/mechanism, both directional contrasts, and reciprocal outcome where applicable;
 - per-dimension descriptive agent and partner summaries;
 - an artifact-digest CSV with **17,920 rows** for the synthetic records;
 - eleven negotiation rows and seven authority-scope outcomes.
