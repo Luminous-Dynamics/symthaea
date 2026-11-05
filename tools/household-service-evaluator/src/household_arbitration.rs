@@ -650,6 +650,7 @@ pub struct ArbitrationScenario {
 pub struct ArbitrationManifest {
     pub schema_version: String,
     pub corpus_id: String,
+    pub profile: String,
     pub owner_issue: u64,
     pub execution_issue: u64,
     pub evidence_class: String,
@@ -682,6 +683,7 @@ pub fn validate_arbitration_manifest(
         .map_err(|error| invalid("arbitration_manifest", error.to_string()))?;
     if manifest.schema_version != "0.1.0"
         || manifest.corpus_id != "HOUSEHOLD-RESOURCE-ARBITRATION-001"
+        || manifest.profile != "household-resource-arbitration-contract-v0.1"
         || manifest.evidence_class != "synthetic_benchmark_design_only"
         || manifest.fixture_status != "proposed_not_executed"
     {
