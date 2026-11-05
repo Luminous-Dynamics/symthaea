@@ -11,6 +11,7 @@ use std::fmt;
 pub mod credit_cover;
 pub mod liquidity_options;
 pub mod liquidity_stress;
+pub mod liquidity_waterfall;
 
 const EPSILON: f64 = 1.0e-9;
 
